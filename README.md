@@ -1,2 +1,2 @@
 # arcade
-Interactive Science Platform
+Interactive Science Platform for ALMA processing
