@@ -1,4 +1,6 @@
-# The arcade web socket proxy to desktop sessions
+# arcade-wsproxy
+
+This is an httpd container that proxies websocket connections to arcade-desktop
 
 ## building
 
