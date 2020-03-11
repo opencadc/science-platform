@@ -1,0 +1,41 @@
+FROM centos:6
+
+# xterm dependency is an extra to get the casa shell in the display
+# perl was added for casa later than 5
+
+RUN yum install -y freetype libSM libXi libXrender libXrandr \
+	libXfixes libXcursor libXinerama fontconfig \
+        libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
+	tkinter ImageMagick-c++ xterm perl
+
+
+# setup all required env variables
+ARG VERSION
+ENV VERSION=${VERSION}
+ENV RELEASE=casa-release-${VERSION}
+ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
+
+# untar casa databundle to container
+ADD ${RELEASE}.tar.gz /opt/
+
+# chown because the untarred casa has wrong owner/group
+RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
+
+# create the guest account
+#RUN groupadd -g 1001 guest
+#RUN useradd -m -g guest -u 1001 guest && \
+#    mkdir -p /home/guest/.ssl && \
+#    chown -R guest:guest /home/guest/.ssl
+#ENV HOME /home/guest
+#ENV USER guest
+
+# copy empty casa configs to avoid upgrade
+#ADD casa /home/guest/.casa
+
+#WORKDIR /home/guest
+
+RUN yum install -y sssd-client acl
+
+ADD nsswitch.conf /etc/
+
+CMD ["xterm", "-e", "casa"]
