@@ -1,4 +1,6 @@
-# The arcade REST API in a tomcat container instance
+# arcade
+
+arcade is a Java servlet implementation offering a REST API to all arcade functionality.
 
 ## building
 
