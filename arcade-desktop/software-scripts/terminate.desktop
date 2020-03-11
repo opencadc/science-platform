@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=terminate
+Comment=Terminate your Arcade session
+Keywords=terminate
+Exec=/usr/local/bin/terminate.sh
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/ban.svg.png
+Type=Application
+Categories=CANFAR;
