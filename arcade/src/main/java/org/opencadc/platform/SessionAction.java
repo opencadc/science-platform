@@ -74,6 +74,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -92,11 +93,15 @@ import java.util.UUID;
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
+import org.opencadc.gms.GroupClient;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.gms.GroupUtil;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpDownload;
+import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.MultiValuedProperties;
@@ -145,6 +150,24 @@ public abstract class SessionAction extends RestAction {
             throw new AccessControlException("No HTTP Principal");
         }
         userID = httpPrincipals.iterator().next().getName();
+        
+        // ensure user is a part of the arcade group
+        String arcadeGroup = super.initParams.get("arcade-users-group");
+        if (arcadeGroup == null) {
+            throw new IllegalStateException("No arcade-users-group defined in web.xml");
+        }
+        LocalAuthority localAuthority = new LocalAuthority();
+        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
+        GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
+        GroupURI membershipGroup = new GroupURI(arcadeGroup);
+        try {
+            CredUtil.checkCredentials();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        if (!gmsClient.isMember(membershipGroup)) {
+            throw new AccessControlException("Not authorized to use the ARCADE system");
+        }
         
         String path = syncInput.getPath();
         log.debug("request path: " + path);
