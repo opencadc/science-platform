@@ -53,6 +53,10 @@
              <param-value>org.opencadc.platform.kubernetes.K8SDelete</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerDelete</param-value> -->
          </init-param>
+         <init-param>
+             <param-name>arcade-users-group</param-name>
+             <param-value>ivo://cadc.nrc.ca/gms?ARCADE-Users</param-value>
+         </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
 
