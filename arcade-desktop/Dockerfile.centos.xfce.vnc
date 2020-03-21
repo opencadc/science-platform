@@ -34,7 +34,7 @@ WORKDIR $HOME
 
 ### Add all install scripts for further steps
 ADD ./src/common/install/ $INST_SCRIPTS/
-ADD ./src/centos/install/ $INST_SCRIPTS/
+COPY ./src/centos/install/ $INST_SCRIPTS/
 RUN find $INST_SCRIPTS -name '*.sh' -exec chmod a+x {} +
 
 ### Install some common tools
@@ -44,6 +44,11 @@ ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 ### Install xvnc-server & noVNC - HTML5 based VNC viewer
 RUN $INST_SCRIPTS/tigervnc.sh
 RUN $INST_SCRIPTS/no_vnc.sh
+
+## BM: Add custom vnc shell and css
+ADD ./conf/vnc_custom.html $NO_VNC_HOME/
+ADD ./conf/base_custom.css $NO_VNC_HOME/app/styles/
+ADD ./conf/arcade-logo.png $NO_VNC_HOME/app/images/.
 
 ### Install firefox and chrome browser
 #RUN $INST_SCRIPTS/firefox.sh
@@ -83,6 +88,7 @@ RUN yum install -y libcurl-openssl-7.33.0-1.1.el7.cern.x86_64.rpm
 RUN yum install -y curl-openssl-7.33.0-1.1.el7.cern.x86_64.rpm
 
 RUN yum install -y sssd-client acl
+RUN yum install -y mailcap
 
 ENV LD_LIBRARY_PATH /opt/shibboleth/lib64
 

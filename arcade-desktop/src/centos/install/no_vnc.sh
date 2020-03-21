@@ -3,10 +3,6 @@
 set -e
 set -u
 
-echo "Install noVNC dependencies"
-yum -y install numpy #used for websockify/novnc
-yum clean all
-
 echo "Install noVNC - HTML5 based VNC viewer"
 mkdir -p $NO_VNC_HOME/utils/websockify
 wget -qO- https://github.com/novnc/noVNC/archive/v1.0.0.tar.gz | tar xz --strip 1 -C $NO_VNC_HOME
@@ -14,4 +10,8 @@ wget -qO- https://github.com/novnc/noVNC/archive/v1.0.0.tar.gz | tar xz --strip 
 wget -qO- https://github.com/novnc/websockify/archive/v0.6.1.tar.gz | tar xz --strip 1 -C $NO_VNC_HOME/utils/websockify
 chmod +x -v $NO_VNC_HOME/utils/*.sh
 ## create index.html to forward automatically to `vnc_lite.html`
-ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
+#ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
+## BM: link to the full version instead of 'lite'
+#ln -s $NO_VNC_HOME/vnc.html $NO_VNC_HOME/index.html
+## BM: link to a custom version (lite + control panel)
+ln -s $NO_VNC_HOME/vnc_custom.html $NO_VNC_HOME/index.html
