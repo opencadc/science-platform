@@ -47,8 +47,11 @@ RUN $INST_SCRIPTS/no_vnc.sh
 
 ## BM: Add custom vnc shell and css
 ADD ./conf/vnc_custom.html $NO_VNC_HOME/
+ADD ./conf/ui_custom.js $NO_VNC_HOME/app/
 ADD ./conf/base_custom.css $NO_VNC_HOME/app/styles/
-ADD ./conf/arcade-logo.png $NO_VNC_HOME/app/images/.
+ADD ./conf/arcade-logo.png $NO_VNC_HOME/app/images/
+ADD ./conf/canfar-logo.png $NO_VNC_HOME/app/images/
+ADD ./conf/canfar-icon.png $NO_VNC_HOME/app/images/icons/
 
 ### Install firefox and chrome browser
 #RUN $INST_SCRIPTS/firefox.sh
