@@ -232,8 +232,13 @@ public abstract class SessionAction extends RestAction {
     }
     
     public String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
-        return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
-            "path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
+        // vnc_light.html accepts title and resize
+        //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
+        //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
+        
+        // vnc.html does not...
+        return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?password=" + sessionID +
+            "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
