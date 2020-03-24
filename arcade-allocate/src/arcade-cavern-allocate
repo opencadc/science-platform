@@ -2,6 +2,9 @@
 
 set -e
 
+### Give the SSSD container time to initialize
+sleep 10
+
 SELF=arcade-cavern-allocate
 CONFDIR=/config
 
@@ -73,6 +76,7 @@ echo " Done"
 echo -n "  Adding home dir config files..."
 cp $BASHRC $HOMEDIR/.bashrc
 cp $XRESOURCES $HOMEDIR/.Xresources
+# xrdb is run on .Xresources later to load the config
 echo " Done"
 
 echo -n "  Creating home .ssl directory ..."
