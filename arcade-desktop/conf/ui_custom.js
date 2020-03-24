@@ -1616,7 +1616,7 @@ var UI = {
         UI.desktopName = e.detail.name;
         // Display the desktop name in the document title
         // BM: custom title
-        document.title = e.detail.name + " - ARCADE";
+        document.title = "ARCADE";
     },
 
     bell: function(e) {

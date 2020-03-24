@@ -116,6 +116,10 @@ xset s off
 xset dpms 0 0 0
 xset -dpms s off
 
+# BM: reload xterm config
+echo "reloading xtermconfig for $arcade_username"
+xrdb /cavern/home/$arcade_username/.Xresources
+
 if [[ $DEBUG == true ]] || [[ $1 =~ -t|--tail-log ]]; then
     echo -e "\n------------------ $HOME/.vnc/*$DISPLAY.log ------------------"
     # if option `-t` or `--tail-log` block the execution and tail the VNC log
