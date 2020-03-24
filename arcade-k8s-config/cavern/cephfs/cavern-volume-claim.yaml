@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cavern-ceph-claim
+  namespace: development
+  labels:
+    app: cavern-ceph-claim
+  finalizers:
+spec:
+  storageClassName: rook-cephfs
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 4500Gi

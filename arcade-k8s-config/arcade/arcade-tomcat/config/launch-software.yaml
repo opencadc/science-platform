@@ -1,0 +1,85 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "${software.jobname}"
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      #restartPolicy: Never
+      initContainers:
+      - name: init-sssd-dir
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - mkdir -p /var/lib/sss/pipes/private;
+          chmod 700 /var/lib/sss/pipes/private;
+        volumeMounts:
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+      containers:
+      - name: "${software.containername}"
+        args:
+        - ${software.containerparam}
+        env:
+        - name: HOME
+          value: "/cavern/home/${arcade.userid}"
+        - name: DISPLAY
+          value: "${software.targetip}"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        securityContext:
+          runAsUser: ${arcade.posixid}
+          runAsGroup: ${arcade.posixid}
+          allowPrivilegeEscalation: false
+        image: "${software.imageid}"
+        workingDir: "/cavern/home/${arcade.userid}"
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/cavern/home"
+          name: cavern-volume
+          subPath: "cavern/home"
+        - mountPath: "/cavern/projects"
+          name: cavern-volume
+          subPath: "cavern/projects"
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+      - name: cavern-sssd
+        image: canfar-registry.cloud.computecanada.ca/cadc-sssd:latest
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /etc/sssd/sssd.conf
+          subPath: sssd.conf
+          name: sssd-config-vol
+        - mountPath: /etc/openldap/certs/ca.crt
+          subPath: ca.crt
+          name: sssd-cert-config-vol
+        - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
+          subPath: cadc_CA_2029.crt
+          name: sssd-cert-config-vol
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: cavern-ceph-claim
+      - name: sssd-config-vol
+        configMap:
+          name: sssd-config
+          # defaultMode of 256 sets the permissions of the file
+          # to 0400 - needed by sssd
+          defaultMode: 256
+      - name: sssd-cert-config-vol
+        configMap:
+          name: sssd-cert-config
+      - name: sssd-dir
+        emptyDir: {}
