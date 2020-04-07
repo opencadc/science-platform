@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: arcade-wsproxy
+  name: arcade-wsproxy
+  namespace: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: arcade-wsproxy
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: arcade-wsproxy
+    spec:
+      containers:
+        - image: canfar-registry.cloud.computecanada.ca/arcade-wsproxy:latest
+          env:
+            - name: arcade.hostname
+              value: proto.canfar.net
+          imagePullPolicy: Always
+          #imagePullPolicy: IfNotPresent
+          name: arcade-wsproxy
+          ports:
+          - containerPort: 80
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /logs
+            name: log-dir
+            readOnly: false
+      volumes:
+      - name: log-dir
+        emptyDir: {}

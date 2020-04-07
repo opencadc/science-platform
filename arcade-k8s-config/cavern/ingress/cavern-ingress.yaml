@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cavern-ingress
+  namespace: development
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /cavern/$2
+spec:
+  rules:
+  - host: proto.canfar.net
+    http:
+      paths:
+      - path: /cavern(/|$)(.*)
+        backend:
+          serviceName: cavern-tomcat-svc
+          servicePort: 8080
