@@ -1,0 +1,34 @@
+#!/bin/bash
+
+set -e
+
+### Give the SSSD container time to initialize
+
+SELF=arcade-carta
+
+TS=$(date)
+echo "$TS $SELF START"
+
+if [ -z "$1" ]
+  then
+    echo "Usage: arcade-cavern-allocation <userid>"
+    exit 2
+fi
+USERID=$1
+
+echo -n "Starting carta..."
+/carta/CARTA-v1.3-remote/carta --folder=/cavern/home/$USERID --root=/cavern --port=5901 --fport=6901
+echo "Done"
+
+### Listen to the log file until the process ends
+sleep 1
+
+PID=$(pgrep -x 'carta_backend')
+echo "PID: $PID"
+
+LOGFILE=/carta/CARTA/log/arcade-carta.log
+
+tail --pid $PID -F $LOGFILE
+
+TS=$(date)
+echo "$TS $SELF DONE"
