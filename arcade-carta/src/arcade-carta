@@ -9,19 +9,20 @@ SELF=arcade-carta
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$1" ]
-  then
-    echo "Usage: arcade-cavern-allocation <userid>"
+if [ "$#" -ne 2 ]; then
+    echo "Usage: arcade-cavern-allocation <root> <folder>"
     exit 2
 fi
-USERID=$1
-
-echo -n "Starting carta..."
-/carta/CARTA-v1.3-remote/carta --folder=/cavern/home/$USERID --root=/cavern --port=5901 --fport=6901
+ROOT=$1
+FOLDER=$2
+echo "root: $ROOT"
+echo "folder: $FOLDER"
+echo "command: /carta/CARTA-v1.3-remote/carta --folder=$FOLDER --root=$ROOT --port=5901 --fport=6901"
+/carta/CARTA-v1.3-remote/carta --folder=$FOLDER --root=$ROOT --port=5901 --fport=6901
 echo "Done"
 
 ### Listen to the log file until the process ends
-sleep 1
+sleep 5
 
 PID=$(pgrep -x 'carta_backend')
 echo "PID: $PID"
