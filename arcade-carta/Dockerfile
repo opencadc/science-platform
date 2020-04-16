@@ -23,6 +23,9 @@ ADD src/arcade-carta /carta/
 RUN rm /carta/CARTA-v1.3-remote/carta
 ADD src/carta /carta/CARTA-v1.3-remote/
 
+# nsswitch for correct sss lookup
+ADD src/nsswitch.conf /etc/
+
 RUN chmod -R a+rwx /carta
 
 CMD ["/carta/arcade-carta"]
