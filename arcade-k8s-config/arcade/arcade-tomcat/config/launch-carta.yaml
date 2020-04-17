@@ -3,20 +3,20 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    canfar-net-sessionID: "${desktop.sessionid}"
-    canfar-net-sessionName: "${desktop.sessionname}"
-    canfar-net-type: carta
+    canfar-net-sessionID: "${arcade.sessionid}"
+    canfar-net-sessionName: "${arcade.sessionname}"
+    canfar-net-sessionType: "${arcade.sessiontype}"
     canfar-net-userid: "${arcade.userid}"
-  name: "${desktop.podname}"
+  name: "${arcade.podname}"
 spec:
   template:
     metadata:
       labels:
-        canfar-net-sessionID: "${desktop.sessionid}"
-        canfar-net-sessionName: "${desktop.sessionname}"
-        canfar-net-type: carta
+        canfar-net-sessionID: "${arcade.sessionid}"
+        canfar-net-sessionName: "${arcade.sessionname}"
+        canfar-net-sessionType: "${arcade.sessiontype}"
         canfar-net-userid: "${arcade.userid}"
-        job-name: "${desktop.podname}"
+        job-name: "${arcade.podname}"
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
@@ -31,7 +31,7 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: "${desktop.podname}"
+      - name: "${arcade.podname}"
         env:
         - name: arcade_hostname
           value: "${arcade.hostname}"
@@ -44,13 +44,16 @@ spec:
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - /carta/arcade-carta /cavern /cavern/projects
         ports:
         - containerPort: 5901
           protocol: TCP
-          name: vnc-port
+          name: websocket-port
         - containerPort: 6901
           protocol: TCP
-          name: novnc-port
+          name: frontend-port
         volumeMounts:
         - mountPath: "/cavern"
           name: cavern-volume

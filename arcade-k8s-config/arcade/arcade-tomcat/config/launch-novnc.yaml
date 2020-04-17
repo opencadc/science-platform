@@ -3,20 +3,20 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    canfar-net-sessionID: "${desktop.sessionid}"
-    canfar-net-sessionName: "${desktop.sessionname}"
-    canfar-net-type: vnc
+    canfar-net-sessionID: "${arcade.sessionid}"
+    canfar-net-sessionName: "${arcade.sessionname}"
+    canfar-net-sessionType: "${arcade.sessiontype}"
     canfar-net-userid: "${arcade.userid}"
-  name: "${desktop.podname}"
+  name: "${arcade.podname}"
 spec:
   template:
     metadata:
       labels:
-        canfar-net-sessionID: "${desktop.sessionid}"
-        canfar-net-sessionName: "${desktop.sessionname}"
-        canfar-net-type: vnc
+        canfar-net-sessionID: "${arcade.sessionid}"
+        canfar-net-sessionName: "${arcade.sessionname}"
+        canfar-net-sessionType: "${arcade.sessiontype}"
         canfar-net-userid: "${arcade.userid}"
-        job-name: "${desktop.podname}"
+        job-name: "${arcade.podname}"
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
@@ -31,10 +31,10 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: "${desktop.podname}"
+      - name: "${arcade.podname}"
         env:
         - name: VNC_PW
-          value: "${desktop.sessionid}"
+          value: "${arcade.sessionid}"
         - name: arcade_hostname
           value: "${arcade.hostname}"
         - name: arcade_username
