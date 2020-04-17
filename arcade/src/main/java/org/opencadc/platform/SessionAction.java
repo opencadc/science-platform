@@ -111,11 +111,14 @@ public abstract class SessionAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SessionAction.class);
     
-    protected static final String SESSION_REQUEST = "session";
-    protected static final String APP_REQUEST = "app";
+    protected static final String REQUEST_TYPE_SESSION = "session";
+    protected static final String REQUEST_TYPE_APP = "app";
+    
+    protected static final String SESSION_TYPE_DESKTOP = "desktop";
+    protected static final String SESSION_TYPE_CARTA = "carta";
     
     protected String userID;
-    protected String requestType;  // session or app
+    protected String requestType;
     protected String sessionID;
     protected String appID;
     protected String server;
@@ -171,7 +174,7 @@ public abstract class SessionAction extends RestAction {
         
         String path = syncInput.getPath();
         log.debug("request path: " + path);
-        requestType = SESSION_REQUEST;
+        requestType = REQUEST_TYPE_SESSION;
         
         if (path == null) {
             return;
@@ -182,7 +185,7 @@ public abstract class SessionAction extends RestAction {
             sessionID = parts[0];
         }
         if (parts.length > 1) {
-            requestType = APP_REQUEST;
+            requestType = REQUEST_TYPE_APP;
         }
         if (parts.length > 2) {
             appID = parts[2];
@@ -193,9 +196,10 @@ public abstract class SessionAction extends RestAction {
         log.debug("request type: " + requestType);
         log.debug("sessionID: " + sessionID);
         log.debug("appID: " + appID);
+        log.debug("userID: " + userID);
     }
     
-    protected String readStream(InputStream in) throws IOException {
+    protected static String readStream(InputStream in) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int nRead;
         byte[] data = new byte[1024];
@@ -205,7 +209,7 @@ public abstract class SessionAction extends RestAction {
         return buffer.toString("UTF-8");
     }
     
-    protected String execute(String[] command) throws IOException, InterruptedException {
+    protected static String execute(String[] command) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         int status = p.waitFor();
         log.debug("Status=" + status + " for command: " + Arrays.toString(command));
@@ -220,17 +224,6 @@ public abstract class SessionAction extends RestAction {
         return stdout.trim();
     }
     
-    protected void createUserMountSpace(String userid) throws Exception {
-        File scratch = new File("/home/" + userid);
-        if (!scratch.exists()) {
-            scratch.mkdir();
-        }
-        File home = new File("/scratch/" + userid);
-        if (!home.exists()) {
-            home.mkdir();
-        }
-    }
-    
     public String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
@@ -242,12 +235,11 @@ public abstract class SessionAction extends RestAction {
     }
     
     public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
-        // https://proto.canfar.net/carta/10.233.114.36/p00swqa2/?socketUrl=wss://proto.canfar.net/carta/10.233.114.36/p00swqa2/socket/
-        
-        return null;
+        return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
+            ipAddress + "/" + sessionID + "/socket/";
     }
     
-    protected void injectProxyCert(String baseHomeDir, final Subject subject, String useri  d, String posixID)
+    protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir

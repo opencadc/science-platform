@@ -67,35 +67,78 @@
 
 package org.opencadc.platform;
 
+import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.StringUtil;
+
+import java.security.AccessControlException;
+
 import org.apache.log4j.Logger;
 
 /**
  *
  * @author majorb
  */
-public abstract class DeleteAction extends SessionAction {
+public class DeleteAction extends SessionAction {
     
     private static final Logger log = Logger.getLogger(DeleteAction.class);
 
     public DeleteAction() {
         super();
     }
-    
-    public abstract void stopSession(String userID, String sessionID) throws Exception;
 
     @Override
     public void doAction() throws Exception {
         super.initRequest();
-        if (requestType.equals(SESSION_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
-                stopSession(userID, sessionID);
+                
+                String k8sNamespace = K8SUtil.getWorkloadNamespace();
+                String[] getSessionCMD = new String[] {
+                    "kubectl", "get", "--namespace", k8sNamespace, "pod",
+                    "--selector=canfar-net-sessionID=" + sessionID,
+                    "--no-headers=true",
+                    "-o", "custom-columns=" +
+                        "TYPE:.metadata.labels.canfar-net-sessionType," +
+                        "USERID:.metadata.labels.canfar-net-userid"};
+                        
+                String session = execute(getSessionCMD);
+                if (!StringUtil.hasText(session)) {
+                    throw new ResourceNotFoundException(sessionID);
+                }
+                String[] lines = session.split("\n");
+                if (lines.length != 1) {
+                    throw new IllegalStateException("found multiple sessions with id " + sessionID);
+                }
+                String[] parts = lines[0].split("\\s+");
+                String type = parts[0];
+                String sessionUserid = parts[1];
+                if (!userID.equals(sessionUserid)) {
+                    throw new AccessControlException("forbidden");
+                }   
+                
+                stopSession(userID, type, sessionID);
             }
             return;
         }
-        if (requestType.equals(APP_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_APP)) {
             throw new UnsupportedOperationException("App killing not supported.");
         }
+    }
+    
+    public void stopSession(String userID, String type, String sessionID) throws Exception {
+        // kill the session specified by sessionID
+        log.debug("Stopping VNC session");
+        
+        String podName = K8SUtil.getPodName(sessionID, type, userID);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        
+        String[] stopVNCCmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace,
+            "service/" + podName,
+            "job.batch/" + podName};
+        execute(stopVNCCmd);
+        
     }
 }

@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform.kubernetes;
+package org.opencadc.platform;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -81,8 +81,8 @@ public class K8SUtil {
         return System.getenv("arcade.namespace");
     }
     
-    public static String getPodName(String sessionID, String userID) {
-        return "arcade-desktop-" + userID + "-" + sessionID;
+    public static String getPodName(String sessionID, String type, String userID) {
+        return "arcade-" + type + "-" + userID + "-" + sessionID;
     }
     
     public static String getHomeDir() {
