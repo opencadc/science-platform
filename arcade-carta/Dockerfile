@@ -7,9 +7,14 @@ RUN yum install -y iproute lsof
 RUN mkdir /carta
 WORKDIR /carta
 ENV HOME /carta
+
+# Download CARTA
 ADD https://github.com/CARTAvis/carta-releases/releases/download/v1.3/CARTA-v1.3-remote.tgz /carta/
 RUN tar xf CARTA-v1.3-remote.tgz
 RUN rm CARTA-v1.3-remote.tgz
+# If iterating on builds, download the tar file to tmp and comment out above 3 lines and
+# uncomment the one below
+#ADD tmp/CARTA-v1.3-remote.tgz /carta/
 
 # arcade carta startup script
 ADD src/arcade-carta /carta/

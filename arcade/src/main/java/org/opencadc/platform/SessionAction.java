@@ -241,7 +241,13 @@ public abstract class SessionAction extends RestAction {
             "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
     }
     
-    protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
+    public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+        // https://proto.canfar.net/carta/10.233.114.36/p00swqa2/?socketUrl=wss://proto.canfar.net/carta/10.233.114.36/p00swqa2/socket/
+        
+        return null;
+    }
+    
+    protected void injectProxyCert(String baseHomeDir, final Subject subject, String useri  d, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir
