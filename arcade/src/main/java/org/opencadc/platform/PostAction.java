@@ -68,10 +68,17 @@
 package org.opencadc.platform;
 
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Set;
+
+import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
 
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
@@ -79,13 +86,25 @@ import ca.nrc.cadc.uws.server.RandomStringGenerator;
  *
  * @author majorb
  */
-public abstract class PostAction extends SessionAction {
+public class PostAction extends SessionAction {
     
     private static final Logger log = Logger.getLogger(PostAction.class);
     
-    public abstract void checkForExistingSession(String userID) throws Exception;
-    public abstract URL createSession(String sessionID, String name) throws Exception;
-    public abstract void attachSoftware(String software, List<String> params, String targetIP) throws Exception;
+    // variables replaced in kubernetes yaml config files for
+    // launching desktop sessions and launching software
+    // use in the form: ${var.name}
+    public static final String ARCADE_HOSTNAME = "arcade.hostname";
+    public static final String ARCADE_USERID = "arcade.userid";
+    public static final String ARCADE_POSIXID = "arcade.posixid";
+    public static final String ARCADE_SESSIONID = "arcade.sessionid";
+    public static final String ARCADE_SESSIONNAME = "arcade.sessionname";
+    public static final String ARCADE_SESSIONTYPE = "arcade.sessiontype";
+    public static final String ARCADE_PODNAME = "arcade.podname";
+    public static final String SOFTWARE_JOBNAME = "software.jobname";
+    public static final String SOFTWARE_CONTAINERNAME = "software.containername";
+    public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
+    public static final String SOFTWARE_TARGETIP = "software.targetip";
+    public static final String SOFTWARE_IMAGEID = "software.imageid";
 
     public PostAction() {
         super();
@@ -95,25 +114,29 @@ public abstract class PostAction extends SessionAction {
     public void doAction() throws Exception {
         
         super.initRequest();
-        createUserMountSpace(userID);
         
-        if (requestType.equals(SESSION_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                
-                // check for no existing session for this user
-                // (rule: only 1 session per user allowed)
-                checkForExistingSession(userID);
-                
+                                
                 String name = syncInput.getParameter("name");
+                String type = syncInput.getParameter("type");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
+                if (type == null) {
+                    throw new IllegalArgumentException("Missing parameter 'type'");
+                }
                 validateName(name);
+                validateType(type);
                 
-                // create a new NoVNC session
-                // VNC passwords are only good up to 8 characters
+                // check for no existing session for this user
+                // (rule: only 1 session per user allowed)
+                checkForExistingSession(userID, type);
+                
+                // create a new session id
+                // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, name);
+                URL sessionURL = createSession(sessionID, type, name);
                 
                 syncOutput.setHeader("Location", sessionURL.toString());
                 syncOutput.setCode(303);
@@ -123,7 +146,7 @@ public abstract class PostAction extends SessionAction {
             }
             return;
         }
-        if (requestType.equals(APP_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
                 // create an app
                 
@@ -154,6 +177,176 @@ public abstract class PostAction extends SessionAction {
         if (!name.matches("[A-Za-z0-9\\-]+")) {
             throw new IllegalArgumentException("name can only contain alpha-numeric chars and '-'");
         }
+    }
+    
+    private void validateType(String type) {
+        if (!StringUtil.hasText(type)) {
+            throw new IllegalArgumentException("type must have a value");
+        }
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) || SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            return;
+        }
+        throw new IllegalArgumentException("type must be one of " + SessionAction.SESSION_TYPE_DESKTOP
+            + " or " + SessionAction.SESSION_TYPE_CARTA);
+    }
+    
+    public void checkForExistingSession(String userid, String type) throws Exception {
+        
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        String[] getSessionsCMD = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-userid=" + userID,
+            "--selector=canfar-net-sessionType=" + type,
+            "--no-headers=true"};
+                
+        String vncSessions = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + vncSessions);
+        
+        if (StringUtil.hasLength(vncSessions)) {
+            throw new IllegalArgumentException("User " + userID + " has a session already running.");
+        }
+    }
+    
+    public URL createSession(String sessionID, String type, String name) throws Exception {
+        
+        String podName = K8SUtil.getPodName(sessionID, type, userID);
+        String posixID = getPosixId();
+        log.debug("Posix id: " + posixID);
+        
+        String launchPath = null;
+        switch (type) {
+            case SessionAction.SESSION_TYPE_DESKTOP:
+                launchPath = System.getProperty("user.home") + "/config/launch-novnc.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_CARTA:
+                launchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                break;
+            default:
+                throw new IllegalStateException("Bug: unknown session type: " + type);
+        }
+        byte[] launchBytes = Files.readAllBytes(Paths.get(launchPath));
+        String launchString = new String(launchBytes, "UTF-8");
+        
+        launchString = setConfigValue(launchString, ARCADE_SESSIONID, sessionID);
+        launchString = setConfigValue(launchString, ARCADE_SESSIONNAME, name);
+        launchString = setConfigValue(launchString, ARCADE_SESSIONTYPE, type);
+        launchString = setConfigValue(launchString, ARCADE_PODNAME, podName);
+        launchString = setConfigValue(launchString, ARCADE_HOSTNAME, K8SUtil.getHostName());
+        launchString = setConfigValue(launchString, ARCADE_USERID, userID);
+        launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
+        
+        String jsonLaunchFile = super.stageFile(launchString);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+          
+        String[] launchCmd = new String[] {
+            "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+        String createResult = execute(launchCmd);
+        log.debug("Create result: " + createResult);
+        
+        String[] getIPCmd = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-sessionID=" + sessionID,
+            "-o", "jsonpath={.items[0].status.podIP}"};
+        String ipAddress = "";
+        int attempts = 0;
+        while (!StringUtil.hasText(ipAddress) && attempts < 10) {          
+            try {
+                log.debug("Sleeping for 1 second");
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+            }
+            log.debug("awake now");
+            ipAddress = execute(getIPCmd);
+            attempts++;
+        }
+        log.debug("pod IP: " + ipAddress);
+        
+        // insert the user's proxy cert in the home dir
+        Subject subject = AuthenticationUtil.getCurrentSubject();   
+        injectProxyCert("/cavern/home", subject, userID, posixID);
+        
+        // give the container a few seconds to initialize
+        try {
+            log.debug("3 second wait for vnc initialization");
+            Thread.sleep(3000);
+        } catch (InterruptedException ignore) {
+        }
+        log.debug("wait over");
+        
+        URL sessionLink = null;
+        switch (type) {
+            case SessionAction.SESSION_TYPE_DESKTOP:
+                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                break;
+            case SessionAction.SESSION_TYPE_CARTA:
+                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                break;
+            default:
+                throw new IllegalStateException("Bug: unknown session type: " + type);
+        }
+        
+        log.debug("session redirect: " + sessionLink);
+        return sessionLink;
+    }
+    
+    public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
+        
+        // TODO: Ensure session at targetIP is of type desktop
+        
+        String name = confirmSoftware(software);
+        
+        String posixID = getPosixId();
+
+        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-software.yaml";
+        byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
+        
+        // default parameter: xterm
+        String param = "xterm\n        - -T\n        - " + name;
+        
+        // only one parameter supported for now
+        if (params != null && params.size() > 0) {
+            param = params.get(0);
+        }
+        log.debug("Using parameter: " + param);
+        
+        String uniqueID = new RandomStringGenerator(8).getID();
+        String jobName = name + "-" + userID + "-" + sessionID + "-" + uniqueID;
+        String containerName = name.replaceAll("\\.", "-"); // no dots in k8s names
+        
+        String launchString = new String(launchBytes, "UTF-8");
+        launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
+        launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
+        launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
+        launchString = setConfigValue(launchString, ARCADE_USERID, userID);
+        launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
+        launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, software);
+                       
+        String launchFile = super.stageFile(launchString);
+        
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        
+        String[] launchCmd = new String[] {
+            "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
+        String createResult = execute(launchCmd);
+        log.debug("Create result: " + createResult);
+        
+        // refresh the user's proxy cert
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        injectProxyCert("/cavern/home", subject, userID, posixID);
+    }
+    
+    private String getPosixId() {
+        Subject s = AuthenticationUtil.getCurrentSubject();
+        Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
+        int uidNumber = principals.iterator().next().getUidNumber();
+        return Integer.toString(uidNumber);
+    }
+    
+    private String setConfigValue(String doc, String key, String value) {
+        String regKey = key.replace(".", "\\.");
+        String regex = "\\$[{]" + regKey + "[}]";
+        return doc.replaceAll(regex, value);
     }
 
 }

@@ -67,6 +67,8 @@
 
 package org.opencadc.platform;
 
+import ca.nrc.cadc.util.StringUtil;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -74,37 +76,84 @@ import org.apache.log4j.Logger;
  *
  * @author majorb
  */
-public abstract class GetAction extends SessionAction {
+public class GetAction extends SessionAction {
     
     private static final Logger log = Logger.getLogger(GetAction.class);
 
     public GetAction() {
         super();
     }
-    
-    public abstract void listSessions() throws Exception;
 
     @Override
     public void doAction() throws Exception {
         super.initRequest();
-        if (requestType.equals(SESSION_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 // List the sessions
                 listSessions();
             } else {
-                // GET to /session/sessionID should be handled
-                // by connection proxy
-                throw new IllegalStateException("Connection request missed by session proxy.");
+                throw new UnsupportedOperationException("Session detail viewing not supported.");
             }
             return;
         }
-        if (requestType.equals(APP_REQUEST)) {
+        if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
                 throw new UnsupportedOperationException("App listing not supported.");
             } else {
                 throw new UnsupportedOperationException("App detail viewing not supported.");
             }
         }
+    }
+    
+    public void listSessions() throws Exception {
+        
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        String[] getSessionsCMD = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-userid=" + userID,
+            "--no-headers=true",
+            "-o", "custom-columns=" +
+                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+                "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "NAME:.metadata.labels.canfar-net-sessionName," +
+                "IPADDR:.status.podIP," +
+                "STARTED:.status.startTime"};
+                
+        String vncSessions = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + vncSessions);
+        
+        if (StringUtil.hasLength(vncSessions)) {
+            String[] lines = vncSessions.split("\n");
+
+            String host = K8SUtil.getHostName();
+            
+            StringBuilder ret = new StringBuilder();
+            for (String line : lines) {
+                String[] parts = line.split("\\s+");
+                String sessionID = parts[0];
+                String sessionType = parts[1];
+                String sessionName = parts[2];
+                String ipAddr = parts[3];
+                String startTime = parts[4];
+                String connectURL = super.getVNCURL(host, sessionID, ipAddr);
+                if (SessionAction.SESSION_TYPE_CARTA.equals(sessionType)) {
+                    connectURL = super.getCartaURL(host, sessionID, ipAddr);
+                }
+                ret.append(sessionID);
+                ret.append("\t");
+                ret.append(sessionType);
+                ret.append("\t");
+                ret.append(sessionName);
+                ret.append("\t");
+                ret.append(connectURL);
+                ret.append("\t");
+                ret.append("Up since " + startTime);
+                ret.append("\n");
+            }
+            syncOutput.getOutputStream().write(ret.toString().getBytes());
+            return;
+        }
+        log.debug("No container listing output");
     }
 
 }

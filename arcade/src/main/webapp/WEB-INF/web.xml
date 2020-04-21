@@ -40,17 +40,17 @@
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.platform.kubernetes.K8SGet</param-value> 
+             <param-value>org.opencadc.platform.GetAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <init-param>
              <param-name>post</param-name>
-             <param-value>org.opencadc.platform.kubernetes.K8SPost</param-value> 
+             <param-value>org.opencadc.platform.PostAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerPost</param-value> -->
          </init-param>
          <init-param>
              <param-name>delete</param-name>
-             <param-value>org.opencadc.platform.kubernetes.K8SDelete</param-value>
+             <param-value>org.opencadc.platform.DeleteAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerDelete</param-value> -->
          </init-param>
          <init-param>
