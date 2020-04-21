@@ -7,7 +7,7 @@ metadata:
     canfar-net-sessionName: "${arcade.sessionname}"
     canfar-net-sessionType: "${arcade.sessiontype}"
     canfar-net-userid: "${arcade.userid}"
-  name: "${arcade.podname}"
+  name: "${arcade.jobname}"
 spec:
   template:
     metadata:
@@ -16,7 +16,7 @@ spec:
         canfar-net-sessionName: "${arcade.sessionname}"
         canfar-net-sessionType: "${arcade.sessiontype}"
         canfar-net-userid: "${arcade.userid}"
-        job-name: "${arcade.podname}"
+        job-name: "${arcade.jobname}"
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
@@ -31,7 +31,23 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: "${arcade.podname}"
+      - name: cavern-sssd
+        image: canfar-registry.cloud.computecanada.ca/cadc-sssd:latest
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /etc/sssd/sssd.conf
+          subPath: sssd.conf
+          name: sssd-config-vol
+        - mountPath: /etc/openldap/certs/ca.crt
+          subPath: ca.crt
+          name: sssd-cert-config-vol
+        - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
+          subPath: cadc_CA_2029.crt
+          name: sssd-cert-config-vol
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+      - name: "${arcade.jobname}"
         env:
         - name: VNC_PW
           value: "${arcade.sessionid}"
@@ -57,22 +73,6 @@ spec:
         - mountPath: "/cavern"
           name: cavern-volume
           subPath: "cavern"
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-      - name: cavern-sssd
-        image: canfar-registry.cloud.computecanada.ca/cadc-sssd:latest
-        imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - mountPath: /etc/sssd/sssd.conf
-          subPath: sssd.conf
-          name: sssd-config-vol
-        - mountPath: /etc/openldap/certs/ca.crt
-          subPath: ca.crt
-          name: sssd-cert-config-vol
-        - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
-          subPath: cadc_CA_2029.crt
-          name: sssd-cert-config-vol
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       volumes:
