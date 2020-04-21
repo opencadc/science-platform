@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -81,7 +81,7 @@ public class K8SUtil {
         return System.getenv("arcade.namespace");
     }
     
-    public static String getPodName(String sessionID, String type, String userID) {
+    public static String getJobName(String sessionID, String type, String userID) {
         return "arcade-" + type + "-" + userID + "-" + sessionID;
     }
     

@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -131,13 +131,11 @@ public class DeleteAction extends SessionAction {
         // kill the session specified by sessionID
         log.debug("Stopping VNC session");
         
-        String podName = K8SUtil.getPodName(sessionID, type, userID);
+        String podName = K8SUtil.getJobName(sessionID, type, userID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
         String[] stopVNCCmd = new String[] {
-            "kubectl", "delete", "--namespace", k8sNamespace,
-            "service/" + podName,
-            "job.batch/" + podName};
+            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
         execute(stopVNCCmd);
         
     }

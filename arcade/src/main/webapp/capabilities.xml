@@ -22,11 +22,7 @@
     </interface>
   </capability>
 
-  <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Proc#session-1.0">
-    <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">http://replace.me.com/arcade/auth-session</accessURL>
-      <securityMethod standardID="http://www.w3.org/Protocols/HTTP/1.0/spec.html#BasicAA"/>
-    </interface>
+  <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
       <accessURL use="base">http://replace.me.com/arcade/session</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#cookie"/>
