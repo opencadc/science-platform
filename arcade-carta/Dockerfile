@@ -2,7 +2,7 @@ FROM centos:6
 
 RUN yum makecache -y
 RUN yum update -y
-RUN yum install -y iproute lsof
+RUN yum install -y iproute lsof sssd-client acl
 
 RUN mkdir /carta
 WORKDIR /carta
