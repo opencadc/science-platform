@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import ca.nrc.cadc.util.StringUtil;
 
@@ -115,9 +115,12 @@ public class GetAction extends SessionAction {
             "-o", "custom-columns=" +
                 "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
                 "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "STATUS:.status.phase," +
                 "NAME:.metadata.labels.canfar-net-sessionName," +
                 "IPADDR:.status.podIP," +
-                "STARTED:.status.startTime"};
+                "STARTED:.status.startTime," +
+                "DELETION:.metadata.deletionTimestamp"};
+     
                 
         String vncSessions = execute(getSessionsCMD);
         log.debug("VNC Session list: " + vncSessions);
@@ -129,12 +132,18 @@ public class GetAction extends SessionAction {
             
             StringBuilder ret = new StringBuilder();
             for (String line : lines) {
+                log.debug("line: " + line);
                 String[] parts = line.split("\\s+");
                 String sessionID = parts[0];
                 String sessionType = parts[1];
-                String sessionName = parts[2];
-                String ipAddr = parts[3];
-                String startTime = parts[4];
+                String status = parts[2];
+                String sessionName = parts[3];
+                String ipAddr = parts[4];
+                String startTime = parts[5];
+                String terminating = parts[6];
+                if (terminating != null && !"<none>".equals(terminating)) {
+                    status = "Terminating";
+                }
                 String connectURL = super.getVNCURL(host, sessionID, ipAddr);
                 if (SessionAction.SESSION_TYPE_CARTA.equals(sessionType)) {
                     connectURL = super.getCartaURL(host, sessionID, ipAddr);
@@ -142,6 +151,8 @@ public class GetAction extends SessionAction {
                 ret.append(sessionID);
                 ret.append("\t");
                 ret.append(sessionType);
+                ret.append("\t");
+                ret.append(status);
                 ret.append("\t");
                 ret.append(sessionName);
                 ret.append("\t");

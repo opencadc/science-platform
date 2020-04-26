@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import org.apache.log4j.Logger;
 

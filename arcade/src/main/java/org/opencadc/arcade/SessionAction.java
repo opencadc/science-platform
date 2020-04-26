@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
@@ -294,7 +294,7 @@ public abstract class SessionAction extends RestAction {
     protected String stageFile(String data) throws IOException {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
-        if (!file.setExecutable(true, false)) {
+        if (!file.setExecutable(true, true)) {
             log.warn("Failed to set execution permssion on file " + tmpFileName);
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));

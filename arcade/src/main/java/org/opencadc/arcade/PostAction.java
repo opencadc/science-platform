@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -99,7 +99,7 @@ public class PostAction extends SessionAction {
     public static final String ARCADE_SESSIONID = "arcade.sessionid";
     public static final String ARCADE_SESSIONNAME = "arcade.sessionname";
     public static final String ARCADE_SESSIONTYPE = "arcade.sessiontype";
-    public static final String ARCADE_PODNAME = "arcade.podname";
+    public static final String ARCADE_JOBNAME = "arcade.jobname";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
@@ -195,8 +195,7 @@ public class PostAction extends SessionAction {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] getSessionsCMD = new String[] {
             "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID,
-            "--selector=canfar-net-sessionType=" + type,
+            "--selector=canfar-net-userid=" + userID + ",canfar-net-sessionType=" + type,
             "--no-headers=true"};
                 
         String vncSessions = execute(getSessionsCMD);
@@ -209,7 +208,7 @@ public class PostAction extends SessionAction {
     
     public URL createSession(String sessionID, String type, String name) throws Exception {
         
-        String podName = K8SUtil.getPodName(sessionID, type, userID);
+        String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
         
@@ -230,7 +229,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, ARCADE_SESSIONID, sessionID);
         launchString = setConfigValue(launchString, ARCADE_SESSIONNAME, name);
         launchString = setConfigValue(launchString, ARCADE_SESSIONTYPE, type);
-        launchString = setConfigValue(launchString, ARCADE_PODNAME, podName);
+        launchString = setConfigValue(launchString, ARCADE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, ARCADE_HOSTNAME, K8SUtil.getHostName());
         launchString = setConfigValue(launchString, ARCADE_USERID, userID);
         launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
