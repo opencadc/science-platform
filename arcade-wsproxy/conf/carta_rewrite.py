@@ -40,10 +40,48 @@ def getRedirect(input):
   log("DEBUG: Segs[4]: " + segs[4])
   ret = ""
   if (segs[4] == "socket"):
+    # do auth check on socket call
+    log("DEBUG: getting session IP address")
+    sessionIPAddress = getIPForSession(sessionID)
+    if sessionID is None:
+      return None
+    if (sessionIPAddress != ipAddress):
+      log("ERROR: wrong ip for session")
+      return None
+    else:
+      log("DEBUG: ip addresses match, authorized")
+
     ret = "ws://" + ipAddress + ":" + bport + "/"
   else:
     ret = "http://" + ipAddress + ":" + port + endOfPath
   return ret
+
+def getIPForSession(sessionID):
+  command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"] 
+  commandString = ' '.join([str(elem) for elem in command]) 
+  log("DEBUG: kubectl command: " + commandString)
+  sessionIPAddress = None
+  try:
+    sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
+  except subprocess.CalledProcessError as exc:
+    log("ERROR: error calling kubectl: " + exc.output)
+    return None
+  else:
+    log("DEBUG: sessionIPAddress: " + sessionIPAddress)
+    return sessionIPAddress.strip()
+
+def initK8S():
+  command = ["kubectl", "config", "--kubeconfig=/www/bin/k8s-config", "use-context", "kanfarnetes-testing"]
+  commandString = ' '.join([str(elem) for elem in command])
+  log("DEBUG: kubectl init: " + commandString)
+  try:
+    result = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    log("DEBUG: success k8s init: " + result)
+    command = ["kubectl", "config", "view"]
+    subprocess.check_output(command, stderr=subprocess.STDOUT)
+    log("DEBUG:" + result)
+  except subprocess.CalledProcessError as exc:
+    log("ERROR: error calling kubectl: " + exc.output)
 
 def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
@@ -51,6 +89,8 @@ def log(message):
 
 logfile = open("/logs/carta-rewrite.log", "a")
 log("INFO: carta_rewrite.py listening to stdin")
+#initK8S()
+os.environ['HOME'] = '/root'
 log("INFO: entering listen loop")
 
 while True:

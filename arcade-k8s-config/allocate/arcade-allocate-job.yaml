@@ -40,7 +40,7 @@ spec:
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/arcade-cavern-allocate"]
-        args: ["cadcauthtest1"]
+        args: ["gschieve"]
 #        command: [ "/bin/bash", "-c", "--" ]
 #        args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
