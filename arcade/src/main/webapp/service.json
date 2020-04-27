@@ -5,7 +5,6 @@
         "title": "Arcade Web Service API",
         "description": "API Documentation (Incomplete).\n"
     },
-    "host": "arcade.canfar.net",
     "paths": {
         "/arcade": {
             "get": {
