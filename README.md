@@ -6,6 +6,8 @@ Arcade is a general purpose science platform built to support ALMA processing re
 
 Because all components of arcade are containers, they can be scaled out on a cluster of nodes to meet the storage and processing demands of the scientific software containers.
 
+![ARCADE-architecture-bigpicture](ARCADE-architecture-bigpicture.png)
+
 ## Components
 
 ### arcade
