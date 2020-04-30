@@ -65,12 +65,14 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
 import org.apache.log4j.Logger;
 
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
 import ca.nrc.cadc.vosi.AvailabilityStatus;
+
+import java.io.IOException;
 
 
 public class Availability implements AvailabilityPlugin
@@ -78,7 +80,7 @@ public class Availability implements AvailabilityPlugin
     private static final Logger LOG = Logger.getLogger(Availability.class);
 
     private static final AvailabilityStatus STATUS_UP =
-        new AvailabilityStatus(true, null, null, null, "session service is available (no resourcing checking).");
+        new AvailabilityStatus(true, null, null, null, "session service is available.");
 
     public Availability()
     {
@@ -97,7 +99,17 @@ public class Availability implements AvailabilityPlugin
     @Override
     public AvailabilityStatus getStatus()
     {
-        // TODO: real availability check
+        // ensure we can run kubectl
+        try {
+            String k8sNamespace = K8SUtil.getWorkloadNamespace();
+            String[] getPods = new String[] {
+                "kubectl", "get", "--namespace", k8sNamespace, "pods"};
+            SessionAction.execute(getPods);
+        } catch (Exception e) {
+            AvailabilityStatus down = new AvailabilityStatus(
+                false, null, null, null, "failed to run kubectl");
+            return down;
+        }
         return STATUS_UP;
     }
 

@@ -65,32 +65,106 @@
 ************************************************************************
 */
 
-package org.opencadc.platform.kubernetes;
+package org.opencadc.arcade;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import ca.nrc.cadc.util.StringUtil;
 
-public class K8SUtil {
+import org.apache.log4j.Logger;
+
+/**
+ * Process the GET request on the session(s) or app(s).
+ *
+ * @author majorb
+ */
+public class GetAction extends SessionAction {
     
-    public static String getHostName() throws IOException {
-        return System.getenv("arcade.hostname");
+    private static final Logger log = Logger.getLogger(GetAction.class);
+
+    public GetAction() {
+        super();
+    }
+
+    @Override
+    public void doAction() throws Exception {
+        super.initRequest();
+        if (requestType.equals(REQUEST_TYPE_SESSION)) {
+            if (sessionID == null) {
+                // List the sessions
+                listSessions();
+            } else {
+                throw new UnsupportedOperationException("Session detail viewing not supported.");
+            }
+            return;
+        }
+        if (requestType.equals(REQUEST_TYPE_APP)) {
+            if (appID == null) {
+                throw new UnsupportedOperationException("App listing not supported.");
+            } else {
+                throw new UnsupportedOperationException("App detail viewing not supported.");
+            }
+        }
     }
     
-    public static String getWorkloadNamespace() throws IOException {
-        return System.getenv("arcade.namespace");
-    }
-    
-    public static String getPodName(String sessionID, String userID) {
-        return "arcade-desktop-" + userID + "-" + sessionID;
-    }
-    
-    public static String getHomeDir() {
-        return System.getenv("arcade.homedir");
-    }
-    
-    public static String getScratchDir() {
-        return System.getenv("arcade.scratchdir");
+    public void listSessions() throws Exception {
+        
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        String[] getSessionsCMD = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-userid=" + userID,
+            "--no-headers=true",
+            "-o", "custom-columns=" +
+                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+                "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "STATUS:.status.phase," +
+                "NAME:.metadata.labels.canfar-net-sessionName," +
+                "IPADDR:.status.podIP," +
+                "STARTED:.status.startTime," +
+                "DELETION:.metadata.deletionTimestamp"};
+     
+                
+        String vncSessions = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + vncSessions);
+        
+        if (StringUtil.hasLength(vncSessions)) {
+            String[] lines = vncSessions.split("\n");
+
+            String host = K8SUtil.getHostName();
+            
+            StringBuilder ret = new StringBuilder();
+            for (String line : lines) {
+                log.debug("line: " + line);
+                String[] parts = line.split("\\s+");
+                String sessionID = parts[0];
+                String sessionType = parts[1];
+                String status = parts[2];
+                String sessionName = parts[3];
+                String ipAddr = parts[4];
+                String startTime = parts[5];
+                String terminating = parts[6];
+                if (terminating != null && !"<none>".equals(terminating)) {
+                    status = "Terminating";
+                }
+                String connectURL = super.getVNCURL(host, sessionID, ipAddr);
+                if (SessionAction.SESSION_TYPE_CARTA.equals(sessionType)) {
+                    connectURL = super.getCartaURL(host, sessionID, ipAddr);
+                }
+                ret.append(sessionID);
+                ret.append("\t");
+                ret.append(sessionType);
+                ret.append("\t");
+                ret.append(status);
+                ret.append("\t");
+                ret.append(sessionName);
+                ret.append("\t");
+                ret.append(connectURL);
+                ret.append("\t");
+                ret.append("Up since " + startTime);
+                ret.append("\n");
+            }
+            syncOutput.getOutputStream().write(ret.toString().getBytes());
+            return;
+        }
+        log.debug("No container listing output");
     }
 
 }

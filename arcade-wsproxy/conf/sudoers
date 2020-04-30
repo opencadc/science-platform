@@ -112,3 +112,4 @@ root	ALL=(ALL) 	ALL
 #includedir /etc/sudoers.d
 
 apache ALL = (root) NOPASSWD: /usr/bin/docker
+apache ALL = (root) NOPASSWD: /usr/bin/kubectl

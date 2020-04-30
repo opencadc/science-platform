@@ -65,95 +65,32 @@
 ************************************************************************
 */
 
-package org.opencadc.platform;
+package org.opencadc.arcade;
 
-import java.net.URL;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
-import org.apache.log4j.Logger;
-
-import ca.nrc.cadc.util.StringUtil;
-import ca.nrc.cadc.uws.server.RandomStringGenerator;
-
-/**
- *
- * @author majorb
- */
-public abstract class PostAction extends SessionAction {
+public class K8SUtil {
     
-    private static final Logger log = Logger.getLogger(PostAction.class);
-    
-    public abstract void checkForExistingSession(String userID) throws Exception;
-    public abstract URL createSession(String sessionID, String name) throws Exception;
-    public abstract void attachSoftware(String software, List<String> params, String targetIP) throws Exception;
-
-    public PostAction() {
-        super();
-    }
-
-    @Override
-    public void doAction() throws Exception {
-        
-        super.initRequest();
-        createUserMountSpace(userID);
-        
-        if (requestType.equals(SESSION_REQUEST)) {
-            if (sessionID == null) {
-                
-                // check for no existing session for this user
-                // (rule: only 1 session per user allowed)
-                checkForExistingSession(userID);
-                
-                String name = syncInput.getParameter("name");
-                if (name == null) {
-                    throw new IllegalArgumentException("Missing parameter 'name'");
-                }
-                validateName(name);
-                
-                // create a new NoVNC session
-                // VNC passwords are only good up to 8 characters
-                sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, name);
-                
-                syncOutput.setHeader("Location", sessionURL.toString());
-                syncOutput.setCode(303);
-                
-            } else {
-                throw new UnsupportedOperationException("Cannot modify an existing session.");
-            }
-            return;
-        }
-        if (requestType.equals(APP_REQUEST)) {
-            if (appID == null) {
-                // create an app
-                
-                // gather job parameters
-                String software = syncInput.getParameter("software");
-                String targetIP = syncInput.getParameter("target-ip");
-                List<String> params = syncInput.getParameters("param");
-                
-                if (software == null) {
-                    throw new IllegalArgumentException("Missing parameter 'software'");
-                }
-                if (targetIP == null) {
-                    throw new IllegalArgumentException("Missing parameter 'target-ip'");
-                }
-                
-                attachSoftware(software, params, targetIP);
-                
-            } else {
-                throw new UnsupportedOperationException("Cannot modify an existing app.");
-            }
-        }
+    public static String getHostName() throws IOException {
+        return System.getenv("arcade.hostname");
     }
     
-    private void validateName(String name) {
-        if (!StringUtil.hasText(name)) {
-            throw new IllegalArgumentException("name must have a value");
-        }
-        if (!name.matches("[A-Za-z0-9\\-]+")) {
-            throw new IllegalArgumentException("name can only contain alpha-numeric chars and '-'");
-        }
+    public static String getWorkloadNamespace() throws IOException {
+        return System.getenv("arcade.namespace");
+    }
+    
+    public static String getJobName(String sessionID, String type, String userID) {
+        return "arcade-" + type + "-" + userID + "-" + sessionID;
+    }
+    
+    public static String getHomeDir() {
+        return System.getenv("arcade.homedir");
+    }
+    
+    public static String getScratchDir() {
+        return System.getenv("arcade.scratchdir");
     }
 
 }

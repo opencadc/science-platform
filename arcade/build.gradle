@@ -3,6 +3,7 @@ plugins {
     id 'maven'
     id 'maven-publish'
     id 'com.jfrog.bintray' version '1.8.4'
+    id 'checkstyle'
 }
 
 repositories {
@@ -14,12 +15,13 @@ repositories {
     }
 }
 
+apply from: 'opencadc.gradle'
+
 sourceCompatibility = 1.8
 
-group = 'ca.nrc.cadc'
+group = 'org.opencadc'
 
 war {
-    // Include the swagger-ui so that /platform provides the tap API documentation
     from(System.getenv('RPS') + '/resources/') {
         include 'swagger-ui/'
     }

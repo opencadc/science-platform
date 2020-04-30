@@ -49,8 +49,6 @@ spec:
           name: sssd-dir
       - name: "${arcade.jobname}"
         env:
-        - name: VNC_PW
-          value: "${arcade.sessionid}"
         - name: arcade_hostname
           value: "${arcade.hostname}"
         - name: arcade_username
@@ -58,17 +56,20 @@ spec:
         securityContext:
           runAsUser: ${arcade.posixid} 
           runAsGroup: ${arcade.posixid}
-        image: canfar-registry.cloud.computecanada.ca/arcade-desktop:latest
+        image: canfar-registry.cloud.computecanada.ca/arcade-carta:latest
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - /carta/arcade-carta /cavern /cavern/projects
         ports:
         - containerPort: 5901
           protocol: TCP
-          name: vnc-port
+          name: websocket-port
         - containerPort: 6901
           protocol: TCP
-          name: novnc-port
+          name: frontend-port
         volumeMounts:
         - mountPath: "/cavern"
           name: cavern-volume

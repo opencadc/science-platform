@@ -9,7 +9,7 @@ from urlparse import urlparse
 
 def getRedirect(input):
 
-  log("DEBUG: proxying k8s session")
+  log("DEBUG: proxying desktop k8s session")
   log("DEBUG: input=" + input)
   if input is None:
     log("WARN: no input")
@@ -46,8 +46,8 @@ def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
-logfile = open("/logs/rewrite.log", "a")
-log("INFO: session_rewrite.py listening to stdin")
+logfile = open("/logs/desktop-rewrite.log", "a")
+log("INFO: desktop_rewrite.py listening to stdin")
 log("INFO: entering listen loop")
 
 while True:
