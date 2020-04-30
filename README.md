@@ -18,7 +18,10 @@ arcade-wsproxy is an apache httpd container whose job is to proxy NoVNC traffic 
 
 ### arcade-desktop
 arcade-desktop is a container representing an arcade session.  It is a NoVNC implementation, forked and modified from the ConSol project:  https://github.com/ConSol/docker-headless-vnc-container.
-The current implementation of arcade-desktop as a NoVNC container will be replaced with another technology at some point.
+The current implementation of arcade-desktop as a NoVNC container may be replaced with another technology at some point.
+
+### arcade-carta
+arcade-carta is container installation of Carta 1.3 Remote.  It is another type of session supported in arcade.
 
 ### software-containers
 These are some of the astronomy science containers that have been built for arcade.  They run as applications within arcade.  The graphical aspects of the containers are displayed in arcade-desktop by sending the DISPLAY to arcade-desktop.
