@@ -1,0 +1,27 @@
+#!/usr/bin/perl
+##
+## move rsync point from svn.cv.nrao.edu to casa.nrao.edu
+##
+use File::Find;
+
+if ( scalar(@ARGV) < 1 ) { die "$0 requires path to CASA installation to be patched..." }
+if ( scalar(@ARGV) > 1 ) { die "$0 requires only one parameter which is the path to CASA installation to be patched..." }
+
+unless ( -d $ARGV[0] ) { die "$0 requires path to CASA installation (which should be a directory) to be patched..." }
+
+sub locate_script {
+    if ( -f $_ && $_ eq "update-data" ) {
+        print "substituting $File::Find::dir/$_\n";
+        open( CONTENTS, "< $_" );
+        my @contents = <CONTENTS>;
+        close( CONTENTS );
+        open( CONTENTS, "> $_" );
+        foreach my $x ( @contents ) {
+            $x =~ s@(?:rsync://svn.cv.nrao.edu/casa-data|rsync://casa.nrao.edu/casa-data)@rsync://casa-rsync.nrao.edu/casa-data@g;
+            print CONTENTS "$x";
+        }
+        close( CONTENTS );
+    }
+}
+
+find( { wanted => \&locate_script }, $ARGV[0] );

@@ -5,7 +5,7 @@
 #	5.1.2-4.el6
 
 VERSIONS = \
-	5.1.2-4.el6
+	4.3.0-el6
 
 DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
 
