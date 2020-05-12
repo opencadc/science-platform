@@ -20,11 +20,3 @@ if [ ! -e "$FILE" ]; then
 else
     echo "$FILE already downloaded."
 fi
-
-FILE="admit"
-URL="https://github.com/astroumd/${FILE}"
-if [ ! -e "$FILE" ]; then
-    git clone  $URL
-else
-    echo "$FILE already downloaded."
-fi
