@@ -36,6 +36,7 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 RUN yum install -y sssd-client acl
 
 # add the admit enhancement (issue #25)
+RUN yum install -y tcsh
 RUN mkdir /opt/admit
 ADD admit /opt/admit
 RUN cd /opt/admit && \
