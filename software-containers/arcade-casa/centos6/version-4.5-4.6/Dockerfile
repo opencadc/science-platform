@@ -34,13 +34,19 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 #WORKDIR /home/guest
 
 RUN yum install -y sssd-client acl
+
+# add the admit enhancement (issue #25)
 RUN mkdir /opt/admit
 ADD admit /opt/admit
 RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
+# apply leap second patch (issue #33)
 ADD update-data.patch /opt/
 RUN /opt/update-data.patch /opt/${RELEASE} && rm -f /opt/update-data.patch
+
+# generate missing dbus uuid (issue #47)
+RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
