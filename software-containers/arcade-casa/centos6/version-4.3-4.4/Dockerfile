@@ -6,7 +6,7 @@ FROM centos:6
 RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	libXfixes libXcursor libXinerama fontconfig \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
-	tkinter ImageMagick-c++ xterm perl autoconf python-sphinx graphviz
+	tkinter ImageMagick-c++ xterm perl
 
 # setup all required env variables
 ARG VERSION
@@ -38,12 +38,6 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 #WORKDIR /home/guest
 
 RUN yum install -y sssd-client acl
-
-# add the admit enhancement (issue #25)
-RUN mkdir /opt/admit
-ADD admit /opt/admit
-RUN cd /opt/admit && \
-    autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
 # apply leap second patch (issue #33)
 ADD update-data.patch /opt/
