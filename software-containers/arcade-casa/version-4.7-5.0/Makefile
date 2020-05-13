@@ -1,6 +1,12 @@
 
 VERSIONS = \
-	5.6.1-8.el7
+	4.7.0-el7 \
+	4.7.1-el7 \
+	4.7.2-el7 \
+	5.0.0-218.el7
+
+#VERSIONS = \
+#	5.0.0-218.el7
 
 DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
 
@@ -8,14 +14,14 @@ DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
 
 all: build
 
-#download:
-#	@- $(foreach V,$(VERSIONS), \
-#		./download.sh $(V); \
-#	)
-
-build: 
+download:
 	@- $(foreach V,$(VERSIONS), \
-		docker build --build-arg VERSION=$(V) -t ${DOCKER_REPO_BASE}:$V .; \
+		./download.sh casa-release-$(V); \
+	)
+
+build: download
+	@- $(foreach V,$(VERSIONS), \
+		docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
     	)
 
 clean:
