@@ -282,9 +282,10 @@ public abstract class SessionAction extends RestAction {
         Iterator<String> it = names.iterator();
         while (it.hasNext()) {
             String next = it.next();
-            log.debug("Next: " + next);
+            log.debug("Next key: " + next);
             String value = mp.getProperty(next).get(0);
-            if (value.equals(software)) {
+            log.debug("Next value: " + value);
+            if (software.trim().equals(value)) {
                 return next;
             }
         }
