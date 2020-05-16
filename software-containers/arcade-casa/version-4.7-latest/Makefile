@@ -43,8 +43,17 @@ clean:
 	  docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
+clean-latest:
+	docker rmi ${DOCKER_REPO_BASE}:$(LATEST)
+
+clean-all: clean clean-latest 
 
 upload: build
 	@- $(foreach V,$(VERSIONS), \
 	  docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
+
+upload-latest: build-latest
+	docker push ${DOCKER_REPO_BASE}:$(LATEST)
+
+upload-all: upload upload-latest 
