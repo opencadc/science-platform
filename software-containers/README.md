@@ -24,7 +24,7 @@ This section describes the process of creating a CASA container. The currently s
 3. execute 'make'
 ### Testing A Container
 Since a CASA container resides inside Arcade, we need to access an Arcade desktop session. 
-#### Getring Access To The CASA Container
+#### Getting Access To The CASA Container
 ##### Use A Custom Script
 We can create a custom script to access the container. We can save the script in our home directory, which persists over sessions. To access the CASA container, we just execute the script. The following is an example of such a script. Just replace the version number (4.7.0-el7) with the version under test. An xterm for the CASA version will pop up after some time.
 ```
