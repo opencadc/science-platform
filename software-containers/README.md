@@ -18,65 +18,13 @@ group:      sss files
 `xterm` must be installed on the container
 ## Creating a CASA container
 This section describes the process of creating a CASA container. The currently supported CASA containers are in the arcade-casa folder. The process iterates over build, deploy and test.
-### Building A Container
-To build a container, go into the relevant folder with the build files or create a new folder if necessary. There are two main files to building a container: Makefile and Dockerfile.
-#### Makefile
-This is the main file that controls the build process. This file is updated to add/change/remove a CASA version or to change the build process. It invokes docker to build the container.
-#### Dockerfile
-This file controls the building of the CASA container. For example, for versions 4.3.x to 4.4.x, the ADMIT package is not added to the container. Changes to the container are made in this file.
-#### How To Build
+### How To Build
 1. cd into the relevant folder with the build file or create a new folder if necessary
 2. update or create the relevant files, e.g. Makefile, Dockerfile, download.sh
 3. execute 'make'
-4. execute 'docker image ls'
-
-Step (3) generates a docker image in the local machine, which is listed in step(4). Here is an example list of generated docker images:
-| REPOSITORY | TAG | IMAGE ID | CREATED | SIZE |
-| --------------------- | ------- | ---------------- | --------------- | ------- |
-| bucket.canfar.net/arcade-casa | 4.5.3-el6 | 0b8c5890921b | 13 hours ago | 4.72GB |
-| bucket.canfar.net/arcade-casa | 4.5.2-el6 | 21719143194a | 13 hours ago | 4.72GB |
-
-For work that does not require a UI, for example adding a new package to CASA, we may be able to run the container and test our work at this point. Execute 'docker run -it <docker image ID> /bin/bash' and check if the work is correct.
-### Deploying A Container
-Since a CASA container runs in Arcade under Kubernetes, the container image generated from the build step needs to be pushed to the repository that Kubernetes uses.
-1. log into docker by entering your username and password(this only needs to be done once)
-```
-docker login bucket.canfar.net
-```
-2. push the docker image generate in the build step to bucket.canfar.net
-```
-docker push bucket.canfar.net/arcade-casa:<TAG>
-```
-3. ssh to canfar-login
-```
-ssh canfar-login
-```
-4. pull the image into canfar-login
-```
-docker pull bucket.canfar.net/arcade-casa:<TAG>
-```
-5. tag the image with the repository that Kubernetes uses
-```
-docker tag <docker image ID> canfar-registry.cloud.computecanada.ca/arcade-casa:<TAG>
-```
-6. push the image to the repository that Kubernetes uses
-```
-docker push canfar-registry.cloud.computecanada.ca/arcade-casa:<TAG>
-```
 ### Testing A Container
-Since a CASA container resides inside Arcade, we need to access an Arcade desktop session. We can either access an existing Arcade session or we can create one.
-#### Get A Session
-##### Open An Existing Arcade Session
-Execute the following command and open a browser using the desktop session URL returned
-```
-curl -E $A/test-certificates/x509_CADCAuthtest2.pem https://proto.canfar.net/arcade/session
-```
-##### Create Your Own Desktop Session
-Execute the following command and open a browser using the desktop session URL returned
-```
-curl -E ~/.ssl/cadcproxy.pem https://proto.canfar.net/arcade/session -d "name=mydesktop" -d "type=desktop"
-```
-#### Get Access The CASA Container
+Since a CASA container resides inside Arcade, we need to access an Arcade desktop session. 
+#### Getring Access To The CASA Container
 ##### Use A Custom Script
 We can create a custom script to access the container. We can save the script in our home directory, which persists over sessions. To access the CASA container, we just execute the script. The following is an example of such a script. Just replace the version number (4.7.0-el7) with the version under test. An xterm for the CASA version will pop up after some time.
 ```
@@ -88,7 +36,7 @@ IP_ADDRESS=`hostname --ip-address`
 ```
 ##### Use The UI
 If you have previously created a desktop session, you can use the UI of that session to access your container. There is an 'Applications' tab on the top left hand corner. Select 'Applications->CANFAR->CASA' and then the version under development. An xterm for the selected CASA version will pop up after some time.
-#### Perform Tests
+#### Performing Tests
 The xterm provides access to the CASA container under development. Perform the necessary tests and repeat the build, deploy and test process if necessary. The following is an example test session on the xterm.
 ```
 cwd: ~
@@ -148,24 +96,3 @@ cwd: ~
 
 cwd: ~
 ```
-### Updating The Config Map
-If your work requires
-```
-arcade-k8s-config/arcade/arcade-tomcat/config/arcade-software.properties
-```
-to be updated, for example, you are adding a new version of CASA container, then prior to releasing the new version of the software, the config map will need to be updated. Follow the steps below.
-1. ssh to canfar-login
-2. git clone the software under development
-3. update the config file
-```
-arcade-k8s-config/arcade/arcade-tomcat/config/arcade-software.properties
-```
-4. delete the current config map by executing
-```
-kubectl delete configmap arcade-config
-```
-5. create the new config map by executing
-```
-arcade-k8s-config/arcade/arcade-tomcat/create-config.sh
-```
-The command may complain about one of the config items already being present. This complain can be ignored.
