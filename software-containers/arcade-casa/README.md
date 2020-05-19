@@ -1,8 +1,8 @@
 # Arcade CASA Container
-## Building a CASA container
+## Building a CASA Container
 1. cd into the relevant folder with the build files 
 2. execute 'make'
-## Testing a Container
+## Testing a CASA Container
 You will need to run the container in a graphical environment, such as arcade, to test the visual components of the CASA containers.
 
 The following steps can be performed in a graphical container environment (such as arcade) to test that the container was built correctly.
