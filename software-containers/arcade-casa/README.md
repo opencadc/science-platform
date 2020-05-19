@@ -1,14 +1,12 @@
 # Arcade CASA Container
 ## Building a CASA container
 1. cd into the relevant folder with the build file or create a new folder if necessary
-2. update Makefile, Dockerfile or other files as necessary
+2. update Makefile, Dockerfile or other files as necessary.
 3. execute 'make'
 ### Testing a Container
-#### Getting Access To The CASA Container
-##### Using The UI
 You will need to run the container in a graphical environment, such as arcade, to test the visual components of the CASA containers.
-#### Performing Tests
-The xterm provides access to the CASA container under development. The following are example steps to test a CASA container.
+
+The following steps can be performed in a graphical container environment (such as arcade) to test that the container was built correctly.
 1. Type the id command and ensure that user name is displayed.
 2. Type 
 ```
