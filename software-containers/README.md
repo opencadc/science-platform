@@ -25,7 +25,7 @@ This section describes the process of creating a CASA container. The currently s
 ### Testing A Container
 #### Getting Access To The CASA Container
 ##### Using The UI
-If you have previously created a desktop session, you can use the UI of that session to access your container. There is an 'Applications' tab on the top left hand corner. Select 'Applications->CANFAR->CASA' and then the version under development. An xterm for the selected CASA version will pop up after some time.
+If you have previously created a desktop session, you will need to run the container in a graphical environment such as arcade, to test the visual components of the CASA container."
 #### Performing Tests
 The xterm provides access to the CASA container under development. Perform the necessary tests and repeat the build, deploy and test process if necessary. The following is an example test session on the xterm.
 ```
