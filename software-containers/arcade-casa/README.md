@@ -1,7 +1,7 @@
 # Arcade CASA Container
 ## Building a CASA container
 1. cd into the relevant folder with the build file or create a new folder if necessary
-2. update or create the relevant files, e.g. Makefile, Dockerfile, download.sh
+2. update Makefile, Dockerfile or other files as necessary
 3. execute 'make'
 ### Testing a Container
 #### Getting Access To The CASA Container
