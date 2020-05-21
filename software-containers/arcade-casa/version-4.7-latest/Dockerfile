@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
@@ -6,13 +6,11 @@ FROM centos:6
 RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	libXfixes libXcursor libXinerama fontconfig \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
-	tkinter ImageMagick-c++ xterm perl
-
+	tkinter ImageMagick-c++ xterm perl autoconf python-sphinx graphviz
 
 # setup all required env variables
-ARG VERSION
-ENV VERSION=${VERSION}
-ENV RELEASE=casa-release-${VERSION}
+ARG RELEASE
+ENV RELEASE=${RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
@@ -35,6 +33,20 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 #WORKDIR /home/guest
 
 RUN yum install -y sssd-client acl
+
+# add the admit enhancement (issue #25)
+RUN yum install -y tcsh
+RUN mkdir /opt/admit
+ADD admit /opt/admit
+RUN cd /opt/admit && \
+    autoconf && ./configure --with-casa-root=/opt/${RELEASE}
+
+# apply leap second patch (issue #33)
+ADD update-data.patch /opt/
+RUN /opt/update-data.patch /opt/${RELEASE} && rm -f /opt/update-data.patch
+
+# generate missing dbus uuid (issue #47)
+RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 

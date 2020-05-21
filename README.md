@@ -21,7 +21,7 @@ arcade-desktop is a container representing an arcade session.  It is a NoVNC imp
 The current implementation of arcade-desktop as a NoVNC container may be replaced with another technology at some point.
 
 ### arcade-carta
-arcade-carta is container installation of Carta 1.3 Remote.  It is another type of session supported in arcade.
+arcade-carta is container installation of Carta 1.3 Remote.  It is another type of session supported in arcade.  Other session types can be added to arcade.
 
 ### software-containers
 These are some of the astronomy science containers that have been built for arcade.  They run as applications within arcade.  The graphical aspects of the containers are displayed in arcade-desktop by sending the DISPLAY to arcade-desktop.
