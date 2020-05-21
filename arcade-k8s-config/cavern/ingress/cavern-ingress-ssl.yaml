@@ -5,6 +5,7 @@ metadata:
   namespace: development
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /cavern/$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   tls:
   - hosts:
