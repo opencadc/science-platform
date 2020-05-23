@@ -34,7 +34,6 @@ RUN yum install -y sssd-client acl which
 RUN mkdir /arcade
 ADD update-data.patch /arcade/
 ADD startup.sh /arcade/
-ENV HOME /opt/${RELEASE}
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
