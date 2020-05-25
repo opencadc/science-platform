@@ -31,7 +31,7 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 
 RUN yum install -y sssd-client acl which
 
-# apply leap second patch (issue #33)
+# add leap second patch(issue #33)
 RUN mkdir /arcade
 ADD update-data.patch /arcade/
 ADD startup.sh /arcade/
@@ -44,4 +44,3 @@ ADD nsswitch.conf /etc/
 RUN chmod -R a+rwx /arcade
 
 ENTRYPOINT [ "/arcade/startup.sh" ]
-CMD ["xterm", "-e", "casa"]

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-#echo "sourcing admit_start.sh"
-#source /opt/admit/admit_start.sh
-
 echo "applying leap second patch"
 /arcade/update-data.patch /opt/casa
 
