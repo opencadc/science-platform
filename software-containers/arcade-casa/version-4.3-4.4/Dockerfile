@@ -49,4 +49,3 @@ RUN dbus-uuidgen --ensure
 ADD nsswitch.conf /etc/
 
 ENTRYPOINT [ "/arcade/startup.sh" ]
-CMD ["xterm", "-e", "casa"]
