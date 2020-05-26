@@ -42,14 +42,13 @@ RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
 # add leap second patch (issue #33)
-ARG STARTUP
 RUN mkdir /arcade
 ADD update-data.patch /arcade/
-ADD ${STARTUP} /arcade/
+ADD startup.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-ENTRYPOINT [ "/arcade/"${STARTUP} ]
+ENTRYPOINT [ "/arcade/startup.sh" ]
