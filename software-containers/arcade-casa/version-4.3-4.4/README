@@ -1,0 +1,5 @@
+The following changes were made:
+2. version 4.3.0 was changed to fix a bug in casa-release-4.3.0-el6/lib64/python2.7/get_user.py
+3. version 4.3.1 was changed to fix a bug in casa-release-4.3.1-el6/lib64/python2.7/get_user.py
+4. version 4.3.1-pipe was changed to fix a bug in casa-release-4.3.1-pipe-el6/lib64/python2.7/get_user.py
+5. version 4.4.0 was changed to fix a bug in casa-release-4.4.0-el6/lib64/python2.7/get_user.py
