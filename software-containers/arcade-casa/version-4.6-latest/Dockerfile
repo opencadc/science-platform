@@ -1,4 +1,5 @@
-FROM centos:6
+ARG CENTOS
+FROM ${CENTOS}
 
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
@@ -9,9 +10,8 @@ RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	tkinter ImageMagick-c++ xterm perl autoconf python-sphinx graphviz
 
 # setup all required env variables
-ARG VERSION
-ENV VERSION=${VERSION}
-ENV RELEASE=casa-release-${VERSION}
+ARG RELEASE
+ENV RELEASE=${RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
@@ -42,13 +42,13 @@ ADD admit /opt/admit
 RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
-# apply leap second patch (issue #33)
-ADD update-data.patch /opt/
-RUN /opt/update-data.patch /opt/${RELEASE} && rm -f /opt/update-data.patch
+# add leap second patch (issue #33)
+RUN mkdir /arcade
+ADD startup.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-CMD ["xterm", "-e", "casa"]
+ENTRYPOINT [ "/arcade/startup.sh" ]
