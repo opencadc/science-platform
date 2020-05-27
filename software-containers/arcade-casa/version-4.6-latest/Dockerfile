@@ -1,4 +1,5 @@
-FROM centos:7
+ARG CENTOS
+FROM ${CENTOS}
 
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
@@ -41,13 +42,13 @@ ADD admit /opt/admit
 RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
-# apply leap second patch (issue #33)
-ADD update-data.patch /opt/
-RUN /opt/update-data.patch /opt/${RELEASE} && rm -f /opt/update-data.patch
+# add leap second patch (issue #33)
+RUN mkdir /arcade
+ADD startup.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-CMD ["xterm", "-e", "casa"]
+ENTRYPOINT [ "/arcade/startup.sh" ]
