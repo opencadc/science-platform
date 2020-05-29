@@ -2,19 +2,17 @@
 
 if [ $# -lt 2 ]
 then
-  echo "usage: $0 <version> <"el6"|"el7"|"latest">"
+  echo "usage: $0 <version> <"old"|"current">"
   exit 1
 fi
 
 RELEASE=$1
 FILE="${RELEASE}.tar.gz"
 
-if [ $2 == "el7" ]; then
-  URL="https://casa.nrao.edu/download/distro/casa/release/el7/${FILE}"
-elif [ $2 == "latest" ]; then
-  URL="https://casa.nrao.edu/download/distro/casa-pipeline/release/el7/${FILE}"
-else
+if [ $2 == "old" ]; then
   URL="https://casa.nrao.edu/download/distro/linux/release/el6/${FILE}"
+else
+  URL="https://casa.nrao.edu/download/distro/casa-pipeline/release/el6/${FILE}"
 fi
 
 # make sure we are in the source folder

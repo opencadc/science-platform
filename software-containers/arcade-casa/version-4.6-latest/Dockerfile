@@ -1,5 +1,4 @@
-ARG CENTOS
-FROM ${CENTOS}
+FROM centos:6
 
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
@@ -44,6 +43,7 @@ RUN cd /opt/admit && \
 
 # add leap second patch (issue #33)
 RUN mkdir /arcade
+ADD update-data.patch /arcade/
 ADD startup.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
