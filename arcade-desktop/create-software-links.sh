@@ -20,6 +20,7 @@ while read p; do
     fi
   fi
   sed -i -e "s#(IMAGE_ID)#$image#g" tmp/$executable
+  sed -i -e "s#(NAME)#$name#g" tmp/$executable
   sed -i -e "s#(NAME)#$name#g" tmp/$desktop
   rm -f tmp/*-e
 done <arcade-software.properties

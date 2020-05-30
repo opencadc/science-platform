@@ -12,21 +12,35 @@ RUN yum install -y freetype libSM libXi libXrender libXrandr \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
 	tkinter ImageMagick-c++ xterm perl
 
-
 # setup all required env variables
-ARG VERSION
-ENV VERSION=${VERSION}
-ENV RELEASE=casapy-42.2.30986-pipe-1-64b
+ARG RELEASE
+ENV RELEASE=${RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
 ADD ${RELEASE}.tar.gz /opt/
+
+# patch in fix for get_user.py
+ARG PYTHON
+ENV PYTHON=${PYTHON}
+RUN rm -f /opt/${RELEASE}/lib64/${PYTHON}/get_user.py
+ADD get_user.py /opt/${RELEASE}/lib64/${PYTHON}/get_user.py
 
 # chown because the untarred casa has wrong owner/group
 RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 
 RUN yum install -y sssd-client acl which
 
+# add leap second patch(issue #33)
+RUN mkdir /arcade
+ADD update-data.patch /arcade/
+ADD startup.sh /arcade/
+
+# generate missing dbus uuid (issue #47)
+RUN dbus-uuidgen --ensure
+
 ADD nsswitch.conf /etc/
 
-CMD ["xterm", "-e", "casa"]
+RUN chmod -R a+rwx /arcade
+
+ENTRYPOINT [ "/arcade/startup.sh" ]

@@ -9,9 +9,8 @@ RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	tkinter ImageMagick-c++ xterm perl
 
 # setup all required env variables
-ARG VERSION
-ENV VERSION=${VERSION}
-ENV RELEASE=casa-release-${VERSION}
+ARG RELEASE
+ENV RELEASE=${RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
@@ -40,12 +39,13 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 RUN yum install -y sssd-client acl
 
 # apply leap second patch (issue #33)
-ADD update-data.patch /opt/
-RUN /opt/update-data.patch /opt/${RELEASE} && rm -f /opt/update-data.patch
+RUN mkdir /arcade
+ADD update-data.patch /arcade/
+ADD startup.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-CMD ["xterm", "-e", "casa"]
+ENTRYPOINT [ "/arcade/startup.sh" ]

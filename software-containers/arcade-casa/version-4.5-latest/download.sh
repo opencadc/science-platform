@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 
-if [ $# -eq 0 ]
+if [ $# -lt 2 ]
 then
-  echo "usage: $0 <version>"
+  echo "usage: $0 <version> <"old"|"current">"
   exit 1
 fi
 
-VERSION=$1
-FILE="casa-release-${VERSION}.tar.gz"
-#URL=https://svn.cv.nrao.edu/casa/linux_distro/release/el6/$FILE
-URL="https://casa.nrao.edu/download/distro/linux/release/el6/${FILE}"
+RELEASE=$1
+FILE="${RELEASE}.tar.gz"
+
+if [ $2 == "old" ]; then
+  URL="https://casa.nrao.edu/download/distro/linux/release/el6/${FILE}"
+else
+  URL="https://casa.nrao.edu/download/distro/casa-pipeline/release/el6/${FILE}"
+fi
 
 # make sure we are in the source folder
 HERE=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
