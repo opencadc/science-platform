@@ -1,0 +1,61 @@
+VERSIONS_OLD = \
+	4.5.0-el6 \
+	4.5.1-el6 \
+	4.5.2-el6 \
+	4.5.3-el6 \
+	4.6.0-el6 \
+	4.7.0-el6 \
+	4.7.1-el6 \
+	4.7.2-el6 \
+	5.0.0-218.el6 \
+	5.1.0-74.el6 \
+	5.1.1-5.el6 \
+	5.1.2-4.el6 \
+	5.3.0-143.el6 \
+	5.4.0-70.el6 \
+	5.4.1-32.el6 \
+	5.4.2-8.el6 \
+	5.5.0-149.el6 \
+	5.6.0-60.el6
+
+#VERSIONS_OLD = \
+#	5.6.0-60.el6
+
+VERSIONS = \
+	5.6.1-8.el6
+
+DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
+
+.PHONY: build clean run 
+
+all: build-old build
+
+build-old: 
+	@- $(foreach V,$(VERSIONS_OLD), \
+		./download.sh casa-release-$(V) old ; \
+		docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
+	)
+
+build: 
+	./download.sh casa-pipeline-release-${VERSIONS} current ; \
+	docker build --build-arg RELEASE=casa-pipeline-release-${VERSIONS} -t ${DOCKER_REPO_BASE}:${VERSIONS} .; \
+
+clean-old:
+	@- $(foreach V,$(VERSIONS_OLD), \
+	  docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
+	)
+
+clean:
+	docker rmi ${DOCKER_REPO_BASE}:$(VERSIONS)
+
+clean-all: clean-old clean 
+
+upload-old: build-old
+	@- $(foreach V,$(VERSIONS_OLD), \
+	  docker push ${DOCKER_REPO_BASE}:$(V) ; \
+	)
+
+upload: build
+	docker push ${DOCKER_REPO_BASE}:$(VERSIONS)
+
+upload-all: upload-old upload 

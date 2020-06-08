@@ -1,0 +1,8 @@
+The following changes were made:
+1. version 3.4.0 was changed to fix a bug in casapy-34.0.19988-002-64b/lib64/python2.6/get_user.py
+2. version 4.0.0 was changed to fix a bug in casapy-40.0.22208-002-64b/lib64/python2.6/get_user.py
+3. version 4.0.1 was changed to fix a bug in casapy-40.1.22889-003-64b/lib64/python2.6/get_user.py
+4. version 4.1.0 was changed to fix a bug in casapy-41.0.24668-001-64b/lib64/python2.6/get_user.py
+5. version 4.2.0 was changed to fix a bug in casapy-42.0.28322-021-1-64b/lib64/python2.7/get_user.py
+6. version 4.2.1 was changed to fix a bug in casapy-42.1.29047-001-1-64b/lib64/python2.7/get_user.py
+7. version 4.2.2 was changed to fix a bug in casapy-42.2.30986-pipe-1-64b/lib64/python2.7/get_user.py
