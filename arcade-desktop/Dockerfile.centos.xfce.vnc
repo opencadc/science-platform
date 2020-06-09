@@ -121,4 +121,4 @@ COPY software-scripts/terminate.desktop /headless/Desktop/terminate.desktop
 RUN chown guest /headless/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
-CMD ["--wait", "--debug"]
+CMD ["--wait"]
