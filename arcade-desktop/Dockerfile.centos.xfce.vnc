@@ -21,8 +21,7 @@ ENV DISPLAY=:1 \
 EXPOSE $VNC_PORT $NO_VNC_PORT
 
 ### Envrionment config
-ENV HOME=/headless \
-    TERM=xterm \
+ENV TERM=xterm \
     STARTUPDIR=/dockerstartup \
     INST_SCRIPTS=/headless/install \
     NO_VNC_HOME=/headless/noVNC \
@@ -30,7 +29,7 @@ ENV HOME=/headless \
     VNC_RESOLUTION=1920x1200 \
     VNC_PW=changeit \
     VNC_VIEW_ONLY=false
-WORKDIR $HOME
+WORKDIR /headless
 
 ### Add all install scripts for further steps
 ADD ./src/common/install/ $INST_SCRIPTS/
@@ -59,12 +58,12 @@ ADD ./conf/canfar-icon.png $NO_VNC_HOME/app/images/icons/
 
 ### Install xfce UI
 RUN $INST_SCRIPTS/xfce_ui.sh
-ADD ./src/common/xfce/ $HOME/
+ADD ./src/common/xfce/ /headless/
 
 ### configure startup
 RUN $INST_SCRIPTS/libnss_wrapper.sh
 ADD ./src/common/scripts $STARTUPDIR
-RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR $HOME
+RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR /headless
 
 # CANFAR Specifics Below
 
@@ -122,4 +121,4 @@ COPY software-scripts/terminate.desktop /headless/Desktop/terminate.desktop
 RUN chown guest /headless/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
-CMD ["--wait"]
+CMD ["--wait", "--debug"]
