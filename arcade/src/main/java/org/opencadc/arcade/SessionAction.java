@@ -116,6 +116,7 @@ public abstract class SessionAction extends RestAction {
     
     protected static final String SESSION_TYPE_DESKTOP = "desktop";
     protected static final String SESSION_TYPE_CARTA = "carta";
+    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
     
     protected String userID;
     protected String requestType;
@@ -236,6 +237,11 @@ public abstract class SessionAction extends RestAction {
     
     public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
+            ipAddress + "/" + sessionID + "/socket/";
+    }
+    
+    public String getNotebookURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/tree" +
             ipAddress + "/" + sessionID + "/socket/";
     }
     

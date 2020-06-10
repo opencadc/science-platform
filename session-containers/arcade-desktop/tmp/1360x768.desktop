@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=1360x768
+Comment=1360x768
+Keywords=1360x768
+Exec=/usr/local/bin/1360x768.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=Resolution;

@@ -183,11 +183,13 @@ public class PostAction extends SessionAction {
         if (!StringUtil.hasText(type)) {
             throw new IllegalArgumentException("type must have a value");
         }
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) || SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) ||
+            SessionAction.SESSION_TYPE_CARTA.equals(type) ||
+            SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             return;
         }
         throw new IllegalArgumentException("type must be one of " + SessionAction.SESSION_TYPE_DESKTOP
-            + " or " + SessionAction.SESSION_TYPE_CARTA);
+            + ", " + SessionAction.SESSION_TYPE_NOTEBOOK + " or " + SessionAction.SESSION_TYPE_CARTA);
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
@@ -219,6 +221,9 @@ public class PostAction extends SessionAction {
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
                 launchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                launchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -279,6 +284,9 @@ public class PostAction extends SessionAction {
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
                 sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID, ipAddress));
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);

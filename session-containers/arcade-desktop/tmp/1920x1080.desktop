@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=1920x1080
+Comment=1920x1080
+Keywords=1920x1080
+Exec=/usr/local/bin/1920x1080.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=Resolution;

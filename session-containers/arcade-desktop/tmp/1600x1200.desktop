@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=1600x1200
+Comment=1600x1200
+Keywords=1600x1200
+Exec=/usr/local/bin/1600x1200.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=Resolution;

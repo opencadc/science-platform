@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=casa-5.1.2-4
+Comment=casa-5.1.2-4
+Keywords=casa-5.1.2-4
+Exec=/usr/local/bin/casa-5.1.2-4.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=CASA;

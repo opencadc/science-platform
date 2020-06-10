@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=640x480
+Comment=640x480
+Keywords=640x480
+Exec=/usr/local/bin/640x480.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=Resolution;
