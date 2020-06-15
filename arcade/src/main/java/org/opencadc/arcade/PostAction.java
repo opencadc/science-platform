@@ -193,18 +193,11 @@ public class PostAction extends SessionAction {
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
-        
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID + ",canfar-net-sessionType=" + type,
-            "--no-headers=true"};
-                
-        String vncSessions = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + vncSessions);
-        
-        if (StringUtil.hasLength(vncSessions)) {
-            throw new IllegalArgumentException("User " + userID + " has a session already running.");
+        List<Session> sessions = GetAction.getAllSessions(userid);
+        for (Session session : sessions) {
+            if (session.type.equals(type) && session.status.equalsIgnoreCase("Running")) {
+                throw new IllegalArgumentException("User " + userID + " has a session already running.");
+            }
         }
     }
     

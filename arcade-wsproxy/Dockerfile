@@ -22,6 +22,11 @@ RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-releas
   chmod +x /usr/bin/kubectl && \
   kubectl version --client
 
+# Install cachetools
+RUN curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+RUN python get-pip.py
+RUN pip install cachetools
+
 COPY conf/nofiles.conf /etc/security/limits.d/nofiles.conf
 COPY conf/sudoers /etc/sudoers
 

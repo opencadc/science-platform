@@ -69,6 +69,9 @@ package org.opencadc.arcade;
 
 import ca.nrc.cadc.util.StringUtil;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -107,6 +110,28 @@ public class GetAction extends SessionAction {
     
     public void listSessions() throws Exception {
         
+        List<Session> sessions = getAllSessions(userID);
+        StringBuilder ret = new StringBuilder();
+        
+        for (Session session : sessions) {
+            ret.append(session.id);
+            ret.append("\t");
+            ret.append(session.type);
+            ret.append("\t");
+            ret.append(session.status);
+            ret.append("\t");
+            ret.append(session.name);
+            ret.append("\t");
+            ret.append(session.connectURL);
+            ret.append("\t");
+            ret.append(session.startTime);
+            ret.append("\n");
+        }
+        syncOutput.getOutputStream().write(ret.toString().getBytes());
+        return;
+    }
+    
+    public static List<Session> getAllSessions(String userID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] getSessionsCMD = new String[] {
             "kubectl", "get", "--namespace", k8sNamespace, "pod",
@@ -120,51 +145,20 @@ public class GetAction extends SessionAction {
                 "IPADDR:.status.podIP," +
                 "STARTED:.status.startTime," +
                 "DELETION:.metadata.deletionTimestamp"};
-     
                 
         String vncSessions = execute(getSessionsCMD);
         log.debug("VNC Session list: " + vncSessions);
         
+        List<Session> sessions = new ArrayList<Session>();
+        
         if (StringUtil.hasLength(vncSessions)) {
             String[] lines = vncSessions.split("\n");
-
-            String host = K8SUtil.getHostName();
-            
-            StringBuilder ret = new StringBuilder();
             for (String line : lines) {
-                log.debug("line: " + line);
-                String[] parts = line.split("\\s+");
-                String sessionID = parts[0];
-                String sessionType = parts[1];
-                String status = parts[2];
-                String sessionName = parts[3];
-                String ipAddr = parts[4];
-                String startTime = parts[5];
-                String terminating = parts[6];
-                if (terminating != null && !"<none>".equals(terminating)) {
-                    status = "Terminating";
-                }
-                String connectURL = super.getVNCURL(host, sessionID, ipAddr);
-                if (SessionAction.SESSION_TYPE_CARTA.equals(sessionType)) {
-                    connectURL = super.getCartaURL(host, sessionID, ipAddr);
-                }
-                ret.append(sessionID);
-                ret.append("\t");
-                ret.append(sessionType);
-                ret.append("\t");
-                ret.append(status);
-                ret.append("\t");
-                ret.append(sessionName);
-                ret.append("\t");
-                ret.append(connectURL);
-                ret.append("\t");
-                ret.append("Up since " + startTime);
-                ret.append("\n");
+                sessions.add(new Session(line));
             }
-            syncOutput.getOutputStream().write(ret.toString().getBytes());
-            return;
         }
-        log.debug("No container listing output");
+        
+        return sessions;
     }
 
 }

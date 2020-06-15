@@ -225,7 +225,7 @@ public abstract class SessionAction extends RestAction {
         return stdout.trim();
     }
     
-    public String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
@@ -235,14 +235,13 @@ public abstract class SessionAction extends RestAction {
             "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
     }
     
-    public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+    public static String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
             ipAddress + "/" + sessionID + "/socket/";
     }
     
-    public String getNotebookURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/tree" +
-            ipAddress + "/" + sessionID + "/socket/";
+    public static String getNotebookURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/tree";
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
