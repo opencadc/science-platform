@@ -116,6 +116,7 @@ public abstract class SessionAction extends RestAction {
     
     protected static final String SESSION_TYPE_DESKTOP = "desktop";
     protected static final String SESSION_TYPE_CARTA = "carta";
+    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
     
     protected String userID;
     protected String requestType;
@@ -224,7 +225,7 @@ public abstract class SessionAction extends RestAction {
         return stdout.trim();
     }
     
-    public String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
@@ -234,9 +235,13 @@ public abstract class SessionAction extends RestAction {
             "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
     }
     
-    public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+    public static String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
         return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
             ipAddress + "/" + sessionID + "/socket/";
+    }
+    
+    public static String getNotebookURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/tree";
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
@@ -282,9 +287,10 @@ public abstract class SessionAction extends RestAction {
         Iterator<String> it = names.iterator();
         while (it.hasNext()) {
             String next = it.next();
-            log.debug("Next: " + next);
+            log.debug("Next key: " + next);
             String value = mp.getProperty(next).get(0);
-            if (value.equals(software)) {
+            log.debug("Next value: " + value);
+            if (software.trim().equals(value)) {
                 return next;
             }
         }

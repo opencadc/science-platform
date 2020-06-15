@@ -82,7 +82,7 @@ public class K8SUtil {
     }
     
     public static String getJobName(String sessionID, String type, String userID) {
-        return "arcade-" + type + "-" + userID + "-" + sessionID;
+        return "arcade-" + type + "-" + userID.toLowerCase() + "-" + sessionID;
     }
     
     public static String getHomeDir() {

@@ -183,26 +183,21 @@ public class PostAction extends SessionAction {
         if (!StringUtil.hasText(type)) {
             throw new IllegalArgumentException("type must have a value");
         }
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) || SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) ||
+            SessionAction.SESSION_TYPE_CARTA.equals(type) ||
+            SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             return;
         }
         throw new IllegalArgumentException("type must be one of " + SessionAction.SESSION_TYPE_DESKTOP
-            + " or " + SessionAction.SESSION_TYPE_CARTA);
+            + ", " + SessionAction.SESSION_TYPE_NOTEBOOK + " or " + SessionAction.SESSION_TYPE_CARTA);
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
-        
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID + ",canfar-net-sessionType=" + type,
-            "--no-headers=true"};
-                
-        String vncSessions = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + vncSessions);
-        
-        if (StringUtil.hasLength(vncSessions)) {
-            throw new IllegalArgumentException("User " + userID + " has a session already running.");
+        List<Session> sessions = GetAction.getAllSessions(userid);
+        for (Session session : sessions) {
+            if (session.type.equals(type) && session.status.equalsIgnoreCase("Running")) {
+                throw new IllegalArgumentException("User " + userID + " has a session already running.");
+            }
         }
     }
     
@@ -219,6 +214,9 @@ public class PostAction extends SessionAction {
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
                 launchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                launchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -280,6 +278,9 @@ public class PostAction extends SessionAction {
             case SessionAction.SESSION_TYPE_CARTA:
                 sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID, ipAddress));
                 break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
@@ -309,7 +310,7 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         
         String uniqueID = new RandomStringGenerator(8).getID();
-        String jobName = name + "-" + userID + "-" + sessionID + "-" + uniqueID;
+        String jobName = name + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
         String containerName = name.replaceAll("\\.", "-"); // no dots in k8s names
         
         String launchString = new String(launchBytes, "UTF-8");

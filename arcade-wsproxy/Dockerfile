@@ -22,11 +22,17 @@ RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-releas
   chmod +x /usr/bin/kubectl && \
   kubectl version --client
 
+# Install cachetools
+RUN curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+RUN python get-pip.py
+RUN pip install cachetools
+
 COPY conf/nofiles.conf /etc/security/limits.d/nofiles.conf
 COPY conf/sudoers /etc/sudoers
 
 ADD conf/desktop_rewrite.py /www/bin/desktop_rewrite.py
 ADD conf/carta_rewrite.py /www/bin/carta_rewrite.py
+ADD conf/notebook_rewrite.py /www/bin/notebook_rewrite.py
 ADD conf/httpd.conf /etc/httpd/conf/
 ADD conf/rewrite.conf /etc/httpd/conf.d/
 ADD conf/cors.conf /etc/httpd/conf.d/
