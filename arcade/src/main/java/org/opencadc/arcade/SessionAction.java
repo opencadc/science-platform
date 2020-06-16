@@ -231,13 +231,13 @@ public abstract class SessionAction extends RestAction {
         //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?password=" + sessionID +
-            "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
+        return "https://" + host + "/desktop/" + sessionID + "/connect?password=" + sessionID +
+            "&path=desktop/" + sessionID + "/websockify";
     }
     
     public static String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
-        return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
-            ipAddress + "/" + sessionID + "/socket/";
+        return "https://" + host + "/carta/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
+            sessionID + "/socket/";
     }
     
     public static String getNotebookURL(String host, String sessionID, String ipAddress) throws MalformedURLException {

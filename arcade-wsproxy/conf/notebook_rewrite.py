@@ -10,7 +10,7 @@ from cachetools import TTLCache
 
 def getRedirect(input):
 
-  log("DEBUG: proxying notebook session")
+  log("DEBUG: proxying notebook sessions")
   log("DEBUG: input=" + input)
   if input is None:
     log("WARN: no input")
@@ -47,8 +47,11 @@ def getRedirect(input):
   log("DEBUG: endOfPath: " + endOfPath)
 
   ret = ""
-  if (segs[3] == "socket"):
-    ret = "ws://" + ipAddress + ":" + wsPort + "/"
+  if len(segs) > 4 and segs[3] == "api" and segs[4] == "kernels":
+    if queryString:
+      ret = "ws://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString
+    else:
+      ret = "ws://" + ipAddress + ":" + part + "/notebook/" + sessionID + endOfPath
   else:
     if queryString:
       ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString + "&token=" + sessionID

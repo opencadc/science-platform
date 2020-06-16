@@ -6,6 +6,7 @@ import time
 import traceback
 import os
 from urlparse import urlparse
+from cachetools import TTLCache
 
 def getRedirect(input):
 
@@ -22,10 +23,10 @@ def getRedirect(input):
   segs = path.split("/")
   log("DEBUG: len(segs): " + str(len(segs)))
 
-  ipAddress = segs[2]
-  log("DEBUG: ipAddress=" + ipAddress)
-  sessionID = segs[3]
+  sessionID = segs[2]
   log("DEBUG: sessionID=" + sessionID)
+
+  ipAddress = getIPForSession(sessionID)
 
   if ipAddress is None:
     log("WARN: IP Address not found")
@@ -37,51 +38,38 @@ def getRedirect(input):
   idx = path.find(sessionID)
   endOfPath = path[(idx+8):]
 
-  log("DEBUG: Segs[4]: " + segs[4])
+  log("DEBUG: Segs[3]: " + segs[3])
   ret = ""
-  if (segs[4] == "socket"):
-    # do auth check on socket call
-    log("DEBUG: getting session IP address")
-    sessionIPAddress = getIPForSession(sessionID)
-    if sessionID is None:
-      return None
-    if (sessionIPAddress != ipAddress):
-      log("ERROR: wrong ip for session")
-      return None
-    else:
-      log("DEBUG: ip addresses match, authorized")
-
+  if (segs[3] == "socket"):
     ret = "ws://" + ipAddress + ":" + bport + "/"
   else:
     ret = "http://" + ipAddress + ":" + port + endOfPath
   return ret
 
 def getIPForSession(sessionID):
-  command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"] 
-  commandString = ' '.join([str(elem) for elem in command]) 
-  log("DEBUG: kubectl command: " + commandString)
-  sessionIPAddress = None
-  try:
-    sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError as exc:
-    log("ERROR: error calling kubectl: " + exc.output)
-    return None
+  sessionIPAddress = getIPFromCache(sessionID)
+  if sessionIPAddress:
+    return sessionIPAddress
   else:
-    log("DEBUG: sessionIPAddress: " + sessionIPAddress)
-    return sessionIPAddress.strip()
+    try:
+      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"]
+      commandString = ' '.join([str(elem) for elem in command])
+      log("DEBUG: kubectl command: " + commandString)
+      sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as exc:
+      log("ERROR: error calling kubectl: " + exc.output)
+      return None
+    else:
+      log("DEBUG: sessionIPAddress: " + sessionIPAddress)
+      cache[sessionID] = sessionIPAddress.strip()
+      return sessionIPAddress.strip()
 
-def initK8S():
-  command = ["kubectl", "config", "--kubeconfig=/www/bin/k8s-config", "use-context", "kanfarnetes-testing"]
-  commandString = ' '.join([str(elem) for elem in command])
-  log("DEBUG: kubectl init: " + commandString)
+def getIPFromCache(sessionID):
   try:
-    result = subprocess.check_output(command, stderr=subprocess.STDOUT)
-    log("DEBUG: success k8s init: " + result)
-    command = ["kubectl", "config", "view"]
-    subprocess.check_output(command, stderr=subprocess.STDOUT)
-    log("DEBUG:" + result)
-  except subprocess.CalledProcessError as exc:
-    log("ERROR: error calling kubectl: " + exc.output)
+    cv = cache[sessionID]
+    return cv
+  except KeyError:
+    return None
 
 def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
@@ -89,8 +77,8 @@ def log(message):
 
 logfile = open("/logs/carta-rewrite.log", "a")
 log("INFO: carta_rewrite.py listening to stdin")
-#initK8S()
 os.environ['HOME'] = '/root'
+cache = TTLCache(maxsize=100, ttl=120)
 log("INFO: entering listen loop")
 
 while True:
