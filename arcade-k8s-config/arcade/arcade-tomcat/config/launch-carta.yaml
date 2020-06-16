@@ -79,7 +79,7 @@ spec:
       volumes:
       - name: cavern-volume
         persistentVolumeClaim:
-          claimName: cavern-ceph-claim
+          claimName: cavern-ceph-claim-20200608
       - name: sssd-config-vol
         configMap:
           name: sssd-config

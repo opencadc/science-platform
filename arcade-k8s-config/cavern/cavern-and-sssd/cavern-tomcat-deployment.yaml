@@ -67,7 +67,7 @@ spec:
           secretName: cavern-servops-secret
       - name: cavern-ceph-volume
         persistentVolumeClaim:
-          claimName: cavern-ceph-claim
+          claimName: cavern-ceph-claim-20200608
       - name: config-volume
         configMap:
           name: cavern-config
