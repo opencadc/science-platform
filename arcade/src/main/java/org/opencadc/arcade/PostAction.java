@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2019.                            (c) 2019.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -195,7 +195,7 @@ public class PostAction extends SessionAction {
     public void checkForExistingSession(String userid, String type) throws Exception {
         List<Session> sessions = GetAction.getAllSessions(userid);
         for (Session session : sessions) {
-            if (session.type.equals(type) && !session.status.equalsIgnoreCase("Terminating")) {
+            if (session.getType().equals(type) && !session.getStatus().equals(Session.STATUS_TERMINATING)) {
                 throw new IllegalArgumentException("User " + userID + " has a session already running.");
             }
         }
@@ -240,24 +240,6 @@ public class PostAction extends SessionAction {
         String createResult = execute(launchCmd);
         log.debug("Create result: " + createResult);
         
-        String[] getIPCmd = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-sessionID=" + sessionID,
-            "-o", "jsonpath={.items[0].status.podIP}"};
-        String ipAddress = "";
-        int attempts = 0;
-        while (!StringUtil.hasText(ipAddress) && attempts < 10) {          
-            try {
-                log.debug("Sleeping for 1 second");
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-            }
-            log.debug("awake now");
-            ipAddress = execute(getIPCmd);
-            attempts++;
-        }
-        log.debug("pod IP: " + ipAddress);
-        
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();   
         injectProxyCert("/cavern/home", subject, userID, posixID);
@@ -273,13 +255,13 @@ public class PostAction extends SessionAction {
         URL sessionLink = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID));
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
-                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID));
                 break;
             case SessionAction.SESSION_TYPE_NOTEBOOK:
-                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID));
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
