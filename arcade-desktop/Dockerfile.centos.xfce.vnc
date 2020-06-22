@@ -53,7 +53,7 @@ ADD ./conf/canfar-logo.png $NO_VNC_HOME/app/images/
 ADD ./conf/canfar-icon.png $NO_VNC_HOME/app/images/icons/
 
 ### Install firefox and chrome browser
-#RUN $INST_SCRIPTS/firefox.sh
+RUN $INST_SCRIPTS/firefox.sh
 #RUN $INST_SCRIPTS/chrome.sh
 
 ### Install xfce UI
