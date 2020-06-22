@@ -114,7 +114,7 @@ COPY software-scripts/*.desktop /usr/share/applications/
 COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
-COPY software-scripts/xterm.desktop /headless/Desktop/xterm.desktop
+COPY software-scripts/python.desktop /headless/Desktop/python.desktop
 COPY software-scripts/firefox.desktop /headless/Desktop/firefox.desktop
 COPY software-scripts/arcade-feedback.desktop /headless/Desktop/arcade-feedback.desktop
 COPY software-scripts/terminate.desktop /headless/Desktop/terminate.desktop
