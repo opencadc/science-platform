@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2019.                            (c) 2019.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,6 +69,7 @@ package org.opencadc.arcade;
 
 import ca.nrc.cadc.util.StringUtil;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -114,35 +115,34 @@ public class GetAction extends SessionAction {
         StringBuilder ret = new StringBuilder();
         
         for (Session session : sessions) {
-            ret.append(session.id);
+            ret.append(session.getId());
             ret.append("\t");
-            ret.append(session.type);
+            ret.append(session.getType());
             ret.append("\t");
-            ret.append(session.status);
+            ret.append(session.getStatus());
             ret.append("\t");
-            ret.append(session.name);
+            ret.append(session.getName());
             ret.append("\t");
-            ret.append(session.connectURL);
+            ret.append(session.getConnectURL());
             ret.append("\t");
-            ret.append(session.startTime);
+            ret.append(session.getStartTime());
             ret.append("\n");
         }
         syncOutput.getOutputStream().write(ret.toString().getBytes());
         return;
     }
     
-    public static List<Session> getAllSessions(String userID) throws Exception {
+    public static List<Session> getAllSessions(String forUserID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] getSessionsCMD = new String[] {
             "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID,
+            "--selector=canfar-net-userid=" + forUserID,
             "--no-headers=true",
             "-o", "custom-columns=" +
                 "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
                 "TYPE:.metadata.labels.canfar-net-sessionType," +
                 "STATUS:.status.phase," +
                 "NAME:.metadata.labels.canfar-net-sessionName," +
-                "IPADDR:.status.podIP," +
                 "STARTED:.status.startTime," +
                 "DELETION:.metadata.deletionTimestamp"};
                 
@@ -154,11 +154,40 @@ public class GetAction extends SessionAction {
         if (StringUtil.hasLength(vncSessions)) {
             String[] lines = vncSessions.split("\n");
             for (String line : lines) {
-                sessions.add(new Session(line));
+                Session session = constructSession(line);
+                sessions.add(session);
             }
         }
         
         return sessions;
+    }
+    
+    private static Session constructSession(String k8sOutput) throws IOException {
+        log.debug("line: " + k8sOutput);
+        String[] parts = k8sOutput.split("\\s+");
+        String id = parts[0];
+        String type = parts[1];
+        String status = parts[2];
+        String name = parts[3];
+        String startTime = "Up since " + parts[4];
+        String deletionTimestamp = parts[5];
+        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+            status = Session.STATUS_TERMINATING;
+        }
+        String host = K8SUtil.getHostName();
+        String connectURL = "unknown";
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
+            connectURL = SessionAction.getVNCURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            connectURL = SessionAction.getCartaURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+            connectURL = SessionAction.getNotebookURL(host, id);
+        }
+
+        return new Session(id, type, status, name, startTime, connectURL);
+        
     }
 
 }

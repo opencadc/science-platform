@@ -6,6 +6,7 @@ import time
 import traceback
 import os
 from urlparse import urlparse
+from cachetools import TTLCache
 
 def getRedirect(input):
 
@@ -21,10 +22,10 @@ def getRedirect(input):
   path = url.path
   segs = path.split("/")
 
-  ipAddress = segs[2]
-  log("DEBUG: ipAddress=" + ipAddress)
-  sessionID = segs[3]
+  sessionID = segs[2]
   log("DEBUG: sessionID=" + sessionID)
+
+  ipAddress = getIPForSession(sessionID)
 
   if ipAddress is None:
     log("WARN: IP Address not found")
@@ -33,20 +34,46 @@ def getRedirect(input):
   port = "6901"
 
   ret = "http://" + ipAddress + ":" + port + "/?password=" + sessionID + "/"
-  log("DEBUG: Segs[4]: " + segs[4])
-  if (segs[4] == "websockify"):
+  log("DEBUG: Segs[3]: " + segs[3])
+  if (segs[3] == "websockify"):
     ret = "ws://" + ipAddress + ":" + port + "/websockify"
-  elif (segs[4] != "connect"):
+  elif (segs[3] != "connect"):
     idx = path.find(sessionID)
     endOfPath = path[(idx+8):]
     ret = "http://" + ipAddress + ":" + port + endOfPath
   return ret
+
+def getIPForSession(sessionID):
+  sessionIPAddress = getIPFromCache(sessionID)
+  if sessionIPAddress:
+    return sessionIPAddress
+  else:
+    try:
+      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"]
+      commandString = ' '.join([str(elem) for elem in command])
+      log("DEBUG: kubectl command: " + commandString)
+      sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as exc:
+      log("ERROR: error calling kubectl: " + exc.output)
+      return None
+    else:
+      log("DEBUG: sessionIPAddress: " + sessionIPAddress)
+      cache[sessionID] = sessionIPAddress.strip()
+      return sessionIPAddress.strip()
+
+def getIPFromCache(sessionID):
+  try:
+    cv = cache[sessionID]
+    return cv
+  except KeyError:
+    return None
 
 def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
 logfile = open("/logs/desktop-rewrite.log", "a")
+cache = TTLCache(maxsize=100, ttl=120)
 log("INFO: desktop_rewrite.py listening to stdin")
 log("INFO: entering listen loop")
 

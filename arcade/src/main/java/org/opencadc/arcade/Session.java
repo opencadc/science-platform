@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2019.                            (c) 2019.
+ *  (c) 2020.                            (c) 2020.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -66,51 +66,58 @@
  */
 package org.opencadc.arcade;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-
 import org.apache.log4j.Logger;
 
 /**
  * @author majorb
+ * 
+ * Represents a session running in arcade.
  *
  */
 public class Session {
     
     private static final Logger log = Logger.getLogger(Session.class);
     
-    public String id;
-    public String type;
-    public String status;
-    public String name;
-    public String ipAddr;
-    public String startTime;
-    public String connectURL;
+    public static final String STATUS_TERMINATING = "Terminating";
+    
+    private String id;
+    private String type;
+    private String status;
+    private String name;
+    private String startTime;
+    private String connectURL;
 
-    public Session(String k8sOutput) throws IOException {
-        log.debug("line: " + k8sOutput);
-        String[] parts = k8sOutput.split("\\s+");
-        id = parts[0];
-        type = parts[1];
-        status = parts[2];
-        name = parts[3];
-        ipAddr = parts[4];
-        startTime = "Up since " + parts[5];
-        String terminating = parts[6];
-        if (terminating != null && !"<none>".equals(terminating)) {
-            status = "Terminating";
-        }
-        String host = K8SUtil.getHostName();
-        connectURL = "unknown";
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id, ipAddr);
-        }
-        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionAction.getCartaURL(host, id, ipAddr);
-        }
-        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, ipAddr);
-        }        
+    public Session(String id, String type, String status, String name, String startTime, String connectURL) {
+        this.id = id;
+        this.type = type;
+        this.status = status;
+        this.name = name;
+        this.startTime = startTime;
+        this.connectURL = connectURL;
+    }
+    
+    public String getId() {
+        return id;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getStartTime() {
+        return startTime;
+    }
+
+    public String getConnectURL() {
+        return connectURL;
     }
     
 }
