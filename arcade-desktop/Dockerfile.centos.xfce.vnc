@@ -28,7 +28,8 @@ ENV TERM=xterm \
     VNC_COL_DEPTH=24 \
     VNC_RESOLUTION=1920x1200 \
     VNC_PW=changeit \
-    VNC_VIEW_ONLY=false
+    VNC_VIEW_ONLY=false \
+    XDG_CONFIG_HOME=/headless
 WORKDIR /headless
 
 ### Add all install scripts for further steps
@@ -58,7 +59,11 @@ RUN $INST_SCRIPTS/firefox.sh
 
 ### Install xfce UI
 RUN $INST_SCRIPTS/xfce_ui.sh
-ADD ./src/common/xfce/ /headless/
+RUN mkdir -p $XDG_CONFIG_HOME/.config
+ADD ./src/common/xfce/.config/user-dirs.dirs $XDG_CONFIG_HOME/.config/
+ADD ./src/common/xfce/.config/ $XDG_CONFIG_HOME/
+ADD ./src/common/xfce/wm_startup.sh $XDG_CONFIG_HOME/
+ADD ./src/common/xfce/Desktop $XDG_CONFIG_HOME/
 
 ### configure startup
 RUN $INST_SCRIPTS/libnss_wrapper.sh
@@ -114,11 +119,11 @@ COPY software-scripts/*.desktop /usr/share/applications/
 COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
-COPY software-scripts/python.desktop /headless/Desktop/python.desktop
-COPY software-scripts/firefox.desktop /headless/Desktop/firefox.desktop
-COPY software-scripts/arcade-feedback.desktop /headless/Desktop/arcade-feedback.desktop
-COPY software-scripts/terminate.desktop /headless/Desktop/terminate.desktop
-RUN chown guest /headless/Desktop/*.desktop
+COPY software-scripts/python.desktop $XDG_CONFIG_HOME/Desktop/python.desktop
+COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
+COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
+COPY software-scripts/terminate.desktop $XDG_CONFIG_HOME/Desktop/terminate.desktop
+RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
 CMD ["--wait"]

@@ -103,7 +103,7 @@ vncserver -SecurityTypes None $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESO
 ## vncserver $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION &> $STARTUPDIR/no_vnc_startup.log
 echo -e "start window manager\n..."
 
-/headless/wm_startup.sh &> $STARTUPDIR/wm_startup.log
+$XDG_CONFIG_HOME/wm_startup.sh &> $STARTUPDIR/wm_startup.log
 
 ## log connect options
 echo -e "\n\n------------------ VNC environment started ------------------"
