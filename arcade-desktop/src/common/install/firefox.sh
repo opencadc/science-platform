@@ -38,4 +38,4 @@ function instFF() {
     exit -1
 }
 
-instFF '45.9.0esr' '/usr/lib/firefox'
+instFF '76.0.1' '/usr/lib/firefox'
