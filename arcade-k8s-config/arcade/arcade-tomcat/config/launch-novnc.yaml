@@ -49,6 +49,8 @@ spec:
           name: sssd-dir
       - name: "${arcade.jobname}"
         env:
+        - name: HOME
+          value: "/cavern/home/${arcade.userid}"
         - name: VNC_PW
           value: "${arcade.sessionid}"
         - name: arcade_hostname

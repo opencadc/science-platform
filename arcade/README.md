@@ -53,7 +53,7 @@ casa-5.6.1-8 = canfar-registry.cloud.computecanada.ca/arcade-casa:5.6.1-8.el7
 starlink-2018A-v0.3 = bucket.canfar.net/arcade-starlink:0.3
 astrodebian = sfabbro/astrodebian:0.2.2
 firefox = canfar-registry.cloud.computecanada.ca/arcade-firefox:latest
-xterm = canfar-registry.cloud.computecanada.ca/arcade-python:latest
+python = canfar-registry.cloud.computecanada.ca/arcade-python:latest
 ```
 
 ### launch-novnc.yaml and launch-software.yaml

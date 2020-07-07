@@ -9,7 +9,7 @@ LABEL io.k8s.description="Headless VNC Container with Xfce window manager, firef
       io.openshift.non-scalable=true
 
 # BM: Install fonts so remote displays work
-RUN yum update -y && yum install -y xorg-x11-fonts*
+RUN yum update -y && yum install -y xorg-x11-fonts* gedit rsync
 
 ## Connection ports for controlling the UI:
 # VNC port:5901
@@ -21,16 +21,16 @@ ENV DISPLAY=:1 \
 EXPOSE $VNC_PORT $NO_VNC_PORT
 
 ### Envrionment config
-ENV HOME=/headless \
-    TERM=xterm \
+ENV TERM=xterm \
     STARTUPDIR=/dockerstartup \
     INST_SCRIPTS=/headless/install \
     NO_VNC_HOME=/headless/noVNC \
     VNC_COL_DEPTH=24 \
     VNC_RESOLUTION=1920x1200 \
     VNC_PW=changeit \
-    VNC_VIEW_ONLY=false
-WORKDIR $HOME
+    VNC_VIEW_ONLY=false \
+    XDG_CONFIG_HOME=/headless
+WORKDIR /headless
 
 ### Add all install scripts for further steps
 ADD ./src/common/install/ $INST_SCRIPTS/
@@ -54,17 +54,21 @@ ADD ./conf/canfar-logo.png $NO_VNC_HOME/app/images/
 ADD ./conf/canfar-icon.png $NO_VNC_HOME/app/images/icons/
 
 ### Install firefox and chrome browser
-#RUN $INST_SCRIPTS/firefox.sh
+RUN $INST_SCRIPTS/firefox.sh
 #RUN $INST_SCRIPTS/chrome.sh
 
 ### Install xfce UI
 RUN $INST_SCRIPTS/xfce_ui.sh
-ADD ./src/common/xfce/ $HOME/
+RUN mkdir -p $XDG_CONFIG_HOME/.config
+ADD ./src/common/xfce/.config/user-dirs.dirs $XDG_CONFIG_HOME/.config/
+ADD ./src/common/xfce/.config/ $XDG_CONFIG_HOME/
+ADD ./src/common/xfce/wm_startup.sh $XDG_CONFIG_HOME/
+ADD ./src/common/xfce/Desktop $XDG_CONFIG_HOME/
 
 ### configure startup
 RUN $INST_SCRIPTS/libnss_wrapper.sh
 ADD ./src/common/scripts $STARTUPDIR
-RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR $HOME
+RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR /headless
 
 # CANFAR Specifics Below
 
@@ -115,11 +119,11 @@ COPY software-scripts/*.desktop /usr/share/applications/
 COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
-COPY software-scripts/xterm.desktop /headless/Desktop/xterm.desktop
-COPY software-scripts/firefox.desktop /headless/Desktop/firefox.desktop
-COPY software-scripts/arcade-feedback.desktop /headless/Desktop/arcade-feedback.desktop
-COPY software-scripts/terminate.desktop /headless/Desktop/terminate.desktop
-RUN chown guest /headless/Desktop/*.desktop
+COPY software-scripts/python.desktop $XDG_CONFIG_HOME/Desktop/python.desktop
+COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
+COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
+COPY software-scripts/terminate.desktop $XDG_CONFIG_HOME/Desktop/terminate.desktop
+RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
 CMD ["--wait"]
