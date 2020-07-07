@@ -19,7 +19,7 @@ VERSIONS_OLD = \
 	5.6.0-60.el6
 
 #VERSIONS_OLD = \
-#	5.6.0-60.el6
+#	4.5.0-el6
 
 VERSIONS = \
 	5.6.1-8.el6
@@ -37,16 +37,20 @@ build-old:
 	)
 
 build: 
-	./download.sh casa-pipeline-release-${VERSIONS} current ; \
-	docker build --build-arg RELEASE=casa-pipeline-release-${VERSIONS} -t ${DOCKER_REPO_BASE}:${VERSIONS} .; \
+	@- $(foreach V,$(VERSIONS), \
+		./download.sh casa-pipeline-release-${VERSIONS} current ; \
+		docker build --build-arg RELEASE=casa-pipeline-release-${VERSIONS} -t ${DOCKER_REPO_BASE}:${VERSIONS} .; \
+	)
 
 clean-old:
 	@- $(foreach V,$(VERSIONS_OLD), \
-	  docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
+		docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
 clean:
-	docker rmi ${DOCKER_REPO_BASE}:$(VERSIONS)
+	@- $(foreach V,$(VERSIONS), \
+		docker rmi ${DOCKER_REPO_BASE}:$(VERSIONS)
+	)
 
 clean-all: clean-old clean 
 
@@ -56,6 +60,8 @@ upload-old: build-old
 	)
 
 upload: build
-	docker push ${DOCKER_REPO_BASE}:$(VERSIONS)
+	@- $(foreach V,$(VERSIONS), \
+		docker push ${DOCKER_REPO_BASE}:$(VERSIONS)
+	)
 
 upload-all: upload-old upload 
