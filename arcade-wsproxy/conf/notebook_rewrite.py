@@ -10,7 +10,7 @@ from cachetools import TTLCache
 
 def getRedirect(input):
 
-  log("DEBUG: proxying desktop k8s session")
+  log("DEBUG: proxying notebook sessions")
   log("DEBUG: input=" + input)
   if input is None:
     log("WARN: no input")
@@ -21,9 +21,17 @@ def getRedirect(input):
   url = urlparse(params[0])
   path = url.path
   segs = path.split("/")
+  log("DEBUG: len(segs): " + str(len(segs)))
 
   sessionID = segs[2]
   log("DEBUG: sessionID=" + sessionID)
+
+  queryString = None
+  if len(params) > 2:
+    queryParam = params[2]
+    log("DEBUG: query=" + queryParam)
+    if queryParam:
+      queryString = queryParam.strip()
 
   ipAddress = getIPForSession(sessionID)
 
@@ -31,16 +39,24 @@ def getRedirect(input):
     log("WARN: IP Address not found")
     return None
 
-  port = "6901"
+  port = "8888"
+  wsPort = "8999"
 
-  ret = "http://" + ipAddress + ":" + port + "/?password=" + sessionID + "/"
-  log("DEBUG: Segs[3]: " + segs[3])
-  if (segs[3] == "websockify"):
-    ret = "ws://" + ipAddress + ":" + port + "/websockify"
-  elif (segs[3] != "connect"):
-    idx = path.find(sessionID)
-    endOfPath = path[(idx+8):]
-    ret = "http://" + ipAddress + ":" + port + endOfPath
+  idx = path.find(sessionID)
+  endOfPath = path[(idx+8):]
+  log("DEBUG: endOfPath: " + endOfPath)
+
+  ret = ""
+  if len(segs) > 4 and segs[3] == "api" and segs[4] == "kernels":
+    if queryString:
+      ret = "ws://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString
+    else:
+      ret = "ws://" + ipAddress + ":" + part + "/notebook/" + sessionID + endOfPath
+  else:
+    if queryString:
+      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString + "&token=" + sessionID
+    else:
+      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?token=" + sessionID
   return ret
 
 def getIPForSession(sessionID):
@@ -49,8 +65,8 @@ def getIPForSession(sessionID):
     return sessionIPAddress
   else:
     try:
-      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"]
-      commandString = ' '.join([str(elem) for elem in command])
+      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"] 
+      commandString = ' '.join([str(elem) for elem in command]) 
       log("DEBUG: kubectl command: " + commandString)
       sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as exc:
@@ -68,13 +84,28 @@ def getIPFromCache(sessionID):
   except KeyError:
     return None
 
+def initK8S():
+  command = ["kubectl", "config", "--kubeconfig=/www/bin/k8s-config", "use-context", "kanfarnetes-testing"]
+  commandString = ' '.join([str(elem) for elem in command])
+  log("DEBUG: kubectl init: " + commandString)
+  try:
+    result = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    log("DEBUG: success k8s init: " + result)
+    command = ["kubectl", "config", "view"]
+    subprocess.check_output(command, stderr=subprocess.STDOUT)
+    log("DEBUG:" + result)
+  except subprocess.CalledProcessError as exc:
+    log("ERROR: error calling kubectl: " + exc.output)
+
 def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
-logfile = open("/logs/desktop-rewrite.log", "a")
+logfile = open("/logs/notebook-rewrite.log", "a")
+log("INFO: notebook_rewrite.py listening to stdin")
+#initK8S()
+os.environ['HOME'] = '/root'
 cache = TTLCache(maxsize=100, ttl=120)
-log("INFO: desktop_rewrite.py listening to stdin")
 log("INFO: entering listen loop")
 
 while True:

@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2019.                            (c) 2019.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,6 +69,10 @@ package org.opencadc.arcade;
 
 import ca.nrc.cadc.util.StringUtil;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -107,64 +111,83 @@ public class GetAction extends SessionAction {
     
     public void listSessions() throws Exception {
         
+        List<Session> sessions = getAllSessions(userID);
+        StringBuilder ret = new StringBuilder();
+        
+        for (Session session : sessions) {
+            ret.append(session.getId());
+            ret.append("\t");
+            ret.append(session.getType());
+            ret.append("\t");
+            ret.append(session.getStatus());
+            ret.append("\t");
+            ret.append(session.getName());
+            ret.append("\t");
+            ret.append(session.getConnectURL());
+            ret.append("\t");
+            ret.append(session.getStartTime());
+            ret.append("\n");
+        }
+        syncOutput.getOutputStream().write(ret.toString().getBytes());
+        return;
+    }
+    
+    public static List<Session> getAllSessions(String forUserID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] getSessionsCMD = new String[] {
             "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID,
+            "--selector=canfar-net-userid=" + forUserID,
             "--no-headers=true",
             "-o", "custom-columns=" +
                 "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
                 "TYPE:.metadata.labels.canfar-net-sessionType," +
                 "STATUS:.status.phase," +
                 "NAME:.metadata.labels.canfar-net-sessionName," +
-                "IPADDR:.status.podIP," +
                 "STARTED:.status.startTime," +
                 "DELETION:.metadata.deletionTimestamp"};
-     
                 
         String vncSessions = execute(getSessionsCMD);
         log.debug("VNC Session list: " + vncSessions);
         
+        List<Session> sessions = new ArrayList<Session>();
+        
         if (StringUtil.hasLength(vncSessions)) {
             String[] lines = vncSessions.split("\n");
-
-            String host = K8SUtil.getHostName();
-            
-            StringBuilder ret = new StringBuilder();
             for (String line : lines) {
-                log.debug("line: " + line);
-                String[] parts = line.split("\\s+");
-                String sessionID = parts[0];
-                String sessionType = parts[1];
-                String status = parts[2];
-                String sessionName = parts[3];
-                String ipAddr = parts[4];
-                String startTime = parts[5];
-                String terminating = parts[6];
-                if (terminating != null && !"<none>".equals(terminating)) {
-                    status = "Terminating";
-                }
-                String connectURL = super.getVNCURL(host, sessionID, ipAddr);
-                if (SessionAction.SESSION_TYPE_CARTA.equals(sessionType)) {
-                    connectURL = super.getCartaURL(host, sessionID, ipAddr);
-                }
-                ret.append(sessionID);
-                ret.append("\t");
-                ret.append(sessionType);
-                ret.append("\t");
-                ret.append(status);
-                ret.append("\t");
-                ret.append(sessionName);
-                ret.append("\t");
-                ret.append(connectURL);
-                ret.append("\t");
-                ret.append("Up since " + startTime);
-                ret.append("\n");
+                Session session = constructSession(line);
+                sessions.add(session);
             }
-            syncOutput.getOutputStream().write(ret.toString().getBytes());
-            return;
         }
-        log.debug("No container listing output");
+        
+        return sessions;
+    }
+    
+    private static Session constructSession(String k8sOutput) throws IOException {
+        log.debug("line: " + k8sOutput);
+        String[] parts = k8sOutput.split("\\s+");
+        String id = parts[0];
+        String type = parts[1];
+        String status = parts[2];
+        String name = parts[3];
+        String startTime = "Up since " + parts[4];
+        String deletionTimestamp = parts[5];
+        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+            status = Session.STATUS_TERMINATING;
+        }
+        String host = K8SUtil.getHostName();
+        String connectURL = "unknown";
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
+            connectURL = SessionAction.getVNCURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            connectURL = SessionAction.getCartaURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+            connectURL = SessionAction.getNotebookURL(host, id);
+        }
+
+        return new Session(id, type, status, name, startTime, connectURL);
+        
     }
 
 }

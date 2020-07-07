@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2019.                            (c) 2019.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -183,26 +183,21 @@ public class PostAction extends SessionAction {
         if (!StringUtil.hasText(type)) {
             throw new IllegalArgumentException("type must have a value");
         }
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) || SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) ||
+            SessionAction.SESSION_TYPE_CARTA.equals(type) ||
+            SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             return;
         }
         throw new IllegalArgumentException("type must be one of " + SessionAction.SESSION_TYPE_DESKTOP
-            + " or " + SessionAction.SESSION_TYPE_CARTA);
+            + ", " + SessionAction.SESSION_TYPE_NOTEBOOK + " or " + SessionAction.SESSION_TYPE_CARTA);
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
-        
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + userID + ",canfar-net-sessionType=" + type,
-            "--no-headers=true"};
-                
-        String vncSessions = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + vncSessions);
-        
-        if (StringUtil.hasLength(vncSessions)) {
-            throw new IllegalArgumentException("User " + userID + " has a session already running.");
+        List<Session> sessions = GetAction.getAllSessions(userid);
+        for (Session session : sessions) {
+            if (session.getType().equals(type) && !session.getStatus().equals(Session.STATUS_TERMINATING)) {
+                throw new IllegalArgumentException("User " + userID + " has a session already running.");
+            }
         }
     }
     
@@ -219,6 +214,9 @@ public class PostAction extends SessionAction {
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
                 launchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                launchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -242,24 +240,6 @@ public class PostAction extends SessionAction {
         String createResult = execute(launchCmd);
         log.debug("Create result: " + createResult);
         
-        String[] getIPCmd = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-sessionID=" + sessionID,
-            "-o", "jsonpath={.items[0].status.podIP}"};
-        String ipAddress = "";
-        int attempts = 0;
-        while (!StringUtil.hasText(ipAddress) && attempts < 10) {          
-            try {
-                log.debug("Sleeping for 1 second");
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-            }
-            log.debug("awake now");
-            ipAddress = execute(getIPCmd);
-            attempts++;
-        }
-        log.debug("pod IP: " + ipAddress);
-        
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();   
         injectProxyCert("/cavern/home", subject, userID, posixID);
@@ -275,10 +255,13 @@ public class PostAction extends SessionAction {
         URL sessionLink = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID));
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
-                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID, ipAddress));
+                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID));
+                break;
+            case SessionAction.SESSION_TYPE_NOTEBOOK:
+                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID));
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -309,7 +292,7 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         
         String uniqueID = new RandomStringGenerator(8).getID();
-        String jobName = name + "-" + userID + "-" + sessionID + "-" + uniqueID;
+        String jobName = name + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
         String containerName = name.replaceAll("\\.", "-"); // no dots in k8s names
         
         String launchString = new String(launchBytes, "UTF-8");

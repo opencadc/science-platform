@@ -4,7 +4,7 @@ metadata:
   name: cavern-ceph-claim
   namespace: development
   labels:
-    app: cavern-ceph-claim
+    app: cavern-ceph-claim-20200608
   finalizers:
 spec:
   storageClassName: rook-cephfs

@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2018.                            (c) 2018.
+*  (c) 2020.                            (c) 2020.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -67,6 +67,16 @@
 
 package org.opencadc.arcade;
 
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.reg.client.LocalAuthority;
+import ca.nrc.cadc.rest.InlineContentHandler;
+import ca.nrc.cadc.rest.RestAction;
+import ca.nrc.cadc.util.MultiValuedProperties;
+import ca.nrc.cadc.util.PropertiesReader;
+
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -76,16 +86,10 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.AccessControlException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
@@ -97,16 +101,6 @@ import org.opencadc.gms.GroupClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.GroupUtil;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.net.HttpDownload;
-import ca.nrc.cadc.reg.client.LocalAuthority;
-import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.rest.RestAction;
-import ca.nrc.cadc.util.MultiValuedProperties;
-import ca.nrc.cadc.util.PropertiesReader;
-
 public abstract class SessionAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SessionAction.class);
@@ -116,6 +110,7 @@ public abstract class SessionAction extends RestAction {
     
     protected static final String SESSION_TYPE_DESKTOP = "desktop";
     protected static final String SESSION_TYPE_CARTA = "carta";
+    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
     
     protected String userID;
     protected String requestType;
@@ -224,19 +219,23 @@ public abstract class SessionAction extends RestAction {
         return stdout.trim();
     }
     
-    public String getVNCURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?password=" + sessionID +
-            "&path=desktop/" + ipAddress + "/" + sessionID + "/websockify";
+        return "https://" + host + "/desktop/" + sessionID + "/connect?password=" + sessionID +
+            "&path=desktop/" + sessionID + "/websockify";
     }
     
-    public String getCartaURL(String host, String sessionID, String ipAddress) throws MalformedURLException {
-        return "https://" + host + "/carta/" + ipAddress + "/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
-            ipAddress + "/" + sessionID + "/socket/";
+    public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/carta/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
+            sessionID + "/socket/";
+    }
+    
+    public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/tree";
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
@@ -252,7 +251,7 @@ public abstract class SessionAction extends RestAction {
             public String run() throws Exception {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 String userid = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
-                HttpDownload download = new HttpDownload(
+                HttpGet download = new HttpGet(
                         new URL("https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
                 download.run();
                 String proxyCert = out.toString();
@@ -282,9 +281,10 @@ public abstract class SessionAction extends RestAction {
         Iterator<String> it = names.iterator();
         while (it.hasNext()) {
             String next = it.next();
-            log.debug("Next: " + next);
+            log.debug("Next key: " + next);
             String value = mp.getProperty(next).get(0);
-            if (value.equals(software)) {
+            log.debug("Next value: " + value);
+            if (software.trim().equals(value)) {
                 return next;
             }
         }
