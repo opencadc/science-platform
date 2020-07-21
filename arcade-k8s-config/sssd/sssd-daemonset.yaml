@@ -1,56 +1,33 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
-  labels:
-    run: mount-test
-  name: mount-test
+  name: sssd-canfar-test-ds
   namespace: development
+  labels:
+    k8s-app: cavern-sssd-ds
 spec:
-  replicas: 1
   selector:
     matchLabels:
-      run: mount-test
+      name: cavern-sssd-ds
   template:
     metadata:
-      creationTimestamp: null
       labels:
-        run: mount-test
+        name: cavern-sssd-ds
     spec:
       initContainers:
       - name: init-sssd-dir
         image: busybox
         command: ["/bin/sh", "-c"]
         args:
-        - mkdir /var/lib/sss/pipes/private;
+        - mkdir -p /var/lib/sss/pipes/private;
           chmod 700 /var/lib/sss/pipes/private;
         volumeMounts:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: mount-test
-        image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:latest
-        imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
-        command: [ "/bin/bash", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        securityContext:
-#          runAsUser: 20004
-#          runAsGroup: 20004
-          runAsUser: 184130476
-          runAsGroup: 184130476
-          allowPrivilegeEscalation: false
-        volumeMounts:
-        - mountPath: "/cephfs"
-          name: cavern-ceph-volume
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-      - name: cavern-sssd
-        #image: canfar-registry.cloud.computecanada.ca/cadc-sssd:0.2
+      - name: cavern-sssd-ds
         image: canfar-registry.cloud.computecanada.ca/cadc-sssd:latest
         imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
-        #command: ["/usr/sbin/sssd", "-d 10", "--logger=files"]
-        #command: ["/usr/sbin/sssd", "--logger=stderr"]
         volumeMounts:
         - mountPath: /etc/sssd/sssd.conf
           subPath: sssd.conf
@@ -62,11 +39,12 @@ spec:
           subPath: cadc_CA_2029.crt
           name: sssd-cert-config-vol
         - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
+          name: sssd-dir          
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: sss
       volumes:
-      - name: cavern-ceph-volume
-        persistentVolumeClaim:
-          claimName: cavern-ceph-claim-2000608
       - name: sssd-config-vol
         configMap:
           name: sssd-config
@@ -77,4 +55,6 @@ spec:
         configMap:
           name: sssd-cert-config
       - name: sssd-dir
-        emptyDir: {}
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory
