@@ -70,8 +70,8 @@ echo -e "\n------------------ change VNC password  ------------------"
 ## change vnc password
 echo -e "\n------------------ change VNC password  ------------------"
 # first entry is control, second is view (if only one is valid for both)
-mkdir -p "$HOME/.vnc"
-PASSWD_PATH="$HOME/.vnc/passwd"
+mkdir -p "/headless/.vnc"
+PASSWD_PATH="/headless/.vnc/passwd"
 if [[ $VNC_VIEW_ONLY == "true" ]]; then
     echo "start VNC server in VIEW ONLY mode!"
     #create random pw to prevent access
@@ -97,11 +97,11 @@ echo -e "start vncserver with param: VNC_COL_DEPTH=$VNC_COL_DEPTH, VNC_RESOLUTIO
 if [[ $DEBUG == true ]]; then echo "vncserver $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION"; fi
 
 ## BM: The 'no password' start command is commented out
-## vncserver -SecurityTypes None $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION &> $STARTUPDIR/no_vnc_startup.log
-vncserver $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION &> $STARTUPDIR/no_vnc_startup.log
+vncserver -SecurityTypes None $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION &> $STARTUPDIR/no_vnc_startup.log
+## vncserver $DISPLAY -depth $VNC_COL_DEPTH -geometry $VNC_RESOLUTION &> $STARTUPDIR/no_vnc_startup.log
 echo -e "start window manager\n..."
 
-$HOME/wm_startup.sh &> $STARTUPDIR/wm_startup.log
+$XDG_CONFIG_HOME/wm_startup.sh &> $STARTUPDIR/wm_startup.log
 
 ## log connect options
 echo -e "\n\n------------------ VNC environment started ------------------"
@@ -121,9 +121,9 @@ echo "reloading xtermconfig for $arcade_username"
 xrdb /cavern/home/$arcade_username/.Xresources
 
 if [[ $DEBUG == true ]] || [[ $1 =~ -t|--tail-log ]]; then
-    echo -e "\n------------------ $HOME/.vnc/*$DISPLAY.log ------------------"
+    echo -e "\n------------------ /headless/.vnc/*$DISPLAY.log ------------------"
     # if option `-t` or `--tail-log` block the execution and tail the VNC log
-    tail -f $STARTUPDIR/*.log $HOME/.vnc/*$DISPLAY.log
+    tail -f $STARTUPDIR/*.log /headless/.vnc/*$DISPLAY.log
 fi
 
 if [ -z "$1" ] || [[ $1 =~ -w|--wait ]]; then

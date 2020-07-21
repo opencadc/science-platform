@@ -10,6 +10,6 @@ xset -dpms &
 xset s noblank &
 xset s off &
 
-/usr/bin/startxfce4 --replace > $HOME/wm.log &
+/usr/bin/startxfce4 --replace > $XDG_CONFIG_HOME/wm.log &
 sleep 1
-cat $HOME/wm.log
+cat $XDG_CONFIG_HOME/wm.log
