@@ -38,8 +38,8 @@ build-old:
 
 build: 
 	@- $(foreach V,$(VERSIONS), \
-		./download.sh casa-pipeline-release-${VERSIONS} current ; \
-		docker build --build-arg RELEASE=casa-pipeline-release-${VERSIONS} -t ${DOCKER_REPO_BASE}:${VERSIONS} .; \
+                ./download.sh casa-pipeline-release-$(V) current ; \
+                docker build --build-arg RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 clean-old:
@@ -49,7 +49,7 @@ clean-old:
 
 clean:
 	@- $(foreach V,$(VERSIONS), \
-		docker rmi ${DOCKER_REPO_BASE}:$(VERSIONS)
+                docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
 clean-all: clean-old clean 
@@ -61,7 +61,7 @@ upload-old: build-old
 
 upload: build
 	@- $(foreach V,$(VERSIONS), \
-		docker push ${DOCKER_REPO_BASE}:$(VERSIONS)
+                docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
 upload-all: upload-old upload 
