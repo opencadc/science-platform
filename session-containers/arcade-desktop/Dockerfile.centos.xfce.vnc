@@ -122,7 +122,7 @@ COPY tmp/*.desktop /usr/share/applications/
 COPY software-scripts/python.desktop $XDG_CONFIG_HOME/Desktop/python.desktop
 COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
-COPY software-scripts/terminate.desktop $XDG_CONFIG_HOME/Desktop/terminate.desktop
+COPY software-scripts/kill-session.desktop $XDG_CONFIG_HOME/Desktop/kill-session.desktop
 RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
