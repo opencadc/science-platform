@@ -63,7 +63,7 @@ The following instructions will work for both Ubuntu/Debian and OSX. Instruction
 
 To start we will need to create a local directory in which to mount ARCADE's file system, cavern.
 
-`mkdir /mnt/cavern`
+`mkdir $HOME/mnt/cavern`
 
 Now we can use sshfs to mount the file system locally with the following command. If your VPS was created with a password login the following command will do the trick. You will be asked for your virtual server’s root password during this step.
 
