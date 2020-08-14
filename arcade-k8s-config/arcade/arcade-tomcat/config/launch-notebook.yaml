@@ -20,6 +20,15 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: rcs.uvic.ca/rook-ceph-role
+                operator: NotIn
+                values:
+                - osd
       containers:
       - name: "${arcade.jobname}"
         env:
@@ -68,6 +77,9 @@ spec:
         - mountPath: "/cavern"
           name: cavern-volume
           subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${arcade.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
@@ -75,6 +87,8 @@ spec:
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: cavern-ceph-claim-20200608
+      - name: scratch-dir
+        emptyDir: {}
       - name: sssd-dir
         hostPath:
           path: /var/lib/ubernetes
