@@ -1,6 +1,11 @@
 #!/bin/bash
 ### every exit != 0 fails the script
-set -e
+
+# BM: temporarily disabled
+#set -e
+
+# BM
+echo "enter vnc_startup.sh"
 
 ## print out help
 help (){
@@ -36,6 +41,9 @@ if [[ $1 =~ -h|--help ]]; then
     help
     exit 0
 fi
+
+# BM
+echo "about to source $HOME/.bashrc"
 
 # should also source $STARTUPDIR/generate_container_user
 source $HOME/.bashrc
