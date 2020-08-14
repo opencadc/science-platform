@@ -41,11 +41,10 @@ ADD admit /opt/admit
 RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${RELEASE}
 
-# replace data repository with an up-to-date version
+# replace data repository with an up-to-date version for leap second fix (issue #33)
 RUN rm -rf /opt/${RELEASE}/data
 RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
 
-# add leap second patch (issue #33)
 RUN mkdir /arcade
 ADD startup.sh /arcade/
 

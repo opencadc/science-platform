@@ -52,10 +52,15 @@ def getIPForSession(sessionID):
     return sessionIPAddress
   else:
     try:
-      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP"]
+      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"]
       commandString = ' '.join([str(elem) for elem in command])
       log("DEBUG: kubectl command: " + commandString)
-      sessionIPAddress = subprocess.check_output(command, stderr=subprocess.STDOUT)
+      commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
+      lines = commandOutput.splitlines()
+      for line in lines:
+        parts = line.split()
+        if (parts[1].strip() == "<none>"):
+          sessionIPAddress = parts[0]
     except subprocess.CalledProcessError as exc:
       log("ERROR: error calling kubectl: " + exc.output)
       return None
