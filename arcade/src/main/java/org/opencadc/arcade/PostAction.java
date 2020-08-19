@@ -292,8 +292,8 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         
         String uniqueID = new RandomStringGenerator(8).getID();
-        String jobName = name + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
-        String containerName = name.replaceAll("\\.", "-"); // no dots in k8s names
+        String jobName = name.toLowerCase() + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
+        String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         
         String launchString = new String(launchBytes, "UTF-8");
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
