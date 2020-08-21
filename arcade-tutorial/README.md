@@ -50,41 +50,47 @@ You can then find the new session’s URL by running the same command as listed 
 where {sessionID} is the 8 character string that comes back from the session listing above.
 
 
-# How To Use SSHFS to Mount the ARCADE File System Over SSH and use `rsync`
+# How To Use SSHFS to Mount the ARCADE File System Over SSH and Use `rsync`
 
-In many cases it can become cumbersome to transfer large files to and from ARCADE. Luckily there is a way to mount the ARCADE file system to your local computer so you can make changes on the fly and treat the ARCADE file system as local storage. In this article, we will show you how to do exactly that.
+In many cases it can become cumbersome to transfer large files to and from ARCADE. Luckily there is a way to mount the ARCADE file system to your local computer so you can make changes on the fly and treat the ARCADE file system as local storage.
 
 ## Installing SSHFS
 ### On Ubuntu/Debian
 
-SSHFS is Linux based software that needs to be installed on your local computer. On Ubuntu and Debian based systems it can be installed through apt-get.
+SSHFS is Linux-based software that needs to be installed on your local computer. On Ubuntu and Debian based systems it can be installed through `apt-get`.
 
 `sudo apt-get install sshfs`
 
 ### On Mac OSX
 
-You can install SSHFS on Mac OSX (although it's often already there). You will need to download FUSE and SSHFS from the osxfuse site (https://osxfuse.github.io/)
+You can install SSHFS on Mac OSX (although it's often already there). You will need to download FUSE and SSHFS from the osxfuse site (https://osxfuse.github.io/).
 
 ## Mounting the Remote File System
 
-The following instructions will work for both Ubuntu/Debian and OSX. Instructions for Windows systems can be found at the bottom of this page (https://www.digitalocean.com/community/tutorials/how-to-use-sshfs-to-mount-remote-file-systems-over-ssh).
+The following instructions will work for both Ubuntu/Debian and OSX. Instructions for Windows systems can be found at the bottom of [this page](https://www.digitalocean.com/community/tutorials/how-to-use-sshfs-to-mount-remote-file-systems-over-ssh).
 
-To start we will need to create a local directory in which to mount ARCADE's file system, cavern.
+To start, we will need to create a local directory in which to mount ARCADE's file system, "cavern."
 
 `mkdir $HOME/mnt/cavern`
 
-Now we can use sshfs to mount the file system locally with the following command. If your VPS was created with a password login the following command will do the trick. You will be asked for your virtual server’s root password during this step.
+Now we can mount the file system locally using the following command, based on which OS you are running. You will be asked for your CADC password during this step.
 
-`sshfs -p 64022 -o allow_other,defer_permissions {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+### On Ubuntu/Debian
 
-## How To Use Rsync to Sync Local and ARCADE Directories over SSH
+`sshfs -o port=6402 {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+
+### On Mac OSX
+
+`sshfs -o port=6402,defer_permissions {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+
+The `defer_permissions` option works around issues with OSX permission handling. See [here](https://github.com/osxfuse/osxfuse/wiki/Mount-options#default_permissions-and-defer_permissions) for more details.
+
+## Syncing Local and ARCADE Directories with `rsync` Over SSH
 
 Rsync, which stands for “remote sync”, is a remote and local file synchronization tool. It uses an algorithm that minimizes the amount of data copied by only moving the portions of files that have changed. Further Rsync examples and docs are [here](https://www.digitalocean.com/community/tutorials/how-to-use-rsync-to-sync-local-and-remote-directories-on-a-vps).
 
-Do an sshfs mount on your local machine:
-`sshfs -p 64022 -o allow_other,defer_permissions {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+Follow the steps above to install SSHFS and mount the ARCADE file system locally. Then perform the sync.
 
-Perform your rsync:
 `rsync -rvP source_dir $HOME/mnt/cavern/destination_dir/`
 
 # How to set up CADC's `vos` tools to transfer from your local computer to arcade
