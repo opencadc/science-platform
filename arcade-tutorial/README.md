@@ -91,7 +91,13 @@ Rsync, which stands for “remote sync”, is a remote and local file synchroniz
 
 Follow the steps above to install SSHFS and mount the ARCADE file system locally. Then perform the sync.
 
-`rsync -rvP source_dir $HOME/mnt/cavern/destination_dir/`
+`rsync -vrltP source_dir $HOME/mnt/cavern/destination_dir/`
+
+- `-v` increases verbosity
+- `-r` recurses into directories
+- `-l` copies symlinks as symlinks
+- `-t` preserves modification times (see `man rsync` for more details on why this option prevents resending already transferred data when not using `-a`)
+- `-P` keeps partially transferred files and shows progress during transfer
 
 # How to set up CADC's `vos` tools to transfer from your local computer to arcade
 
