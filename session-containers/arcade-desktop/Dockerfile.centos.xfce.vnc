@@ -119,7 +119,7 @@ COPY software-scripts/*.desktop /usr/share/applications/
 COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
-COPY software-scripts/python.desktop $XDG_CONFIG_HOME/Desktop/python.desktop
+COPY software-scripts/xterm.desktop $XDG_CONFIG_HOME/Desktop/xterm.desktop
 COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
 COPY software-scripts/kill-session.desktop $XDG_CONFIG_HOME/Desktop/kill-session.desktop
