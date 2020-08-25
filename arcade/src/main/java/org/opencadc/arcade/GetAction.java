@@ -94,7 +94,8 @@ public class GetAction extends SessionAction {
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 // List the sessions
-                listSessions();
+                String typeFilter = syncInput.getParameter("type");
+                listSessions(typeFilter);
             } else {
                 throw new UnsupportedOperationException("Session detail viewing not supported.");
             }
@@ -109,24 +110,26 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public void listSessions() throws Exception {
+    public void listSessions(String typeFilter) throws Exception {
         
         List<Session> sessions = getAllSessions(userID);
         StringBuilder ret = new StringBuilder();
         
         for (Session session : sessions) {
-            ret.append(session.getId());
-            ret.append("\t");
-            ret.append(session.getType());
-            ret.append("\t");
-            ret.append(session.getStatus());
-            ret.append("\t");
-            ret.append(session.getName());
-            ret.append("\t");
-            ret.append(session.getConnectURL());
-            ret.append("\t");
-            ret.append(session.getStartTime());
-            ret.append("\n");
+            if (typeFilter == null || session.getType().equals(typeFilter)) {
+                ret.append(session.getId());
+                ret.append("\t");
+                ret.append(session.getType());
+                ret.append("\t");
+                ret.append(session.getStatus());
+                ret.append("\t");
+                ret.append(session.getName());
+                ret.append("\t");
+                ret.append(session.getConnectURL());
+                ret.append("\t");
+                ret.append(session.getStartTime());
+                ret.append("\n");
+            }
         }
         syncOutput.getOutputStream().write(ret.toString().getBytes());
         return;
