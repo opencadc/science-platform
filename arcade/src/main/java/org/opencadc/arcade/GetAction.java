@@ -95,7 +95,8 @@ public class GetAction extends SessionAction {
             if (sessionID == null) {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
-                listSessions(typeFilter);
+                String statusFilter = syncInput.getParameter("status");
+                listSessions(typeFilter, statusFilter);
             } else {
                 throw new UnsupportedOperationException("Session detail viewing not supported.");
             }
@@ -110,13 +111,17 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public void listSessions(String typeFilter) throws Exception {
+    public void listSessions(String typeFilter, String statusFilter) throws Exception {
         
         List<Session> sessions = getAllSessions(userID);
         StringBuilder ret = new StringBuilder();
         
+        log.debug("typeFilter=" + typeFilter);
+        log.debug("statusFilter=" + statusFilter);
+        
         for (Session session : sessions) {
-            if (typeFilter == null || session.getType().equals(typeFilter)) {
+            if ((typeFilter == null || session.getType().equalsIgnoreCase(typeFilter)) &&
+                (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
                 ret.append(session.getId());
                 ret.append("\t");
                 ret.append(session.getType());
