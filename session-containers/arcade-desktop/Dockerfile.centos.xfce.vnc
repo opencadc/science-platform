@@ -63,7 +63,11 @@ RUN mkdir -p $XDG_CONFIG_HOME/.config
 ADD ./src/common/xfce/.config/user-dirs.dirs $XDG_CONFIG_HOME/.config/
 ADD ./src/common/xfce/.config/ $XDG_CONFIG_HOME/
 ADD ./src/common/xfce/wm_startup.sh $XDG_CONFIG_HOME/
-ADD ./src/common/xfce/Desktop $XDG_CONFIG_HOME/
+RUN mkdir -p $XDG_CONFIG_HOME/Desktop
+ADD ./src/common/xfce/Desktop/terminal_startup.sh $XDG_CONFIG_HOME/
+RUN rm /usr/share/applications/exo-terminal-emulator.desktop
+ADD ./software-scripts/exo-terminal-emulator.desktop /usr/share/applications/exo-terminal-emulator.desktop
+RUN rm /etc/xdg/Thunar/uca.xml
 
 ### configure startup
 RUN $INST_SCRIPTS/libnss_wrapper.sh
