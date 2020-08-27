@@ -77,11 +77,11 @@ Now we can mount the file system locally using the following command, based on w
 
 ### On Ubuntu/Debian
 
-`sshfs -o port=6402 {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+`sshfs -o port=64022 {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
 
 ### On Mac OSX
 
-`sshfs -o port=6402,defer_permissions {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
+`sshfs -o port=64022,defer_permissions {your_cadc_username}@proto.canfar.net:/ $HOME/mnt/cavern`
 
 The `defer_permissions` option works around issues with OSX permission handling. See [here](https://github.com/osxfuse/osxfuse/wiki/Mount-options#default_permissions-and-defer_permissions) for more details.
 
@@ -91,7 +91,25 @@ Rsync, which stands for “remote sync”, is a remote and local file synchroniz
 
 Follow the steps above to install SSHFS and mount the ARCADE file system locally. Then perform the sync.
 
-`rsync -rvP source_dir $HOME/mnt/cavern/destination_dir/`
+`rsync -vrltP source_dir $HOME/mnt/cavern/destination_dir/`
+
+- `-v` increases verbosity
+- `-r` recurses into directories
+- `-l` copies symlinks as symlinks
+- `-t` preserves modification times (see `man rsync` for more details on why this option prevents resending already transferred data when not using `-a`)
+- `-P` keeps partially transferred files and shows progress during transfer
+
+# How to verify data transferred to ARCADE
+
+Regardless of how you transferred your data to ARCADE, it can be helpful to check that the copy on ARCADE is identical to the original.
+
+Likely the most robust method of deteriming this is to calculate cryptographic hashes (checksums) from the data. If you have a single file (e.g. a tarfile) then you can just run the hasher on that file both locally and on ARCADE to make sure the outputs are the same.
+
+`shasum -a 256 /path/to/data`
+
+If you are trying to check a directory and all its contents were fully transferred then move into the top level of the directory you want to test and run the following. Checking the output locally and on ARCADE are identical will tell you that all data was transferred.
+
+`find . -type f -exec shasum -a 256 {} \; | sort -k 1 | shasum -a 256`
 
 # How to set up CADC's `vos` tools to transfer from your local computer to arcade
 
