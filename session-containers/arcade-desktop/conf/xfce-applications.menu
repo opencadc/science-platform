@@ -162,10 +162,10 @@
     </Menu>
 
     <Menu>
-        <Name>CANFAR</Name>
+        <Name>ARCADE</Name>
         <Directory>xfce-canfar.directory</Directory>
         <Include>
-            <Category>CANFAR</Category>
+            <Category>ARCADE</Category>
         </Include>
         <Menu>
             <Name>CASA</Name>
