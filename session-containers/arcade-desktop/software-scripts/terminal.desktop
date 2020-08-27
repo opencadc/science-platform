@@ -1,9 +1,9 @@
 [Desktop Entry]
 Version=1.0
-Name=xterm
+Name=terminal
 Comment=General terminal for Arcade
-Keywords=xterm
-Exec=/usr/local/bin/xterm.sh
+Keywords=terminal
+Exec=/usr/local/bin/terminal.sh
 Terminal=false
 X-MultipleArgs=false
 Icon=/headless/.icons/terminal.svg.png

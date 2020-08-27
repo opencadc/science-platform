@@ -12,6 +12,10 @@
         <Category>X-Xfce-Toplevel</Category>
     </Include>
 
+    <Exclude>
+        <Filename>exo-terminal-emulator.desktop</Filename>
+    </Exclude>
+
     <Layout>
         <Filename>xfce4-run.desktop</Filename>
         <Separator/>
