@@ -121,10 +121,11 @@ COPY software-scripts/*.desktop /usr/share/applications/
 COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
-COPY software-scripts/terminal.desktop $XDG_CONFIG_HOME/Desktop/terminal.desktop
-COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
+COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
+COPY software-scripts/gedit.desktop $XDG_CONFIG_HOME/Desktop/gedit.desktop
 COPY software-scripts/kill-session.desktop $XDG_CONFIG_HOME/Desktop/kill-session.desktop
+COPY software-scripts/terminal.desktop $XDG_CONFIG_HOME/Desktop/terminal.desktop
 RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
