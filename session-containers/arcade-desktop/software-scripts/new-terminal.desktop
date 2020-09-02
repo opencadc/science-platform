@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=new-terminal
+Comment=General terminal for Arcade
+Keywords=terminal
+Exec=/usr/local/bin/new-terminal.sh
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/terminal.svg.png
+Type=Application
+Categories=ARCADE;
