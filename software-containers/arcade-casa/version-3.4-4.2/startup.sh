@@ -12,7 +12,7 @@ function execute {
     else
         if [ ${#msg} -gt 0 ]
         then
-            echo "Failed to executed $cmd, return code = $rc, $msg"
+            echo "Failed to execute $cmd, return code = $rc, $msg"
         else
             echo "Failed to execute $cmd , return code = $rc, no stdout or stderr"
         fi
