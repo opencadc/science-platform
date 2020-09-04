@@ -29,14 +29,14 @@ If your any of your sessions close, a new session (and URL) can be easily create
 `cadc-get-cert -u {your_cadc_username}`\
 (enter your password at the prompt)
 
-2. `curl -E ~/.ssl/cadcproxy.pem https://proto.canfar.net/arcade/session -d "name={my_session_name}" -d “type=desktop"`
+2. `curl -E ~/.ssl/cadcproxy.pem https://proto.canfar.net/arcade/session -d "name={my_session_name}" -d "type=desktop"`
 
 where `{my_session_name}` is the name that you set for the session (e.g., `{your_cadc_username}-arcade`). This can be any string that you want, so long as it is a single string with no spaces.
 
 ### CARTA
-To instead initiate a new CARTA session, the last part of the command would instead be “type=carta”.
+To instead initiate a new CARTA session, the last part of the command would instead be `"type=carta"`.
 
-2. `curl -E ~/.ssl/cadcproxy.pem https://proto.canfar.net/arcade/session -d "name={my_session_name}" -d “type=carta"`
+2. `curl -E ~/.ssl/cadcproxy.pem https://proto.canfar.net/arcade/session -d name={my_session_name} -d type=carta`
 
 You can then find the new session’s URL by running the same command as listed in Step 3 above:
 
@@ -87,7 +87,7 @@ The `defer_permissions` option works around issues with OSX permission handling.
 
 ## Syncing Local and ARCADE Directories with `rsync` Over SSH
 
-Rsync, which stands for “remote sync”, is a remote and local file synchronization tool. It uses an algorithm that minimizes the amount of data copied by only moving the portions of files that have changed. Further Rsync examples and docs are [here](https://www.digitalocean.com/community/tutorials/how-to-use-rsync-to-sync-local-and-remote-directories-on-a-vps).
+Rsync, which stands for "remote sync", is a remote and local file synchronization tool. It uses an algorithm that minimizes the amount of data copied by only moving the portions of files that have changed. Further Rsync examples and docs are [here](https://www.digitalocean.com/community/tutorials/how-to-use-rsync-to-sync-local-and-remote-directories-on-a-vps).
 
 Follow the steps above to install SSHFS and mount the ARCADE file system locally. Then perform the sync.
 
