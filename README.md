@@ -1,5 +1,5 @@
 # ARCADE: ALMA Reduction in the CANFAR Data Environment
-Principal nvestigator: Toby Brown, Helen Kirk
+Principal Investigator: Toby Brown, Helen Kirk
 
 ## Overview
 ARCADE is a general purpose online platform built to support ALMA data processing requirements. The system is currently in beta deployment with a limited number of simultaneous users.
