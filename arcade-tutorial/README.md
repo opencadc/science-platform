@@ -22,7 +22,11 @@ Many interactions with the ARCADE system require CANFAR's _vos tools_ software. 
 
 ## Create your own ARCADE and CARTA sessions
 
-If your any of your sessions close, a new session (and URL) can be easily created.
+**Easy (Recommended)**
+Sessions are started (or resumed) using the `ARCADE` and `CARTA` buttons on the [demo CANFAR homepage](https://demo.canfar.net/en/). Ensure you are logged in to your CADC account at the top right of the page to enable these options.
+
+**Advanced**
+If the easy method above fails or you would rather use the command line to start/resume your sessions:
 
 ### ARCADE
 1. Get your security credentials (standard CADC certificate expires every 10 days) \

@@ -1,14 +1,27 @@
-# arcade
-Interactive Science Platform for ALMA processing
+# ARCADE: ALMA Reduction in the CANFAR Data Environment
+Principal nvestigator: Toby Brown, Helen Kirk
 
 ## Overview
-Arcade is a general purpose science platform built to support ALMA processing requirements.  It allows users to visually interact with docker containers that have been built for specialized tasks.
+ARCADE is a general purpose online platform built to support ALMA data processing requirements. The system is currently in beta deployment with a limited number of simultaneous users.
 
-Because all components of arcade are containers, they can be scaled out on a cluster of nodes to meet the storage and processing demands of the scientific software containers.
+The ARCADE system is also fully integrated with [CARTA: The Cube Analysis and Rendering Tool for Astronomy](https://cartavis.github.io/).
+
+## Getting started
+Obtaining an ARCADE user allocation requires a [CADC account](http://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html). Allocations are provided on a case-by-case basis while the system is in beta.
+
+Sessions are started (or resumed) using the `ARCADE` and `CARTA` buttons on the [demo CANFAR homepage](https://demo.canfar.net/en/). Ensure you are logged in to your CADC account at the top right of the page to enable these options.
+
+## Tutorials
+
+There are also a series of [how to guides](https://github.com/opencadc/arcade/tree/master/arcade-tutorial) for ARCADE.
+
+## Technical Overview
 
 ![ARCADE-architecture-bigpicture](ARCADE-architecture-bigpicture.png)
 
-## Components
+## System Components
+
+Components of arcade are containers that can be scaled out on a cluster of nodes to meet the storage and processing demands of the scientific software containers.
 
 ### arcade
 The arcade module provides the API for creating arcade sessions and launching applications within that session.  It is a Java war file running in tomcat 8 in a container.
