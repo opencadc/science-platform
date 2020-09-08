@@ -4,6 +4,8 @@ Principal nvestigator: Toby Brown, Helen Kirk
 ## Overview
 ARCADE is a general purpose online platform built to support ALMA data processing requirements. The system is currently in beta deployment with a limited number of simultaneous users.
 
+The ARCADE system is also fully integrated with [CARTA: The Cube Analysis and Rendering Tool for Astronomy](https://cartavis.github.io/).
+
 ## Getting started
 Obtaining an ARCADE user allocation requires a [CADC account](http://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html). Allocations are provided on a case-by-case basis while the system is in beta.
 
