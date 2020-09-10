@@ -8,4 +8,4 @@ Terminal=false
 X-MultipleArgs=false
 Icon=/headless/.icons/terminal.svg.png
 Type=Application
-Categories=ARCADE;
+Categories=X-Xfce-Toplevel;

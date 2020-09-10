@@ -7,4 +7,4 @@ Exec=/usr/local/bin/(NAME).sh
 Terminal=false
 X-MultipleArgs=false
 Type=Application
-Categories=ARCADE;
+Categories=AstroSoftware;

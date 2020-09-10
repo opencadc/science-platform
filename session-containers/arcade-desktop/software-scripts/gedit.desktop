@@ -7,4 +7,4 @@ Icon=gedit
 NoDisplay=false
 X-GNOME-UsesNotifications=false
 X-RHEL-AliasOf=org.gnome.gedit
-Categories=ARCADE
+Categories=Utility
