@@ -9,7 +9,7 @@ LABEL io.k8s.description="Headless VNC Container with Xfce window manager, firef
       io.openshift.non-scalable=true
 
 # BM: Install fonts so remote displays work
-RUN yum update -y && yum install -y xorg-x11-fonts* gedit rsync
+RUN yum update -y && yum install -y xorg-x11-fonts* gedit rsync gimp gimp-gmic
 
 ## Connection ports for controlling the UI:
 # VNC port:5901
@@ -78,8 +78,14 @@ COPY conf/xfce-applications.menu /etc/xdg/menus/xfce-applications.menu
 COPY conf/xfce-applications.menu /etc/xdg/menus/applications.menu
 COPY conf/xfce-canfar.directory /usr/share/desktop-directories/xfce-canfar.directory
 COPY conf/xfce-canfar.directory /usr/share/desktop-directories/canfar.directory
-COPY conf/xfce-casa.directory /usr/share/desktop-directories/xfce-casa.directory
-COPY conf/xfce-casa.directory /usr/share/desktop-directories/casa.directory
+COPY conf/xfce-casa-3.directory /usr/share/desktop-directories/xfce-casa-3.directory
+COPY conf/xfce-casa-3.directory /usr/share/desktop-directories/casa-3.directory
+COPY conf/xfce-casa-4.directory /usr/share/desktop-directories/xfce-casa-4.directory
+COPY conf/xfce-casa-4.directory /usr/share/desktop-directories/casa-4.directory
+COPY conf/xfce-casa-5.directory /usr/share/desktop-directories/xfce-casa-5.directory
+COPY conf/xfce-casa-5.directory /usr/share/desktop-directories/casa-5.directory
+COPY conf/xfce-gemini.directory /usr/share/desktop-directories/xfce-gemini.directory
+COPY conf/xfce-gemini.directory /usr/share/desktop-directories/gemini.directory
 COPY conf/xfce-resolution.directory /usr/share/desktop-directories/xfce-resolution.directory
 COPY conf/xfce-resolution.directory /usr/share/desktop-directories/resolution.directory
 COPY conf/atacama.jpg /headless/atacama.jpg

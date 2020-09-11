@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=nifty
+Comment=nifty
+Keywords=nifty
+Exec=/usr/local/bin/nifty.sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=nifty;

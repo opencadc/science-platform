@@ -151,41 +151,35 @@
         <Include>
             <Category>AstroSoftware</Category>
         </Include>
-
         <Menu>
-            <Name>CASA</Name>
-            <Directory>xfce-casa.directory</Directory>
+            <Name>CASA 3</Name>
+            <Directory>xfce-casa-3.directory</Directory>
             <Include>
-                <Category>CASA</Category>
                 <Category>casa3</Category>
             </Include>
-
-            <Menu>
-                <Name>CASA 3</Name>
-                <Directory>xfce-casa-3.directory</Directory>
-                <Include>
-                    <Category>casa3</Category>
-                </Include>
-            </Menu>
-
-            <Menu>
-                <Name>CASA 4</Name>
-                <Directory>xfce-casa-4.directory</Directory>
-                <Include>
-                    <Category>casa4</Category>
-                </Include>
-            </Menu>
-
-            <Menu>
-                <Name>CASA 5</Name>
-                <Directory>xfce-casa-5.directory</Directory>
-                <Include>
-                    <Category>casa5</Category>
-                </Include>
-            </Menu>
-
         </Menu>
-
+        <Menu>
+            <Name>CASA 4</Name>
+            <Directory>xfce-casa-4.directory</Directory>
+            <Include>
+                <Category>casa4</Category>
+            </Include>
+        </Menu>
+        <Menu>
+            <Name>CASA 5</Name>
+            <Directory>xfce-casa-5.directory</Directory>
+            <Include>
+                <Category>casa5</Category>
+            </Include>
+        </Menu>
+        <Menu>
+            <Name>GEMINI</Name>
+            <Directory>xfce-gemini.directory</Directory>
+            <Include>
+                <Category>dragons</Category>
+                <Category>nifty</Category>
+            </Include>
+        </Menu>
     </Menu>
 
     <Menu>
