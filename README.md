@@ -17,7 +17,7 @@ There are also a series of [how to guides](https://github.com/opencadc/arcade/tr
 
 ## Technical Overview
 
-![ARCADE-architecture-bigpicture](ARCADE-architecture-bigpicture.png)
+![ARCADE-architecture](ARCADE-architecture-0.2.png)
 
 ## System Components
 

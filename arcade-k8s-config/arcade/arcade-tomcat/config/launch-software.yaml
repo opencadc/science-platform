@@ -9,6 +9,15 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: rcs.uvic.ca/rook-ceph-role
+                operator: NotIn
+                values:
+                - osd
       containers:
       - name: "${software.containername}"
         args:
@@ -37,6 +46,9 @@ spec:
         - mountPath: "/cavern/home"
           name: cavern-volume
           subPath: "cavern/home"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${arcade.sessionid}"
         - mountPath: "/cavern/projects"
           name: cavern-volume
           subPath: "cavern/projects"
@@ -47,6 +59,8 @@ spec:
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: cavern-ceph-claim-20200608
+      - name: scratch-dir
+        emptyDir: {}
       - name: sssd-dir
         hostPath:
           path: /var/lib/ubernetes
