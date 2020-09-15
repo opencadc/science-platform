@@ -1,4 +1,4 @@
-# ARCADE: ALMA Reduction in the CANFAR Data Environment
+# ARCADE: ALMA Reduction in the CANFAR Science Platform
 Principal Investigator: Toby Brown, Helen Kirk
 
 ## Overview
