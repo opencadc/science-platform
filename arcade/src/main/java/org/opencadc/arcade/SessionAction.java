@@ -139,7 +139,6 @@ public abstract class SessionAction extends RestAction {
         final Subject subject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + subject);
         
-        // authorization, for now, is simply being authenticated
         if (subject == null || subject.getPrincipals().isEmpty()) {
             throw new AccessControlException("Unauthorized");
         }
