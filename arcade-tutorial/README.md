@@ -111,9 +111,20 @@ Likely the most robust method of deteriming this is to calculate cryptographic h
 
 `shasum -a 256 /path/to/data`
 
-If you are trying to check a directory and all its contents were fully transferred then move into the top level of the directory you want to test and run the following. Checking the output locally and on ARCADE are identical will tell you that all data was transferred.
+If you are trying to check a directory and all its contents were fully transferred then do the following. Since the actual check relies on the `sort` command, you first need to make sure the locale rules will be the same on your local machine and ARCADE. Running these commands on ARCADE and your local machine will ensure that.
+
+```
+OLD_LC_ALL=$LC_ALL
+export LC_ALL=C
+```
+
+Next, move into the top level of the directory you want to test and run the following. Checking the output locally and on ARCADE are identical will tell you that all data was transferred.
 
 `find . -type f -exec shasum -a 256 {} \; | sort -k 1 | shasum -a 256`
+
+Finally, running this on your local machine and ARCADE will put the locale settings back to what they were before.
+
+`export LC_ALL=$OLD_LC_ALL`
 
 # How to set up CADC's `vos` tools to transfer from your local computer to arcade
 
