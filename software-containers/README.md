@@ -23,9 +23,6 @@ Use ENTRYPOINT to specify an executable to be run, for example a startup script 
 ### CMD
 Use CMD to specify a command to be executed at the end of the Dockerfile, "xterm".
 
-### desktop
-Each container is associated with a desktop file, for example terminal.desktop, which includes the path to the shell script, for example terminal.sh, which initializes and starts up the container.
-
 ### shell script
 A shell script is created for each container. The shell script initializes and starts up the container. As a result, PostAction is invoked. PostAction uses a default parameter to start up an xterm. However the shell script can pass a parameter to PostAction, which replaces the default parameter. The following is an example script that passes a parameter to PostAction:
 ```
