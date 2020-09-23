@@ -19,8 +19,14 @@ function execute {
     fi
 }
 
-echo "sourcing admit_start.sh"
-execute source /opt/admit/admit_start.sh
+echo "do not auto activate base"
+execute conda "config --set auto_activate_base false"
+echo
+echo "initialize conda environment"
+execute conda "init bash"
+echo
+echo "use stroconda environment"
+source $HOME/.bashrc && conda activate astroconda
 echo
 echo "starting xterm $1"
-execute xterm "-title $1"
+execute xterm "-fg white -bg black -title $1"

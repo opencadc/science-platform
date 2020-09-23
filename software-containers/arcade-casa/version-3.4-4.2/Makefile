@@ -36,6 +36,11 @@ build:
 		docker build --build-arg RELEASE=casapy-$(V) --build-arg PYTHON=python2.7 -t ${DOCKER_REPO_BASE}:$V .; \
 	)
 
+clean2.6:
+	@- $(foreach V,$(VERSIONS2.6), \
+	  docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
+	)
+
 clean:
 	@- $(foreach V,$(VERSIONS), \
 	  docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
@@ -52,4 +57,5 @@ upload: build
 	  docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
+clean_all: clean2.6 clean
 upload_all: upload2.6 upload

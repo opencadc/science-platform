@@ -12,9 +12,15 @@ while read p; do
     executable="${name}.sh"
     desktop="${name}.desktop"
     cp software-scripts/software-sh.template tmp/$executable
-    if [[ $name == casa* ]]
+    if [[ $name == casa-3* ]]
     then
-      cp software-scripts/software-casa.template tmp/$desktop
+      cp software-scripts/software-casa-3.template tmp/$desktop
+    elif [[ $name == casa-4* ]]
+    then
+      cp software-scripts/software-casa-4.template tmp/$desktop
+    elif [[ $name == casa-5* ]]
+    then
+      cp software-scripts/software-casa-5.template tmp/$desktop
     else
       cp software-scripts/software-desktop.template tmp/$desktop
     fi

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=gedit
+Exec=gedit %U
+Type=Application
+MimeType=text/plain;
+Icon=gedit
+NoDisplay=false
+X-GNOME-UsesNotifications=false
+X-RHEL-AliasOf=org.gnome.gedit
+Categories=Utility

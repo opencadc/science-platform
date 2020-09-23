@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=kill-session
+Comment=Kill your Arcade session
+Keywords=kill-session
+Exec=/usr/local/bin/kill-session.sh
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/ban.svg.png
+Type=Application
+Categories=X-Xfce-Toplevel;

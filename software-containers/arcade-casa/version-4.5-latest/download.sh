@@ -11,8 +11,10 @@ FILE="${RELEASE}.tar.gz"
 
 if [ $2 == "old" ]; then
   URL="https://casa.nrao.edu/download/distro/linux/release/el6/${FILE}"
-else
+elif [ $2 == "pipeline" ]; then
   URL="https://casa.nrao.edu/download/distro/casa-pipeline/release/el6/${FILE}"
+else
+  URL="https://casa.nrao.edu/download/distro/casa/release/el6/${FILE}"
 fi
 
 # make sure we are in the source folder

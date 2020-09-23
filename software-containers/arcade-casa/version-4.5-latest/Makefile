@@ -21,14 +21,17 @@ VERSIONS_OLD = \
 #VERSIONS_OLD = \
 #	4.5.0-el6
 
-VERSIONS = \
+VERSIONS_PIPELINE = \
 	5.6.1-8.el6
+
+VERSIONS = \
+	5.7.0-134.el6
 
 DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
 
 .PHONY: build clean run 
 
-all: build-old build
+all: build-old build-pipeline build
 
 build-old: 
 	@- $(foreach V,$(VERSIONS_OLD), \
@@ -36,10 +39,16 @@ build-old:
 		docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
 	)
 
+build-pipeline: 
+	@- $(foreach V,$(VERSIONS_PIPELINE), \
+                ./download.sh casa-pipeline-release-$(V) pipeline ; \
+                docker build --build-arg RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+	)
+
 build: 
 	@- $(foreach V,$(VERSIONS), \
-                ./download.sh casa-pipeline-release-$(V) current ; \
-                docker build --build-arg RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+                ./download.sh casa-release-$(V) current ; \
+                docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 clean-old:
@@ -47,16 +56,26 @@ clean-old:
 		docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
+clean-pipeline:
+	@- $(foreach V,$(VERSIONS_PIPELINE), \
+                docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
+	)
+
 clean:
 	@- $(foreach V,$(VERSIONS), \
                 docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
-clean-all: clean-old clean 
+clean-all: clean-old clean-pipeline clean 
 
 upload-old: build-old
 	@- $(foreach V,$(VERSIONS_OLD), \
 	  docker push ${DOCKER_REPO_BASE}:$(V) ; \
+	)
+
+upload-pipeline: build-pipeline
+	@- $(foreach V,$(VERSIONS_PIPELINE), \
+                docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
 upload: build
@@ -64,4 +83,4 @@ upload: build
                 docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
-upload-all: upload-old upload 
+upload-all: upload-old upload-pipeline upload 

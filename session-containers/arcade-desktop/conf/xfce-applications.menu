@@ -12,12 +12,17 @@
         <Category>X-Xfce-Toplevel</Category>
     </Include>
 
+    <Exclude>
+        <Filename>exo-terminal-emulator.desktop</Filename>
+    </Exclude>
+
     <Layout>
         <Filename>xfce4-run.desktop</Filename>
         <Separator/>
-        <Filename>exo-terminal-emulator.desktop</Filename>
         <Filename>exo-file-manager.desktop</Filename>
+        <Filename>kill-session.desktop</Filename>
         <Filename>exo-mail-reader.desktop</Filename>
+        <Filename>terminal.desktop</Filename>
         <Filename>exo-web-browser.desktop</Filename>
         <Separator/>
         <Menuname>Preferences</Menuname>
@@ -126,16 +131,6 @@
     </Menu>
 
     <Menu>
-        <Name>Multimedia</Name>
-        <Directory>xfce-multimedia.directory</Directory>
-        <Include>
-            <Category>Audio</Category>
-            <Category>Video</Category>
-            <Category>AudioVideo</Category>
-        </Include>
-    </Menu>
-
-    <Menu>
         <Name>Network</Name>
         <Directory>xfce-network.directory</Directory>
         <Include>
@@ -150,24 +145,38 @@
     </Menu>
 
     <Menu>
-        <Name>Office</Name>
-        <Directory>xfce-office.directory</Directory>
-        <Include>
-            <Category>Office</Category>
-        </Include>
-    </Menu>
-
-    <Menu>
-        <Name>CANFAR</Name>
+        <Name>AstroSoftware</Name>
         <Directory>xfce-canfar.directory</Directory>
         <Include>
-            <Category>CANFAR</Category>
+            <Category>AstroSoftware</Category>
         </Include>
         <Menu>
-            <Name>CASA</Name>
-            <Directory>xfce-casa.directory</Directory>
+            <Name>CASA 3</Name>
+            <Directory>xfce-casa-3.directory</Directory>
             <Include>
-                <Category>CASA</Category>
+                <Category>casa3</Category>
+            </Include>
+        </Menu>
+        <Menu>
+            <Name>CASA 4</Name>
+            <Directory>xfce-casa-4.directory</Directory>
+            <Include>
+                <Category>casa4</Category>
+            </Include>
+        </Menu>
+        <Menu>
+            <Name>CASA 5</Name>
+            <Directory>xfce-casa-5.directory</Directory>
+            <Include>
+                <Category>casa5</Category>
+            </Include>
+        </Menu>
+        <Menu>
+            <Name>GEMINI</Name>
+            <Directory>xfce-gemini.directory</Directory>
+            <Include>
+                <Category>dragons</Category>
+                <Category>nifty</Category>
             </Include>
         </Menu>
     </Menu>
