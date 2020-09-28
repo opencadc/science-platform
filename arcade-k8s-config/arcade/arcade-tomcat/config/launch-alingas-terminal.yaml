@@ -1,0 +1,82 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "alingasjob"
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      #restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: rcs.uvic.ca/rook-ceph-role
+                operator: NotIn
+                values:
+                - osd
+      containers:
+      - name: "alingascontainer"
+        args:
+        - xterm
+        env:
+        - name: HOME
+          value: "/cavern/home/cadcauthtest2"
+        - name: DISPLAY
+          value: "10.233.112.191:1"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        securityContext:
+          runAsUser: 0
+#          runAsUser: 20005
+#          runAsGroup: 20005
+          allowPrivilegeEscalation: false
+        image: "canfar-registry.cloud.computecanada.ca/alingas-terminal:latest"
+        workingDir: "/cavern/home/cadcauthtest2"
+        command: ["/arcade/launch-software.sh"]
+        args:
+        - hostname1
+        - cadcauthtest2
+        - posixid1
+        - sessionid1
+        - sessionname1
+        - sessiontype1
+        - arcadejobname1
+        - softwarejobname1
+        - alingas-terminal
+        - containerparam1
+        - targetip1
+        - imageid1
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/cavern/home"
+          name: cavern-volume
+          subPath: "cavern/home"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "alingassessionid"
+        - mountPath: "/cavern/projects"
+          name: cavern-volume
+          subPath: "cavern/projects"
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: cavern-ceph-claim-20200608
+      - name: scratch-dir
+        emptyDir: {}
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory
