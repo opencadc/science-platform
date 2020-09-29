@@ -11,6 +11,6 @@ RUN apt-get update && yes | apt-get install sssd libnss-sss libpam-sss
 
 RUN mkdir /arcade
 ADD launch-software.sh /arcade
-#ADD arcade-init.sh /arcade/
+ADD arcade-init.sh /arcade/
 
 ADD nsswitch.conf /etc/

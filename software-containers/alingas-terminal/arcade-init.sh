@@ -33,5 +33,5 @@ function execute {
     fi
 }
 
-echo "starting xterm $1"
+#echo "starting xterm $1"
 #execute xterm "-fg white -bg black -title $1"
