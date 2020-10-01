@@ -1,6 +1,21 @@
 # ARCADE: ALMA Reduction in the CANFAR Data Environment
 Principal Investigator: Toby Brown, Helen Kirk
 
+#### Table of contents
+  * [Overview](#overview)
+  * [Getting started](#getting-started)
+  * [Tutorials](#tutorials)
+  * [Technical Overview](#technical-overview)
+  * [System Components](#system-components)
+    + [arcade](#arcade)
+    + [arcade-wsproxy](#arcade-wsproxy)
+    + [arcade-desktop](#arcade-desktop)
+    + [arcade-carta](#arcade-carta)
+    + [software-containers](#software-containers)
+  * [Dependencies](#dependencies)
+  * [Deployment](#deployment)
+  * [Publication acknowledgement](#publication-acknowledgement)
+
 ## Overview
 ARCADE is a general purpose online platform built to support ALMA data processing requirements. The system is currently in beta deployment with a limited number of simultaneous users.
 
@@ -52,4 +67,9 @@ arcade relies on a number of other opencadc modules to operate.
 The current implementation targets a Kubernetes deployment.  In the arcade/src/obsolete directory is a version which targets a Docker deployment.  This is no longer supported.
 
 On session and application launch, arcade will interact with kubernetes to manifest these entities.  Two kubernetes configuration files are required for these operations.  Examples of these files can be found in arcade/src/examples.  The variables in these files are replaced by arcade at runtime.
+
+## Publication acknowledgement
+Publications that made use of ARCADE platform must include the following statement in the acknowledgement:
+*“We acknowledge the use of the ARCADE (ALMA Reduction in the CANFAR Data Environment) science platform. ARCADE is a ALMA Cycle 7 development study with support from the National Radio Astronomy Observatory, the North American ALMA Science Centre, and the National Research Centre of Canada."*
+
 
