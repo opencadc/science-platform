@@ -126,6 +126,20 @@ Finally, running this on your local machine and ARCADE will put the locale setti
 
 `export LC_ALL=$OLD_LC_ALL`
 
+# How to manage Python environments with conda on ARCADE
+
+Installing and managing the versions of your Python packages can be done with conda (e.g. working with a set of Python packages that you can export as a text list for others to exac
+tly reproduce your Python environment). [Anaconda](https://docs.anaconda.com/) is installed on ARCADE at the system-wide level so you don't need to install your own (Ana)conda yours
+elf. It should be possible to install (Ana)conda in your own directory, if you really like to have control, but this is likely not necessary for the majority of users and has not be
+en confirmed on ARCADE yet.
+
+If you just want to have access to most general scientific analysis Python packages, then the default environment that starts in the xterm windows will likely suit your needs. This
+default environment, [astroconda](https://astroconda.readthedocs.io/en/latest/), comes with the standard Anaconda suite of packages plus it gives you access to STScI packages.
+
+If you need/want specific versions of packages, or packages you need aren't included in astroconda, then you can create your own conda environments that only you can see on ARCADE.
+The general instructions at the "[Managing environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)" page in the conda documentation s
+hould help you with this.
+
 # How to set up CADC's `vos` tools to transfer from your local computer to arcade
 
 These steps will get you setup to transfer from your local machine directly to ARCADE.
@@ -166,6 +180,3 @@ These steps will get you setup to transfer from your local machine directly to A
 
 
 # [How to use the clipboard to copy/paste into and out of ARCADE](Clipboard_Tutorial.pdf)
-
-
-
