@@ -1,10 +1,11 @@
 # software-containers
-The modules here are astronomy containers built to be run in arcade.
+The modules in this directory can be run in the arcade desktop session environment.
 
 ## Container Requirements
+Containers must be based on a standard Linux distribution.
 
 ### SSSD
-Containers must have `sssd-client` and `acl` installed so that arcade can run them as the end user.
+Containers must have `sssd-client` and `acl` installed.
 
 The file /etc/nsswitch.conf must include the sss module in the passwd, shadow, and group entries.  For example:
 
@@ -16,3 +17,12 @@ group:      sss files
 
 ### xterm
 `xterm` must be installed on the container
+
+## Initialization and Startup
+The CMD and EXECUTABLE directives in a software container Dockerfile will be ignored on startup.  Instead, bash within an xterm will run.  CMD and EXECUTABLE are still useful for testing containers outside of arcade.
+
+The container will be initially started by root but then switched to be run as the active CADC arcade user.
+
+If the container needs to do any runtime initialization, that can be done in a script named `init.sh` in the `/arcade` root directory.  This script **must not block** and needs to return control to the calling process.
+
+If `/arcade/init.sh` is provided, a sensible directive for testing the container via docker is `CMD ["/arcade/init.sh"]`
