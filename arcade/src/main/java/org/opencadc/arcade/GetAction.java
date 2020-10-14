@@ -94,7 +94,9 @@ public class GetAction extends SessionAction {
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 // List the sessions
-                listSessions();
+                String typeFilter = syncInput.getParameter("type");
+                String statusFilter = syncInput.getParameter("status");
+                listSessions(typeFilter, statusFilter);
             } else {
                 throw new UnsupportedOperationException("Session detail viewing not supported.");
             }
@@ -109,24 +111,30 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public void listSessions() throws Exception {
+    public void listSessions(String typeFilter, String statusFilter) throws Exception {
         
         List<Session> sessions = getAllSessions(userID);
         StringBuilder ret = new StringBuilder();
         
+        log.debug("typeFilter=" + typeFilter);
+        log.debug("statusFilter=" + statusFilter);
+        
         for (Session session : sessions) {
-            ret.append(session.getId());
-            ret.append("\t");
-            ret.append(session.getType());
-            ret.append("\t");
-            ret.append(session.getStatus());
-            ret.append("\t");
-            ret.append(session.getName());
-            ret.append("\t");
-            ret.append(session.getConnectURL());
-            ret.append("\t");
-            ret.append(session.getStartTime());
-            ret.append("\n");
+            if ((typeFilter == null || session.getType().equalsIgnoreCase(typeFilter)) &&
+                (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
+                ret.append(session.getId());
+                ret.append("\t");
+                ret.append(session.getType());
+                ret.append("\t");
+                ret.append(session.getStatus());
+                ret.append("\t");
+                ret.append(session.getName());
+                ret.append("\t");
+                ret.append(session.getConnectURL());
+                ret.append("\t");
+                ret.append(session.getStartTime());
+                ret.append("\n");
+            }
         }
         syncOutput.getOutputStream().write(ret.toString().getBytes());
         return;

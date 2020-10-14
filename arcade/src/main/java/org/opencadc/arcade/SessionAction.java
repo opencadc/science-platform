@@ -139,7 +139,6 @@ public abstract class SessionAction extends RestAction {
         final Subject subject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + subject);
         
-        // authorization, for now, is simply being authenticated
         if (subject == null || subject.getPrincipals().isEmpty()) {
             throw new AccessControlException("Unauthorized");
         }
@@ -157,8 +156,9 @@ public abstract class SessionAction extends RestAction {
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
         GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
-        GroupURI membershipGroup = new GroupURI(arcadeGroup);
+        GroupURI membershipGroup = null;
         try {
+            membershipGroup = new GroupURI(arcadeGroup);
             CredUtil.checkCredentials();
         } catch (Exception e) {
             throw new RuntimeException(e);
