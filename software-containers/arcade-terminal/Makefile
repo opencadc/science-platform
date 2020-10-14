@@ -1,5 +1,5 @@
 
-DEVNAME = arcade-python
+DEVNAME = arcade-terminal
 
 NAME = bucket.canfar.net/$(DEVNAME)
 VERSION = latest

@@ -1,11 +1,11 @@
 [Desktop Entry]
 Version=1.0
-Name=python
+Name=terminal
 Comment=General terminal for Arcade
-Keywords=python
-Exec=/usr/local/bin/python.sh
+Keywords=terminal
+Exec=/usr/local/bin/terminal.sh
 Terminal=false
 X-MultipleArgs=false
 Icon=/headless/.icons/terminal.svg.png
 Type=Application
-Categories=CANFAR;
+Categories=X-Xfce-Toplevel;
