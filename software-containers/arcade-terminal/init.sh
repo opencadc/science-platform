@@ -27,6 +27,3 @@ execute conda "init bash"
 echo
 echo "use stroconda environment"
 source $HOME/.bashrc && conda activate astroconda
-echo
-echo "starting xterm $1"
-execute xterm "-fg white -bg black -title $1"
