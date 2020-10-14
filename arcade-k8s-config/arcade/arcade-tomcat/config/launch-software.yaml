@@ -20,7 +20,9 @@ spec:
                 - osd
       containers:
       - name: "${software.containername}"
+        command: ["/arcade-system/start-desktop-software.sh"]
         args:
+        - ${arcade.userid}
         - ${software.containerparam}
         env:
         - name: HOME
@@ -43,6 +45,8 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
+        - mountPath: "/arcade-system"
+          name: start-desktop-software
         - mountPath: "/cavern/home"
           name: cavern-volume
           subPath: "cavern/home"
@@ -56,6 +60,10 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
+      - name: start-desktop-software
+        configMap:
+          name: start-desktop-software
+          defaultMode: 0744
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: cavern-ceph-claim-20200608

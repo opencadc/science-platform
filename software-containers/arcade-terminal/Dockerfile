@@ -24,8 +24,8 @@ RUN apt-get update && yes | apt-get install sssd libnss-sss libpam-sss
 RUN pip install vos cadcdata cadctap cadcutils
 
 RUN mkdir /arcade
-ADD startup.sh /arcade/
+ADD init.sh /arcade/
 
 ADD nsswitch.conf /etc/
 
-ENTRYPOINT [ "/arcade/startup.sh" ]
+CMD ["/arcade/init.sh"]
