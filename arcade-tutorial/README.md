@@ -18,7 +18,7 @@
       - [On Ubuntu/Debian](#on-ubuntu-debian-1)
       - [On Mac OSX](#on-mac-osx-1)
     + [Syncing Local and ARCADE Directories with `rsync` Over SSH](#syncing-local-and-arcade-directories-with--rsync--over-ssh)
-  * [How to set up CADC's `vos` tools to transfer from your local computer to arcade](#how-to-set-up-cadc-s--vos--tools-to-transfer-from-your-local-computer-to-arcade)
+  * [How to set up CADC's _vos tools_ to transfer from your local computer to arcade](#how-to-set-up-cadc-s--vos--tools-to-transfer-from-your-local-computer-to-arcade)
   * [How to verify data transferred to ARCADE](#how-to-verify-data-transferred-to-arcade)
 - [How to manage Python environments with conda on ARCADE](#how-to-manage-python-environments-with-conda-on-arcade)
 - [How to use the clipboard to copy/paste into and out of ARCADE](#how-to-use-the-clipboard-to-copy-paste-into-and-out-of-arcade)
@@ -142,7 +142,7 @@ Follow the steps above to install SSHFS and mount the ARCADE file system locally
 
 These steps will get you setup to transfer from your local machine directly to ARCADE.
 
-1. Install vos tools on your local machine for the transfer (etc.) commands
+1. Install _vos tools_ on your local machine for the transfer (etc.) commands
     - Done per-user since it installs Python modules into your area
     - This command will create a `src` directory where it is run. You need to keep this directory around so make sure you to run the command where you do not mind having that directory stored.
 
