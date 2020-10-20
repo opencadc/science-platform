@@ -22,6 +22,7 @@
   * [How to verify data transferred to ARCADE](#how-to-verify-data-transferred-to-arcade)
 - [How to manage Python environments with conda on ARCADE](#how-to-manage-python-environments-with-conda-on-arcade)
 - [How to use the clipboard to copy/paste into and out of ARCADE](#how-to-use-the-clipboard-to-copy-paste-into-and-out-of-arcade)
+
 # How to start an ARCADE or CARTA session
 
 ARCADE and CARTA sessions are launched from [demo.canfar.net](https://demo.canfar.net/en/) (login required). 
