@@ -4,7 +4,7 @@ metadata:
   labels:
     run: arcade-tomcat
   name: arcade-tomcat
-  namespace: development
+  namespace: arcade-system
 spec:
   replicas: 1
   selector:
@@ -23,7 +23,7 @@ spec:
         - name: arcade.homedir
           value: /cavern
         - name: arcade.namespace
-          value: development
+          value: arcade-workload
         image: canfar-registry.cloud.computecanada.ca/arcade-tomcat:latest
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
@@ -52,5 +52,13 @@ spec:
           defaultMode: 420
           secretName: arcade-servops-secret
       - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: cavern-ceph-claim-20200608
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false

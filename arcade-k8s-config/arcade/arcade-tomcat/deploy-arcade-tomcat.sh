@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl apply -f arcade-tomcat-deployment.yaml
+kubectl -n arcade-system apply -f arcade-tomcat-deployment.yaml

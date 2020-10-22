@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: sssd-canfar-test-ds
-  namespace: development
+  name: cadc-sssd-ds
+  namespace: cadc-sssd
   labels:
-    k8s-app: cavern-sssd-ds
+    k8s-app: cadc-sssd-ds
 spec:
   selector:
     matchLabels:
-      name: cavern-sssd-ds
+      name: cadc-sssd-ds
   template:
     metadata:
       labels:
-        name: cavern-sssd-ds
+        name: cadc-sssd-ds
     spec:
       initContainers:
       - name: init-sssd-dir
@@ -25,9 +25,11 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: cavern-sssd-ds
+      - name: cadc-sssd-ds
         image: canfar-registry.cloud.computecanada.ca/cadc-sssd:latest
         imagePullPolicy: Always
+        #command: ["/bin/sh"]
+        #args: ["-c", "while true; do sleep 10;done"]
         volumeMounts:
         - mountPath: /etc/sssd/sssd.conf
           subPath: sssd.conf
