@@ -1,22 +1,21 @@
-# arcade-wsproxy
+# arcade-wsproxy version 0.1
 
 This is an httpd container that proxies websocket connections to arcade-desktop
 
 ## building
 
 ```
-gradle clean build
-docker build -t arcade-wsproxy:latest -f Dockerfile .
+docker build -t arcade-wsproxy:0.1 -f Dockerfile .
 ```
 
 ## checking it
 ```
-docker run -it --rm arcade-wsproxy:latest /bin/bash
+docker run -it --rm arcade-wsproxy:0.1 /bin/bash
 ```
 
 ## running it
 ```
-docker run -d --rm arcade-wsproxy:latest
+docker run -d --rm arcade-wsproxy:0.1
 
 ## configuration
 
