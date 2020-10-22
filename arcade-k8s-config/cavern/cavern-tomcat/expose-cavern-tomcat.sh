@@ -1,4 +1,4 @@
 #!/bin/bash
 
-kubectl apply -f cavern-tomcat-expose.yaml
+kubectl -n arcade-system apply -f cavern-tomcat-expose.yaml
 

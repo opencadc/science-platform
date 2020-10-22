@@ -1,4 +1,4 @@
 #!/bin/bash
 
-kubectl apply -f cavern-sshd-expose.yaml
+kubectl -n arcade-system apply -f cavern-sshd-expose.yaml
 

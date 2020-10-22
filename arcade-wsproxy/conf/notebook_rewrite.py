@@ -65,7 +65,7 @@ def getIPForSession(sessionID):
     return sessionIPAddress
   else:
     try:
-      command = ["kubectl", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"] 
+      command = ["kubectl", "-n", "arcade-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"] 
       commandString = ' '.join([str(elem) for elem in command]) 
       log("DEBUG: kubectl command: " + commandString)
       commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
@@ -89,37 +89,17 @@ def getIPFromCache(sessionID):
   except KeyError:
     return None
 
-def initK8S():
-  command = ["kubectl", "config", "--kubeconfig=/www/bin/k8s-config", "use-context", "kanfarnetes-testing"]
-  commandString = ' '.join([str(elem) for elem in command])
-  log("DEBUG: kubectl init: " + commandString)
-  try:
-    result = subprocess.check_output(command, stderr=subprocess.STDOUT)
-    log("DEBUG: success k8s init: " + result)
-    command = ["kubectl", "config", "view"]
-    subprocess.check_output(command, stderr=subprocess.STDOUT)
-    log("DEBUG:" + result)
-  except subprocess.CalledProcessError as exc:
-    log("ERROR: error calling kubectl: " + exc.output)
-
 def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
 logfile = open("/logs/notebook-rewrite.log", "a")
 log("INFO: notebook_rewrite.py listening to stdin")
-#initK8S()
 os.environ['HOME'] = '/root'
 cache = TTLCache(maxsize=100, ttl=120)
 log("INFO: entering listen loop")
 
 while True:
-  log("INFO: getting hostname")
-  #hostname = os.environ['HOME', 'proto.canfar.net']
-  # above line produces KeyError when run with kubernetes... environment
-  # is missing.
-  hostname = 'proto.canfar.net'
-  log("INFO: hostname: " + hostname)
   try:
     request = sys.stdin.readline().strip()
     log("INFO: Start request: " + request)
@@ -129,12 +109,12 @@ while True:
       sys.stdout.write(response + '\n')
     else:
       log("INFO: End response: None")
-      sys.stdout.write('http://' + hostname + '/notfound.html\n')
+      sys.stdout.write('https://www.canfar.net/notfound.html\n')
   except Exception as e:
     tb = traceback.format_exc()
     log("ERROR: unexpected: " + str(e) + ":" + tb) 
-    sys.stdout.write('http://' + hostname + '/notfound.html\n')
+    sys.stdout.write('https://www.canfar.net/notfound.html\n')
   except:
     log("ERROR: unclassified error")
-    sys.stdout.write('http://' + hostname + '/notfound.html\n')
+    sys.stdout.write('https://www.canfar.net/notfound.html\n')
   sys.stdout.flush()

@@ -4,7 +4,7 @@ metadata:
   labels:
     run: cavern-tomcat
   name: cavern-tomcat
-  namespace: development
+  namespace: arcade-system
 spec:
   replicas: 1
   selector:
@@ -35,14 +35,25 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: arcade
       volumes:
       - name: servops-cert
         secret:
           defaultMode: 420
           secretName: cavern-servops-secret
       - name: cavern-ceph-volume
-        persistentVolumeClaim:
-          claimName: cavern-ceph-claim-20200608
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false
       - name: config-volume
         configMap:
           name: cavern-config

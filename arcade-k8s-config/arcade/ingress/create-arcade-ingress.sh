@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl create -f arcade-ingress.yaml
+kubectl -n arcade-system create -f arcade-ingress.yaml
