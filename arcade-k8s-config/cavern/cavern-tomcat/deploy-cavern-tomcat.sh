@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl apply -f cavern-tomcat-deployment.yaml
+kubectl -n arcade-system apply -f cavern-tomcat-deployment.yaml

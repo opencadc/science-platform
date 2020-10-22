@@ -1,4 +1,4 @@
 #!/bin/bash
 
-kubectl apply -f arcade-tomcat-expose.yaml
+kubectl -n arcade-system apply -f arcade-tomcat-expose.yaml
 

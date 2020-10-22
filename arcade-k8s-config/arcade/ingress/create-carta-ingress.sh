@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl create -f carta-ingress.yaml
+kubectl -n arcade-system create -f carta-ingress.yaml

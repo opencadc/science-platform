@@ -4,7 +4,7 @@ metadata:
   labels:
     run: arcade-wsproxy
   name: arcade-wsproxy
-  namespace: development
+  namespace: arcade-system
 spec:
   replicas: 1
   selector:
@@ -17,15 +17,15 @@ spec:
         run: arcade-wsproxy
     spec:
       containers:
-        - image: canfar-registry.cloud.computecanada.ca/arcade-wsproxy:latest
+        - image: canfar-registry.cloud.computecanada.ca/arcade-wsproxy:0.1
           env:
             - name: arcade.hostname
-              value: proto.canfar.net
+              value: rc-uv.canfar.net
           imagePullPolicy: Always
           #imagePullPolicy: IfNotPresent
           name: arcade-wsproxy
           ports:
-          - containerPort: 80
+          - containerPort: 8080
             protocol: TCP
           volumeMounts:
           - mountPath: /logs

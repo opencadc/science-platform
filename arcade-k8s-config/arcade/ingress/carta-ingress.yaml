@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: carta-ingress
-  namespace: development
+  namespace: arcade-system
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /carta/$2
 spec:
@@ -13,4 +13,4 @@ spec:
       - path: /carta(/|$)(.*)
         backend:
           serviceName: arcade-wsproxy-svc
-          servicePort: 80
+          servicePort: 8080

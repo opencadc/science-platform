@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl create configmap cavern-config --from-file=config
+kubectl -n arcade-system create configmap cavern-config --from-file=config

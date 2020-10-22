@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl create -f notebook-ingress.yaml
+kubectl -n arcade-system create -f notebook-ingress.yaml

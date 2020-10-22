@@ -6,7 +6,7 @@ metadata:
     run: cavern-sshd-svc
 spec:
   ports:
-  - port: 22
+  - port: 64022
     protocol: TCP
     name: cavern-ssh-port
   selector:
