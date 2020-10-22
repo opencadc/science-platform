@@ -36,6 +36,7 @@ ADD conf/notebook_rewrite.py /www/bin/notebook_rewrite.py
 ADD conf/httpd.conf /etc/httpd/conf/
 ADD conf/rewrite.conf /etc/httpd/conf.d/
 ADD conf/cors.conf /etc/httpd/conf.d/
+ADD conf/ssl.conf /etc/httpd/conf.d/
 
 ADD conf/index.html /var/www/html/
 RUN mkdir /root/kube
