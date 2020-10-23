@@ -1,0 +1,67 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "${software.jobname}"
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      #restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: rcs.uvic.ca/rook-ceph-role
+                operator: NotIn
+                values:
+                - osd
+      containers:
+      - name: "${software.containername}"
+        args:
+        - ${software.containerparam}
+        env:
+        - name: HOME
+          value: "/cavern/home/${arcade.userid}"
+        - name: DISPLAY
+          value: "${software.targetip}"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        securityContext:
+          runAsUser: ${arcade.posixid}
+          runAsGroup: ${arcade.posixid}
+          allowPrivilegeEscalation: false
+        image: "${software.imageid}"
+        workingDir: "/cavern/home/${arcade.userid}"
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/cavern/home"
+          name: cavern-volume
+          subPath: "cavern/home"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${arcade.sessionid}"
+        - mountPath: "/cavern/projects"
+          name: cavern-volume
+          subPath: "cavern/projects"
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: cavern-ceph-claim-20200608
+      - name: scratch-dir
+        emptyDir: {}
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory

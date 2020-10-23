@@ -1,0 +1,1 @@
+nginx needs the entire certificate chain in one file.  contatenate the top-level cert with the rest of the bundle into one file canfar.net-completechain.pem
