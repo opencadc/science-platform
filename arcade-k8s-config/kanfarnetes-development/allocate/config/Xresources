@@ -1,0 +1,4 @@
+# Enables copy paste to xterm via ctrl-shift-C and ctrl-shift-V
+XTerm*vt100.translations: #override \
+    Shift Ctrl <Key> C: copy-selection(SELECT) \n\
+    Shift Ctrl <Key> V: insert-selection(SELECT)

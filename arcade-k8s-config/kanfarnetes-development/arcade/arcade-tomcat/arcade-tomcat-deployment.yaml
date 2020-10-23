@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: arcade-tomcat
+  name: arcade-tomcat
+  namespace: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: arcade-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: arcade-tomcat
+    spec:
+      containers:
+      - env:
+        - name: arcade.hostname
+          value: proto.canfar.net
+        - name: arcade.homedir
+          value: /cavern
+        - name: arcade.namespace
+          value: development
+        image: canfar-registry.cloud.computecanada.ca/arcade-tomcat:latest
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        name: arcade-tomcat
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: /root/.ssl/
+          name: servops-cert
+          readOnly: true
+        - mountPath: "/cavern"
+          name: cavern-volume
+          subPath: cavern
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: arcade
+      volumes:
+      - name: config-volume
+        configMap:
+          name: arcade-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: arcade-servops-secret
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: cavern-ceph-claim-20200608
