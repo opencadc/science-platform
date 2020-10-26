@@ -23,7 +23,7 @@ spec:
         - name: arcade.homedir
           value: /cavern
         - name: arcade.namespace
-          value: development
+          value: arcade-workload
         image: canfar-registry.cloud.computecanada.ca/arcade-tomcat:latest
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
