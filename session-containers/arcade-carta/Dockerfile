@@ -9,19 +9,19 @@ WORKDIR /carta
 ENV HOME /carta
 
 # Download CARTA
-ADD https://github.com/CARTAvis/carta-releases/releases/download/v1.3/CARTA-v1.3-remote.tgz /carta/
-RUN tar xf CARTA-v1.3-remote.tgz
-RUN rm CARTA-v1.3-remote.tgz
+ADD https://github.com/CARTAvis/carta-releases/releases/download/v1.4/CARTA-v1.4-remote.tgz /carta/
+RUN tar xf CARTA-v1.4-remote.tgz
+RUN rm CARTA-v1.4-remote.tgz
 # If iterating on builds, download the tar file to tmp and comment out above 3 lines and
 # uncomment the one below
-#ADD tmp/CARTA-v1.3-remote.tgz /carta/
+#ADD tmp/CARTA-v1.4-remote.tgz /carta/
 
 # arcade carta startup script
 ADD src/arcade-carta /carta/
 
 # customized carta script
-RUN rm /carta/CARTA-v1.3-remote/carta
-ADD src/carta /carta/CARTA-v1.3-remote/
+RUN rm /carta/CARTA-v1.4-remote/carta
+ADD src/carta /carta/CARTA-v1.4-remote/
 
 # nsswitch for correct sss lookup
 ADD src/nsswitch.conf /etc/
