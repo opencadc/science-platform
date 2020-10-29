@@ -46,11 +46,11 @@ RUN rm -rf /opt/${RELEASE}/data
 RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
 
 RUN mkdir /arcade
-ADD startup.sh /arcade/
+ADD init.sh /arcade/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-ENTRYPOINT [ "/arcade/startup.sh" ]
+CMD [ "/arcade/init.sh" ]

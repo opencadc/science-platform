@@ -1,8 +1,8 @@
 
-DEVNAME = arcade-terminal
+DEVNAME = terminal
 
-NAME = bucket.canfar.net/$(DEVNAME)
-VERSION = latest
+NAME = harbor.canfar.net.canfar.net/skaha/$(DEVNAME)
+VERSION = 0.1
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .
