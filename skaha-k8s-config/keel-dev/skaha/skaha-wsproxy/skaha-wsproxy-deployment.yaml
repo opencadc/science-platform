@@ -2,24 +2,24 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: arcade-wsproxy
-  name: arcade-wsproxy
+    run: skaha-wsproxy
+  name: skaha-wsproxy
   namespace: skaha-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      run: arcade-wsproxy
+      run: skaha-wsproxy
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: arcade-wsproxy
+        run: skaha-wsproxy
     spec:
       containers:
-        - image: canfar-registry.cloud.computecanada.ca/arcade-wsproxy:0.1
+        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.1
           env:
-            - name: arcade.hostname
+            - name: skaha.hostname
               value: rc-uv.canfar.net
           imagePullPolicy: Always
           #imagePullPolicy: IfNotPresent
@@ -41,4 +41,4 @@ spec:
         emptyDir: {}
       - name: config-volume
         configMap:
-          name: arcade-wsproxy-config
+          name: skaha-wsproxy-config

@@ -2,14 +2,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "arcade-allocate"
+  name: "skaha-allocate"
 spec:
   template:
     spec:
       restartPolicy: Never
       containers:
-      - name: "arcade-allocate"
-        image: canfar-registry.cloud.computecanada.ca/arcade-allocate:latest
+      - name: "skaha-allocate"
+        image: canfar-registry.cloud.computecanada.ca/skaha-allocate:latest
         imagePullPolicy: Always
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
@@ -36,7 +36,7 @@ spec:
       - name: servops-cert
         secret:
           defaultMode: 420
-          secretName: arcade-servops-secret
+          secretName: skaha-servops-secret
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: cavern-ceph-claim-20200608

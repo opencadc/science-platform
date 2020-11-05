@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: arcade-wsproxy-svc
+  name: skaha-wsproxy-svc
   labels:
-    run: arcade-wsproxy-svc
+    run: skaha-wsproxy-svc
 spec:
   ports:
   - port: 8080
     protocol: TCP
     name: http-connection
   selector:
-    run: arcade-wsproxy
+    run: skaha-wsproxy

@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: Config
 users:
-- name: arcade
+- name: skaha
   user:
     token: <token base64 string>
 clusters:
@@ -17,22 +17,26 @@ clusters:
 contexts:
 - context:
     cluster: <cluster-name>
-    user: arcade
-  name: arcade-wsproxy
-current-context: arcade-wsproxy
+    user: skaha
+  name: skaha-wsproxy
+current-context: skaha-wsproxy
 ```
 
-2. Fill in the value for <ca.crt base64 string> with value in ~/.kube/config
+1. Fill in the value for <ca.crt base64 string> with value in ~/.kube/config
 
-3. Fill in the value of <token base64 string> and <server> by:
+1. Temporarily create the (currently incomplete) config with `create-config.sh`
+
+1. Fill in the value of <token base64 string> and <server> by:
   - Deploying arcade-wsproxy with `deploy-arcade-wsproxy.sh`
   - Connect to the pod with `kubectl -n skaha-system <podID> -- bash`
   - Grab the value from /var/run/secrets/kubernetes.io/serviceaccount/token 
   - Grab the value for <server> with `env | grep KUBERNETES_PORT_443_TCP`, but change `tcp` to `https`
   - exit the container and terminate: `kubectl delete deployment arcade-wsproxy`
 
-4. Fill in the values for <cluster-name> with the name of your cluster (eg k9s-dev)
+1. Fill in the values for <cluster-name> with the name of your cluster (eg k9s-dev)
 
-5. Create the config with `create-config.sh`
+1. Delete the temporary configmap with `kubectl delete cm skaha-wsproxy-config`
 
-6. Deploy aracade-wsproxy again with `deploy-arcade-wsproxy.sh`
+1. Create the config with `create-config.sh`
+
+1. Deploy skaha-wsproxy again with `deploy-skaha-wsproxy.sh`
