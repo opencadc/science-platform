@@ -10,7 +10,7 @@ from cachetools import TTLCache
 
 def getRedirect(input):
 
-  log("DEBUG: proxying carta session")
+  log("DEBUG: proxying notebook sessions")
   log("DEBUG: input=" + input)
   if input is None:
     log("WARN: no input")
@@ -26,24 +26,37 @@ def getRedirect(input):
   sessionID = segs[2]
   log("DEBUG: sessionID=" + sessionID)
 
+  queryString = None
+  if len(params) > 2:
+    queryParam = params[2]
+    log("DEBUG: query=" + queryParam)
+    if queryParam:
+      queryString = queryParam.strip()
+
   ipAddress = getIPForSession(sessionID)
 
   if ipAddress is None:
     log("WARN: IP Address not found")
     return None
 
-  port = "6901"
-  bport = "5901"
+  port = "8888"
+  wsPort = "8999"
 
   idx = path.find(sessionID)
   endOfPath = path[(idx+8):]
+  log("DEBUG: endOfPath: " + endOfPath)
 
-  log("DEBUG: Segs[3]: " + segs[3])
   ret = ""
-  if (segs[3] == "socket"):
-    ret = "ws://" + ipAddress + ":" + bport + "/"
+  if len(segs) > 4 and segs[3] == "api" and segs[4] == "kernels":
+    if queryString:
+      ret = "ws://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString
+    else:
+      ret = "ws://" + ipAddress + ":" + part + "/notebook/" + sessionID + endOfPath
   else:
-    ret = "http://" + ipAddress + ":" + port + endOfPath
+    if queryString:
+      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString + "&token=" + sessionID
+    else:
+      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?token=" + sessionID
   return ret
 
 def getIPForSession(sessionID):
@@ -52,8 +65,8 @@ def getIPForSession(sessionID):
     return sessionIPAddress
   else:
     try:
-      command = ["kubectl", "-n", "arcade-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"]
-      commandString = ' '.join([str(elem) for elem in command])
+      command = ["kubectl", "-n", "skaha-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"] 
+      commandString = ' '.join([str(elem) for elem in command]) 
       log("DEBUG: kubectl command: " + commandString)
       commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
       lines = commandOutput.splitlines()
@@ -80,8 +93,8 @@ def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
-logfile = open("/logs/carta-rewrite.log", "a")
-log("INFO: carta_rewrite.py listening to stdin")
+logfile = open("/logs/notebook-rewrite.log", "a")
+log("INFO: notebook_rewrite.py listening to stdin")
 os.environ['HOME'] = '/root'
 cache = TTLCache(maxsize=100, ttl=120)
 log("INFO: entering listen loop")

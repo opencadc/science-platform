@@ -10,7 +10,7 @@ from cachetools import TTLCache
 
 def getRedirect(input):
 
-  log("DEBUG: proxying desktop k8s session")
+  log("DEBUG: proxying carta session")
   log("DEBUG: input=" + input)
   if input is None:
     log("WARN: no input")
@@ -21,6 +21,7 @@ def getRedirect(input):
   url = urlparse(params[0])
   path = url.path
   segs = path.split("/")
+  log("DEBUG: len(segs): " + str(len(segs)))
 
   sessionID = segs[2]
   log("DEBUG: sessionID=" + sessionID)
@@ -32,14 +33,16 @@ def getRedirect(input):
     return None
 
   port = "6901"
+  bport = "5901"
 
-  ret = "http://" + ipAddress + ":" + port + "/?password=" + sessionID + "/"
+  idx = path.find(sessionID)
+  endOfPath = path[(idx+8):]
+
   log("DEBUG: Segs[3]: " + segs[3])
-  if (segs[3] == "websockify"):
-    ret = "ws://" + ipAddress + ":" + port + "/websockify"
-  elif (segs[3] != "connect"):
-    idx = path.find(sessionID)
-    endOfPath = path[(idx+8):]
+  ret = ""
+  if (segs[3] == "socket"):
+    ret = "ws://" + ipAddress + ":" + bport + "/"
+  else:
     ret = "http://" + ipAddress + ":" + port + endOfPath
   return ret
 
@@ -49,7 +52,7 @@ def getIPForSession(sessionID):
     return sessionIPAddress
   else:
     try:
-      command = ["kubectl", "-n", "arcade-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"]
+      command = ["kubectl", "-n", "skaha-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"]
       commandString = ' '.join([str(elem) for elem in command])
       log("DEBUG: kubectl command: " + commandString)
       commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
@@ -77,9 +80,10 @@ def log(message):
   logfile.write(time.ctime() + " - " + message + "\n")
   logfile.flush()
 
-logfile = open("/logs/desktop-rewrite.log", "a")
+logfile = open("/logs/carta-rewrite.log", "a")
+log("INFO: carta_rewrite.py listening to stdin")
+os.environ['HOME'] = '/root'
 cache = TTLCache(maxsize=100, ttl=120)
-log("INFO: desktop_rewrite.py listening to stdin")
 log("INFO: entering listen loop")
 
 while True:
