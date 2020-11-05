@@ -5,7 +5,7 @@ set -e
 ### Give the SSSD container time to initialize
 sleep 10
 
-SELF=arcade-cavern-allocate
+SELF=skaha-cavern-allocate
 CONFDIR=/config
 
 TS=$(date)
@@ -13,7 +13,7 @@ echo "$TS $SELF START"
 
 if [ -z "$1" ]
   then
-    echo "Usage: arcade-cavern-allocation <userid>"
+    echo "Usage: skaha-cavern-allocation <userid>"
     exit 2
 fi
 USERID=$1
@@ -29,9 +29,9 @@ if [ ! -f $CONFDIR/homedir ]
     exit  2
 fi
 
-if [ ! -f $CONFDIR/arcadegroup ]
+if [ ! -f $CONFDIR/skahagroup ]
   then
-    echo "No file arcadegroup found in $CONFDIR"
+    echo "No file skahagroup found in $CONFDIR"
     exit  2
 fi
 
@@ -61,10 +61,10 @@ fi
 
 HOMEBASE=`cat $CONFDIR/homedir`
 HOMEDIR="$HOMEBASE/$USERID"
-ARCADEGROUP=`cat $CONFDIR/arcadegroup`
+SKAHAGROUP=`cat $CONFDIR/skahagroup`
 
 echo "  Certfile: $CERTFILE"
-echo "  ARCADE Group: $ARCADEGROUP"
+echo "  skaha group: $SKAHAGROUP"
 
 echo "Creating allocation for $USERID"
 echo -n "  Creating home dir $HOMEDIR..."
@@ -94,7 +94,7 @@ rm casa-config.tar
 chown -R $USERID:$USERID $HOMEDIR/.casa
 echo " Done"
 
-echo -n "  Adding user to Aracde group..."
+echo -n "  Adding user to skaha group..."
 curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$ARCADEGROUP/userMembers/$USERID?idType=http"
 echo " Done"
 
