@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: arcade-ingress
+  name: skaha-ingress
   namespace: skaha-system
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /arcade/$2
+    nginx.ingress.kubernetes.io/rewrite-target: /skaha/$2
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "optional"
     nginx.ingress.kubernetes.io/auth-tls-secret: "development/all-cacert"
 #    nginx.ingress.kubernetes.io/auth-tls-secret: "development/gridcanada-cacert"
@@ -19,10 +19,10 @@ spec:
     - keel-dev-ingress.cloud.computecanada.ca
     secretName: canfar-net-cert-secret
   rules:
-  - host: proto.canfar.net
+  - host: rc-uv.canfar.net
     http:
       paths:
-      - path: /arcade(/|$)(.*)
+      - path: /skaha(/|$)(.*)
         backend:
-          serviceName: arcade-tomcat-svc
+          serviceName: skaha-tomcat-svc
           servicePort: 8080
