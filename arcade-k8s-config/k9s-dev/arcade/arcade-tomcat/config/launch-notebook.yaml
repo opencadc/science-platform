@@ -20,6 +20,8 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      imagePullSecrets:
+        - Kendallata7
       containers:
       - name: "${arcade.jobname}"
         env:
@@ -33,21 +35,11 @@ spec:
           value: "/home/jovyan"
         - name: JUPYTER_PATH
           value: "/home/jovyan"
-        #- name: NB_USER
-        #  value: "${arcade.userid}"
-        #- name: NB_UID
-        #  value: "${arcade.posixid}"
-        #- name: NB_GROUP
-        #  value: "${arcade.userid}"
-        #- name: NB_GID
-        #  value: "${arcade.posixid}"
-        #- name: CHOWN_HOME
-        #  value: "yes"
         securityContext:
           runAsUser: 0
           #runAsUser: ${arcade.posixid} 
           #runAsGroup: ${arcade.posixid}
-        image: canfar-registry.cloud.computecanada.ca/arcade-notebook:latest
+        image: harbor.canfar.net/petuan/scipy:0.1
         #workingDir: "/cavern/home/${arcade.userid}"
         #command: ["start-notebook.sh"]
         #args:

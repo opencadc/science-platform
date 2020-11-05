@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl -n arcade-system create -f arcade-ingress.yaml
+kubectl -n skaha-system create -f arcade-ingress.yaml

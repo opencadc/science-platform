@@ -4,7 +4,7 @@ metadata:
   labels:
     run: arcade-wsproxy
   name: arcade-wsproxy
-  namespace: arcade-system
+  namespace: skaha-system
 spec:
   replicas: 1
   selector:
@@ -35,7 +35,7 @@ spec:
             name: config-volume
       securityContext:
         runAsUser: 0
-      serviceAccountName: arcade
+      serviceAccountName: skaha
       volumes:
       - name: log-dir
         emptyDir: {}

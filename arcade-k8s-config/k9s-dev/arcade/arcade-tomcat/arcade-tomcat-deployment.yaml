@@ -4,7 +4,7 @@ metadata:
   labels:
     run: arcade-tomcat
   name: arcade-tomcat
-  namespace: arcade-system
+  namespace: skaha-system
 spec:
   replicas: 1
   selector:
@@ -23,7 +23,7 @@ spec:
         - name: arcade.homedir
           value: /cavern
         - name: arcade.namespace
-          value: arcade-workload
+          value: skaha-workload
         image: canfar-registry.cloud.computecanada.ca/arcade-tomcat:latest
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
@@ -42,7 +42,7 @@ spec:
           subPath: cavern
       securityContext:
         runAsUser: 0
-      serviceAccountName: arcade
+      serviceAccountName: skaha
       volumes:
       - name: config-volume
         configMap:

@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl apply -f cavern-ingress.yaml
+kubectl apply -n skaha-system -f cavern-ingress.yaml

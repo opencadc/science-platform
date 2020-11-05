@@ -9,9 +9,11 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      imagePullSecrets:
+      - name: "${software.imagesecret}"
       containers:
       - name: "${software.containername}"
-        command: ["/arcade-system/start-desktop-software.sh"]
+        command: ["/skaha-system/start-desktop-software.sh"]
         args:
         - ${arcade.userid}
         - ${software.containerparam}
@@ -36,7 +38,7 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
-        - mountPath: "/arcade-system"
+        - mountPath: "/skaha-system"
           name: start-desktop-software
         - mountPath: "/cavern/home"
           name: cavern-volume
