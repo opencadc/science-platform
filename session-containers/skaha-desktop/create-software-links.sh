@@ -29,5 +29,5 @@ while read p; do
   sed -i -e "s#(NAME)#$name#g" tmp/$executable
   sed -i -e "s#(NAME)#$name#g" tmp/$desktop
   rm -f tmp/*-e
-done <arcade-software.properties
+done <skaha-software.properties
 

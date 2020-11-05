@@ -17,7 +17,7 @@ RUN rm CARTA-v1.4-remote.tgz
 #ADD tmp/CARTA-v1.4-remote.tgz /carta/
 
 # arcade carta startup script
-ADD src/arcade-carta /carta/
+ADD src/skaha-carta /carta/
 
 # customized carta script
 RUN rm /carta/CARTA-v1.4-remote/carta
@@ -28,4 +28,4 @@ ADD src/nsswitch.conf /etc/
 
 RUN chmod -R a+rwx /carta
 
-CMD ["/carta/arcade-carta"]
+CMD ["/carta/skaha-carta"]

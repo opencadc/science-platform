@@ -4,13 +4,13 @@ set -e
 
 ### Give the SSSD container time to initialize
 
-SELF=arcade-carta
+SELF=skaha-carta
 
 TS=$(date)
 echo "$TS $SELF START"
 
 if [ "$#" -ne 2 ]; then
-    echo "Usage: arcade-cavern-allocation <root> <folder>"
+    echo "Usage: skaha-cart <root> <folder>"
     exit 2
 fi
 ROOT=$1
@@ -27,7 +27,7 @@ sleep 5
 PID=$(pgrep -x 'carta_backend')
 echo "PID: $PID"
 
-LOGFILE=/carta/CARTA/log/arcade-carta.log
+LOGFILE=/carta/CARTA/log/skaha-carta.log
 
 tail --pid $PID -F $LOGFILE
 

@@ -7,10 +7,10 @@ build: dependencies Dockerfile
 
 dependencies: clean init software resolutions
 
-software: arcade-software.properties
+software: skaha-software.properties
 	./create-software-links.sh
 
-resolutions: arcade-resolutions.properties
+resolutions: skaha-resolutions.properties
 	./create-resolution-links.sh
 
 init:

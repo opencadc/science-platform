@@ -1,5 +1,5 @@
 
-NAME = harbor.canfar.net/arcade/session-carta
+NAME = harbor.canfar.net/carta/skaha-carta
 VERSION = 1.4
 
 build: dependencies Dockerfile

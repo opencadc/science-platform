@@ -26,7 +26,7 @@ if [ ! -d $HOME/CARTA/log ]; then
 fi
 #BM: make log file name static
 #logfilename=$HOME/CARTA/log/$(date +"%Y%m%d_%H%M%S_%Z").log
-logfilename=$HOME/CARTA/log/arcade-carta.log
+logfilename=$HOME/CARTA/log/skaha-carta.log
 
 ## Keep only the latest 5 log files
 if [ "$(uname)" == "Linux" ]; then

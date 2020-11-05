@@ -1,22 +1,22 @@
-# arcade-carta
+# skaha-carta
 
 ## About
 
-A CARTA 1.3 session container for arcade based on CARTA-remote (https://github.com/CARTAvis).
+A CARTA 1.4 session container for skaha based on CARTA-remote (https://github.com/CARTAvis).
 
-A wrapper script, `arcade-carta`, is added to the container that calls the CARTA provided startup script, `carta`.
+A wrapper script, `skaha-carta`, is added to the container that calls the CARTA provided startup script, `carta`.
 
 A modified version of `carta` replaces the original.  This version removes the process blocking commands at the end of the script.
 
 ## Building
 
 ```
-docker build -t harbor.canfar.net/cirada/carta:1.3 -f Dockerfile .
+docker build -t harbor.canfar.net/carta/skaha-carta:1.4 -f Dockerfile .
 ```
 
 ## Publishing to the image registry
 
-ARCADE images are managed in the CANFAR image registry at https://harbor.canfar.net
+skaha images are managed in the CANFAR image registry at https://harbor.canfar.net
 
 In order to push images to this registry, you need to be a publishing member of one of the projects, in this case cirada.  Since it is a private registry, you must login via `docker login` with what is called the harbor `CLI Secret` (Command Line Interface Secret).  The steps to do so are as follows:
 
@@ -24,4 +24,4 @@ In order to push images to this registry, you need to be a publishing member of 
 1. When prompted by harbor to enter an identification, type your CADC Userid or another name by which you wish to be known within the harbor registry.
 1. Copy your CLI Secret to your clipboard under the `User Profile` menu item in the top right corner of the Harbor portal.
 1. Log docker into harbor by typing `docker login <CADC Userid>`.  Use the CLI Secret in your clipboard when prompted for a password.
-1. Push the image to harbor:  `docker push harbor.canfar.net/cirada/carta:1.3`
+1. Push the image to harbor:  `docker push harbor.canfar.net/carta/skaha-carta:1.4`

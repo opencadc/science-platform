@@ -11,5 +11,5 @@ while read p; do
   sed -i -e "s#(RESOLUTION)#$p#g" tmp/$executable
   sed -i -e "s#(NAME)#$p#g" tmp/$desktop
   rm -f tmp/*-e
-done <arcade-resolutions.properties
+done <skaha-resolutions.properties
 

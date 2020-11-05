@@ -125,8 +125,8 @@ xset dpms 0 0 0
 xset -dpms s off
 
 # BM: reload xterm config
-echo "reloading xtermconfig for $arcade_username"
-xrdb /cavern/home/$arcade_username/.Xresources
+echo "reloading xtermconfig for $skaha_username"
+xrdb /cavern/home/$skaha_username/.Xresources
 
 if [[ $DEBUG == true ]] || [[ $1 =~ -t|--tail-log ]]; then
     echo -e "\n------------------ /headless/.vnc/*$DISPLAY.log ------------------"

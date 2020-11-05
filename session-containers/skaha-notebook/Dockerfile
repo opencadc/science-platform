@@ -10,7 +10,7 @@ RUN apt-get -y install sssd acl
 # nsswitch for correct sss lookup
 ADD src/nsswitch.conf /etc/
 
-ADD src/arcade-start-notebook /home/jovyan/
-RUN chmod +x /home/jovyan/arcade-start-notebook 
+ADD src/skaha-start-notebook /home/jovyan/
+RUN chmod +x /home/jovyan/skaha-start-notebook 
 
-CMD ["/home/jovyan/arcade-start-notebook"]
+CMD ["/home/jovyan/skaha-start-notebook"]
