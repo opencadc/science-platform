@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
@@ -121,12 +121,12 @@ public abstract class SessionAction extends RestAction {
     protected String scratchdir;
     
     public SessionAction() {
-        server = System.getenv("arcade.hostname");
-        homedir = System.getenv("arcade.homedir");
-        scratchdir = System.getenv("arcade.scratchdir");
-        log.debug("arcade.hostname=" + server);
-        log.debug("arcade.homedir=" + homedir);
-        log.debug("arcade.scratchdir=" + scratchdir);;
+        server = System.getenv("skaha.hostname");
+        homedir = System.getenv("skaha.homedir");
+        scratchdir = System.getenv("skaha.scratchdir");
+        log.debug("skaha.hostname=" + server);
+        log.debug("skaha.homedir=" + homedir);
+        log.debug("skaha.scratchdir=" + scratchdir);;
     }
     
     @Override
@@ -148,23 +148,23 @@ public abstract class SessionAction extends RestAction {
         }
         userID = httpPrincipals.iterator().next().getName();
         
-        // ensure user is a part of the arcade group
-        String arcadeGroup = super.initParams.get("arcade-users-group");
-        if (arcadeGroup == null) {
-            throw new IllegalStateException("No arcade-users-group defined in web.xml");
+        // ensure user is a part of the skaha group
+        String skahaGroup = super.initParams.get("skaha-users-group");
+        if (skahaGroup == null) {
+            throw new IllegalStateException("No skaha-users-group defined in web.xml");
         }
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
         GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
         GroupURI membershipGroup = null;
         try {
-            membershipGroup = new GroupURI(arcadeGroup);
+            membershipGroup = new GroupURI(skahaGroup);
             CredUtil.checkCredentials();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
         if (!gmsClient.isMember(membershipGroup)) {
-            throw new AccessControlException("Not authorized to use the ARCADE system");
+            throw new AccessControlException("Not authorized to use the skaha system");
         }
         
         String path = syncInput.getPath();
@@ -222,7 +222,7 @@ public abstract class SessionAction extends RestAction {
     public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
-        //    "title=ARCADE&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
+        //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
         return "https://" + host + "/desktop/" + sessionID + "/connect?password=" + sessionID +
@@ -275,7 +275,7 @@ public abstract class SessionAction extends RestAction {
     }
     
     protected String confirmSoftware(String software) {
-        PropertiesReader pr = new PropertiesReader("arcade-software.properties");
+        PropertiesReader pr = new PropertiesReader("skaha-software.properties");
         MultiValuedProperties mp = pr.getAllProperties();
         Set<String> names = mp.keySet();
         Iterator<String> it = names.iterator();

@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2018.                            (c) 2018.
+*  (c) 2019.                            (c) 2019.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,78 +65,32 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
-import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.util.StringUtil;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
-import java.security.AccessControlException;
-
-import org.apache.log4j.Logger;
-
-/**
- *
- * @author majorb
- */
-public class DeleteAction extends SessionAction {
+public class K8SUtil {
     
-    private static final Logger log = Logger.getLogger(DeleteAction.class);
-
-    public DeleteAction() {
-        super();
-    }
-
-    @Override
-    public void doAction() throws Exception {
-        super.initRequest();
-        if (requestType.equals(REQUEST_TYPE_SESSION)) {
-            if (sessionID == null) {
-                throw new UnsupportedOperationException("Cannot kill all sessions.");
-            } else {
-                
-                String k8sNamespace = K8SUtil.getWorkloadNamespace();
-                String[] getSessionCMD = new String[] {
-                    "kubectl", "get", "--namespace", k8sNamespace, "pod",
-                    "--selector=canfar-net-sessionID=" + sessionID,
-                    "--no-headers=true",
-                    "-o", "custom-columns=" +
-                        "TYPE:.metadata.labels.canfar-net-sessionType," +
-                        "USERID:.metadata.labels.canfar-net-userid"};
-                        
-                String session = execute(getSessionCMD);
-                if (!StringUtil.hasText(session)) {
-                    throw new ResourceNotFoundException(sessionID);
-                }
-                String[] lines = session.split("\n");
-                if (lines.length != 1) {
-                    throw new IllegalStateException("found multiple sessions with id " + sessionID);
-                }
-                String[] parts = lines[0].split("\\s+");
-                String type = parts[0];
-                String sessionUserid = parts[1];
-                if (!userID.equals(sessionUserid)) {
-                    throw new AccessControlException("forbidden");
-                }   
-                
-                stopSession(userID, type, sessionID);
-            }
-            return;
-        }
-        if (requestType.equals(REQUEST_TYPE_APP)) {
-            throw new UnsupportedOperationException("App killing not supported.");
-        }
+    public static String getHostName() throws IOException {
+        return System.getenv("skaha.hostname");
     }
     
-    public void stopSession(String userID, String type, String sessionID) throws Exception {
-        // kill the session specified by sessionID
-        log.debug("Stopping VNC session");
-        
-        String podName = K8SUtil.getJobName(sessionID, type, userID);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        
-        String[] stopVNCCmd = new String[] {
-            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
-        execute(stopVNCCmd);
-        
+    public static String getWorkloadNamespace() throws IOException {
+        return System.getenv("skaha.namespace");
     }
+    
+    public static String getJobName(String sessionID, String type, String userID) {
+        return "skaha-" + type + "-" + userID.toLowerCase() + "-" + sessionID;
+    }
+    
+    public static String getHomeDir() {
+        return System.getenv("skaha.homedir");
+    }
+    
+    public static String getScratchDir() {
+        return System.getenv("skaha.scratchdir");
+    }
+
 }

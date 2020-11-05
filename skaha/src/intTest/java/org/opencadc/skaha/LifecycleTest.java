@@ -65,15 +65,12 @@
  ************************************************************************
  */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.net.HttpDelete;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.HttpPost;
-import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
@@ -94,7 +91,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.arcade.SessionAction;
 
 /**
  * @author majorb
@@ -103,11 +99,11 @@ import org.opencadc.arcade.SessionAction;
 public class LifecycleTest {
     
     private static final Logger log = Logger.getLogger(LifecycleTest.class);
-    public static final String ARCADE_SERVICE_ID = "ivo://canfar.net/arcade";
+    public static final String SKAHA_SERVICE_ID = "ivo://cadc.nrc.ca/skaha";
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
     
     static {
-        Log4jInit.setLevel("org.opencadc.platform", Level.INFO);
+        Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
     
     protected URL sessionURL;
@@ -117,11 +113,11 @@ public class LifecycleTest {
         try {
             RegistryClient regClient = new RegistryClient();
             // enable when in registry
-            //sessionURL = regClient.getServiceURL(ARCADE_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
-            sessionURL = new URL("https://proto.canfar.net/arcade/session");
+            //sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
+            sessionURL = new URL("https://proto.canfar.net/skaha/session");
             log.info("sessions URL: " + sessionURL);
     
-            File cert = FileUtil.getFileFromResource("arcade-test.pem", LifecycleTest.class);
+            File cert = FileUtil.getFileFromResource("skaha-test.pem", LifecycleTest.class);
             userSubject = SSLUtil.createSubject(cert);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
@@ -139,8 +135,8 @@ public class LifecycleTest {
                 public Object run() throws Exception {
                     
                     // get sessions
-                    Arcade arcade = getSessions();
-                    Assert.assertTrue("no sessions to start", arcade.sessions.size() == 0);
+                    Skaha skaha = getSessions();
+                    Assert.assertTrue("no sessions to start", skaha.sessions.size() == 0);
                     
                     // create desktop session
                     Map<String, Object> params = new HashMap<String, Object>();
@@ -151,9 +147,9 @@ public class LifecycleTest {
                     Assert.assertNull("create session error", post.getThrowable());
                     
                     // get sessions
-                    arcade = getSessions();
-                    Assert.assertTrue("one session", arcade.sessions.size() == 1);
-                    ArcadeSession session = arcade.sessions.get(0);
+                    skaha = getSessions();
+                    Assert.assertTrue("one session", skaha.sessions.size() == 1);
+                    SkahaSession session = skaha.sessions.get(0);
                     Assert.assertEquals("session name", "intTest", session.sessionName);
                     Assert.assertEquals("session type", SessionAction.SESSION_TYPE_DESKTOP, session.sessionType);
                     Assert.assertNotNull("session id", session.sessionID);
@@ -169,11 +165,11 @@ public class LifecycleTest {
                     Assert.assertNull("create session error", post.getThrowable());
                     
                     // get sessions
-                    arcade = getSessions();
-                    Assert.assertTrue("two sessions", arcade.sessions.size() == 2);
+                    skaha = getSessions();
+                    Assert.assertTrue("two sessions", skaha.sessions.size() == 2);
                     String desktopSessionID = null;
                     String cartaSessionID = null;
-                    for (ArcadeSession s : arcade.sessions) {
+                    for (SkahaSession s : skaha.sessions) {
                         Assert.assertNotNull("session type", s.sessionType);
                         if (s.sessionType.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
                             desktopSessionID = s.sessionID;
@@ -197,9 +193,9 @@ public class LifecycleTest {
                     Assert.assertNull("delete session error", delete.getThrowable());
                     
                     // get sessions
-                    arcade = getSessions();
-                    Assert.assertTrue("one session", arcade.sessions.size() == 1);
-                    session = arcade.sessions.get(0);
+                    skaha = getSessions();
+                    Assert.assertTrue("one session", skaha.sessions.size() == 1);
+                    session = skaha.sessions.get(0);
                     Assert.assertEquals("session name", "intTest", session.sessionName);
                     Assert.assertEquals("session type", SessionAction.SESSION_TYPE_CARTA, session.sessionType);
                     Assert.assertNotNull("session id", session.sessionID);
@@ -212,8 +208,8 @@ public class LifecycleTest {
                     Assert.assertNull("delete session error", delete.getThrowable());
                     
                     // get sessions
-                    arcade = getSessions();
-                    Assert.assertTrue("no sessions to start", arcade.sessions.size() == 0);
+                    skaha = getSessions();
+                    Assert.assertTrue("no sessions to start", skaha.sessions.size() == 0);
 
                     return null;
                 }
@@ -227,23 +223,23 @@ public class LifecycleTest {
         
     }
     
-    private Arcade getSessions() {
+    private Skaha getSessions() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(sessionURL, out);
         get.run();
         Assert.assertNull("get sessions error", get.getThrowable());
-        return new Arcade(out.toString());
+        return new Skaha(out.toString());
     }
     
-    public class Arcade {
+    public class Skaha {
         
-        List<ArcadeSession> sessions = new ArrayList<ArcadeSession>();
+        List<SkahaSession> sessions = new ArrayList<SkahaSession>();
         
-        public Arcade(String output) {
+        public Skaha(String output) {
             if (StringUtil.hasLength(output)) {
                 String[] lines = output.split("\n");
                 for (String line : lines) {
-                    ArcadeSession session = new ArcadeSession(line);
+                    SkahaSession session = new SkahaSession(line);
                     if (session.status.equals("Running")) {
                         sessions.add(session);
                     }
@@ -252,9 +248,9 @@ public class LifecycleTest {
         }
     }
     
-    public class ArcadeSession {
+    public class SkahaSession {
         
-        public ArcadeSession(String line) {
+        public SkahaSession(String line) {
             String[] parts = line.split("\t");
             sessionID = parts[0];
             sessionType = parts[1];

@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
@@ -99,13 +99,13 @@ public class PostAction extends SessionAction {
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
-    public static final String ARCADE_HOSTNAME = "arcade.hostname";
-    public static final String ARCADE_USERID = "arcade.userid";
-    public static final String ARCADE_POSIXID = "arcade.posixid";
-    public static final String ARCADE_SESSIONID = "arcade.sessionid";
-    public static final String ARCADE_SESSIONNAME = "arcade.sessionname";
-    public static final String ARCADE_SESSIONTYPE = "arcade.sessiontype";
-    public static final String ARCADE_JOBNAME = "arcade.jobname";
+    public static final String SKAHA_HOSTNAME = "skaha.hostname";
+    public static final String SKAHA_USERID = "skaha.userid";
+    public static final String SKAHA_POSIXID = "skaha.posixid";
+    public static final String SKAHA_SESSIONID = "skaha.sessionid";
+    public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
+    public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
+    public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
@@ -231,13 +231,13 @@ public class PostAction extends SessionAction {
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchPath));
         String launchString = new String(launchBytes, "UTF-8");
         
-        launchString = setConfigValue(launchString, ARCADE_SESSIONID, sessionID);
-        launchString = setConfigValue(launchString, ARCADE_SESSIONNAME, name);
-        launchString = setConfigValue(launchString, ARCADE_SESSIONTYPE, type);
-        launchString = setConfigValue(launchString, ARCADE_JOBNAME, jobName);
-        launchString = setConfigValue(launchString, ARCADE_HOSTNAME, K8SUtil.getHostName());
-        launchString = setConfigValue(launchString, ARCADE_USERID, userID);
-        launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONNAME, name);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
+        launchString = setConfigValue(launchString, SKAHA_JOBNAME, jobName);
+        launchString = setConfigValue(launchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
+        launchString = setConfigValue(launchString, SKAHA_USERID, userID);
+        launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         
         String jsonLaunchFile = super.stageFile(launchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -310,9 +310,9 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
-        launchString = setConfigValue(launchString, ARCADE_USERID, userID);
+        launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
-        launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, software);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        

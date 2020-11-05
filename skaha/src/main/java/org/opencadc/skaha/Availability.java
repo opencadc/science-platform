@@ -65,32 +65,57 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
+
+import org.apache.log4j.Logger;
+
+import ca.nrc.cadc.vosi.AvailabilityPlugin;
+import ca.nrc.cadc.vosi.AvailabilityStatus;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
-public class K8SUtil {
-    
-    public static String getHostName() throws IOException {
-        return System.getenv("arcade.hostname");
-    }
-    
-    public static String getWorkloadNamespace() throws IOException {
-        return System.getenv("arcade.namespace");
-    }
-    
-    public static String getJobName(String sessionID, String type, String userID) {
-        return "arcade-" + type + "-" + userID.toLowerCase() + "-" + sessionID;
-    }
-    
-    public static String getHomeDir() {
-        return System.getenv("arcade.homedir");
-    }
-    
-    public static String getScratchDir() {
-        return System.getenv("arcade.scratchdir");
+
+public class Availability implements AvailabilityPlugin
+{
+    private static final Logger LOG = Logger.getLogger(Availability.class);
+
+    private static final AvailabilityStatus STATUS_UP =
+        new AvailabilityStatus(true, null, null, null, "skaha service is available.");
+
+    public Availability()
+    {
     }
 
+    @Override
+    public void setAppName(String appName) {
+        // no op
+    }
+
+    @Override
+    public boolean heartbeat() {
+        return true;
+    }
+
+    @Override
+    public AvailabilityStatus getStatus()
+    {
+        // ensure we can run kubectl
+        try {
+            String k8sNamespace = K8SUtil.getWorkloadNamespace();
+            String[] getPods = new String[] {
+                "kubectl", "get", "--namespace", k8sNamespace, "pods"};
+            SessionAction.execute(getPods);
+        } catch (Exception e) {
+            AvailabilityStatus down = new AvailabilityStatus(
+                false, null, null, null, "failed to run kubectl");
+            return down;
+        }
+        return STATUS_UP;
+    }
+
+    @Override
+    public void setState(String string)
+    {
+        //no-op
+    }
 }

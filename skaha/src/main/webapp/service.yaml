@@ -1,12 +1,12 @@
 swagger: '2.0'
 info:
   version: 2.1.0
-  title: arcade
+  title: skaha
   description: |
-    ARCADE API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the arcade processing environment.  Desktop apps can also be launched and attached to arcade desktop sessions through this API.<br/><br/>Clients may authenticate to this service in two ways:<br/>1.  By providing a cookie/token in the Cookie header<br/>2.  By using a client certificate.'
+    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service in two ways:<br/>1.  By providing a cookie/token in the Cookie header<br/>2.  By using a client certificate.'
 schemes:
   - https
-basePath: /arcade
+basePath: /skaha
 paths:
   /session:
     get:
