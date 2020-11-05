@@ -1,22 +1,22 @@
 # arcade
 
-arcade is a Java servlet implementation offering a REST API to all arcade functionality.
+skaha is a Java servlet implementation offering a REST API to all skaha functionality.
 
 ## building
 
 ```
 gradle clean build
-docker build -t arcade-tomcat:latest -f Dockerfile .
+docker build -t skaha-tomcat:latest -f Dockerfile .
 ```
 
 ## checking it
 ```
-docker run -it --rm arcade-tomcat:latest /bin/bash
+docker run -it --rm skaha-tomcat:latest /bin/bash
 ```
 
 ## running it
 ```
-docker run -d --rm arcade-tomcat:latest
+docker run -d --rm skaha-tomcat:latest
 ```
 
 ## configuration
@@ -29,7 +29,7 @@ arcade is run on the cadc-tomcat base container (https://github.com/opencadc/doc
 
 ### LocalAuthority.properties
 
-For all local services used by arcade, a corresponding LocalAuthority entry must be available.  This file maps the StandardID (representing the function of the service) to the serviceID (representing the instance of the service to consult in the registry).  An example LocalAuthority.properties:
+For all local services used by skaha, a corresponding LocalAuthority entry must be available.  This file maps the StandardID (representing the function of the service) to the serviceID (representing the instance of the service to consult in the registry).  An example LocalAuthority.properties:
 
 ```
 ivo://ivoa.net/std/GMS#groups-0.1 = ivo://cadc.nrc.ca/gms
@@ -44,9 +44,9 @@ ivo://ivoa.net/std/CDP#delegate-1.0 = ivo://cadc.nrc.ca/cred
 ivo://ivoa.net/std/CDP#proxy-1.0 = ivo://cadc.nrc.ca/cred
 ```
 
-### arcade-software.properties
+### skaha-software.properties
 
-arcade-software.properties is used in two places:  in arcade to whitelist the available software containers and obtain the container name given the imageID.  Secondly, by arcade-desktop to generate shortcuts for users to launch containers through the arcade API.
+skaha-software.properties is used in two places:  in skaha to whitelist the available software containers and obtain the container name given the imageID.  Secondly, by skaha-desktop to generate shortcuts for users to launch containers through the arcade API.
 
 ```
 casa-5.6.1-8 = canfar-registry.cloud.computecanada.ca/arcade-casa:5.6.1-8.el7
@@ -58,4 +58,4 @@ python = canfar-registry.cloud.computecanada.ca/arcade-python:latest
 
 ### launch-novnc.yaml and launch-software.yaml
 
-These two kubernetes job configuration files are templates used by arcade to run desktop sessions and science containers.  See the examples in src/examples.
+These two kubernetes job configuration files are templates used by skaha to run desktop sessions and science containers.  See the examples in src/examples.

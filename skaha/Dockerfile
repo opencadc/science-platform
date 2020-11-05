@@ -22,6 +22,6 @@ RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-releas
   chmod +x /usr/bin/kubectl && \
   kubectl version --client
 
-COPY build/libs/arcade.war /usr/share/tomcat/webapps/
+COPY build/libs/skaha.war /usr/share/tomcat/webapps/
 
 

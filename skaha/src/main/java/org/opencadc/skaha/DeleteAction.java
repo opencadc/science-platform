@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2019.                            (c) 2019.
+*  (c) 2018.                            (c) 2018.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,57 +65,78 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
+
+import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.StringUtil;
+
+import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
 
-import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import ca.nrc.cadc.vosi.AvailabilityStatus;
+/**
+ *
+ * @author majorb
+ */
+public class DeleteAction extends SessionAction {
+    
+    private static final Logger log = Logger.getLogger(DeleteAction.class);
 
-import java.io.IOException;
-
-
-public class Availability implements AvailabilityPlugin
-{
-    private static final Logger LOG = Logger.getLogger(Availability.class);
-
-    private static final AvailabilityStatus STATUS_UP =
-        new AvailabilityStatus(true, null, null, null, "session service is available.");
-
-    public Availability()
-    {
+    public DeleteAction() {
+        super();
     }
 
     @Override
-    public void setAppName(String appName) {
-        // no op
-    }
-
-    @Override
-    public boolean heartbeat() {
-        return true;
-    }
-
-    @Override
-    public AvailabilityStatus getStatus()
-    {
-        // ensure we can run kubectl
-        try {
-            String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            String[] getPods = new String[] {
-                "kubectl", "get", "--namespace", k8sNamespace, "pods"};
-            SessionAction.execute(getPods);
-        } catch (Exception e) {
-            AvailabilityStatus down = new AvailabilityStatus(
-                false, null, null, null, "failed to run kubectl");
-            return down;
+    public void doAction() throws Exception {
+        super.initRequest();
+        if (requestType.equals(REQUEST_TYPE_SESSION)) {
+            if (sessionID == null) {
+                throw new UnsupportedOperationException("Cannot kill all sessions.");
+            } else {
+                
+                String k8sNamespace = K8SUtil.getWorkloadNamespace();
+                String[] getSessionCMD = new String[] {
+                    "kubectl", "get", "--namespace", k8sNamespace, "pod",
+                    "--selector=canfar-net-sessionID=" + sessionID,
+                    "--no-headers=true",
+                    "-o", "custom-columns=" +
+                        "TYPE:.metadata.labels.canfar-net-sessionType," +
+                        "USERID:.metadata.labels.canfar-net-userid"};
+                        
+                String session = execute(getSessionCMD);
+                if (!StringUtil.hasText(session)) {
+                    throw new ResourceNotFoundException(sessionID);
+                }
+                String[] lines = session.split("\n");
+                if (lines.length != 1) {
+                    throw new IllegalStateException("found multiple sessions with id " + sessionID);
+                }
+                String[] parts = lines[0].split("\\s+");
+                String type = parts[0];
+                String sessionUserid = parts[1];
+                if (!userID.equals(sessionUserid)) {
+                    throw new AccessControlException("forbidden");
+                }   
+                
+                stopSession(userID, type, sessionID);
+            }
+            return;
         }
-        return STATUS_UP;
+        if (requestType.equals(REQUEST_TYPE_APP)) {
+            throw new UnsupportedOperationException("App killing not supported.");
+        }
     }
-
-    @Override
-    public void setState(String string)
-    {
-        //no-op
+    
+    public void stopSession(String userID, String type, String sessionID) throws Exception {
+        // kill the session specified by sessionID
+        log.debug("Stopping VNC session");
+        
+        String podName = K8SUtil.getJobName(sessionID, type, userID);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        
+        String[] stopVNCCmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
+        execute(stopVNCCmd);
+        
     }
 }

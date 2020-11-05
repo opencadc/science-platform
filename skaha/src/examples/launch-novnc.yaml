@@ -2,10 +2,21 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "${software.jobname}"
+  labels:
+    canfar-net-sessionID: "${desktop.sessionid}"
+    canfar-net-sessionName: "${desktop.sessionname}"
+    canfar-net-type: vnc
+    canfar-net-userid: "${skaha.userid}"
+  name: "${desktop.podname}"
 spec:
-  ttlSecondsAfterFinished: 600
   template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${desktop.sessionid}"
+        canfar-net-sessionName: "${desktop.sessionname}"
+        canfar-net-type: vnc
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${desktop.podname}"
     spec:
       restartPolicy: OnFailure
       initContainers:
@@ -19,36 +30,33 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       containers:
-      - name: "${software.containername}"
-        args:
-        - ${software.containerparam}
+      - name: "${desktop.podname}"
         env:
-        - name: HOME
-          value: "/cavern/home/${arcade.userid}"
-        - name: DISPLAY
-          value: "${software.targetip}"
-        - name: SHELL
-          value: "/bin/bash"
+        - name: VNC_PW
+          value: "${desktop.sessionid}"
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
         securityContext:
-          runAsUser: ${arcade.posixid}
-          runAsGroup: ${arcade.posixid}
-          allowPrivilegeEscalation: false
-        image: "${software.imageid}"
-        workingDir: "/cavern/home/${arcade.userid}"
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+        image: skaha-desktop:latest
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 6000
+        - containerPort: 5901
           protocol: TCP
+          name: vnc-port
+        - containerPort: 6901
+          protocol: TCP
+          name: novnc-port
         volumeMounts:
-        - mountPath: "/cavern/home"
+        - mountPath: "/cavern"
           name: cavern-volume
-          subPath: "cavern/home"
-        - mountPath: "/cavern/projects"
-          name: cavern-volume
-          subPath: "cavern/projects"
+          subPath: "cavern"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
-      - name: cavern-sssd
+      - name: skaha-sssd
         image: cadc-sssd:latest
         imagePullPolicy: IfNotPresent
         volumeMounts:

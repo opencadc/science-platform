@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
 import ca.nrc.cadc.util.StringUtil;
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.2//EN" "http://java.sun.com/j2ee/dtds/web-app_2_2.dtd">
 <web-app>
-    <display-name>arcade</display-name>
+    <display-name>skaha</display-name>
     
     <servlet>
         <servlet-name>logControl</servlet-name>
@@ -13,7 +13,7 @@
         <init-param>
             <param-name>logLevelPackages</param-name>
             <param-value>
-                  org.opencadc.arcade
+                  org.opencadc.skaha
                   ca.nrc.cadc.rest
                   ca.nrc.cadc.util
                   ca.nrc.cadc.vosi
@@ -36,21 +36,21 @@
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.arcade.GetAction</param-value> 
+             <param-value>org.opencadc.skaha.GetAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <init-param>
              <param-name>post</param-name>
-             <param-value>org.opencadc.arcade.PostAction</param-value> 
+             <param-value>org.opencadc.skaha.PostAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerPost</param-value> -->
          </init-param>
          <init-param>
              <param-name>delete</param-name>
-             <param-value>org.opencadc.arcade.DeleteAction</param-value>
+             <param-value>org.opencadc.skaha.DeleteAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerDelete</param-value> -->
          </init-param>
          <init-param>
-             <param-name>arcade-users-group</param-name>
+             <param-name>skaha-users-group</param-name>
              <param-value>ivo://cadc.nrc.ca/gms?ARCADE-Users</param-value>
          </init-param>
          <load-on-startup>2</load-on-startup>

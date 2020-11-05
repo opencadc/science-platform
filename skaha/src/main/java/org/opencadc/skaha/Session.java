@@ -64,14 +64,14 @@
  *
  ************************************************************************
  */
-package org.opencadc.arcade;
+package org.opencadc.skaha;
 
 import org.apache.log4j.Logger;
 
 /**
  * @author majorb
  * 
- * Represents a session running in arcade.
+ * Represents a session running in skaha.
  *
  */
 public class Session {
