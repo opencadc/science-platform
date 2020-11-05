@@ -1,8 +1,6 @@
 
-DEVNAME = arcade-desktop
-
-NAME = bucket.canfar.net/$(DEVNAME)
-VERSION = latest
+NAME = harbor.canfar.net/skaha/session-desktop
+VERSION = 0.1
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .

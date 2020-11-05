@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: arcade-tomcat-svc
+  name: skaha-tomcat-svc
   labels:
-    run: arcade-tomcat-svc
+    run: skaha-tomcat-svc
 spec:
   ports:
   - port: 8080
     protocol: TCP
     name: http-connection
   selector:
-    run: arcade-tomcat
+    run: skaha-tomcat

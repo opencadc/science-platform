@@ -15,11 +15,11 @@ spec:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
         args:
-        - ${arcade.userid}
+        - ${skaha.userid}
         - ${software.containerparam}
         env:
         - name: HOME
-          value: "/cavern/home/${arcade.userid}"
+          value: "/cavern/home/${skaha.userid}"
         - name: DISPLAY
           value: "${software.targetip}"
         - name: GDK_SYNCHRONIZE
@@ -27,11 +27,11 @@ spec:
         - name: SHELL
           value: "/bin/bash"
         securityContext:
-          runAsUser: ${arcade.posixid}
-          runAsGroup: ${arcade.posixid}
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
-        workingDir: "/cavern/home/${arcade.userid}"
+        workingDir: "/cavern/home/${skaha.userid}"
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         ports:
@@ -45,7 +45,7 @@ spec:
           subPath: "cavern/home"
         - mountPath: "/scratch"
           name: scratch-dir
-          subPath: "${arcade.sessionid}"
+          subPath: "${skaha.sessionid}"
         - mountPath: "/cavern/projects"
           name: cavern-volume
           subPath: "cavern/projects"

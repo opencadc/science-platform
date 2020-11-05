@@ -3,33 +3,33 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    canfar-net-sessionID: "${arcade.sessionid}"
-    canfar-net-sessionName: "${arcade.sessionname}"
-    canfar-net-sessionType: "${arcade.sessiontype}"
-    canfar-net-userid: "${arcade.userid}"
-  name: "${arcade.jobname}"
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
 spec:
   template:
     metadata:
       labels:
-        canfar-net-sessionID: "${arcade.sessionid}"
-        canfar-net-sessionName: "${arcade.sessionname}"
-        canfar-net-sessionType: "${arcade.sessiontype}"
-        canfar-net-userid: "${arcade.userid}"
-        job-name: "${arcade.jobname}"
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
       containers:
-      - name: "${arcade.jobname}"
+      - name: "${skaha.jobname}"
         env:
-        - name: arcade_hostname
-          value: "${arcade.hostname}"
-        - name: arcade_username
-          value: "${arcade.userid}"
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
         securityContext:
-          runAsUser: ${arcade.posixid} 
-          runAsGroup: ${arcade.posixid}
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
         image: canfar-registry.cloud.computecanada.ca/arcade-carta:latest
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
@@ -50,7 +50,7 @@ spec:
           subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
-          subPath: "${arcade.sessionid}"
+          subPath: "${skaha.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true

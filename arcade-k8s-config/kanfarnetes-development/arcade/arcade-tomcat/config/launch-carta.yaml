@@ -39,7 +39,7 @@ spec:
         securityContext:
           runAsUser: ${arcade.posixid} 
           runAsGroup: ${arcade.posixid}
-        image: canfar-registry.cloud.computecanada.ca/arcade-carta:latest
+        image: canfar-registry.cloud.computecanada.ca/arcade-carta:1.4
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never

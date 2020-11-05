@@ -3,52 +3,52 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    canfar-net-sessionID: "${arcade.sessionid}"
-    canfar-net-sessionName: "${arcade.sessionname}"
-    canfar-net-sessionType: "${arcade.sessiontype}"
-    canfar-net-userid: "${arcade.userid}"
-  name: "${arcade.jobname}"
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
 spec:
   template:
     metadata:
       labels:
-        canfar-net-sessionID: "${arcade.sessionid}"
-        canfar-net-sessionName: "${arcade.sessionname}"
-        canfar-net-sessionType: "${arcade.sessiontype}"
-        canfar-net-userid: "${arcade.userid}"
-        job-name: "${arcade.jobname}"
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
       imagePullSecrets:
         - Kendallata7
       containers:
-      - name: "${arcade.jobname}"
+      - name: "${skaha.jobname}"
         env:
-        - name: arcade_hostname
-          value: "${arcade.hostname}"
-        - name: arcade_username
-          value: "${arcade.userid}"
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
         - name: JUPYTER_TOKEN
-          value: "${arcade.sessionid}"
+          value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
           value: "/home/jovyan"
         - name: JUPYTER_PATH
           value: "/home/jovyan"
         securityContext:
           runAsUser: 0
-          #runAsUser: ${arcade.posixid} 
-          #runAsGroup: ${arcade.posixid}
+          #runAsUser: ${skaha.posixid} 
+          #runAsGroup: ${skaha.posixid}
         image: harbor.canfar.net/petuan/scipy:0.1
         #workingDir: "/cavern/home/${arcade.userid}"
         #command: ["start-notebook.sh"]
         #args:
-        #- "--NotebookApp.base_url=notebook/${arcade.sessionid}"
+        #- "--NotebookApp.base_url=notebook/${skaha.sessionid}"
         #- "--NotebookApp.notebook_dir=/cavern"
         command: ["/home/jovyan/arcade-start-notebook"]
         args:
-          - ${arcade.userid}
-          - ${arcade.sessionid}
+          - ${skaha.userid}
+          - ${skaha.sessionid}
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
@@ -62,7 +62,7 @@ spec:
           subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
-          subPath: "${arcade.sessionid}"
+          subPath: "${skaha.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true

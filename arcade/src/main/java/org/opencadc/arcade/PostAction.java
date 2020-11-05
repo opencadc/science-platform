@@ -67,6 +67,8 @@
 
 package org.opencadc.arcade;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -76,9 +78,13 @@ import java.util.Set;
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
@@ -105,6 +111,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
     public static final String SOFTWARE_IMAGEID = "software.imageid";
+    public static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
 
     public PostAction() {
         super();
@@ -273,22 +280,26 @@ public class PostAction extends SessionAction {
     
     public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
         
+        log.debug("attaching software: " + software + " to " + targetIP);
+        
         // TODO: Ensure session at targetIP is of type desktop
         
         String name = confirmSoftware(software);
+        
+        String imageSecret = "notused";
+        if (software.startsWith("harbor.canfar.net")) {
+            imageSecret = getHarborSecret();            
+        }
+        log.debug("image secret: " + imageSecret);
         
         String posixID = getPosixId();
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-software.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
-        
-        // default parameter: xterm
-        String param = "xterm\n        - -T\n        - " + name;
-        
-        // only one parameter supported for now
-        if (params != null && params.size() > 0) {
-            param = params.get(0);
-        }
+
+        // incoming params ignored for the time being.  set to the 'name' so
+        // that it becomes the xterm title
+        String param = name;
         log.debug("Using parameter: " + param);
         
         String uniqueID = new RandomStringGenerator(8).getID();
@@ -303,6 +314,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, ARCADE_POSIXID, posixID);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, software);
+        launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        
         String launchFile = super.stageFile(launchString);
         
@@ -329,6 +341,45 @@ public class PostAction extends SessionAction {
         String regKey = key.replace(".", "\\.");
         String regex = "\\$[{]" + regKey + "[}]";
         return doc.replaceAll(regex, value);
+    }
+    
+    private String getHarborSecret() throws Exception {
+        // get the user's cli secret:
+        //  1. get the idToken from /ac/authorize
+        //  2. call harbor with idToken to get user info and secret
+        
+        log.debug("verfifying delegated credentials");
+        if (!CredUtil.checkCredentials()) {
+            throw new IllegalStateException("cannot access delegated credentials");
+        }
+        
+        log.debug("getting idToken from ac");
+        URL acURL = new URL("https://proto.canfar.net/ac/authorize?response_type=id_token&client_id=arbutus-harbor&scope=cli");
+        OutputStream out = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(acURL, out);
+        get.run();
+        if (get.getThrowable() != null) {
+            log.debug("error obtaining idToken", get.getThrowable());
+            throw new RuntimeException(get.getThrowable().getMessage());
+        }
+        
+        log.debug("getting secret from harbor");
+        String idToken = out.toString();
+        URL harborURL = new URL("https://proto.canfar.net/harbor/api/v2.0/users/current");
+        out = new ByteArrayOutputStream();
+        get = new HttpGet(harborURL, out);
+        get.setRequestProperty("Authorization", "Bearer " + idToken);
+        get.run();
+        if (get.getThrowable() != null) {
+            log.debug("error obtaining harbor secret", get.getThrowable());
+            throw new RuntimeException(get.getThrowable().getMessage());
+        }
+        String userJson = out.toString();
+        JSONTokener tokener = new JSONTokener(userJson);
+        JSONObject obj = new JSONObject(tokener);
+        String secret = obj.getJSONObject("oidc_user_meta").getString("secret");
+        return secret;
+        
     }
 
 }

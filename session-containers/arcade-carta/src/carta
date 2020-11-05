@@ -24,8 +24,7 @@ if [ ! -d $HOME/CARTA/log ]; then
         mkdir -p $HOME/CARTA/log
         touch $HOME/CARTA/log/carta.log
 fi
-
-# BM: change log file name
+#BM: make log file name static
 #logfilename=$HOME/CARTA/log/$(date +"%Y%m%d_%H%M%S_%Z").log
 logfilename=$HOME/CARTA/log/arcade-carta.log
 
@@ -44,8 +43,15 @@ SERVER_NAME=$(hostname)
 SERVER_IP=$(hostname -I | cut -d' ' -f1)
 ######################################################################
 
-## Find the number of threads on the system
-NTHREADS=$(getconf _NPROCESSORS_CONF)
+## Find the number of threads on the system and make sure it is not 
+## set to 1, otherwise if omp_threads=1, CARTA will not work properly
+## 
+if ! command -v getconf &> /dev/null
+then
+    NTHREADS=2
+else
+    NTHREADS=$(getconf _NPROCESSORS_CONF)
+fi
 
 #####################################################################
 ##### Default values
@@ -55,6 +61,7 @@ threads=4
 omp_threads=$NTHREADS
 port=$WEBSOCKET_PORT
 fport=$FRONTEND_PORT
+grpc_port=-1
 
 #####################################################################
 display_help () { 
@@ -78,6 +85,9 @@ display_help () {
  echo "                                      automatically detected number of cores on"
  echo "                                      you system; usually 4 or 8 on a typical"
  echo "                                      desktop or laptop." 
+ echo "             [--grpc_port=<number>] Optional: Manually choose a port to activate "
+ echo "                                    and use the scripting functionality."
+ echo "                                    Note: This feature is currently in development."
  echo "             [--help] View this help output"
 }
 #####################################################################
@@ -110,6 +120,10 @@ case $i in
     fport="${i#*=}"
     shift # past argument=value
     ;;
+    -grpc_port=*|--grpc_port=*)
+    grpc_port="${i#*=}"
+    shift # past argument=value
+    ;;
     --help)
     display_help
     exit 1
@@ -127,6 +141,7 @@ done
 #echo "DEBUG: port= ${port}"
 #echo "DEBUG: fport= ${fport}"
 #echo "DEBUG: omp_threads= ${omp_threads}"
+#echo "DEBUG: grpc_port= ${grpc_port}"
 
 #################################################################
 #### Do some checks on the user defined command line variables
@@ -147,6 +162,10 @@ if [[ $omp_threads != [0-9]* ]]; then
  echo "Chosen omp_thread value is not a number. Please check." 
  exit 1
 fi
+if [[ $omp_threads = 1 ]]; then
+ echo "CARTA requires more than 1 OMP thread in order to function. Please run with omp_threads > 1. Check —help for more info." 
+ exit 1
+fi
 if [[ $port != [0-9]* ]] ; then
  echo "Requested websocket port is not a number. Please check." 
  exit 1
@@ -161,6 +180,10 @@ if [[ $port -lt 1025 || $port -gt 65535 ]] ; then
 fi
 if [[ $fport -lt 1025 || $port -gt 65535 ]]; then
  echo "Requested frontend port is out of range. Please check." 
+ exit 1
+fi
+if [[ $grpc_port != -1 && $grpc_port -lt 1025 || $grpc_port -gt 65535 ]]; then
+ echo "Requested gRPC port is out of range. Please check." 
  exit 1
 fi
 checkport=`lsof -i :$port`
@@ -200,8 +223,13 @@ DIR="$( cd "$( pwd "${BASH_SOURCE[0]}" )" >/dev/null && pwd )/carta-backend/etc"
 export CASAPATH="../../../../$DIR linux"
 
 export LD_LIBRARY_PATH=$DIR/../lib:$LD_LIBRARY_PATH
+## Fix for RedHat8/Fedora30
+if [ ! -f /usr/lib64/libssl.so.1.1 ]; then
+   export LD_LIBRARY_PATH=$DIR/../lib/redhat8:$LD_LIBRARY_PATH
+fi
+##
 
-$DIR/../bin/carta_backend verbose=true base=$folder root=$root port=$port threads=$threads omp_threads=$omp_threads >> $logfilename 2>&1 &
+$DIR/../bin/carta_backend verbose=true base=$folder root=$root port=$port threads=$threads omp_threads=$omp_threads grpc_port=$grpc_port >> $logfilename 2>&1 &
 
 sleep 1
 
@@ -240,10 +268,10 @@ echo " "
 #    fi
 #done
 #
-### Stop the HTTP server and carta_backend processes
+#### Stop the HTTP server and carta_backend processes
 #kill $httpserver_pid
 #kill $carta_pid
 #
-### Go back to original directory
+#### Go back to original directory
 #cd -
 
