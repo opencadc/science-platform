@@ -1,8 +1,8 @@
 
-DEVNAME = arcade-starlink
+DEVNAME = skaha-ossos
 
 NAME = bucket.canfar.net/$(DEVNAME)
-VERSION = 0.3
+VERSION = latest
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .

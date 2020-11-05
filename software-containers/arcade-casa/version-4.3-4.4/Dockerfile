@@ -42,12 +42,12 @@ RUN yum install -y sssd-client acl
 RUN rm -rf /opt/${RELEASE}/data
 RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
 
-RUN mkdir /arcade
-ADD startup.sh /arcade/
+RUN mkdir /skaha
+ADD startup.sh /skaha/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-ENTRYPOINT [ "/arcade/startup.sh" ]
+ENTRYPOINT [ "/skaha/startup.sh" ]

@@ -23,9 +23,9 @@ RUN conda install astroquery
 RUN apt-get update && yes | apt-get install sssd libnss-sss libpam-sss
 RUN pip install vos cadcdata cadctap cadcutils
 
-RUN mkdir /arcade
-ADD init.sh /arcade/
+RUN mkdir /skaha
+ADD init.sh /skaha/
 
 ADD nsswitch.conf /etc/
 
-CMD ["/arcade/init.sh"]
+CMD ["/skaha/init.sh"]

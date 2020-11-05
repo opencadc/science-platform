@@ -45,12 +45,12 @@ RUN cd /opt/admit && \
 RUN rm -rf /opt/${RELEASE}/data
 RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
 
-RUN mkdir /arcade
-ADD init.sh /arcade/
+RUN mkdir /skaha
+ADD init.sh /skaha/
 
 # generate missing dbus uuid (issue #47)
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-CMD [ "/arcade/init.sh" ]
+CMD [ "/skaha/init.sh" ]
