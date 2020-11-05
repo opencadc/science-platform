@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl -n arcade-system apply -f arcade-wsproxy-deployment.yaml
+kubectl -n skaha-system apply -f arcade-wsproxy-deployment.yaml

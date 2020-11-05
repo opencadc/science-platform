@@ -11,8 +11,8 @@ Notes under an installation step indicate that configuration values must be chan
 ### namespaces
 
 The following namespaces are in use for cavern and arcade installation
-   * arcade-system - for system services (deployments)
-   * arcade-workload - for user sessions and applications (jobs)
+   * skaha-system - for system services (deployments)
+   * skaha-workload - for user sessions and applications (jobs)
    * cadc-harbor - for harbor
    * cadc-sssd - for the sssd daemonsets
 
