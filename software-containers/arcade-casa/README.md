@@ -3,9 +3,9 @@
 1. `cd` into the relevant folder with the build files 
 2. execute `make`
 ## Testing a CASA Container
-You will need to run the container in a graphical environment, such as arcade, to test the visual components of the CASA containers.
+You will need to run the container in a graphical environment, such as skaha-desktop, to test the visual components of the CASA containers.
 
-The following steps can be performed in a graphical container environment (such as arcade) to test that the container was built correctly.
+The following steps can be performed in a graphical container environment (such as skaha-desktop) to test that the container was built correctly.
 1. Type the `id` command and ensure that user name is displayed.
 2. Type the following and ensure that information on ADMIT is displayed
 `source /opt/admit/admint_start.sh`

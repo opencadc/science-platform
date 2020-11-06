@@ -32,7 +32,7 @@ There are also a series of [how to guides](https://github.com/opencadc/arcade/tr
 
 ## Technical Overview
 
-![ARCADE-architecture](ARCADE-architecture-0.2.png)
+![skaha-architecture](skaha-architecture-0.2.png)
 
 ## System Components
 

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vosi:capabilities
+    xmlns:vosi="http://www.ivoa.net/xml/VOSICapabilities/v1.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:vs="http://www.ivoa.net/xml/VODataService/v1.1">
+
+  <capability standardID="ivo://ivoa.net/std/VOSI#capabilities">
+    <interface xsi:type="vs:ParamHTTP" role="std">
+      <accessURL use="full">http://replace.me.com/skaha/capabilities</accessURL>
+    </interface>
+  </capability>
+
+  <capability standardID="ivo://ivoa.net/std/VOSI#availability">
+    <interface xsi:type="vs:ParamHTTP" role="std">
+      <accessURL use="full">http://replace.me.com/skaha/availability</accessURL>
+    </interface>
+  </capability>
+  
+  <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Logging#control-1.0">
+    <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
+      <accessURL use="full">http://replace.me.com/skaha/logControl</accessURL>
+    </interface>
+  </capability>
+
+  <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0">
+    <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
+      <accessURL use="base">http://replace.me.com/skaha/session</accessURL>
+      <securityMethod standardID="ivo://ivoa.net/sso#cookie"/>
+    </interface>
+    <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
+      <accessURL use="base">https://replace.me.com/skaha/session</accessURL>
+      <securityMethod standardID="ivo://ivoa.net/sso#tls-with-certificate"/>
+    </interface>
+    <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
+      <accessURL use="base">https://replace.me.com/skaha/session</accessURL>
+      <securityMethod standardID="ivo://ivoa.net/sso#token"/>
+    </interface>
+  </capability>
+
+</vosi:capabilities>
+

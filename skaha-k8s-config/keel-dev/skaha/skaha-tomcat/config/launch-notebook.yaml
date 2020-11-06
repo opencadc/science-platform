@@ -1,0 +1,86 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      restartPolicy: OnFailure
+      #restartPolicy: Never
+      imagePullSecrets:
+        - Kendallata7
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: JUPYTER_TOKEN
+          value: "${skaha.sessionid}"
+        - name: JUPYTER_CONFIG_DIR
+          value: "/home/jovyan"
+        - name: JUPYTER_PATH
+          value: "/home/jovyan"
+        securityContext:
+          runAsUser: 0
+          #runAsUser: ${skaha.posixid} 
+          #runAsGroup: ${skaha.posixid}
+        image: harbor.canfar.net/petuan/scipy:0.1
+        #workingDir: "/cavern/home/${arcade.userid}"
+        #command: ["start-notebook.sh"]
+        #args:
+        #- "--NotebookApp.base_url=notebook/${skaha.sessionid}"
+        #- "--NotebookApp.notebook_dir=/cavern"
+        command: ["/home/jovyan/arcade-start-notebook"]
+        args:
+          - ${skaha.userid}
+          - ${skaha.sessionid}
+        #imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+        #imagePullPolicy: Never
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+          name: notebook-port
+        volumeMounts:
+        - mountPath: "/cavern"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
+      volumes:
+      - name: cavern-volume
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false          
+      - name: scratch-dir
+        emptyDir: {}
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory

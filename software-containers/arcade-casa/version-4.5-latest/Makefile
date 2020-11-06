@@ -27,7 +27,7 @@ VERSIONS_PIPELINE = \
 VERSIONS = \
 	5.7.0-134.el6
 
-DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
+DOCKER_REPO_BASE=harbor.canfar.net/arcade/casa
 
 .PHONY: build clean run 
 

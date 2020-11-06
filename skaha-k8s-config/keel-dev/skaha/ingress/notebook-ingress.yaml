@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: notebook-ingress
+  namespace: skaha-system
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /notebook/$2
+spec:
+  rules:
+  - host: keel-dev-ingress.cloud.computecanada.ca
+    http:
+      paths:
+      - path: /notebook(/|$)(.*)
+        backend:
+          serviceName: arcade-wsproxy-svc
+          servicePort: 8080

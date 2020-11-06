@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: skaha-tomcat
+  name: skaha-tomcat
+  namespace: skaha-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: skaha-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: skaha-tomcat
+    spec:
+      containers:
+      - env:
+        - name: skaha.hostname
+          value: proto.canfar.net
+        - name: skaha.homedir
+          value: /cavern
+        - name: skaha.namespace
+          value: skaha-workload
+        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.1
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        name: skaha-tomcat
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: /root/.ssl/
+          name: servops-cert
+          readOnly: true
+        - mountPath: "/cavern"
+          name: cavern-volume
+          subPath: cavern
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: skaha
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: skaha-servops-secret
+      - name: cavern-volume
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false
