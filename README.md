@@ -72,4 +72,3 @@ On session and application launch, arcade will interact with kubernetes to manif
 Publications that made use of ARCADE platform must include the following statement in the acknowledgement:
 *“We acknowledge the use of the ARCADE (ALMA Reduction in the CANFAR Data Environment) science platform. ARCADE is a ALMA Cycle 7 development study with support from the National Radio Astronomy Observatory, the North American ALMA Science Centre, and the National Research Centre of Canada."*
 
-
