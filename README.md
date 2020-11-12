@@ -7,6 +7,7 @@
     + [skaha-wsproxy](#skaha-wsproxy)
     + [skaha-desktop](#skaha-desktop)
     + [skaha-carta](#skaha-carta)
+    + [skaha-notebook](#skaha-notebook)
     + [software-containers](#software-containers)
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
