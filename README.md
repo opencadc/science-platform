@@ -2,9 +2,6 @@
 
 #### Table of contents
   * [Overview](#overview)
-  * [Getting started](#getting-started)
-  * [Tutorials](#tutorials)
-  * [Technical Overview](#technical-overview)
   * [System Components](#system-components)
     + [skaha](#skaha)
     + [skaha-wsproxy](#skaha-wsproxy)
@@ -17,10 +14,6 @@
 
 ## Overview
 skaha is a general purpose online platform. The system is currently in beta deployment with a limited number of simultaneous users.
-
-The skaha system is also fully integrated with [CARTA: The Cube Analysis and Rendering Tool for Astronomy](https://cartavis.github.io/).
-
-## Technical Overview
 
 ![skaha-architecture](skaha-architecture-0.2.png)
 
@@ -57,7 +50,7 @@ skaha relies on a number of other opencadc modules to operate.
 * posix/sssd -- skaha-desktop and software-containers are run with a SSSD configuration that must point to the same LDAP instance as is used by ac.  When users interact with cavern on the file system the permissions are enforced according to the group membership contained in the LDAP instace.
 
 ## Deployment
-The current implementation targets a Kubernetes deployment.  In the skaha/src/obsolete directory is a version which targets a Docker deployment.  This is no longer supported.
+The current implementation targets a Kubernetes deployment.
 
 On session and application launch, skaha will interact with kubernetes to manifest these entities.  Two kubernetes configuration files are required for these operations.  Examples of these files can be found in skaha/src/examples.  The variables in these files are replaced by skaha at runtime.
 
