@@ -21,6 +21,8 @@ spec:
         image: canfar-registry.cloud.computecanada.ca/reg:0.1
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 91
         ports:
         - containerPort: 8080
           protocol: TCP
