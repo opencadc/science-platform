@@ -27,11 +27,13 @@ current-context: skaha-wsproxy
 1. Temporarily create the (currently incomplete) config with `create-config.sh`
 
 1. Fill in the value of <token base64 string> and <server> by:
+  - Create the (current incorrectly) conifig map ./createConfig.sh
   - Deploying arcade-wsproxy with `deploy-arcade-wsproxy.sh`
   - Connect to the pod with `kubectl -n skaha-system <podID> -- bash`
-  - Grab the value from /var/run/secrets/kubernetes.io/serviceaccount/token 
+  - Grab the value for <token> from /var/run/secrets/kubernetes.io/serviceaccount/token 
   - Grab the value for <server> with `env | grep KUBERNETES_PORT_443_TCP`, but change `tcp` to `https`
   - exit the container and terminate: `kubectl delete deployment arcade-wsproxy`
+  - delete the config map
 
 1. Fill in the values for <cluster-name> with the name of your cluster (eg k9s-dev)
 
