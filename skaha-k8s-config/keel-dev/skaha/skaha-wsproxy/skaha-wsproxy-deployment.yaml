@@ -23,7 +23,7 @@ spec:
               value: rc-uv.canfar.net
           imagePullPolicy: Always
           #imagePullPolicy: IfNotPresent
-          name: arcade-wsproxy
+          name: skaha-wsproxy
           ports:
           - containerPort: 8080
             protocol: TCP
