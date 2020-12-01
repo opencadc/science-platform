@@ -1,120 +1,45 @@
-#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-import sys
-import subprocess
-import time
-import traceback
 import os
-from urlparse import urlparse
-from cachetools import TTLCache
+import skaha_rewrite
 
-def getRedirect(input):
 
-  log("DEBUG: proxying notebook sessions")
-  log("DEBUG: input=" + input)
-  if input is None:
-    log("WARN: no input")
-    return None
-  
-  params = input.split(",")
+class NotebookRewrite(skaha_rewrite.Rewrite):
+    def __init__(self, log_file_fqn):
+        super(NotebookRewrite, self).__init__(log_file_fqn)
 
-  url = urlparse(params[0])
-  path = url.path
-  segs = path.split("/")
-  log("DEBUG: len(segs): " + str(len(segs)))
+    def _build_url(self, segs, path, session_id, ip_address, params):
+        query_string = None
+        if len(params) > 2:
+            query_string = params[2].strip()
+            self.log('DEBUG: query={}'.format(query_string))
 
-  sessionID = segs[2]
-  log("DEBUG: sessionID=" + sessionID)
+        address = '://{}:8888/notebook/'.format(ip_address)
 
-  queryString = None
-  if len(params) > 2:
-    queryParam = params[2]
-    log("DEBUG: query=" + queryParam)
-    if queryParam:
-      queryString = queryParam.strip()
+        idx = path.find(session_id)
+        end_of_path = path[(idx+8):]
+        self.log('DEBUG: end_of_path: {}'.format(end_of_path))
 
-  ipAddress = getIPForSession(sessionID)
+        if len(segs) > 4 and segs[3] == 'api' and segs[4] == 'kernels':
+            if query_string:
+                ret = 'ws{}{}{}?{}'.format(
+                  address, session_id, end_of_path, query_string)
+            else:
+                ret = 'ws{}{}{}'.format(address, session_id, end_of_path)
+        else:
+            if query_string:
+                ret = 'http{}{}{}?{}&token={}'.format(
+                  address, session_id, end_of_path, query_string, session_id)
+            else:
+                ret = 'http{}{}{}?token={}'.format(
+                  address, session_id, end_of_path, session_id)
+        return ret
 
-  if ipAddress is None:
-    log("WARN: IP Address not found")
-    return None
 
-  port = "8888"
-  wsPort = "8999"
-
-  idx = path.find(sessionID)
-  endOfPath = path[(idx+8):]
-  log("DEBUG: endOfPath: " + endOfPath)
-
-  ret = ""
-  if len(segs) > 4 and segs[3] == "api" and segs[4] == "kernels":
-    if queryString:
-      ret = "ws://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString
-    else:
-      ret = "ws://" + ipAddress + ":" + part + "/notebook/" + sessionID + endOfPath
-  else:
-    if queryString:
-      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?" + queryString + "&token=" + sessionID
-    else:
-      ret = "http://" + ipAddress + ":" + port + "/notebook/" + sessionID + endOfPath + "?token=" + sessionID
-  return ret
-
-def getIPForSession(sessionID):
-  sessionIPAddress = getIPFromCache(sessionID)
-  if sessionIPAddress:
-    return sessionIPAddress
-  else:
-    try:
-      command = ["kubectl", "-n", "skaha-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"] 
-      commandString = ' '.join([str(elem) for elem in command]) 
-      log("DEBUG: kubectl command: " + commandString)
-      commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
-      lines = commandOutput.splitlines()
-      for line in lines:
-        parts = line.split()
-        if (parts[1].strip() == "<none>"):
-          sessionIPAddress = parts[0]
-    except subprocess.CalledProcessError as exc:
-      log("ERROR: error calling kubectl: " + exc.output)
-      return None
-    else:
-      log("DEBUG: sessionIPAddress: " + sessionIPAddress)
-      cache[sessionID] = sessionIPAddress.strip()
-      return sessionIPAddress.strip()
-
-def getIPFromCache(sessionID):
-  try:
-    cv = cache[sessionID]
-    return cv
-  except KeyError:
-    return None
-
-def log(message):
-  logfile.write(time.ctime() + " - " + message + "\n")
-  logfile.flush()
-
-logfile = open("/logs/notebook-rewrite.log", "a")
-log("INFO: notebook_rewrite.py listening to stdin")
-os.environ['HOME'] = '/root'
-cache = TTLCache(maxsize=100, ttl=120)
-log("INFO: entering listen loop")
-
-while True:
-  try:
-    request = sys.stdin.readline().strip()
-    log("INFO: Start request: " + request)
-    response = getRedirect(request)
-    if response:
-      log("INFO: End response: " + response)
-      sys.stdout.write(response + '\n')
-    else:
-      log("INFO: End response: None")
-      sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  except Exception as e:
-    tb = traceback.format_exc()
-    log("ERROR: unexpected: " + str(e) + ":" + tb) 
-    sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  except:
-    log("ERROR: unclassified error")
-    sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  sys.stdout.flush()
+if __name__ == '__main__':
+    sr = NotebookRewrite('/logs/notebook-rewrite.log')
+    sr.log('INFO: notebook_rewrite.py listening to stdin')
+    os.environ['HOME'] = '/root'
+    sr.log('INFO: entering listen loop')
+    while True:
+        sr.listen()
