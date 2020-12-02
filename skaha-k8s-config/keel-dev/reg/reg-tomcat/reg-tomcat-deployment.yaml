@@ -27,7 +27,7 @@ spec:
         - containerPort: 8080
           protocol: TCP
         volumeMounts:
-        - mountPath: "/root/config"
+        - mountPath: "/usr/share/tomcat/config"
           name: config-volume
         - mountPath: "/config"
           name: tomcat-config-volume
