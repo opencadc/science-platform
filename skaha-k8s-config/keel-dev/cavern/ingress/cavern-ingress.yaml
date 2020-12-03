@@ -8,7 +8,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   rules:
-  - host: keel-dev-ingress.cloud.computecanada.ca
+  - host: rc-uv.canfar.net
     http:
       paths:
       - path: /cavern(/|$)(.*)
