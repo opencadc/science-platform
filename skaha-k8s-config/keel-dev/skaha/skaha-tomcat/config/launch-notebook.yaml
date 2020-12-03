@@ -21,7 +21,7 @@ spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
       imagePullSecrets:
-        - Kendallata7
+        - name: "${software.imagesecret}"
       containers:
       - name: "${skaha.jobname}"
         env:

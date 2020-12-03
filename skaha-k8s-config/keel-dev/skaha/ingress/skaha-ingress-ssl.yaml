@@ -16,7 +16,7 @@ metadata:
 spec:
   tls:
   - hosts:
-    - keel-dev-ingress.cloud.computecanada.ca
+    - rc-uv.canfar.net
     secretName: canfar-net-cert-secret
   rules:
   - host: rc-uv.canfar.net
