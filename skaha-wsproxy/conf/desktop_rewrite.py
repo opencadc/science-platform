@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 
 import os
 import skaha_rewrite
@@ -22,9 +22,9 @@ class DesktopRewrite(skaha_rewrite.Rewrite):
 
 
 if __name__ == '__main__':
-  sr = DesktopRewrite('/logs/desktop-rewrite.log')
-  sr.log('INFO: desktop_rewrite.py listening to stdin')
-  os.environ['HOME'] = '/root'
-  sr.log('INFO: entering listen loop')
-  while True:
-    sr.listen()
+    sr = DesktopRewrite('/logs/desktop-rewrite.log')
+    sr.log('INFO: desktop_rewrite.py listening to stdin')
+    os.environ['HOME'] = '/root'
+    sr.log('INFO: entering listen loop')
+    while True:
+        sr.listen()
