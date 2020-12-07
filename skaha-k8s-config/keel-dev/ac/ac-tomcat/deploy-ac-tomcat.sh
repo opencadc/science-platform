@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl apply -f ac-tomcat-deployment.yaml
+kubectl -n skaha-system apply -f ac-tomcat-deployment.yaml

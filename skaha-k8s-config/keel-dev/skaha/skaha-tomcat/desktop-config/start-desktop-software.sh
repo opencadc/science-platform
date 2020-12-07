@@ -8,9 +8,9 @@ echo
 
 INITFILE=/arcade/init.sh
 if [ -f "$INITFILE" ]; then
-    su -s /bin/bash -c '/arcade/init.sh; xterm -fg white -bg black -title $TITLE ' $USERID
+    /bin/bash -c '/arcade/init.sh; xterm -fg white -bg black -title $TITLE '
 else
-    su -s /bin/bash -c 'xterm -fg white -bg black -title $TITLE ' $USERID
+    /bin/bash -c 'xterm -fg white -bg black -title $TITLE '
 fi
 
 echo "[ARCADE] End"
