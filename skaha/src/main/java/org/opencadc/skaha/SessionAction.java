@@ -230,7 +230,7 @@ public abstract class SessionAction extends RestAction {
     }
     
     public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/carta/" + sessionID + "/?socketUrl=wss://proto.canfar.net/carta/" +
+        return "https://" + host + "/carta/" + sessionID + "/?socketUrl=wss://" + host + "/carta/" +
             sessionID + "/socket/";
     }
     
