@@ -8,7 +8,7 @@
         <servlet-class>ca.nrc.cadc.log.LogControlServlet</servlet-class>
         <init-param>
             <param-name>logLevel</param-name>
-            <param-value>info</param-value>
+            <param-value>debug</param-value>
         </init-param>
         <init-param>
             <param-name>logLevelPackages</param-name>
@@ -51,7 +51,7 @@
          </init-param>
          <init-param>
              <param-name>skaha-users-group</param-name>
-             <param-value>ivo://cadc.nrc.ca/gms?ARCADE-Users</param-value>
+             <param-value>ivo://cadc.nrc.ca/gms-proto?ARCADE-Users</param-value>
          </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
