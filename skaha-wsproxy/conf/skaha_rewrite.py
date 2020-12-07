@@ -90,14 +90,7 @@ class Rewrite(object):
         :param ttl: time to live of cache entries
         """
         self._log_fqn = log_fqn
-        if os.path.exists(log_fqn):
-            self._log_file = open(log_fqn, 'a')
-        else:
-            dir_name = os.path.dirname(log_fqn)
-            if not os.path.exists(dir_name):
-                os.mkdir(dir_name)
-            self._log_file = open(log_fqn, 'w')
-
+        self._log_file = open(log_fqn, 'a')
         self._cache = TTLCache(maxsize=max_size, ttl=ttl)
 
     def _build_url(self, segs, path, session_id, ip_address, params):

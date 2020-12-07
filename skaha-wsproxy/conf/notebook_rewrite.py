@@ -37,7 +37,7 @@ class NotebookRewrite(skaha_rewrite.Rewrite):
 
 
 if __name__ == '__main__':
-    sr = NotebookRewrite('/logs/notebook-rewrite.log')
+    sr = NotebookRewrite('/etc/httpd/logs/notebook-rewrite.log')
     sr.log('INFO: notebook_rewrite.py listening to stdin')
     os.environ['HOME'] = '/root'
     sr.log('INFO: entering listen loop')

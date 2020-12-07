@@ -24,7 +24,7 @@ class CartaRewrite(skaha_rewrite.Rewrite):
 
 
 if __name__ == '__main__':
-    sr = CartaRewrite('/logs/carta-rewrite.log')
+    sr = CartaRewrite('/etc/httpd/logs/carta-rewrite.log')
     sr.log('INFO: carta_rewrite.py listening to stdin')
     os.environ['HOME'] = '/root'
     sr.log('INFO: entering listen loop')
