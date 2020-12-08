@@ -67,10 +67,12 @@
 
 package org.opencadc.skaha;
 
+import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.net.HttpDelete;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.HttpPost;
+import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
@@ -78,12 +80,14 @@ import ca.nrc.cadc.util.StringUtil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 
@@ -99,8 +103,10 @@ import org.junit.Test;
 public class LifecycleTest {
     
     private static final Logger log = Logger.getLogger(LifecycleTest.class);
-    public static final String SKAHA_SERVICE_ID = "ivo://cadc.nrc.ca/skaha";
+    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
+    public static final String DESKTOP_IMAGE = "harbor.canfar.net/skaha-desktop/session:0.1";
+    public static final String CARTA_IMAGE = "harbor.canfar.net/skaha-carta/carta:1.4";
     
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
@@ -112,9 +118,7 @@ public class LifecycleTest {
     public LifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            // enable when in registry
-            //sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
-            sessionURL = new URL("https://proto.canfar.net/skaha/session");
+            sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
             log.info("sessions URL: " + sessionURL);
     
             File cert = FileUtil.getFileFromResource("skaha-test.pem", LifecycleTest.class);
@@ -141,10 +145,14 @@ public class LifecycleTest {
                     // create desktop session
                     Map<String, Object> params = new HashMap<String, Object>();
                     params.put("name", "intTest");
-                    params.put("type", SessionAction.SESSION_TYPE_DESKTOP);
-                    HttpPost post = new HttpPost(sessionURL, params, true);
+                    params.put("image", DESKTOP_IMAGE);
+                    HttpPost post = new HttpPost(sessionURL, params, false);
                     post.run();
                     Assert.assertNull("create session error", post.getThrowable());
+                    
+                    // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been 
+                    // addressed, just wait for a bit.
+                    TimeUnit.SECONDS.sleep(10);
                     
                     // get sessions
                     skaha = getSessions();
@@ -159,10 +167,12 @@ public class LifecycleTest {
                     // create carta session
                     params = new HashMap<String, Object>();
                     params.put("name", "intTest");
-                    params.put("type", SessionAction.SESSION_TYPE_CARTA);
-                    post = new HttpPost(sessionURL, params, true);
+                    params.put("image", CARTA_IMAGE);
+                    post = new HttpPost(sessionURL, params, false);
                     post.run();
                     Assert.assertNull("create session error", post.getThrowable());
+                    
+                    TimeUnit.SECONDS.sleep(10);
                     
                     // get sessions
                     skaha = getSessions();
