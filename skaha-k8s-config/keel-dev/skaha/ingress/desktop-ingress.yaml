@@ -7,10 +7,10 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /desktop/$2
 spec:
   rules:
-  - host: keel-dev-ingress.cloud.computecanada.ca
+  - host: rc-uv.canfar.net
     http:
       paths:
       - path: /desktop(/|$)(.*)
         backend:
-          serviceName: arcade-wsproxy-svc
+          serviceName: skaha-wsproxy-svc
           servicePort: 8080

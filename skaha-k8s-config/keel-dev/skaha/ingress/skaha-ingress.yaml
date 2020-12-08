@@ -7,7 +7,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /skaha/$2
 spec:
   rules:
-  - host: keel-dev-ingress.cloud.computecanada.ca
+  - host: rc-uv.canfar.net
     http:
       paths:
       - path: /skaha(/|$)(.*)

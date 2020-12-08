@@ -17,13 +17,13 @@ spec:
         run: skaha-wsproxy
     spec:
       containers:
-        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.1
+        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.2
           env:
             - name: skaha.hostname
               value: rc-uv.canfar.net
           imagePullPolicy: Always
           #imagePullPolicy: IfNotPresent
-          name: arcade-wsproxy
+          name: skaha-wsproxy
           ports:
           - containerPort: 8080
             protocol: TCP

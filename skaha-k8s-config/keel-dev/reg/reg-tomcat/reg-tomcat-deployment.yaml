@@ -2,23 +2,23 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: ac-tomcat
-  name: ac-tomcat
+    run: reg-tomcat
+  name: reg-tomcat
   namespace: skaha-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      run: ac-tomcat
+      run: reg-tomcat
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: ac-tomcat
+        run: reg-tomcat
     spec:
       containers:
-      - name: ac-tomcat
-        image: canfar-registry.cloud.computecanada.ca/ac:0.1
+      - name: reg-tomcat
+        image: canfar-registry.cloud.computecanada.ca/reg:0.1
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         securityContext:
@@ -27,28 +27,14 @@ spec:
         - containerPort: 8080
           protocol: TCP
         volumeMounts:
-        - mountPath: /root/.ssl/
-          name: servops-cert
-          readOnly: true
-        - mountPath: /root/
-          name: db-config
-          readOnly: true
-        - mountPath: "/root/config"
+        - mountPath: "/usr/share/tomcat/config"
           name: config-volume
         - mountPath: "/config"
           name: tomcat-config-volume
       volumes:
-      - name: servops-cert
-        secret:
-          defaultMode: 420
-          secretName: cavern-servops-secret
       - name: config-volume
         configMap:
-          name: ac-config
+          name: reg-config
       - name: tomcat-config-volume
         configMap:
-          name: ac-tomcat-config
-      - name: db-config
-        secret:
-          defaultMode: 420
-          secretName: ac-dbrc
+          name: reg-tomcat-config
