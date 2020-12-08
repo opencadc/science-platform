@@ -39,6 +39,13 @@ spec:
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
+        resources:
+          requests:
+            memory: "32Gi"
+            cpu: "0.5"
+          limits:
+            memory: "256Gi"
+            cpu: "2"
         ports:
         - containerPort: 5901
           protocol: TCP

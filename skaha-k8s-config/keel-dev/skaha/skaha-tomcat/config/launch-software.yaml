@@ -10,7 +10,7 @@ spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
       imagePullSecrets:
-      - name: "${software.imagesecret}"
+      - name: ${software.imagesecret}
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
@@ -34,6 +34,13 @@ spec:
         workingDir: "/cavern/home/${skaha.userid}"
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "32Gi"
+            cpu: "0.5"
+          limits:
+            memory: "256Gi"
+            cpu: "2"
         ports:
         - containerPort: 6000
           protocol: TCP
