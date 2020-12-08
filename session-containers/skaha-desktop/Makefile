@@ -1,5 +1,5 @@
 
-NAME = harbor.canfar.net/skaha/session-desktop
+NAME = harbor.canfar.net/skaha-desktop/session
 VERSION = 0.1
 
 build: dependencies Dockerfile
