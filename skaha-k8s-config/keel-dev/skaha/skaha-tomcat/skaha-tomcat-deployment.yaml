@@ -19,7 +19,7 @@ spec:
       containers:
       - env:
         - name: skaha.hostname
-          value: proto.canfar.net
+          value: rc-uv.canfar.net
         - name: skaha.homedir
           value: /cavern
         - name: skaha.namespace

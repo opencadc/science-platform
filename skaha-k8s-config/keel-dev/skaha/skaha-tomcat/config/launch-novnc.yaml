@@ -34,7 +34,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
-        image: canfar-registry.cloud.computecanada.ca/arcade-desktop:latest
+        image: harbor.canfar.net/skaha/session-desktop:0.1
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never

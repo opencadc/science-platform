@@ -1,4 +1,4 @@
 #!/bin/bash
 
-kubectl apply -f ac-tomcat-expose.yaml
+kubectl -n skaha-system apply -f ac-tomcat-expose.yaml
 

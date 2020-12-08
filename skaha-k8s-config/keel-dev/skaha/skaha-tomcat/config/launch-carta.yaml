@@ -20,6 +20,8 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      imagePullSecrets:
+      - name: ${software.imagesecret}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -30,13 +32,13 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
-        image: canfar-registry.cloud.computecanada.ca/arcade-carta:latest
-        #imagePullPolicy: IfNotPresent
-        imagePullPolicy: Always
-        #imagePullPolicy: Never
+        image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
         - /carta/arcade-carta /cavern /cavern/projects
+        #imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+        #imagePullPolicy: Never
         ports:
         - containerPort: 5901
           protocol: TCP
@@ -65,8 +67,8 @@ spec:
           user: kanfarnetes_dev
           secretRef:
             name: cephfs-cephx-key
-          readOnly: false
-     - name: scratch-dir
+          readOnly: false          
+      - name: scratch-dir
         emptyDir: {}
       - name: sssd-dir
         hostPath:
