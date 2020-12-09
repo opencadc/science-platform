@@ -36,11 +36,11 @@ spec:
         #imagePullPolicy: IfNotPresent
         resources:
           requests:
-            memory: "32Gi"
-            cpu: "0.5"
+            memory: "4Gi"
+            cpu: "0.25"
           limits:
             memory: "256Gi"
-            cpu: "2"
+            cpu: "16"
         ports:
         - containerPort: 6000
           protocol: TCP
@@ -63,7 +63,7 @@ spec:
       - name: start-desktop-software
         configMap:
           name: start-desktop-software
-          defaultMode: 0744
+          defaultMode: 0777
       - name: cavern-volume
         cephfs:
           monitors:

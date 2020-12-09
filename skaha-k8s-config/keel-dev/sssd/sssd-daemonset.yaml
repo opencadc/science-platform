@@ -20,7 +20,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - mkdir -p /var/lib/sss/pipes/private;
-          chmod 700 /var/lib/sss/pipes/private;
+          chmod 1744 /var/lib/sss/pipes/private;
         volumeMounts:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir

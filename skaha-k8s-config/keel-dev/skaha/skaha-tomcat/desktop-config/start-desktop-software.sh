@@ -4,13 +4,14 @@ USERID=$1
 TITLE=$2
 
 echo "[ARCADE] Starting arcade software container [title=$TITLE] for [userid=$USERID]"
-echo
 
 INITFILE=/arcade/init.sh
 if [ -f "$INITFILE" ]; then
-    /bin/bash -c '/arcade/init.sh; xterm -fg white -bg black -title $TITLE '
-else
-    /bin/bash -c 'xterm -fg white -bg black -title $TITLE '
+    echo "[ARCADE] Calling /arcade/init.sh"
+    /arcade/init.sh
 fi
 
-echo "[ARCADE] End"
+echo "[ARCADE] Starting xterm"
+xterm -fg white -bg black -title $TITLE 
+
+echo "[ARCADE] Exit"
