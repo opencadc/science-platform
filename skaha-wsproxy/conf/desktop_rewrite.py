@@ -1,103 +1,30 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-import sys
-import subprocess
-import time
-import traceback
 import os
-from urlparse import urlparse
-from cachetools import TTLCache
+import skaha_rewrite
 
-def getRedirect(input):
 
-  log("DEBUG: proxying desktop k8s session")
-  log("DEBUG: input=" + input)
-  if input is None:
-    log("WARN: no input")
-    return None
-  
-  params = input.split(",")
+class DesktopRewrite(skaha_rewrite.Rewrite):
+    def __init__(self, log_file_fqn):
+        super(DesktopRewrite, self).__init__(log_file_fqn)
 
-  url = urlparse(params[0])
-  path = url.path
-  segs = path.split("/")
+    def _build_url(self, segs, path, session_id, ip_address, params):
+        port = '6901'
+        ret = 'http://{}:{}/?password={}/'.format(ip_address, port, session_id)
+        self.log('DEBUG: Segs[3]: {}'.format(segs[3]))
+        if segs[3] == 'websockify':
+            ret = 'ws://{}:{}/websockify'.format(ip_address, port)
+        elif segs[3] != 'connect':
+            idx = path.find(session_id)
+            end_of_path = path[(idx+8):]
+            ret = 'http://{}:{}{}'.format(ip_address, port, end_of_path)
+        return ret
 
-  sessionID = segs[2]
-  log("DEBUG: sessionID=" + sessionID)
 
-  ipAddress = getIPForSession(sessionID)
-
-  if ipAddress is None:
-    log("WARN: IP Address not found")
-    return None
-
-  port = "6901"
-
-  ret = "http://" + ipAddress + ":" + port + "/?password=" + sessionID + "/"
-  log("DEBUG: Segs[3]: " + segs[3])
-  if (segs[3] == "websockify"):
-    ret = "ws://" + ipAddress + ":" + port + "/websockify"
-  elif (segs[3] != "connect"):
-    idx = path.find(sessionID)
-    endOfPath = path[(idx+8):]
-    ret = "http://" + ipAddress + ":" + port + endOfPath
-  return ret
-
-def getIPForSession(sessionID):
-  sessionIPAddress = getIPFromCache(sessionID)
-  if sessionIPAddress:
-    return sessionIPAddress
-  else:
-    try:
-      command = ["kubectl", "-n", "skaha-workload", "--kubeconfig=/root/kube/k8s-config", "get", "pod", "--selector=canfar-net-sessionID=" + sessionID, "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"]
-      commandString = ' '.join([str(elem) for elem in command])
-      log("DEBUG: kubectl command: " + commandString)
-      commandOutput = subprocess.check_output(command, stderr=subprocess.STDOUT)
-      lines = commandOutput.splitlines()
-      for line in lines:
-        parts = line.split()
-        if (parts[1].strip() == "<none>"):
-          sessionIPAddress = parts[0]
-    except subprocess.CalledProcessError as exc:
-      log("ERROR: error calling kubectl: " + exc.output)
-      return None
-    else:
-      log("DEBUG: sessionIPAddress: " + sessionIPAddress)
-      cache[sessionID] = sessionIPAddress.strip()
-      return sessionIPAddress.strip()
-
-def getIPFromCache(sessionID):
-  try:
-    cv = cache[sessionID]
-    return cv
-  except KeyError:
-    return None
-
-def log(message):
-  logfile.write(time.ctime() + " - " + message + "\n")
-  logfile.flush()
-
-logfile = open("/logs/desktop-rewrite.log", "a")
-cache = TTLCache(maxsize=100, ttl=120)
-log("INFO: desktop_rewrite.py listening to stdin")
-log("INFO: entering listen loop")
-
-while True:
-  try:
-    request = sys.stdin.readline().strip()
-    log("INFO: Start request: " + request)
-    response = getRedirect(request)
-    if response:
-      log("INFO: End response: " + response)
-      sys.stdout.write(response + '\n')
-    else:
-      log("INFO: End response: None")
-      sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  except Exception as e:
-    tb = traceback.format_exc()
-    log("ERROR: unexpected: " + str(e) + ":" + tb) 
-    sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  except:
-    log("ERROR: unclassified error")
-    sys.stdout.write('https://www.canfar.net/notfound.html\n')
-  sys.stdout.flush()
+if __name__ == '__main__':
+    sr = DesktopRewrite('/etc/httpd/logs/desktop-rewrite.log')
+    sr.log('INFO: desktop_rewrite.py listening to stdin')
+    os.environ['HOME'] = '/root'
+    sr.log('INFO: entering listen loop')
+    while True:
+        sr.listen()
