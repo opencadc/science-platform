@@ -94,7 +94,7 @@ class Rewrite(object):
         self._cache = TTLCache(maxsize=max_size, ttl=ttl)
 
     def _build_url(self, segs, path, session_id, ip_address, params):
-        return None
+        raise NotImplementedError
 
     def _get_ip_for_session(self, session_id):
         session_ip_address = self._cache.get(session_id)
@@ -114,7 +114,7 @@ class Rewrite(object):
                            '-o',
                            'custom-columns=IPADDR:.status.podIP,'
                            'DT:.metadata.deletionTimestamp']
-                command_string = ' '.join([str(elem) for elem in command])
+                command_string = ' '.join(str(elem) for elem in command)
                 self.log('DEBUG: kubectl command: {}'.format(command_string))
                 command_output = subprocess.check_output(
                     command, stderr=subprocess.STDOUT)
