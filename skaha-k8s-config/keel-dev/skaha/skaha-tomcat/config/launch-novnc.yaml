@@ -20,6 +20,8 @@ spec:
     spec:
       restartPolicy: OnFailure
       #restartPolicy: Never
+      imagePullSecrets:
+      - name: ${software.imagesecret}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -34,10 +36,17 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
-        image: harbor.canfar.net/skaha/session-desktop:0.1
+        image: ${software.imageid}
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.25"
+          limits:
+            memory: "256Gi"
+            cpu: "16"
         ports:
         - containerPort: 5901
           protocol: TCP

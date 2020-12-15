@@ -23,6 +23,13 @@ spec:
         #imagePullPolicy: IfNotPresent
         #command: ["/bin/sh"]
         #args: ["-c", "while true; do sleep 10;done"] 
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
         ports:
         - containerPort: 64022
           protocol: TCP

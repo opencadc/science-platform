@@ -21,6 +21,13 @@ spec:
         image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:latest
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
         ports:
         - containerPort: 8080
           protocol: TCP
