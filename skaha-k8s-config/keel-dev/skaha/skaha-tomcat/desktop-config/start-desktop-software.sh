@@ -3,14 +3,15 @@
 USERID=$1
 TITLE=$2
 
-echo "[ARCADE] Starting arcade software container [title=$TITLE] for [userid=$USERID]"
-echo
+echo "[skaha] Starting skaha software container [title=$TITLE] for [userid=$USERID]"
 
-INITFILE=/arcade/init.sh
+INITFILE=/skaha/init.sh
 if [ -f "$INITFILE" ]; then
-    su -s /bin/bash -c '/arcade/init.sh; xterm -fg white -bg black -title $TITLE ' $USERID
-else
-    su -s /bin/bash -c 'xterm -fg white -bg black -title $TITLE ' $USERID
+    echo "[skaha] Calling /skaha/init.sh"
+    /skaha/init.sh
 fi
 
-echo "[ARCADE] End"
+echo "[skaha] Starting xterm"
+xterm -fg white -bg black -title $TITLE 
+
+echo "[skaha] Exit"

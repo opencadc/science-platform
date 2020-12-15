@@ -19,7 +19,7 @@ spec:
       containers:
       - env:
         - name: skaha.hostname
-          value: proto.canfar.net
+          value: rc-uv.canfar.net
         - name: skaha.homedir
           value: /cavern
         - name: skaha.namespace
@@ -28,6 +28,13 @@ spec:
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
         ports:
         - containerPort: 8080
           protocol: TCP

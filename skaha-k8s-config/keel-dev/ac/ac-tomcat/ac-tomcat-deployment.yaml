@@ -22,21 +22,27 @@ spec:
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         securityContext:
-          runAsUser: 91
+          runAsUser: 8675309
+          runAsGroup: 8675309
         ports:
         - containerPort: 8080
           protocol: TCP
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
         volumeMounts:
-        - mountPath: /root/.ssl/
+        - mountPath: /usr/share/tomcat/.ssl/
           name: servops-cert
-          readOnly: true
-        - mountPath: /root/
+        - mountPath: /usr/share/tomcat/
           name: db-config
-          readOnly: true
-        - mountPath: "/root/config"
+        - mountPath: "/usr/share/tomcat/config"
           name: config-volume
-        - mountPath: "/config"
-          name: tomcat-config-volume
+      #  - mountPath: "/config"
+      #    name: tomcat-config-volume
       volumes:
       - name: servops-cert
         secret:
@@ -45,9 +51,10 @@ spec:
       - name: config-volume
         configMap:
           name: ac-config
-      - name: tomcat-config-volume
-        configMap:
-          name: ac-tomcat-config
+          defaultMode: 420
+#      - name: tomcat-config-volume
+#        configMap:
+#          name: ac-tomcat-config
       - name: db-config
         secret:
           defaultMode: 420

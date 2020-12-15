@@ -68,6 +68,7 @@
 package org.opencadc.skaha;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
@@ -126,24 +127,24 @@ public class PostAction extends SessionAction {
             if (sessionID == null) {
                                 
                 String name = syncInput.getParameter("name");
-                String type = syncInput.getParameter("type");
+                String image = syncInput.getParameter("image");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
-                if (type == null) {
-                    throw new IllegalArgumentException("Missing parameter 'type'");
+                if (image == null) {
+                    throw new IllegalArgumentException("Missing parameter 'image'");
                 }
                 validateName(name);
-                validateType(type);
+                String type = validateImage(image);
                 
                 // check for no existing session for this user
-                // (rule: only 1 session per user allowed)
+                // (rule: only 1 session of same type per user allowed)
                 checkForExistingSession(userID, type);
                 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, type, name);
+                URL sessionURL = createSession(sessionID, type, image, name);
                 
                 syncOutput.setHeader("Location", sessionURL.toString());
                 syncOutput.setCode(303);
@@ -186,17 +187,22 @@ public class PostAction extends SessionAction {
         }
     }
     
-    private void validateType(String type) {
-        if (!StringUtil.hasText(type)) {
-            throw new IllegalArgumentException("type must have a value");
+    private String validateImage(String image) {
+        if (!StringUtil.hasText(image)) {
+            throw new IllegalArgumentException("image must have a value");
         }
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type) ||
-            SessionAction.SESSION_TYPE_CARTA.equals(type) ||
-            SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            return;
+        
+        if (image.startsWith("harbor.canfar.net/skaha-desktop/session:")) {
+            return SESSION_TYPE_DESKTOP;
+        } else if (image.startsWith("harbor.canfar.net/skaha-carta/")) {
+            return SESSION_TYPE_CARTA;
+        } else if (image.startsWith("harbor.canfar.net/petuan-")) {
+            return SESSION_TYPE_NOTEBOOK;
         }
-        throw new IllegalArgumentException("type must be one of " + SessionAction.SESSION_TYPE_DESKTOP
-            + ", " + SessionAction.SESSION_TYPE_NOTEBOOK + " or " + SessionAction.SESSION_TYPE_CARTA);
+        
+        throw new IllegalArgumentException("session image must come from harbor.canfar.net/skaha-desktop/session:*, " +
+            "harbor.canfar.net/skaha-carta/*, or harbor.canfar.net/petuan-*");
+        
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
@@ -208,11 +214,17 @@ public class PostAction extends SessionAction {
         }
     }
     
-    public URL createSession(String sessionID, String type, String name) throws Exception {
+    public URL createSession(String sessionID, String type, String image, String name) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
+        
+        String imageSecret = getHarborSecret();            
+        log.debug("image secret: " + imageSecret);
+        if (imageSecret == null) {
+            imageSecret = "notused";
+        }
         
         String launchPath = null;
         switch (type) {
@@ -233,11 +245,13 @@ public class PostAction extends SessionAction {
         
         launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
         launchString = setConfigValue(launchString, SKAHA_SESSIONNAME, name);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
         launchString = setConfigValue(launchString, SKAHA_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
+        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
+        launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
         
         String jsonLaunchFile = super.stageFile(launchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -359,26 +373,60 @@ public class PostAction extends SessionAction {
         HttpGet get = new HttpGet(acURL, out);
         get.run();
         if (get.getThrowable() != null) {
-            log.debug("error obtaining idToken", get.getThrowable());
-            throw new RuntimeException(get.getThrowable().getMessage());
+            log.warn("error obtaining idToken", get.getThrowable());
+            return null;
         }
+        String idToken = out.toString();
+        log.debug("idToken: " + idToken);
         
         log.debug("getting secret from harbor");
-        String idToken = out.toString();
-        URL harborURL = new URL("https://proto.canfar.net/harbor/api/v2.0/users/current");
+        URL harborURL = new URL("https://harbor.canfar.net/api/v2.0/users/current");
         out = new ByteArrayOutputStream();
         get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         get.run();
+        log.debug("harbor response code: " + get.getResponseCode());
+        if (get.getResponseCode() == 404) {
+            if (get.getThrowable() != null) {
+                log.warn("user not found in harbor", get.getThrowable());
+            } else {
+                log.warn("user not found in harbor");
+            }
+            return null;
+        }
         if (get.getThrowable() != null) {
-            log.debug("error obtaining harbor secret", get.getThrowable());
-            throw new RuntimeException(get.getThrowable().getMessage());
+            log.warn("error obtaining harbor secret", get.getThrowable());
+            return null;
         }
         String userJson = out.toString();
+        log.debug("harbor user info: " + userJson);
         JSONTokener tokener = new JSONTokener(userJson);
         JSONObject obj = new JSONObject(tokener);
-        String secret = obj.getJSONObject("oidc_user_meta").getString("secret");
-        return secret;
+        String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
+        String harborUsername = obj.getString("username");
+        
+        String secretName = "harbor-secret-" + userID;
+        
+        // delete any old secret by this name
+        String[] deleteCmd = new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+        try {
+            String deleteResult = execute(deleteCmd);
+            log.debug("Delete secret result: " + deleteResult);
+        } catch (IOException notfound) {
+            log.debug("no secret to delete", notfound);
+        }
+        
+        // create new secret
+        String[] createCmd = new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
+             "--docker-server=harbor.canfar.net",
+             "--docker-username=" + harborUsername,
+             "--docker-password=" + cliSecret};
+        String createResult = execute(createCmd);
+        log.debug("Create secret result: " + createResult);
+        
+        return secretName;
         
     }
 
