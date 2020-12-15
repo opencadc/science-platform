@@ -30,6 +30,7 @@ RUN pip install cachetools
 COPY conf/nofiles.conf /etc/security/limits.d/nofiles.conf
 COPY conf/sudoers /etc/sudoers
 
+ADD conf/skaha_rewrite.py /www/bin/skaha_rewrite.py
 ADD conf/desktop_rewrite.py /www/bin/desktop_rewrite.py
 ADD conf/carta_rewrite.py /www/bin/carta_rewrite.py
 ADD conf/notebook_rewrite.py /www/bin/notebook_rewrite.py
