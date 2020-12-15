@@ -403,6 +403,7 @@ public class PostAction extends SessionAction {
         JSONTokener tokener = new JSONTokener(userJson);
         JSONObject obj = new JSONObject(tokener);
         String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
+        String harborUsername = obj.getString("username");
         
         String secretName = "harbor-secret-" + userID;
         
@@ -420,7 +421,7 @@ public class PostAction extends SessionAction {
         String[] createCmd = new String[] {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
              "--docker-server=harbor.canfar.net",
-             "--docker-username=" + userID,
+             "--docker-username=" + harborUsername,
              "--docker-password=" + cliSecret};
         String createResult = execute(createCmd);
         log.debug("Create secret result: " + createResult);
