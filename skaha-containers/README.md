@@ -6,7 +6,7 @@ Session containers are HTML5/websocket applications that are made available thro
 
 Software containers are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, and containers for Gemini processing.
 
-Some of the recipes for these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  However, there is a minimal set of requirements and expectations for both session and software containers that run in skaha.
+Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
 
 ## Buliding skaha containers
 
