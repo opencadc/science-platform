@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kubectl -n skaha-system apply -f skaha-allocate-job.yaml
+kubectl -n skaha-system create -f skaha-allocate-job.yaml
