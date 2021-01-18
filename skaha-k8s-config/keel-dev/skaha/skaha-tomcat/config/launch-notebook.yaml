@@ -36,10 +36,10 @@ spec:
         - name: JUPYTER_PATH
           value: "/home/jovyan"
         securityContext:
-          runAsUser: 0
-          #runAsUser: ${skaha.posixid} 
-          #runAsGroup: ${skaha.posixid}
-        image: harbor.canfar.net/petuan/scipy:0.1
+          #runAsUser: 0
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
+        image: ${software.imageid}
         #workingDir: "/cavern/home/${arcade.userid}"
         #command: ["start-notebook.sh"]
         #args:
