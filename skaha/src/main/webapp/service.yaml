@@ -3,7 +3,7 @@ info:
   version: 2.1.0
   title: skaha
   description: |
-    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service in two ways:<br/>1.  By providing a cookie/token in the Cookie header<br/>2.  By using a client certificate.'
+    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service in two ways:<br/>1.  By providing a bearer token in the Authorization header<br/>2.  By using a client certificate.<br/><br/>The skaha github page is here:  https://github.com/opencadc/skaha
 schemes:
   - https
 basePath: /skaha
@@ -11,7 +11,7 @@ paths:
   /session:
     get:
       description: |
-        Get the list of sessions for the requesting user.  Each line represents one session.  Each line is tab-separated into the following columns:<br/><br/>Session ID<br/>Type<br/>Status<br/>Name<br/>Connect URL<br/>StartTime
+        Get the list of sessions for the requesting user.  Each line represents one session.  Each line is tab-separated into the following columns:<br/><br/>Session ID<br/>Type<br/>Status<br/>Name<br/>Connect URL<br/>StartTime<br/><br/>Valid types are 'desktop', 'carta', and 'notebook'.
       tags:
         - Interactive processing
       responses:
@@ -22,8 +22,18 @@ paths:
         '503':
           description: Service busy
         default:
-          description: Unexpeced error
-      parameters: []
+          description: Unexpected error
+      parameters:
+      - name: type
+        in: query
+        type: string
+        description: Only show sessions of this type
+        required: false
+      - name: status
+        in: query
+        type: string
+        description: Only show sessions with this status
+        required: false
     post:
       description: |
         Launch a new session.
@@ -35,10 +45,10 @@ paths:
           type: string
           description: The name for the session.
           required: true
-        - name: type
+        - name: image
           in: query
           type: string
-          description: Type of session, one of 'desktop', 'carta', or 'notebook'
+          description: The harbor image id of for the session.  For example:<br/><br/>harbor.canfar.net/skaha-desktop/session:0.1<br/>harbor.canfar.net/skaha-carta/carta:0.1<br/>harbor.canfar.net/petuan/notebook-scipy:0.1
           required: true
       responses:
         '200':
@@ -73,7 +83,7 @@ paths:
   /session/{sessionID}/app:
     post:
       description: |
-        Attach an app to the session identified by sessionID.
+        Attach an app to the session identified by sessionID.  This only applies to sessions of type 'desktop'.
       tags:
         - Interactive processing
       parameters:
