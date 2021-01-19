@@ -9,3 +9,5 @@ configMapGenerator:
   files:
   - config/certs/ca.crt
   - config/certs/cadc_CA_2029.crt
+generatorOptions:
+ disableNameSuffixHash: true
