@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: cavern-tomcat
+  name: cavern-tomcat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: cavern-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: cavern-tomcat
+    spec:
+      containers:
+      - name: cavern-tomcat
+        image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:latest
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /root/.ssl/
+          name: servops-cert
+          readOnly: true
+        - mountPath: "/cephfs"
+          name: cavern-ceph-volume
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: skaha
+      volumes:
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: servops-clientcert
+      - name: cavern-ceph-volume
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false
+      - name: config-volume
+        configMap:
+          name: cavern-config
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory

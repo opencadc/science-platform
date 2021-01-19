@@ -1,0 +1,11 @@
+namespace: cadc-sssd
+resources:
+- sssd-daemonset.yaml
+configMapGenerator:
+- name: sssd-config
+  files:
+  - config/sssd.conf
+- name: sssd-cert-config
+  files:
+  - config/certs/ca.crt
+  - config/certs/cadc_CA_2029.crt
