@@ -196,12 +196,12 @@ public class PostAction extends SessionAction {
             return SESSION_TYPE_DESKTOP;
         } else if (image.startsWith("harbor.canfar.net/skaha-carta/")) {
             return SESSION_TYPE_CARTA;
-        } else if (image.startsWith("harbor.canfar.net/petuan-")) {
+        } else if (image.startsWith("harbor.canfar.net/petuan/")) {
             return SESSION_TYPE_NOTEBOOK;
         }
         
         throw new IllegalArgumentException("session image must come from harbor.canfar.net/skaha-desktop/session:*, " +
-            "harbor.canfar.net/skaha-carta/*, or harbor.canfar.net/petuan-*");
+            "harbor.canfar.net/skaha-carta/*, or harbor.canfar.net/petuan/*");
         
     }
     

@@ -1,0 +1,9 @@
+namespace: skaha-system
+secretGenerator:
+- name: servops-clientcert
+  files:
+  - cadcproxy.pem
+#- name: canfar-net-cert-secret
+#  type: tls
+#  key: canfar.net.key
+#  cert: canfar.net-completechain.pem

@@ -1,0 +1,26 @@
+namespace: skaha-system
+resources:
+- cavern-tomcat-deployment.yaml
+- cavern-tomcat-expose.yaml
+- cavern-ingress.yaml
+- cavern-sshd-deployment.yaml
+- cavern-sshd-expose.yaml
+configMapGenerator:
+- name: cavern-config
+  files:
+  - config/catalina.properties
+  - config/Cavern.properties
+  - config/LocalAuthority.properties
+- name: cavern-sshd-config
+  files:
+  - config/sshd_config
+secretGenerator:
+- name: cavern-sshd-priv1-secret
+  files:
+  - sshd-certs/ssh_host_ecdsa_key
+- name: cavern-sshd-priv2-secret
+  files:
+  - sshd-certs/ssh_host_ed25519_key
+- name: cavern-sshd-priv3-secret
+  files:
+  - sshd-certs/ssh_host_rsa_key
