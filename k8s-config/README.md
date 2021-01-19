@@ -16,42 +16,53 @@ The following namespaces are in use for cavern and skaha installation
    * cadc-harbor - for harbor
    * cadc-sssd - for the sssd daemonsets
 
-### cavern installation steps
+### installation steps
 
-1. create servops secret (/cavern/certs/create-servops-secret.sh)
-2. create sssd configmap (/sssd/create-config.sh)
-3. create sssd daemonset (/sssd/apply-sss-daemonset.sh)
-4. create cavern tomcat config maps (/cavern/cavern-tomcat/create-config.sh)
+Installation of cavern, skaha, and sssh is done with kustomize.
+
+1. gather the values for all the secrets and place them in the associated kustomize dir.
+
+```
+.
+./sssd
+./sssd/config
+./sssd/config/certs
+./sssd/config/certs/ca.crt
+./sssd/config/certs/cadc_CA_2029.crt
+./sssd/config/sssd.conf
+./servops-clientcert
+./servops-clientcert/cadcproxy.pem
+./skaha
+./skaha/config
+./skaha/config/k8s-config
+./cavern
+./cavern/sshd-certs
+./cavern/sshd-certs/ssh_host_ed25519_key
+./cavern/sshd-certs/ssh_host_ecdsa_key
+./cavern/sshd-certs/ssh_host_rsa_key
+```
+
+The file `/skaha/config/k8s-config` must be handled specially.  See skaha/README.md for details
+
+2. from k8s-config/kustomize, run: `kubectl apply -k .`
+
+### site-specific configuration
+
+When overlays on kustomize are complete this section won't be needed.
+
+- cavern tomcat:
   - catalina.properties refers to hostname
   - Cavern.properties refers to hostname
   - cavern volume is installation specific
   - cephfs path set to /cavern-dev
-5. create cavern tomcat deployment (/cavern/cavern-tomcat/deploy-cavern-tomcat.sh)
-6. create cavern tomcat service (/cavern/cavern-tomcat/expose-cavern-tomcat.sh)
-7. create cavern tomcat ingress (/cavern/ingress)
-  - ingress referens to hostname
-8. create sshd cert secrets (/cavern/sssd-certs)
-9. create sshd config map (/cavern/sshd-and-sssd)
-10. create sshd deployment (/cavern/sshd-and-sssd)
-11. create sshd service (/cavern/sshd-and-sssd)
-
-### skaha installation steps
-
-1. create servops secret (/skaha/certs/create-servops.secret.sh)
-2. create skaha configmaps
+- cavern ingress:
+  - ingress refers to hostname
+- skaha tomcat:
   - catalina.properties refers to hostname
   - cavern volume is installation specific
-3. create skaha-tomcat deployment (/skaha/skaha-tomcat)
-4. create skaha service (/skaha/skaha-tomcat)
-5. create skaha ingress (/skaha/ingress)
-6. create skaha-wsproxy config map (/skaha/skaha-wsproxy)
-  - README.md explains how to create configuration file
-7. create skaha-wsproxy deployment (/skaha/skaha-wsproxy)
+- skaha wsproxy
+  - ingress refers to hostname
   - python redirect scripts in images reference namespaces
-8. create skaha-wsproxy service (/skaha/skaha-wsproxy)
-9. create desktop ingress (/skaha/ingress)
-10. create carta ingress (/skaha/ingress)
-11. create notebook ingress (/skaha/ingress)
 
 ## Network
 
