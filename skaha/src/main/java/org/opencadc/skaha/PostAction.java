@@ -128,6 +128,7 @@ public class PostAction extends SessionAction {
                                 
                 String name = syncInput.getParameter("name");
                 String image = syncInput.getParameter("image");
+                String type = syncInput.getParameter("type");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
@@ -135,16 +136,16 @@ public class PostAction extends SessionAction {
                     throw new IllegalArgumentException("Missing parameter 'image'");
                 }
                 validateName(name);
-                String type = validateImage(image);
+                String validatedType = validateImage(image, type);
                 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkForExistingSession(userID, type);
+                checkForExistingSession(userID, validatedType);
                 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, type, image, name);
+                URL sessionURL = createSession(sessionID, validatedType, image, name);
                 
                 syncOutput.setHeader("Location", sessionURL.toString());
                 syncOutput.setCode(303);
@@ -187,21 +188,28 @@ public class PostAction extends SessionAction {
         }
     }
     
-    private String validateImage(String image) {
+    private String validateImage(String image, String type) {
         if (!StringUtil.hasText(image)) {
             throw new IllegalArgumentException("image must have a value");
         }
         
-        if (image.startsWith("harbor.canfar.net/skaha-desktop/session:")) {
+        if (image.startsWith(harborHost + "/skaha-desktop/session:")) {
             return SESSION_TYPE_DESKTOP;
-        } else if (image.startsWith("harbor.canfar.net/skaha-carta/")) {
+        } else if (image.startsWith(harborHost + "/skaha-carta/")) {
             return SESSION_TYPE_CARTA;
-        } else if (image.startsWith("harbor.canfar.net/petuan/")) {
+        } else if (image.startsWith(harborHost + "/petuan/")) {
             return SESSION_TYPE_NOTEBOOK;
         }
         
-        throw new IllegalArgumentException("session image must come from harbor.canfar.net/skaha-desktop/session:*, " +
-            "harbor.canfar.net/skaha-carta/*, or harbor.canfar.net/petuan/*");
+        if (adminUser && type != null) {
+            if (! (type.equals(SESSION_TYPE_DESKTOP) || type.equals(SESSION_TYPE_CARTA) || type.equals(SESSION_TYPE_NOTEBOOK))) {
+                throw new IllegalArgumentException("Illegal session type: " + type);
+            }
+            return type;
+        }
+        
+        throw new IllegalArgumentException("session image must come from " + harborHost + "/skaha-desktop/session:*, " +
+                harborHost + "/skaha-carta/*, or " + harborHost + "/petuan/*");
         
     }
     
@@ -220,7 +228,7 @@ public class PostAction extends SessionAction {
         String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
         
-        String imageSecret = getHarborSecret();            
+        String imageSecret = getHarborSecret(image);            
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
             imageSecret = "notused";
@@ -301,8 +309,8 @@ public class PostAction extends SessionAction {
         String name = confirmSoftware(software);
         
         String imageSecret = "notused";
-        if (software.startsWith("harbor.canfar.net")) {
-            imageSecret = getHarborSecret();            
+        if (software.startsWith(harborHost)) {
+            imageSecret = getHarborSecret(software);            
         }
         log.debug("image secret: " + imageSecret);
         
@@ -357,10 +365,15 @@ public class PostAction extends SessionAction {
         return doc.replaceAll(regex, value);
     }
     
-    private String getHarborSecret() throws Exception {
+    private String getHarborSecret(String image) throws Exception {
         // get the user's cli secret:
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret
+        
+        if (!image.startsWith(harborHost)) {
+            log.debug("non-harbor image");
+            return null;
+        }
         
         log.debug("verfifying delegated credentials");
         if (!CredUtil.checkCredentials()) {
@@ -380,7 +393,7 @@ public class PostAction extends SessionAction {
         log.debug("idToken: " + idToken);
         
         log.debug("getting secret from harbor");
-        URL harborURL = new URL("https://harbor.canfar.net/api/v2.0/users/current");
+        URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
         out = new ByteArrayOutputStream();
         get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
