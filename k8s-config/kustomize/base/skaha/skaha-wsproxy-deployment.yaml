@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: skaha-wsproxy
+  name: skaha-wsproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: skaha-wsproxy
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: skaha-wsproxy
+    spec:
+      containers:
+        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.2
+          env:
+            - name: skaha.hostname
+              value: rc-uv.canfar.net
+          imagePullPolicy: Always
+          #imagePullPolicy: IfNotPresent
+          name: skaha-wsproxy
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "0.5"
+            limits:
+              memory: "8Gi"
+              cpu: "2"
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /logs
+            name: log-dir
+            readOnly: false
+          - mountPath: "/root/kube"
+            name: config-volume
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: skaha
+      volumes:
+      - name: log-dir
+        emptyDir: {}
+      - name: config-volume
+        configMap:
+          name: skaha-wsproxy-config

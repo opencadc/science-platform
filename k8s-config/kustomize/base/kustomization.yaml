@@ -1,0 +1,5 @@
+bases:
+- ./servops-clientcert
+- ./cavern
+- ./sssd
+- ./skaha
