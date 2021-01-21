@@ -113,20 +113,30 @@ public abstract class SessionAction extends RestAction {
     protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
     
     protected String userID;
+    protected boolean adminUser = false;
     protected String requestType;
     protected String sessionID;
     protected String appID;
     protected String server;
     protected String homedir;
     protected String scratchdir;
+    protected String harborHost;
+    protected String skahaUsersGroup;
+    protected String skahaAdminsGroup;
     
     public SessionAction() {
         server = System.getenv("skaha.hostname");
         homedir = System.getenv("skaha.homedir");
         scratchdir = System.getenv("skaha.scratchdir");
+        harborHost = System.getenv("skaha.harborhost");
+        skahaUsersGroup = System.getenv("skaha.usersgroup");
+        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
-        log.debug("skaha.scratchdir=" + scratchdir);;
+        log.debug("skaha.scratchdir=" + scratchdir);
+        log.debug("skaha.harborHost=" + harborHost);
+        log.debug("skaha.usersgroup=" + skahaUsersGroup);
+        log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
     }
     
     @Override
@@ -149,22 +159,34 @@ public abstract class SessionAction extends RestAction {
         userID = httpPrincipals.iterator().next().getName();
         
         // ensure user is a part of the skaha group
-        String skahaGroup = super.initParams.get("skaha-users-group");
-        if (skahaGroup == null) {
-            throw new IllegalStateException("No skaha-users-group defined in web.xml");
+        if (skahaUsersGroup == null) {
+            throw new IllegalStateException("skaha.usersgroup not defined in system properties");
         }
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
         GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
         GroupURI membershipGroup = null;
         try {
-            membershipGroup = new GroupURI(skahaGroup);
+            membershipGroup = new GroupURI(skahaUsersGroup);
             CredUtil.checkCredentials();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
         if (!gmsClient.isMember(membershipGroup)) {
             throw new AccessControlException("Not authorized to use the skaha system");
+        }
+        
+        if (skahaAdminsGroup == null) {
+            log.warn("skaha.adminsgroup not defined in system properties");
+        } else {
+            try {
+                GroupURI adminMembershipGroup = new GroupURI(skahaAdminsGroup);
+                if (gmsClient.isMember(adminMembershipGroup)) {
+                    adminUser = true;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
         
         String path = syncInput.getPath();
