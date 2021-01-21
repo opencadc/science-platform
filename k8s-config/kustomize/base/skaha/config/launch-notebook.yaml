@@ -35,20 +35,31 @@ spec:
           value: "/home/jovyan"
         - name: JUPYTER_PATH
           value: "/home/jovyan"
+        - name: NB_USER
+          value: "${skaha.userid}"
+        - name: NB_UID
+          value: "${skaha.posixid}"
         securityContext:
           #runAsUser: 0
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
+          #runAsUser: 1000
+          #runAsGroup: 100
         image: ${software.imageid}
         #workingDir: "/cavern/home/${arcade.userid}"
         #command: ["start-notebook.sh"]
         #args:
         #- "--NotebookApp.base_url=notebook/${skaha.sessionid}"
         #- "--NotebookApp.notebook_dir=/cavern"
-        command: ["/home/jovyan/arcade-start-notebook"]
+        #command: ["/home/jovyan/arcade-start-notebook"]
+        #args:
+        #  - ${skaha.userid}
+        #  - ${skaha.sessionid}
+        command: ["start-notebook.sh"]
         args:
-          - ${skaha.userid}
-          - ${skaha.sessionid}
+          - --NotebookApp.base_url=notebook/${skaha.sessionid}
+          - --NotebookApp.notebook_dir=/cavern 
+          - --NotebookApp.allow_origin="*"
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
