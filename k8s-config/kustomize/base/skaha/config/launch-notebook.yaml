@@ -22,6 +22,26 @@ spec:
       #restartPolicy: Never
       imagePullSecrets:
         - name: "${software.imagesecret}"
+      securityContext:
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: 100
+        fsGroup: ${skaha.posixid}
+      initContainers:
+      - name: init-python-dir
+        image: busybox
+        securityContext:
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+        command: ["mkdir", "-p", "/cavern/home/${skaha.userid}/.local/lib/python3.8/site-packages"]
+        #args:
+        #- mkdir -p /cavern/home/${skaha.userid}/.local/lib/python3.7/site-packages
+        volumeMounts:
+        - mountPath: "/cavern"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -39,12 +59,8 @@ spec:
           value: "${skaha.userid}"
         - name: NB_UID
           value: "${skaha.posixid}"
-        securityContext:
-          #runAsUser: 0
-          runAsUser: ${skaha.posixid} 
-          runAsGroup: ${skaha.posixid}
-          #runAsUser: 1000
-          #runAsGroup: 100
+        - name: HOME
+          value: "/cavern/home/${skaha.userid}"
         image: ${software.imageid}
         #workingDir: "/cavern/home/${arcade.userid}"
         #command: ["start-notebook.sh"]
@@ -58,7 +74,7 @@ spec:
         command: ["start-notebook.sh"]
         args:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
-          - --NotebookApp.notebook_dir=/cavern 
+          - --NotebookApp.notebook_dir=/cavern/home/${skaha.userid} 
           - --NotebookApp.allow_origin="*"
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always

@@ -326,6 +326,7 @@ fullnameOverride:
 ##
 volumePermissions:
   enabled: false
+  #enabled: true
   image:
     registry: docker.io
     repository: bitnami/minideb
@@ -1822,7 +1823,15 @@ trivy:
 
   ## Harbor Trivy container command (using container default if not set)
   ##
+
+  #BM: for debugging
   command:
+    - sh
+    - '-c'
+    - |
+      id
+      ls -la /bitnami/harbor-adapter-trivy/.cache
+
   ## Harbor Trivy container args (using container default if ot set)
   ##
   args:
