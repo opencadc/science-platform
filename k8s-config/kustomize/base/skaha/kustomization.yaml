@@ -24,3 +24,5 @@ configMapGenerator:
 - name: skaha-wsproxy-config
   files:
   - config/k8s-config
+generatorOptions:
+ disableNameSuffixHash: true

@@ -24,3 +24,5 @@ secretGenerator:
 - name: cavern-sshd-priv3-secret
   files:
   - sshd-certs/ssh_host_rsa_key
+generatorOptions:
+ disableNameSuffixHash: true

@@ -7,3 +7,5 @@ secretGenerator:
 #  type: tls
 #  key: canfar.net.key
 #  cert: canfar.net-completechain.pem
+generatorOptions:
+ disableNameSuffixHash: true

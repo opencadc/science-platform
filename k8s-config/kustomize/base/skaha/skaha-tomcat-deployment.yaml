@@ -23,6 +23,12 @@ spec:
           value: /cavern
         - name: skaha.namespace
           value: skaha-workload
+        - name: skaha.harborhost
+          value: harbor-dev.canfar.net
+        - name: skaha.usersgroup
+          value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
+        - name: skaha.adminsgroup
+          value: "ivo://cadc.nrc.ca/gms-proto?skaha-admins"
         image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.1
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent

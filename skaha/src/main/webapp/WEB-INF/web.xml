@@ -53,6 +53,10 @@
              <param-name>skaha-users-group</param-name>
              <param-value>ivo://cadc.nrc.ca/gms-proto?ARCADE-Users</param-value>
          </init-param>
+         <init-param>
+             <param-name>skaha-admin-group</param-name>
+             <param-value>ivo://cadc.nrc.ca/gms-proto?skaha-admins</param-value>
+         </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
 
