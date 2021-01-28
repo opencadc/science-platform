@@ -33,6 +33,8 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: MOZ_FORCE_DISABLE_E10S
+          value: 1
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
