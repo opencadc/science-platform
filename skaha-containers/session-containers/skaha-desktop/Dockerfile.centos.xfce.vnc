@@ -108,8 +108,8 @@ RUN yum install -y mailcap
 ENV LD_LIBRARY_PATH /opt/shibboleth/lib64
 
 # create the guest account
-RUN groupadd -g 1001 guest
-RUN useradd -m -g guest -u 1001 guest && \
+RUN groupadd -g 30001 guest
+RUN useradd -m -g guest -u 30001 guest && \
     mkdir -p /home/guest/.ssl && \
     chown -R guest:guest /home/guest/.ssl && \
     ln -s /home/guest/.ssl /headless/.ssl
@@ -133,6 +133,12 @@ COPY software-scripts/gedit.desktop $XDG_CONFIG_HOME/Desktop/gedit.desktop
 COPY software-scripts/kill-session.desktop $XDG_CONFIG_HOME/Desktop/kill-session.desktop
 COPY software-scripts/terminal.desktop $XDG_CONFIG_HOME/Desktop/terminal.desktop
 RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
+
+# Create firefox profile and space
+RUN mkdir -p /headless/mozilla/skaha
+RUN firefox --headless -CreateProfile "skaha /headless/mozilla/skaha"
+RUN chmod -R 777 /headless/mozilla/skaha
+ENV MOZ_FORCE_DISABLE_E10S 1
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
 CMD ["--wait"]
