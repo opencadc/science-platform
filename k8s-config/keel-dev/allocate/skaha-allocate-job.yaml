@@ -14,7 +14,7 @@ spec:
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/skaha-cavern-allocate"]
-        args: ["jeevesh"]
+        args: ["jkavelaars"]
 #        command: [ "/bin/bash", "-c", "--" ]
 #        args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
@@ -39,7 +39,7 @@ spec:
       - name: servops-cert
         secret:
           defaultMode: 420
-          secretName: skaha-servops-secret
+          secretName: servops-clientcert
       - name: cavern-volume
         cephfs:
           monitors:

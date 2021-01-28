@@ -4,6 +4,10 @@ metadata:
   name: desktop-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /desktop/$2
+    nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
+    nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
+    nginx.org/proxy-read-timeout: 3600s
+    nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
   - host: rc-uv.canfar.net
