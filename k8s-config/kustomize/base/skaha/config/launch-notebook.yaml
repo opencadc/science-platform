@@ -24,7 +24,8 @@ spec:
         - name: "${software.imagesecret}"
       securityContext:
         runAsUser: ${skaha.posixid} 
-        runAsGroup: 100
+#        runAsGroup: 100
+        runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
       initContainers:
       - name: init-python-dir
@@ -52,25 +53,20 @@ spec:
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
-          value: "/home/jovyan"
+          value: "/cavern/home/${skaha.userid}"
         - name: JUPYTER_PATH
-          value: "/home/jovyan"
+          value: "/cavern/home/${skaha.userid}"
         - name: NB_USER
           value: "${skaha.userid}"
         - name: NB_UID
           value: "${skaha.posixid}"
         - name: HOME
           value: "/cavern/home/${skaha.userid}"
+        - name: PWD
+          value: "/cavern/home/${skaha.userid}"
+        - name: XDG_CACHE_HOME
+          value: "/cavern/home/${skaha.userid}"
         image: ${software.imageid}
-        #workingDir: "/cavern/home/${arcade.userid}"
-        #command: ["start-notebook.sh"]
-        #args:
-        #- "--NotebookApp.base_url=notebook/${skaha.sessionid}"
-        #- "--NotebookApp.notebook_dir=/cavern"
-        #command: ["/home/jovyan/arcade-start-notebook"]
-        #args:
-        #  - ${skaha.userid}
-        #  - ${skaha.sessionid}
         command: ["start-notebook.sh"]
         args:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
