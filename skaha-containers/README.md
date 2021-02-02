@@ -1,14 +1,14 @@
 # skaha session and software containers
 
-skaha supports two types of containers: session containers and software containers.
+skaha supports two types of containers: `session containers` and `software containers`.
 
-Session containers are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.  See the [ARCADE github project](https://github.com/canfar/arcade.git "ARCADE").
+`Session containers` are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.  See the [ARCADE github project](https://github.com/canfar/arcade.git "ARCADE").
 
-Software containers are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, and containers for Gemini processing.
+`Software containers` are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, and containers for Gemini processing.
 
 Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
 
-## Buliding skaha containers
+## skaha container build requirements
 
 Containers that are to run in skaha are required to meet rules documented in this section.
 
@@ -30,17 +30,26 @@ group:      sss files
 #### xterm
 For software containers only, `xterm` must be installed.
 
-#### Initialization and Startup
-The CMD and EXECUTABLE directives in a software container Dockerfile will be ignored on startup.  Instead, bash within an xterm will run.  CMD and EXECUTABLE are still useful for testing containers outside of skaha.
+## Initialization and Startup
 
-The container will be initially started by root but then switched to be run as the active CADC skaha user.
+#### Container process owners
+Containers, in skaha, are always executed as the *CADC User* and never as root.  This applies to both session and sofware containers.  Operations that require root must be done at the build phase of the image.  If runtime root access is required, it can be done by giving sudo access to specific actions.
+
+#### session container initialization
+Initialization for session containers is based on the session container *type*.  There are currently three types with different startup procedures:
+1. `desktop` - [skaha-desktop][sessipn-containers/skaha-desktop] - Initialization and startup is performed by the command specified in the Dockerfiles.
+1. `carta` - [skaka-carta][session-containers/skaha-carta] - Initialization and startup is done through a customized script, `skaha-carta`.
+1. `notebook` - [skaha-notebook][session-containers/skaha-notebook] - For Jupyter Notebook servers, startup uses the standard `start-notebook.sh` script.
+
+There may be multiple versions of the same type of session container, but the startup procedure for these must remain the same for them to be of the same type.
+
+#### software container initialization
+
+The CMD and EXECUTABLE directives in a software container Dockerfile will be ignored on startup.  Instead, bash within an xterm will run.  CMD and EXECUTABLE are still useful for testing containers outside of skaha.
 
 If the container needs to do any runtime initialization, that can be done in a script named `init.sh` in the `/skaha` root directory.  This script **must not block** and needs to return control to the calling process.
 
 If `/skaha/init.sh` is provided, a sensible directive for testing the container via docker is `CMD ["/skaha/init.sh"]`
-
-### Container process owners
-Containers, in skaha, are always executed as the *CADC User* and never as root.  This applies to both session and sofware containers.  Operations that require root must be done at the build phase of the image.
 
 ## Publishing skaha containers
 
