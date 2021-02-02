@@ -1,5 +1,15 @@
 # skaha session and software containers
 
+1. [Introduction](#intro)
+1. [Building](#building)
+1. [Initialization](#init)
+1. [Publishing](#publishing)
+1. [Launching](#launching)
+1. [Testing](#testing)
+
+<a name="intro"></a>
+## Introduction
+
 skaha supports two types of containers: `session containers` and `software containers`.
 
 `Session containers` are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.  See the [ARCADE github project](https://github.com/canfar/arcade.git "ARCADE").
@@ -8,7 +18,8 @@ skaha supports two types of containers: `session containers` and `software conta
 
 Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
 
-## skaha container build requirements
+<a name="building"></a>
+## Building skaha containers
 
 Containers that are to run in skaha are required to meet rules documented in this section.
 
@@ -30,6 +41,7 @@ group:      sss files
 #### xterm
 For software containers only, `xterm` must be installed.
 
+<a name="init"></a>
 ## Initialization and Startup
 
 #### Container process owners
@@ -51,21 +63,71 @@ If the container needs to do any runtime initialization, that can be done in a s
 
 If `/skaha/init.sh` is provided, a sensible directive for testing the container via docker is `CMD ["/skaha/init.sh"]`
 
+<a name="publishing"></a>
 ## Publishing skaha containers
 
-skaha runs a instance of the [Harbor](https://goharbor.io/) opensource project as a container registry.  All session and software containers launched from skaha come from this registry.  The registry and portal are hosted at http://harbor.canfar.net
+### Step 1: Create a harbor account
+skaha runs a instance of the [Harbor](https://goharbor.io/) opensource project as a container registry.  Session and software containers launched can be launched from this registry.
 
-One uses their CADC userid and password to login to the harbor portal via the `Login via OIDC Provider` button.  On first login, users will be asked to provide a harbor username.  This should be set to the same as their CADC account name.
+If you have logged into harbor before then step 1 can be skipped.
 
-Harbor hosts a number of *projects*.  Each project has a list of members that are able to publish to that project.  If you wish to be added to a specific project please contact support@canfar.net
+1. Go to https://harbor.canfar.net
+2. Press the `Login with OIDC Provider` button.
+3. Enter your CADC username and password.
+4. When prompter for a harbor userid, use your CADC userid.
 
-Images hosted in harbor may be subject to image security scanning.
+After these steps you now have a harbor account and can see the projects through this portal.  If you wish to publish to any of the projects, contact the project admistrator (or contact support@canfar.net) and ask for 'Development' access to the project.
 
-The session and software images that are able to be launched in skaha are limited to a set of projects hosted in harbor.
+### Step 2: Docker login to harbor
+1. From the harbor portal, go to the top right, click on your username, then go to 'User Profile'.
+2. Set your CLI secret -- this is the password to use for `docker login` commands.  You can copy the existing, generated secret, or 'upload' (enter) your own.
+3. From the computer on which you have built the docker image you wish to publish, do a docker login:
 
+```docker login harbor.canfar.net```
+
+Your userid is your CADC userid, and your password the value of the CLI Secret mentioned above.
+
+### Step 3: Push your image to your project
+1. On the same computer, find the `IMAGE ID` of the image you'd like to push with the command
+
+```docker images```
+
+2. Tag the image for harbor:
+
+```docker tag <IMAGE ID> harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>``` 
+
+where:
+   * `<PROJECT>` is the project to which you've been granted Developer access.
+   * `<MY IMAGE NAME>` is the name of the image you are publishing.
+   * `<IMAGE VERSION>` is the version of the image.
+   
+3. Push the image to harbor, with:
+
+```docker push harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>```
+
+<a name="launching"></a>
+## Launching containers in skaha
+
+### Session containers
+
+1. Use the CANFAR Science Platform Portal (TBD) or this curl command to launch your newly published image:
+
+```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/session -d "name=<arbitrary-name>" -d "image=harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>"```
+
+2. Use the CANFAR Science Platform Portal (TBD) or this curl command to find the URL to your session:
+
+```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/session```
+
+If this is the first time this image has been launched in may take a few minutes for the cloud do retrieve the image from harbor.  If this is a `notebook` image you can see the JupyterLab view by changing the end of the URL from `tree` to `lab`.
+
+### Software containers
+
+(To be completed)
+
+<a name="testing"></a>
 ## Testing
-Before publishing a new or modified image testing should be done to ensure it works as expected.  Some testing can be done by using `docker` to run the image.  For software containers, docker will not be able to provide a graphical display of CASA windows.  That testing must be done in ARCADE itself.
+Before publishing a new or modified image, testing should be done to ensure it works as expected.
 
-To test software images, users can push the image to the 'testing sandbox' project in the image registry (to be define).  The images in this registry will not be displayed in the desktop menu, but can still be launched using the API of skaha.  Users can iterate by making corrections to the image and overwritting the image in the sandbox.  Once testing is complete the image can be published to the correct project in Harbor and hence released into the skaha system.
+For session containers, nearly all testing can be done by using `docker` to run the image.  A port should be exposed so you can connect your browser to the locally running session.
 
-Session containers should be mostly testable with only docker.
+For software containers, docker will not be able to provide a graphical display of CASA windows, so most testing must be done in a skaha-desktop instance running in the cloud.
