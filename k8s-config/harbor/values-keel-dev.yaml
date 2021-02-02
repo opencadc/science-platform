@@ -1825,12 +1825,12 @@ trivy:
   ##
 
   #BM: for debugging
-  command:
-    - sh
-    - '-c'
-    - |
-      id
-      ls -la /bitnami/harbor-adapter-trivy/.cache
+#  command:
+#    - sh
+#    - '-c'
+#    - |
+#      id
+#      ls -la /bitnami/harbor-adapter-trivy/.cache
 
   ## Harbor Trivy container args (using container default if ot set)
   ##
