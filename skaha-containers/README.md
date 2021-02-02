@@ -37,9 +37,9 @@ Containers, in skaha, are always executed as the *CADC User* and never as root. 
 
 #### session container initialization
 Initialization for session containers is based on the session container *type*.  There are currently three types with different startup procedures:
-1. `desktop` - [skaha-desktop][sessipn-containers/skaha-desktop] - Initialization and startup is performed by the command specified in the Dockerfiles.
-1. `carta` - [skaka-carta][session-containers/skaha-carta] - Initialization and startup is done through a customized script, `skaha-carta`.
-1. `notebook` - [skaha-notebook][session-containers/skaha-notebook] - For Jupyter Notebook servers, startup uses the standard `start-notebook.sh` script.
+1. `desktop` - [skaha-desktop](session-containers/skaha-desktop) - Initialization and startup is performed by the command specified in the Dockerfiles.
+1. `carta` - [skaka-carta](session-containers/skaha-carta) - Initialization and startup is done through a customized script, `skaha-carta`.
+1. `notebook` - [skaha-notebook](session-containers/skaha-notebook) - For Jupyter Notebook servers, startup uses the standard `start-notebook.sh` script.
 
 There may be multiple versions of the same type of session container, but the startup procedure for these must remain the same for them to be of the same type.
 
