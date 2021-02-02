@@ -193,14 +193,25 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image must have a value");
         }
         
-        if (image.startsWith(harborHost + "/skaha-desktop/session:")) {
-            return SESSION_TYPE_DESKTOP;
-        } else if (image.startsWith(harborHost + "/skaha-carta/")) {
-            return SESSION_TYPE_CARTA;
-        } else if (image.startsWith(harborHost + "/petuan/")) {
-            return SESSION_TYPE_NOTEBOOK;
+        for (String harborHost : harborHosts) {
+            if (image.startsWith(harborHost + "/skaha-desktop/session:")) {
+                if (type != null && !type.equals(SESSION_TYPE_DESKTOP)) {
+                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
+                }       
+                return SESSION_TYPE_DESKTOP;
+            } else if (image.startsWith(harborHost + "/skaha-carta/")) {
+                if (type != null && !type.equals(SESSION_TYPE_CARTA)) {
+                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
+                }     
+                return SESSION_TYPE_CARTA;
+            } else if (image.startsWith(harborHost + "/petuan/")) {
+                if (type != null && !type.equals(SESSION_TYPE_NOTEBOOK)) {
+                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
+                }     
+                return SESSION_TYPE_NOTEBOOK;
+            }
         }
-        
+                
         if (adminUser && type != null) {
             if (! (type.equals(SESSION_TYPE_DESKTOP) || type.equals(SESSION_TYPE_CARTA) || type.equals(SESSION_TYPE_NOTEBOOK))) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
@@ -208,8 +219,14 @@ public class PostAction extends SessionAction {
             return type;
         }
         
-        throw new IllegalArgumentException("session image must come from " + harborHost + "/skaha-desktop/session:*, " +
-                harborHost + "/skaha-carta/*, or " + harborHost + "/petuan/*");
+        StringBuilder hostList = new StringBuilder("[").append(harborHosts.get(0));
+        for (String next : harborHosts.subList(1, harborHosts.size())) {
+            hostList.append("/").append(next);
+        }
+        hostList.append("]");
+        
+        throw new IllegalArgumentException("session image must come from " + hostList + "/skaha-desktop/session:*, " +
+                hostList + "/skaha-carta/*, or " + hostList + "/petuan/*");
         
     }
     
@@ -309,8 +326,10 @@ public class PostAction extends SessionAction {
         String name = confirmSoftware(software);
         
         String imageSecret = "notused";
-        if (software.startsWith(harborHost)) {
-            imageSecret = getHarborSecret(software);            
+        for (String harborHost : harborHosts) {
+            if (software.startsWith(harborHost)) {
+                imageSecret = getHarborSecret(software);            
+            }
         }
         log.debug("image secret: " + imageSecret);
         
@@ -370,7 +389,13 @@ public class PostAction extends SessionAction {
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret
         
-        if (!image.startsWith(harborHost)) {
+        String harborHost = null;
+        for (String next : harborHosts) {
+            if (image.startsWith(next)) {
+                harborHost = next;
+            }
+        }
+        if (harborHost == null) {
             log.debug("non-harbor image");
             return null;
         }
