@@ -1,20 +1,15 @@
-# skaha - A container based science platform in CANFAR
+# skaha - A Container-based Science Platform in CANFAR
 
 #### Table of contents
   * [Overview](#overview)
   * [System Components](#system-components)
-    + [skaha](#skaha)
-    + [skaha-wsproxy](#skaha-wsproxy)
-    + [skaha-desktop](#skaha-desktop)
-    + [skaha-carta](#skaha-carta)
-    + [skaha-notebook](#skaha-notebook)
-    + [software-containers](#software-containers)
+  * [Session Containers](#session-containers)
+  * [Software Containers](#software-containers)
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
-  * [Publication acknowledgement](#publication-acknowledgement)
 
 ## Overview
-skaha is a general purpose online platform. The system is currently in beta deployment with a limited number of simultaneous users.
+skaha is a general purpose online platform for running science containers interactively.
 
 ![skaha-architecture](skaha-architecture-0.2.png)
 
@@ -28,6 +23,10 @@ The skaha module provides the API for creating skaha sessions and launching appl
 ### skaha-wsproxy
 skaha-wsproxy is an apache httpd container whose job is to proxy NoVNC traffic to the containers running NoVNC sessions.
 
+## Session Containers
+
+More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
+
 ### skaha-desktop
 skaha-desktop is a container representing a skaha session.  It is a NoVNC implementation, forked and modified from the ConSol project:  https://github.com/ConSol/docker-headless-vnc-container.
 The current implementation of skaha-desktop as a NoVNC container may be replaced with another technology at some point.
@@ -38,7 +37,10 @@ skaha-carta is container installation of Carta 1.3 Remote.  It is another type o
 ### skaha-notebook
 skaha-notebook is a Jupyter notebook session with which we are currently experimenting and prototyping.
 
-### software-containers
+## Software Containers
+
+More information on software containers can be found in the [Skaha Containers](skaha-containers) directory.
+
 These are some of the astronomy science containers that have been built for skaha.  They run as applications within skaha.  The graphical aspects of the containers are displayed in skaha-desktop by sending the DISPLAY to skaha-desktop.
 
 ## Dependencies

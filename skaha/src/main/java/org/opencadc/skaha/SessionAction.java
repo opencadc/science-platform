@@ -89,8 +89,10 @@ import java.net.URL;
 import java.security.AccessControlException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -120,7 +122,7 @@ public abstract class SessionAction extends RestAction {
     protected String server;
     protected String homedir;
     protected String scratchdir;
-    protected String harborHost;
+    protected List<String> harborHosts = new ArrayList<String>();
     protected String skahaUsersGroup;
     protected String skahaAdminsGroup;
     
@@ -128,13 +130,14 @@ public abstract class SessionAction extends RestAction {
         server = System.getenv("skaha.hostname");
         homedir = System.getenv("skaha.homedir");
         scratchdir = System.getenv("skaha.scratchdir");
-        harborHost = System.getenv("skaha.harborhost");
+        String harborHostList = System.getenv("skaha.harborhosts");
+        harborHosts = Arrays.asList(harborHostList.split(" "));
         skahaUsersGroup = System.getenv("skaha.usersgroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
         log.debug("skaha.scratchdir=" + scratchdir);
-        log.debug("skaha.harborHost=" + harborHost);
+        log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
     }
