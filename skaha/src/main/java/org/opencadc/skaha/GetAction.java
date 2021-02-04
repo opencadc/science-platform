@@ -67,9 +67,9 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.util.StringUtil;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,7 +96,8 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
-                listSessions(typeFilter, statusFilter);
+                String json = listSessions(typeFilter, statusFilter);
+                syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 throw new UnsupportedOperationException("Session detail viewing not supported.");
             }
@@ -111,91 +112,31 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public void listSessions(String typeFilter, String statusFilter) throws Exception {
+    public String listSessions(String typeFilter, String statusFilter) throws Exception {
         
         List<Session> sessions = getAllSessions(userID);
-        StringBuilder ret = new StringBuilder();
         
         log.debug("typeFilter=" + typeFilter);
         log.debug("statusFilter=" + statusFilter);
         
+        List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
+        
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String json = gson.toJson(filteredSessions);
+        
+        return json;
+    }
+    
+    public List<Session> filter(List<Session> sessions, String typeFilter, String statusFilter) {
+        List<Session> ret = new ArrayList<Session>();
         for (Session session : sessions) {
             if ((typeFilter == null || session.getType().equalsIgnoreCase(typeFilter)) &&
                 (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
-                ret.append(session.getId());
-                ret.append("\t");
-                ret.append(session.getType());
-                ret.append("\t");
-                ret.append(session.getStatus());
-                ret.append("\t");
-                ret.append(session.getName());
-                ret.append("\t");
-                ret.append(session.getConnectURL());
-                ret.append("\t");
-                ret.append(session.getStartTime());
-                ret.append("\n");
+                ret.add(session);
             }
         }
-        syncOutput.getOutputStream().write(ret.toString().getBytes());
-        return;
+        return ret;
     }
-    
-    public static List<Session> getAllSessions(String forUserID) throws Exception {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + forUserID,
-            "--no-headers=true",
-            "-o", "custom-columns=" +
-                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
-                "TYPE:.metadata.labels.canfar-net-sessionType," +
-                "STATUS:.status.phase," +
-                "NAME:.metadata.labels.canfar-net-sessionName," +
-                "STARTED:.status.startTime," +
-                "DELETION:.metadata.deletionTimestamp"};
-                
-        String vncSessions = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + vncSessions);
-        
-        List<Session> sessions = new ArrayList<Session>();
-        
-        if (StringUtil.hasLength(vncSessions)) {
-            String[] lines = vncSessions.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                sessions.add(session);
-            }
-        }
-        
-        return sessions;
-    }
-    
-    private static Session constructSession(String k8sOutput) throws IOException {
-        log.debug("line: " + k8sOutput);
-        String[] parts = k8sOutput.split("\\s+");
-        String id = parts[0];
-        String type = parts[1];
-        String status = parts[2];
-        String name = parts[3];
-        String startTime = "Up since " + parts[4];
-        String deletionTimestamp = parts[5];
-        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
-            status = Session.STATUS_TERMINATING;
-        }
-        String host = K8SUtil.getHostName();
-        String connectURL = "unknown";
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
-        }
-        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionAction.getCartaURL(host, id);
-        }
-        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id);
-        }
 
-        return new Session(id, type, status, name, startTime, connectURL);
-        
-    }
 
 }

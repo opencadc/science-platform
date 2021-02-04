@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2020.                            (c) 2020.
+ *  (c) 2021.                            (c) 2021.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -66,70 +66,117 @@
  */
 package org.opencadc.skaha;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
+import org.junit.Assert;
+import org.junit.Test;
+import org.opencadc.skaha.GetAction;
+import org.opencadc.skaha.Session;
 
 /**
  * @author majorb
- * 
- * Represents a session running in skaha.
  *
  */
-public class Session {
+public class GetTests {
     
-    private static final Logger log = Logger.getLogger(Session.class);
+    private static final Logger log = Logger.getLogger(GetTests.class);
     
-    public static final String STATUS_TERMINATING = "Terminating";
-    
-    private String id;
-    private String type;
-    private String status;
-    private String name;
-    private String startTime;
-    private String connectURL;
+    private static final String K8S_LIST =
+            "pud05npw   carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
+            "e37lmx4m   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
+            "gspc0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
+            "abcd0n8m   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
+            "defg0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
 
-    public Session(String id, String type, String status, String name, String startTime, String connectURL) {
-        if (id == null) {
-            throw new IllegalArgumentException("id is requried");
+    public GetTests() {
+    }
+    
+    @Test
+    public void testListSessions() {
+        try {
+            GetAction get = new TestGetAction();
+            String json = get.listSessions(null, null);
+            log.info("json: \n" + json);
+            List<Session> sessions1 = get.getAllSessions(null);
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<Session>>(){}.getType();
+            List<Session> sessions2 = gson.fromJson(json, listType);
+            Assert.assertTrue(sessions1.size() == K8S_LIST.split("\n").length);
+            Assert.assertTrue("session count", sessions1.size() == sessions2.size());
+            for (Session s : sessions1) {
+                Assert.assertTrue(s.getId(), sessions2.contains(s));
+            }
+            
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
         }
-        this.id = id;
-        this.type = type;
-        this.status = status;
-        this.name = name;
-        this.startTime = startTime;
-        this.connectURL = connectURL;
     }
     
-    public String getId() {
-        return id;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getStartTime() {
-        return startTime;
-    }
-
-    public String getConnectURL() {
-        return connectURL;
-    }
-    
-    @Override
-    public boolean equals(Object o) {
-        if (o instanceof Session) {
-            Session s = (Session) o;
-            return this.id.equals(s.id);
+    @Test
+    public void testFilterType() {
+        try {
+            GetAction get = new TestGetAction();
+            List<Session> sessions = get.getAllSessions(null);
+            List<Session> filtered = get.filter(sessions, "notebook", null);
+            for (Session s : filtered) {
+                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
         }
-        return false;
     }
     
+    @Test
+    public void testFilterStatus() {
+        try {
+            GetAction get = new TestGetAction();
+            List<Session> sessions = get.getAllSessions(null);
+            List<Session> filtered = get.filter(sessions, null, "Running");
+            for (Session s : filtered) {
+                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+    }
+    
+    @Test
+    public void testFilterTypeStatus() {
+        try {
+            GetAction get = new TestGetAction();
+            List<Session> sessions = get.getAllSessions(null);
+            List<Session> filtered = get.filter(sessions, "notebook", "Running");
+            for (Session s : filtered) {
+                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
+                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+    }
+    
+    class TestGetAction extends GetAction {
+        
+        @Override
+        public List<Session> getAllSessions(String forUserID) throws Exception {
+            List<Session> sessions = new ArrayList<Session>();
+            String[] lines = K8S_LIST.split("\n");
+            for (String line : lines) {
+                Session session = constructSession(line);
+                sessions.add(session);
+            }
+            return sessions;
+        }
+        
+    }
 }

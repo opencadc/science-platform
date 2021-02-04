@@ -231,7 +231,7 @@ public class PostAction extends SessionAction {
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
-        List<Session> sessions = GetAction.getAllSessions(userid);
+        List<Session> sessions = super.getAllSessions(userid);
         for (Session session : sessions) {
             if (session.getType().equals(type) && !session.getStatus().equals(Session.STATUS_TERMINATING)) {
                 throw new IllegalArgumentException("User " + userID + " has a session already running.");
