@@ -96,7 +96,10 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
+                
                 String json = listSessions(typeFilter, statusFilter);
+                
+                syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 throw new UnsupportedOperationException("Session detail viewing not supported.");

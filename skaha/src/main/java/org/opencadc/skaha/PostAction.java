@@ -145,10 +145,7 @@ public class PostAction extends SessionAction {
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, validatedType, image, name);
-                
-                syncOutput.setHeader("Location", sessionURL.toString());
-                syncOutput.setCode(303);
+                createSession(sessionID, validatedType, image, name);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -239,7 +236,7 @@ public class PostAction extends SessionAction {
         }
     }
     
-    public URL createSession(String sessionID, String type, String image, String name) throws Exception {
+    public void createSession(String sessionID, String type, String image, String name) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
@@ -292,29 +289,11 @@ public class PostAction extends SessionAction {
         
         // give the container a few seconds to initialize
         try {
-            log.debug("3 second wait for vnc initialization");
+            log.debug("3 second wait for container initialization");
             Thread.sleep(3000);
         } catch (InterruptedException ignore) {
         }
-        log.debug("wait over");
-        
-        URL sessionLink = null;
-        switch (type) {
-            case SessionAction.SESSION_TYPE_DESKTOP:
-                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID));
-                break;
-            case SessionAction.SESSION_TYPE_CARTA:
-                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID));
-                break;
-            case SessionAction.SESSION_TYPE_NOTEBOOK:
-                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID));
-                break;
-            default:
-                throw new IllegalStateException("Bug: unknown session type: " + type);
-        }
-        
-        log.debug("session redirect: " + sessionLink);
-        return sessionLink;
+
     }
     
     public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
