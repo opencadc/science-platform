@@ -76,6 +76,7 @@ import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
+import ca.nrc.cadc.util.StringUtil;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
@@ -131,7 +132,11 @@ public abstract class SessionAction extends RestAction {
         homedir = System.getenv("skaha.homedir");
         scratchdir = System.getenv("skaha.scratchdir");
         String harborHostList = System.getenv("skaha.harborhosts");
-        harborHosts = Arrays.asList(harborHostList.split(" "));
+        if (harborHostList == null) {
+            log.warn("no harbor host list configured!");
+        } else {
+            harborHosts = Arrays.asList(harborHostList.split(" "));
+        }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
         log.debug("skaha.hostname=" + server);
@@ -327,6 +332,64 @@ public abstract class SessionAction extends RestAction {
         writer.flush();
         writer.close();
         return tmpFileName;
+    }
+    
+    public List<Session> getAllSessions(String forUserID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        String[] getSessionsCMD = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-userid=" + forUserID,
+            "--no-headers=true",
+            "-o", "custom-columns=" +
+                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+                "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "STATUS:.status.phase," +
+                "NAME:.metadata.labels.canfar-net-sessionName," +
+                "STARTED:.status.startTime," +
+                "DELETION:.metadata.deletionTimestamp"};
+                
+        String vncSessions = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + vncSessions);
+        
+        List<Session> sessions = new ArrayList<Session>();
+        
+        if (StringUtil.hasLength(vncSessions)) {
+            String[] lines = vncSessions.split("\n");
+            for (String line : lines) {
+                Session session = constructSession(line);
+                sessions.add(session);
+            }
+        }
+        
+        return sessions;
+    }
+    
+    protected Session constructSession(String k8sOutput) throws IOException {
+        log.debug("line: " + k8sOutput);
+        String[] parts = k8sOutput.split("\\s+");
+        String id = parts[0];
+        String type = parts[1];
+        String status = parts[2];
+        String name = parts[3];
+        String startTime = "Up since " + parts[4];
+        String deletionTimestamp = parts[5];
+        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+            status = Session.STATUS_TERMINATING;
+        }
+        String host = K8SUtil.getHostName();
+        String connectURL = "unknown";
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
+            connectURL = SessionAction.getVNCURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            connectURL = SessionAction.getCartaURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+            connectURL = SessionAction.getNotebookURL(host, id);
+        }
+
+        return new Session(id, type, status, name, startTime, connectURL);
+        
     }
     
 }
