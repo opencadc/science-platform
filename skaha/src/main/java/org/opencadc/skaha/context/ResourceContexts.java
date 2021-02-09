@@ -64,119 +64,67 @@
  *
  ************************************************************************
  */
-package org.opencadc.skaha;
+package org.opencadc.skaha.context;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import ca.nrc.cadc.util.MultiValuedProperties;
+import ca.nrc.cadc.util.PropertiesReader;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.junit.Assert;
-import org.junit.Test;
-import org.opencadc.skaha.session.GetAction;
-import org.opencadc.skaha.session.Session;
 
 /**
  * @author majorb
  *
  */
-public class GetTests {
+public class ResourceContexts {
     
-    private static final Logger log = Logger.getLogger(GetTests.class);
+    private static final Logger log = Logger.getLogger(ResourceContexts.class);
     
-    private static final String K8S_LIST =
-            "pud05npw   carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
-            "e37lmx4m   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
-            "gspc0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
-            "abcd0n8m   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
-            "defg0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
+    private Integer defaultCores;
+    private List<Integer> availableCores = new ArrayList<Integer>();
+    
+    // units in GB
+    private Integer defaultRAM;
+    private List<Integer> availableRAM = new ArrayList<Integer>();
 
-    public GetTests() {
-    }
-    
-    @Test
-    public void testListSessions() {
+    public ResourceContexts() {
         try {
-            GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null);
-            log.info("json: \n" + json);
-            List<Session> sessions1 = get.getAllSessions(null);
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<Session>>(){}.getType();
-            List<Session> sessions2 = gson.fromJson(json, listType);
-            Assert.assertTrue(sessions1.size() == K8S_LIST.split("\n").length);
-            Assert.assertTrue("session count", sessions1.size() == sessions2.size());
-            for (Session s : sessions1) {
-                Assert.assertTrue(s.getId(), sessions2.contains(s));
-            }
+            PropertiesReader reader = new PropertiesReader("k8s-resources.properties");
+            MultiValuedProperties mvp = reader.getAllProperties();
+            defaultCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default"));
+            defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
+            String cOptions = mvp.getFirstPropertyValue("cores-options");
+            String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
             
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+            for (String c : cOptions.split(" ")) {
+                availableCores.add(Integer.valueOf(c));
+            }
+            for (String r : rOptions.split(" ")) {
+                availableRAM.add(Integer.valueOf(r));
+            }
+        } catch (Exception e) {
+            log.error(e);
+            throw new IllegalStateException("failed reading k8s-resources.properties", e);
         }
+    }
+
+    public Integer getDefaultCores() {
+        return defaultCores;
+    }
+
+    public List<Integer> getAvailableCores() {
+        return availableCores;
+    }
+
+    public Integer getDefaultRAM() {
+        return defaultRAM;
+    }
+
+    public List<Integer> getAvailableRAM() {
+        return availableRAM;
     }
     
-    @Test
-    public void testFilterType() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, "notebook", null);
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
     
-    @Test
-    public void testFilterStatus() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, null, "Running");
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    @Test
-    public void testFilterTypeStatus() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, "notebook", "Running");
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    class TestGetAction extends GetAction {
-        
-        @Override
-        public List<Session> getAllSessions(String forUserID) throws Exception {
-            List<Session> sessions = new ArrayList<Session>();
-            String[] lines = K8S_LIST.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                sessions.add(session);
-            }
-            return sessions;
-        }
-        
-    }
 }

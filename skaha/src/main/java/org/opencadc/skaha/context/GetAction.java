@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2020.                            (c) 2020.
+ *  (c) 2021.                            (c) 2021.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -64,72 +64,34 @@
  *
  ************************************************************************
  */
-package org.opencadc.skaha;
 
-import org.apache.log4j.Logger;
+package org.opencadc.skaha.context;
+
+import ca.nrc.cadc.rest.InlineContentHandler;
+import ca.nrc.cadc.rest.RestAction;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 /**
- * @author majorb
+ * Output the resource context information.
  * 
- * Represents a session running in skaha.
- *
+ * @author majorb
  */
-public class Session {
-    
-    private static final Logger log = Logger.getLogger(Session.class);
-    
-    public static final String STATUS_TERMINATING = "Terminating";
-    
-    private String id;
-    private String type;
-    private String status;
-    private String name;
-    private String startTime;
-    private String connectURL;
+public class GetAction extends RestAction {
 
-    public Session(String id, String type, String status, String name, String startTime, String connectURL) {
-        if (id == null) {
-            throw new IllegalArgumentException("id is requried");
-        }
-        this.id = id;
-        this.type = type;
-        this.status = status;
-        this.name = name;
-        this.startTime = startTime;
-        this.connectURL = connectURL;
-    }
-    
-    public String getId() {
-        return id;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getStartTime() {
-        return startTime;
-    }
-
-    public String getConnectURL() {
-        return connectURL;
-    }
-    
     @Override
-    public boolean equals(Object o) {
-        if (o instanceof Session) {
-            Session s = (Session) o;
-            return this.id.equals(s.id);
-        }
-        return false;
+    public void doAction() throws Exception {
+        ResourceContexts rc = new ResourceContexts();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String json = gson.toJson(rc);
+        syncOutput.setHeader("Content-Type", "application/json");
+        syncOutput.getOutputStream().write(json.getBytes());
     }
-    
+
+    @Override
+    protected InlineContentHandler getInlineContentHandler() {
+        return null;
+    }
+
 }

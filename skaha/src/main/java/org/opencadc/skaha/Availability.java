@@ -68,6 +68,7 @@
 package org.opencadc.skaha;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.session.SessionAction;
 
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
 import ca.nrc.cadc.vosi.AvailabilityStatus;
