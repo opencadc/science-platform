@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
@@ -103,6 +103,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.gms.GroupClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.GroupUtil;
+import org.opencadc.skaha.K8SUtil;
 
 public abstract class SessionAction extends RestAction {
     
@@ -234,7 +235,7 @@ public abstract class SessionAction extends RestAction {
         return buffer.toString("UTF-8");
     }
     
-    protected static String execute(String[] command) throws IOException, InterruptedException {
+    public static String execute(String[] command) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         int status = p.waitFor();
         log.debug("Status=" + status + " for command: " + Arrays.toString(command));

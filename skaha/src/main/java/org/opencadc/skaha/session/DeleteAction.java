@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2018.                            (c) 2018.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -65,26 +65,25 @@
 ************************************************************************
 */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.StringUtil;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 /**
- * Process the GET request on the session(s) or app(s).
  *
  * @author majorb
  */
-public class GetAction extends SessionAction {
+public class DeleteAction extends SessionAction {
     
-    private static final Logger log = Logger.getLogger(GetAction.class);
+    private static final Logger log = Logger.getLogger(DeleteAction.class);
 
-    public GetAction() {
+    public DeleteAction() {
         super();
     }
 
@@ -93,53 +92,52 @@ public class GetAction extends SessionAction {
         super.initRequest();
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                // List the sessions
-                String typeFilter = syncInput.getParameter("type");
-                String statusFilter = syncInput.getParameter("status");
-                
-                String json = listSessions(typeFilter, statusFilter);
-                
-                syncOutput.setHeader("Content-Type", "application/json");
-                syncOutput.getOutputStream().write(json.getBytes());
+                throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
-                throw new UnsupportedOperationException("Session detail viewing not supported.");
+                
+                String k8sNamespace = K8SUtil.getWorkloadNamespace();
+                String[] getSessionCMD = new String[] {
+                    "kubectl", "get", "--namespace", k8sNamespace, "pod",
+                    "--selector=canfar-net-sessionID=" + sessionID,
+                    "--no-headers=true",
+                    "-o", "custom-columns=" +
+                        "TYPE:.metadata.labels.canfar-net-sessionType," +
+                        "USERID:.metadata.labels.canfar-net-userid"};
+                        
+                String session = execute(getSessionCMD);
+                if (!StringUtil.hasText(session)) {
+                    throw new ResourceNotFoundException(sessionID);
+                }
+                String[] lines = session.split("\n");
+                if (lines.length != 1) {
+                    throw new IllegalStateException("found multiple sessions with id " + sessionID);
+                }
+                String[] parts = lines[0].split("\\s+");
+                String type = parts[0];
+                String sessionUserid = parts[1];
+                if (!userID.equals(sessionUserid)) {
+                    throw new AccessControlException("forbidden");
+                }   
+                
+                stopSession(userID, type, sessionID);
             }
             return;
         }
         if (requestType.equals(REQUEST_TYPE_APP)) {
-            if (appID == null) {
-                throw new UnsupportedOperationException("App listing not supported.");
-            } else {
-                throw new UnsupportedOperationException("App detail viewing not supported.");
-            }
+            throw new UnsupportedOperationException("App killing not supported.");
         }
     }
     
-    public String listSessions(String typeFilter, String statusFilter) throws Exception {
+    public void stopSession(String userID, String type, String sessionID) throws Exception {
+        // kill the session specified by sessionID
+        log.debug("Stopping VNC session");
         
-        List<Session> sessions = getAllSessions(userID);
+        String podName = K8SUtil.getJobName(sessionID, type, userID);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
-        log.debug("typeFilter=" + typeFilter);
-        log.debug("statusFilter=" + statusFilter);
+        String[] stopVNCCmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
+        execute(stopVNCCmd);
         
-        List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
-        
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String json = gson.toJson(filteredSessions);
-        
-        return json;
     }
-    
-    public List<Session> filter(List<Session> sessions, String typeFilter, String statusFilter) {
-        List<Session> ret = new ArrayList<Session>();
-        for (Session session : sessions) {
-            if ((typeFilter == null || session.getType().equalsIgnoreCase(typeFilter)) &&
-                (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
-                ret.add(session);
-            }
-        }
-        return ret;
-    }
-
-
 }
