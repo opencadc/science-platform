@@ -1,0 +1,13 @@
+bases:
+- ../../../base/cavern
+patchesStrategicMerge:
+- cavern-tomcat-deployment.yaml
+- cavern-sshd-deployment.yaml
+configMapGenerator:
+- name: cavern-config
+  files:
+  - config/catalina.properties
+  - config/Cavern.properties
+  - config/LocalAuthority.properties
+generatorOptions:
+ disableNameSuffixHash: true
