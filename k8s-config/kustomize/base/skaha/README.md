@@ -36,8 +36,8 @@ current-context: skaha-wsproxy
   - Create the (current incorrectly) conifig map ./createConfig.sh
   - Deploying arcade-wsproxy with `deploy-arcade-wsproxy.sh`
   - Connect to the pod with `kubectl -n skaha-system <podID> -- bash`
-  - Grab the value for <token> from /var/run/secrets/kubernetes.io/serviceaccount/token 
-  - Grab the value for <server> with `env | grep KUBERNETES_PORT_443_TCP`, but change `tcp` to `https`
+  - Grab the value for `<token>` from /var/run/secrets/kubernetes.io/serviceaccount/token 
+  - Grab the value for `<server>` with `env | grep KUBERNETES_PORT_443_TCP`, but change `tcp` to `https`
   - exit the container and terminate: `kubectl delete deployment arcade-wsproxy`
   - delete the config map
 
