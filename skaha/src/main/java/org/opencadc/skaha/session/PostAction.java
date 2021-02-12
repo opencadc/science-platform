@@ -419,27 +419,12 @@ public class PostAction extends SessionAction {
             return null;
         }
         
-        log.debug("verfifying delegated credentials");
-        if (!CredUtil.checkCredentials()) {
-            throw new IllegalStateException("cannot access delegated credentials");
-        }
-        
-        log.debug("getting idToken from ac");
-        URL acURL = new URL("https://proto.canfar.net/ac/authorize?response_type=id_token&client_id=arbutus-harbor&scope=cli");
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(acURL, out);
-        get.run();
-        if (get.getThrowable() != null) {
-            log.warn("error obtaining idToken", get.getThrowable());
-            return null;
-        }
-        String idToken = out.toString();
-        log.debug("idToken: " + idToken);
+        String idToken = super.getIdToken();
         
         log.debug("getting secret from harbor");
         URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
-        out = new ByteArrayOutputStream();
-        get = new HttpGet(harborURL, out);
+        OutputStream out = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         get.run();
         log.debug("harbor response code: " + get.getResponseCode());

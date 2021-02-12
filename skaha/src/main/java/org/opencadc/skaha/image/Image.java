@@ -64,119 +64,52 @@
  *
  ************************************************************************
  */
-package org.opencadc.skaha;
-
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.log4j.Logger;
-import org.junit.Assert;
-import org.junit.Test;
-import org.opencadc.skaha.session.GetAction;
-import org.opencadc.skaha.session.Session;
+package org.opencadc.skaha.image;
 
 /**
  * @author majorb
  *
  */
-public class GetTests {
+public class Image {
     
-    private static final Logger log = Logger.getLogger(GetTests.class);
+    private String id;
+    private String type;
+    private String digest;
     
-    private static final String K8S_LIST =
-            "pud05npw   carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
-            "e37lmx4m   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
-            "gspc0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
-            "abcd0n8m   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
-            "defg0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
+    public Image(String id, String type, String digest) {
+        if (id == null) {
+            throw new IllegalArgumentException("id requried");
+        }
+        if (type == null) {
+            throw new IllegalArgumentException("type");
+        }
+        if (digest == null) {
+            throw new IllegalArgumentException("digest requried");
+        }
+        this.id = id;
+        this.type = type;
+        this.digest = digest;
+    }
 
-    public GetTests() {
+    public String getId() {
+        return id;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public String getDigest() {
+        return digest;
     }
     
-    @Test
-    public void testListSessions() {
-        try {
-            GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null);
-            log.info("json: \n" + json);
-            List<Session> sessions1 = get.getAllSessions(null);
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<Session>>(){}.getType();
-            List<Session> sessions2 = gson.fromJson(json, listType);
-            Assert.assertTrue(sessions1.size() == K8S_LIST.split("\n").length);
-            Assert.assertTrue("session count", sessions1.size() == sessions2.size());
-            for (Session s : sessions1) {
-                Assert.assertTrue(s.getId(), sessions2.contains(s));
-            }
-            
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Image) {
+            Image i = (Image) o;
+            return i.id.equals(this.id) && i.digest.equals(this.digest) && i.type.equals(this.type);
         }
+        return false;
     }
-    
-    @Test
-    public void testFilterType() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, "notebook", null);
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    @Test
-    public void testFilterStatus() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, null, "Running");
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    @Test
-    public void testFilterTypeStatus() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, "notebook", "Running");
-            for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    class TestGetAction extends GetAction {
-        
-        @Override
-        public List<Session> getAllSessions(String forUserID) throws Exception {
-            List<Session> sessions = new ArrayList<Session>();
-            String[] lines = K8S_LIST.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                sessions.add(session);
-            }
-            return sessions;
-        }
-        
-    }
+
 }
