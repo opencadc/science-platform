@@ -125,6 +125,7 @@ public class LifecycleTest {
         try {
             RegistryClient regClient = new RegistryClient();
             sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
+            sessionURL = new URL(sessionURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);
     
             File cert = FileUtil.getFileFromResource("skaha-test.pem", LifecycleTest.class);
@@ -248,7 +249,7 @@ public class LifecycleTest {
         HttpGet get = new HttpGet(sessionURL, out);
         get.run();
         Assert.assertNull("get sessions error", get.getThrowable());
-        Assert.assertTrue("content-type", get.getContentType().equals("application/json"));
+        Assert.assertEquals("content-type", "application/json", get.getContentType());
         String json = out.toString();
         Type listType = new TypeToken<List<Session>>(){}.getType();
         Gson gson = new Gson();
