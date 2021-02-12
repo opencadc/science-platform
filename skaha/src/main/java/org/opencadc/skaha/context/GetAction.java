@@ -68,20 +68,27 @@
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.rest.RestAction;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import org.opencadc.skaha.SkahaAction;
 
 /**
  * Output the resource context information.
  * 
  * @author majorb
  */
-public class GetAction extends RestAction {
+public class GetAction extends SkahaAction {
+    
+    public GetAction() {
+        super();
+    }
 
     @Override
     public void doAction() throws Exception {
+        super.initRequest();
+        
         ResourceContexts rc = new ResourceContexts();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         String json = gson.toJson(rc);

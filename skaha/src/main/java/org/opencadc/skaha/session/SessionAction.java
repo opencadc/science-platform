@@ -67,13 +67,10 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
 import ca.nrc.cadc.util.StringUtil;
@@ -85,7 +82,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
 import java.security.PrivilegedActionException;
@@ -100,52 +96,22 @@ import java.util.UUID;
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
-import org.opencadc.gms.GroupClient;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.gms.GroupUtil;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 
-public abstract class SessionAction extends RestAction {
+public abstract class SessionAction extends SkahaAction {
     
     private static final Logger log = Logger.getLogger(SessionAction.class);
     
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
     
-    protected static final String SESSION_TYPE_DESKTOP = "desktop";
-    protected static final String SESSION_TYPE_CARTA = "carta";
-    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
-    
-    protected String userID;
-    protected boolean adminUser = false;
     protected String requestType;
     protected String sessionID;
     protected String appID;
-    protected String server;
-    protected String homedir;
-    protected String scratchdir;
-    protected List<String> harborHosts = new ArrayList<String>();
-    protected String skahaUsersGroup;
-    protected String skahaAdminsGroup;
     
     public SessionAction() {
-        server = System.getenv("skaha.hostname");
-        homedir = System.getenv("skaha.homedir");
-        scratchdir = System.getenv("skaha.scratchdir");
-        String harborHostList = System.getenv("skaha.harborhosts");
-        if (harborHostList == null) {
-            log.warn("no harbor host list configured!");
-        } else {
-            harborHosts = Arrays.asList(harborHostList.split(" "));
-        }
-        skahaUsersGroup = System.getenv("skaha.usersgroup");
-        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
-        log.debug("skaha.hostname=" + server);
-        log.debug("skaha.homedir=" + homedir);
-        log.debug("skaha.scratchdir=" + scratchdir);
-        log.debug("skaha.harborHosts=" + harborHostList);
-        log.debug("skaha.usersgroup=" + skahaUsersGroup);
-        log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        super();
     }
     
     @Override
@@ -154,49 +120,7 @@ public abstract class SessionAction extends RestAction {
     }
 
     protected void initRequest() throws AccessControlException, IOException {
-        
-        final Subject subject = AuthenticationUtil.getCurrentSubject();
-        log.debug("Subject: " + subject);
-        
-        if (subject == null || subject.getPrincipals().isEmpty()) {
-            throw new AccessControlException("Unauthorized");
-        }
-        Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
-        if (httpPrincipals.isEmpty()) {
-            throw new AccessControlException("No HTTP Principal");
-        }
-        userID = httpPrincipals.iterator().next().getName();
-        
-        // ensure user is a part of the skaha group
-        if (skahaUsersGroup == null) {
-            throw new IllegalStateException("skaha.usersgroup not defined in system properties");
-        }
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
-        GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
-        GroupURI membershipGroup = null;
-        try {
-            membershipGroup = new GroupURI(skahaUsersGroup);
-            CredUtil.checkCredentials();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        if (!gmsClient.isMember(membershipGroup)) {
-            throw new AccessControlException("Not authorized to use the skaha system");
-        }
-        
-        if (skahaAdminsGroup == null) {
-            log.warn("skaha.adminsgroup not defined in system properties");
-        } else {
-            try {
-                GroupURI adminMembershipGroup = new GroupURI(skahaAdminsGroup);
-                if (gmsClient.isMember(adminMembershipGroup)) {
-                    adminUser = true;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
+        super.initRequest();
         
         String path = syncInput.getPath();
         log.debug("request path: " + path);
