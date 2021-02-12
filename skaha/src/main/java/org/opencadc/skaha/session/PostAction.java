@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -81,6 +81,8 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.ResourceContexts;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
@@ -113,6 +115,10 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_TARGETIP = "software.targetip";
     public static final String SOFTWARE_IMAGEID = "software.imageid";
     public static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
+    public static final String SOFTWARE_REQUESTS_CORES = "software.requests.cores";
+    public static final String SOFTWARE_REQUESTS_RAM = "software.requests.ram";
+    public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
+    public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
 
     public PostAction() {
         super();
@@ -129,6 +135,8 @@ public class PostAction extends SessionAction {
                 String name = syncInput.getParameter("name");
                 String image = syncInput.getParameter("image");
                 String type = syncInput.getParameter("type");
+                String coresParam = syncInput.getParameter("cores");
+                String ramParam = syncInput.getParameter("ram");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
@@ -145,10 +153,34 @@ public class PostAction extends SessionAction {
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
-                URL sessionURL = createSession(sessionID, validatedType, image, name);
+
+                ResourceContexts rc = new ResourceContexts();
+                Integer cores = rc.getDefaultCores();
+                Integer ram = rc.getDefaultRAM();
                 
-                syncOutput.setHeader("Location", sessionURL.toString());
-                syncOutput.setCode(303);
+                if (coresParam != null) {
+                    try {
+                        cores = Integer.valueOf(coresParam);
+                        if (!rc.getAvailableCores().contains(cores)) {
+                            throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
+                        }
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
+                    }
+                }
+                
+                if (ramParam != null) {
+                    try {
+                        ram = Integer.valueOf(ramParam);
+                        if (!rc.getAvailableRAM().contains(ram)) {
+                            throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+                        }
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+                    }
+                }
+                
+                createSession(sessionID, validatedType, image, name, cores, ram);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -231,7 +263,7 @@ public class PostAction extends SessionAction {
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
-        List<Session> sessions = GetAction.getAllSessions(userid);
+        List<Session> sessions = super.getAllSessions(userid);
         for (Session session : sessions) {
             if (session.getType().equals(type) && !session.getStatus().equals(Session.STATUS_TERMINATING)) {
                 throw new IllegalArgumentException("User " + userID + " has a session already running.");
@@ -239,7 +271,7 @@ public class PostAction extends SessionAction {
         }
     }
     
-    public URL createSession(String sessionID, String type, String image, String name) throws Exception {
+    public void createSession(String sessionID, String type, String image, String name, Integer cores, Integer ram) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
@@ -277,6 +309,11 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, cores.toString());
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, cores.toString());
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, ram.toString() + "G");
+
         
         String jsonLaunchFile = super.stageFile(launchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -292,29 +329,11 @@ public class PostAction extends SessionAction {
         
         // give the container a few seconds to initialize
         try {
-            log.debug("3 second wait for vnc initialization");
+            log.debug("3 second wait for container initialization");
             Thread.sleep(3000);
         } catch (InterruptedException ignore) {
         }
-        log.debug("wait over");
-        
-        URL sessionLink = null;
-        switch (type) {
-            case SessionAction.SESSION_TYPE_DESKTOP:
-                sessionLink = new URL(super.getVNCURL(K8SUtil.getHostName(), sessionID));
-                break;
-            case SessionAction.SESSION_TYPE_CARTA:
-                sessionLink = new URL(super.getCartaURL(K8SUtil.getHostName(), sessionID));
-                break;
-            case SessionAction.SESSION_TYPE_NOTEBOOK:
-                sessionLink = new URL(super.getNotebookURL(K8SUtil.getHostName(), sessionID));
-                break;
-            default:
-                throw new IllegalStateException("Bug: unknown session type: " + type);
-        }
-        
-        log.debug("session redirect: " + sessionLink);
-        return sessionLink;
+
     }
     
     public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
@@ -400,27 +419,12 @@ public class PostAction extends SessionAction {
             return null;
         }
         
-        log.debug("verfifying delegated credentials");
-        if (!CredUtil.checkCredentials()) {
-            throw new IllegalStateException("cannot access delegated credentials");
-        }
-        
-        log.debug("getting idToken from ac");
-        URL acURL = new URL("https://proto.canfar.net/ac/authorize?response_type=id_token&client_id=arbutus-harbor&scope=cli");
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(acURL, out);
-        get.run();
-        if (get.getThrowable() != null) {
-            log.warn("error obtaining idToken", get.getThrowable());
-            return null;
-        }
-        String idToken = out.toString();
-        log.debug("idToken: " + idToken);
+        String idToken = super.getIdToken();
         
         log.debug("getting secret from harbor");
         URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
-        out = new ByteArrayOutputStream();
-        get = new HttpGet(harborURL, out);
+        OutputStream out = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         get.run();
         log.debug("harbor response code: " + get.getResponseCode());

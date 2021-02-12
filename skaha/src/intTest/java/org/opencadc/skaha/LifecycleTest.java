@@ -78,8 +78,12 @@ import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
 import ca.nrc.cadc.util.StringUtil;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
@@ -95,6 +99,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.session.Session;
+import org.opencadc.skaha.session.SessionAction;
 
 /**
  * @author majorb
@@ -139,8 +145,8 @@ public class LifecycleTest {
                 public Object run() throws Exception {
                     
                     // get sessions
-                    Skaha skaha = getSessions();
-                    Assert.assertTrue("no sessions to start", skaha.sessions.size() == 0);
+                    List<Session> sessions = getSessions();
+                    Assert.assertTrue("zero sessions #1", sessions.size() == 0);
                     
                     // create desktop session
                     Map<String, Object> params = new HashMap<String, Object>();
@@ -155,14 +161,14 @@ public class LifecycleTest {
                     TimeUnit.SECONDS.sleep(10);
                     
                     // get sessions
-                    skaha = getSessions();
-                    Assert.assertTrue("one session", skaha.sessions.size() == 1);
-                    SkahaSession session = skaha.sessions.get(0);
-                    Assert.assertEquals("session name", "intTest", session.sessionName);
-                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_DESKTOP, session.sessionType);
-                    Assert.assertNotNull("session id", session.sessionID);
-                    Assert.assertNotNull("connect URL", session.connectURL);
-                    Assert.assertNotNull("up since", session.upSince);
+                    sessions = getSessions();
+                    Assert.assertTrue("one session #1", sessions.size() == 1);
+                    Session session = sessions.get(0);
+                    Assert.assertEquals("session name", "intTest", session.getName());
+                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_DESKTOP, session.getType());
+                    Assert.assertNotNull("session id", session.getId());
+                    Assert.assertNotNull("connect URL", session.getConnectURL());
+                    Assert.assertNotNull("up since", session.getStartTime());
                     
                     // create carta session
                     params = new HashMap<String, Object>();
@@ -175,24 +181,24 @@ public class LifecycleTest {
                     TimeUnit.SECONDS.sleep(10);
                     
                     // get sessions
-                    skaha = getSessions();
-                    Assert.assertTrue("two sessions", skaha.sessions.size() == 2);
+                    sessions = getSessions();
+                    Assert.assertTrue("two sessions", sessions.size() == 2);
                     String desktopSessionID = null;
                     String cartaSessionID = null;
-                    for (SkahaSession s : skaha.sessions) {
-                        Assert.assertNotNull("session type", s.sessionType);
-                        if (s.sessionType.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                            desktopSessionID = s.sessionID;
-                            desktopSessionID = session.sessionID;
-                        } else if (s.sessionType.equals(SessionAction.SESSION_TYPE_CARTA)) {
-                            cartaSessionID = s.sessionID;
+                    for (Session s : sessions) {
+                        Assert.assertNotNull("session type", s.getType());
+                        if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+                            desktopSessionID = s.getId();
+                            desktopSessionID = session.getId();
+                        } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
+                            cartaSessionID = s.getId();
                         } else {
-                            throw new AssertionError("invalid session type: " + s.sessionType);
+                            throw new AssertionError("invalid session type: " + s.getType());
                         }
-                        Assert.assertEquals("session name", "intTest", session.sessionName);
-                        Assert.assertNotNull("session id", session.sessionID);
-                        Assert.assertNotNull("connect URL", session.connectURL);
-                        Assert.assertNotNull("up since", session.upSince);
+                        Assert.assertEquals("session name", "intTest", session.getName());
+                        Assert.assertNotNull("session id", session.getId());
+                        Assert.assertNotNull("connect URL", session.getConnectURL());
+                        Assert.assertNotNull("up since", session.getStartTime());
                     }
                     Assert.assertNotNull("no desktop session", desktopSessionID);
                     Assert.assertNotNull("no carta session", cartaSessionID);
@@ -202,24 +208,28 @@ public class LifecycleTest {
                     delete.run();
                     Assert.assertNull("delete session error", delete.getThrowable());
                     
+                    TimeUnit.SECONDS.sleep(10);
+                    
                     // get sessions
-                    skaha = getSessions();
-                    Assert.assertTrue("one session", skaha.sessions.size() == 1);
-                    session = skaha.sessions.get(0);
-                    Assert.assertEquals("session name", "intTest", session.sessionName);
-                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_CARTA, session.sessionType);
-                    Assert.assertNotNull("session id", session.sessionID);
-                    Assert.assertNotNull("connect URL", session.connectURL);
-                    Assert.assertNotNull("up since", session.upSince);
+                    sessions = getSessions();
+                    Assert.assertTrue("one session #2", sessions.size() == 1);
+                    session = sessions.get(0);
+                    Assert.assertEquals("session name", "intTest", session.getName());
+                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_CARTA, session.getType());
+                    Assert.assertNotNull("session id", session.getId());
+                    Assert.assertNotNull("connect URL", session.getConnectURL());
+                    Assert.assertNotNull("up since", session.getStartTime());
                     
                     // delete carta session
                     delete = new HttpDelete(new URL(sessionURL.toString() + "/" + cartaSessionID), true);
                     delete.run();
                     Assert.assertNull("delete session error", delete.getThrowable());
                     
+                    TimeUnit.SECONDS.sleep(10);
+                    
                     // get sessions
-                    skaha = getSessions();
-                    Assert.assertTrue("no sessions to start", skaha.sessions.size() == 0);
+                    sessions = getSessions();
+                    Assert.assertTrue("zero sessions #2", sessions.size() == 0);
 
                     return null;
                 }
@@ -233,49 +243,24 @@ public class LifecycleTest {
         
     }
     
-    private Skaha getSessions() {
+    private List<Session> getSessions() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(sessionURL, out);
         get.run();
         Assert.assertNull("get sessions error", get.getThrowable());
-        return new Skaha(out.toString());
-    }
-    
-    public class Skaha {
-        
-        List<SkahaSession> sessions = new ArrayList<SkahaSession>();
-        
-        public Skaha(String output) {
-            if (StringUtil.hasLength(output)) {
-                String[] lines = output.split("\n");
-                for (String line : lines) {
-                    SkahaSession session = new SkahaSession(line);
-                    if (session.status.equals("Running")) {
-                        sessions.add(session);
-                    }
-                }
+        Assert.assertTrue("content-type", get.getContentType().equals("application/json"));
+        String json = out.toString();
+        Type listType = new TypeToken<List<Session>>(){}.getType();
+        Gson gson = new Gson();
+        List<Session> sessions = gson.fromJson(json, listType);
+        List<Session> active = new ArrayList<Session>();
+        for (Session s : sessions) {
+            if (!s.getStatus().equals(Session.STATUS_TERMINATING)) {
+                active.add(s);
             }
         }
+        return active;
     }
     
-    public class SkahaSession {
-        
-        public SkahaSession(String line) {
-            String[] parts = line.split("\t");
-            sessionID = parts[0];
-            sessionType = parts[1];
-            status = parts[2];
-            sessionName = parts[3];
-            connectURL = parts[4];
-            upSince = parts[5];
-        }
-
-        public String sessionID;
-        public String sessionType;
-        public String status;
-        public String sessionName;
-        public String connectURL;
-        public String upSince;
-    }
 
 }

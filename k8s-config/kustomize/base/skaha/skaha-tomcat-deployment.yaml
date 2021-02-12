@@ -24,12 +24,13 @@ spec:
         - name: skaha.namespace
           value: skaha-workload
         - name: skaha.harborhosts
-          value: "harbor.canfar.net harbor-dev.canfar.net"
+          value: "harbor.canfar.net"
+          #value: "harbor.canfar.net harbor-dev.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-admins"
-        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.1
+        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.3
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat

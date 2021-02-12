@@ -1,13 +1,7 @@
-namespace: skaha-system
-resources:
-- skaha-tomcat-deployment.yaml
-- skaha-tomcat-expose.yaml
-- skaha-wsproxy-deployment.yaml
-- skaha-wsproxy-expose.yaml
-- carta-ingress.yaml
-- desktop-ingress.yaml
-- notebook-ingress.yaml
-- skaha-ingress.yaml
+bases:
+- ../../../base/skaha
+patchesStrategicMerge:
+- cavern-skaha-deployment.yaml
 configMapGenerator:
 - name: skaha-config
   files:
@@ -18,10 +12,6 @@ configMapGenerator:
   - config/launch-novnc.yaml
   - config/launch-software.yaml
   - config/skaha-software.properties
-  - config/k8s-resources.properties
-- name: start-desktop-software
-  files:
-  - config/start-desktop-software.sh
 - name: skaha-wsproxy-config
   files:
   - config/k8s-config

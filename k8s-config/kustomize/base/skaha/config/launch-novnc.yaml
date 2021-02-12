@@ -7,6 +7,8 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
+    canfar-net-cores: "${software.cores}"
+    canfar-net-ram: "${software.ram}"
   name: "${skaha.jobname}"
 spec:
   template:
@@ -44,11 +46,11 @@ spec:
         #imagePullPolicy: Never
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.25"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
           limits:
-            memory: "256Gi"
-            cpu: "16"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
         ports:
         - containerPort: 5901
           protocol: TCP

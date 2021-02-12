@@ -12,6 +12,7 @@ metadata:
 #    nginx.ingress.kubernetes.io/auth-tls-error-page: "https://www.canfar.net"
 #    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "false"
     nginx.ingress.kubernetes.io/proxy_set_header: X-Client-Certificate $ssl_client_escaped_cert
+    nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   tls:
   - hosts:
