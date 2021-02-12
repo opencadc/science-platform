@@ -165,7 +165,7 @@ public class GetImagesTests {
         try {
             GetAction get = new TestGetAction();
             get.harborHosts.add("test");
-            List<Image> images = get.getImages(null);
+            List<Image> images = get.getImages(null, null);
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             String json = gson.toJson(images);
             log.info(json);

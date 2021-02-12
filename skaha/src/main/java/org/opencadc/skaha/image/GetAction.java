@@ -97,8 +97,9 @@ public class GetAction extends SkahaAction {
     
     private static final Logger log = Logger.getLogger(GetAction.class);
     
-    Map<String, String> cache = Collections.synchronizedMap(
-        new WeakHashMap<String, String>());
+    // Consider adding a cache
+    Map<List<Image>, String> cache = Collections.synchronizedMap(
+        new WeakHashMap<List<Image>, String>());
     
     public GetAction() {
         super();
@@ -108,24 +109,22 @@ public class GetAction extends SkahaAction {
     public void doAction() throws Exception {
         super.initRequest();
         
-        String json = checkCache(userID);
-        if (json == null) {
-            String idToken = super.getIdToken();
-            List<Image> images = getImages(idToken);
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            json = gson.toJson(images);
+        String type = syncInput.getParameter("type");
+        if (type != null && !SESSION_TYPES.contains(type)) {
+            throw new IllegalArgumentException("unknown type: " + type);
         }
+        
+        String idToken = super.getIdToken();
+        List<Image> images = getImages(idToken, type);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String json = gson.toJson(images);
+        
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(json.getBytes());
         
     }
-    
-    private String checkCache(String key) {
-        // TODO
-        return null;
-    }
         
-    protected List<Image> getImages(String idToken) throws Exception {
+    protected List<Image> getImages(String idToken, String typeFilter) throws Exception {
         
         List<Image> images = new ArrayList<Image>();
         
@@ -161,16 +160,18 @@ public class GetAction extends SkahaAction {
                             JSONArray labels = jArtifact.getJSONArray("labels");
                             String type = getTypeFromLabels(labels);
                             if (type != null) {
-                                String digest = jArtifact.getString("digest");
-                                if (!jArtifact.isNull("tags")) {
-                                    JSONArray tags = jArtifact.getJSONArray("tags");
-                                    for (int j=0; j<tags.length(); j++) {
-                                        JSONObject jTag = tags.getJSONObject(j);
-                                        String tag = jTag.getString("name");
-                                        String imageID = harborHost + "/" + rName + ":" + tag;
-                                        Image image = new Image(imageID, type, digest);
-                                        images.add(image);
-                                        log.debug("Added image: " + imageID);
+                                if (typeFilter == null || typeFilter.equals(type)) {
+                                    String digest = jArtifact.getString("digest");
+                                    if (!jArtifact.isNull("tags")) {
+                                        JSONArray tags = jArtifact.getJSONArray("tags");
+                                        for (int j=0; j<tags.length(); j++) {
+                                            JSONObject jTag = tags.getJSONObject(j);
+                                            String tag = jTag.getString("name");
+                                            String imageID = harborHost + "/" + rName + ":" + tag;
+                                            Image image = new Image(imageID, type, digest);
+                                            images.add(image);
+                                            log.debug("Added image: " + imageID);
+                                        }
                                     }
                                 }
                             }
