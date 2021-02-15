@@ -180,6 +180,19 @@ public class GetImagesTests {
         }
     }
     
+    @Test
+    public void testGetImage() {
+        try {
+            GetAction get = new TestGetAction();
+            Image image = get.getImage("test/petuan/new-earth-snap:0.1.1");
+            Assert.assertEquals("imageID",  "test/petuan/new-earth-snap:0.1.1", image.getId());
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+        
+    }
+    
     class TestGetAction extends GetAction {
         
         @Override
@@ -191,10 +204,14 @@ public class GetImagesTests {
                 log.debug("repo ouutput: " + REPO_LIST);
                 return REPO_LIST;
             } else {    
-                log.debug("artifact ouutput: " + ARTIFACT_LIST);
+                log.debug("artifact output: " + ARTIFACT_LIST);
                 return ARTIFACT_LIST;
             }
         }
         
+        @Override
+        protected String getIdToken() {
+            return "";
+        }
     }
 }

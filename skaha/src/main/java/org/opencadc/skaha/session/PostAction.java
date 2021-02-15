@@ -83,11 +83,13 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
@@ -220,32 +222,34 @@ public class PostAction extends SessionAction {
         }
     }
     
-    private String validateImage(String image, String type) {
-        if (!StringUtil.hasText(image)) {
-            throw new IllegalArgumentException("image must have a value");
+    /**
+     * Validate and return the session type
+     * 
+     * @param imageID The image to validate
+     * @param type User-provided session type (optional)
+     * @return The system recognized session type
+     * @throws ResourceNotFoundException 
+     */
+    private String validateImage(String imageID, String type) throws Exception {
+        if (!StringUtil.hasText(imageID)) {
+            throw new IllegalArgumentException("image is required");
         }
         
         for (String harborHost : harborHosts) {
-            if (image.startsWith(harborHost + "/skaha-desktop/session:")) {
-                if (type != null && !type.equals(SESSION_TYPE_DESKTOP)) {
-                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
-                }       
-                return SESSION_TYPE_DESKTOP;
-            } else if (image.startsWith(harborHost + "/skaha-carta/")) {
-                if (type != null && !type.equals(SESSION_TYPE_CARTA)) {
-                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
-                }     
-                return SESSION_TYPE_CARTA;
-            } else if (image.startsWith(harborHost + "/petuan/")) {
-                if (type != null && !type.equals(SESSION_TYPE_NOTEBOOK)) {
-                    throw new IllegalArgumentException("image/type mismatch: " + image + "/" + type);
-                }     
-                return SESSION_TYPE_NOTEBOOK;
+            if (imageID.startsWith(harborHost)) {
+                Image image = getImage(imageID);
+                if (image == null) {
+                    throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
+                }
+                if (type != null && !type.equals(image.getType())) {
+                    throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
+                }
+                return image.getType();
             }
         }
                 
         if (adminUser && type != null) {
-            if (! (type.equals(SESSION_TYPE_DESKTOP) || type.equals(SESSION_TYPE_CARTA) || type.equals(SESSION_TYPE_NOTEBOOK))) {
+            if (!SESSION_TYPES.contains(type)) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
             }
             return type;
@@ -253,12 +257,11 @@ public class PostAction extends SessionAction {
         
         StringBuilder hostList = new StringBuilder("[").append(harborHosts.get(0));
         for (String next : harborHosts.subList(1, harborHosts.size())) {
-            hostList.append("/").append(next);
+            hostList.append(",").append(next);
         }
         hostList.append("]");
         
-        throw new IllegalArgumentException("session image must come from " + hostList + "/skaha-desktop/session:*, " +
-                hostList + "/skaha-carta/*, or " + hostList + "/petuan/*");
+        throw new IllegalArgumentException("session image must come from one of " + hostList);
         
     }
     

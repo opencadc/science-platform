@@ -116,7 +116,7 @@ public class GetAction extends SkahaAction {
         
         String idToken = super.getIdToken();
         List<Image> images = getImages(idToken, type);
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(images);
         
         syncOutput.setHeader("Content-Type", "application/json");
@@ -187,55 +187,9 @@ public class GetAction extends SkahaAction {
         
     }
     
-    protected String getTypeFromLabels(JSONArray labels) {
-        Set<String> types = new HashSet<String>();
-        for (int i=0; i<labels.length(); i++) {
-            JSONObject label = labels.getJSONObject(i);
-            String name = label.getString("name");
-            log.debug("label: " + name);
-            if (name != null && SESSION_TYPES.contains(name)) {
-                types.add(name);
-            }
-        }
-        if (types.size() == 1) {
-            return types.iterator().next();
-        }
-        return null;
-    }
-    
-    protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
-        
-        URL harborURL = null;
-        String message = null;
-        if (project == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects");
-            message = "projects";
-        } else if (repo == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories");
-            message = "repositories";
-        } else {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                + repo + "/artifacts?detail=true&with_label=true");
-            message = "artifacts";
-        }
-        
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(harborURL, out);
-        get.setRequestProperty("Authorization", "Bearer " + idToken);
-        log.debug("calling " + harborURL + " for " + message);
-        get.run();
-        log.debug("response code: " + get.getResponseCode());
-     
-        if (get.getThrowable() != null) {
-            log.warn("error listing harbor " + message, get.getThrowable());
-            throw new RuntimeException(get.getThrowable());
-        }
 
-        String output = out.toString();
-        log.debug(message + " output: " + output);
-        return output;
-        
-    }
+    
+
 
     @Override
     protected InlineContentHandler getInlineContentHandler() {
