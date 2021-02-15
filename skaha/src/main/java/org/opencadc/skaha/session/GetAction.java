@@ -124,7 +124,7 @@ public class GetAction extends SessionAction {
         
         List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
         
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(filteredSessions);
         
         return json;

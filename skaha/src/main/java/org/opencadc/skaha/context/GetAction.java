@@ -90,7 +90,7 @@ public class GetAction extends SkahaAction {
         super.initRequest();
         
         ResourceContexts rc = new ResourceContexts();
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(rc);
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(json.getBytes());
