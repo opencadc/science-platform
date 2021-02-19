@@ -10,7 +10,7 @@ metadata:
     nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
-  - host: rc-uv.canfar.net
+  - host: ws-uv.canfar.net
     http:
       paths:
       - path: /desktop(/|$)(.*)

@@ -15,10 +15,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - rc-uv.canfar.net
+    - ws-uv.canfar.net
     secretName: canfar-net-cert-secret
   rules:
-  - host: rc-uv.canfar.net
+  - host: ws-uv.canfar.net
     http:
       paths:
       - path: /skaha(/|$)(.*)

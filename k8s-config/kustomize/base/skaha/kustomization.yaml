@@ -18,6 +18,7 @@ configMapGenerator:
   - config/launch-novnc.yaml
   - config/launch-software.yaml
   - config/skaha-software.properties
+  - config/k8s-resources.properties
 - name: start-desktop-software
   files:
   - config/start-desktop-software.sh

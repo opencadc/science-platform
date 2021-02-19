@@ -18,7 +18,7 @@ spec:
       containers:
       - env:
         - name: skaha.hostname
-          value: rc-uv.canfar.net
+          value: ws-uv.canfar.net
         - name: skaha.homedir
           value: /cavern
         - name: skaha.namespace
@@ -29,7 +29,7 @@ spec:
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-admins"
-        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.1
+        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.3
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
@@ -69,8 +69,8 @@ spec:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-          user: kanfarnetes_dev
+          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+          user: keel_prod
           secretRef:
             name: cephfs-cephx-key
           readOnly: false
