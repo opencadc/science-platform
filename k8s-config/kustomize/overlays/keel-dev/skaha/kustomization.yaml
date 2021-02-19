@@ -1,0 +1,19 @@
+bases:
+- ../../../base/skaha
+patchesStrategicMerge:
+- cavern-skaha-deployment.yaml
+configMapGenerator:
+- name: skaha-config
+  files:
+  - config/catalina.properties
+  - config/LocalAuthority.properties
+  - config/launch-carta.yaml
+  - config/launch-notebook.yaml
+  - config/launch-novnc.yaml
+  - config/launch-software.yaml
+  - config/skaha-software.properties
+- name: skaha-wsproxy-config
+  files:
+  - config/k8s-config
+generatorOptions:
+ disableNameSuffixHash: true

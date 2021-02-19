@@ -18,6 +18,8 @@ skaha supports two types of containers: `session containers` and `software conta
 
 Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
 
+For detailed information about the skaha service REST API, refer to the [skaha API documentation](https://rc-uv.canfar.net/skaha "skaha").
+
 <a name="building"></a>
 ## Building skaha containers
 
@@ -105,6 +107,25 @@ where:
 
 ```docker push harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>```
 
+### Step 4: Label your image type
+
+1. Go back to https://harbor.canfar.net
+2. Click on your project, then on your newly pushed image (also called a repository in harbor).
+3. Select the 'artifact' with the correct version (tag).
+4. Under the 'Actions' drop-down, apply the approripate label to the artifact.
+
+## Listing images in skaha
+
+Once publishing and labeling has been completed, the image will be visible to skaha, which can be verified with this command:
+
+```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/image```
+
+## Listing resource contexts
+
+The available cores and RAM in skaha can be viewed with:
+
+```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/context```
+
 <a name="launching"></a>
 ## Launching containers in skaha
 
@@ -113,6 +134,8 @@ where:
 1. Use the CANFAR Science Platform Portal (TBD) or this curl command to launch your newly published image:
 
 ```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/session -d "name=<arbitrary-name>" -d "image=harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>"```
+
+If non-default values for cores and/or ram is preferred, the parameters `-d cores=<cores>` and `-d ram=<ram>` can be added to the session launching command above.
 
 2. Use the CANFAR Science Platform Portal (TBD) or this curl command to find the URL to your session:
 

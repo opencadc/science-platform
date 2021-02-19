@@ -65,17 +65,15 @@
 ************************************************************************
 */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
+import ca.nrc.cadc.util.StringUtil;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
@@ -84,7 +82,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
 import java.security.PrivilegedActionException;
@@ -99,47 +96,22 @@ import java.util.UUID;
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
-import org.opencadc.gms.GroupClient;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.gms.GroupUtil;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 
-public abstract class SessionAction extends RestAction {
+public abstract class SessionAction extends SkahaAction {
     
     private static final Logger log = Logger.getLogger(SessionAction.class);
     
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
     
-    protected static final String SESSION_TYPE_DESKTOP = "desktop";
-    protected static final String SESSION_TYPE_CARTA = "carta";
-    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
-    
-    protected String userID;
-    protected boolean adminUser = false;
     protected String requestType;
     protected String sessionID;
     protected String appID;
-    protected String server;
-    protected String homedir;
-    protected String scratchdir;
-    protected List<String> harborHosts = new ArrayList<String>();
-    protected String skahaUsersGroup;
-    protected String skahaAdminsGroup;
     
     public SessionAction() {
-        server = System.getenv("skaha.hostname");
-        homedir = System.getenv("skaha.homedir");
-        scratchdir = System.getenv("skaha.scratchdir");
-        String harborHostList = System.getenv("skaha.harborhosts");
-        harborHosts = Arrays.asList(harborHostList.split(" "));
-        skahaUsersGroup = System.getenv("skaha.usersgroup");
-        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
-        log.debug("skaha.hostname=" + server);
-        log.debug("skaha.homedir=" + homedir);
-        log.debug("skaha.scratchdir=" + scratchdir);
-        log.debug("skaha.harborHosts=" + harborHostList);
-        log.debug("skaha.usersgroup=" + skahaUsersGroup);
-        log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        super();
     }
     
     @Override
@@ -148,49 +120,7 @@ public abstract class SessionAction extends RestAction {
     }
 
     protected void initRequest() throws AccessControlException, IOException {
-        
-        final Subject subject = AuthenticationUtil.getCurrentSubject();
-        log.debug("Subject: " + subject);
-        
-        if (subject == null || subject.getPrincipals().isEmpty()) {
-            throw new AccessControlException("Unauthorized");
-        }
-        Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
-        if (httpPrincipals.isEmpty()) {
-            throw new AccessControlException("No HTTP Principal");
-        }
-        userID = httpPrincipals.iterator().next().getName();
-        
-        // ensure user is a part of the skaha group
-        if (skahaUsersGroup == null) {
-            throw new IllegalStateException("skaha.usersgroup not defined in system properties");
-        }
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
-        GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
-        GroupURI membershipGroup = null;
-        try {
-            membershipGroup = new GroupURI(skahaUsersGroup);
-            CredUtil.checkCredentials();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        if (!gmsClient.isMember(membershipGroup)) {
-            throw new AccessControlException("Not authorized to use the skaha system");
-        }
-        
-        if (skahaAdminsGroup == null) {
-            log.warn("skaha.adminsgroup not defined in system properties");
-        } else {
-            try {
-                GroupURI adminMembershipGroup = new GroupURI(skahaAdminsGroup);
-                if (gmsClient.isMember(adminMembershipGroup)) {
-                    adminUser = true;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
+        super.initRequest();
         
         String path = syncInput.getPath();
         log.debug("request path: " + path);
@@ -229,7 +159,7 @@ public abstract class SessionAction extends RestAction {
         return buffer.toString("UTF-8");
     }
     
-    protected static String execute(String[] command) throws IOException, InterruptedException {
+    public static String execute(String[] command) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         int status = p.waitFor();
         log.debug("Status=" + status + " for command: " + Arrays.toString(command));
@@ -327,6 +257,64 @@ public abstract class SessionAction extends RestAction {
         writer.flush();
         writer.close();
         return tmpFileName;
+    }
+    
+    public List<Session> getAllSessions(String forUserID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        String[] getSessionsCMD = new String[] {
+            "kubectl", "get", "--namespace", k8sNamespace, "pod",
+            "--selector=canfar-net-userid=" + forUserID,
+            "--no-headers=true",
+            "-o", "custom-columns=" +
+                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+                "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "STATUS:.status.phase," +
+                "NAME:.metadata.labels.canfar-net-sessionName," +
+                "STARTED:.status.startTime," +
+                "DELETION:.metadata.deletionTimestamp"};
+                
+        String vncSessions = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + vncSessions);
+        
+        List<Session> sessions = new ArrayList<Session>();
+        
+        if (StringUtil.hasLength(vncSessions)) {
+            String[] lines = vncSessions.split("\n");
+            for (String line : lines) {
+                Session session = constructSession(line);
+                sessions.add(session);
+            }
+        }
+        
+        return sessions;
+    }
+    
+    protected Session constructSession(String k8sOutput) throws IOException {
+        log.debug("line: " + k8sOutput);
+        String[] parts = k8sOutput.split("\\s+");
+        String id = parts[0];
+        String type = parts[1];
+        String status = parts[2];
+        String name = parts[3];
+        String startTime = "Up since " + parts[4];
+        String deletionTimestamp = parts[5];
+        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+            status = Session.STATUS_TERMINATING;
+        }
+        String host = K8SUtil.getHostName();
+        String connectURL = "unknown";
+        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
+            connectURL = SessionAction.getVNCURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            connectURL = SessionAction.getCartaURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+            connectURL = SessionAction.getNotebookURL(host, id);
+        }
+
+        return new Session(id, type, status, name, startTime, connectURL);
+        
     }
     
 }

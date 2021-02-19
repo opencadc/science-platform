@@ -6,17 +6,17 @@ skaha is a Java servlet implementation offering a REST API to all skaha function
 
 ```
 gradle clean build
-docker build -t skaha-tomcat:latest -f Dockerfile .
+docker build -t skaha-tomcat:0.3 -f Dockerfile .
 ```
 
 ## checking it
 ```
-docker run -it --rm skaha-tomcat:latest /bin/bash
+docker run -it --rm skaha-tomcat:0.3 /bin/bash
 ```
 
 ## running it
 ```
-docker run -d --rm skaha-tomcat:latest
+docker run -d --rm skaha-tomcat:0.3
 ```
 
 ## configuration

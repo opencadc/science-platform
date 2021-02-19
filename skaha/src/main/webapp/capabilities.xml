@@ -6,33 +6,33 @@
 
   <capability standardID="ivo://ivoa.net/std/VOSI#capabilities">
     <interface xsi:type="vs:ParamHTTP" role="std">
-      <accessURL use="full">http://replace.me.com/skaha/capabilities</accessURL>
+      <accessURL use="full">https://replace.me.com/skaha/capabilities</accessURL>
     </interface>
   </capability>
 
   <capability standardID="ivo://ivoa.net/std/VOSI#availability">
     <interface xsi:type="vs:ParamHTTP" role="std">
-      <accessURL use="full">http://replace.me.com/skaha/availability</accessURL>
+      <accessURL use="full">https://replace.me.com/skaha/availability</accessURL>
     </interface>
   </capability>
   
   <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Logging#control-1.0">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="full">http://replace.me.com/skaha/logControl</accessURL>
+      <accessURL use="full">https://replace.me.com/skaha/logControl</accessURL>
     </interface>
   </capability>
 
   <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">http://replace.me.com/skaha/session</accessURL>
+      <accessURL use="base">https://replace.me.com/skaha</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#cookie"/>
     </interface>
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">https://replace.me.com/skaha/session</accessURL>
+      <accessURL use="base">https://replace.me.com/skaha</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#tls-with-certificate"/>
     </interface>
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">https://replace.me.com/skaha/session</accessURL>
+      <accessURL use="base">https://replace.me.com/skaha</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>

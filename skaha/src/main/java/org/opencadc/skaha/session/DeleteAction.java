@@ -65,7 +65,7 @@
 ************************************************************************
 */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -73,6 +73,7 @@ import ca.nrc.cadc.util.StringUtil;
 import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 /**
  *

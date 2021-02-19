@@ -36,17 +36,17 @@
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.skaha.GetAction</param-value> 
+             <param-value>org.opencadc.skaha.session.GetAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <init-param>
              <param-name>post</param-name>
-             <param-value>org.opencadc.skaha.PostAction</param-value> 
+             <param-value>org.opencadc.skaha.session.PostAction</param-value> 
              <!-- <param-value>org.opencadc.platform.docker.DockerPost</param-value> -->
          </init-param>
          <init-param>
              <param-name>delete</param-name>
-             <param-value>org.opencadc.skaha.DeleteAction</param-value>
+             <param-value>org.opencadc.skaha.session.DeleteAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerDelete</param-value> -->
          </init-param>
          <init-param>
@@ -56,6 +56,28 @@
          <init-param>
              <param-name>skaha-admin-group</param-name>
              <param-value>ivo://cadc.nrc.ca/gms-proto?skaha-admins</param-value>
+         </init-param>
+         <load-on-startup>2</load-on-startup>
+    </servlet>
+    
+    <servlet>
+         <servlet-name>ContextServlet</servlet-name>
+         <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+         <init-param>
+             <param-name>get</param-name>
+             <param-value>org.opencadc.skaha.context.GetAction</param-value> 
+             <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
+         </init-param>
+         <load-on-startup>2</load-on-startup>
+    </servlet>
+    
+    <servlet>
+         <servlet-name>ImageServlet</servlet-name>
+         <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+         <init-param>
+             <param-name>get</param-name>
+             <param-value>org.opencadc.skaha.image.GetAction</param-value> 
+             <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
@@ -89,8 +111,13 @@
     </servlet-mapping>
     
     <servlet-mapping>
-        <servlet-name>SessionServlet</servlet-name>
-        <url-pattern>/auth-session/*</url-pattern>
+        <servlet-name>ContextServlet</servlet-name>
+        <url-pattern>/context/*</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>ImageServlet</servlet-name>
+        <url-pattern>/image/*</url-pattern>
     </servlet-mapping>
         
     <servlet-mapping>

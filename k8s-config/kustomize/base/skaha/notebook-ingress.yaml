@@ -4,6 +4,7 @@ metadata:
   name: notebook-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /notebook/$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   rules:
   - host: ws-uv.canfar.net
