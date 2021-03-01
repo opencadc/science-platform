@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: reg-tomcat
+  name: reg-tomcat
+  namespace: skaha-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: reg-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: reg-tomcat
+    spec:
+      containers:
+      - name: reg-tomcat
+        image: canfar-registry.cloud.computecanada.ca/reg:0.1
+        imagePullPolicy: Always
+        #imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 91
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+          limits:
+            memory: "8Gi"
+            cpu: "2"
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/usr/share/tomcat/config"
+          name: config-volume
+        - mountPath: "/config"
+          name: tomcat-config-volume
+      volumes:
+      - name: config-volume
+        configMap:
+          name: reg-config
+      - name: tomcat-config-volume
+        configMap:
+          name: reg-tomcat-config

@@ -83,15 +83,19 @@ import java.net.URL;
 import java.security.AccessControlException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.opencadc.gms.GroupClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.GroupUtil;
+import org.opencadc.skaha.image.Image;
 
 public abstract class SkahaAction extends RestAction {
     
@@ -186,6 +190,16 @@ public abstract class SkahaAction extends RestAction {
     }
     
     protected String getIdToken() throws Exception {
+        
+        log.debug("checking public credentials for idToken");
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        if (subject != null) {
+            Set<IDToken> idTokens = subject.getPublicCredentials(IDToken.class);
+            if (!idTokens.isEmpty()) {
+                log.debug("returning idToken from public credentials");
+                return idTokens.iterator().next().idToken;
+            }
+        }
         log.debug("verfifying delegated credentials");
         if (!CredUtil.checkCredentials()) {
             throw new IllegalStateException("cannot access delegated credentials");
@@ -202,6 +216,116 @@ public abstract class SkahaAction extends RestAction {
         }
         String idToken = out.toString();
         log.debug("idToken: " + idToken);
+        // adding to public credentials
+        IDToken tokenClass = new IDToken();
+        tokenClass.idToken = idToken;
+        subject.getPublicCredentials().add(tokenClass);
+        
         return idToken;
+    }
+    
+    public Image getImage(String imageID) throws Exception {
+        String idToken = getIdToken();
+
+        log.debug("get image: " + imageID);
+        int firstSlash = imageID.indexOf("/");
+        int secondSlash = imageID.indexOf("/", firstSlash + 1);
+        int colon = imageID.lastIndexOf(":");
+        String harborHost = imageID.substring(0, firstSlash);
+        String project = imageID.substring(firstSlash + 1, secondSlash);
+        String repo = imageID.substring(secondSlash + 1, colon);
+        String version = imageID.substring(colon + 1);
+        log.debug("host: " + harborHost);
+        log.debug("project: " + project);
+        log.debug("repo: " + repo);
+        log.debug("version: " + version);
+        
+        String artifacts = callHarbor(idToken, harborHost, project, repo);
+        
+        JSONArray jArtifacts = new JSONArray(artifacts);
+
+        for (int a=0; a<jArtifacts.length(); a++) {
+            JSONObject jArtifact = jArtifacts.getJSONObject(a);
+            
+            if (!jArtifact.isNull("tags")) {
+                JSONArray tags = jArtifact.getJSONArray("tags");
+                for (int j=0; j<tags.length(); j++) {
+                    JSONObject jTag = tags.getJSONObject(j);
+                    String tag = jTag.getString("name");
+                    if (version.equals(tag)) {
+                        if (!jArtifact.isNull("labels")) {
+                            String digest = jArtifact.getString("digest");
+                            JSONArray labels = jArtifact.getJSONArray("labels");
+                            String type = getTypeFromLabels(labels);
+                            if (type != null) {
+                                return new Image(imageID, type, digest);
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+        
+        
+        return null;
+    }
+    
+    protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
+        
+        URL harborURL = null;
+        String message = null;
+        if (project == null) {
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects");
+            message = "projects";
+        } else if (repo == null) {
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories");
+            message = "repositories";
+        } else {
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
+                + repo + "/artifacts?detail=true&with_label=true");
+            message = "artifacts";
+        }
+        
+        OutputStream out = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(harborURL, out);
+        get.setRequestProperty("Authorization", "Bearer " + idToken);
+        log.debug("calling " + harborURL + " for " + message);
+        get.run();
+        log.debug("response code: " + get.getResponseCode());
+     
+        if (get.getThrowable() != null) {
+            log.warn("error listing harbor " + message, get.getThrowable());
+            throw new RuntimeException(get.getThrowable());
+        }
+
+        String output = out.toString();
+        log.debug(message + " output: " + output);
+        return output;
+        
+    }
+    
+    protected String getTypeFromLabels(JSONArray labels) {
+        Set<String> types = new HashSet<String>();
+        for (int i=0; i<labels.length(); i++) {
+            JSONObject label = labels.getJSONObject(i);
+            String name = label.getString("name");
+            log.debug("label: " + name);
+            if (name != null && SESSION_TYPES.contains(name)) {
+                types.add(name);
+            }
+        }
+        if (types.size() == 1) {
+            return types.iterator().next();
+        }
+        return null;
+    }
+    
+    /**
+     * Temporary holder of tokens until cadc-util auth package with Token
+     * support released.
+     */
+    class IDToken {
+        public String idToken;
     }
 }
