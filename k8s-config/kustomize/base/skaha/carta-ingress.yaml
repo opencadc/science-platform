@@ -7,7 +7,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   rules:
-  - host: rc-uv.canfar.net
+  - host: ws-uv.canfar.net
     http:
       paths:
       - path: /carta(/|$)(.*)

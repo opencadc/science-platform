@@ -7,8 +7,6 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
-    canfar-net-cores: "${software.cores}"
-    canfar-net-ram: "${software.ram}"
   name: "${skaha.jobname}"
 spec:
   template:
@@ -43,11 +41,11 @@ spec:
         #imagePullPolicy: Never
         resources:
           requests:
-            memory: "${software.ram}"
-            cpu: "${software.cores}"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
           limits:
-            memory: "${software.ram}"
-            cpu: "${software.cores}"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
         ports:
         - containerPort: 5901
           protocol: TCP
@@ -72,8 +70,8 @@ spec:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-          user: kanfarnetes_dev
+          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+          user: keel_prod
           secretRef:
             name: cephfs-cephx-key
           readOnly: false          

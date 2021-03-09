@@ -8,7 +8,7 @@ metadata:
 spec:
   tls:
   - hosts:
-    - proto.canfar.net
+    - ws-uv.canfar.net
     secretName: canfar-net-cert-secret
   rules:
   - host: proto.canfar.net

@@ -18,7 +18,7 @@ skaha supports two types of containers: `session containers` and `software conta
 
 Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
 
-For detailed information about the skaha service REST API, refer to the [skaha API documentation](https://rc-uv.canfar.net/skaha "skaha").
+For detailed information about the skaha service REST API, refer to the [skaha API documentation](https://ws-uv.canfar.net/skaha "skaha").
 
 <a name="building"></a>
 ## Building skaha containers
@@ -73,7 +73,7 @@ skaha runs a instance of the [Harbor](https://goharbor.io/) opensource project a
 
 If you have logged into harbor before then step 1 can be skipped.
 
-1. Go to https://harbor.canfar.net
+1. Go to https://images.canfar.net
 2. Press the `Login with OIDC Provider` button.
 3. Enter your CADC username and password.
 4. When prompter for a harbor userid, use your CADC userid.
@@ -85,7 +85,7 @@ After these steps you now have a harbor account and can see the projects through
 2. Set your CLI secret -- this is the password to use for `docker login` commands.  You can copy the existing, generated secret, or 'upload' (enter) your own.
 3. From the computer on which you have built the docker image you wish to publish, do a docker login:
 
-```docker login harbor.canfar.net```
+```docker login images.canfar.net```
 
 Your userid is your CADC userid, and your password the value of the CLI Secret mentioned above.
 
@@ -96,7 +96,7 @@ Your userid is your CADC userid, and your password the value of the CLI Secret m
 
 2. Tag the image for harbor:
 
-```docker tag <IMAGE ID> harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>``` 
+```docker tag <IMAGE ID> images.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>``` 
 
 where:
    * `<PROJECT>` is the project to which you've been granted Developer access.
@@ -105,11 +105,11 @@ where:
    
 3. Push the image to harbor, with:
 
-```docker push harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>```
+```docker push images.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>```
 
 ### Step 4: Label your image type
 
-1. Go back to https://harbor.canfar.net
+1. Go back to https://images.canfar.net
 2. Click on your project, then on your newly pushed image (also called a repository in harbor).
 3. Select the 'artifact' with the correct version (tag).
 4. Under the 'Actions' drop-down, apply the approripate label to the artifact.
@@ -118,13 +118,13 @@ where:
 
 Once publishing and labeling has been completed, the image will be visible to skaha, which can be verified with this command:
 
-```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/image```
+```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/image```
 
 ## Listing resource contexts
 
 The available cores and RAM in skaha can be viewed with:
 
-```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/context```
+```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/context```
 
 <a name="launching"></a>
 ## Launching containers in skaha
@@ -133,13 +133,13 @@ The available cores and RAM in skaha can be viewed with:
 
 1. Use the CANFAR Science Platform Portal (TBD) or this curl command to launch your newly published image:
 
-```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/session -d "name=<arbitrary-name>" -d "image=harbor.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>"```
+```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/session -d "name=<arbitrary-name>" -d "image=images.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>"```
 
 If non-default values for cores and/or ram is preferred, the parameters `-d cores=<cores>` and `-d ram=<ram>` can be added to the session launching command above.
 
 2. Use the CANFAR Science Platform Portal (TBD) or this curl command to find the URL to your session:
 
-```curl -E <cadcproxy.pem> https://rc-uv.canfar.net/skaha/session```
+```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/session```
 
 If this is the first time this image has been launched in may take a few minutes for the cloud do retrieve the image from harbor.  If this is a `notebook` image you can see the JupyterLab view by changing the end of the URL from `tree` to `lab`.
 

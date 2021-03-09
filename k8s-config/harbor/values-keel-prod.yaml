@@ -430,9 +430,9 @@ ingress:
   ##
   hosts:
     #BM core: core.harbor.domain
-    core: images-rc.canfar.net
+    core: images.canfar.net
     #BM notary: notary.harbor.domain
-    notary: notary-rc.canfar.net
+    notary: images.canfar.net
   ## Set to the type of ingress controller if it has specific requirements.
   ## leave as `default` for most ingress controllers.
   ## set to `gce` if using the GCE ingress controller
@@ -464,7 +464,7 @@ ingress:
 ##
 #BM externalURL: https://core.harbor.domain
 #externalURL: https://harbor.canfar.net/
-externalURL: https://images-rc.canfar.net
+externalURL: https://images.canfar.net
 
 ## SecurityContext configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/

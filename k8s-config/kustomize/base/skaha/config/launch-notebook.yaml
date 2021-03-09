@@ -43,6 +43,38 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
+#      - name: init-lab
+#        image: ${software.imageid}
+#        securityContext:
+#          runAsUser: ${skaha.posixid}
+#          runAsGroup: ${skaha.posixid}
+#        command: ["/opt/conda/bin/jupyter", "lab", "build"]
+#        env:
+#        - name: JUPYTER_TOKEN
+#          value: "${skaha.sessionid}"
+#        - name: JUPYTER_CONFIG_DIR
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTER_PATH
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTERLAB_DIR
+#          value: "/cavern/home/${skaha.userid}/skaha-lab"
+#        - name: NB_USER
+#          value: "${skaha.userid}"
+#        - name: NB_UID
+#          value: "${skaha.posixid}"
+#        - name: HOME
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: PWD
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: XDG_CACHE_HOME
+#          value: "/cavern/home/${skaha.userid}"
+#        volumeMounts:
+#        - mountPath: "/cavern"
+#          name: cavern-volume
+#          subPath: "cavern"
+#        - mountPath: /var/lib/sss/pipes
+#          name: sssd-dir
+#          readOnly: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -56,6 +88,8 @@ spec:
           value: "/cavern/home/${skaha.userid}"
         - name: JUPYTER_PATH
           value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTERLAB_DIR
+#          value: "/cavern/home/${skaha.userid}/skaha-lab"
         - name: NB_USER
           value: "${skaha.userid}"
         - name: NB_UID
@@ -72,6 +106,7 @@ spec:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
           - --NotebookApp.notebook_dir=/cavern/home/${skaha.userid} 
           - --NotebookApp.allow_origin="*"
+          - --NotebookApp.extra_nbextensions_pathList=/home/jovyan:/cavern/home/${skaha.userid}
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
@@ -103,8 +138,8 @@ spec:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-          user: kanfarnetes_dev
+          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+          user: keel_prod
           secretRef:
             name: cephfs-cephx-key
           readOnly: false          
