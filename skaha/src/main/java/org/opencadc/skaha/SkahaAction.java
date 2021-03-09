@@ -69,6 +69,7 @@ package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.client.LocalAuthority;
@@ -147,7 +148,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("Subject: " + subject);
         
         if (subject == null || subject.getPrincipals().isEmpty()) {
-            throw new AccessControlException("Unauthorized");
+            throw new NotAuthenticatedException("Unauthorized");
         }
         Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
         if (httpPrincipals.isEmpty()) {
