@@ -17,6 +17,10 @@ paths:
       responses:
         '200':
           description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '500':
           description: Internal error
         '503':
@@ -78,6 +82,10 @@ paths:
           description: Successful response
         '400':
           description: If the image is not found
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '404':
           description: If the image ID format is incorrect
         '500':
@@ -101,6 +109,10 @@ paths:
       responses:
         '200':
           description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '500':
           description: Internal error
         '503':
@@ -132,6 +144,10 @@ paths:
       responses:
         '200':
           description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '500':
           description: Internal error
         '503':
@@ -147,6 +163,10 @@ paths:
       responses:
         '200':
           description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '500':
           description: Internal error
         '503':
@@ -168,6 +188,10 @@ paths:
       responses:
         '200':
           description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
         '500':
           description: Internal error
         '503':
