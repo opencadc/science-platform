@@ -8,6 +8,5 @@ configMapGenerator:
   files:
   - config/catalina.properties
   - config/Cavern.properties
-  - config/LocalAuthority.properties
 generatorOptions:
  disableNameSuffixHash: true
