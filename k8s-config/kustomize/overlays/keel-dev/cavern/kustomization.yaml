@@ -4,6 +4,7 @@ namespace: skaha-system
 patchesStrategicMerge:
 - cavern-tomcat-deployment.yaml
 - cavern-sshd-deployment.yaml
+- cavern-ingress.yaml
 configMapGenerator:
 - name: cavern-config
   behavior: merge

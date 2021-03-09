@@ -3,6 +3,10 @@ bases:
 namespace: skaha-system
 patchesStrategicMerge:
 - skaha-tomcat-deployment.yaml
+- carta-ingress.yaml
+- desktop-ingress.yaml
+- notebook-ingress.yaml
+- skaha-ingress.yaml
 configMapGenerator:
 - name: skaha-config
   behavior: merge
