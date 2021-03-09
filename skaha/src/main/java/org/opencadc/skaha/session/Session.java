@@ -79,6 +79,7 @@ public class Session {
     private static final Logger log = Logger.getLogger(Session.class);
     
     public static final String STATUS_TERMINATING = "Terminating";
+    public static final String STATUS_SUCCEEDED = "Succeeded";
     
     private String id;
     private String type;

@@ -6,17 +6,17 @@ skaha is a Java servlet implementation offering a REST API to all skaha function
 
 ```
 gradle clean build
-docker build -t skaha-tomcat:0.3 -f Dockerfile .
+docker build -t bucket.canfar.net/skaha-tomcat:latest -f Dockerfile .
 ```
 
 ## checking it
 ```
-docker run -it --rm skaha-tomcat:0.3 /bin/bash
+docker run -it --rm bucket.canfar.net/skaha-tomcat:latest /bin/bash
 ```
 
 ## running it
 ```
-docker run -d --rm skaha-tomcat:0.3
+docker run -d --rm bucket.canfar.net/skaha-tomcat:latest
 ```
 
 ## configuration
@@ -59,3 +59,13 @@ python = canfar-registry.cloud.computecanada.ca/arcade-python:latest
 ### launch-novnc.yaml and launch-software.yaml
 
 These two kubernetes job configuration files are templates used by skaha to run desktop sessions and science containers.  See the examples in src/examples.
+
+## apply version tags
+```bash
+. VERSION && echo "tags: $TAGS" 
+for t in $TAGS; do
+   docker image tag bucket.canfar.net/skaha-tomcat:latest bucket.canfar.net/skaha-tomcat:$t
+done
+unset TAGS
+docker image list bucket.canfar.net/skaha-tomcat
+```
