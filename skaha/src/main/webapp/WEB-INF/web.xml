@@ -16,7 +16,6 @@
                   org.opencadc.skaha
                   ca.nrc.cadc.rest
                   ca.nrc.cadc.util
-                  ca.nrc.cadc.vosi
                   ca.nrc.cadc.db
             </param-value>
         </init-param>
