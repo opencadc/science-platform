@@ -14,6 +14,10 @@ configMapGenerator:
   - config/catalina.properties
   - config/k8s-resources.properties
   - config/skaha-software.properties
+  - config/launch-carta.yaml
+  - config/launch-notebook.yaml
+  - config/launch-novnc.yaml
+  - config/launch-software.yaml
 - name: skaha-wsproxy-config
   behavior: merge
   files:
