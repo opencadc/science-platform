@@ -7,8 +7,6 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
-    canfar-net-cores: "${software.cores}"
-    canfar-net-ram: "${software.ram}"
   name: "${skaha.jobname}"
 spec:
   template:
