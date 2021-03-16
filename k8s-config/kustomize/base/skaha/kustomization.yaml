@@ -19,9 +19,6 @@ configMapGenerator:
   - config/launch-software.yaml
   - config/skaha-software.properties
   - config/k8s-resources.properties
-- name: start-desktop-software
-  files:
-  - config/start-desktop-software.sh
 - name: skaha-wsproxy-config
   files:
   - config/k8s-config

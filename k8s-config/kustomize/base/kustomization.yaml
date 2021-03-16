@@ -3,3 +3,4 @@ bases:
 - ./cavern
 - ./sssd
 - ./skaha
+- ./desktop-software
