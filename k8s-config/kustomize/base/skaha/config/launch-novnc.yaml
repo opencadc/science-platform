@@ -22,6 +22,12 @@ spec:
       #restartPolicy: Never
       imagePullSecrets:
       - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups:
+        - ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
         env:
