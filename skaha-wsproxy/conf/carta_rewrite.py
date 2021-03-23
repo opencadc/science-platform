@@ -8,7 +8,7 @@ class CartaRewrite(skaha_rewrite.Rewrite):
     def __init__(self, log_file_fqn):
         super(CartaRewrite, self).__init__(log_file_fqn)
 
-    def _build_url(self, segs, path, session_id, ip_address, params):
+    def _build_url(self, segs, path, scheme, session_id, ip_address, params):
         port = '6901'
         bport = '5901'
 

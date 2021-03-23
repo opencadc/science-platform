@@ -467,7 +467,7 @@ public class PostAction extends SessionAction {
         // create new secret
         String[] createCmd = new String[] {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
-             "--docker-server=harbor.canfar.net",
+             "--docker-server=" + harborHost,
              "--docker-username=" + harborUsername,
              "--docker-password=" + cliSecret};
         String createResult = execute(createCmd);

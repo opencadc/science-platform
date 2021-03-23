@@ -42,4 +42,7 @@ ADD conf/ssl.conf /etc/httpd/conf.d/
 ADD conf/index.html /var/www/html/
 RUN mkdir /root/kube
 
+RUN mkdir /skaha
+RUN chmod 777 /skaha
+
 EXPOSE 8080

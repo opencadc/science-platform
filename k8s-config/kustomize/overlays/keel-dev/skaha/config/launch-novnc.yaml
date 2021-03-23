@@ -22,6 +22,12 @@ spec:
       #restartPolicy: Never
       imagePullSecrets:
       - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups:
+        - ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -44,11 +50,11 @@ spec:
         #imagePullPolicy: Never
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.25"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
           limits:
-            memory: "256Gi"
-            cpu: "16"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
         ports:
         - containerPort: 5901
           protocol: TCP

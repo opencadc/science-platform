@@ -190,7 +190,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/tree";
+        return "https://" + host + "/notebook/" + sessionID + "/lab";
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)

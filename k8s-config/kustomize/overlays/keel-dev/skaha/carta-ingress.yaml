@@ -1,9 +1,9 @@
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: notebook-ingress
+  name: carta-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /notebook/$2
+    nginx.ingress.kubernetes.io/rewrite-target: /carta/$2
     nginx.ingress.kubernetes.io/proxy-body-size: 100g
     nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
     nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
@@ -11,10 +11,10 @@ metadata:
     nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
-  - host: ws-uv.canfar.net
+  - host: rc-uv.canfar.net
     http:
       paths:
-      - path: /notebook(/|$)(.*)
+      - path: /carta(/|$)(.*)
         backend:
           serviceName: skaha-wsproxy-svc
           servicePort: 8080

@@ -24,9 +24,10 @@ spec:
         - name: "${software.imagesecret}"
       securityContext:
         runAsUser: ${skaha.posixid} 
-#        runAsGroup: 100
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
+        supplementalGroups:
+        - 100
       initContainers:
       - name: init-python-dir
         image: busybox
@@ -43,6 +44,38 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
+#      - name: init-lab
+#        image: ${software.imageid}
+#        securityContext:
+#          runAsUser: ${skaha.posixid}
+#          runAsGroup: ${skaha.posixid}
+#        command: ["/opt/conda/bin/jupyter", "lab", "build"]
+#        env:
+#        - name: JUPYTER_TOKEN
+#          value: "${skaha.sessionid}"
+#        - name: JUPYTER_CONFIG_DIR
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTER_PATH
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTERLAB_DIR
+#          value: "/cavern/home/${skaha.userid}/skaha-lab"
+#        - name: NB_USER
+#          value: "${skaha.userid}"
+#        - name: NB_UID
+#          value: "${skaha.posixid}"
+#        - name: HOME
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: PWD
+#          value: "/cavern/home/${skaha.userid}"
+#        - name: XDG_CACHE_HOME
+#          value: "/cavern/home/${skaha.userid}"
+#        volumeMounts:
+#        - mountPath: "/cavern"
+#          name: cavern-volume
+#          subPath: "cavern"
+#        - mountPath: /var/lib/sss/pipes
+#          name: sssd-dir
+#          readOnly: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -56,6 +89,8 @@ spec:
           value: "/cavern/home/${skaha.userid}"
         - name: JUPYTER_PATH
           value: "/cavern/home/${skaha.userid}"
+#        - name: JUPYTERLAB_DIR
+#          value: "/cavern/home/${skaha.userid}/skaha-lab"
         - name: NB_USER
           value: "${skaha.userid}"
         - name: NB_UID
@@ -71,17 +106,21 @@ spec:
         args:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
           - --NotebookApp.notebook_dir=/cavern/home/${skaha.userid} 
+# Using / for notebook_dir results in a lot of permission denied and directory '' not found.
+#          - --NotebookApp.notebook_dir=/cavern
           - --NotebookApp.allow_origin="*"
+# The following needs to be a 'list'
+#          - --NotebookApp.extra_nbextensions_path=/home/jovyan:/cavern/home/${skaha.userid}
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.25"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
           limits:
-            memory: "256Gi"
-            cpu: "16"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
         ports:
         - containerPort: 8888
           protocol: TCP

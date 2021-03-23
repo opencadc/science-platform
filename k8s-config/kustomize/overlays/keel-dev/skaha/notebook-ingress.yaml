@@ -11,7 +11,7 @@ metadata:
     nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
-  - host: ws-uv.canfar.net
+  - host: rc-uv.canfar.net
     http:
       paths:
       - path: /notebook(/|$)(.*)
