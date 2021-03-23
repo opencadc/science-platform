@@ -11,7 +11,7 @@ spec:
         - name: skaha.hostname
           value: rc-uv.canfar.net
         - name: skaha.harborhosts
-          value: "harbor.canfar.net images-rc.canfar.net images.canfar.net"
+          value: "images-rc.canfar.net images.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
         - name: skaha.adminsgroup

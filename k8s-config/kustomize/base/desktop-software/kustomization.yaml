@@ -1,0 +1,7 @@
+namespace: skaha-workload
+configMapGenerator:
+- name: start-desktop-software
+  files:
+  - config/start-desktop-software.sh
+generatorOptions:
+ disableNameSuffixHash: true
