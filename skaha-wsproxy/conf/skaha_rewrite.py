@@ -93,7 +93,7 @@ class Rewrite(object):
         self._log_file = open(log_fqn, 'a')
         self._cache = TTLCache(maxsize=max_size, ttl=ttl)
 
-    def _build_url(self, segs, path, session_id, ip_address, params):
+    def _build_url(self, segs, path, scheme, session_id, ip_address, params):
         raise NotImplementedError
 
     def _get_ip_for_session(self, session_id):
@@ -134,7 +134,7 @@ class Rewrite(object):
                 return session_ip_address
 
     def _get_redirect(self, from_stdin):
-        self.log('DEBUG: proxying carta session')
+        self.log('DEBUG: proxying session')
         self.log('DEBUG: from_stdin=' + from_stdin)
         if from_stdin is None:
             self.log('WARN: no from_stdin')
@@ -147,6 +147,9 @@ class Rewrite(object):
         segs = path.split('/')
         self.log('DEBUG: len(segs): {}'.format(str(len(segs))))
 
+        scheme = params[1]
+        self.log('DEBUG: scheme: {}'.format(scheme))
+
         session_id = segs[2]
         self.log('DEBUG: session_id={}'.format(session_id))
 
@@ -156,7 +159,7 @@ class Rewrite(object):
             self.log('WARN: IP Address not found')
             return None
 
-        return self._build_url(segs, path, session_id, ip_address, params)
+        return self._build_url(segs, path, scheme, session_id, ip_address, params)
 
     def listen(self):
         try:

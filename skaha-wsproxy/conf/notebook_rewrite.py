@@ -8,7 +8,7 @@ class NotebookRewrite(skaha_rewrite.Rewrite):
     def __init__(self, log_file_fqn):
         super(NotebookRewrite, self).__init__(log_file_fqn)
 
-    def _build_url(self, segs, path, session_id, ip_address, params):
+    def _build_url(self, segs, path, scheme, session_id, ip_address, params):
         query_string = None
         if len(params) > 2:
             query_string = params[2].strip()
@@ -20,7 +20,7 @@ class NotebookRewrite(skaha_rewrite.Rewrite):
         end_of_path = path[(idx+8):]
         self.log('DEBUG: end_of_path: {}'.format(end_of_path))
 
-        if len(segs) > 4 and segs[3] == 'api' and segs[4] == 'kernels':
+        if (len(segs) > 4 and segs[3] == 'api' and segs[4] == 'kernels') or ('websocket' in path):
             if query_string:
                 ret = 'ws{}{}{}?{}'.format(
                   address, session_id, end_of_path, query_string)

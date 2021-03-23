@@ -5,6 +5,10 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /notebook/$2
     nginx.ingress.kubernetes.io/proxy-body-size: 100g
+    nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
+    nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
+    nginx.org/proxy-read-timeout: 3600s
+    nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
   - host: rc-uv.canfar.net
