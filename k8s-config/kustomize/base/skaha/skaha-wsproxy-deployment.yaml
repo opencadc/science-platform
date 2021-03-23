@@ -16,7 +16,7 @@ spec:
         run: skaha-wsproxy
     spec:
       containers:
-        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.2
+        - image: canfar-registry.cloud.computecanada.ca/skaha-wsproxy:0.3
           env:
             - name: skaha.hostname
               value: rc-uv.canfar.net
