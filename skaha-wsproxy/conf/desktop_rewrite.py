@@ -8,7 +8,7 @@ class DesktopRewrite(skaha_rewrite.Rewrite):
     def __init__(self, log_file_fqn):
         super(DesktopRewrite, self).__init__(log_file_fqn)
 
-    def _build_url(self, segs, path, session_id, ip_address, params):
+    def _build_url(self, segs, path, scheme, session_id, ip_address, params):
         port = '6901'
         ret = 'http://{}:{}/?password={}/'.format(ip_address, port, session_id)
         self.log('DEBUG: Segs[3]: {}'.format(segs[3]))
