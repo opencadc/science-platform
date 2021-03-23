@@ -194,18 +194,14 @@ public class PostAction extends SessionAction {
                 // create an app
                 
                 // gather job parameters
-                String software = syncInput.getParameter("software");
-                String targetIP = syncInput.getParameter("target-ip");
+                String image = syncInput.getParameter("image");
                 List<String> params = syncInput.getParameters("param");
                 
-                if (software == null) {
-                    throw new IllegalArgumentException("Missing parameter 'software'");
-                }
-                if (targetIP == null) {
-                    throw new IllegalArgumentException("Missing parameter 'target-ip'");
+                if (image == null) {
+                    throw new IllegalArgumentException("Missing parameter 'image'");
                 }
                 
-                attachSoftware(software, params, targetIP);
+                attachSoftware(image, params);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
@@ -341,18 +337,44 @@ public class PostAction extends SessionAction {
 
     }
     
-    public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
+    public void attachSoftware(String image, List<String> params) throws Exception {
         
-        log.debug("attaching software: " + software + " to " + targetIP);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
-        // TODO: Ensure session at targetIP is of type desktop
+        // Get the IP address based on the session
+        String[] getIPCommand = new String[] {
+            "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
+                "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"};
+        String ipResult = execute(getIPCommand);
+        log.debug("GET IP result: " + ipResult);
         
-        String name = confirmSoftware(software);
+        String targetIP = null;
+        String[] ipLines = ipResult.split("\n");
+        for (String ipLine : ipLines) {
+            log.debug("ipLine: " + ipLine);
+            String[] parts = ipLine.split("\\s+");
+            if (log.isDebugEnabled()) {
+                for (String part : parts) {
+                    log.debug("part: " + part);
+                }
+            }
+            if (parts.length > 1 && parts[1].trim().equals("<none>")) {
+                targetIP = parts[0].trim();
+            }
+        }
+        
+        if (targetIP == null) {
+            throw new ResourceNotFoundException("session " + sessionID + " not found");
+        }
+        
+        log.debug("attaching software: " + image + " to " + targetIP);
+        
+        String name = confirmSoftware(image);
         
         String imageSecret = "notused";
         for (String harborHost : harborHosts) {
-            if (software.startsWith(harborHost)) {
-                imageSecret = getHarborSecret(software);            
+            if (image.startsWith(harborHost)) {
+                imageSecret = getHarborSecret(image);            
             }
         }
         log.debug("image secret: " + imageSecret);
@@ -378,12 +400,10 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
-        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, software);
+        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        
         String launchFile = super.stageFile(launchString);
-        
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
         String[] launchCmd = new String[] {
             "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
