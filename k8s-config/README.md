@@ -8,9 +8,15 @@ This module contains the prototype deployment configuration of skaha and cavern 
 
 Notes under an installation step indicate that configuration values must be changed to match the specifics of the kubernetes install.
 
+### prerequisites
+
+The following supporting applications must be installed:
+   * `git`
+   * `helm` is needed to install pods from harbour
+
 ### namespaces
 
-The following namespaces are in use for cavern and skaha installation
+Namespaces represent different parts of kubernetes where pods run, and can have different permissions, etc. The following namespaces are in use for cavern and skaha installation:
    * skaha-system - for system services (deployments)
    * skaha-workload - for user sessions and applications (jobs)
    * cadc-harbor - for harbor
@@ -20,7 +26,7 @@ The following namespaces are in use for cavern and skaha installation
 
 Installation of cavern, skaha, and sssh is done with kustomize.
 
-1. gather the values for all the secrets and place them in the associated kustomize dir.
+1. First clone the skaha.git repo into the desired location on the target machine. A number of certificates and secrets are needed for the system to run, so these must be gathererd and placed in the associated kustomize directories:
 
 ```
 .
@@ -44,11 +50,11 @@ Installation of cavern, skaha, and sssh is done with kustomize.
 
 The file `/skaha/config/k8s-config` must be handled specially.  See skaha/README.md for details
 
-2. from k8s-config/kustomize, run: `kubectl apply -k .`
+2. from the `k8s-config/kustomize` directory, run: `kubectl apply -k .` to apply the configuration. This command can also be issue to update the config or certificates at at later date.
 
 ### site-specific configuration
 
-When overlays on kustomize are complete this section won't be needed.
+The following files contain configuration settings for the deployment:
 
 - cavern tomcat:
   - catalina.properties refers to hostname
@@ -63,6 +69,9 @@ When overlays on kustomize are complete this section won't be needed.
 - skaha wsproxy
   - ingress refers to hostname
   - python redirect scripts in images reference namespaces
+
+When overlays on kustomize are complete these files won't be needed.
+
 
 ## Network
 
