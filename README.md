@@ -9,9 +9,15 @@
   * [Deployment](#deployment)
 
 ## Overview
-skaha is a general purpose online platform for running science containers interactively.
+skaha is a general purpose online platform for running science containers interactively.  It is part of the CANFAR science platform for containers.
+
+![canfar-architecture](canfar-platform-architecture-0.1.png)
+
+CANFAR Platform Architecture
 
 ![skaha-architecture](skaha-architecture-0.2.png)
+
+Skaha architecture
 
 ## System Components
 
