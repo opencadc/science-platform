@@ -31,7 +31,7 @@ The skaha module provides the API for:
 - Creating skaha sessions from published container images
 - Launching container images to be displayed in desktop sessions
 
-The complete API of skaha can be viewed here: ![skaha-api][https://ws-uv.canfar.net/skaha]
+The complete API of skaha can be viewed here: https://ws-uv.canfar.net/skaha
 
 ### skaha-wsproxy
 skaha-wsproxy is an apache httpd container that proxies traffic to session containers.
