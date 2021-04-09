@@ -32,8 +32,7 @@ coreImage:
   ## It turns BASH and NAMI debugging in minideb
   ## ref:  https://github.com/bitnami/minideb-extras/#turn-on-bash-debugging
   ##
-  #BM debug: false
-  debug: true
+  debug: false
 
 ## Bitnami Harbor Portal image
 ## ref: https://hub.docker.com/r/bitnami/harbor-portal/tags/
@@ -1060,16 +1059,16 @@ core:
   ##
   livenessProbe:
     enabled: true
-    initialDelaySeconds: 20
-    periodSeconds: 10
-    timeoutSeconds: 5
+    initialDelaySeconds: 60
+    periodSeconds: 60
+    timeoutSeconds: 10
     failureThreshold: 6
     successThreshold: 1
   readinessProbe:
     enabled: true
-    initialDelaySeconds: 20
-    periodSeconds: 10
-    timeoutSeconds: 5
+    initialDelaySeconds: 60
+    periodSeconds: 60
+    timeoutSeconds: 10
     failureThreshold: 6
     successThreshold: 1
 
