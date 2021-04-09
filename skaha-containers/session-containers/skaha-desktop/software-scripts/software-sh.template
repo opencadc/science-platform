@@ -2,4 +2,4 @@
 
 IP_ADDRESS=`hostname --ip-address`
 
-/opt/shibboleth/bin/curl -v -L -k -E /cavern/home/${skaha_username}/.ssl/cadcproxy.pem -d "target-ip=${IP_ADDRESS}" -d "software=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/session/${VNC_PW}/app
+/opt/shibboleth/bin/curl -v -L -k -E /cavern/home/${skaha_username}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/session/${VNC_PW}/app
