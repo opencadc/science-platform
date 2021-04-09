@@ -93,7 +93,7 @@ paths:
         '503':
           description: Service busy
         default:
-          description: Unexpeced error
+          description: Unexpected error
   /session/{sessionID}:
     delete:
       description: |
@@ -118,7 +118,7 @@ paths:
         '503':
           description: Service busy
         default:
-          description: Unexpeced error
+          description: Unexpected error
   /session/{sessionID}/app:
     post:
       description: |
@@ -129,17 +129,12 @@ paths:
         - name: sessionID
           in: path
           type: string
-          description: The desktop session to display the desktop-app
+          description: The desktop session on which to attach the desktop-app
           required: true
-        - name: software
+        - name: image
           in: query
           type: string
           description: The imageID of the desktop-app to attach
-          required: true
-        - name: target-ip
-          in: query
-          type: string
-          description: The IP of the desktop session
           required: true
       responses:
         '200':
@@ -153,7 +148,7 @@ paths:
         '503':
           description: Service busy
         default:
-          description: Unexpeced error
+          description: Unexpected error
   /image:
     get:
       description: |
