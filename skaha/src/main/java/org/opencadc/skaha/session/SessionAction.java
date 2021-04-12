@@ -119,7 +119,7 @@ public abstract class SessionAction extends SkahaAction {
         return null;
     }
 
-    protected void initRequest() throws AccessControlException, IOException {
+    protected void initRequest() throws Exception {
         super.initRequest();
         
         String path = syncInput.getPath();
