@@ -1,12 +1,19 @@
 # skaha - A Container-based Science Platform in CANFAR
 
 #### Table of contents
+  * [Acknowledgements](#acknowledgements)
   * [Overview](#overview)
   * [System Components](#system-components)
   * [Session Containers](#session-containers)
   * [Software Containers](#software-containers)
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
+
+## Acknowledgements
+This project has been funded in part by:
+- The ALMA Cycle 7 development study with support from the National Radio Astronomy Observatory and the North American ALMA Science Centre
+- The CANARIE Research Software Program Competitive Funding Call 3: Research Software Platform Re-Use
+- The National Research Centre of Canada
 
 ## Overview
 skaha is a general purpose online platform for running science containers interactively.  It is part of the CANFAR science platform for containers.  In the architecture diagram below, skaha is the main API to the Science Platform.
