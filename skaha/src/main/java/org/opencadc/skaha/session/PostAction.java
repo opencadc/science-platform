@@ -85,6 +85,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 
+import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
@@ -107,6 +108,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
     public static final String SKAHA_USERID = "skaha.userid";
     public static final String SKAHA_POSIXID = "skaha.posixid";
+    public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
     public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
@@ -284,6 +286,8 @@ public class PostAction extends SessionAction {
             imageSecret = "notused";
         }
         
+        String supplementalGroups = getSupplementalGroupsList();
+        
         String launchPath = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
@@ -307,6 +311,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
@@ -380,6 +385,7 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
         
         String posixID = getPosixId();
+        String supplementalGroups = getSupplementalGroupsList();
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-software.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
@@ -400,6 +406,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        
@@ -472,7 +479,7 @@ public class PostAction extends SessionAction {
         String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
         String harborUsername = obj.getString("username");
         
-        String secretName = "harbor-secret-" + userID;
+        String secretName = "harbor-secret-" + userID.toLowerCase();
         
         // delete any old secret by this name
         String[] deleteCmd = new String[] {
@@ -496,5 +503,25 @@ public class PostAction extends SessionAction {
         return secretName;
         
     }
+    
+    private String getSupplementalGroupsList() {
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        Class c = (Class<List<Group>>)(Class<?>)List.class;
+        Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
+        if (groupCreds.size() == 1) {
+            List<Group> memberships = groupCreds.iterator().next();
+            log.debug("Adding " + memberships.size() + " supplemental groups");
+            if (memberships.size() > 0) {
+                StringBuilder sb = new StringBuilder();
+                for (Group g : memberships) {
+                    sb.append(g.gid).append(", ");
+                }
+                sb.setLength(sb.length() - 2);
+                return sb.toString();
+            }
+        }
+        return "";
+    }
+    
 
 }
