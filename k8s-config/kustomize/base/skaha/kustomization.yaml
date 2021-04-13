@@ -2,11 +2,6 @@ namespace: skaha-system
 resources:
 - skaha-tomcat-deployment.yaml
 - skaha-tomcat-expose.yaml
-- skaha-wsproxy-deployment.yaml
-- skaha-wsproxy-expose.yaml
-- carta-ingress.yaml
-- desktop-ingress.yaml
-- notebook-ingress.yaml
 - skaha-ingress.yaml
 configMapGenerator:
 - name: skaha-config
@@ -19,8 +14,7 @@ configMapGenerator:
   - config/launch-software.yaml
   - config/skaha-software.properties
   - config/k8s-resources.properties
-- name: skaha-wsproxy-config
-  files:
-  - config/k8s-config
+  - config/service-notebook.yaml
+  - config/ingress-notebook.yaml
 generatorOptions:
  disableNameSuffixHash: true
