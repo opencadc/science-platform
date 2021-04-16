@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: skaha-desktop-ingress-${skaha.sessionid}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /desktop/${skaha.sessionid}/$2
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/proxy-body-size: 100g
     nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
     nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
@@ -11,10 +11,10 @@ metadata:
     nginx.org/proxy-send-timeout: 3600s
 spec:
   rules:
-  - host: rc-uv.canfar.net
+  - host: ws-uv.canfar.net
     http:
       paths:
       - path: /desktop/${skaha.sessionid}(/|$)(.*)
         backend:
           serviceName: skaha-desktop-svc-${skaha.sessionid}
-          servicePort: 8080
+          servicePort: 6901
