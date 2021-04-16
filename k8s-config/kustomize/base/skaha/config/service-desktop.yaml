@@ -6,9 +6,8 @@ metadata:
     run: skaha-desktop-svc-${skaha.sessionid}
 spec:
   ports:
-  - port: 8080
+  - port: 6901
     protocol: TCP
     name: http-connection
-    targetPort: 6901
   selector:
     canfar-net-sessionID: ${skaha.sessionid}
