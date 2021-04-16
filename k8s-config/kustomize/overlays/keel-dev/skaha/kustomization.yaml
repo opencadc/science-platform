@@ -3,9 +3,6 @@ bases:
 namespace: skaha-system
 patchesStrategicMerge:
 - skaha-tomcat-deployment.yaml
-- carta-ingress.yaml
-- desktop-ingress.yaml
-- notebook-ingress.yaml
 - skaha-ingress.yaml
 configMapGenerator:
 - name: skaha-config
@@ -18,9 +15,11 @@ configMapGenerator:
   - config/launch-notebook.yaml
   - config/launch-novnc.yaml
   - config/launch-software.yaml
-- name: skaha-wsproxy-config
-  behavior: merge
-  files:
-  - config/k8s-config
+  - config/service-notebook.yaml
+  - config/ingress-notebook.yaml
+  - config/service-desktop.yaml
+  - config/ingress-desktop.yaml
+  - config/service-carta.yaml
+  - config/ingress-carta.yaml
 generatorOptions:
  disableNameSuffixHash: true
