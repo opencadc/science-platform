@@ -130,14 +130,23 @@ public class DeleteAction extends SessionAction {
     
     public void stopSession(String userID, String type, String sessionID) throws Exception {
         // kill the session specified by sessionID
-        log.debug("Stopping VNC session");
-        
-        String podName = K8SUtil.getJobName(sessionID, type, userID);
+        log.debug("Stopping " + type + " session: " + sessionID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
-        String[] stopVNCCmd = new String[] {
+        String ingressName = K8SUtil.getIngressName(sessionID, type);
+        String[] cmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace, "ingress", ingressName};
+        execute(cmd);
+        
+        String serviceName = K8SUtil.getServiceName(sessionID, type);
+        cmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace, "service", serviceName};
+        execute(cmd);
+        
+        String podName = K8SUtil.getJobName(sessionID, type, userID);
+        cmd = new String[] {
             "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
-        execute(stopVNCCmd);
+        execute(cmd);
         
     }
 }
