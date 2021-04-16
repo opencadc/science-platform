@@ -26,8 +26,7 @@ spec:
         runAsUser: ${skaha.posixid}
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
-        supplementalGroups:
-        - ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
       containers:
       - name: "${skaha.jobname}"
         env:
