@@ -288,50 +288,79 @@ public class PostAction extends SessionAction {
         
         String supplementalGroups = getSupplementalGroupsList();
         
-        String launchPath = null;
+        String jobLaunchPath = null;
+        String servicePath = null;
+        String ingressPath = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                launchPath = System.getProperty("user.home") + "/config/launch-novnc.yaml";
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-novnc.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-desktop.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-desktop.yaml";
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
-                launchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-carta.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-carta.yaml";
                 break;
             case SessionAction.SESSION_TYPE_NOTEBOOK:
-                launchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
-        byte[] launchBytes = Files.readAllBytes(Paths.get(launchPath));
-        String launchString = new String(launchBytes, "UTF-8");
+        byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
+        String jobLaunchString = new String(jobLaunchBytes, "UTF-8");
         
-        launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONNAME, name);
-        launchString = setConfigValue(launchString, SKAHA_JOBNAME, jobName);
-        launchString = setConfigValue(launchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-        launchString = setConfigValue(launchString, SKAHA_USERID, userID);
-        launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
-        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
-        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, type);
-        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
-        launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, cores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, cores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, ram.toString() + "G");
-
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram.toString() + "G");
         
-        String jsonLaunchFile = super.stageFile(launchString);
+        String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
           
         String[] launchCmd = new String[] {
             "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
-        log.debug("Create result: " + createResult);
+        log.debug("Create job result: " + createResult);
         
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();   
         injectProxyCert("/cavern/home", subject, userID, posixID);
+        
+        if (servicePath != null) {
+            byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
+            String serviceString = new String(serviceBytes, "UTF-8");
+            serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
+            jsonLaunchFile = super.stageFile(serviceString);
+            launchCmd = new String[] {
+                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            createResult = execute(launchCmd);
+            log.debug("Create service result: " + createResult);
+        }
+        
+        if (ingressPath != null) {
+            byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
+            String ingressString = new String(ingressBytes, "UTF-8");
+            ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            jsonLaunchFile = super.stageFile(ingressString);
+            launchCmd = new String[] {
+                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            createResult = execute(launchCmd);
+            log.debug("Create ingress result: " + createResult);
+        }
         
         // give the container a few seconds to initialize
         try {
