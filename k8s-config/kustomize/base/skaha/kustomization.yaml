@@ -16,5 +16,9 @@ configMapGenerator:
   - config/k8s-resources.properties
   - config/service-notebook.yaml
   - config/ingress-notebook.yaml
+  - config/service-desktop.yaml
+  - config/ingress-desktop.yaml
+  - config/service-carta.yaml
+  - config/ingress-carta.yaml
 generatorOptions:
  disableNameSuffixHash: true
