@@ -1,9 +1,8 @@
 
 NAME = images.canfar.net/skaha/desktop
-VERSION = 0.4
 
 build: dependencies Dockerfile
-	docker build -t $(NAME):$(VERSION) -f Dockerfile .
+	docker build -t $(NAME):latest -f Dockerfile .
 
 dependencies: clean init software resolutions
 
