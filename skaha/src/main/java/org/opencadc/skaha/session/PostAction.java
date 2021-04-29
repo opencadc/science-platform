@@ -405,11 +405,10 @@ public class PostAction extends SessionAction {
         
         String name = confirmSoftware(image);
         
-        String imageSecret = "notused";
-        for (String harborHost : harborHosts) {
-            if (image.startsWith(harborHost)) {
-                imageSecret = getHarborSecret(image);            
-            }
+        String imageSecret = getHarborSecret(image);            
+        log.debug("image secret: " + imageSecret);
+        if (imageSecret == null) {
+            imageSecret = "notused";
         }
         log.debug("image secret: " + imageSecret);
         
