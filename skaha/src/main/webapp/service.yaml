@@ -11,7 +11,7 @@ paths:
   /session:
     get:
       description: |
-        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>Type<br/>Status<br/>Name<br/>Connect URL<br/>StartTime<br/><br/>Valid types are 'desktop', 'carta', and 'notebook'.
+        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>Type<br/>Status<br/>Name<br/>Connect URL<br/>StartTime<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and 'headless'.
       tags:
         - Session Management
       responses:
@@ -31,12 +31,12 @@ paths:
       - name: type
         in: query
         type: string
-        description: Only show sessions of this type (desktop, notebook, or carta)
+        description: Only show sessions of this type (desktop, notebook, carta, or headless)
         required: false
       - name: status
         in: query
         type: string
-        description: Only show sessions with this status (Running, Terminating, or Pending)
+        description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
         required: false
     post:
       description: |
@@ -76,6 +76,24 @@ paths:
           type: string
           description: |
               For images that reside outside of the supported harbor registries, the type parameter must be provided.  This requires additional privileges.
+          required: false
+        - name: cmd
+          in: query
+          type: string
+          description: |
+              Only applies to session type 'headless'. Override the image entrypoint with this command.
+          required: false
+        - name: arg
+          in: query
+          type: string
+          description: |
+              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple values supported.
+          required: false
+        - name: env
+          in: query
+          type: string
+          description: |
+              Only applies to session type 'headless'. Add additional environment to the container. Format is key=value. Multiple values supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
           required: false
       responses:
         '200':
