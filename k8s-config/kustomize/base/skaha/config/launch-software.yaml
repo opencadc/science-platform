@@ -4,7 +4,8 @@ kind: Job
 metadata:
   name: "${software.jobname}"
 spec:
-  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 259200
+  ttlSecondsAfterFinished: 86400
   template:
     spec:
       restartPolicy: OnFailure
