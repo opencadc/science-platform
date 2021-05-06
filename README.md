@@ -1,6 +1,7 @@
 # skaha - A Container-based Science Platform in CANFAR
 
 #### Table of contents
+  * [Acknowledgements](#acknowledgements)
   * [Overview](#overview)
   * [System Components](#system-components)
   * [Session Containers](#session-containers)
@@ -8,40 +9,40 @@
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
 
-## Overview
-skaha is a general purpose online platform for running science containers interactively.
+## Acknowledgements
+This project has been funded in part by:
+- The ALMA Cycle 7 development study with support from the National Radio Astronomy Observatory and the North American ALMA Science Centre
+- The CANARIE Research Software Program Competitive Funding Call 3: Research Software Platform Re-Use
+- The National Research Council Canada
 
-![skaha-architecture](skaha-architecture-0.2.png)
+## Overview
+skaha is a general purpose online platform for running science containers interactively.  It is part of the CANFAR science platform for containers.  In the architecture diagram below, skaha is the main API to the Science Platform.
+
+![canfar-architecture](canfar-platform-architecture-0.2.png)
+
+The CANFAR Science Platform Architecture.  Skaha is the API to the Science Platform box.
 
 ## System Components
 
 Components of skaha are containers that can be scaled out on a cluster of nodes to meet the storage and processing demands of the scientific software containers.
 
 ### skaha
-The skaha module provides the API for creating skaha sessions and launching applications within that session.  It is a Java war file running in tomcat 8 in a container.
+The skaha module provides the API for:
+- Listing published container images that the calling user is allowed to run
+- Creating skaha sessions from published container images
+- Launching container images to be displayed in desktop sessions
 
-### skaha-wsproxy
-skaha-wsproxy is an apache httpd container whose job is to proxy NoVNC traffic to the containers running NoVNC sessions.
+The complete API of skaha can be viewed here: https://ws-uv.canfar.net/skaha
 
 ## Session Containers
 
-More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
-
-### skaha-desktop
-skaha-desktop is a container representing a skaha session.  It is a NoVNC implementation, forked and modified from the ConSol project:  https://github.com/ConSol/docker-headless-vnc-container.
-The current implementation of skaha-desktop as a NoVNC container may be replaced with another technology at some point.
-
-### skaha-carta
-skaha-carta is container installation of Carta 1.3 Remote.  It is another type of session supported in skaha.  Other session types can be added to skaha.
-
-### skaha-notebook
-skaha-notebook is a Jupyter notebook session with which we are currently experimenting and prototyping.
+Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
 
 ## Software Containers
 
-More information on software containers can be found in the [Skaha Containers](skaha-containers) directory.
-
 These are some of the astronomy science containers that have been built for skaha.  They run as applications within skaha.  The graphical aspects of the containers are displayed in skaha-desktop by sending the DISPLAY to skaha-desktop.
+
+More information on software containers can be found in the [Skaha Containers](skaha-containers) directory.
 
 ## Dependencies
 
@@ -49,11 +50,8 @@ skaha relies on a number of other opencadc modules to operate.
 * registry (reg) web service (https://github.com/opencadc/reg) -- A registry service will be used to read the capabilities and locations of other web services used by skaha.
 * access control (ac) web service (https://github.com/opencadc/ac) -- If the IdentityManager implementation is configured to use cadc-access-control-server for authentication an operational ac web service is required to be running.
 * credential delegation (cdp) web service (https://github.com/opencadc/cdp) -- The cdp service is used to obtain users' delegated proxy certificates.
-* cavern -- skaha is greatly complimented by running cavern along side it.  (https://github.com/opencadc/vos/tree/master/cavern).  cavern is a vospace implementation where both the data and metadata are based on the contents of a file system.  If the software-containers have access to the cavern file system the contents of that file system can be accessed and shared through the cavern web service.
-* posix/sssd -- skaha-desktop and software-containers are run with a SSSD configuration that must point to the same LDAP instance as is used by ac.  When users interact with cavern on the file system the permissions are enforced according to the group membership contained in the LDAP instace.
+* cavern -- skaha is complimented by having the cavern VOSpace implementation mounted as a shared POSIX file system.  (https://github.com/opencadc/vos/tree/master/cavern).  cavern is a vospace implementation where both the data and metadata are based on the contents of a file system.  If the software-containers have access to the cavern file system the contents of that file system can be accessed and shared through the cavern web service.
+* posix/sssd -- Containers in skaha are always run _as the user_ and with the users' group memberships.  If skaha-desktop and software-containers are run with a SSSD configuration that points to the same LDAP instance as used by ac, the names of those uids and gids can be resolved.
 
 ## Deployment
-The current implementation targets a Kubernetes deployment.
-
-On session and application launch, skaha will interact with kubernetes to manifest these entities.  Two kubernetes configuration files are required for these operations.  Examples of these files can be found in skaha/src/examples.  The variables in these files are replaced by skaha at runtime.
-
+skaha runs on kubernetes.  See the k8s-config directory for deployment specifics.

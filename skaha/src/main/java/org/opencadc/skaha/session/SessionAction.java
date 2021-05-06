@@ -119,7 +119,7 @@ public abstract class SessionAction extends SkahaAction {
         return null;
     }
 
-    protected void initRequest() throws AccessControlException, IOException {
+    protected void initRequest() throws Exception {
         super.initRequest();
         
         String path = syncInput.getPath();
@@ -180,17 +180,15 @@ public abstract class SessionAction extends SkahaAction {
         //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        return "https://" + host + "/desktop/" + sessionID + "/connect?password=" + sessionID +
-            "&path=desktop/" + sessionID + "/websockify";
+        return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
     }
     
     public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/carta/" + sessionID + "/?socketUrl=wss://" + host + "/carta/" +
-            sessionID + "/socket/";
+        return "https://" + host + "/carta/http/" + sessionID + "/?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
     }
     
     public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/tree";
+        return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
     }
     
     protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)

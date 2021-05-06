@@ -32,8 +32,7 @@ coreImage:
   ## It turns BASH and NAMI debugging in minideb
   ## ref:  https://github.com/bitnami/minideb-extras/#turn-on-bash-debugging
   ##
-  #BM debug: false
-  debug: true
+  debug: false
 
 ## Bitnami Harbor Portal image
 ## ref: https://hub.docker.com/r/bitnami/harbor-portal/tags/
@@ -432,7 +431,7 @@ ingress:
     #BM core: core.harbor.domain
     core: images.canfar.net
     #BM notary: notary.harbor.domain
-    notary: images.canfar.net
+    notary: notary.canfar.net
   ## Set to the type of ingress controller if it has specific requirements.
   ## leave as `default` for most ingress controllers.
   ## set to `gce` if using the GCE ingress controller
@@ -499,7 +498,8 @@ persistence:
       ## Specify the "storageClass" used to provision the volume.
       ## Set it to "-" to disable dynamic provisioning
       ##
-      storageClass: "csi-cinder-sc-retain"
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
       #BM subPath: ""
       subPath: "harbor-registry"
       accessMode: ReadWriteOnce
@@ -512,7 +512,8 @@ persistence:
       ## Specify the "storageClass" used to provision the volume.
       ## Set it to "-" to disable dynamic provisioning
       ##
-      storageClass: "csi-cinder-sc-retain"
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
       #BM subPath: ""
       subPath: "harbor-jobservice"
       accessMode: ReadWriteOnce
@@ -525,16 +526,17 @@ persistence:
       ## Specify the "storageClass" used to provision the volume.
       ## Set it to "-" to disable dynamic provisioning
       ##
-      storageClass: "csi-cinder-sc-retain"
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
       #BM subPath: ""
       subPath: "harbor-chartmuseum"
       accessMode: ReadWriteOnce
       size: 40Gi
     trivy:
       #existingClaim: "harbor-pvc"
-      storageClass: "csi-cinder-sc-retain"
-      #BM accessMode: ReadWriteOnce
-      accessMode: ReadWriteMany
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
+      accessMode: ReadWriteOnce
       size: 40Gi
 
   ## Define which storage backend is used for registry and chartmuseum to store
@@ -1057,16 +1059,16 @@ core:
   ##
   livenessProbe:
     enabled: true
-    initialDelaySeconds: 20
-    periodSeconds: 10
-    timeoutSeconds: 5
+    initialDelaySeconds: 60
+    periodSeconds: 60
+    timeoutSeconds: 10
     failureThreshold: 6
     successThreshold: 1
   readinessProbe:
     enabled: true
-    initialDelaySeconds: 20
-    periodSeconds: 10
-    timeoutSeconds: 5
+    initialDelaySeconds: 60
+    periodSeconds: 60
+    timeoutSeconds: 10
     failureThreshold: 6
     successThreshold: 1
 
@@ -2250,7 +2252,8 @@ redis:
   ##
   #BM Added persistence section below
   peristence:
-    storageClass: "csi-cinder-sc-retain"
+    #storageClass: "csi-cinder-sc-retain"
+    storageClass: ""
     #existingClaim: "harbor-pvc"
     accessModes:
       - ReadWriteMany
@@ -2261,14 +2264,16 @@ redis:
     persistence:
       enabled: true
       #BM Added lines below
-      storageClass: "csi-cinder-sc-retain"
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
       #existingClaim: "harbor-pvc"
       subPath: harbor-redis
   slave:
     persistence:
       enabled: true
       #BM Added lines below
-      storageClass: "csi-cinder-sc-retain"
+      #storageClass: "csi-cinder-sc-retain"
+      storageClass: ""
       #existingClaim: "harbor-pvc"
       subPath: harbor-redis
 
@@ -2304,7 +2309,8 @@ postgresql:
   persistence:
     enabled: true
     #BM - added 3 new attrs below
-    storageClass: "csi-cinder-sc-retain"
+    #storageClass: "csi-cinder-sc-retain"
+    storageClass: ""
     #existingClaim: "harbor-pvc"
     subPath: harbor-postgresql
   ## PostgreSQL initdb initdbScripts

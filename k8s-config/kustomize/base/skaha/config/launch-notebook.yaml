@@ -24,9 +24,9 @@ spec:
         - name: "${software.imagesecret}"
       securityContext:
         runAsUser: ${skaha.posixid} 
-#        runAsGroup: 100
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
+        supplementalGroups: [100, ${skaha.supgroups}]
       initContainers:
       - name: init-python-dir
         image: busybox
@@ -105,8 +105,11 @@ spec:
         args:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
           - --NotebookApp.notebook_dir=/cavern/home/${skaha.userid} 
+# Using / for notebook_dir results in a lot of permission denied and directory '' not found.
+#          - --NotebookApp.notebook_dir=/cavern
           - --NotebookApp.allow_origin="*"
-          - --NotebookApp.extra_nbextensions_pathList=/home/jovyan:/cavern/home/${skaha.userid}
+# The following needs to be a 'list'
+#          - --NotebookApp.extra_nbextensions_path=/home/jovyan:/cavern/home/${skaha.userid}
         #imagePullPolicy: IfNotPresent
         imagePullPolicy: Always
         #imagePullPolicy: Never

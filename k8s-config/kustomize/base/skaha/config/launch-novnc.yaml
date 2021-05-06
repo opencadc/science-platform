@@ -7,8 +7,6 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
-    canfar-net-cores: "${software.cores}"
-    canfar-net-ram: "${software.ram}"
   name: "${skaha.jobname}"
 spec:
   template:
@@ -24,6 +22,11 @@ spec:
       #restartPolicy: Never
       imagePullSecrets:
       - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
       containers:
       - name: "${skaha.jobname}"
         env:

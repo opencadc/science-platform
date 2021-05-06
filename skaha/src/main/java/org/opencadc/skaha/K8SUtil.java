@@ -83,6 +83,15 @@ public class K8SUtil {
         return "skaha-" + type + "-" + userID.toLowerCase() + "-" + sessionID;
     }
     
+    //skaha-notebook-svc-rdcc0219
+    public static String getServiceName(String sessionID, String type) {
+        return "skaha-" + type + "-svc-" + sessionID;
+    }
+    
+    public static String getIngressName(String sessionID, String type) {
+        return "skaha-" + type + "-ingress-" + sessionID;
+    }
+    
     public static String getHomeDir() {
         return System.getenv("skaha.homedir");
     }

@@ -67,6 +67,9 @@
 
 package org.opencadc.skaha;
 
+import ca.nrc.cadc.ac.Group;
+import ca.nrc.cadc.ac.Role;
+import ca.nrc.cadc.ac.client.GMSClient;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
@@ -77,7 +80,6 @@ import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
@@ -93,9 +95,7 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.opencadc.gms.GroupClient;
 import org.opencadc.gms.GroupURI;
-import org.opencadc.gms.GroupUtil;
 import org.opencadc.skaha.image.Image;
 
 public abstract class SkahaAction extends RestAction {
@@ -142,7 +142,7 @@ public abstract class SkahaAction extends RestAction {
         return null;
     }
 
-    protected void initRequest() throws AccessControlException, IOException {
+    protected void initRequest() throws Exception {
         
         final Subject subject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + subject);
@@ -163,30 +163,41 @@ public abstract class SkahaAction extends RestAction {
         }
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
-        GroupClient gmsClient = GroupUtil.getGroupClient(gmsSearchURI);
-        GroupURI membershipGroup = null;
+        
+        // get all the user's groups
+        if (!CredUtil.checkCredentials()) {
+            throw new IllegalStateException("cannot access delegated credentials");
+        }
+        GMSClient gmsClient = new GMSClient(gmsSearchURI);
+        List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
+        
+        Group skahaUsersGroupObj = null;
         try {
-            membershipGroup = new GroupURI(skahaUsersGroup);
-            CredUtil.checkCredentials();
+            skahaUsersGroupObj = new Group(new GroupURI(skahaUsersGroup));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        if (!gmsClient.isMember(membershipGroup)) {
+        
+        if (!memberships.contains(skahaUsersGroupObj)) {
             throw new AccessControlException("Not authorized to use the skaha system");
         }
         
+        Group skahaAdminGroupObj = null;
         if (skahaAdminsGroup == null) {
             log.warn("skaha.adminsgroup not defined in system properties");
         } else {
             try {
-                GroupURI adminMembershipGroup = new GroupURI(skahaAdminsGroup);
-                if (gmsClient.isMember(adminMembershipGroup)) {
+                skahaAdminGroupObj = new Group(new GroupURI(skahaAdminsGroup));
+                if (memberships.contains(skahaAdminGroupObj)) {
                     adminUser = true;
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
+        
+        // save group memberships in subject
+        subject.getPublicCredentials().add(memberships);
 
     }
     

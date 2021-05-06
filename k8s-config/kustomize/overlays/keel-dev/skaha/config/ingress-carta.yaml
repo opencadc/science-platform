@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: skaha-carta-ingress-${skaha.sessionid}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 100g
+    nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
+    nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
+    nginx.org/proxy-read-timeout: 3600s
+    nginx.org/proxy-send-timeout: 3600s
+spec:
+  rules:
+  - host: rc-uv.canfar.net
+    http:
+      paths:
+      - path: /carta/http/${skaha.sessionid}(/|$)(.*)
+        backend:
+          serviceName: skaha-carta-svc-${skaha.sessionid}
+          servicePort: 6901
+      - path: /carta/ws/${skaha.sessionid}(/|$)(.*)
+        backend:
+          serviceName: skaha-carta-svc-${skaha.sessionid}
+          servicePort: 5901

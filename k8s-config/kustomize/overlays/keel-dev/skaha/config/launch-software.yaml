@@ -11,6 +11,11 @@ spec:
       #restartPolicy: Never
       imagePullSecrets:
       - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]

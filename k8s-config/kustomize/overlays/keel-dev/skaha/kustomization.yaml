@@ -1,19 +1,25 @@
 bases:
 - ../../../base/skaha
+namespace: skaha-system
 patchesStrategicMerge:
-- cavern-skaha-deployment.yaml
+- skaha-tomcat-deployment.yaml
+- skaha-ingress.yaml
 configMapGenerator:
 - name: skaha-config
+  behavior: merge
   files:
   - config/catalina.properties
-  - config/LocalAuthority.properties
+  - config/k8s-resources.properties
+  - config/skaha-software.properties
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
   - config/launch-novnc.yaml
   - config/launch-software.yaml
-  - config/skaha-software.properties
-- name: skaha-wsproxy-config
-  files:
-  - config/k8s-config
+  - config/service-notebook.yaml
+  - config/ingress-notebook.yaml
+  - config/service-desktop.yaml
+  - config/ingress-desktop.yaml
+  - config/service-carta.yaml
+  - config/ingress-carta.yaml
 generatorOptions:
  disableNameSuffixHash: true
