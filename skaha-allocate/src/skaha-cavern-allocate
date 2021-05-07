@@ -95,7 +95,7 @@ chown -R $USERID:$USERID $HOMEDIR/.casa
 echo " Done"
 
 echo -n "  Adding user to skaha group..."
-curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$ARCADEGROUP/userMembers/$USERID?idType=http"
+curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERID?idType=http"
 echo " Done"
 
 TS=$(date)
