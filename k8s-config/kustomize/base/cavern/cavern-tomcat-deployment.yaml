@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: cavern-tomcat
-        image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:0.1
+        image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:0.2
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         resources:

@@ -105,8 +105,9 @@ public abstract class SkahaAction extends RestAction {
     protected static final String SESSION_TYPE_DESKTOP = "desktop";
     protected static final String SESSION_TYPE_CARTA = "carta";
     protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
+    protected static final String SESSION_TYPE_HEADLESS = "headless";
     protected static List<String> SESSION_TYPES = Arrays.asList(
-        new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK});
+        new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS});
     
     protected String userID;
     protected boolean adminUser = false;
