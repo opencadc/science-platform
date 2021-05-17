@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: cavern-tomcat
-  name: cavern-tomcat
+    run: arc-tomcat
+  name: arc-tomcat
 spec:
   replicas: 1
   selector:
     matchLabels:
-      run: cavern-tomcat
+      run: arc-tomcat
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: cavern-tomcat
+        run: arc-tomcat
     spec:
       containers:
-      - name: cavern-tomcat
+      - name: arc-tomcat
         image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:0.2.1
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
@@ -62,7 +62,7 @@ spec:
           readOnly: false
       - name: config-volume
         configMap:
-          name: cavern-config
+          name: arc-config
       - name: sssd-dir
         hostPath:
           path: /var/lib/ubernetes

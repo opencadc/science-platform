@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cavern-tomcat
+  name: arc-tomcat
 spec:
   template:
     spec:
       containers:
-      - name: cavern-tomcat
+      - name: arc-tomcat
       volumes:
       - name: cavern-ceph-volume
         cephfs:
