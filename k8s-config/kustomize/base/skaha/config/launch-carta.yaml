@@ -42,7 +42,7 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/arcade-carta /cavern /cavern/projects
+        - /carta/arcade-carta /arc /arc/projects
         imagePullPolicy: IfNotPresent
         resources:
           requests:
