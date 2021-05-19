@@ -2,14 +2,25 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "${software.jobname}"
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
 spec:
   activeDeadlineSeconds: 259200
   ttlSecondsAfterFinished: 86400
   template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
     spec:
-      restartPolicy: OnFailure
-      #restartPolicy: Never
+      restartPolicy: Never
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
@@ -18,40 +29,22 @@ spec:
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
       containers:
-      - name: "${software.containername}"
-        command: ["/skaha-system/start-desktop-software.sh"]
-        args:
-        - ${skaha.userid}
-        - ${software.containerparam}
-        env:
-        - name: HOME
-          value: "/arc/home/${skaha.userid}"
-        - name: DISPLAY
-          value: "${software.targetip}"
-        - name: GDK_SYNCHRONIZE
-          value: "1"
-        - name: SHELL
-          value: "/bin/bash"
+      - name: "${skaha.jobname}"
+        ${headless.image.bundle}
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
-        image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.25"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
           limits:
-            memory: "256Gi"
-            cpu: "16"
-        ports:
-        - containerPort: 6000
-          protocol: TCP
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
         volumeMounts:
-        - mountPath: "/skaha-system"
-          name: start-desktop-software
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -62,21 +55,17 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
-      - name: start-desktop-software
-        configMap:
-          name: start-desktop-software
-          defaultMode: 0777
       - name: cavern-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-          user: kanfarnetes_dev
+          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+          user: keel_prod
           secretRef:
             name: cephfs-cephx-key
-          readOnly: false          
+          readOnly: false
       - name: scratch-dir
         emptyDir: {}
       - name: sssd-dir

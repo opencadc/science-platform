@@ -35,8 +35,8 @@ spec:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
-        workingDir: "/cavern/home/${skaha.userid}"
-        imagePullPolicy: Always
+        workingDir: "/arc/home/${skaha.userid}"
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"
@@ -45,15 +45,12 @@ spec:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
         volumeMounts:
-        - mountPath: "/cavern/home"
+        - mountPath: "/arc"
           name: cavern-volume
-          subPath: "cavern/home"
+          subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
-        - mountPath: "/cavern/projects"
-          name: cavern-volume
-          subPath: "cavern/projects"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true

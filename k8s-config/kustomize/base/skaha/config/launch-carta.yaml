@@ -42,10 +42,8 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/arcade-carta /cavern /cavern/projects
-        #imagePullPolicy: IfNotPresent
-        imagePullPolicy: Always
-        #imagePullPolicy: Never
+        - /carta/arcade-carta /arc /arc/projects
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"
@@ -61,7 +59,7 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"

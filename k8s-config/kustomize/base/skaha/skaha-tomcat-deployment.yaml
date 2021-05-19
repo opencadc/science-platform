@@ -20,17 +20,16 @@ spec:
         - name: skaha.hostname
           value: ws-uv.canfar.net
         - name: skaha.homedir
-          value: /cavern
+          value: /arc/home
         - name: skaha.namespace
           value: skaha-workload
         - name: skaha.harborhosts
           value: "images.canfar.net"
-          #value: "harbor.canfar.net harbor-dev.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms-proto?skaha-admins"
-        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.7.1
+        image: canfar-registry.cloud.computecanada.ca/skaha-tomcat:0.7.2
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
@@ -50,7 +49,7 @@ spec:
         - mountPath: /root/.ssl/
           name: servops-cert
           readOnly: true
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: cavern-volume
           subPath: cavern
       securityContext:

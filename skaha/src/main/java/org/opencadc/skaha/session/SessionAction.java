@@ -191,11 +191,11 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
     }
     
-    protected void injectProxyCert(String baseHomeDir, final Subject subject, String userid, String posixID)
+    protected void injectProxyCert(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir
-        execute(new String[] {"mkdir", "-p", baseHomeDir + "/" + userid + "/.ssl"});
+        execute(new String[] {"mkdir", "-p", homedir + "/" + userid + "/.ssl"});
         
         // get the proxy cert
         Subject opsSubject = CredUtil.createOpsSubject();
@@ -219,7 +219,7 @@ public abstract class SessionAction extends SkahaAction {
         String tmpFileName = stageFile(proxyCert);
         String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
         execute(chown);
-        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, baseHomeDir + "/" + userid + "/.ssl/cadcproxy.pem"};
+        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
         execute(injectCert);
         
         
