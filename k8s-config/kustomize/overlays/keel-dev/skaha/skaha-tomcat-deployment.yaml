@@ -13,9 +13,9 @@ spec:
         - name: skaha.harborhosts
           value: "images-rc.canfar.net images.canfar.net"
         - name: skaha.usersgroup
-          value: "ivo://cadc.nrc.ca/gms-proto?skaha-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
-          value: "ivo://cadc.nrc.ca/gms-proto?skaha-admins"
+          value: "ivo://cadc.nrc.ca/gms?skaha-admins"
       serviceAccountName: skaha
       volumes:
       - name: cavern-volume
