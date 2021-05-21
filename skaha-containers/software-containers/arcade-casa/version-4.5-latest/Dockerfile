@@ -43,7 +43,7 @@ RUN cd /opt/admit && \
 
 # replace data repository with an up-to-date version for leap second fix (issue #33)
 RUN rm -rf /opt/${RELEASE}/data
-RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
+RUN ln -s /arc/projects/casa-data-repository/ /opt/${RELEASE}/data
 
 RUN mkdir /skaha
 ADD init.sh /skaha/
