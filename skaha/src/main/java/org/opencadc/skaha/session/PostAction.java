@@ -123,6 +123,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_REQUESTS_RAM = "software.requests.ram";
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
+    public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
 
     public PostAction() {
         super();
@@ -141,6 +142,9 @@ public class PostAction extends SessionAction {
                 String type = syncInput.getParameter("type");
                 String coresParam = syncInput.getParameter("cores");
                 String ramParam = syncInput.getParameter("ram");
+                String cmd = syncInput.getParameter("cmd");
+                List<String> args = syncInput.getParameters("arg");
+                List<String> envs = syncInput.getParameters("env");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
@@ -184,7 +188,7 @@ public class PostAction extends SessionAction {
                     }
                 }
                 
-                createSession(sessionID, validatedType, image, name, cores, ram);
+                createSession(sessionID, validatedType, image, name, cores, ram, cmd, args, envs);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -274,7 +278,8 @@ public class PostAction extends SessionAction {
         }
     }
     
-    public void createSession(String sessionID, String type, String image, String name, Integer cores, Integer ram) throws Exception {
+    public void createSession(String sessionID, String type, String image, String name,
+        Integer cores, Integer ram, String cmd, List<String> args, List<String> envs) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
@@ -307,11 +312,15 @@ public class PostAction extends SessionAction {
                 servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
                 break;
+            case SessionAction.SESSION_TYPE_HEADLESS:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
+                break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, "UTF-8");
+        String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name);
@@ -323,6 +332,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
+        jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
@@ -338,7 +348,7 @@ public class PostAction extends SessionAction {
         
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();   
-        injectProxyCert("/cavern/home", subject, userID, posixID);
+        injectProxyCert(subject, userID, posixID);
         
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
@@ -447,7 +457,7 @@ public class PostAction extends SessionAction {
         
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert("/cavern/home", subject, userID, posixID);
+        injectProxyCert(subject, userID, posixID);
     }
     
     private String getPosixId() {
@@ -549,6 +559,51 @@ public class PostAction extends SessionAction {
             }
         }
         return "";
+    }
+    
+    /**
+      Create the image, command, args, and env sections of the job launch yaml.  Example:
+      
+        image: "${software.imageid}"
+        command: ["/skaha-system/start-desktop-software.sh"]
+        args: [arg1, arg2]
+        env:
+        - name: HOME
+          value: "/cavern/home/${skaha.userid}"
+        - name: SHELL
+          value: "/bin/bash"   
+     */
+    private String getHeadlessImageBundle(String image, String cmd, List<String> args, List<String> envs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("image: \"").append(image).append("\"");
+        if (cmd != null) {
+            sb.append("\n        command: [\"").append(cmd).append("\"]");
+        }
+        if (args != null && !args.isEmpty()) {
+            sb.append("\n        args: [");
+            for (String arg : args) {
+                sb.append("\"").append(arg).append("\", ");
+            }
+            sb.setLength(sb.length() - 2);
+            sb.append("]");
+        }
+        sb.append("\n        env:");
+        sb.append("\n        - name: HOME");
+        sb.append("\n          value: \"").append(homedir).append(userID).append("\"");
+        if (envs != null && !envs.isEmpty()) {
+            for (String env : envs) {
+                String[] keyVal = env.split("=");
+                if (keyVal.length == 2) {
+                    sb.append("\n        - name: ").append(keyVal[0]);
+                    sb.append("\n          value: \"").append(keyVal[1]).append("\"");
+                } else {
+                    log.debug("invalid key/value env var: " + env);
+                }
+            }
+        }
+        
+        return sb.toString();
+
     }
     
 

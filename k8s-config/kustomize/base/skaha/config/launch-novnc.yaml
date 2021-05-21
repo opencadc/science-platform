@@ -9,6 +9,8 @@ metadata:
     canfar-net-userid: "${skaha.userid}"
   name: "${skaha.jobname}"
 spec:
+  activeDeadlineSeconds: 259200
+  ttlSecondsAfterFinished: 86400
   template:
     metadata:
       labels:
@@ -31,7 +33,7 @@ spec:
       - name: "${skaha.jobname}"
         env:
         - name: HOME
-          value: "/cavern/home/${skaha.userid}"
+          value: "/arc/home/${skaha.userid}"
         - name: VNC_PW
           value: "${skaha.sessionid}"
         - name: skaha_hostname
@@ -44,9 +46,7 @@ spec:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
         image: ${software.imageid}
-        #imagePullPolicy: IfNotPresent
-        imagePullPolicy: Always
-        #imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"
@@ -62,7 +62,7 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"

@@ -4,7 +4,8 @@ kind: Job
 metadata:
   name: "${software.jobname}"
 spec:
-  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 259200
+  ttlSecondsAfterFinished: 86400
   template:
     spec:
       restartPolicy: OnFailure
@@ -24,7 +25,7 @@ spec:
         - ${software.containerparam}
         env:
         - name: HOME
-          value: "/cavern/home/${skaha.userid}"
+          value: "/arc/home/${skaha.userid}"
         - name: DISPLAY
           value: "${software.targetip}"
         - name: GDK_SYNCHRONIZE
@@ -36,9 +37,8 @@ spec:
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
-        workingDir: "/cavern/home/${skaha.userid}"
-        imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
+        workingDir: "/arc/home/${skaha.userid}"
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "4Gi"
@@ -52,15 +52,12 @@ spec:
         volumeMounts:
         - mountPath: "/skaha-system"
           name: start-desktop-software
-        - mountPath: "/cavern/home"
+        - mountPath: "/arc"
           name: cavern-volume
-          subPath: "cavern/home"
+          subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
-        - mountPath: "/cavern/projects"
-          name: cavern-volume
-          subPath: "cavern/projects"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
