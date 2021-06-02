@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cavern-sshd
+  name: arc-sshd
 spec:
   template:
     spec:
       containers:
-      - name: cavern-sshd
+      - name: arc-sshd
       volumes:
       - name: cavern-ceph-volume
         cephfs:
