@@ -4,8 +4,10 @@ This container runs a script to create a skaha and cavern allocation for the giv
 
 ## building
 
+Update VERSION, then:
 ```
-docker build -t skaha-allocate:latest -f Dockerfile .
+docker build -t bucket.canfar.net/skaha-allocate:latest -f Dockerfile .
+./apply-version.sh
 ```
 ## configuration
 
