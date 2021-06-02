@@ -10,6 +10,9 @@ RUN dnf makecache -y \
 # system settings and permissions
 COPY src/nofiles.conf /etc/security/limits.d/
 
+# startup file, just writes to the console
+COPY src/init.sh /skaha/
+
 ## see https://bugzilla.redhat.com/show_bug.cgi?id=1773148
 RUN touch /etc/sudo.conf && echo "Set disable_coredump false" > /etc/sudo.conf
 
@@ -23,4 +26,4 @@ RUN unzip /usr/bin/topcat-full.jar -d /usr/bin topcat stilts
 RUN chmod 755 /usr/bin/topcat /usr/bin/stilts
 
 # Check STILTS version if applicable.
-CMD ["/usr/bin/stilts", "-version"]
+CMD ["/skaha/init.sh"]
