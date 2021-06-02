@@ -8,7 +8,7 @@ spec:
       containers:
       - name: arc-sshd
       volumes:
-      - name: cavern-ceph-volume
+      - name: arc-ceph-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789
