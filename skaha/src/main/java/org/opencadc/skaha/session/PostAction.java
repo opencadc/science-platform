@@ -348,7 +348,7 @@ public class PostAction extends SessionAction {
         
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();   
-        injectProxyCert("/cavern/home", subject, userID, posixID);
+        injectProxyCert(subject, userID, posixID);
         
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
@@ -457,7 +457,7 @@ public class PostAction extends SessionAction {
         
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert("/cavern/home", subject, userID, posixID);
+        injectProxyCert(subject, userID, posixID);
     }
     
     private String getPosixId() {
@@ -589,7 +589,7 @@ public class PostAction extends SessionAction {
         }
         sb.append("\n        env:");
         sb.append("\n        - name: HOME");
-        sb.append("\n          value: \"").append("/cavern/home/").append(userID).append("\"");
+        sb.append("\n          value: \"").append(homedir).append(userID).append("\"");
         if (envs != null && !envs.isEmpty()) {
             for (String env : envs) {
                 String[] keyVal = env.split("=");

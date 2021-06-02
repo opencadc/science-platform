@@ -70,12 +70,15 @@ package org.opencadc.skaha;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.ac.Role;
 import ca.nrc.cadc.ac.client.GMSClient;
+import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
+import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 
@@ -203,6 +206,11 @@ public abstract class SkahaAction extends RestAction {
     }
     
     protected String getIdToken() throws Exception {
+        LocalAuthority localAuthority = new LocalAuthority();
+        URI serviceURI = localAuthority.getServiceURI(Standards.SECURITY_METHOD_OAUTH.toString());
+        RegistryClient regClient = new RegistryClient();
+        URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
+        log.debug("using ac oauth endpoint: " + oauthURL);
         
         log.debug("checking public credentials for idToken");
         Subject subject = AuthenticationUtil.getCurrentSubject();
@@ -219,7 +227,7 @@ public abstract class SkahaAction extends RestAction {
         }
         
         log.debug("getting idToken from ac");
-        URL acURL = new URL("https://proto.canfar.net/ac/authorize?response_type=id_token&client_id=arbutus-harbor&scope=cli");
+        URL acURL = new URL(oauthURL.toString() + "?response_type=id_token&client_id=arbutus-harbor&scope=cli");
         OutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(acURL, out);
         get.run();
