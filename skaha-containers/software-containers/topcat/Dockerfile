@@ -23,6 +23,7 @@ ENV JAVA_OPTS="-Xms512m -Xmx2048m -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryE
 # For fixed versions you could use ftp://andromeda.star.bris.ac.uk/pub/star/topcat/vX.X/
 ADD http://www.starlink.ac.uk/topcat/topcat-full.jar /usr/bin/topcat-full.jar
 RUN unzip /usr/bin/topcat-full.jar -d /usr/bin topcat stilts
+RUN chmod 644 /usr/bin/topcat-full.jar
 RUN chmod 755 /usr/bin/topcat /usr/bin/stilts
 
 # Check STILTS version if applicable.
