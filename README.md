@@ -34,6 +34,8 @@ The skaha module provides the API for:
 
 The complete API of skaha can be viewed here: https://ws-uv.canfar.net/skaha
 
+The CANFAR Science Platform, a web interface to skaha, is here: https://www.canfar.net
+
 ## Session Containers
 
 Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
