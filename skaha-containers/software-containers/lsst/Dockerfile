@@ -11,6 +11,9 @@ RUN curl https://ds9.si.edu/download/centos7/ds9.centos7.8.2.1.tar.gz | tar -zx 
 # install the SSSD-CLIENT needed by Arcade ?
 RUN yum install -y sssd-client acl
 
+# need an xterm at least
+RUN yum -y install xterm 
+
 # system settings and permissions
 COPY src/nofiles.conf /etc/security/limits.d/
 
