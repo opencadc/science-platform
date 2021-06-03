@@ -1,6 +1,6 @@
 bases:
 - ./servops-clientcert
-- ./cavern
+- ./arc
 - ./sssd
 - ./skaha
 - ./desktop-software
