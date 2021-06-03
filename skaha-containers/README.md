@@ -28,9 +28,8 @@ Containers that are to run in skaha are required to meet rules documented in thi
 Containers must be based on a standard Linux distribution.
 
 #### SSSD
-Containers must have `sssd-client` and `acl` installed.
+For linux group id (gid) names to be resolved, the container must have `sssd-client` and `acl` installed, and must provide an nsswitch.conf file as described below.  If any of these are missing, only gids will be displayed (when `id` is typed for example), but file system authorization will continue to work as expected.
 
-#### nsswitch.conf
 The file /etc/nsswitch.conf must include the sss module in the passwd, shadow, and group entries.  For example:
 
 ```
@@ -114,15 +113,19 @@ where:
 3. Select the 'artifact' with the correct version (tag).
 4. Under the 'Actions' drop-down, apply the approripate label to the artifact.
 
+## Science Platform Portal
+
+A number of the steps below can be done using the CANFAR Science Platform Portal at https://www.canfar.net
+
 ## Listing images in skaha
 
-Once publishing and labeling has been completed, the image will be visible to skaha, which can be verified with this command:
+Once publishing and labeling has been completed, the image will be visible to skaha.  It can then be seen on the Science Platform Portal, or with the folowing command:
 
 ```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/image```
 
 ## Listing resource contexts
 
-The available cores and RAM in skaha can be viewed with:
+The available cores and RAM in skaha can be seein from the Science Platform Portal, or viewed with:
 
 ```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/context```
 
@@ -131,21 +134,23 @@ The available cores and RAM in skaha can be viewed with:
 
 ### Session containers
 
-1. Use the CANFAR Science Platform Portal (TBD) or this curl command to launch your newly published image:
+1. Use the Science Platform Portal or this curl command to launch your newly published image:
 
 ```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/session -d "name=<arbitrary-name>" -d "image=images.canfar.net/<PROJECT>/<MY IMAGE NAME>:<IMAGE VERSION>"```
 
 If non-default values for cores and/or ram is preferred, the parameters `-d cores=<cores>` and `-d ram=<ram>` can be added to the session launching command above.
 
-2. Use the CANFAR Science Platform Portal (TBD) or this curl command to find the URL to your session:
+2. Use the Science Platform Portal or this curl command to find the URL to your session:
 
 ```curl -E <cadcproxy.pem> https://ws-uv.canfar.net/skaha/session```
 
 If this is the first time this image has been launched in may take a few minutes for the cloud do retrieve the image from harbor.  If this is a `notebook` image you can see the JupyterLab view by changing the end of the URL from `tree` to `lab`.
 
-### Software containers
+### Software containers (for desktop sessions)
 
-(To be completed)
+Once a software container has been pushed to harbor, it must be labelled with `desktop-app`.
+
+To make it available in the Applications->Astro Software menu on the desktop, please make the request to support@canfar.net.  Note: this manual step will be automated soon so that `desktop-app` labelled images appear in the menu automatically.
 
 <a name="testing"></a>
 ## Testing
