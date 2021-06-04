@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cavern-tomcat
+  name: arc-sshd
 spec:
   template:
     spec:
       containers:
-      - name: cavern-tomcat
+      - name: arc-sshd
       volumes:
-      - name: cavern-ceph-volume
+      - name: arc-ceph-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789

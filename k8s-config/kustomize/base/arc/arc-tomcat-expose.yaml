@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cavern-tomcat-svc
+  name: arc-tomcat-svc
   labels:
-    run: cavern-tomcat-svc
+    run: arc-tomcat-svc
 spec:
   ports:
   - port: 8080
     protocol: TCP
     name: http-connection
   selector:
-    run: cavern-tomcat
+    run: arc-tomcat

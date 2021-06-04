@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: cavern-sshd
-  name: cavern-sshd
+    run: arc-sshd
+  name: arc-sshd
 spec:
   replicas: 1
   selector:
     matchLabels:
-      run: cavern-sshd
+      run: arc-sshd
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: cavern-sshd
+        run: arc-sshd
     spec:
       containers:
-      - name: cavern-sshd
+      - name: arc-sshd
         image: canfar-registry.cloud.computecanada.ca/cavern-sshd:latest
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
@@ -34,19 +34,19 @@ spec:
           protocol: TCP
         volumeMounts:
         - mountPath: "/cavern"
-          name: cavern-ceph-volume
+          name: arc-ceph-volume
           subPath: cavern
         - mountPath: /etc/ssh/sshd_config
-          name: cavern-sshd-config-vol
+          name: arc-sshd-config-vol
           subPath: sshd_config
         - mountPath: /etc/ssh/ssh_host_ecdsa_key.pub
-          name: cavern-sshd-config-vol
+          name: arc-sshd-config-vol
           subPath: ssh_host_ecdsa_key.pub
         - mountPath: /etc/ssh/ssh_host_ed25519_key.pub
-          name: cavern-sshd-config-vol
+          name: arc-sshd-config-vol
           subPath: ssh_host_ed25519_key.pub
         - mountPath: /etc/ssh/ssh_host_rsa_key.pub
-          name: cavern-sshd-config-vol
+          name: arc-sshd-config-vol
           subPath: ssh_host_rsa_key.pub
         - mountPath: /etc/ssh/ssh_host_ecdsa_key
           name: ssh-host-ecdsa-key
@@ -64,7 +64,7 @@ spec:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: cavern-ceph-volume
+      - name: arc-ceph-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789
@@ -75,20 +75,20 @@ spec:
           secretRef:
             name: cephfs-cephx-key
           readOnly: false
-      - name: cavern-sshd-config-vol
+      - name: arc-sshd-config-vol
         configMap:
-          name: cavern-sshd-config
+          name: arc-sshd-config
       - name: ssh-host-ecdsa-key
         secret:
-          secretName: cavern-sshd-priv1-secret
+          secretName: arc-sshd-priv1-secret
           defaultMode: 256
       - name: ssh-host-ed25519-key
         secret:
-          secretName: cavern-sshd-priv2-secret
+          secretName: arc-sshd-priv2-secret
           defaultMode: 256
       - name: ssh-host-rsa-key
         secret:
-          secretName: cavern-sshd-priv3-secret
+          secretName: arc-sshd-priv3-secret
           defaultMode: 256
       - name: sssd-dir
         hostPath:
