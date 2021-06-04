@@ -10,9 +10,6 @@ RUN dnf makecache -y \
 # system settings and permissions
 COPY src/nofiles.conf /etc/security/limits.d/
 
-# startup file, just writes to the console
-COPY src/init.sh /skaha/
-
 ## see https://bugzilla.redhat.com/show_bug.cgi?id=1773148
 RUN touch /etc/sudo.conf && echo "Set disable_coredump false" > /etc/sudo.conf
 
@@ -23,7 +20,15 @@ ENV JAVA_OPTS="-Xms512m -Xmx2048m -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryE
 # For fixed versions you could use ftp://andromeda.star.bris.ac.uk/pub/star/topcat/vX.X/
 ADD http://www.starlink.ac.uk/topcat/topcat-full.jar /usr/bin/topcat-full.jar
 RUN unzip /usr/bin/topcat-full.jar -d /usr/bin topcat stilts
+RUN chmod 644 /usr/bin/topcat-full.jar
 RUN chmod 755 /usr/bin/topcat /usr/bin/stilts
 
-# Check STILTS version if applicable.
-CMD ["/skaha/init.sh"]
+# Prepare a startup message.
+RUN mkdir -p /usr/share/topcat
+COPY src/msg.sh /usr/share/topcat
+RUN chmod 755 /usr/share/topcat/msg.sh
+RUN bash /usr/share/topcat/msg.sh /usr/bin/topcat-full.jar >/usr/share/topcat/msg.txt
+RUN echo "cat /usr/share/topcat/msg.txt" >/etc/bash.bashrc
+
+# Check TOPCAT version if applicable.
+CMD ["topcat", "-version"]
