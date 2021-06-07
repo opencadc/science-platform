@@ -9,28 +9,15 @@ RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	tkinter ImageMagick-c++ xterm perl autoconf python-sphinx graphviz
 
 # setup all required env variables
-ARG RELEASE
-ENV RELEASE=${RELEASE}
+ARG CASA_RELEASE
+ENV CASA_RELEASE=${CASA_RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
-ADD ${RELEASE}.tar.gz /opt/
+ADD ${CASA_RELEASE}.tar.gz /opt/
 
 # chown because the untarred casa has wrong owner/group
-RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
-
-# create the guest account
-#RUN groupadd -g 1001 guest
-#RUN useradd -m -g guest -u 1001 guest && \
-#    mkdir -p /home/guest/.ssl && \
-#    chown -R guest:guest /home/guest/.ssl
-#ENV HOME /home/guest
-#ENV USER guest
-
-# copy empty casa configs to avoid upgrade
-#ADD casa /home/guest/.casa
-
-#WORKDIR /home/guest
+RUN chown -R root:root /opt/${CASA_RELEASE} && ln -s /opt/${CASA_RELEASE} /opt/casa
 
 RUN yum install -y sssd-client acl
 
@@ -39,11 +26,11 @@ RUN yum install -y tcsh
 RUN mkdir /opt/admit
 ADD admit /opt/admit
 RUN cd /opt/admit && \
-    autoconf && ./configure --with-casa-root=/opt/${RELEASE}
+    autoconf && ./configure --with-casa-root=/opt/${CASA_RELEASE}
 
-# replace data repository with an up-to-date version for leap second fix (issue #33)
-RUN rm -rf /opt/${RELEASE}/data
-RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
+# Allow runtime symlink creation to the casa-data-repository
+RUN rm -rf /opt/${CASA_RELEASE}/data
+RUN chmod 777 /opt/${CASA_RELEASE}
 
 RUN mkdir /skaha
 ADD init.sh /skaha/
