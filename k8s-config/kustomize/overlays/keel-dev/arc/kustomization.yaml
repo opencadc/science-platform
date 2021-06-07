@@ -1,12 +1,12 @@
 bases:
-- ../../../base/cavern
+- ../../../base/arc
 namespace: skaha-system
 patchesStrategicMerge:
-- cavern-tomcat-deployment.yaml
-- cavern-sshd-deployment.yaml
-- cavern-ingress.yaml
+- arc-tomcat-deployment.yaml
+- arc-sshd-deployment.yaml
+- arc-ingress.yaml
 configMapGenerator:
-- name: cavern-config
+- name: arc-config
   behavior: merge
   files:
   - config/catalina.properties

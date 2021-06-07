@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cavern-sshd-svc
+  name: arc-sshd-svc
   labels:
-    run: cavern-sshd-svc
+    run: arc-sshd-svc
 spec:
   ports:
   - port: 64022
     protocol: TCP
-    name: cavern-ssh-port
+    name: arc-ssh-port
   selector:
-    run: cavern-sshd
+    run: arc-sshd
