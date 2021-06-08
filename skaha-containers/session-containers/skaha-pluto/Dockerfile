@@ -16,6 +16,7 @@ RUN chmod u+x /skaha/startup.sh
 
 # pre-install pluto
 RUN julia -e 'using Pkg; Pkg.add("Pluto")'
+EXPOSE 1234
 
 # nsswitch for correct sss lookup
 ADD src/nsswitch.conf /etc/
