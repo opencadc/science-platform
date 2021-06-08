@@ -40,7 +40,6 @@ Installation of cavern, skaha, and sssh is done with kustomize.
 ./servops-clientcert/cadcproxy.pem
 ./skaha
 ./skaha/config
-./skaha/config/k8s-config
 ./cavern
 ./cavern/sshd-certs
 ./cavern/sshd-certs/ssh_host_ed25519_key
@@ -48,30 +47,7 @@ Installation of cavern, skaha, and sssh is done with kustomize.
 ./cavern/sshd-certs/ssh_host_rsa_key
 ```
 
-The file `/skaha/config/k8s-config` must be handled specially.  See skaha/README.md for details
-
 2. from the `k8s-config/kustomize` directory, run: `kubectl apply -k .` to apply the configuration. This command can also be issue to update the config or certificates at at later date.
-
-### site-specific configuration
-
-The following files contain configuration settings for the deployment:
-
-- cavern tomcat:
-  - catalina.properties refers to hostname
-  - Cavern.properties refers to hostname
-  - cavern volume is installation specific
-  - cephfs path set to /cavern-dev
-- cavern ingress:
-  - ingress refers to hostname
-- skaha tomcat:
-  - catalina.properties refers to hostname
-  - cavern volume is installation specific
-- skaha wsproxy
-  - ingress refers to hostname
-  - python redirect scripts in images reference namespaces
-
-When overlays on kustomize are complete these files won't be needed.
-
 
 ## Network
 
