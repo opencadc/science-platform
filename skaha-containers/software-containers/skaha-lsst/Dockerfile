@@ -1,4 +1,4 @@
-FROM lsstsqre/centos:7-stack-lsst_distrib-v19_0_0
+FROM lsstsqre/centos:7-stack-lsst_distrib-v21_0_0
 USER root
 # install git-lfs using package cloud
 RUN yum -y install sudo.x86_64
@@ -24,6 +24,7 @@ RUN touch /etc/sudo.conf && echo "Set disable_coredump false" > /etc/sudo.conf
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
+COPY src/start_lsst.sh /etc/profile.d/
 
 USER lsst
 CMD [ "bash" ]
