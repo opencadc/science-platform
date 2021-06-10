@@ -455,6 +455,8 @@ public class PostAction extends SessionAction {
         String jobName = name.toLowerCase() + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         
+        String gpuScheduling = getGPUScheduling(0);
+        
         String launchString = new String(launchBytes, "UTF-8");
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
@@ -463,6 +465,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
+        launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        
@@ -624,25 +627,23 @@ public class PostAction extends SessionAction {
     }
     
     private String getGPUScheduling(Integer gpus) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("affinity:\n");
+        sb.append("          nodeAffinity:\n");
+        sb.append("            requiredDuringSchedulingIgnoredDuringExecution:\n");
+        sb.append("              nodeSelectorTerms:\n");
+        sb.append("              - matchExpressions:\n");
         if (gpus == null || gpus == 0) {
-            return "#no-gpus";
+            sb.append("                - key: nvidia.com/gpu.count\n");
+            sb.append("                  operator: DoesNotExist\n");
         } else {
-            StringBuilder sb = new StringBuilder();
-            sb.append("affinity:");
-            sb.append("  nodeAffinity:");
-            sb.append("    requiredDuringSchedulingIgnoredDuringExecution:");
-            sb.append("      nodeSelectorTerms:");
-            sb.append("      - matchExpressions:");
-            sb.append("        - key: nvidia.com/gpu.count");
-            sb.append("          operator: Gt");
-            sb.append("          values:");
-            sb.append("          - 0");
-            sb.append("tolerations:");
-            sb.append("- key: \"key1\"");
-            sb.append("  operator: \"Exists\"");
-            sb.append("  effect: \"NoSchedule\"");
+            sb.append("                - key: nvidia.com/gpu.count\n");
+            sb.append("                  operator: Gt\n");
+            sb.append("                  values:\n");
+            sb.append("                  - \"0\"\n");
             return sb.toString();
         }
+        return sb.toString();
     }
     
 }
