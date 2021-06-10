@@ -3,6 +3,13 @@ FROM centos:6
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
 
+# Override old repo info with current urls
+RUN rm /etc/yum.repos.d/CentOS-Base.repo
+ADD CentOS-Base.repo /etc/yum.repos.d/
+
+RUN yum clean all -y
+RUN yum makecache -y
+RUN yum update -y
 RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	libXfixes libXcursor libXinerama fontconfig \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
