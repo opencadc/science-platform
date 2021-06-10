@@ -56,7 +56,7 @@ paths:
           description: |
               The image ID of for the session.  For example:
               ```
-              harbor.canfar.net/skaha/notebook-scipy\:0.2
+              images.canfar.net/skaha/notebook-scipy:0.2
               ```
           required: true
         - name: cores
