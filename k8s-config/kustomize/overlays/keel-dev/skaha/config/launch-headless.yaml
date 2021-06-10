@@ -21,6 +21,7 @@ spec:
         job-name: "${skaha.jobname}"
     spec:
       restartPolicy: Never
+      ${skaha.schedulegpu}
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:

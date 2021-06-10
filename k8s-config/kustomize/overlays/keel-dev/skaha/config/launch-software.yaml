@@ -9,7 +9,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      #restartPolicy: Never
+      ${skaha.schedulegpu}
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
