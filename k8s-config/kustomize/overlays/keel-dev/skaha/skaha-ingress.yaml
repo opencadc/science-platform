@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: skaha-ingress
@@ -11,6 +11,9 @@ spec:
     http:
       paths:
       - path: /skaha(/|$)(.*)
+        pathType: Prefix
         backend:
-          serviceName: skaha-tomcat-svc
-          servicePort: 8080
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080
