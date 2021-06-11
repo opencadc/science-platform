@@ -22,11 +22,6 @@ spec:
     spec:
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
-      tolerations:
-      - key: "key1"
-        operator: "Exists"
-        effect: "NoSchedule"
-      #restartPolicy: Never
       imagePullSecrets:
         - name: "${software.imagesecret}"
       securityContext:
