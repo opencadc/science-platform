@@ -199,7 +199,7 @@ public class PostAction extends SessionAction {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
                     } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+                        throw new IllegalArgumentException("Invalid value for 'gups': " + gpusParam);
                     }
                 }
                 
