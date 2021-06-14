@@ -6,17 +6,17 @@ skaha is a Java servlet implementation offering a REST API to all skaha function
 
 ```
 gradle clean build
-docker build -t bucket.canfar.net/skaha-tomcat:latest -f Dockerfile .
+docker build -t images.canfar.net/skaha-system/skaha:latest -f Dockerfile .
 ```
 
 ## checking it
 ```
-docker run -it --rm bucket.canfar.net/skaha-tomcat:latest /bin/bash
+docker run -it --rm images.canfar.net/skaha-system/skaha:latest /bin/bash
 ```
 
 ## running it
 ```
-docker run -d --rm bucket.canfar.net/skaha-tomcat:latest
+docker run -d --rm images.canfar.net/skaha-system/skaha:latest
 ```
 
 ## configuration
@@ -64,8 +64,8 @@ These two kubernetes job configuration files are templates used by skaha to run 
 ```bash
 . VERSION && echo "tags: $TAGS" 
 for t in $TAGS; do
-   docker image tag bucket.canfar.net/skaha-tomcat:latest bucket.canfar.net/skaha-tomcat:$t
+   docker image tag images.canfar.net/skaha-system/skaha:latest images.canfar.net/skaha-system/skaha:$t
 done
 unset TAGS
-docker image list bucket.canfar.net/skaha-tomcat
+docker image list images.canfar.net/skaha-system/skaha
 ```
