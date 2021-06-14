@@ -8,7 +8,7 @@ VERSIONS = \
 #VERSIONS = \
 #	4.4.0-el6 
 
-DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
+DOCKER_REPO_BASE=images.canfar.net/arcade-casa
 
 .PHONY: build clean run 
 
@@ -17,7 +17,7 @@ all: build
 build: 
 	@- $(foreach V,$(VERSIONS), \
 		./download.sh $(V); \
-		docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
+		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
     	)
 
 clean:
