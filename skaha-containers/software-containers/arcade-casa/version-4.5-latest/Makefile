@@ -36,7 +36,7 @@ all: build-old build-pipeline build
 build-old: 
 	@- $(foreach V,$(VERSIONS_OLD), \
 		./download.sh casa-release-$(V) old ; \
-		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
+		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build-pipeline: 
