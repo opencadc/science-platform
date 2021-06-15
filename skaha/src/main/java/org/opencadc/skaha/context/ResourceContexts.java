@@ -88,6 +88,8 @@ public class ResourceContexts {
     // units in GB
     private Integer defaultRAM;
     private List<Integer> availableRAM = new ArrayList<Integer>();
+    
+    private List<Integer> availableGPUs = new ArrayList<Integer>();
 
     public ResourceContexts() {
         try {
@@ -97,12 +99,16 @@ public class ResourceContexts {
             defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
             String cOptions = mvp.getFirstPropertyValue("cores-options");
             String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
+            String gOptions = mvp.getFirstPropertyValue("gpus-options");
             
             for (String c : cOptions.split(" ")) {
                 availableCores.add(Integer.valueOf(c));
             }
             for (String r : rOptions.split(" ")) {
                 availableRAM.add(Integer.valueOf(r));
+            }
+            for (String g : gOptions.split(" ")) {
+                availableGPUs.add(Integer.valueOf(g));
             }
         } catch (Exception e) {
             log.error(e);
@@ -126,5 +132,8 @@ public class ResourceContexts {
         return availableRAM;
     }
     
+    public List<Integer> getAvailableGPUs() {
+        return availableGPUs;
+    }
     
 }
