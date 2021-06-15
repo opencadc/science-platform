@@ -336,7 +336,8 @@ public abstract class SkahaAction extends RestAction {
                 types.add(name);
             }
         }
-        if (types.size() == 1) {
+        // TODO: determine how to pick type when there are multiple
+        if (types.size() > 0) {
             return types.iterator().next();
         }
         return null;
