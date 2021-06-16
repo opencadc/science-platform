@@ -10,7 +10,8 @@ metadata:
   name: "${skaha.jobname}"
 spec:
   activeDeadlineSeconds: 259200
-  ttlSecondsAfterFinished: 86400
+  ttlSecondsAfterFinished: 0
+  backoffLimit: 0
   template:
     metadata:
       labels:
