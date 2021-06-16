@@ -83,11 +83,11 @@ paths:
           description: |
               Only applies to session type 'headless'. Override the image entrypoint with this command.
           required: false
-        - name: arg
+        - name: args
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple arg parameters supported.
+              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple arguments are separated with a space. The value must be URL encoded. For example, "args=arg1 arg2" is represented as "args=arg1%20arg2".
           required: false
         - name: env
           in: query
