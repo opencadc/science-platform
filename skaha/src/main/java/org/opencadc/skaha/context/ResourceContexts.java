@@ -73,6 +73,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.SkahaAction;
 
 /**
  * @author majorb
@@ -83,10 +84,12 @@ public class ResourceContexts {
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
     
     private Integer defaultCores;
+    private Integer defaultCoresHeadless;
     private List<Integer> availableCores = new ArrayList<Integer>();
     
     // units in GB
     private Integer defaultRAM;
+    private Integer defaultRAMHeadless;
     private List<Integer> availableRAM = new ArrayList<Integer>();
     
     private List<Integer> availableGPUs = new ArrayList<Integer>();
@@ -96,7 +99,9 @@ public class ResourceContexts {
             PropertiesReader reader = new PropertiesReader("k8s-resources.properties");
             MultiValuedProperties mvp = reader.getAllProperties();
             defaultCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default"));
+            defaultCoresHeadless = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-headless"));
             defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
+            defaultRAMHeadless = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-headless"));
             String cOptions = mvp.getFirstPropertyValue("cores-options");
             String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
             String gOptions = mvp.getFirstPropertyValue("gpus-options");
@@ -116,7 +121,10 @@ public class ResourceContexts {
         }
     }
 
-    public Integer getDefaultCores() {
+    public Integer getDefaultCores(String sessionType) {
+        if (SkahaAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
+            return defaultCoresHeadless;
+        }
         return defaultCores;
     }
 
@@ -124,7 +132,10 @@ public class ResourceContexts {
         return availableCores;
     }
 
-    public Integer getDefaultRAM() {
+    public Integer getDefaultRAM(String sessionType) {
+        if (SkahaAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
+            return defaultRAMHeadless;
+        }
         return defaultRAM;
     }
 

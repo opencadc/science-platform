@@ -227,7 +227,7 @@ public abstract class SessionAction extends SkahaAction {
 //        execute(chown);
     }
     
-    protected String confirmSoftware(String software) {
+    protected String getImageName(String image) {
         PropertiesReader pr = new PropertiesReader("skaha-software.properties");
         MultiValuedProperties mp = pr.getAllProperties();
         Set<String> names = mp.keySet();
@@ -237,11 +237,23 @@ public abstract class SessionAction extends SkahaAction {
             log.debug("Next key: " + next);
             String value = mp.getProperty(next).get(0);
             log.debug("Next value: " + value);
-            if (software.trim().equals(value)) {
+            if (image.trim().equals(value)) {
                 return next;
             }
         }
-        throw new IllegalArgumentException("Software with ID " + software + " is not available.");
+        try {
+            // return the last segment of the path
+            int lastSlash = image.lastIndexOf("/");
+            String name = image.substring(lastSlash + 1, image.length());
+            // replace colons and dots with dash
+            name = name.replaceAll(":", "-");
+            name = name.replaceAll(".", "-");
+            return name.toLowerCase();
+        } catch (Exception e) {
+            log.warn("failed to determine name for image: " + image);
+            return "unknown";
+        }
+
     }
     
     protected String stageFile(String data) throws IOException {
@@ -300,7 +312,7 @@ public abstract class SessionAction extends SkahaAction {
             status = Session.STATUS_TERMINATING;
         }
         String host = K8SUtil.getHostName();
-        String connectURL = "unknown";
+        String connectURL = "not-applicable";
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
             connectURL = SessionAction.getVNCURL(host, id);
         }
