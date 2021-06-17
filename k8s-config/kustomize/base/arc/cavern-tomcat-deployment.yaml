@@ -2,37 +2,24 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: skaha-tomcat
-  name: skaha-tomcat
+    run: cavern-tomcat
+  name: cavern-tomcat
 spec:
   replicas: 1
   selector:
     matchLabels:
-      run: skaha-tomcat
+      run: cavern-tomcat
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: skaha-tomcat
+        run: cavern-tomcat
     spec:
       containers:
-      - env:
-        - name: skaha.hostname
-          value: ws-uv.canfar.net
-        - name: skaha.homedir
-          value: /arc/home
-        - name: skaha.namespace
-          value: skaha-workload
-        - name: skaha.harborhosts
-          value: "images.canfar.net"
-        - name: skaha.usersgroup
-          value: "ivo://cadc.nrc.ca/gms?skaha-users"
-        - name: skaha.adminsgroup
-          value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.8.1
+      - name: cavern-tomcat
+        image: canfar-registry.cloud.computecanada.ca/cavern-tomcat:0.2.1
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
-        name: skaha-tomcat
         resources:
           requests:
             memory: "4Gi"
@@ -44,26 +31,25 @@ spec:
         - containerPort: 8080
           protocol: TCP
         volumeMounts:
-        - mountPath: "/config"
-          name: config-volume
         - mountPath: /root/.ssl/
           name: servops-cert
           readOnly: true
-        - mountPath: "/arc"
-          name: cavern-volume
-          subPath: cavern
+        - mountPath: "/cephfs"
+          name: cavern-ceph-volume
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
       securityContext:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: config-volume
-        configMap:
-          name: skaha-config
       - name: servops-cert
         secret:
           defaultMode: 420
           secretName: servops-clientcert
-      - name: cavern-volume
+      - name: cavern-ceph-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789
@@ -74,3 +60,10 @@ spec:
           secretRef:
             name: cephfs-cephx-key
           readOnly: false
+      - name: config-volume
+        configMap:
+          name: cavern-config
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory

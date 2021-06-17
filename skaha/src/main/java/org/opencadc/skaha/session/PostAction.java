@@ -67,6 +67,14 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.ac.Group;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.StringUtil;
+import ca.nrc.cadc.uws.server.RandomStringGenerator;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -84,15 +92,6 @@ import org.json.JSONTokener;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
-
-import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.PosixPrincipal;
-import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.util.StringUtil;
-import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
 /**
  *
@@ -113,6 +112,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
+    public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
@@ -123,7 +123,9 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_REQUESTS_RAM = "software.requests.ram";
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
+    public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
+
 
     public PostAction() {
         super();
@@ -142,6 +144,7 @@ public class PostAction extends SessionAction {
                 String type = syncInput.getParameter("type");
                 String coresParam = syncInput.getParameter("cores");
                 String ramParam = syncInput.getParameter("ram");
+                String gpusParam = syncInput.getParameter("gpus");
                 String cmd = syncInput.getParameter("cmd");
                 List<String> args = syncInput.getParameters("arg");
                 List<String> envs = syncInput.getParameters("env");
@@ -165,6 +168,7 @@ public class PostAction extends SessionAction {
                 ResourceContexts rc = new ResourceContexts();
                 Integer cores = rc.getDefaultCores();
                 Integer ram = rc.getDefaultRAM();
+                Integer gpus = 0;
                 
                 if (coresParam != null) {
                     try {
@@ -188,7 +192,18 @@ public class PostAction extends SessionAction {
                     }
                 }
                 
-                createSession(sessionID, validatedType, image, name, cores, ram, cmd, args, envs);
+                if (gpusParam != null) {
+                    try {
+                        gpus = Integer.valueOf(gpusParam);
+                        if (!rc.getAvailableGPUs().contains(gpus)) {
+                            throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
+                        }
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException("Invalid value for 'gups': " + gpusParam);
+                    }
+                }
+                
+                createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -279,7 +294,7 @@ public class PostAction extends SessionAction {
     }
     
     public void createSession(String sessionID, String type, String image, String name,
-        Integer cores, Integer ram, String cmd, List<String> args, List<String> envs) throws Exception {
+        Integer cores, Integer ram, Integer gpus, String cmd, List<String> args, List<String> envs) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
@@ -321,6 +336,7 @@ public class PostAction extends SessionAction {
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, "UTF-8");
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
+        String gpuScheduling = getGPUScheduling(gpus);
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name);
@@ -330,6 +346,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
@@ -337,6 +354,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram.toString() + "G");
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
         
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -437,6 +455,8 @@ public class PostAction extends SessionAction {
         String jobName = name.toLowerCase() + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         
+        String gpuScheduling = getGPUScheduling(0);
+        
         String launchString = new String(launchBytes, "UTF-8");
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
@@ -445,6 +465,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
+        launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
                        
@@ -603,8 +624,26 @@ public class PostAction extends SessionAction {
         }
         
         return sb.toString();
-
     }
     
-
+    private String getGPUScheduling(Integer gpus) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("affinity:\n");
+        sb.append("          nodeAffinity:\n");
+        sb.append("            requiredDuringSchedulingIgnoredDuringExecution:\n");
+        sb.append("              nodeSelectorTerms:\n");
+        sb.append("              - matchExpressions:\n");
+        if (gpus == null || gpus == 0) {
+            sb.append("                - key: nvidia.com/gpu.count\n");
+            sb.append("                  operator: DoesNotExist\n");
+        } else {
+            sb.append("                - key: nvidia.com/gpu.count\n");
+            sb.append("                  operator: Gt\n");
+            sb.append("                  values:\n");
+            sb.append("                  - \"0\"\n");
+            return sb.toString();
+        }
+        return sb.toString();
+    }
+    
 }

@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "skaha-allocate"
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: "skaha-allocate"
+        image: images.canfar.net/skaha-system/allocate:0.2
+        imagePullPolicy: IfNotPresent
+        # Userid for allocation goes in this argument.
+        # TODO: automate the setting of this in the calling script
+        command: ["/usr/bin/skaha-cavern-allocate"]
+        args: ["jeevesh"]
+#        command: [ "/bin/bash", "-c", "--" ]
+#        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+        - mountPath: "/config"
+          name: allocate-config
+        - mountPath: /root/.ssl/
+          name: servops-cert
+          readOnly: true
+        - mountPath: "/cavern"
+          name: cavern-volume
+          subPath: cavern
+        - mountPath: /var/lib/sss/pipes
+          name: sssd-dir
+          readOnly: true
+      securityContext:
+        runAsUser: 0
+      serviceAccountName: skaha
+      volumes:
+      - name: allocate-config
+        configMap:
+          name: allocate-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: servops-clientcert
+      - name: cavern-volume
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false
+      - name: sssd-dir
+        hostPath:
+          path: /var/lib/ubernetes
+          type: Directory

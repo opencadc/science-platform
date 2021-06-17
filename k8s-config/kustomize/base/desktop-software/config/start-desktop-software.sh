@@ -4,10 +4,11 @@ USERID=$1
 TITLE=$2
 
 if [[ -z "${CASA_RELEASE}" ]];
-  echo "not a casa container"
+then
+    echo "not a casa container"
 else
-  echo "creating casa data repo link"
-  ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE}/data
+    echo "creating casa data repo link"
+    ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE}/data
 fi
 
 echo "[skaha] Starting skaha software container [title=$TITLE] for [userid=$USERID]"
