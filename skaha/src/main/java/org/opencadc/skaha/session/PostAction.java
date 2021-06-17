@@ -146,7 +146,7 @@ public class PostAction extends SessionAction {
                 String ramParam = syncInput.getParameter("ram");
                 String gpusParam = syncInput.getParameter("gpus");
                 String cmd = syncInput.getParameter("cmd");
-                List<String> args = syncInput.getParameters("arg");
+                String args = syncInput.getParameter("args");
                 List<String> envs = syncInput.getParameters("env");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
@@ -166,8 +166,8 @@ public class PostAction extends SessionAction {
                 sessionID = new RandomStringGenerator(8).getID();
 
                 ResourceContexts rc = new ResourceContexts();
-                Integer cores = rc.getDefaultCores();
-                Integer ram = rc.getDefaultRAM();
+                Integer cores = rc.getDefaultCores(validatedType);
+                Integer ram = rc.getDefaultRAM(validatedType);
                 Integer gpus = 0;
                 
                 if (coresParam != null) {
@@ -283,6 +283,10 @@ public class PostAction extends SessionAction {
     }
     
     public void checkForExistingSession(String userid, String type) throws Exception {
+        // multiple 
+        if (SESSION_TYPE_HEADLESS.equals(type)) {
+            return;
+        }
         List<Session> sessions = super.getAllSessions(userid);
         for (Session session : sessions) {
             if (session.getType().equals(type) &&
@@ -294,7 +298,7 @@ public class PostAction extends SessionAction {
     }
     
     public void createSession(String sessionID, String type, String image, String name,
-        Integer cores, Integer ram, Integer gpus, String cmd, List<String> args, List<String> envs) throws Exception {
+        Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs) throws Exception {
         
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
@@ -431,8 +435,7 @@ public class PostAction extends SessionAction {
         
         log.debug("attaching software: " + image + " to " + targetIP);
         
-        String name = confirmSoftware(image);
-        
+        String name = getImageName(image);
         String imageSecret = getHarborSecret(image);            
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
@@ -499,15 +502,14 @@ public class PostAction extends SessionAction {
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret
         
-        String harborHost = null;
+        String harborHost = null; 
         for (String next : harborHosts) {
             if (image.startsWith(next)) {
                 harborHost = next;
             }
         }
         if (harborHost == null) {
-            log.debug("non-harbor image");
-            return null;
+            throw new IllegalArgumentException("not a skaha harbor image: " + image);
         }
         
         String idToken = super.getIdToken();
@@ -594,19 +596,22 @@ public class PostAction extends SessionAction {
         - name: SHELL
           value: "/bin/bash"   
      */
-    private String getHeadlessImageBundle(String image, String cmd, List<String> args, List<String> envs) {
+    private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
         StringBuilder sb = new StringBuilder();
         sb.append("image: \"").append(image).append("\"");
         if (cmd != null) {
             sb.append("\n        command: [\"").append(cmd).append("\"]");
         }
-        if (args != null && !args.isEmpty()) {
-            sb.append("\n        args: [");
-            for (String arg : args) {
-                sb.append("\"").append(arg).append("\", ");
+        if (args != null) {
+            String[] argList = args.split(" ");
+            if (argList.length > 0) {
+                sb.append("\n        args: [");
+                for (String arg : argList) {
+                    sb.append("\"").append(arg).append("\", ");
+                }
+                sb.setLength(sb.length() - 2);
+                sb.append("]");
             }
-            sb.setLength(sb.length() - 2);
-            sb.append("]");
         }
         sb.append("\n        env:");
         sb.append("\n        - name: HOME");
