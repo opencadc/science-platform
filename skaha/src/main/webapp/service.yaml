@@ -83,17 +83,17 @@ paths:
           description: |
               Only applies to session type 'headless'. Override the image entrypoint with this command.
           required: false
-        - name: arg
+        - name: args
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple values supported.
+              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple arguments are separated with a space. The value must be URL encoded. For example, "args=arg1 arg2" is represented as "args=arg1%20arg2".
           required: false
         - name: env
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Add additional environment to the container. Format is key=value. Multiple values supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
+              Only applies to session type 'headless'. Add additional environment to the container. Format is key=value. Multiple env parameters supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
           required: false
       responses:
         '200':
