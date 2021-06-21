@@ -18,7 +18,7 @@ VERSIONS = \
 #VERSIONS = \
 #	42.2.30986-pipe-1-64b
 
-DOCKER_REPO_BASE=bucket.canfar.net/arcade-casa
+DOCKER_REPO_BASE=images.canfar.net/arcade/casa
 
 .PHONY: build clean run 
 
@@ -27,13 +27,13 @@ all: build2.6 build
 build2.6: 
 	@- $(foreach V,$(VERSIONS2.6), \
 		./download.sh casapy-$(V); \
-		docker build --build-arg RELEASE=casapy-$(V) --build-arg PYTHON=python2.6 -t ${DOCKER_REPO_BASE}:$V .; \
+		docker build --build-arg CASA_RELEASE=casapy-$(V) --build-arg PYTHON=python2.6 -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build: 
 	@- $(foreach V,$(VERSIONS), \
 		./download.sh casapy-$(V); \
-		docker build --build-arg RELEASE=casapy-$(V) --build-arg PYTHON=python2.7 -t ${DOCKER_REPO_BASE}:$V .; \
+		docker build --build-arg CASA_RELEASE=casapy-$(V) --build-arg PYTHON=python2.7 -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 clean2.6:
