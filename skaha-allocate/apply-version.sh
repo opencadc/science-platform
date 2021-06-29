@@ -1,7 +1,7 @@
 #!/bin/bash
 . VERSION && echo "tags: $TAGS"
 for t in $TAGS; do
-   docker image tag bucket.canfar.net/skaha-allocate:latest bucket.canfar.net/skaha-allocate:$t
+   docker image tag images.canfar.net/skaha-system/allocate:latest images.canfar.net/skaha-system/allocate:$t
 done
 unset TAGS
-docker image list bucket.canfar.net/skaha-allocate
+docker image list images.canfar.net/skaha-system/allocate

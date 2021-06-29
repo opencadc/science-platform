@@ -70,6 +70,7 @@ echo "Creating allocation for $USERID"
 echo -n "  Creating home dir $HOMEDIR..."
 mkdir $HOMEDIR
 chown $USERID:$USERID $HOMEDIR
+chmod 700 $HOMEDIR
 echo " Done"
 
 echo -n "  Adding home dir config files..."
