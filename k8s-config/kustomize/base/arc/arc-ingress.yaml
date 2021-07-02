@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: arc-ingress
@@ -11,6 +11,9 @@ spec:
     http:
       paths:
       - path: /arc(/|$)(.*)
+        pathType: Prefix
         backend:
-          serviceName: arc-tomcat-svc
-          servicePort: 8080
+          service:
+            name: arc-tomcat-svc
+            port:
+              number: 8080

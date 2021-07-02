@@ -1,4 +1,0 @@
-Private key files associated with the public keys in cavern-sshd must be provided:
-- ssh_host_ecdsa_key
-- ssh_host_ed25519_key
-- ssh_host_rsa_key

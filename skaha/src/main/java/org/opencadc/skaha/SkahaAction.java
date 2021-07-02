@@ -105,11 +105,11 @@ public abstract class SkahaAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     
-    protected static final String SESSION_TYPE_DESKTOP = "desktop";
-    protected static final String SESSION_TYPE_CARTA = "carta";
-    protected static final String SESSION_TYPE_NOTEBOOK = "notebook";
-    protected static final String SESSION_TYPE_HEADLESS = "headless";
-    protected static List<String> SESSION_TYPES = Arrays.asList(
+    public static final String SESSION_TYPE_DESKTOP = "desktop";
+    public static final String SESSION_TYPE_CARTA = "carta";
+    public static final String SESSION_TYPE_NOTEBOOK = "notebook";
+    public static final String SESSION_TYPE_HEADLESS = "headless";
+    public static List<String> SESSION_TYPES = Arrays.asList(
         new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS});
     
     protected String userID;
@@ -336,7 +336,8 @@ public abstract class SkahaAction extends RestAction {
                 types.add(name);
             }
         }
-        if (types.size() == 1) {
+        // TODO: determine how to pick type when there are multiple
+        if (types.size() > 0) {
             return types.iterator().next();
         }
         return null;

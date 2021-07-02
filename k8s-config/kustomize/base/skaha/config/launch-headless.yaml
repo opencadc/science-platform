@@ -10,7 +10,8 @@ metadata:
   name: "${skaha.jobname}"
 spec:
   activeDeadlineSeconds: 259200
-  ttlSecondsAfterFinished: 86400
+  ttlSecondsAfterFinished: 0
+  backoffLimit: 0
   template:
     metadata:
       labels:
@@ -21,6 +22,7 @@ spec:
         job-name: "${skaha.jobname}"
     spec:
       restartPolicy: Never
+      ${skaha.schedulegpu}
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
@@ -36,7 +38,12 @@ spec:
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
-        imagePullPolicy: IfNotPresent
+        env:
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "${software.requests.ram}"

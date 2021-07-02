@@ -21,7 +21,7 @@ spec:
         job-name: "${skaha.jobname}"
     spec:
       restartPolicy: OnFailure
-      #restartPolicy: Never
+      ${skaha.schedulegpu}
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:

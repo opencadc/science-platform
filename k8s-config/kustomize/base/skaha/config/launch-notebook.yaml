@@ -21,7 +21,7 @@ spec:
         job-name: "${skaha.jobname}"
     spec:
       restartPolicy: OnFailure
-      #restartPolicy: Never
+      ${skaha.schedulegpu}
       imagePullSecrets:
         - name: "${software.imagesecret}"
       securityContext:
@@ -119,6 +119,7 @@ spec:
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
         ports:
         - containerPort: 8888
           protocol: TCP

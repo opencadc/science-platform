@@ -1,0 +1,4 @@
+## deployable containers have a semantic and build tag
+# semantic version tag: major.minor
+# build version tag: timestamp
+TAGS="21.1 $(date -u +"%Y%m%dT%H%M%S")"
