@@ -3,25 +3,32 @@ FROM centos:6
 # xterm dependency is an extra to get the casa shell in the display
 # perl was added for casa later than 5
 
+# Override old repo info with current urls
+RUN rm /etc/yum.repos.d/CentOS-Base.repo
+ADD CentOS-Base.repo /etc/yum.repos.d/
+
+RUN yum clean all -y
+RUN yum makecache -y
+RUN yum update -y
 RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	libXfixes libXcursor libXinerama fontconfig \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
 	tkinter ImageMagick-c++ xterm perl
 
 # setup all required env variables
-ARG RELEASE
-ENV RELEASE=${RELEASE}
+ARG CASA_RELEASE
+ENV CASA_RELEASE=${CASA_RELEASE}
 ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/casa/bin
 
 # untar casa databundle to container
-ADD ${RELEASE}.tar.gz /opt/
+ADD ${CASA_RELEASE}.tar.gz /opt/
 
 # patch in fix for get_user.py
-RUN rm -f /opt/${RELEASE}/lib/python2.7/get_user.py
-ADD get_user.py /opt/${RELEASE}/lib/python2.7/get_user.py
+RUN rm -f /opt/${CASA_RELEASE}/lib/python2.7/get_user.py
+ADD get_user.py /opt/${CASA_RELEASE}/lib/python2.7/get_user.py
 
 # chown because the untarred casa has wrong owner/group
-RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
+RUN chown -R root:root /opt/${CASA_RELEASE} && ln -s /opt/${CASA_RELEASE} /opt/casa
 
 # create the guest account
 #RUN groupadd -g 1001 guest
@@ -38,9 +45,9 @@ RUN chown -R root:root /opt/${RELEASE} && ln -s /opt/${RELEASE} /opt/casa
 
 RUN yum install -y sssd-client acl
 
-# replace data repository with an up-to-date version for leap second fix (issue #33)
-RUN rm -rf /opt/${RELEASE}/data
-RUN ln -s /cavern/projects/casa-data-repository/ /opt/${RELEASE}/data
+# Allow runtime symlink creation to the casa-data-repository
+RUN rm -rf /opt/${CASA_RELEASE}/data
+RUN chmod 777 /opt/${CASA_RELEASE}
 
 RUN mkdir /skaha
 ADD startup.sh /skaha/

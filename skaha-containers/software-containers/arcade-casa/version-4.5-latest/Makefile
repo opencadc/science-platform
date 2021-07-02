@@ -27,7 +27,7 @@ VERSIONS_PIPELINE = \
 VERSIONS = \
 	5.7.0-134.el6
 
-DOCKER_REPO_BASE=harbor.canfar.net/arcade/casa
+DOCKER_REPO_BASE=images.canfar.net/arcade/casa
 
 .PHONY: build clean run 
 
@@ -36,19 +36,19 @@ all: build-old build-pipeline build
 build-old: 
 	@- $(foreach V,$(VERSIONS_OLD), \
 		./download.sh casa-release-$(V) old ; \
-		docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$V .; \
+		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build-pipeline: 
 	@- $(foreach V,$(VERSIONS_PIPELINE), \
                 ./download.sh casa-pipeline-release-$(V) pipeline ; \
-                docker build --build-arg RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+                docker build --build-arg CASA_RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build: 
 	@- $(foreach V,$(VERSIONS), \
                 ./download.sh casa-release-$(V) current ; \
-                docker build --build-arg RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+                docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 clean-old:
