@@ -191,6 +191,10 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
     }
     
+    public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/pluto/" + sessionID + "/";
+    }
+    
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
@@ -283,13 +287,13 @@ public abstract class SessionAction extends SkahaAction {
                 "STARTED:.status.startTime," +
                 "DELETION:.metadata.deletionTimestamp"};
                 
-        String vncSessions = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + vncSessions);
+        String sessionList = execute(getSessionsCMD);
+        log.debug("VNC Session list: " + sessionList);
         
         List<Session> sessions = new ArrayList<Session>();
         
-        if (StringUtil.hasLength(vncSessions)) {
-            String[] lines = vncSessions.split("\n");
+        if (StringUtil.hasLength(sessionList)) {
+            String[] lines = sessionList.split("\n");
             for (String line : lines) {
                 Session session = constructSession(line);
                 sessions.add(session);
@@ -321,6 +325,9 @@ public abstract class SessionAction extends SkahaAction {
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionAction.getNotebookURL(host, id);
+        }
+        if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
+            connectURL = SessionAction.getPlutoURL(host, id);
         }
 
         return new Session(id, type, status, name, startTime, connectURL);

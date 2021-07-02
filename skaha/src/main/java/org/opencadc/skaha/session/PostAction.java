@@ -331,6 +331,11 @@ public class PostAction extends SessionAction {
                 servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
                 break;
+            case SessionAction.SESSION_TYPE_PLUTO:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-pluto.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-pluto.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-pluto.yaml";
+                break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 break;

@@ -15,6 +15,8 @@ ADD src/startup.sh /skaha/
 RUN chmod u+x /skaha/startup.sh
 
 # pre-install pluto
+RUN mkdir /.julia
+RUN chmod 777 /.julia
 RUN julia -e 'using Pkg; Pkg.add("Pluto")'
 EXPOSE 1234
 
