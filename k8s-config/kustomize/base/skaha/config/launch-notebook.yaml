@@ -111,7 +111,7 @@ spec:
           - --NotebookApp.allow_origin="*"
 # The following needs to be a 'list'
 #          - --NotebookApp.extra_nbextensions_path=/home/jovyan:/arc/home/${skaha.userid}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "${software.requests.ram}"

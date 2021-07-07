@@ -38,7 +38,7 @@ spec:
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "4Gi"
