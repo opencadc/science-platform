@@ -43,7 +43,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - /carta/arcade-carta /arc /arc/projects
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "${software.requests.ram}"
