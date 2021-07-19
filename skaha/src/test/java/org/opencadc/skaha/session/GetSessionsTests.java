@@ -95,11 +95,11 @@ public class GetSessionsTests {
     }
     
     private static final String K8S_LIST =
-        "pud05npw   carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
-        "e37lmx4m   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
-        "gspc0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
-        "abcd0n8m   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
-        "defg0n8m   notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
+        "pud05npw   majorb  imageID carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
+        "e37lmx4m   majorb  imageID desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
+        "gspc0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
+        "abcd0n8m   majorb  imageID notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
+        "defg0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
 
     public GetSessionsTests() {
     }
@@ -108,7 +108,7 @@ public class GetSessionsTests {
     public void testListSessions() {
         try {
             GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null);
+            String json = get.listSessions(null, null, true);
             log.info("json: \n" + json);
             List<Session> sessions1 = get.getAllSessions(null);
             Gson gson = new Gson();
