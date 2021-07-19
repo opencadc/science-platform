@@ -38,6 +38,11 @@ paths:
         type: string
         description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
         required: false
+      - name: detail
+        in: query
+        type: string
+        description: Session list detail level.  The only valid value for this field is 'max'.  If set to max, all users' session are listed, not just the calling user's sessions.
+        required: false
     post:
       description: |
         Launch a new session.  Depending on the underlying image and system state, sessions may take for the system to download in startup.  Normal initialization time to a running session is less than 10 seconds.

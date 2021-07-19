@@ -96,8 +96,10 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
+                String detail = syncInput.getParameter("detail");
+                boolean allUsers = SESSION_DETAIL_MAX.equals(detail);
                 
-                String json = listSessions(typeFilter, statusFilter);
+                String json = listSessions(typeFilter, statusFilter, allUsers);
                 
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
@@ -115,9 +117,14 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public String listSessions(String typeFilter, String statusFilter) throws Exception {
+    public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
         
-        List<Session> sessions = getAllSessions(userID);
+        List<Session> sessions = null;
+        if (allUsers) {
+            sessions = getAllSessions(null);
+        } else {
+            sessions = getAllSessions(userID);
+        }
         
         log.debug("typeFilter=" + typeFilter);
         log.debug("statusFilter=" + statusFilter);

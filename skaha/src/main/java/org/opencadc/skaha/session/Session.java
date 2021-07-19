@@ -82,17 +82,21 @@ public class Session {
     public static final String STATUS_SUCCEEDED = "Succeeded";
     
     private String id;
+    private String userid;
+    private String image;
     private String type;
     private String status;
     private String name;
     private String startTime;
     private String connectURL;
 
-    public Session(String id, String type, String status, String name, String startTime, String connectURL) {
+    public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
         if (id == null) {
             throw new IllegalArgumentException("id is requried");
         }
         this.id = id;
+        this.userid = userid;
+        this.image = image;
         this.type = type;
         this.status = status;
         this.name = name;
@@ -102,6 +106,14 @@ public class Session {
     
     public String getId() {
         return id;
+    }
+    
+    public String getUserid() {
+        return userid;
+    }
+    
+    public String getImage() {
+        return image;
     }
 
     public String getType() {
