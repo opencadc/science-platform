@@ -36,10 +36,10 @@ spec:
         resources:
           requests:
             memory: "4Gi"
-            cpu: "0.5"
+            cpu: "1"
           limits:
             memory: "8Gi"
-            cpu: "2"
+            cpu: "4"
         ports:
         - containerPort: 8080
           protocol: TCP
@@ -54,6 +54,7 @@ spec:
           subPath: cavern
       securityContext:
         runAsUser: 0
+      priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:
       - name: config-volume
