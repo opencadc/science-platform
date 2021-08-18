@@ -17,6 +17,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
@@ -43,9 +44,11 @@ spec:
           requests:
             memory: "4Gi"
             cpu: "0.25"
+            ephemeral-storage: "20Gi"
           limits:
             memory: "256Gi"
             cpu: "16"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 6000
           protocol: TCP
