@@ -1,6 +1,6 @@
 bases:
 - ./arc
 - ./skaha
-- ../../base/desktop-software
+- ../../base/skaha-workload
 - ../../base/sssd
 - ../../base/servops-clientcert

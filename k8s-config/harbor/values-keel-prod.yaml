@@ -2261,6 +2261,8 @@ redis:
   cluster:
     enabled: false
   master:
+    # BM: set priority class name
+    priorityClassName: uber-user-preempt-high
     persistence:
       enabled: true
       #BM Added lines below
