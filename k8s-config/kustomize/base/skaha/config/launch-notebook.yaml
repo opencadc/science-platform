@@ -29,6 +29,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [100, ${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
       initContainers:
       - name: init-python-dir
         image: busybox
@@ -116,10 +117,12 @@ spec:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
+            ephemeral-storage: "20Gi"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             nvidia.com/gpu: "${software.limits.gpus}"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 8888
           protocol: TCP
