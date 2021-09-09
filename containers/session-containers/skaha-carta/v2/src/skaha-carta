@@ -14,10 +14,12 @@ if [ "$#" -ne 2 ]; then
     exit 2
     # ROOT="/"
 fi
-FOLDER=/
+ROOT=$1
+FOLDER=$2
+echo "root: $ROOT"
 echo "folder: $FOLDER"
-echo "command: carta --no_browser --top_level_folder=$FOLDER --port=6901 --idle_timeout=100000 --debug_no_auth"
-carta --no_browser --top_level_folder=$FOLDER --port=6901 --idle_timeout=100000 --debug_no_auth
+echo "command: carta --no_browser --top_level_folder=$ROOT --port=6901 --idle_timeout=100000 --debug_no_auth $FOLDER"
+carta --no_browser --top_level_folder=$ROOT --port=6901 --idle_timeout=100000 --debug_no_auth $FOLDER
 # A bit over a day timeout. Disable token authentication.
 
 # echo "Done"
