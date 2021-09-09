@@ -43,7 +43,7 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/arcade-carta /arc /arc/projects
+        - /carta/skaha-carta /arc /arc/projects
         imagePullPolicy: Always
         resources:
           requests:
