@@ -133,7 +133,10 @@ public class DeleteAction extends SessionAction {
         log.debug("Stopping " + type + " session: " + sessionID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
-        String[] cmd = null;
+        String podName = K8SUtil.getJobName(sessionID, type, userID);
+        String[] cmd = new String[] {
+            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
+        execute(cmd);
         
         if (!SESSION_TYPE_HEADLESS.equals(type)) {
             String ingressName = K8SUtil.getIngressName(sessionID, type);
@@ -146,11 +149,6 @@ public class DeleteAction extends SessionAction {
                 "kubectl", "delete", "--namespace", k8sNamespace, "service", serviceName};
             execute(cmd);
         }
-        
-        String podName = K8SUtil.getJobName(sessionID, type, userID);
-        cmd = new String[] {
-            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
-        execute(cmd);
         
     }
 }

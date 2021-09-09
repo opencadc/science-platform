@@ -1,5 +1,5 @@
 
-NAME = images.canfar.net/carta/skaha-carta
+NAME = images.canfar.net/skaha/carta
 VERSION = 3.0-beta
 
 build: dependencies Dockerfile
