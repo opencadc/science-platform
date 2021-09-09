@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -e
+
+### Give the SSSD container time to initialize
+
+SELF=skaha-carta
+
+TS=$(date)
+echo "$TS $SELF START"
+
+if [ "$#" -ne 2 ]; then
+    # echo "Usage: skaha-cart <root> <folder>"
+    # exit 2
+    ROOT="/"
+fi
+ROOT=$1
+echo "root: $ROOT"
+echo "folder: $FOLDER"
+echo "command: carta --no_browser --top_level_folder=$FOLDER --port=6901"
+carta --no_browser --top_level_folder=$FOLDER --port=6901
+
+
+# echo "Done"
+
+# ### Listen to the log file until the process ends
+# sleep 5
+
+# PID=$(pgrep -x 'carta_backend')
+# echo "PID: $PID"
+
+# LOGFILE=/carta/CARTA/log/skaha-carta.log
+
+# tail --pid $PID -F $LOGFILE
+
+# TS=$(date)
+# echo "$TS $SELF DONE"
