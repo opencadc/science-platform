@@ -185,8 +185,12 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
     }
     
-    public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/carta/http/" + sessionID + "/?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
+        String url = "https://" + host + "/carta/http/" + sessionID + "/";
+        if (altSocketUrl) {
+            url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+        }
+        return url;
     }
     
     public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
@@ -333,7 +337,12 @@ public abstract class SessionAction extends SkahaAction {
             connectURL = SessionAction.getVNCURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionAction.getCartaURL(host, id);
+            if (image.endsWith(":1.4")) {
+                // support alt web socket path for 1.4 carta 
+                connectURL = SessionAction.getCartaURL(host, id, true); 
+            } else {
+                connectURL = SessionAction.getCartaURL(host, id, false);
+            }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionAction.getNotebookURL(host, id);
