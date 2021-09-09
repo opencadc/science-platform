@@ -1,5 +1,8 @@
 FROM centos:6
 
+RUN rm /etc/yum.repos.d/CentOS-Base.repo
+ADD CentOS-Base.repo /etc/yum.repos.d/
+
 RUN yum makecache -y
 RUN yum update -y
 RUN yum install -y iproute lsof sssd-client acl

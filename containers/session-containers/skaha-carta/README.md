@@ -11,7 +11,7 @@ A modified version of `carta` replaces the original.  This version removes the p
 ## Building
 
 ```
-docker build -t harbor.canfar.net/carta/skaha-carta:1.4 -f Dockerfile .
+docker build -t images.canfar.net/skaha/carta:1.4 -f Dockerfile .
 ```
 
 ## Publishing to the image registry
