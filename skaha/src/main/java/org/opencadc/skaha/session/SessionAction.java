@@ -211,7 +211,7 @@ public abstract class SessionAction extends SkahaAction {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 String userid = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
                 HttpGet download = new HttpGet(
-                        new URL("https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
+                        new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
                 download.run();
                 String proxyCert = out.toString();
                     
