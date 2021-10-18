@@ -38,10 +38,10 @@ paths:
         type: string
         description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
         required: false
-      - name: detail
+      - name: view
         in: query
         type: string
-        description: Session list detail level.  The only valid value for this field is 'max'.  If set to max, all users' session are listed, not just the calling user's sessions.
+        description: Session list view level.  The only valid value for this field is 'all'.  If set to all, all users' session are listed, not just the calling user's sessions.
         required: false
     post:
       description: |

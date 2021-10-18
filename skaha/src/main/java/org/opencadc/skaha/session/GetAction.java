@@ -67,6 +67,8 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.StringUtil;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -96,15 +98,21 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
-                String detail = syncInput.getParameter("detail");
-                boolean allUsers = SESSION_DETAIL_MAX.equals(detail);
+                String view = syncInput.getParameter("view");
+                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
                 
                 String json = listSessions(typeFilter, statusFilter, allUsers);
                 
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
-                throw new UnsupportedOperationException("Session detail viewing not supported.");
+                String view = syncInput.getParameter("view");
+                if (SESSION_VIEW_LOGS.equals(view)) {
+                    throw new UnsupportedOperationException("Session detail viewing not supported.");
+                }
+                String logs = getPodLogs(sessionID);
+                syncOutput.setHeader("Content-Type", "text/plain");
+                syncOutput.getOutputStream().write(logs.getBytes());
             }
             return;
         }
@@ -146,6 +154,19 @@ public class GetAction extends SessionAction {
             }
         }
         return ret;
+    }
+    
+    public String getPodLogs(String sessionID) throws Exception {
+        String events = getEvents(userID, sessionID);
+        String podLogs = getPodLogs(userID, sessionID);
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- SCHEDULING EVENTS ---\n");
+        sb.append(events + "\n");
+        sb.append("--- IMAGE LOGS ---\n");
+        sb.append(podLogs + "\n");
+        
+        return "";
     }
 
 

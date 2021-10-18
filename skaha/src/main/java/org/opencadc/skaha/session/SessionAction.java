@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
@@ -106,7 +107,8 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
     
-    protected static final String SESSION_DETAIL_MAX = "max";
+    protected static final String SESSION_LIST_VIEW_ALL = "all";
+    protected static final String SESSION_VIEW_LOGS = "logs";
     
     protected String requestType;
     protected String sessionID;
@@ -273,6 +275,68 @@ public abstract class SessionAction extends SkahaAction {
         writer.flush();
         writer.close();
         return tmpFileName;
+    }
+    
+    public String getPodID(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getPodCMD = new ArrayList<String>();
+        getPodCMD.add("kubectl");
+        getPodCMD.add("--namespace");
+        getPodCMD.add(k8sNamespace);
+        getPodCMD.add("get");
+        getPodCMD.add("pod");
+        getPodCMD.add("--selector=canfar-net-userid=" + forUserID);
+        getPodCMD.add("--selector=canfar-net-sessionID=" + sessionID);
+        getPodCMD.add("--no-headers=true");
+        getPodCMD.add("-o");
+        getPodCMD.add("custom-columns=NAME:.metadata.name");
+        String podID = execute(getPodCMD.toArray(new String[0]));
+        log.debug("podID: " + podID);
+        if (!StringUtil.hasLength(podID)) {
+            throw new ResourceNotFoundException("session " + sessionID + " not found.");
+        } 
+        return podID;
+    }
+    
+    public String getEvents(String forUserID, String sessionID) throws Exception {
+
+        String podID = getPodID(forUserID, sessionID);
+
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getEventsCmd = new ArrayList<String>();
+        getEventsCmd.add("kubectl");
+        getEventsCmd.add("--namespace");
+        getEventsCmd.add(k8sNamespace);
+        getEventsCmd.add("get");
+        getEventsCmd.add("event");
+        getEventsCmd.add("--field-selector");
+        getEventsCmd.add("involvedObject.name=" + podID);
+        //getEventsCmd.add("--no-headers=true");
+        getEventsCmd.add("-o");
+        String customColumns = "TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp";
+        getEventsCmd.add("custom-columns=" + customColumns);
+        String events = execute(getEventsCmd.toArray(new String[0]));
+        log.debug("events: " + events);
+        return events;
+        
+        //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
+        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp 
+        
+    }
+    
+    public String getPodLogs(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getLogsCmd = new ArrayList<String>();
+        getLogsCmd.add("kubectl");
+        getLogsCmd.add("--namespace");
+        getLogsCmd.add(k8sNamespace);
+        getLogsCmd.add("get");
+        getLogsCmd.add("log");
+        getLogsCmd.add("--selector=canfar-net-userid=" + forUserID);
+        getLogsCmd.add("--selector=canfar-net-sessionID=" + sessionID);
+        String podLogs = execute(getLogsCmd.toArray(new String[0]));
+        log.debug("pod logs: " + podLogs);
+        return podLogs;
     }
     
     public List<Session> getAllSessions(String forUserID) throws Exception {
