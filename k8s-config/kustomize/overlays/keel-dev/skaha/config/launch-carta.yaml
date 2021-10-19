@@ -29,6 +29,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -43,14 +44,16 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - /carta/arcade-carta /arc /arc/projects
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
+            ephemeral-storage: "20Gi"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 5901
           protocol: TCP

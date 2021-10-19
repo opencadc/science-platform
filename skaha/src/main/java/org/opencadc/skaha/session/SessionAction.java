@@ -106,6 +106,8 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
     
+    protected static final String SESSION_DETAIL_MAX = "max";
+    
     protected String requestType;
     protected String sessionID;
     protected String appID;
@@ -183,8 +185,12 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
     }
     
-    public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/carta/http/" + sessionID + "/?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
+        String url = "https://" + host + "/carta/http/" + sessionID + "/";
+        if (altSocketUrl) {
+            url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+        }
+        return url;
     }
     
     public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
@@ -205,7 +211,7 @@ public abstract class SessionAction extends SkahaAction {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 String userid = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
                 HttpGet download = new HttpGet(
-                        new URL("https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
+                        new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
                 download.run();
                 String proxyCert = out.toString();
                     
@@ -271,19 +277,31 @@ public abstract class SessionAction extends SkahaAction {
     
     public List<Session> getAllSessions(String forUserID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + forUserID,
-            "--no-headers=true",
-            "-o", "custom-columns=" +
-                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
-                "TYPE:.metadata.labels.canfar-net-sessionType," +
-                "STATUS:.status.phase," +
-                "NAME:.metadata.labels.canfar-net-sessionName," +
-                "STARTED:.status.startTime," +
-                "DELETION:.metadata.deletionTimestamp"};
+        List<String> getSessionsCMD = new ArrayList<String>();
+        getSessionsCMD.add("kubectl");
+        getSessionsCMD.add("get");
+        getSessionsCMD.add("--namespace");
+        getSessionsCMD.add(k8sNamespace);
+        getSessionsCMD.add("pod");
+        if (forUserID != null) {
+            getSessionsCMD.add("--selector=canfar-net-userid=" + forUserID);
+        }
+        getSessionsCMD.add("--no-headers=true");
+        getSessionsCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+            "USERID:.metadata.labels.canfar-net-userid," +
+            "IMAGE:.spec.containers[0].image," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.phase," +
+            "NAME:.metadata.labels.canfar-net-sessionName," +
+            "STARTED:.status.startTime," +
+            "DELETION:.metadata.deletionTimestamp";
+        
+        getSessionsCMD.add(customColumns);
                 
-        String vncSessions = execute(getSessionsCMD);
+        String vncSessions = execute(getSessionsCMD.toArray(new String[0]));
         log.debug("VNC Session list: " + vncSessions);
         
         List<Session> sessions = new ArrayList<Session>();
@@ -303,11 +321,13 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("line: " + k8sOutput);
         String[] parts = k8sOutput.split("\\s+");
         String id = parts[0];
-        String type = parts[1];
-        String status = parts[2];
-        String name = parts[3];
-        String startTime = "Up since " + parts[4];
-        String deletionTimestamp = parts[5];
+        String userid = parts[1];
+        String image = parts[2];
+        String type = parts[3];
+        String status = parts[4];
+        String name = parts[5];
+        String startTime = "Up since " + parts[6];
+        String deletionTimestamp = parts[7];
         if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
@@ -317,13 +337,18 @@ public abstract class SessionAction extends SkahaAction {
             connectURL = SessionAction.getVNCURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionAction.getCartaURL(host, id);
+            if (image.endsWith(":1.4")) {
+                // support alt web socket path for 1.4 carta 
+                connectURL = SessionAction.getCartaURL(host, id, true); 
+            } else {
+                connectURL = SessionAction.getCartaURL(host, id, false);
+            }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionAction.getNotebookURL(host, id);
         }
 
-        return new Session(id, type, status, name, startTime, connectURL);
+        return new Session(id, userid, image, type, status, name, startTime, connectURL);
         
     }
     

@@ -918,6 +918,11 @@ portal:
 ## Harbor Core parameters
 ##
 core:
+
+  ## BM: set the priority class
+  ## Note: This does not work--waiting for feedback from bitnami
+  priorityClassName: uber-user-preempt-high
+
   ## Harbor core container command (using container default if not set)
   ##
   command:
@@ -2263,6 +2268,9 @@ redis:
   cluster:
     enabled: false
   master:
+    # BM: set priority class name
+    # Note: this works
+    priorityClassName: uber-user-preempt-high
     persistence:
       enabled: true
       #BM Added lines below

@@ -38,13 +38,13 @@ The CANFAR Science Platform, a web interface to skaha, is here: https://www.canf
 
 ## Session Containers
 
-Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
+Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Containers](containers) directory.
 
 ## Software Containers
 
 These are some of the astronomy science containers that have been built for skaha.  They run as applications within skaha.  The graphical aspects of the containers are displayed in skaha-desktop by sending the DISPLAY to skaha-desktop.
 
-More information on software containers can be found in the [Skaha Containers](skaha-containers) directory.
+More information on software containers can be found in the [Containers](containers) directory.
 
 ## Dependencies
 

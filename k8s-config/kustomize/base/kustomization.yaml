@@ -3,4 +3,4 @@ bases:
 - ./arc
 - ./sssd
 - ./skaha
-- ./desktop-software
+- ./skaha-workload
