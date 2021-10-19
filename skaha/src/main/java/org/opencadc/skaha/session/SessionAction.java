@@ -164,6 +164,10 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public static String execute(String[] command) throws IOException, InterruptedException {
+        return execute(command, false);
+    }
+    
+    public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         int status = p.waitFor();
         log.debug("Status=" + status + " for command: " + Arrays.toString(command));
@@ -172,8 +176,12 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("stdout: " + stdout);
         log.debug("stderr: " + stderr);
         if (status != 0) {
-            String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-            throw new IOException(message);
+            if (allowError) {
+                return stderr;
+            } else {
+                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
+                throw new IOException(message);
+            }
         } 
         return stdout.trim();
     }
@@ -285,8 +293,8 @@ public abstract class SessionAction extends SkahaAction {
         getPodCMD.add(k8sNamespace);
         getPodCMD.add("get");
         getPodCMD.add("pod");
-        getPodCMD.add("--selector=canfar-net-userid=" + forUserID);
-        getPodCMD.add("--selector=canfar-net-sessionID=" + sessionID);
+        getPodCMD.add("-l");
+        getPodCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
         getPodCMD.add("--no-headers=true");
         getPodCMD.add("-o");
         getPodCMD.add("custom-columns=NAME:.metadata.name");
@@ -330,13 +338,48 @@ public abstract class SessionAction extends SkahaAction {
         getLogsCmd.add("kubectl");
         getLogsCmd.add("--namespace");
         getLogsCmd.add(k8sNamespace);
-        getLogsCmd.add("get");
-        getLogsCmd.add("log");
-        getLogsCmd.add("--selector=canfar-net-userid=" + forUserID);
-        getLogsCmd.add("--selector=canfar-net-sessionID=" + sessionID);
-        String podLogs = execute(getLogsCmd.toArray(new String[0]));
+        getLogsCmd.add("logs");
+        getLogsCmd.add("-l");
+        getLogsCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        String podLogs = execute(getLogsCmd.toArray(new String[0]), true);
         log.debug("pod logs: " + podLogs);
         return podLogs;
+    }
+    
+    public Session getSession(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getSessionCMD = new ArrayList<String>();
+        getSessionCMD.add("kubectl");
+        getSessionCMD.add("get");
+        getSessionCMD.add("--namespace");
+        getSessionCMD.add(k8sNamespace);
+        getSessionCMD.add("pod");
+        getSessionCMD.add("-l");
+        getSessionCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getSessionCMD.add("--no-headers=true");
+        getSessionCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+            "USERID:.metadata.labels.canfar-net-userid," +
+            "IMAGE:.spec.containers[0].image," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.phase," +
+            "NAME:.metadata.labels.canfar-net-sessionName," +
+            "STARTED:.status.startTime," +
+            "DELETION:.metadata.deletionTimestamp";
+        
+        getSessionCMD.add(customColumns);
+                
+        String vncSession = execute(getSessionCMD.toArray(new String[0]));
+        log.debug("VNC Session: " + vncSession);
+       
+        if (StringUtil.hasLength(vncSession)) {
+            Session session = constructSession(vncSession.trim());
+            return session;
+        } else {
+            throw new ResourceNotFoundException("session " + sessionID + " not found");
+        }
     }
     
     public List<Session> getAllSessions(String forUserID) throws Exception {
@@ -348,7 +391,8 @@ public abstract class SessionAction extends SkahaAction {
         getSessionsCMD.add(k8sNamespace);
         getSessionsCMD.add("pod");
         if (forUserID != null) {
-            getSessionsCMD.add("--selector=canfar-net-userid=" + forUserID);
+            getSessionsCMD.add("-l");
+            getSessionsCMD.add("canfar-net-userid=" + forUserID);
         }
         getSessionsCMD.add("--no-headers=true");
         getSessionsCMD.add("-o");

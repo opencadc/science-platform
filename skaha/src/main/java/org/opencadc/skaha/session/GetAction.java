@@ -108,11 +108,14 @@ public class GetAction extends SessionAction {
             } else {
                 String view = syncInput.getParameter("view");
                 if (SESSION_VIEW_LOGS.equals(view)) {
-                    throw new UnsupportedOperationException("Session detail viewing not supported.");
+                    String logs = getLogs(sessionID);
+                    syncOutput.setHeader("Content-Type", "applicatoin/json");
+                    syncOutput.getOutputStream().write(logs.getBytes());
+                } else {
+                    String json = getSingleSession(sessionID);
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
                 }
-                String logs = getPodLogs(sessionID);
-                syncOutput.setHeader("Content-Type", "text/plain");
-                syncOutput.getOutputStream().write(logs.getBytes());
             }
             return;
         }
@@ -123,6 +126,12 @@ public class GetAction extends SessionAction {
                 throw new UnsupportedOperationException("App detail viewing not supported.");
             }
         }
+    }
+    
+    public String getSingleSession(String sessionID) throws Exception {
+        Session session = this.getSession(userID, sessionID);
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+        return gson.toJson(session);
     }
     
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
@@ -139,8 +148,18 @@ public class GetAction extends SessionAction {
         
         List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
         
+        // if for all users, only show public information
+        String json = null;
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        String json = gson.toJson(filteredSessions);
+        if (allUsers) {
+            List<PublicSession> publicSessions = new ArrayList<PublicSession>(filteredSessions.size());
+            for (Session s : filteredSessions) {
+                publicSessions.add(new PublicSession(s.getUserid(), s.getType(), s.getStatus(), s.getStartTime()));
+            }
+            json = gson.toJson(publicSessions);
+        } else {
+            json = gson.toJson(filteredSessions);
+        }
         
         return json;
     }
@@ -156,17 +175,23 @@ public class GetAction extends SessionAction {
         return ret;
     }
     
-    public String getPodLogs(String sessionID) throws Exception {
+    public String getLogs(String sessionID) throws Exception {
+        Session session = getSession(userID, sessionID);
         String events = getEvents(userID, sessionID);
+        if (!StringUtil.hasLength(events)) {
+            events = "<none>";
+        }
         String podLogs = getPodLogs(userID, sessionID);
+        if (!StringUtil.hasLength(podLogs)) {
+            podLogs = "<none>";
+        }
+        SessionLogs logs = new SessionLogs();
+        logs.session = session;
+        logs.eventLogs = events;
+        logs.containerLogs = podLogs;
         
-        StringBuilder sb = new StringBuilder();
-        sb.append("--- SCHEDULING EVENTS ---\n");
-        sb.append(events + "\n");
-        sb.append("--- IMAGE LOGS ---\n");
-        sb.append(podLogs + "\n");
-        
-        return "";
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+        return gson.toJson(logs);
     }
 
 

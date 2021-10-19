@@ -108,7 +108,7 @@ public class GetSessionsTests {
     public void testListSessions() {
         try {
             GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null, true);
+            String json = get.listSessions(null, null, false);
             log.info("json: \n" + json);
             List<Session> sessions1 = get.getAllSessions(null);
             Gson gson = new Gson();
