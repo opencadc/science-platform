@@ -1,0 +1,9 @@
+namespace: skaha-cleanup
+resources:
+- cleanup-daemonset.yaml
+configMapGenerator:
+- name: cleanup-script
+  files:
+  - config/cleanup.sh
+generatorOptions:
+ disableNameSuffixHash: true
