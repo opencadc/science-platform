@@ -38,10 +38,10 @@ paths:
         type: string
         description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
         required: false
-      - name: detail
+      - name: view
         in: query
         type: string
-        description: Session list detail level.  The only valid value for this field is 'max'.  If set to max, all users' session are listed, not just the calling user's sessions.
+        description: Session list view level.  If set to 'all', all users' sessions are listed (with limited information), not just the calling user's sessions.
         required: false
     post:
       description: |
@@ -59,7 +59,7 @@ paths:
           in: query
           type: string
           description: |
-              The image ID of for the session.  For example:
+              The image ID of the session.  For example:
               ```
               images.canfar.net/skaha/notebook-scipy:0.2
               ```
@@ -118,6 +118,37 @@ paths:
         default:
           description: Unexpected error
   /session/{sessionID}:
+    get:
+      description: |
+        Get the session identified by sessionID as a JSON object.
+      tags:
+        - Session Management
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '404':
+          description: Not found
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: sessionID
+          in: path
+          type: string
+          description: The session to get, returned in application/json format.
+          required: true
+        - name: view
+          in: query
+          type: string
+          description: If set to 'event', return the scheduling event logs.  If set to 'log', return the container logs in text/plain format.  Responses are in text/plain format.
+          required: false
     delete:
       description: |
         Delete the session identified by sessionID.

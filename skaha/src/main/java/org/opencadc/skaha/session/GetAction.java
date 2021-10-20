@@ -67,6 +67,8 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.StringUtil;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -96,15 +98,31 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
-                String detail = syncInput.getParameter("detail");
-                boolean allUsers = SESSION_DETAIL_MAX.equals(detail);
+                String view = syncInput.getParameter("view");
+                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
                 
                 String json = listSessions(typeFilter, statusFilter, allUsers);
                 
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
-                throw new UnsupportedOperationException("Session detail viewing not supported.");
+                String view = syncInput.getParameter("view");
+                if (SESSION_VIEW_LOG.equals(view)) {
+                    // return the container log
+                    String logs = getContainerLog(sessionID);
+                    syncOutput.setHeader("Content-Type", "text/plain");
+                    syncOutput.getOutputStream().write(logs.getBytes());
+                } else if (SESSION_VIEW_EVENTS.equals(view)) {
+                    // return the event logs
+                    String logs = getEventLogs(sessionID);
+                    syncOutput.setHeader("Content-Type", "text/plain");
+                    syncOutput.getOutputStream().write(logs.getBytes());
+                } else {
+                    // return the session
+                    String json = getSingleSession(sessionID);
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
+                }
             }
             return;
         }
@@ -115,6 +133,12 @@ public class GetAction extends SessionAction {
                 throw new UnsupportedOperationException("App detail viewing not supported.");
             }
         }
+    }
+    
+    public String getSingleSession(String sessionID) throws Exception {
+        Session session = this.getSession(userID, sessionID);
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+        return gson.toJson(session);
     }
     
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
@@ -131,8 +155,18 @@ public class GetAction extends SessionAction {
         
         List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
         
+        // if for all users, only show public information
+        String json = null;
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        String json = gson.toJson(filteredSessions);
+        if (allUsers) {
+            List<PublicSession> publicSessions = new ArrayList<PublicSession>(filteredSessions.size());
+            for (Session s : filteredSessions) {
+                publicSessions.add(new PublicSession(s.getUserid(), s.getType(), s.getStatus(), s.getStartTime()));
+            }
+            json = gson.toJson(publicSessions);
+        } else {
+            json = gson.toJson(filteredSessions);
+        }
         
         return json;
     }
@@ -147,6 +181,21 @@ public class GetAction extends SessionAction {
         }
         return ret;
     }
-
+    
+    public String getEventLogs(String sessionID) throws Exception {
+        String events = getEvents(userID, sessionID);
+        if (!StringUtil.hasLength(events)) {
+            events = "<none>";
+        }
+        return events + "\n";
+    }
+    
+    public String getContainerLog(String sessionID) throws Exception {
+        String podLogs = getPodLogs(userID, sessionID);
+        if (!StringUtil.hasLength(podLogs)) {
+            podLogs = "<none>";
+        }
+        return podLogs + "\n";
+    }
 
 }
