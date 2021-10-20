@@ -108,7 +108,8 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String REQUEST_TYPE_APP = "app";
     
     protected static final String SESSION_LIST_VIEW_ALL = "all";
-    protected static final String SESSION_VIEW_LOGS = "logs";
+    protected static final String SESSION_VIEW_EVENTS = "events";
+    protected static final String SESSION_VIEW_LOG = "log";
     
     protected String requestType;
     protected String sessionID;
@@ -325,7 +326,13 @@ public abstract class SessionAction extends SkahaAction {
         getEventsCmd.add("custom-columns=" + customColumns);
         String events = execute(getEventsCmd.toArray(new String[0]));
         log.debug("events: " + events);
-        return events;
+        if (events != null) {
+            String[] lines = events.split("\n");
+            if (lines.length > 1) {  // header row returned
+                return events;
+            }
+        }
+        return "";
         
         //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
         //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp 

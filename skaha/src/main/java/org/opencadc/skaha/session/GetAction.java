@@ -107,11 +107,18 @@ public class GetAction extends SessionAction {
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 String view = syncInput.getParameter("view");
-                if (SESSION_VIEW_LOGS.equals(view)) {
-                    String logs = getLogs(sessionID);
-                    syncOutput.setHeader("Content-Type", "applicatoin/json");
+                if (SESSION_VIEW_LOG.equals(view)) {
+                    // return the container log
+                    String logs = getContainerLog(sessionID);
+                    syncOutput.setHeader("Content-Type", "text/plain");
+                    syncOutput.getOutputStream().write(logs.getBytes());
+                } else if (SESSION_VIEW_EVENTS.equals(view)) {
+                    // return the event logs
+                    String logs = getEventLogs(sessionID);
+                    syncOutput.setHeader("Content-Type", "text/plain");
                     syncOutput.getOutputStream().write(logs.getBytes());
                 } else {
+                    // return the session
                     String json = getSingleSession(sessionID);
                     syncOutput.setHeader("Content-Type", "application/json");
                     syncOutput.getOutputStream().write(json.getBytes());
@@ -175,24 +182,20 @@ public class GetAction extends SessionAction {
         return ret;
     }
     
-    public String getLogs(String sessionID) throws Exception {
-        Session session = getSession(userID, sessionID);
+    public String getEventLogs(String sessionID) throws Exception {
         String events = getEvents(userID, sessionID);
         if (!StringUtil.hasLength(events)) {
             events = "<none>";
         }
+        return events + "\n";
+    }
+    
+    public String getContainerLog(String sessionID) throws Exception {
         String podLogs = getPodLogs(userID, sessionID);
         if (!StringUtil.hasLength(podLogs)) {
             podLogs = "<none>";
         }
-        SessionLogs logs = new SessionLogs();
-        logs.session = session;
-        logs.eventLogs = events;
-        logs.containerLogs = podLogs;
-        
-        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        return gson.toJson(logs);
+        return podLogs + "\n";
     }
-
 
 }

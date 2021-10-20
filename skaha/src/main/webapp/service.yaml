@@ -142,12 +142,12 @@ paths:
         - name: sessionID
           in: path
           type: string
-          description: The session to get
+          description: The session to get, returned in application/json format.
           required: true
         - name: view
           in: query
           type: string
-          description: If set to 'log', show the session info, scheduling information, and container logs in text/plain format.
+          description: If set to 'event', return the scheduling event logs.  If set to 'log', return the container logs in text/plain format.  Responses are in text/plain format.
           required: false
     delete:
       description: |
