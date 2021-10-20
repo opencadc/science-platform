@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.io.MultiBufferIO;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -82,9 +83,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.AccessControlException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -109,7 +114,7 @@ public abstract class SessionAction extends SkahaAction {
     
     protected static final String SESSION_LIST_VIEW_ALL = "all";
     protected static final String SESSION_VIEW_EVENTS = "events";
-    protected static final String SESSION_VIEW_LOG = "log";
+    protected static final String SESSION_VIEW_LOGS = "logs";
     
     protected String requestType;
     protected String sessionID;
@@ -166,6 +171,26 @@ public abstract class SessionAction extends SkahaAction {
     
     public static String execute(String[] command) throws IOException, InterruptedException {
         return execute(command, false);
+    }
+    
+    public static void execute(String[] command, OutputStream out) throws IOException, InterruptedException {
+        Process p = Runtime.getRuntime().exec(command);
+
+        WritableByteChannel wbc = Channels.newChannel(out);
+        ReadableByteChannel rbc = Channels.newChannel(p.getInputStream());
+
+        int count = 0;
+        ByteBuffer buffer = ByteBuffer.allocate(512);
+        while (count != -1) {
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
+            }
+            count = rbc.read(buffer);
+            if (count != -1) {
+                wbc.write((ByteBuffer)buffer.flip());
+                buffer.flip();
+            }
+        }
     }
     
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
@@ -339,7 +364,7 @@ public abstract class SessionAction extends SkahaAction {
         
     }
     
-    public String getPodLogs(String forUserID, String sessionID) throws Exception {
+    public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getLogsCmd = new ArrayList<String>();
         getLogsCmd.add("kubectl");
@@ -348,9 +373,9 @@ public abstract class SessionAction extends SkahaAction {
         getLogsCmd.add("logs");
         getLogsCmd.add("-l");
         getLogsCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
-        String podLogs = execute(getLogsCmd.toArray(new String[0]), true);
-        log.debug("pod logs: " + podLogs);
-        return podLogs;
+        getLogsCmd.add("--tail");
+        getLogsCmd.add("-1");
+        execute(getLogsCmd.toArray(new String[0]), out);
     }
     
     public Session getSession(String forUserID, String sessionID) throws Exception {
@@ -441,7 +466,7 @@ public abstract class SessionAction extends SkahaAction {
         String type = parts[3];
         String status = parts[4];
         String name = parts[5];
-        String startTime = "Up since " + parts[6];
+        String startTime = parts[6];
         String deletionTimestamp = parts[7];
         if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;

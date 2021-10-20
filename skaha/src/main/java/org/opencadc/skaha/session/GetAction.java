@@ -72,6 +72,7 @@ import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -107,11 +108,11 @@ public class GetAction extends SessionAction {
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 String view = syncInput.getParameter("view");
-                if (SESSION_VIEW_LOG.equals(view)) {
+                if (SESSION_VIEW_LOGS.equals(view)) {
                     // return the container log
-                    String logs = getContainerLog(sessionID);
                     syncOutput.setHeader("Content-Type", "text/plain");
-                    syncOutput.getOutputStream().write(logs.getBytes());
+                    syncOutput.setCode(200);
+                    streamContainerLogs(sessionID, syncOutput.getOutputStream());
                 } else if (SESSION_VIEW_EVENTS.equals(view)) {
                     // return the event logs
                     String logs = getEventLogs(sessionID);
@@ -190,12 +191,8 @@ public class GetAction extends SessionAction {
         return events + "\n";
     }
     
-    public String getContainerLog(String sessionID) throws Exception {
-        String podLogs = getPodLogs(userID, sessionID);
-        if (!StringUtil.hasLength(podLogs)) {
-            podLogs = "<none>";
-        }
-        return podLogs + "\n";
+    public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
+        streamPodLogs(userID, sessionID, out);
     }
 
 }
