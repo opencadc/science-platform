@@ -2,6 +2,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
+  labels:
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
 spec:
   activeDeadlineSeconds: 1209600
