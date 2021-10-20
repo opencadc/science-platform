@@ -20,7 +20,7 @@ spec:
         command: ["/bin/sh"]
         args: ["-c", "while true; do sleep 10;done"]
         volumeMounts:
-        - mountPath: /skaha-system
+        - mountPath: /skaha-cleanup
           name: cleanup-script          
       terminationGracePeriodSeconds: 30
       securityContext:
