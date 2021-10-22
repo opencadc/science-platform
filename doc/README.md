@@ -38,6 +38,8 @@ The CANFAR Science Portal allows for the creation of CARTA (Cube Analysis and Re
 
 ### ARCADE Desktop
 
+For running CASA and other non-browser applications in the Science Platform.
+
 - ARCADE documentation and tutorials: [ARCADE](https://github.com/canfar/arcade)
 - Launching a CASA window in ARCADE YouTube tutorial:  [YouTube Tutorial](https://youtu.be/GDDQ3jKbldU)
 
@@ -83,7 +85,54 @@ By default the proxy certificate is valid for 10 days.  This can be modified (to
 
 Instead of prompting for your password, cadc-get-cert can read it from your `$HOME/.netrc` file using the `--netrc-file` parameter.
 
-#### Headless Jobs
+### Headless Jobs
+
+Please contact us before making use of the 'headless job' support--we are incrementally adding support for batch processing in the science platform.
+
+#### Create an image
+
+Create an image as per the regular process of making containers available in the platform:  [Publishing](https://github.com/opencadc/skaha/tree/master/containers)
+
+However, label it as `headless` in https://images.canfar.net to make it available for headless job launching.
+
+#### Launch a headless job
+
+For the full details of the job launching API, see this section of the akaha API documentation:  https://ws-uv.canfar.net/skaha#!/Session_Management/post_session
+
+All jobs will be run as the calling user.  All jobs have the `/arc` filesystem mounted.
+
+Example: launch a headless job, overriding the command and providing two arguments:
+
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session -d "name=headless-test" -d "image=images.canfar.net/skaha/terminal:0.1" --data-urlencode "cmd=touch" --data-urlencode "args=/arc/home/majorb/headless-test-1a /arc/home/majorb/headless-test-1b"```
+
+skaha will return the `sessionID` on a successful post (job launch).  The job will remain in the system for 1 hour after completion (success or failure).
+
+Job phases:
+- Pending
+- Running
+- Succeeded
+- Failed
+- Terminating
+- Unknown
+
+To view all sessions and jobs:
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session```
+
+To view a single session or job:
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>```
+
+To view logs for session:
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>?view=logs```
+
+This shows the complete output (stdout and stderr) for the image for the job.
+
+To view scheduling events for session:
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>?view=events```
+
+Scheduling events will only be seen when there are issues scheduling the job on a node.
+
+
+
 
 
 ![canfar](canfar-logo.png)
