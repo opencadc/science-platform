@@ -1,9 +1,5 @@
 # skaha - A Container-based Science Platform in CANFAR
 
-## Table of contents
-  * [Science Portal Documentation](#science-portal-documentation)
-  * [Skaha System Documentation](#skaha-system-documentation)
-
 ## Science Portal Documentation
 
 The CANFAR Science Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
@@ -45,7 +41,19 @@ The CANFAR Science Portal allows for the creation of CARTA (Cube Analysis and Re
 - ARCADE documentation and tutorials: [ARCADE](https://github.com/canfar/arcade)
 - Launching a CASA window in ARCADE YouTube tutorial:  [YouTube Tutorial](https://youtu.be/GDDQ3jKbldU)
 
-## Programatic Access
+## Storage
+
+All sessions and applications that run in the Science Portal have filesystem access to the same storage, mounted at `/arc`.  Within are `/arc/home` (contains all home directories) and `/arc/projects` (for project use).  We encourage the use of `/arc/projects` for most data, and `/arc/home` for personalized configuration.
+
+`arc` is accesible through an API based on the IVOA VOSpace specification.  The following list the ways it can be accessed:
+- Through the `/arc` filesystem mount on all portal sessions and ARCADE windows.
+- Using the storage management UI in CANFAR: https://www.canfar.net/storage/arc/list
+- Using the [CADC Python libraries](https://github.com/opencadc/vostools/tree/master/vos)
+- Using sshfs [documentation](https://github.com/canfar/arcade/tree/master/arcade-tutorial)
+
+Please take care to protect sensitive information by ensuring it is not publicly accessible.
+
+## Programmatic Access
 
 The skaha API definition and science platform service are here:  https://ws-uv.canfar.net/skaha
 
@@ -76,10 +84,6 @@ By default the proxy certificate is valid for 10 days.  This can be modified (to
 Instead of prompting for your password, cadc-get-cert can read it from your `$HOME/.netrc` file using the `--netrc-file` parameter.
 
 #### Headless Jobs
-
-## Skaha System Documentation
-
-TBD
 
 
 ![canfar](canfar-logo.png)
