@@ -204,6 +204,9 @@ public class PostAction extends SessionAction {
                 }
                 
                 createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                // return the session id
+                syncOutput.setHeader("Content-Type", "text/plain");
+                syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
