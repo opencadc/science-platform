@@ -9,7 +9,9 @@
 The CANFAR Science Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
 
 A Canadian Astronomy Data Centre (CADC) Account and authorization to use the portal are required first.
+
 To request a CADC Account:  http://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html
+
 To request authorization to use the science portal, send an email to [support@canfar.net](mailto:support@canfar.net)
 
 ## Community and Support
