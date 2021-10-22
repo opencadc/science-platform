@@ -1,6 +1,6 @@
 namespace: skaha-cleanup
 resources:
-- cronjob.yaml
+- cleanup-job.yaml
 configMapGenerator:
 - name: cleanup-script
   files:

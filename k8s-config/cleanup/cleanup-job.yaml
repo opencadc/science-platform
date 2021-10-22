@@ -1,15 +1,14 @@
 apiVersion: batch/v1
-kind: CronJob
+kind: Job
 metadata:
-  name: skaha-cleanup-cj
+  name: skaha-cleanup-job
 spec:
-  schedule: "* * * * 0"
   jobTemplate:
     spec:
       template:
         spec:
           containers:
-            - name: skaha-cleanup-cj
+            - name: skaha-cleanup-job
               image: busybox
               imagePullPolicy: Always
               command: ["/bin/sh"]
