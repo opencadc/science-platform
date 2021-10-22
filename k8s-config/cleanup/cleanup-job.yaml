@@ -13,11 +13,3 @@ spec:
               imagePullPolicy: Always
               command: ["/bin/sh"]
               args: ["-c", "cleanup.sh"]
-            volumeMounts:
-            - mountPath: /skaha-cleanup
-              name: cleanup-script          
-          volumes:
-          - name: cleanup-script
-            configMap:
-              name: cleanup-script
-              defaultMode: 0777
