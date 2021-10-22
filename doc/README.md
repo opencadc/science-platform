@@ -26,7 +26,7 @@ The CANFAR Science Portal allows users to run both pre-built, shared containers 
 
 Logins to the Image Registry are done through the OpenID Connect Login button using your CADC/CANFAR crendentials.  Contact the project image coordinator to obtain authorization to publish images to that project.
 
-Details of image publishing for use in the CANFAR science portal can be found here:  [Publishing](https://github.com/opencadc/skaha/tree/master/containers)
+Details of image publishing for use in the CANFAR science portal can be found here:  [Publishing](../containers)
 
 ### Jupyter Notebooks
 
@@ -91,7 +91,7 @@ Please contact us before making use of the 'headless job' support--we are increm
 
 #### Create an image
 
-Create an image as per the regular process of making containers available in the platform:  [Publishing](https://github.com/opencadc/skaha/tree/master/containers)
+Create an image as per the regular process of making containers available in the platform:  [Publishing](../containers)
 
 However, label it as `headless` in https://images.canfar.net to make it available for headless job launching.
 
