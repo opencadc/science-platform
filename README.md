@@ -12,7 +12,7 @@
 
 ## CANFAR Science Portal Documentation
 
-User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](https://github.com/brianmajor/skaha/tree/master/doc)
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](doc)
 
 ## Acknowledgements
 This project has been funded in part by:
