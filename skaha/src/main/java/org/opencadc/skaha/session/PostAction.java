@@ -204,6 +204,9 @@ public class PostAction extends SessionAction {
                 }
                 
                 createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                // return the session id
+                syncOutput.setHeader("Content-Type", "text/plain");
+                syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -616,7 +619,9 @@ public class PostAction extends SessionAction {
         }
         sb.append("\n        env:");
         sb.append("\n        - name: HOME");
-        sb.append("\n          value: \"").append(homedir).append(userID).append("\"");
+        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
+        sb.append("\n        - name: PWD");
+        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
         if (envs != null && !envs.isEmpty()) {
             for (String env : envs) {
                 String[] keyVal = env.split("=");
