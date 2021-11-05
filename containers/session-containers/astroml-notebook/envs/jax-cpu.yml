@@ -1,0 +1,24 @@
+name: base
+
+channels:
+  - conda-forge
+  
+dependencies:
+  - pip
+  - chex
+  - dm-haiku
+  - jax
+  - flax
+  - numpyro
+  - optax
+  - pymc3
+  - toolz
+  - cloudpickle
+ 
+  - pip:
+  # not yet in conda
+    - dm-pix
+    - elegy
+    - objax
+    - ott
+#    - 

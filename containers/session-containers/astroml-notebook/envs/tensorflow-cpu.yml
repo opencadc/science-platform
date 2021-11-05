@@ -1,0 +1,14 @@
+name: base
+
+channels:
+  - conda-forge
+  
+dependencies:
+  - pip
+  - tensorflow=2.6.0
+  - tensorflow-probability
+  
+  - pip:
+    # not yet in conda
+    - edward2
+    - tensorflow-addons

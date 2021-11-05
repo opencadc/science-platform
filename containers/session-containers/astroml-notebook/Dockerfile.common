@@ -1,0 +1,62 @@
+FROM jupyter/scipy-notebook:latest
+
+USER root
+
+RUN mkdir /opt/image-build && chmod 777 /opt/image-build
+
+# install apt packages
+COPY scripts/apt-install.sh  /opt/image-build
+COPY envs/common.apt /opt/image-build
+WORKDIR /opt/image-build
+RUN ./apt-install.sh ./common.apt
+
+# install latest stilts
+RUN wget --quiet http://www.star.bris.ac.uk/~mbt/stilts/stilts.jar \
+	-O /usr/local/bin/stilts.jar \
+	&& wget --quiet http://www.star.bris.ac.uk/~mbt/stilts/stilts \
+	-O /usr/local/bin/stilts \
+	&& chmod +x /usr/local/bin/stilts
+
+#
+#ENV NB_GID=768
+#RUN groupadd -g 768 jovyan \
+#	&& usermod -g jovyan jovyan \
+#	&& chown "${NB_USER}:${NB_GID}" "${CONDA_DIR}"
+
+# install conda and pip packages
+USER ${NB_UID}
+RUN rm ${CONDA_DIR}/conda-meta/pinned \
+	&& mamba install python=3.8 --quiet --yes \
+	&& mamba update --all --quiet --yes \
+	&& mamba clean --all --quiet --yes
+
+COPY scripts/conda-install.sh /opt/image-build
+COPY envs/common.yml /opt/image-build
+RUN ./conda-install.sh common.yml
+#COPY envs/test.yml /opt/image-build
+#RUN ./conda-install.sh test.yml
+
+# Copy local files as late as possible to avoid cache busting
+
+COPY config/jupyter_notebook_config.py /etc/jupyter/
+COPY config/condarc /opt/image-build
+RUN cat /opt/image-build/condarc >> ${CONDA_DIR}/.condarc
+
+# left-overs
+RUN jupyter lab build \
+	&& jupyter lab clean \
+	&& fix-permissions "/home/${NB_USER}" \
+	&& fix-permissions "${CONDA_DIR}"
+#	&& rm -rf "/home/${NB_USER}/.cache/yarn" \
+
+
+USER root
+
+# install kernels as root
+RUN python -m bash_kernel.install
+ADD config/nsswitch.conf /etc/
+COPY config/bash.bashrc /opt/image-build
+RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
+RUN mkdir /usr/local/bin/start-notebook.d/
+COPY scripts/cdhome.sh /usr/local/bin/start-notebook.d/
+COPY scripts/start-notebook.sh /usr/local/bin/

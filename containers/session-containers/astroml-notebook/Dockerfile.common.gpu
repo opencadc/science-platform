@@ -1,0 +1,5 @@
+FROM canfar/astroml:latest
+
+USER ${NB_UID}
+COPY envs/common-gpu.yml /opt/image-build
+RUN /opt/image-build/conda-install.sh /opt/image-build/common-gpu.yml
