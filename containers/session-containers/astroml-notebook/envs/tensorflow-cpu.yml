@@ -5,7 +5,8 @@ channels:
   
 dependencies:
   - pip
-  - tensorflow=2.6.0
+  - keras-tuner
+  - tensorflow>=2.6.0
   - tensorflow-probability
   
   - pip:
