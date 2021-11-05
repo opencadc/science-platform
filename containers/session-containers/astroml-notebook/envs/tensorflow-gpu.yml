@@ -1,0 +1,17 @@
+name: base
+
+channels:
+  - conda-forge
+  
+dependencies:
+  - pip
+  - cudatoolkit=11.1.*
+  - arrow-cpp=*=*cuda*
+  - pyarrow=*=*cuda*
+  - tensorflow=2.6.0
+  - tensorflow-probability
+  
+  - pip:
+    # not yet in conda
+    - edward2
+    - tensorflow-addons
