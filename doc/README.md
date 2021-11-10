@@ -1,24 +1,25 @@
-# skaha - A Container-based Science Platform in CANFAR
 
-## Science Portal Documentation
 
-The CANFAR Science Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
+# CANFAR Science Platform Documentation
+
+# Table of Contents
+1. [Introduction and Access](#introduction-and-access)
+2. [Interactive Sessions](#interactive-sessions)
+3. [Storage](#storage)
+4. [Programmatic Access](#programmatic-access)
+5. [Community and Support](#community-and-support)
+6. [FAQ](#faq)
+
+## Introduction and Access
+
+The CANFAR Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
+On the portal are the [Science Portal](https://www.canfar.net/science-portal) and the [Storage UI](https://www.canfar.net/storage/arc/list/).
 
 A Canadian Astronomy Data Centre (CADC) Account and authorization to use the portal are required first.
 
-To request a CADC Account:  http://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html
+To request a CADC Account:  https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html
 
 To request authorization to use the science portal, send an email to [support@canfar.net](mailto:support@canfar.net)
-
-## Community and Support
-
-Dicussions of issues and platform features take place in the Science Platform Slack Channel:  [Science Platform Slack Channel](https://cadc.slack.com/archives/C01K60U5Q87)
-
-Reporting of bugs and new feature requests can also be made as github issues:  https://github.com/opencadc/skaha/issues
-
-Contributions to the platform (including updates or corrections to the documentation) can be submitted as pull requests to this github project.
-
-General inquiries can be made to [support@canfar.net](mailto:support@canfar.net)
 
 ## Interactive Sessions
 
@@ -131,8 +132,23 @@ To view scheduling events for session:
 
 Scheduling events will only be seen when there are issues scheduling the job on a node.
 
+## Community and Support
 
+Dicussions of issues and platform features take place in the Science Platform Slack Channel:  [Science Platform Slack Channel](https://cadc.slack.com/archives/C01K60U5Q87)
 
+Reporting of bugs and new feature requests can also be made as github issues:  https://github.com/opencadc/skaha/issues
+
+Contributions to the platform (including updates or corrections to the documentation) can be submitted as pull requests to this github project.
+
+General inquiries can be made to [support@canfar.net](mailto:support@canfar.net)
+
+## FAQ
+
+* ***My session is stuck in the `Pending` state*** - This can imply that the platform is unable to launch your image.  There are a number of potential causes:
+   * Often skaha fails to authorize you to https:images.canfar.net due to an expired `CLI Secret`.  Try resetting this value by logging into https://images.canfar.net (using the OIDC Login button), going to your User Profile, and updating your CLI Secret.  Once done you should delete the Pending session and try launching it again.
+    * If the image is proprietary and the CLI Secret update did not work, check with your project administrator to ensure you have been granted access to the project in https://images.canfar.net
+    * The session could be in a Pending state waiting for resources so that it can be scheduled.
+    * More information about the reason for the Pending state can be found using the logging mechanisms explained in [Programmatic Access](#programmatic-access).
 
 
 ![canfar](canfar-logo.png)
