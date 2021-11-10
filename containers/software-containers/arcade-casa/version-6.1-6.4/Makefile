@@ -1,31 +1,13 @@
 VERSIONS_OLD = \
-	4.5.0-el6 \
-	4.5.1-el6 \
-	4.5.2-el6 \
-	4.5.3-el6 \
-	4.6.0-el6 \
-	4.7.0-el6 \
-	4.7.1-el6 \
-	4.7.2-el6 \
-	5.0.0-218.el6 \
-	5.1.0-74.el6 \
-	5.1.1-5.el6 \
-	5.1.2-4.el6 \
-	5.3.0-143.el6 \
-	5.4.0-70.el6 \
-	5.4.1-32.el6 \
-	5.4.2-8.el6 \
-	5.5.0-149.el6 \
-	5.6.0-60.el6
-
-#VERSIONS_OLD = \
-#	4.5.0-el6
+ 	casa-6.3.0-48 \
+ 	casa-6.2.0-124 \
+ 	casa-6.1.0-118
 
 VERSIONS_PIPELINE = \
-	5.6.1-8.el6
+ 	6.2.1-7-pipeline-2021.2.0.128
 
 VERSIONS = \
-	5.7.0-134.el6
+	casa-6.4.0-16-py3.8
 
 DOCKER_REPO_BASE=images.canfar.net/arcade/casa
 
@@ -35,20 +17,20 @@ all: build-old build-pipeline build
 
 build-old: 
 	@- $(foreach V,$(VERSIONS_OLD), \
-		./download.sh casa-release-$(V) old ; \
-		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+		./download.sh $(V) old ; \
+		docker build --build-arg CASA_RELEASE=$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build-pipeline: 
 	@- $(foreach V,$(VERSIONS_PIPELINE), \
-                ./download.sh casa-pipeline-release-$(V) pipeline ; \
-                docker build --build-arg CASA_RELEASE=casa-pipeline-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+                ./download.sh $(V) pipeline ; \
+                docker build --build-arg CASA_RELEASE=$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 build: 
 	@- $(foreach V,$(VERSIONS), \
-                ./download.sh casa-release-$(V) current ; \
-                docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
+                ./download.sh $(V) current ; \
+                docker build --build-arg CASA_RELEASE=$(V) -t ${DOCKER_REPO_BASE}:$(V) .; \
 	)
 
 clean-old:
