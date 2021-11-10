@@ -298,10 +298,10 @@ public abstract class SkahaAction extends RestAction {
         URL harborURL = null;
         String message = null;
         if (project == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects?page_size=100");
             message = "projects";
         } else if (repo == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
             message = "repositories";
         } else {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
