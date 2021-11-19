@@ -10,7 +10,7 @@ metadata:
   name: "${skaha.jobname}"
 spec:
   activeDeadlineSeconds: 1209600
-  ttlSecondsAfterFinished: 0
+  ttlSecondsAfterFinished: 3600
   backoffLimit: 0
   template:
     metadata:
@@ -38,11 +38,6 @@ spec:
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
-        env:
-        - name: HOME
-          value: "/arc/home/${skaha.userid}"
-        - name: PWD
-          value: "/arc/home/${skaha.userid}"
         imagePullPolicy: Always
         resources:
           requests:

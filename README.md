@@ -1,6 +1,7 @@
 # skaha - A Container-based Science Platform in CANFAR
 
 #### Table of contents
+  * [User Documentation](#canfar-science-portal-documentation)
   * [Acknowledgements](#acknowledgements)
   * [Overview](#overview)
   * [System Components](#system-components)
@@ -8,6 +9,10 @@
   * [Software Containers](#software-containers)
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
+
+## CANFAR Science Portal Documentation
+
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](doc)
 
 ## Acknowledgements
 This project has been funded in part by:
