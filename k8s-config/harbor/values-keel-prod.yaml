@@ -2315,6 +2315,21 @@ postgresql:
     storageClass: ""
     #existingClaim: "harbor-pvc"
     subPath: harbor-postgresql
+  master:
+    extraVolumeMounts:
+      - name: writableconf
+        mountPath: /opt/bitnami/postgresql/conf
+      - name: writableconfd
+        mountPath: /opt/bitnami/postgresql/conf/conf.d
+      - name: writabletmp
+        mountPath: /opt/bitnami/postgresql/tmp
+    extraVolumes:
+      - name: writableconf
+        emptyDir: {}
+      - name: writableconfd
+        emptyDir: {}
+      - name: writabletmp
+        emptyDir: {}
   ## PostgreSQL initdb initdbScripts
   ##
   initdbScripts:
