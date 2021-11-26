@@ -138,6 +138,18 @@ Set the read-write group:
 setfacl -R -m group:{group-name}:rwx {read-write-dir}
 ```
 
+To set group permissions on an existing directory tree recursively, and to have new children in directories of that tree inherit the group permissions, run *one* of the following commands:
+
+Set the read group:
+```
+setfacl -R -d -m group:{group-name}:r-x {read-only-dir}
+```
+
+Set the read-write group:
+```
+setfacl -R -d -m group:{group-name}:rwx {read-write-dir}
+```
+
 ## Programmatic Access
 
 The skaha API definition and science platform service are here:  https://ws-uv.canfar.net/skaha
