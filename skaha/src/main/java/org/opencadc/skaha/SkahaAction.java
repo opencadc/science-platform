@@ -238,6 +238,10 @@ public abstract class SkahaAction extends RestAction {
         }
         String idToken = out.toString();
         log.debug("idToken: " + idToken);
+        if (idToken == null || idToken.trim().length() == 0) {
+            log.warn("null id token returned");
+            return null;
+        }
         // adding to public credentials
         IDToken tokenClass = new IDToken();
         tokenClass.idToken = idToken;
@@ -313,8 +317,13 @@ public abstract class SkahaAction extends RestAction {
         HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         log.debug("calling " + harborURL + " for " + message);
-        get.run();
-        log.debug("response code: " + get.getResponseCode());
+        try {
+            get.run();
+        } catch (Exception e) {
+            log.debug("error listing harbor " + message + ": " + e.getMessage(), e);
+            log.debug("response code: " + get.getResponseCode());
+            throw e;
+        }
      
         if (get.getThrowable() != null) {
             log.warn("error listing harbor " + message, get.getThrowable());

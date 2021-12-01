@@ -66,21 +66,15 @@
  */
 package org.opencadc.skaha.image;
 
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.rest.InlineContentHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.WeakHashMap;
 
 import org.apache.log4j.Logger;

@@ -542,6 +542,7 @@ public class PostAction extends SessionAction {
         JSONTokener tokener = new JSONTokener(userJson);
         JSONObject obj = new JSONObject(tokener);
         String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
+        log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
         
         String secretName = "harbor-secret-" + userID.toLowerCase();
@@ -556,18 +557,25 @@ public class PostAction extends SessionAction {
             log.debug("no secret to delete", notfound);
         }
         
-        // create new secret
-        String[] createCmd = new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
-             "--docker-server=" + harborHost,
-             "--docker-username=" + harborUsername,
-             "--docker-password=" + cliSecret};
-        String createResult = execute(createCmd);
-        log.debug("Create secret result: " + createResult);
+        // harbor invalidates secrets with the unicode replacement characters 'fffd'.
+        if (cliSecret != null && !cliSecret.startsWith("\ufffd")) {
+            // create new secret
+            String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
+                 "--docker-server=" + harborHost,
+                 "--docker-username=" + harborUsername,
+                 "--docker-password=" + cliSecret};
+            String createResult = execute(createCmd);
+            log.debug("Create secret result: " + createResult);
+        } else {
+            log.warn("Image repository 'CLI Secret' is invalid and needs resetting.");
+            return null;
+        }
         
         return secretName;
         
     }
+    
     
     private String getSupplementalGroupsList() {
         Subject subject = AuthenticationUtil.getCurrentSubject();
