@@ -69,7 +69,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.io.MultiBufferIO;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -302,7 +301,7 @@ public abstract class SessionAction extends SkahaAction {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
         if (!file.setExecutable(true, true)) {
-            log.warn("Failed to set execution permssion on file " + tmpFileName);
+            log.debug("Failed to set execution permssion on file " + tmpFileName);
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(data + "\n");
