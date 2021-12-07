@@ -13,7 +13,7 @@ spec:
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/skaha-cavern-allocate"]
-        args: ["jeevesh"]
+        args: ["majorb"]
 #        command: [ "/bin/bash", "-c", "--" ]
 #        args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
@@ -22,7 +22,7 @@ spec:
         - mountPath: /root/.ssl/
           name: servops-cert
           readOnly: true
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: cavern-volume
           subPath: cavern
         - mountPath: /var/lib/sss/pipes
