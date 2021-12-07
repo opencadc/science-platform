@@ -23,7 +23,7 @@ spec:
         - mountPath: /root/.ssl/
           name: servops-cert
           readOnly: true
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: cavern-volume
           subPath: cavern
         - mountPath: /var/lib/sss/pipes
