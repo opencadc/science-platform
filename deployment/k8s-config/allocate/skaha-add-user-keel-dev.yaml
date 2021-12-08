@@ -1,14 +1,16 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "skaha-allocate"
+  name: "skaha-add-user"
 spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
       containers:
-      - name: "skaha-allocate"
-        image: images.canfar.net/skaha-system/allocate:0.2
+      - name: "skaha-add-user"
+        image: images.canfar.net/skaha-system/add-user:0.2
         imagePullPolicy: IfNotPresent
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
