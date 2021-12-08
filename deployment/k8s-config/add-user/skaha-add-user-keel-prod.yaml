@@ -9,7 +9,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: "skaha-allocate"
-        image: images.canfar.net/skaha-system/allocate:0.2
+        image: images.canfar.net/skaha-system/allocate:1.0
         imagePullPolicy: IfNotPresent
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
