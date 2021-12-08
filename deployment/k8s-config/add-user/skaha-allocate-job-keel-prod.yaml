@@ -19,7 +19,7 @@ spec:
 #        args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
         - mountPath: "/config"
-          name: allocate-config
+          name: add-user-config
         - mountPath: /root/.ssl/
           name: servops-cert
           readOnly: true
@@ -33,9 +33,9 @@ spec:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: allocate-config
+      - name: add-user-config
         configMap:
-          name: allocate-config
+          name: add-user-config
       - name: servops-cert
         secret:
           defaultMode: 420
