@@ -5,7 +5,7 @@ set -e
 ### Give the SSSD container time to initialize
 sleep 10
 
-SELF=skaha-cavern-allocate
+SELF=add-user
 CONFDIR=/config
 
 TS=$(date)
@@ -13,7 +13,7 @@ echo "$TS $SELF START"
 
 if [ -z "$1" ]
   then
-    echo "Usage: skaha-cavern-allocation <userid>"
+    echo "Usage: add-user <userid>"
     exit 2
 fi
 USERID=$1
