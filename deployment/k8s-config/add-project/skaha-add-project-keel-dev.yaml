@@ -11,11 +11,11 @@ spec:
       containers:
       - name: "skaha-add-project"
         image: images.canfar.net/skaha-system/add-project:1.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
         # args: project-dir-name, owner-userid, project-group-name, read-only or read-write
-        args: ["myproject", "majorb", "mygroup", "read-write"]
+        args: ["test-project", "majorb", "skaha-users", "read-write"]
         volumeMounts:
         - mountPath: "/config"
           name: add-project-config
@@ -29,9 +29,9 @@ spec:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: add-user-config
+      - name: add-project-config
         configMap:
-          name: add-user-config
+          name: add-project-config
       - name: cavern-volume
         cephfs:
           monitors:

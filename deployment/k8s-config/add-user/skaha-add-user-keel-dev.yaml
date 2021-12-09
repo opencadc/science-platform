@@ -11,13 +11,11 @@ spec:
       containers:
       - name: "skaha-add-user"
         image: images.canfar.net/skaha-system/add-user:1.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         # Userid for allocation goes in this argument.
         # TODO: automate the setting of this in the calling script
-        command: ["/usr/bin/skaha-cavern-allocate"]
+        command: ["/usr/bin/add-user"]
         args: ["majorb"]
-#        command: [ "/bin/bash", "-c", "--" ]
-#        args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
         - mountPath: "/config"
           name: add-user-config
