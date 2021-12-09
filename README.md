@@ -61,4 +61,4 @@ skaha relies on a number of other opencadc modules to operate.
 * posix/sssd -- Containers in skaha are always run _as the user_ and with the users' group memberships.  If skaha-desktop and software-containers are run with a SSSD configuration that points to the same LDAP instance as used by ac, the names of those uids and gids can be resolved.
 
 ## Deployment
-skaha runs on kubernetes.  See the k8s-config directory for deployment specifics.
+skaha runs on kubernetes.  See the deployment directory for specifics.

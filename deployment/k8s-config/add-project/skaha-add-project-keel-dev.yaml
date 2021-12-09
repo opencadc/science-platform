@@ -1,27 +1,24 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "skaha-allocate"
+  name: "skaha-add-project"
 spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
       containers:
-      - name: "skaha-allocate"
-        image: images.canfar.net/skaha-system/allocate:0.2
-        imagePullPolicy: IfNotPresent
-        # Userid for allocation goes in this argument.
+      - name: "skaha-add-project"
+        image: images.canfar.net/skaha-system/add-project:1.0
+        imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
-        command: ["/usr/bin/skaha-cavern-allocate"]
-        args: ["majorb"]
-#        command: [ "/bin/bash", "-c", "--" ]
-#        args: [ "while true; do sleep 30; done;" ]
+        command: ["/usr/bin/add-project"]
+        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write
+        args: ["test-project", "majorb", "skaha-users", "read-write"]
         volumeMounts:
         - mountPath: "/config"
-          name: allocate-config
-        - mountPath: /root/.ssl/
-          name: servops-cert
-          readOnly: true
+          name: add-project-config
         - mountPath: "/arc"
           name: cavern-volume
           subPath: cavern
@@ -32,13 +29,9 @@ spec:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: allocate-config
+      - name: add-project-config
         configMap:
-          name: allocate-config
-      - name: servops-cert
-        secret:
-          defaultMode: 420
-          secretName: servops-clientcert
+          name: add-project-config
       - name: cavern-volume
         cephfs:
           monitors:
