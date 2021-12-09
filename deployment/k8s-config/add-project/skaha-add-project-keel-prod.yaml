@@ -2,22 +2,24 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "add-project"
+  name: "skaha-add-project"
 spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
       containers:
-      - name: "add-project"
+      - name: "skaha-add-project"
         image: images.canfar.net/skaha-system/add-project:1.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
         # args: project-dir-name, owner-userid, project-group-name, read-only or read-write
         args: ["myproject", "majorb", "mygroup", "read-write"]
         volumeMounts:
         - mountPath: "/config"
-          name: add-user-config
+          name: add-project-config
         - mountPath: "/arc"
           name: cavern-volume
           subPath: cavern
@@ -28,9 +30,9 @@ spec:
         runAsUser: 0
       serviceAccountName: skaha
       volumes:
-      - name: add-user-config
+      - name: add-project-config
         configMap:
-          name: add-user-config
+          name: add-project-config
       - name: cavern-volume
         cephfs:
           monitors:
