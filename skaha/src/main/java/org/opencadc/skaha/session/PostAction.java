@@ -114,6 +114,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
+    public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
@@ -346,7 +347,7 @@ public class PostAction extends SessionAction {
         String gpuScheduling = getGPUScheduling(gpus);
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
@@ -355,6 +356,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_HOSTNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
@@ -465,6 +467,7 @@ public class PostAction extends SessionAction {
         
         String launchString = new String(launchBytes, "UTF-8");
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
+        launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
