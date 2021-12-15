@@ -30,6 +30,7 @@ spec:
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
       containers:
       - name: "${skaha.jobname}"
         env:
