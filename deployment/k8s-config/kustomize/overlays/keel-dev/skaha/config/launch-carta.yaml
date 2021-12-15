@@ -30,6 +30,7 @@ spec:
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -43,7 +44,7 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/arcade-carta /arc /arc/projects
+        - /carta/skaha-carta /arc /arc/projects
         imagePullPolicy: Always
         resources:
           requests:
