@@ -22,12 +22,8 @@ do
       out=`kubectl -n skaha-workload get pods | grep -e "$id"`
       if [[ -z "$out" && -n "$id" ]]
       then
-        # no corresponding pod, delete orphaned sessions
-        if [ "$type" = "service" ]; then
-          kubectl -n skaha-workload delete service $name
-        else
-          kubectl -n skaha-workload delete ingress skaha-${session}-ingress-$id
-        fi
+        # no corresponding pod, delete orphaned session
+        kubectl -n skaha-workload delete $type $name
       fi
     done
 done
