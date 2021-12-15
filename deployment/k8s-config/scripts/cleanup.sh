@@ -15,7 +15,6 @@ do
     do
       # obtain various info on the session
       name=`echo $line | awk '{print $1}'`
-      session=`echo $name | awk -F- '{print $2}'`
       id=`echo $name | awk -F- '{print $4}'`
 
       # check if there is a corresponding pod
