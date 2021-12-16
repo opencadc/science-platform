@@ -105,13 +105,13 @@ public abstract class SkahaAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     
-    public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
     public static final String SESSION_TYPE_HEADLESS = "headless";
-    public static List<String> SESSION_TYPES = Arrays.asList(
-        new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS});
     public static final String TYPE_DESKTOP_APP = "desktop-app";
+    public static final String SESSION_TYPE_DESKTOP = "desktop";
+    public static List<String> SESSION_TYPES = Arrays.asList(
+        new String[] {SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS, SESSION_TYPE_DESKTOP, TYPE_DESKTOP_APP});
     
     protected String userID;
     protected boolean adminUser = false;
