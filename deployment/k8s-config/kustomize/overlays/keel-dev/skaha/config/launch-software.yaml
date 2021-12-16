@@ -21,6 +21,7 @@ spec:
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]

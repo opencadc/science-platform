@@ -30,6 +30,7 @@ spec:
         fsGroup: ${skaha.posixid}
         supplementalGroups: [100, ${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
       initContainers:
       - name: init-python-dir
         image: busybox
