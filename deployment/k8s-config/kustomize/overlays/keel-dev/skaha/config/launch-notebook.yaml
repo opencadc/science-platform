@@ -31,54 +31,6 @@ spec:
         supplementalGroups: [100, ${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
-      initContainers:
-      - name: init-python-dir
-        image: busybox
-        securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
-        command: ["mkdir", "-p", "/arc/home/${skaha.userid}/.local/lib/python3.8/site-packages"]
-        #args:
-        #- mkdir -p /arc/home/${skaha.userid}/.local/lib/python3.7/site-packages
-        volumeMounts:
-        - mountPath: "/arc"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-          readOnly: true
-#      - name: init-lab
-#        image: ${software.imageid}
-#        securityContext:
-#          runAsUser: ${skaha.posixid}
-#          runAsGroup: ${skaha.posixid}
-#        command: ["/opt/conda/bin/jupyter", "lab", "build"]
-#        env:
-#        - name: JUPYTER_TOKEN
-#          value: "${skaha.sessionid}"
-#        - name: JUPYTER_CONFIG_DIR
-#          value: "/arc/home/${skaha.userid}"
-#        - name: JUPYTER_PATH
-#          value: "/arc/home/${skaha.userid}"
-#        - name: JUPYTERLAB_DIR
-#          value: "/arc/home/${skaha.userid}/skaha-lab"
-#        - name: NB_USER
-#          value: "${skaha.userid}"
-#        - name: NB_UID
-#          value: "${skaha.posixid}"
-#        - name: HOME
-#          value: "/arc/home/${skaha.userid}"
-#        - name: PWD
-#          value: "/arc/home/${skaha.userid}"
-#        - name: XDG_CACHE_HOME
-#          value: "/arc/home/${skaha.userid}"
-#        volumeMounts:
-#        - mountPath: "/arc"
-#          name: cavern-volume
-#          subPath: "cavern"
-#        - mountPath: /var/lib/sss/pipes
-#          name: sssd-dir
-#          readOnly: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -108,11 +60,8 @@ spec:
         command: ["start-notebook.sh"]
         args:
           - --NotebookApp.base_url=notebook/${skaha.sessionid}
-          - --NotebookApp.notebook_dir=/arc/home/${skaha.userid} 
-#          - --NotebookApp.notebook_dir=/arc
+          - --NotebookApp.notebook_dir=/
           - --NotebookApp.allow_origin="*"
-# The following needs to be a 'list'
-#          - --NotebookApp.extra_nbextensions_path=/home/jovyan:/arc/home/${skaha.userid}
         imagePullPolicy: Always
         resources:
           requests:
