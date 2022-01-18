@@ -228,8 +228,8 @@ public abstract class SessionAction extends SkahaAction {
         return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
+    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
@@ -484,7 +484,7 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id);
+            connectURL = SessionAction.getNotebookURL(host, id, userid);
         }
 
         return new Session(id, userid, image, type, status, name, startTime, connectURL);
