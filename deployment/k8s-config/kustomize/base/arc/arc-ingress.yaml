@@ -3,14 +3,13 @@ kind: Ingress
 metadata:
   name: arc-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /arc/$2
-    nginx.ingress.kubernetes.io/proxy-body-size: 100g
+    kubernetes.io/ingress.class: traefik
 spec:
   rules:
   - host: ws-uv.canfar.net
     http:
       paths:
-      - path: /arc(/|$)(.*)
+      - path: /arc/
         pathType: Prefix
         backend:
           service:
