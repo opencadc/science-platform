@@ -4,13 +4,7 @@ NAME = images.canfar.net/skaha/desktop
 build: dependencies Dockerfile
 	docker build -t $(NAME):latest -f Dockerfile .
 
-dependencies: clean init software resolutions
-
-software: skaha-software.properties
-	./create-software-links.sh
-
-resolutions: skaha-resolutions.properties
-	./create-resolution-links.sh
+dependencies: clean init
 
 init:
 	mkdir -p build

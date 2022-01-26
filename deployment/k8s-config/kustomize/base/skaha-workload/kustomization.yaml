@@ -3,5 +3,6 @@ configMapGenerator:
 - name: start-desktop-software
   files:
   - config/start-desktop-software.sh
+  - config/build-astrosoftware-menu.sh
 generatorOptions:
  disableNameSuffixHash: true
