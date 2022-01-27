@@ -1,15 +1,13 @@
 #!/bin/bash
 
 STARTUP_DIR="/dockerstartup"
-MENUS_DIR="$HOME/.config/menus"
 EXECUTABLE_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
 DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"
 START_APPLICATIONS_MENU="${STARTUP_DIR}/template/xfce-applications-top.menu"
 END_APPLICATIONS_MENU="${STARTUP_DIR}/template/xfce-applications-bottom.menu"
-START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-menu-top.template"
-END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-menu-bottom.template"
-APPLICATIONS_MENU="$MENUS_DIR/xfce-applications.menu"
+START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-top.menu"
+END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 
@@ -24,7 +22,7 @@ init_dir () {
 }
 
 init () {
-  dirs="${MENUS_DIR} ${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
+  dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
     init_dir ${dir}
   done
