@@ -5,7 +5,6 @@ patchesStrategicMerge:
 - arc-tomcat-deployment.yaml
 - arc-sshd-deployment.yaml
 - arc-ingress.yaml
-- arc-sshd-ingress.yaml
 configMapGenerator:
 - name: arc-config
   behavior: merge
