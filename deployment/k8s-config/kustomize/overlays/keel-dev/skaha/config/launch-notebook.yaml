@@ -72,7 +72,7 @@ spec:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             nvidia.com/gpu: "${software.limits.gpus}"
-            ephemeral-storage: "200Gi"
+            ephemeral-storage: "40Gi"
         ports:
         - containerPort: 8888
           protocol: TCP
