@@ -1,5 +1,6 @@
 #!/bin/bash
 
+HOST=$1
 STARTUP_DIR="/dockerstartup"
 EXECUTABLE_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
@@ -14,10 +15,10 @@ ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 init_dir () {
   if [[ -d "$1" ]]; then
     rm -f $1/*
-    echo "removed all files in $1"
+    echo "[skaha] Removed all files in $1"
   else
     mkdir -p "$1"
-    echo "created directory $1"
+    echo "[skaha] Created directory $1"
   fi
 }
 
@@ -45,10 +46,10 @@ build_resolution_items () {
         rm -f ${DEKSTOP_DIR}/*-e
       done < ${STARTUP_DIR}/template/skaha-resolutions.properties
     else
-      echo "${RESOLUTION_DESKTOP} does not exist" 
+      echo "[skaha] ${RESOLUTION_DESKTOP} does not exist" 
     fi
   else
-    echo "${RESOLUTION_SH} does not exist"
+    echo "[skaha] ${RESOLUTION_SH} does not exist"
   fi
 }
 
@@ -72,17 +73,17 @@ create_merged_applications_menu () {
     rm -f ${DIRECTORIES_DIR}/*-e
     cp ${DIRECTORIES_DIR}/xfce-canfar.directory ${DIRECTORIES_DIR}/canfar.directory
   else
-    echo "${START_ASTROSOFTWARE_MENU} does not exist"
+    echo "[skaha] ${START_ASTROSOFTWARE_MENU} does not exist"
   fi
 }
 
 complete_merged_applications_menu () {
   if [[ -f "${ASTROSOFTWARE_MENU}" ]]; then
-    echo "${ASTROSOFTWARE_MENU} exists, complete the menu"
+    echo "[skaha] ${ASTROSOFTWARE_MENU} exists, complete the menu"
     cat ${END_ASTROSOFTWARE_MENU} >> ${ASTROSOFTWARE_MENU}
     build_resolution_menu
   else
-    echo "${ASTROSOFTWARE_MENU} does not exist"
+    echo "[skaha] ${ASTROSOFTWARE_MENU} does not exist"
   fi
 }
 
@@ -117,9 +118,10 @@ build_menu_item () {
   rm -f ${DESKTOP_DIR}/*-e
 }
 
+echo "[skaha] Start building menu."
 init
 create_merged_applications_menu 
-apps=$(curl -k -E ~/.ssl/cadcproxy.pem https://rc-uv.canfar.net/skaha/image?type=desktop-app | grep '"id"')
+apps=$(curl -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/image?type=desktop-app | grep '"id"')
 if [[ ${apps} == *"id"* ]]; then
   project_array=()
   while IFS= read -r line
@@ -127,13 +129,11 @@ if [[ ${apps} == *"id"* ]]; then
     parts_array=($(echo $line | tr "\"" "\n"))
     if [[ ${#parts_array[@]} -ge 4 && ${parts_array[0]} == "id" ]]; then
       image_id=${parts_array[2]}
-      echo "image_id: ${image_id}"
+      echo "[skaha] image_id: ${image_id}"
       image_array=($(echo ${image_id} | tr "/" "\n"))
       if [[ ${#image_array[@]} -ge 3 ]]; then
         project=${image_array[1]}
         name=${image_array[2]}
-        echo "project: ${project}"
-        echo "name: ${name}"
 	if [[ ! " ${project_array[*]} " =~ " ${project} " ]]; then
           project_array=(${project_array[@]} ${project})
           build_menu ${project} ${name}
@@ -143,6 +143,7 @@ if [[ ${apps} == *"id"* ]]; then
     fi
   done < <(printf '%s\n' "$apps")
 else
-  echo "no id"
+  echo "[skaha] no desktop-app"
 fi
 complete_merged_applications_menu 
+echo "[skaha] Finish building menu."
