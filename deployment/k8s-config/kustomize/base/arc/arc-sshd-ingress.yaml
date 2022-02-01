@@ -1,0 +1,14 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: arc-sshd-ingressroute
+spec:
+  entryPoints:
+    - tcp-ingress
+  routes:
+  - match: HostSNI(`*`)
+    services:
+    - name: arc-sshd-svc
+      port: 64022
+
