@@ -2,15 +2,12 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: skaha-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /skaha/$2
-    nginx.ingress.kubernetes.io/proxy-body-size: 100g
 spec:
   rules:
   - host: rc-uv.canfar.net
     http:
       paths:
-      - path: /skaha(/|$)(.*)
+      - path: /skaha/
         pathType: Prefix
         backend:
           service:
