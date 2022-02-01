@@ -13,8 +13,6 @@ fi
 
 echo "[skaha] Starting skaha software container [title=$TITLE] for [userid=$USERID]"
 
-build-astrosoftware-menu.sh
-
 INITFILE=/skaha/init.sh
 if [ -f "$INITFILE" ]; then
     echo "[skaha] Calling /skaha/init.sh"

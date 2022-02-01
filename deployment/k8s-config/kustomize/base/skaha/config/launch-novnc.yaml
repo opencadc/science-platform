@@ -33,6 +33,9 @@ spec:
       hostname: "${software.hostname}"
       containers:
       - name: "${skaha.jobname}"
+        command: ["/skaha-system/start-desktop.sh"]
+	args:
+        - "uv.canfar.net"
         env:
         - name: HOME
           value: "/arc/home/${skaha.userid}"
@@ -66,6 +69,8 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
+        - mountPath: "/skaha-system"
+          name: start-desktop
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -76,6 +81,10 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
+      - name: start-desktop
+        configMap:
+          name: start-desktop
+          defaultMode: 0777
       - name: cavern-volume
         cephfs:
           monitors:
