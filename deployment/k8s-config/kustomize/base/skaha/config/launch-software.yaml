@@ -50,7 +50,7 @@ spec:
             cpu: "1"
             ephemeral-storage: "20Gi"
           limits:
-            memory: "32Gi"
+            memory: "192Gi"
             cpu: "8"
             ephemeral-storage: "50Gi"
         ports:
