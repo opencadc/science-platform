@@ -5,6 +5,10 @@ patchesStrategicMerge:
 - skaha-tomcat-deployment.yaml
 - skaha-ingress.yaml
 configMapGenerator:
+- name: start-desktop
+  files:
+  - config/start-desktop.sh
+  - config/build-menu.sh
 - name: skaha-config
   behavior: merge
   files:
