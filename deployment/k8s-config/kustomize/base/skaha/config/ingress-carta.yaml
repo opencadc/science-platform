@@ -36,7 +36,7 @@ spec:
     middlewares:
       - name: skaha-carta-http-middleware-${skaha.sessionid}
   - kind: Rule
-    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/carta/ws/${skaha.sessionid}`)
+    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/carta/ws/${skaha.sessionid}`)
     services:
     - kind: Service
       name: skaha-carta-svc-${skaha.sessionid}
