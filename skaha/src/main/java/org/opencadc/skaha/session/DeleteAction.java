@@ -141,7 +141,7 @@ public class DeleteAction extends SessionAction {
         if (!SESSION_TYPE_HEADLESS.equals(type)) {
             String ingressName = K8SUtil.getIngressName(sessionID, type);
             cmd = new String[] {
-                "kubectl", "delete", "--namespace", k8sNamespace, "ingress", ingressName};
+                "kubectl", "delete", "--namespace", k8sNamespace, "ingressroute", ingressName};
             execute(cmd);
             
             String serviceName = K8SUtil.getServiceName(sessionID, type);

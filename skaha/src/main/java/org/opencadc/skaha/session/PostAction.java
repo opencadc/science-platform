@@ -399,12 +399,13 @@ public class PostAction extends SessionAction {
             log.debug("Create ingress result: " + createResult);
         }
         
-        // give the container a few seconds to initialize
-        try {
-            log.debug("3 second wait for container initialization");
-            Thread.sleep(3000);
-        } catch (InterruptedException ignore) {
-        }
+        // Removed 3 second delay--container initialization cannot be quantified
+        // so this is pointless.
+        //try {
+        //    log.debug("3 second wait for container initialization");
+        //    Thread.sleep(3000);
+        //} catch (InterruptedException ignore) {
+        //}
 
     }
     
@@ -555,7 +556,7 @@ public class PostAction extends SessionAction {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
         try {
             String deleteResult = execute(deleteCmd);
-            log.debug("Delete secret result: " + deleteResult);
+            log.debug("delete secret result: " + deleteResult);
         } catch (IOException notfound) {
             log.debug("no secret to delete", notfound);
         }
@@ -568,10 +569,26 @@ public class PostAction extends SessionAction {
                  "--docker-server=" + harborHost,
                  "--docker-username=" + harborUsername,
                  "--docker-password=" + cliSecret};
-            String createResult = execute(createCmd);
-            log.debug("Create secret result: " + createResult);
+            try {
+                String createResult = execute(createCmd);
+                log.debug("create secret result: " + createResult);
+            } catch (IOException e) {
+                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
+                    // This can happen with concurrent posts by same user.
+                    // Considered making secrets unique with the session id,
+                    // but that would lead to a large number of secrets and there
+                    // is no k8s option to have them cleaned up automatically.
+                    // Should look at supporting multiple job creations on a post,
+                    // specifically for the headless use case.  That way only one
+                    // secret per post.
+                    log.debug("secret creation failed, moving on: " + e);
+                } else {
+                    log.error(e.getMessage(), e);
+                    throw new IOException("error creating image pull secret");
+                }
+            }
         } else {
-            log.warn("Image repository 'CLI Secret' is invalid and needs resetting.");
+            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
             return null;
         }
         
