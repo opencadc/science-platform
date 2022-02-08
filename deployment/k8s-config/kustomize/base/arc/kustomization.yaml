@@ -5,6 +5,7 @@ resources:
 - arc-ingress.yaml
 - arc-sshd-deployment.yaml
 - arc-sshd-expose.yaml
+- arc-sshd-ingress.yaml
 configMapGenerator:
 - name: arc-config
   files:

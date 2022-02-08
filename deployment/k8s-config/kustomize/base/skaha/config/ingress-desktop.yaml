@@ -1,20 +1,27 @@
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-desktop-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/desktop/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
   name: skaha-desktop-ingress-${skaha.sessionid}
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/proxy-body-size: 100g
-    nginx.ingress.kubernetes.io/proxy-read-timeout: 3600s
-    nginx.ingress.kubernetes.io/proxy-send-timeout: 3600s
-    nginx.org/proxy-read-timeout: 3600s
-    nginx.org/proxy-send-timeout: 3600s
 spec:
-  rules:
-  - host: ws-uv.canfar.net
-    http:
-      paths:
-      - path: /desktop/${skaha.sessionid}(/|$)(.*)
-        backend:
-          serviceName: skaha-desktop-svc-${skaha.sessionid}
-          servicePort: 6901
+  entryPoints:
+    - web
+  routes:
+  - kind: Rule
+    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/desktop/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-desktop-svc-${skaha.sessionid}
+      port: 6901
+      scheme: http
+    middlewares:
+      - name: skaha-desktop-middleware-${skaha.sessionid}
