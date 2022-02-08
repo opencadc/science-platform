@@ -5,10 +5,6 @@ patchesStrategicMerge:
 - skaha-tomcat-deployment.yaml
 - skaha-ingress.yaml
 configMapGenerator:
-- name: start-desktop
-  files:
-  - config/start-desktop.sh
-  - config/build-menu.sh
 - name: skaha-config
   behavior: merge
   files:
@@ -26,5 +22,7 @@ configMapGenerator:
   - config/ingress-desktop.yaml
   - config/service-carta.yaml
   - config/ingress-carta.yaml
+  - config/start-desktop.sh
+  - config/build-menu.sh
 generatorOptions:
  disableNameSuffixHash: true
