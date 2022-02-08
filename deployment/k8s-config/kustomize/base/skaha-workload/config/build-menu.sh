@@ -15,10 +15,8 @@ ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 init_dir () {
   if [[ -d "$1" ]]; then
     rm -f $1/*
-    echo "[skaha] Removed all files in $1"
   else
     mkdir -p "$1"
-    echo "[skaha] Created directory $1"
   fi
 }
 
@@ -79,7 +77,6 @@ create_merged_applications_menu () {
 
 complete_merged_applications_menu () {
   if [[ -f "${ASTROSOFTWARE_MENU}" ]]; then
-    echo "[skaha] ${ASTROSOFTWARE_MENU} exists, complete the menu"
     cat ${END_ASTROSOFTWARE_MENU} >> ${ASTROSOFTWARE_MENU}
     build_resolution_menu
   else
