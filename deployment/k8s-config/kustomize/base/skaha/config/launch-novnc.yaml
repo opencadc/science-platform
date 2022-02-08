@@ -60,7 +60,7 @@ spec:
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
-            ephemeral-storage: "200Gi"
+            ephemeral-storage: "20Gi"
         ports:
         - containerPort: 5901
           protocol: TCP
