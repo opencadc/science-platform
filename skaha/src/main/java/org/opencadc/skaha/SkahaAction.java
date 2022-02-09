@@ -105,13 +105,13 @@ public abstract class SkahaAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     
-    public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
     public static final String SESSION_TYPE_HEADLESS = "headless";
-    public static List<String> SESSION_TYPES = Arrays.asList(
-        new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS});
     public static final String TYPE_DESKTOP_APP = "desktop-app";
+    public static final String SESSION_TYPE_DESKTOP = "desktop";
+    public static List<String> SESSION_TYPES = Arrays.asList(
+        new String[] {SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_HEADLESS, SESSION_TYPE_DESKTOP, TYPE_DESKTOP_APP});
     
     protected String userID;
     protected boolean adminUser = false;
@@ -238,6 +238,10 @@ public abstract class SkahaAction extends RestAction {
         }
         String idToken = out.toString();
         log.debug("idToken: " + idToken);
+        if (idToken == null || idToken.trim().length() == 0) {
+            log.warn("null id token returned");
+            return null;
+        }
         // adding to public credentials
         IDToken tokenClass = new IDToken();
         tokenClass.idToken = idToken;
@@ -298,14 +302,14 @@ public abstract class SkahaAction extends RestAction {
         URL harborURL = null;
         String message = null;
         if (project == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects?page_size=100");
             message = "projects";
         } else if (repo == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
             message = "repositories";
         } else {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                + repo + "/artifacts?detail=true&with_label=true");
+                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
             message = "artifacts";
         }
         
@@ -313,8 +317,13 @@ public abstract class SkahaAction extends RestAction {
         HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         log.debug("calling " + harborURL + " for " + message);
-        get.run();
-        log.debug("response code: " + get.getResponseCode());
+        try {
+            get.run();
+        } catch (Exception e) {
+            log.debug("error listing harbor " + message + ": " + e.getMessage(), e);
+            log.debug("response code: " + get.getResponseCode());
+            throw e;
+        }
      
         if (get.getThrowable() != null) {
             log.warn("error listing harbor " + message, get.getThrowable());

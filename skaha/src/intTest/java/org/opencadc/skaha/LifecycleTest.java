@@ -111,8 +111,8 @@ public class LifecycleTest {
     private static final Logger log = Logger.getLogger(LifecycleTest.class);
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
-    public static final String DESKTOP_IMAGE = "harbor.canfar.net/skaha/desktop:0.3";
-    public static final String CARTA_IMAGE = "harbor.canfar.net/skaha/carta:1.4";
+    public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:0.4.13";
+    public static final String CARTA_IMAGE = "images.canfar.net/skaha/carta:1.4";
     
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);

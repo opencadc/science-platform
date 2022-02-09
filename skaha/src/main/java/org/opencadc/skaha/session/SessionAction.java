@@ -69,7 +69,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.io.MultiBufferIO;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -229,8 +228,8 @@ public abstract class SessionAction extends SkahaAction {
         return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
+    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
@@ -302,7 +301,7 @@ public abstract class SessionAction extends SkahaAction {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
         if (!file.setExecutable(true, true)) {
-            log.warn("Failed to set execution permssion on file " + tmpFileName);
+            log.debug("Failed to set execution permssion on file " + tmpFileName);
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(data + "\n");
@@ -485,7 +484,7 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id);
+            connectURL = SessionAction.getNotebookURL(host, id, userid);
         }
 
         return new Session(id, userid, image, type, status, name, startTime, connectURL);

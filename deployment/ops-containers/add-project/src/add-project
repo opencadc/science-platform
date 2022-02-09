@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -e
+
+### Give the SSSD container time to initialize
+sleep 10
+
+SELF=add-project
+CONFDIR=/config
+
+TS=$(date)
+echo "$TS $SELF START"
+
+if [ -z "$4" ]
+  then
+    echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write>"
+    exit 2
+fi
+PROJECT=$1
+OWNER=$2
+GROUP=$3
+ACCESS_ARG=$4
+ACCESS=""
+MODE=""
+
+if [ $ACCESS_ARG == "read-only" ]
+  then
+    ACCESS="r-x"
+    MODE="750"
+elif [ $ACCESS_ARG == "read-write" ]
+  then
+    ACCESS="rwx"
+    MODE="770"
+else
+  echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write>"
+  exit 2
+fi
+
+if [ ! -f $CONFDIR/projectdir ]
+  then
+    echo "No file projectdir found in $CONFDIR"
+    exit  2
+fi
+
+PROJECTBASE=`cat $CONFDIR/projectdir`
+PROJECTDIR="$PROJECTBASE/$PROJECT"
+
+echo "Creating project $PROJECT"
+echo -n "  Creating project dir $PROJECTDIR..."
+mkdir $PROJECTDIR
+echo " Done"
+echo -n "  Setting permissions to $ACCESS for group $GROUP"
+chown $OWNER:$OWNER $PROJECTDIR
+chmod $MODE $PROJECTDIR
+setfacl -d -m group:$GROUP:$ACCESS $PROJECTDIR
+setfacl -m group:$GROUP:$ACCESS $PROJECTDIR
+echo " Done"
+
+TS=$(date)
+echo "$TS $SELF DONE"

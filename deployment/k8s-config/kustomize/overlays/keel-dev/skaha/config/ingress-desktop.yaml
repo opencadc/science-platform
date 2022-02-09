@@ -1,0 +1,27 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-desktop-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/desktop/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-desktop-ingress-${skaha.sessionid}
+spec:
+  entryPoints:
+    - web
+  routes:
+  - kind: Rule
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/desktop/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-desktop-svc-${skaha.sessionid}
+      port: 6901
+      scheme: http
+    middlewares:
+      - name: skaha-desktop-middleware-${skaha.sessionid}

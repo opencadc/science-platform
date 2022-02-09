@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: skaha-ingress
+spec:
+  rules:
+  - host: rc-uv.canfar.net
+    http:
+      paths:
+      - path: /skaha/
+        pathType: Prefix
+        backend:
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080
