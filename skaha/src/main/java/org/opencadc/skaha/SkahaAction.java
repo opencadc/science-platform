@@ -309,7 +309,7 @@ public abstract class SkahaAction extends RestAction {
             message = "repositories";
         } else {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                + repo + "/artifacts?detail=true&with_label=true");
+                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
             message = "artifacts";
         }
         

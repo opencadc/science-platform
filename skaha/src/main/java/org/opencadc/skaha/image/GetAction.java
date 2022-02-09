@@ -180,10 +180,6 @@ public class GetAction extends SkahaAction {
         return images;
         
     }
-    
-
-    
-
 
     @Override
     protected InlineContentHandler getInlineContentHandler() {
