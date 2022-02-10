@@ -1,7 +1,7 @@
 #!/bin/bash
 
 HOST=$1
-STARTUP_DIR="/dockerstartup"
+STARTUP_DIR="/desktopstartup"
 EXECUTABLE_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
 DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"

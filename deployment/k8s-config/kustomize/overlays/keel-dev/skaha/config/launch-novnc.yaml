@@ -69,6 +69,8 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
+        - mountPath: "/desktopstartup"
+          name: templates
         - mountPath: "/skaha-system"
           name: start-desktop
         - mountPath: "/arc"
@@ -81,6 +83,10 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
+      - name: templates
+        configMap:
+          name: templates
+          defaultMode: 0777
       - name: start-desktop
         configMap:
           name: start-desktop

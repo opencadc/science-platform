@@ -73,20 +73,6 @@ ADD ./src/common/scripts $STARTUPDIR
 RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR /headless
 
 # CANFAR Specifics Below
-RUN mkdir -p $STARTUPDIR/template
-COPY software-scripts/software-sh.template $STARTUPDIR/template/software-sh.template
-COPY software-scripts/software-category.template $STARTUPDIR/template/software-category.template
-COPY software-scripts/resolution-sh.template $STARTUPDIR/template/resolution-sh.template
-COPY software-scripts/resolution-desktop.template $STARTUPDIR/template/resolution-desktop.template
-COPY skaha-resolutions.properties $STARTUPDIR/template/skaha-resolutions.properties
-COPY conf/xfce-applications-top.menu $STARTUPDIR/template/xfce-applications-top.menu
-COPY conf/xfce-applications-bottom.menu $STARTUPDIR/template/xfce-applications-bottom.menu
-COPY conf/xfce-applications-menu-item.template $STARTUPDIR/template/xfce-applications-menu-item.template
-COPY conf/xfce-directory.template $STARTUPDIR/template/xfce-directory.template
-COPY conf/astrosoftware-top.menu $STARTUPDIR/template/astrosoftware-top.menu
-COPY conf/astrosoftware-bottom.menu $STARTUPDIR/template/astrosoftware-bottom.menu
-COPY conf/xfce-applications.menu /etc/xdg/menus/xfce-applications.menu
-COPY conf/xfce-applications.menu /etc/xdg/menus/applications.menu
 RUN chmod 777 /etc/xdg/menus/applications-merged
 COPY conf/atacama.jpg /headless/atacama.jpg
 
