@@ -3,6 +3,9 @@ configMapGenerator:
 - name: start-desktop-software
   files:
   - config/start-desktop-software.sh
+- name: templates
+  files:
+  - config/templates
 - name: start-desktop
   files:
   - config/start-desktop.sh
