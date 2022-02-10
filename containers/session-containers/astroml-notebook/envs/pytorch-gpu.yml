@@ -13,7 +13,7 @@ dependencies:
   - gpytorch
   - opencv-python-headless
   - pyarrow=*=*cuda*
-  - pyg=*=*cu111*
+  - pyg=*=*cu11*
   - pyro-ppl
   - pytorch-forecasting
   - pytorch-lightning
@@ -26,7 +26,7 @@ dependencies:
   - torchinfo
   - torchmetrics
 #  - torchsde bad numpy/scipy
-  - torchvision=*=*cuda111*
+  - torchvision=*=*cuda11*
   
   - pip:
     # not yet in conda
