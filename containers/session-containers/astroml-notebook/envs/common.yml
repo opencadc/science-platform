@@ -2,11 +2,10 @@ name: base
 
 channels:
   - conda-forge
-  - glueviz
+#  - glueviz
   
 dependencies:
   # minimum
-  - python=3.8
   - pip
   - pip-tools
   - cython
@@ -22,6 +21,7 @@ dependencies:
   - pandas
   - parquet-tools
   - pyarrow>4
+  - pytables
   - vaex
   
   # stats
@@ -46,7 +46,7 @@ dependencies:
   - scikit-learn
   - scikit-optimize
   - shap
-  - sktime
+  - sktime-all-extras
   - spacy
   - umap-learn
   - visidata
@@ -62,9 +62,6 @@ dependencies:
   - cmasher
   - datashader
   - glue-core>1.2
-  - glue-astronomy>0.3
-  - glue-jupyter  
-  - glue-vispy-viewers
   - holoviews
   - matplotlib
   - mpl-scatter-density
@@ -106,15 +103,16 @@ dependencies:
   - voila-vuetify
   - voila-gridstack
   - websockify
+  - wwt_jupyterlab_extension
   
   # astro
-  - aplpy
   - astroalign
   - astropy-healpix
   - astroml
   - astroplan
   - astroquery
   - ccdproc
+  - cosmosis
   - dust_extinction
   - ephem
   - esutil
@@ -129,11 +127,13 @@ dependencies:
   - ipyaladin
   - linetools
   - mocpy
+  - numcosmo
   - pgplot
   - photutils
   - pydl
   - pyspeckit
   - pyvo
+  - pywwt
   - regions
   - reproject
   - sep
@@ -156,6 +156,8 @@ dependencies:
     - babyplots
     - cufflinks
     - nway
+    - pillow-simd
+    - git+https://github.com/glue-viz/glue-jupyter.git
     # cadc packages
     - cadcutils
     - cadcdata
