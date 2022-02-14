@@ -73,6 +73,8 @@ ADD ./src/common/scripts $STARTUPDIR
 RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR /headless
 
 # CANFAR Specifics Below
+COPY conf/xfce-applications.menu /etc/xdg/menus/xfce-applications.menu
+COPY conf/xfce-applications.menu /etc/xdg/menus/applications.menu
 RUN chmod 777 /etc/xdg/menus/applications-merged
 COPY conf/atacama.jpg /headless/atacama.jpg
 
