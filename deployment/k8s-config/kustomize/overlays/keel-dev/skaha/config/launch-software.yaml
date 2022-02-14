@@ -52,7 +52,7 @@ spec:
           limits:
             memory: "192Gi"
             cpu: "8"
-            ephemeral-storage: "50Gi"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 6000
           protocol: TCP

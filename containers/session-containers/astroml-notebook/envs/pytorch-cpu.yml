@@ -7,9 +7,9 @@ channels:
   - pytorch
   
 dependencies:
-  - python=3.8
   - pip
   - albumentations
+  - captum
   - fastai
   - gpytorch
   - opencv-python-headless

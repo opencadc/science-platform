@@ -49,7 +49,7 @@ spec:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             nvidia.com/gpu: "${software.limits.gpus}"
-            ephemeral-storage: "50Gi"
+            ephemeral-storage: "200Gi"
         volumeMounts:
         - mountPath: "/arc"
           name: cavern-volume
