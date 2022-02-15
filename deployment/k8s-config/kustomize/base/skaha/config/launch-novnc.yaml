@@ -35,7 +35,7 @@ spec:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
 	args:
-        - "uv.canfar.net"
+        - "ws-uv.canfar.net"
         env:
         - name: HOME
           value: "/arc/home/${skaha.userid}"
