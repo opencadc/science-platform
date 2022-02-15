@@ -3,5 +3,20 @@ configMapGenerator:
 - name: start-desktop-software
   files:
   - config/start-desktop-software.sh
+- name: start-desktop
+  files:
+  - config/start-desktop.sh
+  - config/build-menu.sh
+- name: templates
+  files:
+  - config/templates/skaha-resolutions.properties
+  - config/templates/xfce-directory.template
+  - config/templates/xfce-applications-menu-item.template
+  - config/templates/software-sh.template
+  - config/templates/software-category.template
+  - config/templates/resolution-sh.template
+  - config/templates/resolution-desktop.template
+  - config/templates/astrosoftware-top.menu
+  - config/templates/astrosoftware-bottom.menu
 generatorOptions:
  disableNameSuffixHash: true
