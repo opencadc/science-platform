@@ -104,8 +104,6 @@ RUN useradd -m -g guest -u 30001 guest && \
 
 # Add scripts that launch sofware containers
 ADD software-scripts/*.sh /usr/local/bin/
-RUN rm /usr/local/bin/dragons.sh
-RUN rm /usr/local/bin/nifty.sh
 
 # Add desktop icon files
 RUN mkdir -p /headless/.icons
@@ -113,8 +111,6 @@ COPY software-scripts/icons/* /headless/.icons/
 
 # Add desktop links to those scripts
 COPY software-scripts/*.desktop /usr/share/applications/
-RUN rm /usr/share/applications/DRAGONS.desktop
-RUN rm /usr/share/applications/nifty.desktop
 
 # Add a subset of software links to the desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
