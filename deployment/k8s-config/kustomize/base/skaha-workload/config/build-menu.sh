@@ -5,10 +5,10 @@ STARTUP_DIR="/desktopstartup"
 EXECUTABLE_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
 DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"
-START_APPLICATIONS_MENU="${STARTUP_DIR}/template/xfce-applications-top.menu"
-END_APPLICATIONS_MENU="${STARTUP_DIR}/template/xfce-applications-bottom.menu"
-START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-top.menu"
-END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/template/astrosoftware-bottom.menu"
+START_APPLICATIONS_MENU="${STARTUP_DIR}/xfce-applications-top.menu"
+END_APPLICATIONS_MENU="${STARTUP_DIR}/xfce-applications-bottom.menu"
+START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
+END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 
@@ -28,8 +28,8 @@ init () {
 }
 
 build_resolution_items () {
-  RESOLUTION_SH="${STARTUP_DIR}/template/resolution-sh.template"
-  RESOLUTION_DESKTOP="${STARTUP_DIR}/template/resolution-desktop.template"
+  RESOLUTION_SH="${STARTUP_DIR}/resolution-sh.template"
+  RESOLUTION_DESKTOP="${STARTUP_DIR}/resolution-desktop.template"
   if [[ -f "${RESOLUTION_SH}" ]]; then 
     if [[ -f "${RESOLUTION_DESKTOP}" ]]; then 
       while IFS= read -r line; do
@@ -42,7 +42,7 @@ build_resolution_items () {
         sed -i -e "s#(NAME)#${line}#g" ${desktop}
         sed -i -e "s#(HOME)#${HOME}#g" ${desktop}
         rm -f ${DEKSTOP_DIR}/*-e
-      done < ${STARTUP_DIR}/template/skaha-resolutions.properties
+      done < ${STARTUP_DIR}/skaha-resolutions.properties
     else
       echo "[skaha] ${RESOLUTION_DESKTOP} does not exist" 
     fi
@@ -53,7 +53,7 @@ build_resolution_items () {
 
 build_resolution_menu () {
   RESOLUTION="resolution"
-  cp ${STARTUP_DIR}/template/xfce-directory.template ${DIRECTORIES_DIR}/xfce-${RESOLUTION}.directory
+  cp ${STARTUP_DIR}/xfce-directory.template ${DIRECTORIES_DIR}/xfce-${RESOLUTION}.directory
   sed -i -e "s#(NAME)#Resolution#g" ${DIRECTORIES_DIR}/xfce-${RESOLUTION}.directory
   cp ${DIRECTORIES_DIR}/xfce-${RESOLUTION}.directory ${DIRECTORIES_DIR}/${RESOLUTION}.directory
   rm -f ${DIRECTORIES_DIR}/*-e
@@ -66,7 +66,7 @@ create_merged_applications_menu () {
       rm -f ${ASTROSOFTWARE_MENU}
     fi
     cp ${START_ASTROSOFTWARE_MENU} ${ASTROSOFTWARE_MENU}
-    cp ${STARTUP_DIR}/template/xfce-directory.template ${DIRECTORIES_DIR}/xfce-canfar.directory
+    cp ${STARTUP_DIR}/xfce-directory.template ${DIRECTORIES_DIR}/xfce-canfar.directory
     sed -i -e "s#(NAME)#AstroSoftware#g" ${DIRECTORIES_DIR}/xfce-canfar.directory
     rm -f ${DIRECTORIES_DIR}/*-e
     cp ${DIRECTORIES_DIR}/xfce-canfar.directory ${DIRECTORIES_DIR}/canfar.directory
@@ -87,13 +87,13 @@ complete_merged_applications_menu () {
 build_menu () {
   project=$1
   directory="xfce-$1.directory"
-  cat ${STARTUP_DIR}/template/xfce-applications-menu-item.template >> ${ASTROSOFTWARE_MENU}
+  cat ${STARTUP_DIR}/xfce-applications-menu-item.template >> ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(NAME)#${project}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(DIRECTORY)#${directory}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(CATEGORY)#${project}#g" ${ASTROSOFTWARE_MENU}
   rm -f ${MERGED_DIR}/*-e
 
-  cp ${STARTUP_DIR}/template/xfce-directory.template ${DIRECTORIES_DIR}/${directory}
+  cp ${STARTUP_DIR}/xfce-directory.template ${DIRECTORIES_DIR}/${directory}
   sed -i -e "s#(NAME)#${project}#g" ${DIRECTORIES_DIR}/${directory}
   rm -f ${DIRECTORIES_DIR}/*-e
 }
@@ -104,8 +104,8 @@ build_menu_item () {
   category=$3
   executable="${EXECUTABLE_DIR}/${name}.sh"
   desktop="${DESKTOP_DIR}/${name}.desktop"
-  cp ${STARTUP_DIR}/template/software-sh.template $executable
-  cp ${STARTUP_DIR}/template/software-category.template $desktop
+  cp ${STARTUP_DIR}/software-sh.template $executable
+  cp ${STARTUP_DIR}/software-category.template $desktop
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $desktop
