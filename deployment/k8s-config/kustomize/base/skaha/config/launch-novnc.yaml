@@ -34,7 +34,7 @@ spec:
       containers:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
-	args:
+        args:
         - "ws-uv.canfar.net"
         env:
         - name: HOME
