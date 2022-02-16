@@ -14,11 +14,9 @@ skaha supports two types of containers: `session containers` and `software conta
 
 `Session containers` are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.  See the [ARCADE github project](https://github.com/canfar/arcade.git "ARCADE").
 
-`Software containers` are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, and containers for Gemini processing.
+`Software containers` are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, TOPCAT, and containers for Gemini processing.
 
-Some of the recipes for building these containers are in this section of skaha git repository.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, they must meet a minimal set of requirements and expectations for both session and software containers that run in skaha.
-
-For detailed information about the skaha service REST API, refer to the [skaha API documentation](https://ws-uv.canfar.net/skaha "skaha").
+Some of the recipes (Dockerfiles) for building these containers are in this directory of skaha git.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, containers must meet a minimal set of requirements and expectations for execution in skaha.
 
 <a name="building"></a>
 ## Building skaha containers
@@ -50,9 +48,9 @@ Containers, in skaha, are always executed as the *CADC User* and never as root. 
 
 #### session container initialization
 Initialization for session containers is based on the session container *type*.  There are currently three types with different startup procedures:
-1. `desktop` - [skaha-desktop](session-containers/skaha-desktop) - Initialization and startup is performed by the command specified in the Dockerfiles.
-1. `carta` - [skaka-carta](session-containers/skaha-carta) - Initialization and startup is done through a customized script, `skaha-carta`.
 1. `notebook` - [skaha-notebook](session-containers/skaha-notebook) - For Jupyter Notebook servers, startup uses the standard `start-notebook.sh` script.
+1. `carta` - [skaka-carta](session-containers/skaha-carta) - Initialization and startup is done through a customized script, `skaha-carta`.
+1. `desktop` - [skaha-desktop](session-containers/skaha-desktop) - Desktop session startup is managed by the skaha infrastructure.
 
 There may be multiple versions of the same type of session container, but the startup procedure for these must remain the same for them to be of the same type.
 
@@ -150,7 +148,15 @@ If this is the first time this image has been launched in may take a few minutes
 
 Once a software container has been pushed to harbor, it must be labelled with `desktop-app`.
 
-To make it available in the Applications->Astro Software menu on the desktop, please make the request to support@canfar.net.  Note: this manual step will be automated soon so that `desktop-app` labelled images appear in the menu automatically.
+To then make it appear in the Applications->Astro Software menu on the desktop a new desktop session must be started.
+
+The desktop menu items in Applications->Astro Software are organized by harbor project.  A sub-folder is created for each project.  Then, each version of the artifacts (images) within that project will be displayed in the project sub-folder.  For example, the desktop-app image identified by URI:
+
+```images.canfar.net/skaha/terminal:1.0```
+
+will be placed in the desktop menu like so:
+
+```Applications -> Astro Software -> skaha -> terminal:1.0```
 
 <a name="testing"></a>
 ## Testing
