@@ -282,9 +282,12 @@ public abstract class SkahaAction extends RestAction {
                         if (!jArtifact.isNull("labels")) {
                             String digest = jArtifact.getString("digest");
                             JSONArray labels = jArtifact.getJSONArray("labels");
-                            String type = getTypeFromLabels(labels);
-                            if (type != null) {
-                                return new Image(imageID, type, digest);
+                            Set<String> types = getTypesFromLabels(labels);
+                            if (types.size() > 0) {
+                                // TODO: fix the cardinality of types to image.
+                                // ie--A running image has 1 type, but an image can have multiple
+                                // supported types before being launched.
+                                return new Image(imageID, types.iterator().next(), digest);
                             }
                         }
                     }
@@ -336,7 +339,7 @@ public abstract class SkahaAction extends RestAction {
         
     }
     
-    protected String getTypeFromLabels(JSONArray labels) {
+    protected Set<String> getTypesFromLabels(JSONArray labels) {
         Set<String> types = new HashSet<String>();
         for (int i=0; i<labels.length(); i++) {
             JSONObject label = labels.getJSONObject(i);
@@ -346,11 +349,7 @@ public abstract class SkahaAction extends RestAction {
                 types.add(name);
             }
         }
-        // TODO: determine how to pick type when there are multiple
-        if (types.size() > 0) {
-            return types.iterator().next();
-        }
-        return null;
+        return types;
     }
     
     /**

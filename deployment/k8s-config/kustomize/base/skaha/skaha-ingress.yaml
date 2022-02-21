@@ -9,7 +9,7 @@ spec:
   - host: ws-uv.canfar.net
     http:
       paths:
-      - path: /skaha/
+      - path: /skaha
         pathType: Prefix
         backend:
           service:
