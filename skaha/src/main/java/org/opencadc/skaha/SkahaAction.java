@@ -286,6 +286,7 @@ public abstract class SkahaAction extends RestAction {
                             if (types.size() > 0) {
                                 // TODO: fix the cardinality of types to image.
                                 // ie--A running image has 1 type, but an image can have multiple
+                                // supported types before being launched.
                                 return new Image(imageID, types.iterator().next(), digest);
                             }
                         }
