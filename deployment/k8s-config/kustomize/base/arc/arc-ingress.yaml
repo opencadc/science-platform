@@ -9,7 +9,7 @@ spec:
   - host: ws-uv.canfar.net
     http:
       paths:
-      - path: /arc/
+      - path: /arc
         pathType: Prefix
         backend:
           service:
