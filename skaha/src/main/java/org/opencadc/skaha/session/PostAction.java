@@ -442,6 +442,7 @@ public class PostAction extends SessionAction {
         log.debug("attaching software: " + image + " to " + targetIP);
         
         String name = getImageName(image);
+        log.debug("name: " + name);
         String imageSecret = getHarborSecret(image);            
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
