@@ -274,9 +274,10 @@ public abstract class SessionAction extends SkahaAction {
             int lastSlash = image.lastIndexOf("/");
             String name = image.substring(lastSlash + 1, image.length());
             log.debug("cleaning up name: " + name);
-            // replace colons and dots with dash
+            // replace colons and dots and underscores with dash
             name = name.replaceAll(":", "-");
             name = name.replaceAll("\\.", "-");
+            name = name.replaceAll("_", "-");
             return name.toLowerCase();
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
