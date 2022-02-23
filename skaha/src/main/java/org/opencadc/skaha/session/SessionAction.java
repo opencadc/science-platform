@@ -269,26 +269,14 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String getImageName(String image) {
-        PropertiesReader pr = new PropertiesReader("skaha-software.properties");
-        MultiValuedProperties mp = pr.getAllProperties();
-        Set<String> names = mp.keySet();
-        Iterator<String> it = names.iterator();
-        while (it.hasNext()) {
-            String next = it.next();
-            log.debug("Next key: " + next);
-            String value = mp.getProperty(next).get(0);
-            log.debug("Next value: " + value);
-            if (image.trim().equals(value)) {
-                return next;
-            }
-        }
         try {
             // return the last segment of the path
             int lastSlash = image.lastIndexOf("/");
             String name = image.substring(lastSlash + 1, image.length());
+            log.debug("cleaning up name: " + name);
             // replace colons and dots with dash
             name = name.replaceAll(":", "-");
-            name = name.replaceAll(".", "-");
+            name = name.replaceAll("\\.", "-");
             return name.toLowerCase();
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
