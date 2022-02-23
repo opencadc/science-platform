@@ -13,7 +13,6 @@ configMapGenerator:
   - config/launch-novnc.yaml
   - config/launch-headless.yaml
   - config/launch-software.yaml
-  - config/skaha-software.properties
   - config/k8s-resources.properties
   - config/service-notebook.yaml
   - config/ingress-notebook.yaml
