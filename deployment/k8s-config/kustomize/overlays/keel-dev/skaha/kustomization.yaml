@@ -10,7 +10,6 @@ configMapGenerator:
   files:
   - config/catalina.properties
   - config/k8s-resources.properties
-  - config/skaha-software.properties
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
   - config/launch-novnc.yaml

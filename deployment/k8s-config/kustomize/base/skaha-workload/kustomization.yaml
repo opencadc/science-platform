@@ -3,6 +3,9 @@ configMapGenerator:
 - name: start-desktop-software
   files:
   - config/start-desktop-software.sh
+- name: start-jupyterlab
+  files:
+  - config/start-jupyterlab.sh
 - name: start-desktop
   files:
   - config/start-desktop.sh
