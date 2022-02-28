@@ -1,4 +1,15 @@
 apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-pluto-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/session/pluto/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+
+apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: skaha-pluto-ingress-${skaha.sessionid}
@@ -13,3 +24,5 @@ spec:
       name: skaha-pluto-svc-${skaha.sessionid}
       port: 1234
       scheme: http
+    middlewares:
+      - name: skaha-pluto-middleware-${skaha.sessionid}
