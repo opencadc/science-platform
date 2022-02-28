@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
@@ -81,9 +82,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.AccessControlException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -105,6 +110,10 @@ public abstract class SessionAction extends SkahaAction {
     
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
+    
+    protected static final String SESSION_LIST_VIEW_ALL = "all";
+    protected static final String SESSION_VIEW_EVENTS = "events";
+    protected static final String SESSION_VIEW_LOGS = "logs";
     
     protected String requestType;
     protected String sessionID;
@@ -160,6 +169,30 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public static String execute(String[] command) throws IOException, InterruptedException {
+        return execute(command, false);
+    }
+    
+    public static void execute(String[] command, OutputStream out) throws IOException, InterruptedException {
+        Process p = Runtime.getRuntime().exec(command);
+
+        WritableByteChannel wbc = Channels.newChannel(out);
+        ReadableByteChannel rbc = Channels.newChannel(p.getInputStream());
+
+        int count = 0;
+        ByteBuffer buffer = ByteBuffer.allocate(512);
+        while (count != -1) {
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
+            }
+            count = rbc.read(buffer);
+            if (count != -1) {
+                wbc.write((ByteBuffer)buffer.flip());
+                buffer.flip();
+            }
+        }
+    }
+    
+    public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         int status = p.waitFor();
         log.debug("Status=" + status + " for command: " + Arrays.toString(command));
@@ -168,8 +201,12 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("stdout: " + stdout);
         log.debug("stderr: " + stderr);
         if (status != 0) {
-            String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-            throw new IOException(message);
+            if (allowError) {
+                return stderr;
+            } else {
+                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
+                throw new IOException(message);
+            }
         } 
         return stdout.trim();
     }
@@ -183,12 +220,16 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
     }
     
-    public static String getCartaURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/carta/http/" + sessionID + "/?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
+        String url = "https://" + host + "/carta/http/" + sessionID + "/";
+        if (altSocketUrl) {
+            url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+        }
+        return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/lab?token=" + sessionID;
+    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
+        return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
     }
     
     public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
@@ -209,7 +250,7 @@ public abstract class SessionAction extends SkahaAction {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 String userid = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
                 HttpGet download = new HttpGet(
-                        new URL("https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
+                        new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
                 download.run();
                 String proxyCert = out.toString();
                     
@@ -232,26 +273,15 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String getImageName(String image) {
-        PropertiesReader pr = new PropertiesReader("skaha-software.properties");
-        MultiValuedProperties mp = pr.getAllProperties();
-        Set<String> names = mp.keySet();
-        Iterator<String> it = names.iterator();
-        while (it.hasNext()) {
-            String next = it.next();
-            log.debug("Next key: " + next);
-            String value = mp.getProperty(next).get(0);
-            log.debug("Next value: " + value);
-            if (image.trim().equals(value)) {
-                return next;
-            }
-        }
         try {
             // return the last segment of the path
             int lastSlash = image.lastIndexOf("/");
             String name = image.substring(lastSlash + 1, image.length());
-            // replace colons and dots with dash
+            log.debug("cleaning up name: " + name);
+            // replace colons and dots and underscores with dash
             name = name.replaceAll(":", "-");
-            name = name.replaceAll(".", "-");
+            name = name.replaceAll("\\.", "-");
+            name = name.replaceAll("_", "-");
             return name.toLowerCase();
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
@@ -264,7 +294,7 @@ public abstract class SessionAction extends SkahaAction {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
         if (!file.setExecutable(true, true)) {
-            log.warn("Failed to set execution permssion on file " + tmpFileName);
+            log.debug("Failed to set execution permssion on file " + tmpFileName);
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(data + "\n");
@@ -273,22 +303,138 @@ public abstract class SessionAction extends SkahaAction {
         return tmpFileName;
     }
     
+    public String getPodID(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getPodCMD = new ArrayList<String>();
+        getPodCMD.add("kubectl");
+        getPodCMD.add("--namespace");
+        getPodCMD.add(k8sNamespace);
+        getPodCMD.add("get");
+        getPodCMD.add("pod");
+        getPodCMD.add("-l");
+        getPodCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getPodCMD.add("--no-headers=true");
+        getPodCMD.add("-o");
+        getPodCMD.add("custom-columns=NAME:.metadata.name");
+        String podID = execute(getPodCMD.toArray(new String[0]));
+        log.debug("podID: " + podID);
+        if (!StringUtil.hasLength(podID)) {
+            throw new ResourceNotFoundException("session " + sessionID + " not found.");
+        } 
+        return podID;
+    }
+    
+    public String getEvents(String forUserID, String sessionID) throws Exception {
+
+        String podID = getPodID(forUserID, sessionID);
+
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getEventsCmd = new ArrayList<String>();
+        getEventsCmd.add("kubectl");
+        getEventsCmd.add("--namespace");
+        getEventsCmd.add(k8sNamespace);
+        getEventsCmd.add("get");
+        getEventsCmd.add("event");
+        getEventsCmd.add("--field-selector");
+        getEventsCmd.add("involvedObject.name=" + podID);
+        //getEventsCmd.add("--no-headers=true");
+        getEventsCmd.add("-o");
+        String customColumns = "TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp";
+        getEventsCmd.add("custom-columns=" + customColumns);
+        String events = execute(getEventsCmd.toArray(new String[0]));
+        log.debug("events: " + events);
+        if (events != null) {
+            String[] lines = events.split("\n");
+            if (lines.length > 1) {  // header row returned
+                return events;
+            }
+        }
+        return "";
+        
+        //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
+        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp 
+        
+    }
+    
+    public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getLogsCmd = new ArrayList<String>();
+        getLogsCmd.add("kubectl");
+        getLogsCmd.add("--namespace");
+        getLogsCmd.add(k8sNamespace);
+        getLogsCmd.add("logs");
+        getLogsCmd.add("-l");
+        getLogsCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getLogsCmd.add("--tail");
+        getLogsCmd.add("-1");
+        execute(getLogsCmd.toArray(new String[0]), out);
+    }
+    
+    public Session getSession(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getSessionCMD = new ArrayList<String>();
+        getSessionCMD.add("kubectl");
+        getSessionCMD.add("get");
+        getSessionCMD.add("--namespace");
+        getSessionCMD.add(k8sNamespace);
+        getSessionCMD.add("pod");
+        getSessionCMD.add("-l");
+        getSessionCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getSessionCMD.add("--no-headers=true");
+        getSessionCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+            "USERID:.metadata.labels.canfar-net-userid," +
+            "IMAGE:.spec.containers[0].image," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.phase," +
+            "NAME:.metadata.labels.canfar-net-sessionName," +
+            "STARTED:.status.startTime," +
+            "DELETION:.metadata.deletionTimestamp";
+        
+        getSessionCMD.add(customColumns);
+                
+        String vncSession = execute(getSessionCMD.toArray(new String[0]));
+        log.debug("VNC Session: " + vncSession);
+       
+        if (StringUtil.hasLength(vncSession)) {
+            Session session = constructSession(vncSession.trim());
+            return session;
+        } else {
+            throw new ResourceNotFoundException("session " + sessionID + " not found");
+        }
+    }
+    
     public List<Session> getAllSessions(String forUserID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getSessionsCMD = new String[] {
-            "kubectl", "get", "--namespace", k8sNamespace, "pod",
-            "--selector=canfar-net-userid=" + forUserID,
-            "--no-headers=true",
-            "-o", "custom-columns=" +
-                "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
-                "TYPE:.metadata.labels.canfar-net-sessionType," +
-                "STATUS:.status.phase," +
-                "NAME:.metadata.labels.canfar-net-sessionName," +
-                "STARTED:.status.startTime," +
-                "DELETION:.metadata.deletionTimestamp"};
+        List<String> getSessionsCMD = new ArrayList<String>();
+        getSessionsCMD.add("kubectl");
+        getSessionsCMD.add("get");
+        getSessionsCMD.add("--namespace");
+        getSessionsCMD.add(k8sNamespace);
+        getSessionsCMD.add("pod");
+        if (forUserID != null) {
+            getSessionsCMD.add("-l");
+            getSessionsCMD.add("canfar-net-userid=" + forUserID);
+        }
+        getSessionsCMD.add("--no-headers=true");
+        getSessionsCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+            "USERID:.metadata.labels.canfar-net-userid," +
+            "IMAGE:.spec.containers[0].image," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.phase," +
+            "NAME:.metadata.labels.canfar-net-sessionName," +
+            "STARTED:.status.startTime," +
+            "DELETION:.metadata.deletionTimestamp";
+        
+        getSessionsCMD.add(customColumns);
                 
-        String sessionList = execute(getSessionsCMD);
-        log.debug("VNC Session list: " + sessionList);
+        String sessionList = execute(getSessionsCMD.toArray(new String[0]));
+        log.debug("Session list: " + sessionList);
         
         List<Session> sessions = new ArrayList<Session>();
         
@@ -307,11 +453,13 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("line: " + k8sOutput);
         String[] parts = k8sOutput.split("\\s+");
         String id = parts[0];
-        String type = parts[1];
-        String status = parts[2];
-        String name = parts[3];
-        String startTime = "Up since " + parts[4];
-        String deletionTimestamp = parts[5];
+        String userid = parts[1];
+        String image = parts[2];
+        String type = parts[3];
+        String status = parts[4];
+        String name = parts[5];
+        String startTime = parts[6];
+        String deletionTimestamp = parts[7];
         if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
@@ -321,16 +469,21 @@ public abstract class SessionAction extends SkahaAction {
             connectURL = SessionAction.getVNCURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionAction.getCartaURL(host, id);
+            if (image.endsWith(":1.4")) {
+                // support alt web socket path for 1.4 carta 
+                connectURL = SessionAction.getCartaURL(host, id, true); 
+            } else {
+                connectURL = SessionAction.getCartaURL(host, id, false);
+            }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id);
+            connectURL = SessionAction.getNotebookURL(host, id, userid);
         }
         if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
             connectURL = SessionAction.getPlutoURL(host, id);
         }
 
-        return new Session(id, type, status, name, startTime, connectURL);
+        return new Session(id, userid, image, type, status, name, startTime, connectURL);
         
     }
     

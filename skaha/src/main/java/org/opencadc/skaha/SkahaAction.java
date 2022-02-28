@@ -105,13 +105,14 @@ public abstract class SkahaAction extends RestAction {
     
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     
-    public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
+    public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_PLUTO = "pluto";
     public static final String SESSION_TYPE_HEADLESS = "headless";
+    public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static List<String> SESSION_TYPES = Arrays.asList(
-        new String[] {SESSION_TYPE_DESKTOP, SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_PLUTO, SESSION_TYPE_HEADLESS});
+        new String[] {SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP, SESSION_TYPE_PLUTO, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP});
     
     protected String userID;
     protected boolean adminUser = false;
@@ -238,6 +239,10 @@ public abstract class SkahaAction extends RestAction {
         }
         String idToken = out.toString();
         log.debug("idToken: " + idToken);
+        if (idToken == null || idToken.trim().length() == 0) {
+            log.warn("null id token returned");
+            return null;
+        }
         // adding to public credentials
         IDToken tokenClass = new IDToken();
         tokenClass.idToken = idToken;
@@ -278,9 +283,12 @@ public abstract class SkahaAction extends RestAction {
                         if (!jArtifact.isNull("labels")) {
                             String digest = jArtifact.getString("digest");
                             JSONArray labels = jArtifact.getJSONArray("labels");
-                            String type = getTypeFromLabels(labels);
-                            if (type != null) {
-                                return new Image(imageID, type, digest);
+                            Set<String> types = getTypesFromLabels(labels);
+                            if (types.size() > 0) {
+                                // TODO: fix the cardinality of types to image.
+                                // ie--A running image has 1 type, but an image can have multiple
+                                // supported types before being launched.
+                                return new Image(imageID, types.iterator().next(), digest);
                             }
                         }
                     }
@@ -298,14 +306,14 @@ public abstract class SkahaAction extends RestAction {
         URL harborURL = null;
         String message = null;
         if (project == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects?page_size=100");
             message = "projects";
         } else if (repo == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories");
+            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
             message = "repositories";
         } else {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                + repo + "/artifacts?detail=true&with_label=true");
+                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
             message = "artifacts";
         }
         
@@ -313,8 +321,13 @@ public abstract class SkahaAction extends RestAction {
         HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
         log.debug("calling " + harborURL + " for " + message);
-        get.run();
-        log.debug("response code: " + get.getResponseCode());
+        try {
+            get.run();
+        } catch (Exception e) {
+            log.debug("error listing harbor " + message + ": " + e.getMessage(), e);
+            log.debug("response code: " + get.getResponseCode());
+            throw e;
+        }
      
         if (get.getThrowable() != null) {
             log.warn("error listing harbor " + message, get.getThrowable());
@@ -327,7 +340,7 @@ public abstract class SkahaAction extends RestAction {
         
     }
     
-    protected String getTypeFromLabels(JSONArray labels) {
+    protected Set<String> getTypesFromLabels(JSONArray labels) {
         Set<String> types = new HashSet<String>();
         for (int i=0; i<labels.length(); i++) {
             JSONObject label = labels.getJSONObject(i);
@@ -337,11 +350,7 @@ public abstract class SkahaAction extends RestAction {
                 types.add(name);
             }
         }
-        // TODO: determine how to pick type when there are multiple
-        if (types.size() > 0) {
-            return types.iterator().next();
-        }
-        return null;
+        return types;
     }
     
     /**

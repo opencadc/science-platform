@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=arcade-feedback
+Comment=Provide suggestions for Arcade improvements
+Keywords=firefox
+Exec=firefox --new-window https://github.com/opencadc/arcade/issues
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/comments.svg.png
+Type=Application
+Categories=AstroSoftware;

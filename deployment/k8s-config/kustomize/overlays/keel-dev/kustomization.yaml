@@ -1,0 +1,6 @@
+bases:
+- ./arc
+- ./skaha
+- ../../base/skaha-workload
+- ../../base/sssd
+- ../../base/servops-clientcert

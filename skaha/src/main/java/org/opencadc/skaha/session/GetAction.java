@@ -67,9 +67,12 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.StringUtil;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,13 +99,31 @@ public class GetAction extends SessionAction {
                 // List the sessions
                 String typeFilter = syncInput.getParameter("type");
                 String statusFilter = syncInput.getParameter("status");
+                String view = syncInput.getParameter("view");
+                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
                 
-                String json = listSessions(typeFilter, statusFilter);
+                String json = listSessions(typeFilter, statusFilter, allUsers);
                 
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
-                throw new UnsupportedOperationException("Session detail viewing not supported.");
+                String view = syncInput.getParameter("view");
+                if (SESSION_VIEW_LOGS.equals(view)) {
+                    // return the container log
+                    syncOutput.setHeader("Content-Type", "text/plain");
+                    syncOutput.setCode(200);
+                    streamContainerLogs(sessionID, syncOutput.getOutputStream());
+                } else if (SESSION_VIEW_EVENTS.equals(view)) {
+                    // return the event logs
+                    String logs = getEventLogs(sessionID);
+                    syncOutput.setHeader("Content-Type", "text/plain");
+                    syncOutput.getOutputStream().write(logs.getBytes());
+                } else {
+                    // return the session
+                    String json = getSingleSession(sessionID);
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
+                }
             }
             return;
         }
@@ -115,17 +136,38 @@ public class GetAction extends SessionAction {
         }
     }
     
-    public String listSessions(String typeFilter, String statusFilter) throws Exception {
+    public String getSingleSession(String sessionID) throws Exception {
+        Session session = this.getSession(userID, sessionID);
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+        return gson.toJson(session);
+    }
+    
+    public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
         
-        List<Session> sessions = getAllSessions(userID);
+        List<Session> sessions = null;
+        if (allUsers) {
+            sessions = getAllSessions(null);
+        } else {
+            sessions = getAllSessions(userID);
+        }
         
         log.debug("typeFilter=" + typeFilter);
         log.debug("statusFilter=" + statusFilter);
         
         List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
         
+        // if for all users, only show public information
+        String json = null;
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        String json = gson.toJson(filteredSessions);
+        if (allUsers) {
+            List<PublicSession> publicSessions = new ArrayList<PublicSession>(filteredSessions.size());
+            for (Session s : filteredSessions) {
+                publicSessions.add(new PublicSession(s.getUserid(), s.getType(), s.getStatus(), s.getStartTime()));
+            }
+            json = gson.toJson(publicSessions);
+        } else {
+            json = gson.toJson(filteredSessions);
+        }
         
         return json;
     }
@@ -140,6 +182,17 @@ public class GetAction extends SessionAction {
         }
         return ret;
     }
-
+    
+    public String getEventLogs(String sessionID) throws Exception {
+        String events = getEvents(userID, sessionID);
+        if (!StringUtil.hasLength(events)) {
+            events = "<none>";
+        }
+        return events + "\n";
+    }
+    
+    public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
+        streamPodLogs(userID, sessionID, out);
+    }
 
 }

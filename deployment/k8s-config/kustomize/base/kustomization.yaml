@@ -1,0 +1,6 @@
+bases:
+- ./servops-clientcert
+- ./arc
+- ./sssd
+- ./skaha
+- ./skaha-workload

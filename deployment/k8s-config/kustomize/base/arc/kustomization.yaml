@@ -1,0 +1,31 @@
+namespace: skaha-system
+resources:
+- arc-tomcat-deployment.yaml
+- arc-tomcat-expose.yaml
+- arc-ingress.yaml
+- arc-sshd-deployment.yaml
+- arc-sshd-expose.yaml
+- arc-sshd-ingress.yaml
+configMapGenerator:
+- name: arc-config
+  files:
+  - config/catalina.properties
+  - config/Cavern.properties
+  - config/LocalAuthority.properties
+  - config/VOSpaceWS.properties
+  - config/war-rename.conf
+- name: arc-sshd-config
+  files:
+  - config/sshd_config
+secretGenerator:
+- name: arc-sshd-priv1-secret
+  files:
+  - sshd-certs/ssh_host_ecdsa_key
+- name: arc-sshd-priv2-secret
+  files:
+  - sshd-certs/ssh_host_ed25519_key
+- name: arc-sshd-priv3-secret
+  files:
+  - sshd-certs/ssh_host_rsa_key
+generatorOptions:
+ disableNameSuffixHash: true

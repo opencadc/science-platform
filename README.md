@@ -1,6 +1,7 @@
 # skaha - A Container-based Science Platform in CANFAR
 
 #### Table of contents
+  * [User Documentation](#canfar-science-portal-documentation)
   * [Acknowledgements](#acknowledgements)
   * [Overview](#overview)
   * [System Components](#system-components)
@@ -8,6 +9,10 @@
   * [Software Containers](#software-containers)
   * [Dependencies](#dependencies)
   * [Deployment](#deployment)
+
+## CANFAR Science Portal Documentation
+
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](doc)
 
 ## Acknowledgements
 This project has been funded in part by:
@@ -38,13 +43,13 @@ The CANFAR Science Platform, a web interface to skaha, is here: https://www.canf
 
 ## Session Containers
 
-Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Skaha Containers](skaha-containers) directory.
+Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Containers](containers) directory.
 
 ## Software Containers
 
 These are some of the astronomy science containers that have been built for skaha.  They run as applications within skaha.  The graphical aspects of the containers are displayed in skaha-desktop by sending the DISPLAY to skaha-desktop.
 
-More information on software containers can be found in the [Skaha Containers](skaha-containers) directory.
+More information on software containers can be found in the [Containers](containers) directory.
 
 ## Dependencies
 
@@ -56,4 +61,4 @@ skaha relies on a number of other opencadc modules to operate.
 * posix/sssd -- Containers in skaha are always run _as the user_ and with the users' group memberships.  If skaha-desktop and software-containers are run with a SSSD configuration that points to the same LDAP instance as used by ac, the names of those uids and gids can be resolved.
 
 ## Deployment
-skaha runs on kubernetes.  See the k8s-config directory for deployment specifics.
+skaha runs on kubernetes.  See the deployment directory for specifics.

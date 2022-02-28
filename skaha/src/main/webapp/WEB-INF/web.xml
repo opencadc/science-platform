@@ -15,8 +15,6 @@
             <param-value>
                   org.opencadc.skaha
                   ca.nrc.cadc.rest
-                  ca.nrc.cadc.util
-                  ca.nrc.cadc.db
             </param-value>
         </init-param>
         <init-param>
@@ -83,13 +81,25 @@
 
     <!-- Servlet that identifies the services provided by platform -->
     <servlet>
-        <load-on-startup>3</load-on-startup>
-        <servlet-name>CapabilitiesServlet</servlet-name>
-        <servlet-class>ca.nrc.cadc.vosi.CapabilitiesServlet</servlet-class>
-        <init-param>
-            <param-name>input</param-name>
-            <param-value>/capabilities.xml</param-value>
-        </init-param>
+      <servlet-name>CapabilitiesServlet</servlet-name>
+      <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+      <init-param>
+        <param-name>init</param-name>
+        <param-value>ca.nrc.cadc.vosi.CapInitAction</param-value>
+      </init-param>
+      <init-param>
+        <param-name>get</param-name>
+        <param-value>ca.nrc.cadc.vosi.CapGetAction</param-value>
+      </init-param>
+      <init-param>
+        <param-name>head</param-name>
+        <param-value>ca.nrc.cadc.vosi.CapHeadAction</param-value>
+      </init-param>
+      <init-param>
+        <param-name>input</param-name>
+        <param-value>/capabilities.xml</param-value>
+      </init-param>
+      <load-on-startup>3</load-on-startup>
     </servlet>
 
     <!-- Servlet that checks the availability status of platform -->

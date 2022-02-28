@@ -3,7 +3,7 @@ info:
   version: 0.3
   title: skaha
   description: |
-    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/skaha<br/><br/>Documentation on using skaha can be found here:  https://github.com/opencadc/skaha/tree/master/skaha-containers
+    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/skaha<br/><br/>Documentation on using skaha can be found here:  https://github.com/brianmajor/skaha/tree/master/doc
 schemes:
   - https
 basePath: /skaha
@@ -38,9 +38,14 @@ paths:
         type: string
         description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
         required: false
+      - name: view
+        in: query
+        type: string
+        description: Session list view level.  If set to 'all', all users' sessions are listed (with limited information), not just the calling user's sessions.
+        required: false
     post:
       description: |
-        Launch a new session.  Depending on the underlying image and system state, sessions may take for the system to download in startup.  Normal initialization time to a running session is less than 10 seconds.
+            Launch a new session.  Depending on the underlying image and system state, sessions may take time for the system to download in startup.  Normal initialization time to a running session is less than 10 seconds.  After a successful POST, the sessionID is returned in the response body.
       tags:
         - Session Management
       parameters:
@@ -54,7 +59,7 @@ paths:
           in: query
           type: string
           description: |
-              The image ID of for the session.  For example:
+              The image ID of the session.  For example:
               ```
               images.canfar.net/skaha/notebook-scipy:0.2
               ```
@@ -113,6 +118,37 @@ paths:
         default:
           description: Unexpected error
   /session/{sessionID}:
+    get:
+      description: |
+        Get the session identified by sessionID as a JSON object.
+      tags:
+        - Session Management
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '404':
+          description: Not found
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: sessionID
+          in: path
+          type: string
+          description: The session to get, returned in application/json format.
+          required: true
+        - name: view
+          in: query
+          type: string
+          description: If set to 'event', return the scheduling event logs.  If set to 'logs', return the container logs in text/plain format.  Responses are in text/plain format.
+          required: false
     delete:
       description: |
         Delete the session identified by sessionID.

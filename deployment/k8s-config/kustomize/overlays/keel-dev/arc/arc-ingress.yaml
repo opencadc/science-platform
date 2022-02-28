@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: arc-ingress
+spec:
+  rules:
+  - host: rc-uv.canfar.net
+    http:
+      paths:
+      - path: /arc
+        pathType: Prefix
+        backend:
+          service:
+            name: arc-tomcat-svc
+            port:
+              number: 8080

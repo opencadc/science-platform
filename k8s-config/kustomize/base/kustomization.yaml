@@ -1,6 +1,0 @@
-bases:
-- ./servops-clientcert
-- ./arc
-- ./sssd
-- ./skaha
-- ./desktop-software

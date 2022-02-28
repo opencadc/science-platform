@@ -114,6 +114,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
+    public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
@@ -204,6 +205,9 @@ public class PostAction extends SessionAction {
                 }
                 
                 createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                // return the session id
+                syncOutput.setHeader("Content-Type", "text/plain");
+                syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing session.");
@@ -348,7 +352,7 @@ public class PostAction extends SessionAction {
         String gpuScheduling = getGPUScheduling(gpus);
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
@@ -357,6 +361,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_HOSTNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
@@ -399,12 +404,13 @@ public class PostAction extends SessionAction {
             log.debug("Create ingress result: " + createResult);
         }
         
-        // give the container a few seconds to initialize
-        try {
-            log.debug("3 second wait for container initialization");
-            Thread.sleep(3000);
-        } catch (InterruptedException ignore) {
-        }
+        // Removed 3 second delay--container initialization cannot be quantified
+        // so this is pointless.
+        //try {
+        //    log.debug("3 second wait for container initialization");
+        //    Thread.sleep(3000);
+        //} catch (InterruptedException ignore) {
+        //}
 
     }
     
@@ -441,6 +447,7 @@ public class PostAction extends SessionAction {
         log.debug("attaching software: " + image + " to " + targetIP);
         
         String name = getImageName(image);
+        log.debug("name: " + name);
         String imageSecret = getHarborSecret(image);            
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
@@ -467,9 +474,11 @@ public class PostAction extends SessionAction {
         
         String launchString = new String(launchBytes, "UTF-8");
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
+        launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
@@ -543,6 +552,7 @@ public class PostAction extends SessionAction {
         JSONTokener tokener = new JSONTokener(userJson);
         JSONObject obj = new JSONObject(tokener);
         String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
+        log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
         
         String secretName = "harbor-secret-" + userID.toLowerCase();
@@ -552,23 +562,46 @@ public class PostAction extends SessionAction {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
         try {
             String deleteResult = execute(deleteCmd);
-            log.debug("Delete secret result: " + deleteResult);
+            log.debug("delete secret result: " + deleteResult);
         } catch (IOException notfound) {
             log.debug("no secret to delete", notfound);
         }
         
-        // create new secret
-        String[] createCmd = new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
-             "--docker-server=" + harborHost,
-             "--docker-username=" + harborUsername,
-             "--docker-password=" + cliSecret};
-        String createResult = execute(createCmd);
-        log.debug("Create secret result: " + createResult);
+        // harbor invalidates secrets with the unicode replacement characters 'fffd'.
+        if (cliSecret != null && !cliSecret.startsWith("\ufffd")) {
+            // create new secret
+            String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
+                 "--docker-server=" + harborHost,
+                 "--docker-username=" + harborUsername,
+                 "--docker-password=" + cliSecret};
+            try {
+                String createResult = execute(createCmd);
+                log.debug("create secret result: " + createResult);
+            } catch (IOException e) {
+                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
+                    // This can happen with concurrent posts by same user.
+                    // Considered making secrets unique with the session id,
+                    // but that would lead to a large number of secrets and there
+                    // is no k8s option to have them cleaned up automatically.
+                    // Should look at supporting multiple job creations on a post,
+                    // specifically for the headless use case.  That way only one
+                    // secret per post.
+                    log.debug("secret creation failed, moving on: " + e);
+                } else {
+                    log.error(e.getMessage(), e);
+                    throw new IOException("error creating image pull secret");
+                }
+            }
+        } else {
+            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
+            return null;
+        }
         
         return secretName;
         
     }
+    
     
     private String getSupplementalGroupsList() {
         Subject subject = AuthenticationUtil.getCurrentSubject();
@@ -620,7 +653,9 @@ public class PostAction extends SessionAction {
         }
         sb.append("\n        env:");
         sb.append("\n        - name: HOME");
-        sb.append("\n          value: \"").append(homedir).append(userID).append("\"");
+        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
+        sb.append("\n        - name: PWD");
+        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
         if (envs != null && !envs.isEmpty()) {
             for (String env : envs) {
                 String[] keyVal = env.split("=");

@@ -81,7 +81,7 @@ public class Image {
             throw new IllegalArgumentException("id requried");
         }
         if (type == null) {
-            throw new IllegalArgumentException("type");
+            throw new IllegalArgumentException("type required");
         }
         if (digest == null) {
             throw new IllegalArgumentException("digest requried");

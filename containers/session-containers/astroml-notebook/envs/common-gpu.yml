@@ -1,0 +1,10 @@
+name: base
+
+channels:
+  - conda-forge
+  
+dependencies:
+  - cudatoolkit=11.1*
+  - arrow-cpp=*=*cuda*
+  - pyarrow=*=*cuda*
+
