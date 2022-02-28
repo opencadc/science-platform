@@ -5,9 +5,9 @@ RUN yum update -y
 RUN yum install -y iproute lsof sssd-client acl wget
 
 RUN cd /
-RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.6/julia-1.6.1-linux-x86_64.tar.gz
-RUN tar zxvf julia-1.6.1-linux-x86_64.tar.gz
-ENV PATH="/julia-1.6.1/bin:${PATH}"
+RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.7/julia-1.7.2-linux-x86_64.tar.gz
+RUN tar zxvf julia-1.7.2-linux-x86_64.tar.gz
+ENV PATH="/julia-1.7.2/bin:${PATH}"
 RUN echo "PATH: ${PATH}"
 
 RUN mkdir /skaha
