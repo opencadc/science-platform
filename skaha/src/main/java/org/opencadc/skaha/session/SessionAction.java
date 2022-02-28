@@ -233,7 +233,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/pluto/" + sessionID + "/";
+        return "https://" + host + "/session/pluto/" + sessionID + "/";
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
