@@ -8,6 +8,7 @@ configMapGenerator:
   files:
   - config/catalina.properties
   - config/LocalAuthority.properties
+  - config/RsaSignaturePub.key
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
   - config/launch-novnc.yaml
