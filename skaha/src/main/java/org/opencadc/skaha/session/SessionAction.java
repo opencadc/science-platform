@@ -211,25 +211,41 @@ public abstract class SessionAction extends SkahaAction {
         return stdout.trim();
     }
     
-    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID, boolean isNew) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
-    }
-    
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
-        String url = "https://" + host + "/carta/http/" + sessionID + "/";
-        if (altSocketUrl) {
-            url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+        if (isNew) {
+            return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
+        } else {
+            return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
         }
-        return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl, boolean isNew) throws MalformedURLException {
+        if (isNew) {
+            String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
+            if (altSocketUrl) {
+                url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
+            }
+            return url;
+        } else {
+            String url = "https://" + host + "/carta/http/" + sessionID + "/";
+            if (altSocketUrl) {
+                url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+            }
+            return url;
+        }
+    }
+    
+    public static String getNotebookURL(String host, String sessionID, String userid, boolean isNew) throws MalformedURLException {
+        if (isNew) {
+            return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+        } else {
+            return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+        }
     }
     
     public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
@@ -465,19 +481,28 @@ public abstract class SessionAction extends SkahaAction {
         }
         String host = K8SUtil.getHostName();
         String connectURL = "not-applicable";
+        
+        // temporary: new ingress definition applied to sessions after this date
+        boolean isNew = false;
+        String newIngressDate = "2022-03-01T18:00:00Z";
+        if (startTime.compareTo(newIngressDate) >= 0) {
+            isNew = true;
+        }
+        log.debug("is new: " + isNew);
+        
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
+            connectURL = SessionAction.getVNCURL(host, id, isNew);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
             if (image.endsWith(":1.4")) {
                 // support alt web socket path for 1.4 carta 
-                connectURL = SessionAction.getCartaURL(host, id, true); 
+                connectURL = SessionAction.getCartaURL(host, id, true, isNew); 
             } else {
-                connectURL = SessionAction.getCartaURL(host, id, false);
+                connectURL = SessionAction.getCartaURL(host, id, false, isNew);
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid);
+            connectURL = SessionAction.getNotebookURL(host, id, userid, isNew);
         }
         if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
             connectURL = SessionAction.getPlutoURL(host, id);
