@@ -200,7 +200,7 @@ public class PostAction extends SessionAction {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
                     } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'gups': " + gpusParam);
+                        throw new IllegalArgumentException("Invalid value for 'gpus': " + gpusParam);
                     }
                 }
                 
@@ -334,6 +334,11 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
                 servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_PLUTO:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-pluto.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-pluto.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-pluto.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
