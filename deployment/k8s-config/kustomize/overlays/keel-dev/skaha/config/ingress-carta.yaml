@@ -4,7 +4,7 @@ metadata:
   name: skaha-carta-http-middleware-${skaha.sessionid}
 spec:
   replacePathRegex:
-    regex: ^/carta/http/${skaha.sessionid}(/|$)(.*)
+    regex: ^/session/carta/http/${skaha.sessionid}(/|$)(.*)
     replacement: /$2
 
 ---
@@ -14,7 +14,7 @@ metadata:
   name: skaha-carta-ws-middleware-${skaha.sessionid}
 spec:
   replacePathRegex:
-    regex: ^/carta/ws/${skaha.sessionid}(/|$)(.*)
+    regex: ^/session/carta/ws/${skaha.sessionid}(/|$)(.*)
     replacement: /$2
 
 ---
@@ -27,7 +27,7 @@ spec:
     - web
   routes:
   - kind: Rule
-    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/carta/http/${skaha.sessionid}`)
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/carta/http/${skaha.sessionid}`)
     services:
     - kind: Service
       name: skaha-carta-svc-${skaha.sessionid}
@@ -36,7 +36,7 @@ spec:
     middlewares:
       - name: skaha-carta-http-middleware-${skaha.sessionid}
   - kind: Rule
-    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/carta/ws/${skaha.sessionid}`)
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/carta/ws/${skaha.sessionid}`)
     services:
     - kind: Service
       name: skaha-carta-svc-${skaha.sessionid}
