@@ -12,6 +12,7 @@ configMapGenerator:
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
   - config/launch-novnc.yaml
+  - config/launch-pluto.yaml
   - config/launch-headless.yaml
   - config/launch-software.yaml
   - config/k8s-resources.properties
@@ -21,5 +22,7 @@ configMapGenerator:
   - config/ingress-desktop.yaml
   - config/service-carta.yaml
   - config/ingress-carta.yaml
+  - config/service-pluto.yaml
+  - config/ingress-pluto.yaml
 generatorOptions:
  disableNameSuffixHash: true
