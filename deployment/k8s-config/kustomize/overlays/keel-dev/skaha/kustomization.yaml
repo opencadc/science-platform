@@ -12,7 +12,7 @@ configMapGenerator:
   - config/k8s-resources.properties
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
-  - config/launch-novnc.yaml
+  - config/launch-desktop.yaml
   - config/launch-headless.yaml
   - config/launch-software.yaml
   - config/launch-pluto.yaml

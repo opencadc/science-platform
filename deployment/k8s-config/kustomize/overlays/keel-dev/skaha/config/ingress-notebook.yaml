@@ -7,7 +7,7 @@ spec:
     - web
   routes:
   - kind: Rule
-    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/notebook/${skaha.sessionid}/`)
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/notebook/${skaha.sessionid}/`)
     services:
     - kind: Service
       name: skaha-notebook-svc-${skaha.sessionid}
