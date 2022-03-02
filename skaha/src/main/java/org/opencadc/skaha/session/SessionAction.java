@@ -484,7 +484,7 @@ public abstract class SessionAction extends SkahaAction {
         
         // temporary: new ingress definition applied to sessions after this date
         boolean isNew = false;
-        String newIngressDate = "2022-03-01T18:00:00Z";
+        String newIngressDate = "2022-03-02T00:15:00Z";
         if (startTime.compareTo(newIngressDate) >= 0) {
             isNew = true;
         }
