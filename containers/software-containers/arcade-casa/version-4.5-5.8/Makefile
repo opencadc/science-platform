@@ -26,8 +26,8 @@ VERSIONS_PIPELINE = \
 
 VERSIONS = \
 	5.7.0-134.el6 \
-    5.7.2-4.el6 \
-    5.8.0-109.el6 
+	5.7.2-4.el6 \
+ 	5.8.0-109.el6 
 
 DOCKER_REPO_BASE=images.canfar.net/arcade/casa
 
