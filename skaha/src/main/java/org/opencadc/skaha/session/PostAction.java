@@ -321,7 +321,7 @@ public class PostAction extends SessionAction {
         String ingressPath = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-novnc.yaml";
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
                 servicePath = System.getProperty("user.home") + "/config/service-desktop.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-desktop.yaml";
                 break;
