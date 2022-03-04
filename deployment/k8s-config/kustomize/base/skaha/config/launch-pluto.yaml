@@ -23,9 +23,9 @@ spec:
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
       imagePullSecrets:
-        - name: "${software.imagesecret}"
+      - name: ${software.imagesecret}
       securityContext:
-        runAsUser: ${skaha.posixid} 
+        runAsUser: ${skaha.posixid}
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
@@ -38,28 +38,8 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
-        - name: JUPYTER_TOKEN
-          value: "${skaha.sessionid}"
-        - name: JUPYTER_CONFIG_DIR
-          value: "/arc/home/${skaha.userid}"
-        - name: JUPYTER_PATH
-          value: "/arc/home/${skaha.userid}"
-#        - name: JUPYTERLAB_DIR
-#          value: "/arc/home/${skaha.userid}/skaha-lab"
-        - name: NB_USER
-          value: "${skaha.userid}"
-        - name: NB_UID
-          value: "${skaha.posixid}"
-        - name: HOME
-          value: "/arc/home/${skaha.userid}"
-        - name: PWD
-          value: "/arc/home/${skaha.userid}"
-        - name: XDG_CACHE_HOME
-          value: "/arc/home/${skaha.userid}"
         image: ${software.imageid}
-        command: ["/skaha-system/start-jupyterlab.sh"]
-        args:
-        - ${skaha.sessionid}
+        command: ["/skaha/startup.sh"]
         imagePullPolicy: Always
         resources:
           requests:
@@ -72,12 +52,10 @@ spec:
             nvidia.com/gpu: "${software.limits.gpus}"
             ephemeral-storage: "200Gi"
         ports:
-        - containerPort: 8888
+        - containerPort: 1234
           protocol: TCP
-          name: notebook-port
+          name: main-port
         volumeMounts:
-        - mountPath: "/skaha-system"
-          name: start-jupyterlab
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -88,21 +66,17 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
-      - name: start-jupyterlab
-        configMap:
-          name: start-jupyterlab
-          defaultMode: 0777
       - name: cavern-volume
         cephfs:
           monitors:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-          user: kanfarnetes_dev
+          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+          user: keel_prod
           secretRef:
             name: cephfs-cephx-key
-          readOnly: false          
+          readOnly: false
       - name: scratch-dir
         emptyDir: {}
       - name: sssd-dir
