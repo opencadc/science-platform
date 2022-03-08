@@ -38,6 +38,10 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         imagePullPolicy: Always
