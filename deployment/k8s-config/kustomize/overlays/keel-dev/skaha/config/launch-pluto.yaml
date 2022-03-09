@@ -48,6 +48,8 @@ spec:
           value: "${software.requests.cores}"
         - name: MKL_NUM_THREADS
           value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         imagePullPolicy: Always
