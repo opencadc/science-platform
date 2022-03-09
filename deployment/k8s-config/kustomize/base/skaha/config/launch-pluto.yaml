@@ -42,6 +42,12 @@ spec:
           value: "/arc/home/${skaha.userid}"
         - name: PWD
           value: "/arc/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         imagePullPolicy: Always
