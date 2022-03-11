@@ -11,7 +11,3 @@ RUN apt-get -y update && \
 
 # nsswitch for correct sss lookup
 ADD src/nsswitch.conf /etc/
-
-# start terminal in home on filesystem and ensure jupyter home directories
-RUN mkdir -p /usr/local/bin/start-notebook.d
-COPY src/skaha-hook.sh /usr/local/bin/start-notebook.d/
