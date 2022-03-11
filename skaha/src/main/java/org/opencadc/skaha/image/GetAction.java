@@ -75,6 +75,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 
 import org.apache.log4j.Logger;
@@ -152,26 +153,31 @@ public class GetAction extends SkahaAction {
                         
                         if (!jArtifact.isNull("labels")) {
                             JSONArray labels = jArtifact.getJSONArray("labels");
-                            String type = getTypeFromLabels(labels);
-                            if (type != null) {
-                                if (typeFilter == null || typeFilter.equals(type)) {
-                                    String digest = jArtifact.getString("digest");
-                                    if (!jArtifact.isNull("tags")) {
-                                        JSONArray tags = jArtifact.getJSONArray("tags");
-                                        for (int j=0; j<tags.length(); j++) {
-                                            JSONObject jTag = tags.getJSONObject(j);
-                                            String tag = jTag.getString("name");
-                                            String imageID = harborHost + "/" + rName + ":" + tag;
-                                            Image image = new Image(imageID, type, digest);
-                                            images.add(image);
-                                            log.debug("Added image: " + imageID);
+                            Set<String> types = getTypesFromLabels(labels);
+                            if (types.size() > 0 && (typeFilter == null || types.contains(typeFilter))) {
+                                String digest = jArtifact.getString("digest");
+                                if (!jArtifact.isNull("tags")) {
+                                    JSONArray tags = jArtifact.getJSONArray("tags");
+                                    for (int j=0; j<tags.length(); j++) {
+                                        JSONObject jTag = tags.getJSONObject(j);
+                                        String tag = jTag.getString("name");
+                                        String imageID = harborHost + "/" + rName + ":" + tag;
+                                        Image image = null;
+                                        if (typeFilter == null) {
+                                            // TODO: Sort out the cardinality problem with images types.
+                                            // Images can have multiple types (labels), but running images
+                                            // have a single type.
+                                            image = new Image(imageID, types.iterator().next(), digest);
+                                        } else {
+                                            image = new Image(imageID, typeFilter, digest);
                                         }
+                                        images.add(image);
+                                        log.debug("Added image: " + imageID);
                                     }
                                 }
                             }
                         }
                     }
-                    
                 }
             }
             

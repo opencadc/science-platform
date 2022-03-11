@@ -3,13 +3,22 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
-  name: "${software.jobname}"
+  name: "${skaha.jobname}"
 spec:
   activeDeadlineSeconds: 1209600
   ttlSecondsAfterFinished: 86400
   template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
     spec:
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
@@ -23,42 +32,34 @@ spec:
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
-      - name: "${software.containername}"
-        command: ["/skaha-system/start-desktop-software.sh"]
-        args:
-        - ${skaha.userid}
-        - ${software.containerparam}
+      - name: "${skaha.jobname}"
         env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
         - name: HOME
           value: "/arc/home/${skaha.userid}"
-        - name: DISPLAY
-          value: "${software.targetip}"
-        - name: GDK_SYNCHRONIZE
-          value: "1"
-        - name: SHELL
-          value: "/bin/bash"
-        securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
-          allowPrivilegeEscalation: false
-        image: "${software.imageid}"
-        workingDir: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        image: ${software.imageid}
+        command: ["/skaha/startup.sh"]
         imagePullPolicy: Always
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "1"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
             ephemeral-storage: "20Gi"
           limits:
-            memory: "192Gi"
-            cpu: "8"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
             ephemeral-storage: "200Gi"
         ports:
-        - containerPort: 6000
+        - containerPort: 1234
           protocol: TCP
+          name: main-port
         volumeMounts:
-        - mountPath: "/skaha-system"
-          name: start-desktop-software
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -69,10 +70,6 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
-      - name: start-desktop-software
-        configMap:
-          name: start-desktop-software
-          defaultMode: 0777
       - name: cavern-volume
         cephfs:
           monitors:

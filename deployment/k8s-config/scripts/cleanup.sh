@@ -6,7 +6,7 @@
 
 echo "START"
 
-types="service ingress"
+types="service ingressroute"
 for type in $types;
 do
   kubectl -n skaha-workload get $type |

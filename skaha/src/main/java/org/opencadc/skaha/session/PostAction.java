@@ -200,7 +200,7 @@ public class PostAction extends SessionAction {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
                     } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'gups': " + gpusParam);
+                        throw new IllegalArgumentException("Invalid value for 'gpus': " + gpusParam);
                     }
                 }
                 
@@ -321,7 +321,7 @@ public class PostAction extends SessionAction {
         String ingressPath = null;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-novnc.yaml";
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
                 servicePath = System.getProperty("user.home") + "/config/service-desktop.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-desktop.yaml";
                 break;
@@ -334,6 +334,11 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
                 servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
+                break;
+            case SessionAction.SESSION_TYPE_PLUTO:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-pluto.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-pluto.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-pluto.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
@@ -442,6 +447,7 @@ public class PostAction extends SessionAction {
         log.debug("attaching software: " + image + " to " + targetIP);
         
         String name = getImageName(image);
+        log.debug("name: " + name);
         String imageSecret = getHarborSecret(image);            
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {

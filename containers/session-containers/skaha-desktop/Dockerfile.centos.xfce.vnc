@@ -73,21 +73,9 @@ ADD ./src/common/scripts $STARTUPDIR
 RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR /headless
 
 # CANFAR Specifics Below
-
 COPY conf/xfce-applications.menu /etc/xdg/menus/xfce-applications.menu
 COPY conf/xfce-applications.menu /etc/xdg/menus/applications.menu
-COPY conf/xfce-canfar.directory /usr/share/desktop-directories/xfce-canfar.directory
-COPY conf/xfce-canfar.directory /usr/share/desktop-directories/canfar.directory
-COPY conf/xfce-casa-3.directory /usr/share/desktop-directories/xfce-casa-3.directory
-COPY conf/xfce-casa-3.directory /usr/share/desktop-directories/casa-3.directory
-COPY conf/xfce-casa-4.directory /usr/share/desktop-directories/xfce-casa-4.directory
-COPY conf/xfce-casa-4.directory /usr/share/desktop-directories/casa-4.directory
-COPY conf/xfce-casa-5.directory /usr/share/desktop-directories/xfce-casa-5.directory
-COPY conf/xfce-casa-5.directory /usr/share/desktop-directories/casa-5.directory
-COPY conf/xfce-gemini.directory /usr/share/desktop-directories/xfce-gemini.directory
-COPY conf/xfce-gemini.directory /usr/share/desktop-directories/gemini.directory
-COPY conf/xfce-resolution.directory /usr/share/desktop-directories/xfce-resolution.directory
-COPY conf/xfce-resolution.directory /usr/share/desktop-directories/resolution.directory
+RUN chmod 777 /etc/xdg/menus/applications-merged
 COPY conf/atacama.jpg /headless/atacama.jpg
 
 # add curl with openssl (instead of nss)
@@ -115,7 +103,6 @@ RUN useradd -m -g guest -u 30001 guest && \
     ln -s /home/guest/.ssl /headless/.ssl
 
 # Add scripts that launch sofware containers
-ADD tmp/*.sh /usr/local/bin/
 ADD software-scripts/*.sh /usr/local/bin/
 
 # Add desktop icon files
@@ -124,7 +111,6 @@ COPY software-scripts/icons/* /headless/.icons/
 
 # Add desktop links to those scripts
 COPY software-scripts/*.desktop /usr/share/applications/
-COPY tmp/*.desktop /usr/share/applications/
 
 # Add a subset of software links to the desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop

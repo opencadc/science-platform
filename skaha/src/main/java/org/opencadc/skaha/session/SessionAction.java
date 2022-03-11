@@ -211,25 +211,45 @@ public abstract class SessionAction extends SkahaAction {
         return stdout.trim();
     }
     
-    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID, boolean isNew) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
-    }
-    
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
-        String url = "https://" + host + "/carta/http/" + sessionID + "/";
-        if (altSocketUrl) {
-            url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+        if (isNew) {
+            return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
+        } else {
+            return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
         }
-        return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
-        return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl, boolean isNew) throws MalformedURLException {
+        if (isNew) {
+            String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
+            if (altSocketUrl) {
+                url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
+            }
+            return url;
+        } else {
+            String url = "https://" + host + "/carta/http/" + sessionID + "/";
+            if (altSocketUrl) {
+                url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
+            }
+            return url;
+        }
+    }
+    
+    public static String getNotebookURL(String host, String sessionID, String userid, boolean isNew) throws MalformedURLException {
+        if (isNew) {
+            return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+        } else {
+            return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+        }
+    }
+    
+    public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/session/pluto/" + sessionID + "/";
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
@@ -269,26 +289,15 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String getImageName(String image) {
-        PropertiesReader pr = new PropertiesReader("skaha-software.properties");
-        MultiValuedProperties mp = pr.getAllProperties();
-        Set<String> names = mp.keySet();
-        Iterator<String> it = names.iterator();
-        while (it.hasNext()) {
-            String next = it.next();
-            log.debug("Next key: " + next);
-            String value = mp.getProperty(next).get(0);
-            log.debug("Next value: " + value);
-            if (image.trim().equals(value)) {
-                return next;
-            }
-        }
         try {
             // return the last segment of the path
             int lastSlash = image.lastIndexOf("/");
             String name = image.substring(lastSlash + 1, image.length());
-            // replace colons and dots with dash
+            log.debug("cleaning up name: " + name);
+            // replace colons and dots and underscores with dash
             name = name.replaceAll(":", "-");
-            name = name.replaceAll(".", "-");
+            name = name.replaceAll("\\.", "-");
+            name = name.replaceAll("_", "-");
             return name.toLowerCase();
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
@@ -440,13 +449,13 @@ public abstract class SessionAction extends SkahaAction {
         
         getSessionsCMD.add(customColumns);
                 
-        String vncSessions = execute(getSessionsCMD.toArray(new String[0]));
-        log.debug("VNC Session list: " + vncSessions);
+        String sessionList = execute(getSessionsCMD.toArray(new String[0]));
+        log.debug("Session list: " + sessionList);
         
         List<Session> sessions = new ArrayList<Session>();
         
-        if (StringUtil.hasLength(vncSessions)) {
-            String[] lines = vncSessions.split("\n");
+        if (StringUtil.hasLength(sessionList)) {
+            String[] lines = sessionList.split("\n");
             for (String line : lines) {
                 Session session = constructSession(line);
                 sessions.add(session);
@@ -472,19 +481,31 @@ public abstract class SessionAction extends SkahaAction {
         }
         String host = K8SUtil.getHostName();
         String connectURL = "not-applicable";
+        
+        // temporary: new ingress definition applied to sessions after this date
+        boolean isNew = false;
+        String newIngressDate = "2022-03-02T00:15:00Z";
+        if (startTime.compareTo(newIngressDate) >= 0) {
+            isNew = true;
+        }
+        log.debug("is new: " + isNew);
+        
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
+            connectURL = SessionAction.getVNCURL(host, id, isNew);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
             if (image.endsWith(":1.4")) {
                 // support alt web socket path for 1.4 carta 
-                connectURL = SessionAction.getCartaURL(host, id, true); 
+                connectURL = SessionAction.getCartaURL(host, id, true, isNew); 
             } else {
-                connectURL = SessionAction.getCartaURL(host, id, false);
+                connectURL = SessionAction.getCartaURL(host, id, false, isNew);
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid);
+            connectURL = SessionAction.getNotebookURL(host, id, userid, isNew);
+        }
+        if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
+            connectURL = SessionAction.getPlutoURL(host, id);
         }
 
         return new Session(id, userid, image, type, status, name, startTime, connectURL);
