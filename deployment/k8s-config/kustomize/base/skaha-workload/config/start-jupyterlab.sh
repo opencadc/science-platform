@@ -15,4 +15,4 @@ jupyter lab \
 	--ServerApp.base_url=session/notebook/"$1" \
 	--ServerApp.root_dir=/ \
 	--ServerApp.allow_origin="*" \
-	${JUPYTERLAB_ARGS} "${@}"
+	${JUPYTERLAB_ARGS}
