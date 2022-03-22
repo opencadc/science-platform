@@ -1,30 +1,8 @@
 #!/bin/bash
 
-
 #https://github.com/restic/restic/releases/download/v0.12.1/restic_0.12.1_linux_amd64.bz2
 #https://restic.readthedocs.io/en/stable/index.html
 #https://github.com/stonezdj/harbor/blob/backup_restore/tools/harbor-backup.sh
-
-
-RESTIC_REPO='s3:harbor-repo'
-
-KEY_ID=''
-ACCESS_KEY=''
-PASSWORD=''
-
-POSTGRES_POD='cadc-harbor-postgresql-0'
-REDIS_POD='cadc-harbor-redis-master-0'
-REGISTRY_POD='cadc-harbor-registry'
-
-POSTGRES_DIR='/bitnami/postgresql'
-REDIS_DIR='/data'
-REGISTRY_DIR='/storage/docker/registry'
-
-PGPASSWORD=''
-PGDUMP_DIR='/tmp/harbor'
-
-
-
 
 RESTIC_REPO='s3:repo-url'
 KEY_ID='<aws access key id>'
