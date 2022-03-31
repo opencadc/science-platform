@@ -4,9 +4,9 @@ Monitoring Installation Instructions
 Prequisites:
 ------------
 
-Download helm binary and extract to a suitable location:
+Download helm binary and extract to a suitable location. The latest releases can be found here: https://github.com/helm/helm/releases
 
-- https://github.com/helm/helm/releases
+To download and extract the binary run:
 
     curl -O https://get.helm.sh/helm-v3.8.1-linux-amd64.tar.gz
 
@@ -37,11 +37,12 @@ Once the pv is configured, continue with the install with:
 
 If helm is not installed system wide, modify the install script to point to the helm binary.
 
+If the the pod fails to start, or the pod or pvc are pending, ensure the pv isn't still bound to a previous helm install.
+
 Uninstall Grafana:
 ------------------
 
 To uninstall grafana, run:
 
     sh uninstall-grafana.sh
-
 
