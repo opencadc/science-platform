@@ -1,0 +1,3 @@
+#!/bin/bash
+
+helm upgrade --install cadc-loki-loki --namespace cadc-loki grafana/loki --values values-loki.yaml

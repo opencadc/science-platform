@@ -1,3 +1,3 @@
 #!/bin/bash
 
-helm install cadc-loki-grafana  -n cadc-loki grafana/grafana --values values-grafana.yaml
+helm upgrade --install cadc-loki-grafana  --namespace cadc-loki grafana/grafana --values values-grafana.yaml
