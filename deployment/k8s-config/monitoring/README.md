@@ -28,6 +28,8 @@ Ensure a suitable persistent volume (pv) is created before attempting to install
         - ReadWriteOnce
       size: 10Gi
 
+
+
 Install Grafana:
 ----------------
 
@@ -39,10 +41,23 @@ If helm is not installed system wide, modify the install script to point to the 
 
 If the the pod fails to start, or the pod or pvc are pending, ensure the pv isn't still bound to a previous helm install.
 
-Uninstall Grafana:
+
+Install Loki:
+-------------
+
+To install loki run:
+
+    sh install-loki.sh
+
+
+Uninstall Grafana and loki::
 ------------------
 
 To uninstall grafana, run:
 
     sh uninstall-grafana.sh
+
+To uninstall loki, run:
+
+    sh uninstall-loki.sh
 
