@@ -1,8 +1,9 @@
 Monitoring Installation Instructions
 ====================================
 
-Prequisites:
-------------
+
+Prerequisites:
+--------------
 
 Download helm binary and extract to a suitable location. The latest releases can be found here: https://github.com/helm/helm/releases
 
@@ -61,6 +62,7 @@ To uninstall loki, run:
 
     sh uninstall-loki.sh
 
+
 Configure Grafana:
 ------------------
 
@@ -85,8 +87,6 @@ Also add the loki data source:
 
 Next import the following dashboards (or use your own favorites):
 
-
-
-
-
-
+    https://grafana.com/grafana/dashboards/13407
+    
+    
