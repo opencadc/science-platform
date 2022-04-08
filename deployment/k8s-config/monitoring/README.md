@@ -61,3 +61,32 @@ To uninstall loki, run:
 
     sh uninstall-loki.sh
 
+Configure Grafana:
+------------------
+
+Determine the IP of the grafana pod using:
+
+    kubectl --namespace cadc-loki get pod -o wide
+
+Obtain the admin password using:
+
+    kubectl get secret --namespace cadc-loki cadc-loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+Now launch a new desktop session and login to the Grafana dashboard using the IP at port 3000 and admin credentials.
+
+In the Grafana gui, navigate to the Configuration menu and add the prometheus data source:
+
+    http://kube-prometheus-prometheus.kube-prometheus:9090/
+
+Also add the loki data source:
+
+    http:<IP of Loki pod>:3100
+
+
+Next import the following dashboards (or use your own favorites):
+
+
+
+
+
+
