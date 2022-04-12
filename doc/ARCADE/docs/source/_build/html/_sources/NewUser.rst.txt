@@ -1,0 +1,10 @@
+Tutorials For New Users
+=======================
+
+Welcome to ARCADE (Astronomy Reduction in the CANFAR Data Environment)!
+Here are some tutorials to get you started.
+
+  * :ref:`label_login`
+  * :ref:`label_launch_desktop_page`
+  * :ref:`label_launch_carta_page`
+  * :ref:`label_launch_notebook_page`
