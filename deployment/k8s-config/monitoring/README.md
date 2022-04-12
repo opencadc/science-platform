@@ -87,6 +87,12 @@ Also add the loki data source:
 
 Next import the following dashboards (or use your own favorites):
 
+Kubernetes node level view:
+    
+    https://grafana.com/grafana/dashboards/5219
+
+Loki Global metrics:
+
     https://grafana.com/grafana/dashboards/13407
-    
-    
+
+ 
