@@ -93,6 +93,4 @@ Kubernetes node level view:
 
 Loki Global metrics:
 
-    https://grafana.com/grafana/dashboards/13407
-
- 
+    https://grafana.com/grafana/dashboards/14055 
