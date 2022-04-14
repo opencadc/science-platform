@@ -2,6 +2,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: arc-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
 spec:
   rules:
   - host: rc-uv.canfar.net
