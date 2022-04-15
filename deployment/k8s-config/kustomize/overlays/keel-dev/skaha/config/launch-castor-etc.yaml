@@ -41,6 +41,7 @@ spec:
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         args:
+        - ${skaha.sessionid}  # for URL routing
         - debug  # verbosity level of logs
         imagePullPolicy: Always
         resources:
