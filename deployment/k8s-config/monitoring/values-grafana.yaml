@@ -1,0 +1,18 @@
+rbac:
+  create: false
+  pspEnabled: false
+
+serviceAccount:
+  create: false
+
+persistence:
+  type: pvc
+  enabled: true
+  storageClassName: "\"\""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+initChownData:
+  enabled: false
+

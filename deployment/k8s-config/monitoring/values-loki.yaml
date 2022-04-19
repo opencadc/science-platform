@@ -1,0 +1,19 @@
+rbac:
+  create: false
+  pspEnabled: false
+
+serviceAccount:
+  create: false
+  name:
+  annotations: {}
+  automountServiceAccountToken: false
+
+prometheus:
+  enabled: true
+  alertmanager:
+    persistentVolume:
+      enabled: false
+  server:
+    persistentVolume:
+      enabled: false
+
