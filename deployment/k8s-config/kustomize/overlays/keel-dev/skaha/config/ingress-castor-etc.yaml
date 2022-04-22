@@ -1,0 +1,28 @@
+# apiVersion: traefik.containo.us/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: skaha-castor-etc-middleware-${skaha.sessionid}
+# spec:
+#   replacePathRegex:
+#     regex: ^/session/castor-etc/${skaha.sessionid}(/|$)(.*)
+#     replacement: /$2
+
+# ---
+
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-castor-etc-ingress-${skaha.sessionid}
+spec:
+  entryPoints:
+    - web
+  routes:
+  - kind: Rule
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/castor-etc/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-castor-etc-svc-${skaha.sessionid}
+      port: 5000
+      scheme: http
+    # middlewares:
+    #   - name: skaha-castor-etc-middleware-${skaha.sessionid}
