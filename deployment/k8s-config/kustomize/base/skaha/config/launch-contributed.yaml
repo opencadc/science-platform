@@ -40,6 +40,18 @@ spec:
           value: "${skaha.userid}"
         - name: skaha_sessionid
           value: "${skaha.sessionid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         args:
