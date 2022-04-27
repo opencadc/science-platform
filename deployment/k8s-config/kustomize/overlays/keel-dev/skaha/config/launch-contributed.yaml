@@ -38,11 +38,12 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         image: ${software.imageid}
         command: ["/skaha/startup.sh"]
         args:
-        - ${skaha.sessionid}  # for URL routing
-        - debug  # verbosity level of logs
+        - ${skaha.sessionid}
         imagePullPolicy: Always
         resources:
           requests:
@@ -58,12 +59,12 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
-        # - mountPath: "/arc"
-        #   name: cavern-volume
-        #   subPath: "cavern"
-        # - mountPath: "/scratch"
-        #   name: scratch-dir
-        #   subPath: "${skaha.sessionid}"
+         - mountPath: "/arc"
+           name: cavern-volume
+           subPath: "cavern"
+         - mountPath: "/scratch"
+           name: scratch-dir
+           subPath: "${skaha.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
