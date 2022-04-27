@@ -4,7 +4,7 @@ metadata:
   name: skaha-contributed-middleware-${skaha.sessionid}
 spec:
   replacePathRegex:
-    regex: ^/session/contributed/${skaha.sessionid}(/|$)(.*)
+    regex: ^/session/contrib/${skaha.sessionid}(/|$)(.*)
     replacement: /$2
 
 ---
@@ -18,7 +18,7 @@ spec:
     - web
   routes:
   - kind: Rule
-    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/contributed/${skaha.sessionid}/`)
+    match: Host(`rc-uv.canfar.net`) && PathPrefix(`/session/contrib/${skaha.sessionid}/`)
     services:
     - kind: Service
       name: skaha-contributed-svc-${skaha.sessionid}
