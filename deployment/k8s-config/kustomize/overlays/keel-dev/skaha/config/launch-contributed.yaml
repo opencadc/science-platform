@@ -53,9 +53,6 @@ spec:
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         image: ${software.imageid}
-        command: ["/skaha/startup.sh"]
-        args:
-        - ${skaha.sessionid}
         imagePullPolicy: Always
         resources:
           requests:
