@@ -68,12 +68,12 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
-         - mountPath: "/arc"
-           name: cavern-volume
-           subPath: "cavern"
-         - mountPath: "/scratch"
-           name: scratch-dir
-           subPath: "${skaha.sessionid}"
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
