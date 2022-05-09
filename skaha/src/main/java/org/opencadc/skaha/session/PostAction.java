@@ -340,10 +340,10 @@ public class PostAction extends SessionAction {
                 servicePath = System.getProperty("user.home") + "/config/service-pluto.yaml";
                 ingressPath = System.getProperty("user.home") + "/config/ingress-pluto.yaml";
                 break;
-            case SessionAction.SESSION_TYPE_CASTORETC:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-castor-etc.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-castor-etc.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-castor-etc.yaml";
+            case SessionAction.SESSION_TYPE_CONTRIB:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-contributed.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-contributed.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-contributed.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";

@@ -108,7 +108,7 @@
         <servlet-class>ca.nrc.cadc.vosi.AvailabilityServlet</servlet-class>
         <init-param>
             <param-name>ca.nrc.cadc.vosi.AvailabilityPlugin</param-name>
-            <param-value>org.opencadc.skaha.Availability</param-value>
+            <param-value>org.opencadc.skaha.SkahaAvailability</param-value>
         </init-param>
     </servlet>
 
