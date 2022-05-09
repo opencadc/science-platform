@@ -40,7 +40,7 @@ dependencies {
     compile 'org.opencadc:cadc-uws-server:[1.1.3,)'
     compile 'org.opencadc:cadc-access-control:[1.1.23,)'
     compile 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
-    compile 'org.opencadc:cadc-vosi:1.2'
+    compile 'org.opencadc:cadc-vosi:[1.4.3,)'
     compile 'org.opencadc:cadc-cdp:[1.2,)'
     compile 'com.google.code.gson:gson:2.8.6'
     runtime 'org.opencadc:cadc-registry:[1.3.5,)'

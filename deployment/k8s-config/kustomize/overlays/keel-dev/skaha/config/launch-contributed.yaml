@@ -38,11 +38,21 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         image: ${software.imageid}
-        command: ["/skaha/startup.sh"]
-        args:
-        - ${skaha.sessionid}  # for URL routing
-        - debug  # verbosity level of logs
         imagePullPolicy: Always
         resources:
           requests:
@@ -58,12 +68,12 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
-        # - mountPath: "/arc"
-        #   name: cavern-volume
-        #   subPath: "cavern"
-        # - mountPath: "/scratch"
-        #   name: scratch-dir
-        #   subPath: "${skaha.sessionid}"
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
           readOnly: true
@@ -74,8 +84,8 @@ spec:
           - 10.30.201.3:6789
           - 10.30.202.3:6789
           - 10.30.203.3:6789
-          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
-          user: keel_prod
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
           secretRef:
             name: cephfs-cephx-key
           readOnly: false

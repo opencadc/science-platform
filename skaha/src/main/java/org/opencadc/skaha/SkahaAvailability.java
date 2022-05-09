@@ -70,20 +70,20 @@ package org.opencadc.skaha;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.session.SessionAction;
 
+import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import ca.nrc.cadc.vosi.AvailabilityStatus;
 
 import java.io.IOException;
 
 
-public class Availability implements AvailabilityPlugin
+public class SkahaAvailability implements AvailabilityPlugin
 {
-    private static final Logger LOG = Logger.getLogger(Availability.class);
+    private static final Logger LOG = Logger.getLogger(SkahaAvailability.class);
 
-    private static final AvailabilityStatus STATUS_UP =
-        new AvailabilityStatus(true, null, null, null, "skaha service is available.");
+    private static final Availability STATUS_UP =
+        new Availability(true, "skaha service is available.");
 
-    public Availability()
+    public SkahaAvailability()
     {
     }
 
@@ -98,7 +98,7 @@ public class Availability implements AvailabilityPlugin
     }
 
     @Override
-    public AvailabilityStatus getStatus()
+    public Availability getStatus()
     {
         // ensure we can run kubectl
         try {
@@ -107,8 +107,7 @@ public class Availability implements AvailabilityPlugin
                 "kubectl", "get", "--namespace", k8sNamespace, "pods"};
             SessionAction.execute(getPods);
         } catch (Exception e) {
-            AvailabilityStatus down = new AvailabilityStatus(
-                false, null, null, null, "failed to run kubectl");
+            Availability down = new Availability(false, "failed to run kubectl");
             return down;
         }
         return STATUS_UP;
