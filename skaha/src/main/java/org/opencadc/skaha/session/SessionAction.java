@@ -236,8 +236,8 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/pluto/" + sessionID + "/";
     }
     
-    public static String getCastorEtcURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/session/castor-etc/" + sessionID + "/";
+    public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
@@ -487,8 +487,8 @@ public abstract class SessionAction extends SkahaAction {
         if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
             connectURL = SessionAction.getPlutoURL(host, id);
         }
-        if (SessionAction.SESSION_TYPE_CASTORETC.equals(type)) {
-            connectURL = SessionAction.getCastorEtcURL(host, id);
+        if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
+            connectURL = SessionAction.getContributedURL(host, id);
         }
 
         return new Session(id, userid, image, type, status, name, startTime, connectURL);
