@@ -101,7 +101,8 @@ curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userM
 echo " Done"
 
 echo -n "  Setting user quota to ${QUOTA}G..."
-setfattr -n user.ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
+setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
+setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
 echo " Done"
 
 TS=$(date)

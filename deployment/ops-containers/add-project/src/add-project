@@ -56,7 +56,8 @@ chmod $MODE $PROJECTDIR
 setfacl -d -m group:$GROUP:$ACCESS $PROJECTDIR
 setfacl -m group:$GROUP:$ACCESS $PROJECTDIR
 echo -n "  Setting quota to ${QUOTA}G"
-setfattr -n user.ceph.quota.max_bytes -v ${QUOTA}000000000 $PROJECTDIR
+setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $PROJECTDIR
+setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $PROJECTDIR
 echo " Done"
 
 TS=$(date)
