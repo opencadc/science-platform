@@ -44,6 +44,12 @@ RUN yum install -y xorg-x11-fonts-ISO8859-1-100dpi-7.2-11.el6.noarch
 RUN yum install -y xorg-x11-fonts-misc-7.2-11.el6.noarch
 RUN yum install -y xorg-x11-font-utils-7.2-11.el6.x86_64
 
+# Add some stuff to make the UNIX environment a bit nicer
+RUN yum install -y emacs
+RUN yum install -y moreutils
+RUN yum install -y man-pages
+RUN yum install -v -y man
+
 ENV STARLINK_DIR=/star-2021A
 
 # Fifth try, JJ suggestion
@@ -57,4 +63,3 @@ RUN chmod +x /skaha/startup.sh
 # RUN groupadd -g 1001 jkavelaars 
 # RUN useradd -u 1001 -g 1001 -s /bin/bash -d /arc/home/jkavelaars -m jkavelaars
 
-ENTRYPOINT ["/skaha/init.sh"]

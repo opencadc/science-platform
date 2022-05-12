@@ -10,7 +10,7 @@ build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .
 
 deploy: build
-	docker push -t $(NAME):$(VERSION)
+	docker push $(NAME):$(VERSION)
 
 dependencies: 
 
