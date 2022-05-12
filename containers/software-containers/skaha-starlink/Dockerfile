@@ -48,8 +48,8 @@ ENV STARLINK_DIR=/star-2021A
 
 # Fifth try, JJ suggestion
 COPY src/starlink.sh /etc/profile.d/
-COPY src/init.sh /skaha/init.sh
-RUN chmod +x /skaha/init.sh
+COPY src/startup.sh /skaha/startup.sh
+RUN chmod +x /skaha/startup.sh
 
 # add my user id to the conatiner, to have consistent testing.
 # Below is used in testing....

@@ -1,11 +1,16 @@
 
-DEVNAME = skaha-starlink
+REPO = images.canfar.net
+PROJECT = skaha
+DEVNAME = starlink
+VERSION = 2021A
 
-NAME = bucket.canfar.net/$(DEVNAME)
-VERSION = 0.3
+NAME = $(REPO)/$(PROJECT)/$(DEVNAME)
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .
+
+deploy: build
+	docker push -t $(NAME):$(VERSION)
 
 dependencies: 
 
