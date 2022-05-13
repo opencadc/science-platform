@@ -1,6 +1,6 @@
 # Build file for ORACDR [JCMT data processing environment]
 #copying centos6 setup from casa4.5-5.8 containers
-FROM centos:6
+FROM centos:6 AS deploy
 # make sure we get manual pages
 RUN sed -i '/tsflags=nodocs/d' /etc/yum.conf
 RUN rm /etc/yum.repos.d/CentOS-Base.repo
@@ -57,9 +57,12 @@ COPY src/starlink.sh /etc/profile.d/
 COPY src/startup.sh /skaha/startup.sh
 RUN chmod +x /skaha/startup.sh
 
-# add my user id to the conatiner, to have consistent testing.
-# Below is used in testing....
-# RUN mkdir -p /arc/home
-# RUN groupadd -g 1001 jkavelaars 
-# RUN useradd -u 1001 -g 1001 -s /bin/bash -d /arc/home/jkavelaars -m jkavelaars
+# Two build sets, deploy and test
+FROM deploy as test
+RUN echo "Adding a test user to run local testing"
+RUN mkdir -p /arc/home
+RUN groupadd -g 1001 testuser
+RUN useradd -u 1001 -g 1001 -s /bin/bash -d /arc/home/testuser -m testuser
+ENTRYPOINT ["/skaha/startup.sh"]
+
 

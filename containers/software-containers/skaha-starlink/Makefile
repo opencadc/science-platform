@@ -6,11 +6,14 @@ VERSION = 2021A
 
 NAME = $(REPO)/$(PROJECT)/$(DEVNAME)
 
-build: dependencies Dockerfile
-	docker build -t $(NAME):$(VERSION) -f Dockerfile .
+production: dependencies Dockerfile
+	docker build --target deploy -t $(NAME):$(VERSION) -f Dockerfile .
 
-deploy: build
+deploy: production
 	docker push $(NAME):$(VERSION)
+
+dev: dependencies Dockerfile
+	docker build --target test -t $(NAME):$(VERSION) -f Dockerfile .
 
 dependencies: 
 
