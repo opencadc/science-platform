@@ -1,4 +1,4 @@
-FROM lsstsqre/centos:7-stack-lsst_distrib-current
+FROM lsstsqre/centos:7-stack-lsst_distrib-v21_0_0
 USER root
 
 # install git-lfs using package cloud
