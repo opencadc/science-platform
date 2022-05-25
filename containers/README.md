@@ -62,6 +62,8 @@ If the container needs to do any runtime initialization, that can be done in a s
 
 If `/skaha/init.sh` is provided, a sensible directive for testing the container via docker is `CMD ["/skaha/init.sh"]`
 
+Another option is for containers to make available a file named `/skaha/startup.sh`.  If it exists, it will be called with a single parameter, which is the command `startup.sh` must run in order to execute on the platform.  So, the end of `startup.sh` should do: `exec "$@"` to execute the incoming parameter.  Containers should use startup.sh when environment must be made available to the context of the application.
+
 <a name="publishing"></a>
 ## Publishing skaha containers
 
