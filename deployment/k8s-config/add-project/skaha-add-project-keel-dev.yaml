@@ -13,9 +13,8 @@ spec:
         image: images.canfar.net/skaha-system/add-project:1.0
         imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
-        # 5th argument is project quota in GB
         command: ["/usr/bin/add-project"]
-        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write
+        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write, quota in GB
         args: ["test-project", "majorb", "skaha-users", "read-write", "1000"]
         volumeMounts:
         - mountPath: "/config"
