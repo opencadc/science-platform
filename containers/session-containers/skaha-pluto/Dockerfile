@@ -6,9 +6,9 @@ RUN yum makecache -y && \
     yum clean all
 
 WORKDIR /
-RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.7/julia-1.7.2-linux-x86_64.tar.gz && \
-    tar zxvf julia-1.7.2-linux-x86_64.tar.gz && \
-    rm julia-1.7.2-linux-x86_64.tar.gz
+RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.8/julia-1.8.0-beta3-linux-x86_64.tar.gz && \
+    tar zxvf julia-1.8.0-beta3-linux-x86_64.tar.gz && \
+    rm julia-1.8.0-beta3-linux-x86_64.tar.gz
 
 # We want to set up Julia carefully.
 # We want some packages e.g. Pluto backed into the container,
@@ -29,7 +29,7 @@ ENV JULIA_DEPOT_PATH=/opt/julia
 ENV JULIA_PKGDIR=/opt/julia
 RUN mkdir "${JULIA_PKGDIR}" && mkdir "${JULIA_PKGDIR}/artifacts"
 
-ENV PATH="/julia-1.7.2/bin:${PATH}"
+ENV PATH="/julia-1.8.0-beta3/bin:${PATH}"
 RUN echo "PATH: ${PATH}"
 
 # Copy a script that we will use to correct permissions after running certain commands
@@ -50,7 +50,7 @@ RUN chmod a+rx /usr/local/bin/fix-permissions
 # for e.g. Pluto but might cause issues if they install a new package that is incompatible with
 # a transitive dependency like requiring an old version of HTML.jl
 
-RUN julia -e 'using Pkg; Pkg.add(["Pluto", "PlutoUI", "PackageCompiler"]); using PackageCompiler; create_sysimage([:Pluto, :PlutoUI], sysimage_path="/PlutoSysImg.so")' && \
+RUN julia -e 'using Pkg; Pkg.add(["Pluto", "PlutoUI", "PackageCompiler"]); using PackageCompiler; create_sysimage([:Pluto, :PlutoUI],sysimage_path="/PlutoSysImg.so")' && \
     rm -rf ${JULIA_DEPOT_PATH}/registries/General && \
     chmod -R 755 ${JULIA_DEPOT_PATH}/artifacts && \
     fix-permissions /julia* /opt/julia PlutoSysImg.so
@@ -59,7 +59,7 @@ RUN mkdir /skaha
 ADD src/startup.sh /skaha/
 RUN chmod gou+x /skaha/startup.sh
 
-EXPOSE 1234
+EXPOSE 5000
 
 # Network file systems do not fire file events without polling
 ENV JULIA_REVISE_POLL=1
@@ -71,4 +71,4 @@ ADD src/nsswitch.conf /etc/
 # RUN useradd -ms /bin/bash tstusr
 # WORKDIR /home/newuser
 # USER tstusr
-CMD ["/skaha/startup.sh"]
+ENTRYPOINT [ "/skaha/startup.sh" ]
