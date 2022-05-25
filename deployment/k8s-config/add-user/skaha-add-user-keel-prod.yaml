@@ -11,7 +11,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: "skaha-add-user"
-        image: images.canfar.net/skaha-system/add-user:1.0
+        image: images.canfar.net/skaha-system/add-user:1.2
         imagePullPolicy: Always
         # Userid for allocation goes in this argument.
         # Second argument is user quota in GB

@@ -11,7 +11,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: "skaha-add-project"
-        image: images.canfar.net/skaha-system/add-project:1.0
+        image: images.canfar.net/skaha-system/add-project:1.2
         imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
