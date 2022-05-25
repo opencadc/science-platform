@@ -14,7 +14,7 @@ spec:
         imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
-        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write, quota in GB
+        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write, quota-in-gb
         args: ["test-project", "majorb", "skaha-users", "read-write", "1000"]
         volumeMounts:
         - mountPath: "/config"
