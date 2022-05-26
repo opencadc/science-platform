@@ -11,12 +11,13 @@ CONFDIR=/config
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$1" ]
+if [ -z "$2" ]
   then
-    echo "Usage: add-user <userid>"
+    echo "Usage: add-user <userid> <quota in GB>"
     exit 2
 fi
 USERID=$1
+QUOTA=$2
 
 BASHRC="$CONFDIR/bashrc"
 XRESOURCES="$CONFDIR/Xresources"
@@ -97,6 +98,11 @@ echo " Done"
 
 echo -n "  Adding user to skaha group..."
 curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERID?idType=http"
+echo " Done"
+
+echo -n "  Setting user quota to ${QUOTA}G..."
+setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
+setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
 echo " Done"
 
 TS=$(date)
