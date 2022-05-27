@@ -16,11 +16,11 @@ mkdir -p "$HOME/.julia"
 # New pacakges get installed into here:
 export JULIA_DEPOT_PATH="$HOME/.julia:$JULIA_DEPOT_PATH"
 # Packages can get loaded from both depots
-export JULIA_LOAD_PATH="/opt/julia/environments/v1.7/Project.toml:"
+export JULIA_LOAD_PATH="/opt/julia/environments/v1.8/Project.toml:"
 # Default project environment kept in the user's home directory
 export JULIA_PROJECT="$HOME"
 
-julia -J /PlutoSysImg.so -e 'using Pluto; Pluto.run(require_secret_for_access=false, auto_reload_from_file=true, launch_browser=false, host="0.0.0.0")'
+julia -J /PlutoSysImg.so -e 'using Pluto; Pluto.run(require_secret_for_access=false, auto_reload_from_file=true, launch_browser=false, host="0.0.0.0", port=5000)'
 
 echo "Exiting"
 
