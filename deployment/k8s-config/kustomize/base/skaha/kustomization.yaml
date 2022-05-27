@@ -12,7 +12,6 @@ configMapGenerator:
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
   - config/launch-desktop.yaml
-  - config/launch-pluto.yaml
   - config/launch-contributed.yaml
   - config/launch-headless.yaml
   - config/launch-software.yaml
@@ -23,8 +22,6 @@ configMapGenerator:
   - config/ingress-desktop.yaml
   - config/service-carta.yaml
   - config/ingress-carta.yaml
-  - config/service-pluto.yaml
-  - config/ingress-pluto.yaml
   - config/service-contributed.yaml
   - config/ingress-contributed.yaml
 generatorOptions:
