@@ -76,7 +76,6 @@ import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
-import ca.nrc.cadc.util.StringUtil;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -84,6 +83,7 @@ import com.google.gson.reflect.TypeToken;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.Type;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
@@ -111,8 +111,8 @@ public class LifecycleTest {
     private static final Logger log = Logger.getLogger(LifecycleTest.class);
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
-    public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:0.4.13";
-    public static final String CARTA_IMAGE = "images.canfar.net/skaha/carta:1.4";
+    public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:1.0.1";
+    public static final String CARTA_IMAGE = "images.canfar.net/skaha/carta:2.0";
     
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
@@ -145,44 +145,26 @@ public class LifecycleTest {
 
                 public Object run() throws Exception {
                     
-                    // get sessions
-                    List<Session> sessions = getSessions();
-                    Assert.assertTrue("zero sessions #1", sessions.size() == 0);
+                    // ensure that there is no active session
+                    initialize();
                     
                     // create desktop session
-                    Map<String, Object> params = new HashMap<String, Object>();
-                    params.put("name", "intTest");
-                    params.put("image", DESKTOP_IMAGE);
-                    HttpPost post = new HttpPost(sessionURL, params, false);
-                    post.run();
-                    Assert.assertNull("create session error", post.getThrowable());
+                    createSession(DESKTOP_IMAGE);
                     
                     // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been 
                     // addressed, just wait for a bit.
                     TimeUnit.SECONDS.sleep(10);
                     
-                    // get sessions
-                    sessions = getSessions();
-                    Assert.assertTrue("one session #1", sessions.size() == 1);
-                    Session session = sessions.get(0);
-                    Assert.assertEquals("session name", "intTest", session.getName());
-                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_DESKTOP, session.getType());
-                    Assert.assertNotNull("session id", session.getId());
-                    Assert.assertNotNull("connect URL", session.getConnectURL());
-                    Assert.assertNotNull("up since", session.getStartTime());
+                    // verify desktop session
+                    verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#1");
                     
                     // create carta session
-                    params = new HashMap<String, Object>();
-                    params.put("name", "intTest");
-                    params.put("image", CARTA_IMAGE);
-                    post = new HttpPost(sessionURL, params, false);
-                    post.run();
-                    Assert.assertNull("create session error", post.getThrowable());
+                    createSession(CARTA_IMAGE);
                     
                     TimeUnit.SECONDS.sleep(10);
                     
-                    // get sessions
-                    sessions = getSessions();
+                    // verify both desktop and carta sessions
+                    List<Session> sessions = getSessions();
                     Assert.assertTrue("two sessions", sessions.size() == 2);
                     String desktopSessionID = null;
                     String cartaSessionID = null;
@@ -190,51 +172,38 @@ public class LifecycleTest {
                         Assert.assertNotNull("session type", s.getType());
                         if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
                             desktopSessionID = s.getId();
-                            desktopSessionID = session.getId();
                         } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
                             cartaSessionID = s.getId();
                         } else {
                             throw new AssertionError("invalid session type: " + s.getType());
                         }
-                        Assert.assertEquals("session name", "intTest", session.getName());
-                        Assert.assertNotNull("session id", session.getId());
-                        Assert.assertNotNull("connect URL", session.getConnectURL());
-                        Assert.assertNotNull("up since", session.getStartTime());
+                        Assert.assertEquals("session name", "inttest", s.getName());
+                        Assert.assertNotNull("session id", s.getId());
+                        Assert.assertNotNull("connect URL", s.getConnectURL());
+                        Assert.assertNotNull("up since", s.getStartTime());
                     }
                     Assert.assertNotNull("no desktop session", desktopSessionID);
                     Assert.assertNotNull("no carta session", cartaSessionID);
 
                     // delete desktop session
-                    HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + desktopSessionID), true);
-                    delete.run();
-                    Assert.assertNull("delete session error", delete.getThrowable());
+                    deleteSession(sessionURL, desktopSessionID);
                     
                     TimeUnit.SECONDS.sleep(10);
                     
-                    // get sessions
-                    sessions = getSessions();
-                    Assert.assertTrue("one session #2", sessions.size() == 1);
-                    session = sessions.get(0);
-                    Assert.assertEquals("session name", "intTest", session.getName());
-                    Assert.assertEquals("session type", SessionAction.SESSION_TYPE_CARTA, session.getType());
-                    Assert.assertNotNull("session id", session.getId());
-                    Assert.assertNotNull("connect URL", session.getConnectURL());
-                    Assert.assertNotNull("up since", session.getStartTime());
+                    // verify remaining carta session
+                    verifyOneSession(SessionAction.SESSION_TYPE_CARTA, "#2");
                     
                     // delete carta session
-                    delete = new HttpDelete(new URL(sessionURL.toString() + "/" + cartaSessionID), true);
-                    delete.run();
-                    Assert.assertNull("delete session error", delete.getThrowable());
+                    deleteSession(sessionURL, cartaSessionID);
                     
                     TimeUnit.SECONDS.sleep(10);
                     
-                    // get sessions
+                    // verify that there is no session left
                     sessions = getSessions();
                     Assert.assertTrue("zero sessions #2", sessions.size() == 0);
 
                     return null;
                 }
-                
             });
             
         } catch (Exception t) {
@@ -242,6 +211,41 @@ public class LifecycleTest {
             Assert.fail("unexpected throwable: " + t);
         }
         
+    }
+    
+    private void initialize() throws MalformedURLException {
+        List<Session> sessions = getSessions();
+        for (Session session : sessions) {
+            deleteSession(sessionURL, session.getId());
+        }
+
+        sessions = getSessions();
+        Assert.assertTrue("zero sessions #1", sessions.size() == 0);
+    }
+    private void createSession(String image) {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("name", "inttest");
+        params.put("image", image);
+        HttpPost post = new HttpPost(sessionURL, params, false);
+        post.run();
+        Assert.assertNull("create session error", post.getThrowable());
+    }
+
+    private void verifyOneSession(String expectedSessionType, String sessionNumber) {
+        List<Session> sessions = getSessions();
+        Assert.assertTrue("one session " + sessionNumber, sessions.size() == 1);
+        Session session = sessions.get(0);
+        Assert.assertEquals("session name", "inttest", session.getName());
+        Assert.assertEquals("session type", expectedSessionType, session.getType());
+        Assert.assertNotNull("session id", session.getId());
+        Assert.assertNotNull("connect URL", session.getConnectURL());
+        Assert.assertNotNull("up since", session.getStartTime());
+    }
+
+    private void deleteSession(URL sessionURL, String sessionID) throws MalformedURLException {
+        HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + sessionID), true);
+        delete.run();
+        Assert.assertNull("delete session error", delete.getThrowable());
     }
     
     private List<Session> getSessions() {
