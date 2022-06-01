@@ -17,7 +17,7 @@ RUN rm -f /tmp/anaconda.sh
 RUN conda update conda 
 RUN conda config --add channels http://ssb.stsci.edu/astroconda 
 RUN conda config --add channels astropy
-RUN conda create -n astroconda stsci
+RUN conda create -y -n astroconda python=3.7 stsci
 RUN conda install astroquery
 
 RUN apt-get update && yes | apt-get install sssd libnss-sss libpam-sss

@@ -11,15 +11,16 @@ CONFDIR=/config
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$4" ]
+if [ -z "$5" ]
   then
-    echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write>"
+    echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write> <quota in GB>"
     exit 2
 fi
 PROJECT=$1
 OWNER=$2
 GROUP=$3
 ACCESS_ARG=$4
+QUOTA=$5
 ACCESS=""
 MODE=""
 
@@ -54,6 +55,9 @@ chown $OWNER:$OWNER $PROJECTDIR
 chmod $MODE $PROJECTDIR
 setfacl -d -m group:$GROUP:$ACCESS $PROJECTDIR
 setfacl -m group:$GROUP:$ACCESS $PROJECTDIR
+echo -n "  Setting quota to ${QUOTA}G"
+setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $PROJECTDIR
+setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $PROJECTDIR
 echo " Done"
 
 TS=$(date)

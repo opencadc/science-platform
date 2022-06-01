@@ -72,8 +72,6 @@ import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.util.MultiValuedProperties;
-import ca.nrc.cadc.util.PropertiesReader;
 import ca.nrc.cadc.util.StringUtil;
 
 import java.io.BufferedWriter;
@@ -93,9 +91,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
@@ -211,45 +207,29 @@ public abstract class SessionAction extends SkahaAction {
         return stdout.trim();
     }
     
-    public static String getVNCURL(String host, String sessionID, boolean isNew) throws MalformedURLException {
+    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
         
         // vnc.html does not...
-        if (isNew) {
-            return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
-        } else {
-            return "https://" + host + "/desktop/" + sessionID + "/?password=" + sessionID + "&path=desktop/" + sessionID + "/";
-        }
+        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
     }
     
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl, boolean isNew) throws MalformedURLException {
-        if (isNew) {
-            String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
-            if (altSocketUrl) {
-                url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
-            }
-            return url;
-        } else {
-            String url = "https://" + host + "/carta/http/" + sessionID + "/";
-            if (altSocketUrl) {
-                url = url + "?socketUrl=wss://" + host + "/carta/ws/" + sessionID + "/";
-            }
-            return url;
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
+        String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
+        if (altSocketUrl) {
+            url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
         }
+        return url;
     }
     
-    public static String getNotebookURL(String host, String sessionID, String userid, boolean isNew) throws MalformedURLException {
-        if (isNew) {
-            return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
-        } else {
-            return "https://" + host + "/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
-        }
+    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
+        return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
     }
     
-    public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/session/pluto/" + sessionID + "/";
+    public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
+        return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
     
     protected void injectProxyCert(final Subject subject, String userid, String posixID)
@@ -482,30 +462,22 @@ public abstract class SessionAction extends SkahaAction {
         String host = K8SUtil.getHostName();
         String connectURL = "not-applicable";
         
-        // temporary: new ingress definition applied to sessions after this date
-        boolean isNew = false;
-        String newIngressDate = "2022-03-02T00:15:00Z";
-        if (startTime.compareTo(newIngressDate) >= 0) {
-            isNew = true;
-        }
-        log.debug("is new: " + isNew);
-        
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id, isNew);
+            connectURL = SessionAction.getVNCURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
             if (image.endsWith(":1.4")) {
                 // support alt web socket path for 1.4 carta 
-                connectURL = SessionAction.getCartaURL(host, id, true, isNew); 
+                connectURL = SessionAction.getCartaURL(host, id, true); 
             } else {
-                connectURL = SessionAction.getCartaURL(host, id, false, isNew);
+                connectURL = SessionAction.getCartaURL(host, id, false);
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid, isNew);
+            connectURL = SessionAction.getNotebookURL(host, id, userid);
         }
-        if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
-            connectURL = SessionAction.getPlutoURL(host, id);
+        if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
+            connectURL = SessionAction.getContributedURL(host, id);
         }
 
         return new Session(id, userid, image, type, status, name, startTime, connectURL);

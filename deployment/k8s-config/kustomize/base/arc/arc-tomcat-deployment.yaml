@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: arc-tomcat
-        image: images.canfar.net/skaha-system/cavern:0.3.0
+        image: images.canfar.net/skaha-system/cavern:0.4.1
         imagePullPolicy: Always
         resources:
           requests:

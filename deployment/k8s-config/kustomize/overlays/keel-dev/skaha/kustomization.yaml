@@ -15,14 +15,14 @@ configMapGenerator:
   - config/launch-desktop.yaml
   - config/launch-headless.yaml
   - config/launch-software.yaml
-  - config/launch-pluto.yaml
+  - config/launch-contributed.yaml
   - config/service-notebook.yaml
   - config/ingress-notebook.yaml
   - config/service-desktop.yaml
   - config/ingress-desktop.yaml
   - config/service-carta.yaml
   - config/ingress-carta.yaml
-  - config/service-pluto.yaml
-  - config/ingress-pluto.yaml
+  - config/service-contributed.yaml
+  - config/ingress-contributed.yaml
 generatorOptions:
  disableNameSuffixHash: true
