@@ -30,5 +30,6 @@ RUN rm -f v${PHOSIM_VERSION}.tar.gz && \
 ADD nsswitch.conf /etc/
 
 ENV PATH ${PATH}:/opt/phosim
+COPY phosim /opt/phosim
 
 CMD ["phosim","--version"]
