@@ -13,7 +13,7 @@
 
 ## Introduction and Access
 
-Documentation for new users can be found here: [Documentation For New Users](https://helenkirk-arcade.readthedocs.io/en/latest/) TO BE MODIFIED SOON
+Documentation for new users can be found here: [Documentation For New Users](https://canfar-arcade.readthedocs.io/en/latest/) 
 
 The CANFAR Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
 On the portal are the [Science Portal](https://www.canfar.net/science-portal) and the [Storage UI](https://www.canfar.net/storage/arc/list/).
