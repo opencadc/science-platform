@@ -1,7 +1,7 @@
 
 DEVNAME = terminal
 
-NAME = images.canfar/skaha/$(DEVNAME)
+NAME = images.canfar.net/skaha/$(DEVNAME)
 VERSION = 1.0
 
 build: dependencies Dockerfile
