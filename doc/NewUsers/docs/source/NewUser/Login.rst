@@ -11,7 +11,7 @@ To request authorization to use the science portal, send an email to
 support@canfar.net  You may also wish to consider the following:
 
 * *Project space*: If you intend to work on a dataset with collaborators, it may be worth considering whether or not it makes sense to set up a 'project space', where a designated group of users all has common access to the files contained within it.  You will need to supply a project name and estimated space requirement to the email address above.
-* *Communications on Slack*: a Slack workspace is used for some aspects of communication around ARCADE, including notice of service outages and some trouble-shooting support.  You can request that you be added to this space also by contacting the email address listed above.
+* *Communications on Slack*: a Slack workspace is used for some aspects of communication around the Science Portal, including notice of service outages and some trouble-shooting support.  You can request that you be added to this space also by contacting the email address listed above.
 
 
 

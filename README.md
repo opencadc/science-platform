@@ -13,6 +13,7 @@
 ## CANFAR Science Portal Documentation
 
 User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](doc)
+Additional documentation for new users can be found here: [New User Documentation](https://canfar-scienceportal.readthedocs.io/en/latest/)
 
 ## Acknowledgements
 This project has been funded in part by:

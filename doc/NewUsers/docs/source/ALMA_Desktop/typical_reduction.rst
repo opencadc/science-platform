@@ -63,6 +63,6 @@ using the vcp command.
 
    .. image:: images/typical_reduc/5_imaging_done_copy_out.png
 
-Note that ARCADE is not intended to be used for long-term data
+Note that the Science Portal is not intended to be used for long-term data
 storage needs - VOSpace is instead recommended as it has a robust
 backup system in place.
