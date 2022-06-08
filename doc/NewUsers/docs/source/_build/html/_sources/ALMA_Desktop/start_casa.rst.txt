@@ -19,16 +19,12 @@ to CASA 3.4.0 is available (this is the version of CASA which is
 tied to the scripts distributed with ALMA Cycle 0 data on the archive;
 see link `here <https://casaguides.nrao.edu/index.php?title=Updating_a_script_to_work_with_CASA_4.2>`_)
 
-**NOTE: This screenshot will
-need to be revised once the menu is finalzed and 'ARCADE' has been
-removed**
-
    .. image:: images/start_casa/3_choose_casa.png
 
 Clicking on your prefered version of CASA will open a terminal in which
 you can run CASA in the standard manner (typing either 'casa' or
 'casa --pipeline' depending on the mode you wish to use).
-**[NB: need to fix formatting so spaces between two dashes shows up]**
+[NB: there are two dashes before 'pipeline' in the previous command]
 
    .. image:: images/start_casa/4_casa_launched.png
    .. image:: images/start_casa/5_run_casa.png
