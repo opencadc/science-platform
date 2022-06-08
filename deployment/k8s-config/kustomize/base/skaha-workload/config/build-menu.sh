@@ -9,6 +9,7 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
+TERMINAL_VERSION="terminal:"
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -96,6 +97,14 @@ build_menu () {
   rm -f ${DIRECTORIES_DIR}/*-e
 }
 
+update_terminal_desktop () {
+  script_name="${EXECUTABLE_DIR}/$2.sh"
+  cp ${STARTUP_DIR}/terminal.desktop.template /tmp/terminal.desktop
+  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/terminal.desktop
+  cp /tmp/terminal.desktop $1
+  rm /tmp/terminal.desktop
+}
+
 build_menu_item () {
   image_id=$1
   name=$2
@@ -109,6 +118,14 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(HOME)#$HOME#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
+  if [[ ${name} == *"terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
+      TERMINAL_VERSION=${name}
+#      cp ${executable} ${EXECUTABLE_DIR}/terminal.sh
+      # terminal.desktop accessed via "Applications->terminal"
+      update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
+      # terminal.desktop accessed via terminal icon on desktop
+      update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
+  fi
   rm -f ${EXECUTABLE_DIR}/*-e
   rm -f ${DESKTOP_DIR}/*-e
 }
