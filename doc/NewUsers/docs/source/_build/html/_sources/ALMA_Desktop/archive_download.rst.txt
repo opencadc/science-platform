@@ -1,6 +1,6 @@
 .. _desktop_download:
 
-Download Data from the ALMA Archive (web browser)
+Download data from the ALMA archive (web browser)
 =================================================
 
 Downloading data directly from an ALMA archive web query 

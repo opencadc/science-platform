@@ -26,7 +26,10 @@ Now, hit the launch button and wait for your session to launch
 Congratulations!  You’ve started your first session.  You are automatically 
 returned to the main science portal page, where your desktop session appears 
 as an icon, with your chosen descriptive name.  Access the session by clicking 
-on the icon.
+on the icon.  Note that sometimes it takes a few seconds for the link to your
+session to work properly; if you are taken to a webpage that states 
+*Bad gateway* when you click on the icon, simply wait a few more seconds and 
+then try again.
 
   .. image:: images/desktop/5_active_desktop.png
 
