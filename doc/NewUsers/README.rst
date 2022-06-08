@@ -1,7 +1,6 @@
-README for CANFAR's ARCADE Science Platform documentation
+README for CANFAR's Science Portal documentation
 =========================================================
 
-The Astronomy Reduction in the CANFAR Data Environment (ARCADE)
-Science Platform provides cloud-based
+CANFAR's Science Portal provides cloud-based
 computing resources for astronomers working with large observational
 datasets.
