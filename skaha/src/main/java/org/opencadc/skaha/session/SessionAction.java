@@ -72,8 +72,6 @@ import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
-import ca.nrc.cadc.util.MultiValuedProperties;
-import ca.nrc.cadc.util.PropertiesReader;
 import ca.nrc.cadc.util.StringUtil;
 
 import java.io.BufferedWriter;
@@ -93,9 +91,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
@@ -230,10 +226,6 @@ public abstract class SessionAction extends SkahaAction {
     
     public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
         return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
-    }
-    
-    public static String getPlutoURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/session/pluto/" + sessionID + "/";
     }
     
     public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
@@ -483,9 +475,6 @@ public abstract class SessionAction extends SkahaAction {
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionAction.getNotebookURL(host, id, userid);
-        }
-        if (SessionAction.SESSION_TYPE_PLUTO.equals(type)) {
-            connectURL = SessionAction.getPlutoURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
             connectURL = SessionAction.getContributedURL(host, id);

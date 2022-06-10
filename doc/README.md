@@ -13,6 +13,8 @@
 
 ## Introduction and Access
 
+Documentation for new users can be found here: [Documentation For New Users](https://canfar-scienceportal.readthedocs.io/en/latest/) 
+
 The CANFAR Portal can be found here:  [CANFAR Science Portal](https://www.canfar.net)
 On the portal are the [Science Portal](https://www.canfar.net/science-portal) and the [Storage UI](https://www.canfar.net/storage/arc/list/).
 

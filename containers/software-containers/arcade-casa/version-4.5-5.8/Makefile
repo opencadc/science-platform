@@ -26,14 +26,16 @@ VERSIONS_PIPELINE = \
 
 VERSIONS = \
 	5.7.0-134.el6 \
-    5.7.2-4.el6 \
-    5.8.0-109.el6 
+	5.7.2-4.el6 \
+	5.8.0-109.el6 
 
 DOCKER_REPO_BASE=images.canfar.net/arcade/casa
 
 .PHONY: build clean run 
 
-all: build-old build-pipeline build
+#HK test
+#all: build-old build-pipeline build
+all: build
 
 build-old: 
 	@- $(foreach V,$(VERSIONS_OLD), \
@@ -68,7 +70,9 @@ clean:
                 docker rmi ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
-clean-all: clean-old clean-pipeline clean 
+#HK test
+#clean-all: clean-old clean-pipeline clean 
+clean-all: clean
 
 upload-old: build-old
 	@- $(foreach V,$(VERSIONS_OLD), \
@@ -85,4 +89,6 @@ upload: build
                 docker push ${DOCKER_REPO_BASE}:$(V) ; \
 	)
 
-upload-all: upload-old upload-pipeline upload 
+#HK test
+#upload-all: upload-old upload-pipeline upload 
+upload-all: upload
