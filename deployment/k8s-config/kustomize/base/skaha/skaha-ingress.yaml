@@ -16,3 +16,10 @@ spec:
             name: skaha-tomcat-svc
             port:
               number: 8080
+      - path: /skaha/
+        pathType: Prefix
+        backend:
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080
