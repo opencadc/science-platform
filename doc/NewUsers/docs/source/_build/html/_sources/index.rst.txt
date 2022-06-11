@@ -1,14 +1,13 @@
-.. ARCADE documentation master file, created by
+.. CANFAR Science Portal documentation master file, created by
    sphinx-quickstart on Wed Feb 16 14:36:26 2022.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to the documentation for CANFAR's ARCADE Science Platform!
+Welcome to the documentation for CANFAR's Science Portal!
 ==================================================================
 
-The ARCADE (Astronomy Reduction in the CANFAR Data Environment) 
-Science Platform is a 
-platform which provides astronomers the computing resources they
+The CANFAR Science Portal 
+provides astronomers the computing resources they
 need to work with their data.
 
 Tutorials for New Users

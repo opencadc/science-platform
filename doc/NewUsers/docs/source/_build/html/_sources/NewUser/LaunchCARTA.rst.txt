@@ -24,7 +24,7 @@ best to choose the smallest value that is reasonable for your needs, as
 the computing resources are shared amongst all users.  A very large
 RAM request may slow or prevent you from launching a session if the
 necessary resources are not currently available on the system.
-If you are unsure of what you need, the default value of 16MB is a 
+If you are unsure of what you need, the default value of 16GB is a 
 safe assumption - it is the amount of RAM available on a MacBookPro.
 
   .. image:: images/carta/4_choose_carta_ram.png

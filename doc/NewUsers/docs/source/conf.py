@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'ARCADE'
-copyright = '2022, ARCADE team'
-author = 'ARCADE team'
+project = 'CANFAR Science Portal'
+copyright = '2022, CANFAR Science Portal'
+author = 'CANFAR Science Portal team'
 
 
 # -- General configuration ---------------------------------------------------

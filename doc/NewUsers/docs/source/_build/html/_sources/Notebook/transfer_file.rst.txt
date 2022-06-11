@@ -1,6 +1,6 @@
 .. _notebook_transfer_file:
 
-Transfer File Into Notebook Session
+Transfer file into Notebook session
 ===================================
 
 Smaller files can be uploaded into a Notebook session easily in two different
