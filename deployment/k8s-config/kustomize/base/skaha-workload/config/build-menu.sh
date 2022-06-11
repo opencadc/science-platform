@@ -2,9 +2,13 @@
 
 HOST=$1
 STARTUP_DIR="/desktopstartup"
-EXECUTABLE_DIR="$HOME/.local/bin"
-DESKTOP_DIR="$HOME/.local/share/applications"
-DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"
+OLD_EXECUTABLE_DIR="$HOME/.local/bin"
+OLD_DESKTOP_DIR="$HOME/.local/share/applications"
+OLD_DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"
+SKAHA_DIR="$HOME/.local/skaha"
+EXECUTABLE_DIR="$HOME/.local/skaha/bin"
+DESKTOP_DIR="$HOME/.local/skaha/share/applications"
+DIRECTORIES_DIR="$HOME/.local/skaha/share/desktop-directories"
 START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
@@ -13,17 +17,35 @@ TERMINAL_VERSION="terminal:"
 
 init_dir () {
   if [[ -d "$1" ]]; then
+    # empty the directory
     rm -f $1/*
   else
     mkdir -p "$1"
   fi
 }
 
-init () {
+init_dirs () {
   dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
     init_dir ${dir}
   done
+}
+
+delete_old_dirs () {
+  dirs="${OLD_EXECUTABLE_DIR} ${OLD_DESKTOP_DIR} ${OLD_DIRECTORIES_DIR}"
+  for dir in ${dirs}; do
+    if [[ -d "$dir" ]]; then
+      # delete the directory
+      rm -rf $dir
+    fi
+  done
+}
+
+init () {
+  if [[ ! -d "${SKAHA_DIR}" ]]; then
+    delete_old_dirs
+  fi
+  init_dirs 
 }
 
 build_resolution_items () {
@@ -120,7 +142,6 @@ build_menu_item () {
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
   if [[ ${name} == *"terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
       TERMINAL_VERSION=${name}
-#      cp ${executable} ${EXECUTABLE_DIR}/terminal.sh
       # terminal.desktop accessed via "Applications->terminal"
       update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
       # terminal.desktop accessed via terminal icon on desktop
