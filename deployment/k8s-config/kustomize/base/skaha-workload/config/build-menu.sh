@@ -2,9 +2,6 @@
 
 HOST=$1
 STARTUP_DIR="/desktopstartup"
-OLD_EXECUTABLE_DIR="$HOME/.local/bin"
-OLD_DESKTOP_DIR="$HOME/.local/share/applications"
-OLD_DIRECTORIES_DIR="$HOME/.local/share/desktop-directories"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
 DESKTOP_DIR="$HOME/.local/skaha/share/applications"
@@ -24,35 +21,18 @@ init_dir () {
   fi
 }
 
-init_dirs () {
+init () {
   dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
     init_dir ${dir}
   done
 }
 
-delete_old_dirs () {
-  dirs="${OLD_EXECUTABLE_DIR} ${OLD_DESKTOP_DIR} ${OLD_DIRECTORIES_DIR}"
-  for dir in ${dirs}; do
-    if [[ -d "$dir" ]]; then
-      # delete the directory
-      rm -rf $dir
-    fi
-  done
-}
-
-init () {
-  if [[ ! -d "${SKAHA_DIR}" ]]; then
-    delete_old_dirs
-  fi
-  init_dirs 
-}
-
 build_resolution_items () {
   RESOLUTION_SH="${STARTUP_DIR}/resolution-sh.template"
   RESOLUTION_DESKTOP="${STARTUP_DIR}/resolution-desktop.template"
-  if [[ -f "${RESOLUTION_SH}" ]]; then 
-    if [[ -f "${RESOLUTION_DESKTOP}" ]]; then 
+  if [[ -f "${RESOLUTION_SH}" ]]; then
+    if [[ -f "${RESOLUTION_DESKTOP}" ]]; then
       while IFS= read -r line; do
         executable="${EXECUTABLE_DIR}/${line}.sh"
         desktop="${DESKTOP_DIR}/${line}.desktop"
@@ -65,7 +45,7 @@ build_resolution_items () {
         rm -f ${DEKSTOP_DIR}/*-e
       done < ${STARTUP_DIR}/skaha-resolutions.properties
     else
-      echo "[skaha] ${RESOLUTION_DESKTOP} does not exist" 
+      echo "[skaha] ${RESOLUTION_DESKTOP} does not exist"
     fi
   else
     echo "[skaha] ${RESOLUTION_SH} does not exist"
@@ -82,7 +62,7 @@ build_resolution_menu () {
 }
 
 create_merged_applications_menu () {
-  if [[ -f "${START_ASTROSOFTWARE_MENU}" ]]; then 
+  if [[ -f "${START_ASTROSOFTWARE_MENU}" ]]; then
     if [[ -f "${ASTROSOFTWARE_MENU}" ]]; then
       rm -f ${ASTROSOFTWARE_MENU}
     fi
@@ -153,7 +133,7 @@ build_menu_item () {
 
 echo "[skaha] Start building menu."
 init
-create_merged_applications_menu 
+create_merged_applications_menu
 apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/image?type=desktop-app | grep '"id"')
 if [[ ${apps} == *"id"* ]]; then
   project_array=()
@@ -178,5 +158,5 @@ if [[ ${apps} == *"id"* ]]; then
 else
   echo "[skaha] no desktop-app"
 fi
-complete_merged_applications_menu 
+complete_merged_applications_menu
 echo "[skaha] Finish building menu."
