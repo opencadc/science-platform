@@ -4,6 +4,7 @@ HOST=$1
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
+XFCE_DESKTOP_DIR="$HOME/.local/share/applications"
 DESKTOP_DIR="$HOME/.local/skaha/share/applications"
 DIRECTORIES_DIR="$HOME/.local/skaha/share/desktop-directories"
 START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
@@ -26,6 +27,12 @@ init () {
   for dir in ${dirs}; do
     init_dir ${dir}
   done
+
+  # XFCE is hardcoded to use ~/.local/share/applications
+  if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
+    # soft link does not exist, create one
+    ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
+  fi
 }
 
 build_resolution_items () {
@@ -41,7 +48,7 @@ build_resolution_items () {
         sed -i -e "s#(RESOLUTION)#${line}#g" ${executable}
         rm -f ${EXECUTABLE_DIR}/*-e
         sed -i -e "s#(NAME)#${line}#g" ${desktop}
-        sed -i -e "s#(HOME)#${HOME}#g" ${desktop}
+        sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" ${desktop}
         rm -f ${DEKSTOP_DIR}/*-e
       done < ${STARTUP_DIR}/skaha-resolutions.properties
     else
@@ -118,7 +125,7 @@ build_menu_item () {
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $desktop
-  sed -i -e "s#(HOME)#$HOME#g" $desktop
+  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
   if [[ ${name} == *"terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
       TERMINAL_VERSION=${name}
