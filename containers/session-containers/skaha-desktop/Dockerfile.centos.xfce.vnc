@@ -111,6 +111,7 @@ COPY software-scripts/icons/* /headless/.icons/
 
 # Add desktop links to those scripts
 COPY software-scripts/*.desktop /usr/share/applications/
+RUN chmod 777 /usr/share/applications/terminal.desktop
 
 # Add a subset of software links to the desktop
 COPY software-scripts/arcade-feedback.desktop $XDG_CONFIG_HOME/Desktop/arcade-feedback.desktop
@@ -118,6 +119,7 @@ COPY software-scripts/firefox.desktop $XDG_CONFIG_HOME/Desktop/firefox.desktop
 COPY software-scripts/gedit.desktop $XDG_CONFIG_HOME/Desktop/gedit.desktop
 COPY software-scripts/kill-session.desktop $XDG_CONFIG_HOME/Desktop/kill-session.desktop
 COPY software-scripts/terminal.desktop $XDG_CONFIG_HOME/Desktop/terminal.desktop
+RUN chmod 777 $XDG_CONFIG_HOME/Desktop/terminal.desktop
 RUN chown guest $XDG_CONFIG_HOME/Desktop/*.desktop
 
 # Create firefox profile and space
