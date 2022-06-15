@@ -127,7 +127,7 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ ${name} == *"terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
+  if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
       TERMINAL_VERSION=${name}
       # terminal.desktop accessed via "Applications->terminal"
       update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
