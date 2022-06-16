@@ -36,7 +36,10 @@ init () {
 
   # create soft link if there isn't one already
   if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
-    ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
+    current_dir=`pwd`
+    cd $HOME/.local/share
+    ln -s ../skaha/share/applications ./applications
+    cd ${current_dir}
   fi
 }
 
