@@ -29,8 +29,13 @@ init () {
   done
 
   # XFCE is hardcoded to use ~/.local/share/applications
+  if [[ -d ${XFCE_DESKTOP_DIR} ]]; then
+    # directory already exists, delete it
+    rm -rf ${XFCE_DESKTOP_DIR}
+  fi
+
+  # create soft link if there isn't one already
   if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
-    # soft link does not exist, create one
     ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
   fi
 }
