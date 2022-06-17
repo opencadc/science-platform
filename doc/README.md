@@ -246,5 +246,7 @@ General inquiries can be made to [support@canfar.net](mailto:support@canfar.net)
     * The session could be in a Pending state waiting for resources so that it can be scheduled.
     * More information about the reason for the Pending state can be found using the logging mechanisms explained in [Programmatic Access](#programmatic-access).
 
+* ***How do I test a graphical container on my Mac?***
+   * See the instructions to have container display shown on your Mac here:  [Display ENV on OSX](DISPLAY_ENV_ON_OSX.md)
 
 ![canfar](canfar-logo.png)
