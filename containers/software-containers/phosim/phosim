@@ -1,0 +1,5 @@
+#!/bin/bash
+
+pushd /opt/phosim &> /dev/null
+python phosim.py $*
+popd &> /dev/null

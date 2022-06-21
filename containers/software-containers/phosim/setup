@@ -1,0 +1,7 @@
+setenv PYTHON /usr/bin/python
+setenv CCP g++
+setenv CCS g++
+setenv CFIODIR /usr/lib/x86_64-linux-gnu
+setenv CFIO_INC_DIR /usr/include
+setenv FFTW3_DIR /usr/lib/x86_64-linux-gnu
+setenv FFTW3_INC_DIR /usr/include
