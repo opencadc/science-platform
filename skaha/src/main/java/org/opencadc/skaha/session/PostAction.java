@@ -470,7 +470,7 @@ public class PostAction extends SessionAction {
         String param = name;
         log.debug("Using parameter: " + param);
         
-        String uniqueID = new RandomStringGenerator(8).getID();
+        String uniqueID = new RandomStringGenerator(3).getID();
         String jobName = sessionID + "-" + uniqueID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
