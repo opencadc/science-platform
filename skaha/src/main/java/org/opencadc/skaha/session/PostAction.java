@@ -101,6 +101,10 @@ public class PostAction extends SessionAction {
     
     private static final Logger log = Logger.getLogger(PostAction.class);
     
+    // k8s rejects label size > 63. Since k8s appends a maximum of six characters
+    // to a job name to form a pod name, we limit the job name length to 57 characters.
+    private static final int MAX_JOB_NAME_LENGTH = 57;
+    
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
@@ -466,10 +470,21 @@ public class PostAction extends SessionAction {
         String param = name;
         log.debug("Using parameter: " + param);
         
-        String uniqueID = new RandomStringGenerator(8).getID();
-        String jobName = name.toLowerCase() + "-" + userID.toLowerCase() + "-" + sessionID + "-" + uniqueID;
+        String uniqueID = new RandomStringGenerator(3).getID();
+        String jobName = sessionID + "-" + uniqueID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
-        
+        // trim job name if necessary
+        if (jobName.length() > MAX_JOB_NAME_LENGTH) {
+            int pos = MAX_JOB_NAME_LENGTH;
+            jobName = jobName.substring(0, pos--);
+            // ensure that the trimmed job name is valid, i.e. starts and ends with 
+            // an alphanumeric character
+            while (!jobName.matches("(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?")) {
+                // invalid job name, continue to trim
+                jobName = jobName.substring(0, pos--);
+            }
+        }
+
         String gpuScheduling = getGPUScheduling(0);
         
         String launchString = new String(launchBytes, "UTF-8");
