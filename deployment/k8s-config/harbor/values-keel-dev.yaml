@@ -1,4 +1,7 @@
 
+logLevel: info
+#logLevel: debug
+
 externalURL: https://images-rc.canfar.net
 
 harborAdminPassword: changeme
