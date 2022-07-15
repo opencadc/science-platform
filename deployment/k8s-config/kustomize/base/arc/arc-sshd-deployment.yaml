@@ -15,6 +15,13 @@ spec:
       labels:
         run: arc-sshd
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.count
+                operator: DoesNotExist
       containers:
       - name: arc-sshd
         image: images.canfar.net/skaha-system/sshd:0.1
