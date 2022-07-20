@@ -743,7 +743,7 @@ nginx:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
   ## Pod extra labels
@@ -881,7 +881,7 @@ portal:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Harbor Portal Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -1022,7 +1022,7 @@ core:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Harbor Core Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -1179,9 +1179,9 @@ jobservice:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
+  #affinity: {}
   ## Harbor Jobservice Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
-  affinity: {}
 
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1402,7 +1402,7 @@ registry:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Harbor Registry Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -1574,7 +1574,7 @@ chartmuseum:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Chartmuseum Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -1809,7 +1809,7 @@ clair:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Clair Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -1975,7 +1975,7 @@ trivy:
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
-  affinity: {}
+  #affinity: {}
   ## Trivy Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
   podAntiAffinityPreset: hard
 
@@ -2098,7 +2098,7 @@ notary:
     ## Affinity for pod assignment. Evaluated as a template.
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
     ##
-    affinity: {}
+    #affinity: {}
     ## Harbor Notary Server Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
     podAntiAffinityPreset: hard
 
@@ -2187,7 +2187,7 @@ notary:
     ## Affinity for pod assignment. Evaluated as a template.
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
     ##
-    affinity: {}
+    #affinity: {}
     ## Harbor Notary Signer Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
     podAntiAffinityPreset: hard
 
