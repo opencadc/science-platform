@@ -740,12 +740,12 @@ nginx:
   ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   ##
   tolerations: []
-  ## Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   ##
@@ -878,12 +878,12 @@ portal:
   ##
   tolerations: []
 
-  ## Harbor Portal Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Harbor Portal Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1019,12 +1019,12 @@ core:
   ##
   tolerations: []
 
-  ## Harbor Core Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Harbor Core Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1176,11 +1176,11 @@ jobservice:
   ##
   tolerations: []
 
-  ## Harbor Jobservice Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
+  ## Harbor Jobservice Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
   affinity: {}
 
   ## Pod extra labels
@@ -1399,12 +1399,12 @@ registry:
   ##
   tolerations: []
 
-  ## Harbor Registry Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Harbor Registry Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels. Evaluated as a template.
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1571,12 +1571,12 @@ chartmuseum:
   ##
   tolerations: []
 
-  ## Chartmuseum Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Chartmuseum Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1806,12 +1806,12 @@ clair:
   ##
   tolerations: []
 
-  ## Clair Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Clair Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels. Evaluated as a template.
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -1972,12 +1972,12 @@ trivy:
   ##
   tolerations: []
 
-  ## Trivy Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-  podAntiAffinityPreset: hard
   ## Affinity for pod assignment. Evaluated as a template.
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
+  ## Trivy Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+  podAntiAffinityPreset: hard
 
   ## Pod extra labels
   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -2095,12 +2095,12 @@ notary:
     ##
     tolerations: []
 
-    ## Harbor Notary Server Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-    podAntiAffinityPreset: hard
     ## Affinity for pod assignment. Evaluated as a template.
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
     ##
     affinity: {}
+    ## Harbor Notary Server Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+    podAntiAffinityPreset: hard
 
     ## Pod extra labels. Evaluated as a template.
     ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -2184,12 +2184,12 @@ notary:
     ##
     tolerations: []
 
-    ## Harbor Notary Signer Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
-    podAntiAffinityPreset: hard
     ## Affinity for pod assignment. Evaluated as a template.
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
     ##
     affinity: {}
+    ## Harbor Notary Signer Pod anti-affinity preset. Ignored if affinity is set. Allowed values: soft or hard
+    podAntiAffinityPreset: hard
 
     ## Pod extra labels. Evaluated as a template.
     ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
