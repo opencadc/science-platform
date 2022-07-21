@@ -13,7 +13,6 @@ containerSecurityContext:
 podSecurityContext:
   fsGroup: 1001
 
-
 #***************************************************
 service:
   type: ClusterIP
@@ -40,11 +39,77 @@ ingress:
 
 
 #***************************************************
+notary:
+  server: 
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+
+  signer: 
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+
+#***************************************************
+portal:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+#***************************************************
+chartmuseum:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+jobservice:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+registry:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+trivy:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+#***************************************************
 persistence:
   enabled: true
 
   persistentVolumeClaim:
-
     registry:
       existingClaim: ""
       storageClass: ""
@@ -78,7 +143,13 @@ persistence:
 #***************************************************
 core:
   priorityClassName: uber-user-preempt-high
-
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
 
 
 #***************************************************
@@ -91,6 +162,13 @@ postgresql:
     subPath: harbor-postgresql
 
   primary:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
     volumes:
       - name: postgresql-extended-config
         configMap:
@@ -121,6 +199,13 @@ redis:
   enabled: true
 
   master:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
     persistence:
       enabled: true
       storageClass: ""
