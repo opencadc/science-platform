@@ -16,6 +16,8 @@ persistence:
 initChownData:
   enabled: false
 
+priorityClassName: uber-user-preempt-high
+
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:

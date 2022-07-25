@@ -44,6 +44,13 @@ spec:
       securityContext:
         runAsUser: 0
       priorityClassName: uber-user-preempt-high
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.count
+                operator: DoesNotExist
       serviceAccountName: skaha
       volumes:
       - name: servops-cert
