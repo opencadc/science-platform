@@ -13,13 +13,6 @@ spec:
       labels:
         name: cadc-sssd-ds
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: nvidia.com/gpu.count
-                operator: DoesNotExist
       initContainers:
       - name: init-sssd-dir
         image: busybox
