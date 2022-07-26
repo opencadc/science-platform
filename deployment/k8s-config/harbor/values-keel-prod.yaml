@@ -13,7 +13,6 @@ containerSecurityContext:
 podSecurityContext:
   fsGroup: 1001
 
-
 #***************************************************
 service:
   type: ClusterIP
@@ -40,11 +39,84 @@ ingress:
 
 
 #***************************************************
+notary:
+  server: 
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+
+  signer: 
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+
+#***************************************************
+portal:
+  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+#***************************************************
+chartmuseum:
+  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+jobservice:
+  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+registry:
+  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+trivy:
+  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+#***************************************************
 persistence:
   enabled: true
 
   persistentVolumeClaim:
-
     registry:
       existingClaim: ""
       storageClass: ""
@@ -78,7 +150,13 @@ persistence:
 #***************************************************
 core:
   priorityClassName: uber-user-preempt-high
-
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
 
 
 #***************************************************
@@ -91,6 +169,14 @@ postgresql:
     subPath: harbor-postgresql
 
   primary:
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
     volumes:
       - name: postgresql-extended-config
         configMap:
@@ -121,12 +207,18 @@ redis:
   enabled: true
 
   master:
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
     persistence:
       enabled: true
       storageClass: ""
       subPath: harbor-redis
-
-    priorityClassName: uber-user-preempt-high
 
   slave:
     persistence:
