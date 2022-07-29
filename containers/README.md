@@ -12,11 +12,11 @@
 
 skaha supports two types of containers: `session containers` and `software containers`.
 
-`Session containers` are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.  See the [ARCADE github project](https://github.com/canfar/arcade.git "ARCADE").
+`Session containers` are HTML5/websocket applications that are made available through skaha on a browser.  Examples of session containers in skaha are the skaha desktop (NoVNC), CARTA, and Notebook containers.  The skaha desktop container is also known as the ARCADE software environment.
 
 `Software containers` are launched and viewed through the skaha desktop container.  Examples of software containers in skaha are CASA, the multi-purpose terminal, TOPCAT, and containers for Gemini processing.
 
-Some of the recipes (Dockerfiles) for building these containers are in this directory of skaha git.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted in the [ARCADE](https://github.com/canfar/arcade.git "ARCADE") respository.  However, wherever the source is hosted, containers must meet a minimal set of requirements and expectations for execution in skaha.
+Some of the recipes (Dockerfiles) for building these containers are in this directory of skaha git.  They can also be managed and hosted elsewhere.  The source for CASA containers are hosted here [ARCADE-CASA](software-containers/arcade-casa "ARCADE-CASA").  However, wherever the source is hosted, containers must meet a minimal set of requirements and expectations for execution in skaha.
 
 <a name="building"></a>
 ## Building skaha containers
