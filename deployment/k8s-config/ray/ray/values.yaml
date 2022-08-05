@@ -99,7 +99,7 @@ clusterOnly: false
 # namespacedOperator - If true, the operator is scoped to the Release namespace
 # and only manages RayClusters in that namespace.
 # By default, the operator is cluster-scoped and runs in the default namespace.
-namespacedOperator: false
+namespacedOperator: true
 # operatorNamepsace - If using a cluster-scoped operator (namespacedOperator: false), set the namespace
 # in which to launch the operator.
 operatorNamespace: default
