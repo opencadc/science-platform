@@ -37,9 +37,6 @@ Fore more information see: https://github.com/ConSol/docker-headless-vnc-contain
 if [[ $1 =~ -h|--help ]]; then
     help
     exit 0
-"vnc_startup.sh" 122L, 4274C
-    help
-    exit 0
 fi
 
 # BM
