@@ -50,5 +50,11 @@ ADD init.sh /skaha/
 RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
+WORKDIR /opt
+COPY extract-casaviewer.sh .
+RUN bash extract-casaviewer.sh && rm extract-casaviewer.sh
+
+#RUN chmod 755 /opt/squashfs-root /opt/squashfs-root/usr /opt/squashfs-root/usr/*
+RUN chmod 777 -R /opt/squashfs-root /opt/squashfs-root/usr /opt/squashfs-root/usr/*
 
 CMD [ "/skaha/init.sh" ]
