@@ -58,9 +58,11 @@ build_resolution_items () {
       done < ${STARTUP_DIR}/skaha-resolutions.properties
     else
       echo "[skaha] ${RESOLUTION_DESKTOP} does not exist"
+      exit 1
     fi
   else
     echo "[skaha] ${RESOLUTION_SH} does not exist"
+    exit 1
   fi
 }
 
@@ -85,6 +87,7 @@ create_merged_applications_menu () {
     cp ${DIRECTORIES_DIR}/xfce-canfar.directory ${DIRECTORIES_DIR}/canfar.directory
   else
     echo "[skaha] ${START_ASTROSOFTWARE_MENU} does not exist"
+    exit 1
   fi
 }
 
@@ -94,6 +97,7 @@ complete_merged_applications_menu () {
     build_resolution_menu
   else
     echo "[skaha] ${ASTROSOFTWARE_MENU} does not exist"
+    exit 1
   fi
 }
 
@@ -169,6 +173,7 @@ if [[ ${apps} == *"id"* ]]; then
   done < <(printf '%s\n' "$apps")
 else
   echo "[skaha] no desktop-app"
+  exit 1
 fi
 complete_merged_applications_menu
 echo "[skaha] Finish building menu."
