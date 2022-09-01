@@ -2,9 +2,9 @@ FROM ubuntu:20.04
 
 RUN apt update && \
     apt install -y software-properties-common && \
-    add-apt-repository ppa:cartavis-team/carta-testing && \
+    add-apt-repository ppa:cartavis-team/carta && \
     apt update && \
-    apt install -y carta-beta
+    apt install -y carta
 
 RUN mkdir /carta
 WORKDIR /carta
