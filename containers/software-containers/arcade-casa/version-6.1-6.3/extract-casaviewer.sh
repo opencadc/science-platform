@@ -12,4 +12,21 @@ ln -s /opt/squashfs-root/AppRun /opt/casa/bin/casaviewer
 mv /opt/casa/lib/py/lib/python3.6/site-packages/casaviewer/__bin__/casaviewer-x86_64.AppImage /opt/casa/lib/py/lib/python3.6/site-packages/casaviewer/__bin__/casaviewer-x86_64.AppImage.orig
 ln -s /opt/squashfs-root/usr/bin/casaviewer /opt/casa/lib/py/lib/python3.6/site-packages/casaviewer/__bin__/casaviewer-x86_64.AppImage
 
+#additional steps below to fix a similar problem for plotms
+# Right now, need to uncomment out each specific version for the first
+# command to run.  Hopefully this can be tidied up to something similar to the
+# first set of commands above
+
+#---- Choose the correct line/version below & uncomment out ------
+#/opt/casa-6.1.0-118/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage --appimage-extract 2> /dev/null
+#/opt/casa-6.2.0-124/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage --appimage-extract 2> /dev/null
+#/opt/casa-6.3.0-48/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage --appimage-extract 2> /dev/null
+#/opt/casa-6.2.1-7-pipeline-2021.2.0.128/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage --appimage-extract 2> /dev/null
+/opt/casa-6.1.1-15-pipeline-2020.1.0.40/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage --appimage-extract 2> /dev/null
+#----------------
+
+#the two commands below apply to all versions to finish fixing plotms
+mv /opt/casa/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage /opt/casa/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage.orig
+ln -s /opt/squashfs-root/usr/bin/casaplotms /opt/casa/lib/py/lib/python3.6/site-packages/casaplotms/__bin__/casaplotms-x86_64.AppImage
+
 popd

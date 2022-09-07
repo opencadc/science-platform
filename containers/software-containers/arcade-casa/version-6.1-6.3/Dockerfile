@@ -40,9 +40,11 @@ RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${CASA_RELEASE%%-py*}
 
 # Allow runtime symlink creation to the casa-data-repository
-#RUN rm -rf /opt/${CASA_RELEASE%%-py*}/data
+RUN rm -rf /opt/${CASA_RELEASE%%-py*}/data
 #update for CASA6+, new directory for the leapsecond data
-RUN rm -rf /opt/${CASA_RELEASE%%-py*}/lib
+#(in theory, might need to run something like below, but this causes other
+# install errors, presumably b/c of other files also in the lib directory)
+#RUN rm -rf /opt/${CASA_RELEASE%%-py*}/lib
 RUN chmod 777 /opt/${CASA_RELEASE%%-py*}
 
 RUN mkdir /skaha
@@ -57,6 +59,7 @@ COPY extract-casaviewer.sh .
 RUN bash extract-casaviewer.sh && rm extract-casaviewer.sh
 
 #RUN chmod 755 /opt/squashfs-root /opt/squashfs-root/usr /opt/squashfs-root/usr/*
+#COMMENTED BELOW LINE OUT ONLY FOR TESTING PURPOSES.  NEED TO INCLUDE!
 RUN chmod 777 -R /opt/squashfs-root /opt/squashfs-root/usr /opt/squashfs-root/usr/*
 
 CMD [ "/skaha/init.sh" ]

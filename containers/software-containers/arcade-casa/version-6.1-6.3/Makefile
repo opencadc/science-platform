@@ -1,9 +1,9 @@
 #NB: before using, uncomment the particular version to be built, all the way
 # through the script
 VERSIONS_OLD = \
-# 	casa-6.1.0-118#
-# 	casa-6.2.0-124# \
+ 	casa-6.2.0-124# \
 # 	casa-6.3.0-48 \
+# 	casa-6.1.0-118#
 
 VERSIONS_PIPELINE = \
 	casa-6.1.1-15-pipeline-2020.1.0.40
@@ -18,7 +18,7 @@ DOCKER_REPO_BASE=images.canfar.net/casa-6/casa
 .PHONY: build clean run 
 
 #all: build-old build-pipeline build
-all: build-pipeline 
+all: build-pipeline
 
 #build-old: 
 #	@- $(foreach V,$(VERSIONS_OLD), \
