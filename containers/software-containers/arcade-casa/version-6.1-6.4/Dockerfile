@@ -40,6 +40,8 @@ RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${CASA_RELEASE%%-py*}
 
 # Allow runtime symlink creation to the casa-data-repository
+# Create a dangling symlink to casa-data-repository so that after deployment
+# the symlink will link to the actual casa-data-repository in storage.
 RUN mkdir -p /arc/projects/casa-data-repository
 RUN rm -rf /opt/${CASA_RELEASE%%-py*}/data && \
     ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE%%-py*}/data
