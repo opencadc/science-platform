@@ -8,7 +8,7 @@ VERSIONS = \
 #VERSIONS = \
 #	4.4.0-el6 
 
-DOCKER_REPO_BASE=images.canfar.net/arcade/casa
+DOCKER_REPO_BASE=images.canfar.net/casa-4/casa
 
 .PHONY: build clean run 
 
