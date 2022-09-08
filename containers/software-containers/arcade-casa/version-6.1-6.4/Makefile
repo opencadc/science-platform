@@ -9,7 +9,7 @@ VERSIONS_PIPELINE = \
 VERSIONS = \
 	casa-6.4.0-16-py3.8
 
-DOCKER_REPO_BASE=images.canfar.net/arcade/casa
+DOCKER_REPO_BASE=images.canfar.net/casa-6/casa
 
 .PHONY: build clean run 
 
