@@ -1,6 +1,6 @@
 
 NAME = images.canfar.net/skaha/carta
-VERSION = 3.0-beta
+VERSION = 3.0
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .

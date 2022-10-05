@@ -2,7 +2,7 @@
 DEVNAME = terminal
 
 NAME = images.canfar.net/skaha/$(DEVNAME)
-VERSION = 1.1
+VERSION = 1.1.1
 
 build: dependencies Dockerfile
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .

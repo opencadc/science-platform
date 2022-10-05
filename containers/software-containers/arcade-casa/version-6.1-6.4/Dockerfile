@@ -40,8 +40,18 @@ RUN cd /opt/admit && \
     autoconf && ./configure --with-casa-root=/opt/${CASA_RELEASE%%-py*}
 
 # Allow runtime symlink creation to the casa-data-repository
-RUN rm -rf /opt/${CASA_RELEASE%%-py*}/data
+# Create a dangling symlink to casa-data-repository so that after deployment
+# the symlink will link to the actual casa-data-repository in storage.
+RUN mkdir -p /arc/projects/casa-data-repository
+RUN rm -rf /opt/${CASA_RELEASE%%-py*}/data && \
+    ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE%%-py*}/data
 RUN chmod 777 /opt/${CASA_RELEASE%%-py*}
+RUN cd /opt/${CASA_RELEASE%%-py*} && \
+    REPLACED_DATA=`find lib -name __data__` && \
+    chmod 777 ${REPLACED_DATA}/.. && \
+    rm -rf ${REPLACED_DATA} && \
+    ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE%%-py*}/${REPLACED_DATA}
+RUN rm -rf /arc
 
 RUN mkdir /skaha
 ADD init.sh /skaha/
