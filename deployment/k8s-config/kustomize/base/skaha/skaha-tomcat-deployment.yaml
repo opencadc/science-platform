@@ -43,10 +43,10 @@ spec:
         resources:
           requests:
             memory: "4Gi"
-            cpu: "1"
+            cpu: "10"
           limits:
             memory: "8Gi"
-            cpu: "4"
+            cpu: "20"
         ports:
         - containerPort: 8080
           protocol: TCP
