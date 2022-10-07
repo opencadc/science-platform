@@ -24,7 +24,7 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: arc-tomcat
-        image: images.canfar.net/skaha-system/cavern:0.4.2
+        image: images.canfar.net/skaha-system/cavern:0.4.3
         imagePullPolicy: Always
         resources:
           requests:
