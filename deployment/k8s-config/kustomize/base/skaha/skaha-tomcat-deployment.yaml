@@ -30,13 +30,15 @@ spec:
           value: /arc/home
         - name: skaha.namespace
           value: skaha-workload
+        - name: skaha.maxusersessions
+          value: "3"
         - name: skaha.harborhosts
           value: "images.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.8.32
+        image: images.canfar.net/skaha-system/skaha:0.9.0
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
