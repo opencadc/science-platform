@@ -123,6 +123,7 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<String>();
     protected String skahaUsersGroup;
     protected String skahaAdminsGroup;
+    protected int maxUserSessions;
     
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -136,12 +137,20 @@ public abstract class SkahaAction extends RestAction {
         }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
+        String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
+        if (maxUsersSessionsString == null) {
+            log.warn("no max user sessions value configured.");
+            maxUserSessions = 1;
+        } else {   
+            maxUserSessions = new Integer(maxUsersSessionsString).intValue();
+        }
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        log.debug("skaha.maxusersessions=" + maxUserSessions);
     }
     
     @Override

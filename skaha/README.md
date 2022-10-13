@@ -7,6 +7,7 @@ skaha is a Java servlet implementation offering a REST API to all skaha function
 ```
 gradle clean build
 docker build -t images.canfar.net/skaha-system/skaha:latest -f Dockerfile .
+./apply-version.sh
 ```
 
 ## checking it

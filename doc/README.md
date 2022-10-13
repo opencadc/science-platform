@@ -56,6 +56,7 @@ All sessions and applications that run in the Science Portal have filesystem acc
 - Using the storage management UI in CANFAR: https://www.canfar.net/storage/arc/list
 - Using the [CADC Python libraries](https://github.com/opencadc/vostools/tree/master/vos)
 - Using sshfs [documentation](https://github.com/canfar/arcade/tree/master/arcade-tutorial)
+- Using the `/arc/files` endpoint [documentation](https://ws-uv.canfar.net/arc)
 
 Please take care to protect sensitive information by ensuring it is not publicly accessible.
 
