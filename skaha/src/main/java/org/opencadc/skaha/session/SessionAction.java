@@ -110,6 +110,7 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_LIST_VIEW_ALL = "all";
     protected static final String SESSION_VIEW_EVENTS = "events";
     protected static final String SESSION_VIEW_LOGS = "logs";
+    protected static final String SESSION_VIEW_STATS = "stats";
     
     protected String requestType;
     protected String sessionID;

@@ -64,7 +64,7 @@
  *
  ************************************************************************
  */
-package org.opencadc.skaha.stats;
+package org.opencadc.skaha.session;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

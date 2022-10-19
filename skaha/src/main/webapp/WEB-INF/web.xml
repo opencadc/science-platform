@@ -60,17 +60,6 @@
     </servlet>
     
     <servlet>
-         <servlet-name>StatsServlet</servlet-name>
-         <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
-         <init-param>
-             <param-name>get</param-name>
-             <param-value>org.opencadc.skaha.stats.GetAction</param-value> 
-             <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
-         </init-param>
-         <load-on-startup>2</load-on-startup>
-    </servlet>
-    
-    <servlet>
          <servlet-name>ContextServlet</servlet-name>
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
@@ -130,11 +119,6 @@
     <servlet-mapping>
         <servlet-name>SessionServlet</servlet-name>
         <url-pattern>/session/*</url-pattern>
-    </servlet-mapping>
-    
-    <servlet-mapping>
-        <servlet-name>StatsServlet</servlet-name>
-        <url-pattern>/stats/*</url-pattern>
     </servlet-mapping>
     
     <servlet-mapping>

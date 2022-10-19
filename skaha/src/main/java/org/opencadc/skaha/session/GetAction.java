@@ -95,19 +95,27 @@ public class GetAction extends SessionAction {
     public void doAction() throws Exception {
         super.initRequest();
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
+            String view = syncInput.getParameter("view");
             if (sessionID == null) {
-                // List the sessions
-                String typeFilter = syncInput.getParameter("type");
-                String statusFilter = syncInput.getParameter("status");
-                String view = syncInput.getParameter("view");
-                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
+                if (SESSION_VIEW_STATS.equals(view)) {
+                    // return the container statistics
+                    ResourceStats rc = new ResourceStats();
+                    Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+                    String json = gson.toJson(rc);
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
+                } else {
+                    // List the sessions
+                    String typeFilter = syncInput.getParameter("type");
+                    String statusFilter = syncInput.getParameter("status");
+                    boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
                 
-                String json = listSessions(typeFilter, statusFilter, allUsers);
+                    String json = listSessions(typeFilter, statusFilter, allUsers);
                 
-                syncOutput.setHeader("Content-Type", "application/json");
-                syncOutput.getOutputStream().write(json.getBytes());
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
+                }
             } else {
-                String view = syncInput.getParameter("view");
                 if (SESSION_VIEW_LOGS.equals(view)) {
                     // return the container log
                     syncOutput.setHeader("Content-Type", "text/plain");
