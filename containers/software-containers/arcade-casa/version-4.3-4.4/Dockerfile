@@ -13,7 +13,7 @@ RUN yum update -y
 RUN yum install -y freetype libSM libXi libXrender libXrandr \
 	libXfixes libXcursor libXinerama fontconfig \
         libxslt xauth xorg-x11-server-Xvfb dbus-x11 \
-	tkinter ImageMagick-c++ xterm perl
+	tkinter ImageMagick-c++ xterm perl autoconf python-sphinx graphviz
 
 # setup all required env variables
 ARG CASA_RELEASE
@@ -45,9 +45,21 @@ RUN chown -R root:root /opt/${CASA_RELEASE} && ln -s /opt/${CASA_RELEASE} /opt/c
 
 RUN yum install -y sssd-client acl
 
+#HK updated to new leapsecond solution
 # Allow runtime symlink creation to the casa-data-repository
-RUN rm -rf /opt/${CASA_RELEASE}/data
+# Create a dangling symlink to casa-data-repository so that after deployment
+# the symlink will link to the actual casa-data-repository in storage.
+RUN mkdir -p /arc/projects/casa-data-repository
+RUN rm -rf /opt/${CASA_RELEASE}/data && \
+    ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE}/data
 RUN chmod 777 /opt/${CASA_RELEASE}
+RUN rm -rf /arc
+#(old method below)
+## Allow runtime symlink creation to the casa-data-repository
+#RUN rm -rf /opt/${CASA_RELEASE}/data
+#RUN chmod 777 /opt/${CASA_RELEASE}
+
+
 
 RUN mkdir /skaha
 ADD startup.sh /skaha/
@@ -57,4 +69,6 @@ RUN dbus-uuidgen --ensure
 
 ADD nsswitch.conf /etc/
 
-ENTRYPOINT [ "/skaha/startup.sh" ]
+#HK updated below
+#ENTRYPOINT [ "/skaha/startup.sh" ]
+CMD [ "/skaha/init.sh" ]

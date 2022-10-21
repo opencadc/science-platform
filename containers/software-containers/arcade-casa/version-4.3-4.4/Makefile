@@ -1,14 +1,15 @@
 
 VERSIONS = \
 	4.3.0-el6 \
-	4.3.1-el6 \
+#	4.3.1-el6 \
 	4.3.1-pipe-el6 \
 	4.4.0-el6 
 
 #VERSIONS = \
 #	4.4.0-el6 
 
-DOCKER_REPO_BASE=images.canfar.net/arcade/casa
+#DOCKER_REPO_BASE=images.canfar.net/arcade/casa
+DOCKER_REPO_BASE=images.canfar.net/casa-4/casa
 
 .PHONY: build clean run 
 
