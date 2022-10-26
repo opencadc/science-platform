@@ -98,8 +98,14 @@ public class GetAction extends SessionAction {
             String view = syncInput.getParameter("view");
             if (sessionID == null) {
                 if (SESSION_VIEW_STATS.equals(view)) {
-                    // return the container statistics
-                    ResourceStats rc = new ResourceStats();
+                    // report stats on sessions and resources
+                    List<Session> sessions = getAllSessions(null);
+                    int desktopSessionCount = filter(sessions, "desktop", "Running").size();
+                    int headlessSessionCount = filter(sessions, "headless", "Running").size();
+                    int totalSessionCount = sessions.size();
+                    
+
+                    ResourceStats rc = new ResourceStats(desktopSessionCount, headlessSessionCount, totalSessionCount);
                     Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
                     String json = gson.toJson(rc);
                     syncOutput.setHeader("Content-Type", "application/json");

@@ -85,12 +85,14 @@ public class ResourceStats {
     
     private static final Logger log = Logger.getLogger(ResourceStats.class);
     
-    private Integer defaultRAM;
-    private Integer defaultCores;
-    private Integer availableRAM;
-    private Integer availableCores;
+    private ActiveSessionCounts activeSessionCounts;
+    private Integer coresInUse = 0;
+    private Integer coresAvailable = 0;
+    private NodeResources maxCores;
+    private NodeResources maxRAM;
 
-    public ResourceStats() {
+    public ResourceStats(int desktopCount, int headlessCount, int totalCount) {
+        activeSessionCounts = new ActiveSessionCounts(desktopCount, headlessCount, totalCount);
         String k8sNamespace;
         try {
             k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -100,27 +102,28 @@ public class ResourceStats {
         }
 
         try {
-            int totalRequestedCPUCores = 0;
-            int totalRequestedMemory = 0;
-            int totalAvailableCPUCores = 0;
-            int totalAvailableMemory = 0;
+            maxCores = new NodeResources();
+            maxRAM = new NodeResources();
             List<String> nodeNames = getNodeNames(k8sNamespace);
             for (String nodeName : nodeNames) {
-                int rMemory = getMemory(nodeName, k8sNamespace);
                 int rCPUCores = getCPUCores(nodeName, k8sNamespace);
-                int aMemory = getAvailableCPUCores(nodeName, k8sNamespace);
-                int aCPUCores = getAvailableMemory(nodeName, k8sNamespace);
-                totalRequestedMemory = totalRequestedMemory + rMemory;
-                totalRequestedCPUCores = totalRequestedCPUCores + rCPUCores;
-                totalAvailableMemory = totalAvailableMemory + aMemory;
-                totalAvailableCPUCores = totalAvailableCPUCores + aCPUCores;
-                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + rMemory + "/" + aMemory + " GB");
+                int resources[] = getAvailableResources(nodeName, k8sNamespace);
+                int aCPUCores = resources[0];
+                if (aCPUCores > maxCores.cores) {
+                    maxCores.cores = aCPUCores;
+                    maxCores.memory = resources[1];
+                }
+                
+                int aMemory = resources[1];
+                if (aMemory > maxRAM.memory) {
+                    maxRAM.memory = aMemory;
+                    maxRAM.cores = aCPUCores;
+                }
+
+                coresInUse = coresInUse + rCPUCores;
+                coresAvailable = coresAvailable + aCPUCores;
+                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aMemory + " GB");
             }
-            
-            defaultRAM = totalRequestedMemory;
-            defaultCores = totalRequestedCPUCores;
-            availableRAM = totalAvailableMemory;
-            availableCores = totalAvailableCPUCores;
          }catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed reading k8s-resources.properties", e);
@@ -174,26 +177,6 @@ public class ResourceStats {
         return new ArrayList<String>();
     }
 
-    private int getMemory(String nodeName, String k8sNamespace) throws Exception {
-        String getMemoryCmd = "kubectl -n " + k8sNamespace + " get pods -o custom-columns=0:.spec.containers[].resources.requests.memory --field-selector spec.nodeName=" + nodeName + " | sed 's/[^0-9]*//g'";
-        String nodeMemory = execute(getMemoryCmd.split(" "));
-        log.debug("memory in node " + nodeName + ": " + nodeMemory);
-        if (nodeMemory != null) {
-            String[] lines = nodeMemory.split("\n");
-            if (lines.length > 0) {
-                List<Integer> memories = Arrays.stream(lines).map(Integer::parseInt).collect(Collectors.toList());
-                int totalNodeMemory = 0;
-                for (Integer memory : memories) {
-                    totalNodeMemory = totalNodeMemory + memory;
-                }
-                
-                return totalNodeMemory;
-            }
-        }
-        
-        return 0;
-    }
-
     private int getCPUCores(String nodeName, String k8sNamespace) throws Exception {
         String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " get pods -o custom-columns=0:.spec.containers[].resources.requests.cpu --field-selector spec.nodeName=" + nodeName;
         String nodeCPUCores = execute(getCPUCoresCmd.split(" "));
@@ -214,31 +197,54 @@ public class ResourceStats {
         return 0;
     }
 
-    private int getAvailableCPUCores(String nodeName, String k8sNamespace) throws Exception {
-        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " describe node " + nodeName + " | grep cpu: | sed 's/[^0-9]*//g'";
+    private int[] getAvailableResources(String nodeName, String k8sNamespace) throws Exception {
+        int resources[] = new int[2];
+        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " describe node " + nodeName;
         String nodeCPUCores = execute(getCPUCoresCmd.split(" "));
-        log.debug("Available CPU cores in node " + nodeName + ": " + nodeCPUCores);
         if (nodeCPUCores != null) {
             String[] lines = nodeCPUCores.split("\n");
-            if (lines.length > 0) {
-                return Integer.parseInt(lines[0]);
+            boolean hasCores = false;
+            boolean hasRAM = false;
+            for (String line : lines) {
+                if (!hasCores && line.indexOf("cpu:") >= 0) {
+                    String[] parts = line.split(":");
+                    int cores = Integer.parseInt(parts[1].trim());
+                    log.debug("Available CPU cores in node " + nodeName + ": " + cores);
+                    resources[0] = cores;
+                    hasCores = true;
+                }
+
+                if (!hasRAM && line.indexOf("memory:") >= 0) {
+                    String[] parts = line.split(":");
+                    int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim())/1000000;
+                    log.debug("Available memory in node " + nodeName + ": " + ram + " GB");
+                    resources[1] = ram;
+                    hasRAM = true;
+                }
             }
+            
+            return resources;
         }
         
-        return 0;
+        return new int[] {0, 0};
     }
 
-    private int getAvailableMemory(String nodeName, String k8sNamespace) throws Exception {
-        String getAvailableMemoryCmd = "kubectl -n " + k8sNamespace + " describe node " + nodeName + " | grep memory: | sed 's/[^0-9]*//g'";
-        String nodeAvailableMemory = execute(getAvailableMemoryCmd.split(" "));
-        log.debug("Available memory in node " + nodeName + ": " + nodeAvailableMemory);
-        if (nodeAvailableMemory != null) {
-            String[] lines = nodeAvailableMemory.split("\n");
-            if (lines.length > 1) {
-                return Integer.parseInt(lines[1])/1000000;
-            }
-        }
+    class ActiveSessionCounts {
+        private int interactive;
+        private int desktop;
+        private int headless;
+        private int total;
         
-        return 0;
+        public ActiveSessionCounts(int desktopCount, int headlessCount, int totalCount) {
+            desktop = desktopCount;
+            headless = headlessCount;
+            total = totalCount;
+            interactive = total - desktop - headless;
+        }
+    }
+    
+    class NodeResources {
+        public int cores = 0;
+        public int memory = 0;
     }
 }
