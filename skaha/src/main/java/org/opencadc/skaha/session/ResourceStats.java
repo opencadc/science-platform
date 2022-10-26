@@ -85,14 +85,12 @@ public class ResourceStats {
     
     private static final Logger log = Logger.getLogger(ResourceStats.class);
     
-    private ActiveSessionCounts activeSessionCounts;
-    private Integer coresInUse = 0;
-    private Integer coresAvailable = 0;
-    private NodeResources maxCores;
-    private NodeResources maxRAM;
+    private JobInstances instances;
+    private Core cores;
+    private Ram ram;
 
     public ResourceStats(int desktopCount, int headlessCount, int totalCount) {
-        activeSessionCounts = new ActiveSessionCounts(desktopCount, headlessCount, totalCount);
+        instances = new JobInstances(desktopCount, headlessCount, totalCount);
         String k8sNamespace;
         try {
             k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -102,8 +100,10 @@ public class ResourceStats {
         }
 
         try {
-            maxCores = new NodeResources();
-            maxRAM = new NodeResources();
+            MaxCoreResource maxCores = new MaxCoreResource();
+            MaxRamResource maxRAM = new MaxRamResource();
+            int coresInUse = 0;
+            int coresAvailable = 0;
             List<String> nodeNames = getNodeNames(k8sNamespace);
             for (String nodeName : nodeNames) {
                 int rCPUCores = getCPUCores(nodeName, k8sNamespace);
@@ -111,19 +111,26 @@ public class ResourceStats {
                 int aCPUCores = resources[0];
                 if (aCPUCores > maxCores.cores) {
                     maxCores.cores = aCPUCores;
-                    maxCores.memory = resources[1];
+                    maxCores.withRam = resources[1];
                 }
                 
                 int aMemory = resources[1];
-                if (aMemory > maxRAM.memory) {
-                    maxRAM.memory = aMemory;
-                    maxRAM.cores = aCPUCores;
+                if (aMemory > maxRAM.ram) {
+                    maxRAM.ram = aMemory;
+                    maxRAM.withCores = aCPUCores;
                 }
 
                 coresInUse = coresInUse + rCPUCores;
                 coresAvailable = coresAvailable + aCPUCores;
                 log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aMemory + " GB");
             }
+
+            cores = new Core();
+            cores.maxCores = maxCores;
+            cores.coresAvailable = coresAvailable;
+            cores.coresInUse = coresInUse;
+            ram = new Ram();
+            ram.maxRAM = maxRAM;
          }catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed reading k8s-resources.properties", e);
@@ -229,22 +236,35 @@ public class ResourceStats {
         return new int[] {0, 0};
     }
 
-    class ActiveSessionCounts {
-        private int interactive;
-        private int desktop;
+    class JobInstances {
+        private int session;
+        private int desktopApp;
         private int headless;
-        private int total;
         
-        public ActiveSessionCounts(int desktopCount, int headlessCount, int totalCount) {
-            desktop = desktopCount;
+        public JobInstances(int desktopCount, int headlessCount, int totalCount) {
+            desktopApp = desktopCount;
             headless = headlessCount;
-            total = totalCount;
-            interactive = total - desktop - headless;
+            session = totalCount - desktopCount - headlessCount;
         }
     }
     
-    class NodeResources {
+    class Core {
+        int coresInUse = 0;
+        int coresAvailable = 0;
+        MaxCoreResource maxCores;
+    }
+    
+    class Ram {
+        MaxRamResource maxRAM;
+    }
+
+    class MaxCoreResource {
         public int cores = 0;
-        public int memory = 0;
+        public int withRam = 0;
+    }
+
+    class MaxRamResource {
+        public int ram = 0;
+        public int withCores = 0;
     }
 }
