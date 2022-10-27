@@ -240,10 +240,12 @@ public class ResourceStats {
         private int session;
         private int desktopApp;
         private int headless;
+        private int total;
         
         public JobInstances(int desktopCount, int headlessCount, int totalCount) {
             desktopApp = desktopCount;
             headless = headlessCount;
+            total = totalCount;
             session = totalCount - desktopCount - headlessCount;
         }
     }
