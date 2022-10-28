@@ -41,7 +41,7 @@ paths:
       - name: view
         in: query
         type: string
-        description: Session list view level.  If set to 'all', all users' sessions are listed (with limited information), not just the calling user's sessions. If set to 'stats', jobs and resources (cores and ram) information is listed.
+        description: Session list view level and stats.  If set to 'all', all users' sessions are listed (with limited information), not just the calling user's sessions. If set to 'stats', jobs and resources (cores and ram) information is listed.
         required: false
     post:
       description: |
