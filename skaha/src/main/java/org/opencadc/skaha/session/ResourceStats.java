@@ -215,6 +215,7 @@ public class ResourceStats {
             for (String line : lines) {
                 if (!hasCores && line.indexOf("cpu:") >= 0) {
                     String[] parts = line.split(":");
+                    // number of cores from "Capabity.cpu"
                     int cores = Integer.parseInt(parts[1].trim());
                     log.debug("Available CPU cores in node " + nodeName + ": " + cores);
                     resources[0] = cores;
@@ -223,6 +224,7 @@ public class ResourceStats {
 
                 if (!hasRAM && line.indexOf("memory:") >= 0) {
                     String[] parts = line.split(":");
+                    // amount of RAM from "Capabity.memory"
                     int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim())/1000000;
                     log.debug("Available memory in node " + nodeName + ": " + ram + " GB");
                     resources[1] = ram;
