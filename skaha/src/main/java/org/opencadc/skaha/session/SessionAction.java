@@ -519,9 +519,6 @@ public abstract class SessionAction extends SkahaAction {
         String name = parts[5];
         String startTime = parts[6];
         String deletionTimestamp = parts[7];
-        String requestedRAM = parts[8];
-        String requestedCPUCores = parts[9];
-        String requestedGPUCores = parts[10];
         if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
@@ -547,13 +544,18 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        session.setRequestedRAM(Integer.parseInt(requestedRAM.replaceAll("[^0-9]", "").trim()));
-        session.setRequestedCPUCores(Integer.parseInt(requestedCPUCores.replaceAll("[^0-9]", "").trim()));
-        String gpuCoresString = requestedGPUCores.replaceAll("[^0-9]", "").trim();
-        if (gpuCoresString.length() > 0) {
-            session.setRequestedGPUCores(Integer.parseInt(gpuCoresString));
-        } else {
-            session.setRequestedGPUCores(0);
+        if (parts.length > 8) {
+            String requestedRAM = parts[8];
+            String requestedCPUCores = parts[9];
+            String requestedGPUCores = parts[10];
+            session.setRequestedRAM(Integer.parseInt(requestedRAM.replaceAll("[^0-9]", "").trim()));
+            session.setRequestedCPUCores(Integer.parseInt(requestedCPUCores.replaceAll("[^0-9]", "").trim()));
+            String gpuCoresString = requestedGPUCores.replaceAll("[^0-9]", "").trim();
+            if (gpuCoresString.length() > 0) {
+                session.setRequestedGPUCores(Integer.parseInt(gpuCoresString));
+            } else {
+                session.setRequestedGPUCores(0);
+            }
         }
 
         return session;
