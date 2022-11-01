@@ -372,7 +372,6 @@ public abstract class SessionAction extends SkahaAction {
         List<String> sessionCMD = getSessionCMD(k8sNamespace, forUserID, sessionID);
         String vncSession = execute(sessionCMD.toArray(new String[0]));
         log.debug("VNC Session: " + vncSession);
-        log.info("alinga-- VNC Session: " + vncSession);
        
         if (StringUtil.hasLength(vncSession)) {
             Session session = constructSession(vncSession.trim());
@@ -381,22 +380,15 @@ public abstract class SessionAction extends SkahaAction {
             List<String> sessionExpiryTimeCMD = getSessionExpiryTimeCMD(k8sNamespace, forUserID, sessionID);
             String sessionExpiryTime = execute(sessionExpiryTimeCMD.toArray(new String[0]));
             log.debug("Expiry time: " + sessionExpiryTime + " seconds");
-            log.info("alinga-- Expiry time: " + sessionExpiryTime + " seconds");
-            session.setExpiryTime(Integer.parseInt(sessionExpiryTime));
+            session.setExpiryTime(sessionExpiryTime);
             
             // get RAM and CPU usage
             List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID, sessionID);
             String sessionResourceUsage = execute(sessionResourceUsageCMD.toArray(new String[0]));
             log.debug("Resource used: " + sessionResourceUsage);
-            log.info("alinga-- Resource used: " + sessionResourceUsage);
             String resourceUsage[] = sessionResourceUsage.trim().replaceAll("\\s+", " ").split(" ");
-            log.info("alinga-- resourceUsage[0]: " + resourceUsage[0]);
-            log.info("alinga-- resourceUsage[1]: " + resourceUsage[1]);
-            log.info("alinga-- resourceUsage[2]: " + resourceUsage[2]);
-            int coreUsage = Integer.parseInt(resourceUsage[1].replaceAll("[^0-9]", "").trim());
-            int ramUsage = Integer.parseInt(resourceUsage[2].replaceAll("[^0-9]", "").trim());
-            session.setCoresUsed(coreUsage);
-            session.setRAMUsed(ramUsage);
+            session.setCoresUsed(resourceUsage[1]);
+            session.setRAMUsed(resourceUsage[2]);
             return session;
         } else {
             throw new ResourceNotFoundException("session " + sessionID + " not found");
@@ -548,14 +540,9 @@ public abstract class SessionAction extends SkahaAction {
             String requestedRAM = parts[8];
             String requestedCPUCores = parts[9];
             String requestedGPUCores = parts[10];
-            session.setRequestedRAM(Integer.parseInt(requestedRAM.replaceAll("[^0-9]", "").trim()));
-            session.setRequestedCPUCores(Integer.parseInt(requestedCPUCores.replaceAll("[^0-9]", "").trim()));
-            String gpuCoresString = requestedGPUCores.replaceAll("[^0-9]", "").trim();
-            if (gpuCoresString.length() > 0) {
-                session.setRequestedGPUCores(Integer.parseInt(gpuCoresString));
-            } else {
-                session.setRequestedGPUCores(0);
-            }
+            session.setRequestedRAM(requestedRAM);
+            session.setRequestedCPUCores(requestedCPUCores);
+            session.setRequestedGPUCores(requestedGPUCores);
         }
 
         return session;

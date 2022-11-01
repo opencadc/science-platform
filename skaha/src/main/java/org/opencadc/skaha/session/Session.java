@@ -89,12 +89,12 @@ public class Session {
     private String name;
     private String startTime;
     private String connectURL;
-    private int requestedRAM;      // in GiB
-    private int requestedCPUCores;
-    private int requestedGPUCores;
-    private int coresUsed;         // in 1/1000th of a core
-    private int ramUsed;           // in MiB
-    private int expiryTime;        // in seconds
+    private String requestedRAM;
+    private String requestedCPUCores;
+    private String requestedGPUCores;
+    private String coresUsed;
+    private String ramUsed;
+    private String expiryTime;            // in seconds
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
         if (id == null) {
@@ -142,51 +142,51 @@ public class Session {
         return connectURL;
     }
     
-    public int getRequestedRAM() {
+    public String getRequestedRAM() {
         return requestedRAM;
     }
     
-    public void setRequestedRAM(int ram) {
+    public void setRequestedRAM(String ram) {
         this.requestedRAM = ram;
     }
 
-    public int getRequestedCPUCores() {
+    public String getRequestedCPUCores() {
         return requestedCPUCores;
     }
 
-    public void setRequestedCPUCores(int cores) {
+    public void setRequestedCPUCores(String cores) {
         this.requestedCPUCores = cores;
     }
 
-    public int getRequestedGPUCores() {
+    public String getRequestedGPUCores() {
         return requestedGPUCores;
     }
 
-    public void setRequestedGPUCores(int cores) {
+    public void setRequestedGPUCores(String cores) {
         this.requestedGPUCores = cores;
     }
 
-    public int getCoresused() {
+    public String getCoresused() {
         return coresUsed;
     }
 
-    public void setCoresUsed(int cores) {
+    public void setCoresUsed(String cores) {
         this.coresUsed = cores;
     }
 
-    public int getRAMused() {
+    public String getRAMused() {
         return ramUsed;
     }
 
-    public void setRAMUsed(int memory) {
+    public void setRAMUsed(String memory) {
         this.ramUsed = memory;
     }
 
-    public int getExpiryTime() {
+    public String getExpiryTime() {
         return expiryTime;
     }
 
-    public void setExpiryTime(int timeInSeconds) {
+    public void setExpiryTime(String timeInSeconds) {
         this.expiryTime = timeInSeconds;
     }
     
