@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -89,9 +90,15 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.text.DateFormat;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
@@ -380,15 +387,17 @@ public abstract class SessionAction extends SkahaAction {
             List<String> sessionExpiryTimeCMD = getSessionExpiryTimeCMD(k8sNamespace, forUserID, sessionID);
             String sessionExpiryTime = execute(sessionExpiryTimeCMD.toArray(new String[0]));
             log.debug("Expiry time: " + sessionExpiryTime + " seconds");
-            session.setExpiryTime(sessionExpiryTime);
+            Instant instant = Instant.parse(session.getStartTime());
+            instant = instant.plus(Integer.parseInt(sessionExpiryTime), ChronoUnit.SECONDS);
+            session.setExpiryTime(instant.toString());
             
             // get RAM and CPU usage
             List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID, sessionID);
             String sessionResourceUsage = execute(sessionResourceUsageCMD.toArray(new String[0]));
             log.debug("Resource used: " + sessionResourceUsage);
             String resourceUsage[] = sessionResourceUsage.trim().replaceAll("\\s+", " ").split(" ");
-            session.setCoresUsed(resourceUsage[1]);
-            session.setRAMUsed(resourceUsage[2]);
+            session.setCoresInUse(resourceUsage[1]);
+            session.setRAMInUse(resourceUsage[2]);
             return session;
         } else {
             throw new ResourceNotFoundException("session " + sessionID + " not found");

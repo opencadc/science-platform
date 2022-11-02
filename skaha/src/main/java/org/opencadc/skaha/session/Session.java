@@ -92,8 +92,8 @@ public class Session {
     private String requestedRAM;
     private String requestedCPUCores;
     private String requestedGPUCores;
-    private String coresUsed;
-    private String ramUsed;
+    private String coresInUse;
+    private String ramInUse;
     private String expiryTime;            // in seconds
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
@@ -166,20 +166,20 @@ public class Session {
         this.requestedGPUCores = cores;
     }
 
-    public String getCoresused() {
-        return coresUsed;
+    public String getCoresInUse() {
+        return coresInUse;
     }
 
-    public void setCoresUsed(String cores) {
-        this.coresUsed = cores;
+    public void setCoresInUse(String cores) {
+        this.coresInUse = cores;
     }
 
-    public String getRAMused() {
-        return ramUsed;
+    public String getRAMInUse() {
+        return ramInUse;
     }
 
-    public void setRAMUsed(String memory) {
-        this.ramUsed = memory;
+    public void setRAMInUse(String memory) {
+        this.ramInUse = memory;
     }
 
     public String getExpiryTime() {
