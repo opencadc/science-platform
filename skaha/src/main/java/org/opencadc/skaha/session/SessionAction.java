@@ -505,7 +505,7 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("-l");
         getSessionJobCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
         getSessionJobCMD.add("--no-headers=true");
-//        getSessionJobCMD.add("--use-protocol-buffers=true");
+        getSessionJobCMD.add("--use-protocol-buffers=true");
         return getSessionJobCMD;
     }
     
