@@ -53,7 +53,6 @@ RUN cd /opt/${CASA_RELEASE%%-py*} && \
     ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE%%-py*}/${REPLACED_DATA}
 RUN rm -rf /arc
 
-
 RUN mkdir /skaha
 ADD init.sh /skaha/
 
