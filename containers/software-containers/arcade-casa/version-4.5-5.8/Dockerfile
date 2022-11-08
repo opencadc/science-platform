@@ -43,9 +43,6 @@ RUN rm -rf /opt/${CASA_RELEASE}/data && \
     ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE}/data
 RUN chmod 777 /opt/${CASA_RELEASE}
 RUN rm -rf /arc
-# original method below - no longer implemented on kubernetes side
-#RUN rm -rf /opt/${CASA_RELEASE}/data
-#RUN chmod 777 /opt/${CASA_RELEASE}
 
 RUN mkdir /skaha
 ADD init.sh /skaha/
