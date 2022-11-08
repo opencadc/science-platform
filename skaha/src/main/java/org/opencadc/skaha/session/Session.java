@@ -145,4 +145,11 @@ public class Session {
         return false;
     }
     
+    @Override
+    public String toString() {
+        return String.format(
+            "Session[id=%s,userid=%s,image=%s,type=%s,status=%s,name=%s,startTime=%s,connectURL=%s]",
+            id, userid, image, type, status, name, startTime, connectURL);
+    }
+    
 }

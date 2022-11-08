@@ -298,12 +298,16 @@ public class PostAction extends SessionAction {
         List<Session> sessions = super.getAllSessions(userid);
         int count = 0;
         for (Session session : sessions) {
-            if (!SESSION_TYPE_HEADLESS.equals(type) &&
-                    !session.getStatus().equals(Session.STATUS_TERMINATING) &&
-                    !session.getStatus().equals(Session.STATUS_SUCCEEDED)) {
-                count++;
+            log.debug("checking session: " + session);
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())) {
+                String status = session.getStatus();
+                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
+                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                    count++;
+                }
             }
         }
+        log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
             throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
                 maxUserSessions + " active sessions.");
