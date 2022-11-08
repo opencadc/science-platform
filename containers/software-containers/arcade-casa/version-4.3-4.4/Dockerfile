@@ -45,7 +45,7 @@ RUN chown -R root:root /opt/${CASA_RELEASE} && ln -s /opt/${CASA_RELEASE} /opt/c
 
 RUN yum install -y sssd-client acl
 
-#HK updated to new leapsecond solution
+# updated to new leapsecond solution
 # Allow runtime symlink creation to the casa-data-repository
 # Create a dangling symlink to casa-data-repository so that after deployment
 # the symlink will link to the actual casa-data-repository in storage.
@@ -54,10 +54,6 @@ RUN rm -rf /opt/${CASA_RELEASE}/data && \
     ln -s /arc/projects/casa-data-repository/ /opt/${CASA_RELEASE}/data
 RUN chmod 777 /opt/${CASA_RELEASE}
 RUN rm -rf /arc
-#(old method below)
-## Allow runtime symlink creation to the casa-data-repository
-#RUN rm -rf /opt/${CASA_RELEASE}/data
-#RUN chmod 777 /opt/${CASA_RELEASE}
 
 
 
