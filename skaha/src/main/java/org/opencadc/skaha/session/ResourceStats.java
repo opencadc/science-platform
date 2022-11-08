@@ -66,16 +66,7 @@
  */
 package org.opencadc.skaha.session;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
 
 /**
  * @author yeunga
@@ -89,155 +80,25 @@ public class ResourceStats {
     private Core cores;
     private Ram ram;
 
-    public ResourceStats(int desktopCount, int headlessCount, int totalCount) {
+    public ResourceStats(int desktopCount, int headlessCount, int totalCount, 
+            int coresInUse, int coresAvailable, int mCores, String withRAM, String mRAM, int withCores) {
         instances = new JobInstances(desktopCount, headlessCount, totalCount);
-        String k8sNamespace;
-        try {
-            k8sNamespace = K8SUtil.getWorkloadNamespace();
-        } catch (Exception e) {
-            log.error(e);
-            throw new IllegalStateException("failed to get workload namespace", e);
-        }
 
-        try {
-            MaxCoreResource maxCores = new MaxCoreResource();
-            MaxRamResource maxRAM = new MaxRamResource();
-            int coresInUse = 0;
-            int coresAvailable = 0;
-            List<String> nodeNames = getNodeNames(k8sNamespace);
-            for (String nodeName : nodeNames) {
-                int rCPUCores = getCPUCores(nodeName, k8sNamespace);
-                int resources[] = getAvailableResources(nodeName, k8sNamespace);
-                int aCPUCores = resources[0];
-                if (aCPUCores > maxCores.cores) {
-                    maxCores.cores = aCPUCores;
-                    maxCores.withRam = resources[1];
-                }
-                
-                int aMemory = resources[1];
-                if (aMemory > maxRAM.ram) {
-                    maxRAM.ram = aMemory;
-                    maxRAM.withCores = aCPUCores;
-                }
+        MaxCoreResource maxCores = new MaxCoreResource();
+        maxCores.cores = mCores;
+        maxCores.withRam = withRAM;
+        cores = new Core();
+        cores.maxCores = maxCores;
+        cores.coresAvailable = coresAvailable;
+        cores.coresInUse = coresInUse;
 
-                coresInUse = coresInUse + rCPUCores;
-                coresAvailable = coresAvailable + aCPUCores;
-                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aMemory + " GB");
-            }
-
-            cores = new Core();
-            cores.maxCores = maxCores;
-            cores.coresAvailable = coresAvailable;
-            cores.coresInUse = coresInUse;
-            ram = new Ram();
-            ram.maxRAM = maxRAM;
-         }catch (Exception e) {
-            log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.properties", e);
-        }
+        MaxRamResource maxRAM = new MaxRamResource();
+        maxRAM.ram = mRAM;
+        maxRAM.withCores = withCores;
+        ram = new Ram();
+        ram.maxRAM = maxRAM;
     }
     
-    private static String readStream(InputStream in) throws IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        int nRead;
-        byte[] data = new byte[1024];
-        while ((nRead = in.read(data, 0, data.length)) != -1) {
-            buffer.write(data, 0, nRead);
-        }
-        return buffer.toString("UTF-8");
-    }
-    
-    private static String execute(String[] command) throws IOException, InterruptedException {
-        return execute(command, false);
-    }
-
-    private static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
-        Process p = Runtime.getRuntime().exec(command);
-        int status = p.waitFor();
-        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
-        String stdout = readStream(p.getInputStream());
-        String stderr = readStream(p.getErrorStream());
-        log.debug("stdout: " + stdout);
-        log.debug("stderr: " + stderr);
-        if (status != 0) {
-            if (allowError) {
-                return stderr;
-            } else {
-                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-                throw new IOException(message);
-            }
-        } 
-        return stdout.trim();
-    }
-
-    private List<String> getNodeNames(String k8sNamespace) throws Exception {
-        String getNodeNamesCmd = "kubectl -n " + k8sNamespace + " get nodes -o custom-columns=:metadata.name";
-        String nodeNames = execute(getNodeNamesCmd.split(" "));
-        log.debug("nodes: " + nodeNames);
-        if (nodeNames != null) {
-            String[] lines = nodeNames.split("\n");
-            if (lines.length > 0) {
-                return Arrays.asList(lines);
-            }
-        }
-        
-        return new ArrayList<String>();
-    }
-
-    private int getCPUCores(String nodeName, String k8sNamespace) throws Exception {
-        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " get pods -o custom-columns=0:.spec.containers[].resources.requests.cpu --field-selector spec.nodeName=" + nodeName;
-        String nodeCPUCores = execute(getCPUCoresCmd.split(" "));
-        log.debug("CPU cores in node " + nodeName + ": " + nodeCPUCores);
-        if (nodeCPUCores != null) {
-            String[] lines = nodeCPUCores.split("\n");
-            if (lines.length > 0) {
-                List<Integer> cpuCores = Arrays.stream(lines).map(Integer::parseInt).collect(Collectors.toList());
-                int totalNodeCPUCores = 0;
-                for (Integer cpuCore : cpuCores) {
-                    totalNodeCPUCores = totalNodeCPUCores + cpuCore;
-                }
-                
-                return totalNodeCPUCores;
-            }
-        }
-        
-        return 0;
-    }
-
-    private int[] getAvailableResources(String nodeName, String k8sNamespace) throws Exception {
-        int resources[] = new int[2];
-        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " describe node " + nodeName;
-        String nodeCPUCores = execute(getCPUCoresCmd.split(" "));
-        if (nodeCPUCores != null) {
-            String[] lines = nodeCPUCores.split("\n");
-            boolean hasCores = false;
-            boolean hasRAM = false;
-            for (String line : lines) {
-                if (!hasCores && line.indexOf("cpu:") >= 0) {
-                    String[] parts = line.split(":");
-                    // number of cores from "Capabity.cpu"
-                    int cores = Integer.parseInt(parts[1].trim());
-                    log.debug("Available CPU cores in node " + nodeName + ": " + cores);
-                    resources[0] = cores;
-                    hasCores = true;
-                }
-
-                if (!hasRAM && line.indexOf("memory:") >= 0) {
-                    String[] parts = line.split(":");
-                    // amount of RAM from "Capabity.memory"
-                    int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim())/1000000;
-                    log.debug("Available memory in node " + nodeName + ": " + ram + " GB");
-                    resources[1] = ram;
-                    hasRAM = true;
-                }
-            }
-            
-            return resources;
-        }
-        
-        return new int[] {0, 0};
-    }
-
     class JobInstances {
         private int session;
         private int desktopApp;
@@ -264,11 +125,11 @@ public class ResourceStats {
 
     class MaxCoreResource {
         public int cores = 0;
-        public int withRam = 0;
+        public String withRam = "0Gi";
     }
 
     class MaxRamResource {
-        public int ram = 0;
+        public String ram = "0Gi";
         public int withCores = 0;
     }
 }
