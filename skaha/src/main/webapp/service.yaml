@@ -3,7 +3,7 @@ info:
   version: 0.3
   title: skaha
   description: |
-    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using skaha can be found here:  https://github.com/brianmajor/science-platform/tree/master/doc
+    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using skaha can be found here:  https://github.com/opencadc/science-platform/tree/master/doc
 schemes:
   - https
 basePath: /skaha
