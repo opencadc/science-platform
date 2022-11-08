@@ -55,8 +55,6 @@ RUN rm -rf /opt/${CASA_RELEASE}/data && \
 RUN chmod 777 /opt/${CASA_RELEASE}
 RUN rm -rf /arc
 
-
-
 RUN mkdir /skaha
 ADD startup.sh /skaha/
 

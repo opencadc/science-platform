@@ -164,7 +164,7 @@ public class PostAction extends SessionAction {
                 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkForExistingSession(userID, validatedType);
+                checkExistingSessions(userID, validatedType);
                 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
@@ -290,18 +290,27 @@ public class PostAction extends SessionAction {
         
     }
     
-    public void checkForExistingSession(String userid, String type) throws Exception {
+    public void checkExistingSessions(String userid, String type) throws Exception {
         // multiple 
         if (SESSION_TYPE_HEADLESS.equals(type)) {
             return;
         }
         List<Session> sessions = super.getAllSessions(userid);
+        int count = 0;
         for (Session session : sessions) {
-            if (session.getType().equals(type) &&
-                    !session.getStatus().equals(Session.STATUS_TERMINATING) &&
-                    !session.getStatus().equals(Session.STATUS_SUCCEEDED)) {
-                throw new IllegalArgumentException("User " + userID + " has a session already running.");
+            log.debug("checking session: " + session);
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())) {
+                String status = session.getStatus();
+                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
+                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                    count++;
+                }
             }
+        }
+        log.debug("active interactive sessions: " + count);
+        if (count >= maxUserSessions) {
+            throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
+                maxUserSessions + " active sessions.");
         }
     }
     
@@ -559,7 +568,7 @@ public class PostAction extends SessionAction {
             return null;
         }
         if (get.getThrowable() != null) {
-            log.warn("error obtaining harbor secret", get.getThrowable());
+            log.warn("error obtaining harbor secret. response code: " + get.getResponseCode());
             return null;
         }
         String userJson = out.toString();

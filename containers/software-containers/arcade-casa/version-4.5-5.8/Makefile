@@ -6,7 +6,7 @@ VERSIONS_OLD_4 = \
 	4.6.0-el6 \
 	4.7.0-el6 \
 	4.7.1-el6 \
-	4.7.2-el6 
+	4.7.2-el6
 VERSIONS_OLD_5 = \
 	5.0.0-218.el6 \
 	5.1.0-74.el6 \
@@ -40,7 +40,6 @@ build-old-4:
 		./download.sh casa-release-$(V) old-4 ; \
 		docker build --build-arg CASA_RELEASE=casa-release-$(V) -t ${DOCKER_REPO_BASE_4}:$(V) .; \
 	)
-
 build-old-5: 
 	@- $(foreach V,$(VERSIONS_OLD_5), \
 		./download.sh casa-release-$(V) old-5 ; \
@@ -86,7 +85,6 @@ upload-old-4: build-old-4
 	@- $(foreach V,$(VERSIONS_OLD_4), \
 	  docker push ${DOCKER_REPO_BASE_4}:$(V) ; \
 	)
-
 upload-old-5: build-old-5
 	@- $(foreach V,$(VERSIONS_OLD_5), \
 	  docker push ${DOCKER_REPO_BASE}:$(V) ; \
