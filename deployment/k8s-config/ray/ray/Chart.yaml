@@ -7,4 +7,4 @@ type: application
 version: 0.1.0
 
 # Ray version.
-appVersion: "1.13.1-py39"
+appVersion: "1.13.0-py39"
