@@ -11,7 +11,7 @@ paths:
   /session:
     get:
       description: |
-        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>Type<br/>Status<br/>Name<br/>Connect URL<br/>StartTime<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and 'headless'.
+        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>User ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect URL<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and 'headless'.
       tags:
         - Session Management
       responses:
