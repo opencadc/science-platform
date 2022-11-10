@@ -104,7 +104,11 @@ public class GetAction extends SessionAction {
             String view = syncInput.getParameter("view");
             if (sessionID == null) {
                 if (SESSION_VIEW_STATS.equals(view)) {
-                    reportStats();
+                    ResourceStats resourceStats = getResourceStats();
+                    Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+                    String json = gson.toJson(resourceStats);
+                    syncOutput.setHeader("Content-Type", "application/json");
+                    syncOutput.getOutputStream().write(json.getBytes());
                 } else {
                     // List the sessions
                     String typeFilter = syncInput.getParameter("type");
@@ -145,7 +149,7 @@ public class GetAction extends SessionAction {
         }
     }
 
-    private void reportStats() throws Exception {
+    private ResourceStats getResourceStats() throws Exception {
         // report stats on sessions and resources
         List<Session> sessions = getAllSessions(null);
         int desktopCount = filter(sessions, "desktop-app", "Running").size();
@@ -182,11 +186,7 @@ public class GetAction extends SessionAction {
 
             String withRAMStr = String.valueOf(withRAM) + "Gi";
             String maxRAMStr = String.valueOf(maxRAM) + "Gi";
-            ResourceStats rc = new ResourceStats(desktopCount, headlessCount, totalCount, coresInUse, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
-            Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-            String json = gson.toJson(rc);
-            syncOutput.setHeader("Content-Type", "application/json");
-            syncOutput.getOutputStream().write(json.getBytes());
+            return new ResourceStats(desktopCount, headlessCount, totalCount, coresInUse, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed reading k8s-resources.properties", e);
