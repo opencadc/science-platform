@@ -7,8 +7,7 @@ The most efficient way to transfer files in and out of CANFAR's Science Portal i
 the VOS Tools, which are also used for interacting with CANFAR's VOSpace.
 
 Instructions for installing VOS Tools on your personal computer are 
-located here: 
-https://www.canfar.net/en/docs/storage/
+located `here <https://www.canfar.net/en/docs/storage/>`_
 under the section titled *The vos Python module and command line client*.
 
 Instructions on how to use this tool, including some basic examples, are

@@ -1,7 +1,7 @@
 .. _clipboard:
 
-Copy & Paste with the Clipboard
-===============================
+Copy & Paste Between Desktop Containers
+=======================================
 
 Since the different containers (e.g., CASA and terminal windows) on a Desktop
 session may not be running on the same remote computer, copying and pasting

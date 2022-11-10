@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>Example: reduce and image data &#8212; CANFAR Science Portal  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
@@ -12,10 +12,11 @@
     <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
     <script src="../_static/jquery.js"></script>
     <script src="../_static/underscore.js"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Using VOS Tools" href="../General_tools/Using_vostools.html" />
     <link rel="prev" title="Download data from the ALMA archive (transfer script)" href="archive_script_download.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -34,19 +35,22 @@
           <div class="body" role="main">
             
   <section id="example-reduce-and-image-data">
-<span id="typical-reduction"></span><h1>Example: reduce and image data<a class="headerlink" href="#example-reduce-and-image-data" title="Permalink to this headline">¶</a></h1>
+<span id="typical-reduction"></span><h1>Example: reduce and image data<a class="headerlink" href="#example-reduce-and-image-data" title="Permalink to this heading">¶</a></h1>
 <p>This tutorial walks through an example of reducing and imaging
 and ALMA dataset, and copying the final images to a personal
 computer.
 First, you need to download your ALMA data onto your Desktop Session.
-See <a class="reference internal" href="archive_download.html#desktop-download"><span class="std std-ref">here</span></a> for a tutorial on how to download
-data directly from the ALMA science archive, or <a class="reference internal" href="../General_tools/Using_vostools.html#vostools"><span class="std std-ref">here</span></a>
-for instructions on how to use the VOS Tools to transfer files
-from your personal computer or VOSpace to the Desktop Session.</p>
+See <a class="reference internal" href="archive_download.html#desktop-download"><span class="std std-ref">here</span></a> or <a class="reference internal" href="archive_script_download.html#desktop-script-download"><span class="std std-ref">here</span></a>
+for tutorials on how to download
+data directly from the ALMA Science Archive, or <a class="reference internal" href="../General_tools/File_transfers.html#filetransfer"><span class="std std-ref">here</span></a>
+for instructions on how to transfer files
+from your personal computer or VOSpace to the Desktop Session, if you
+already have your ALMA data downloaded there.</p>
 <p>Next, open a CASA container (see <a class="reference internal" href="start_casa.html#desktop-start-casa"><span class="std std-ref">this tutorial</span></a>)
 with the version that you need to run.
 Then, start CASA in either interactive or pipeline mode, depending on
-what is required for your reduction script.</p>
+what is required for your reduction script, by typing <code class="docutils literal notranslate"><span class="pre">casa</span></code> or
+<code class="docutils literal notranslate"><span class="pre">casa</span> <span class="pre">--pipeline</span></code></p>
 <blockquote>
 <div><p><em>Note: The version of CASA originally used to reduce your dataset
 can usually be found listed in the log files and/or near the top of the
@@ -57,7 +61,7 @@ the script directory indicate that CASA must be initiated in pipeline mode.</em>
 <img alt="../_images/1_start_casa.png" src="../_images/1_start_casa.png" />
 </div></blockquote>
 <p>Once you have started CASA, run the data reduction script (usually
-called scriptForPI.py).</p>
+called scriptForPI.py) by typing <code class="docutils literal notranslate"><span class="pre">execfile('scriptForPI.py')</span></code></p>
 <blockquote>
 <div><img alt="../_images/2_run_scriptForPI.png" src="../_images/2_run_scriptForPI.png" />
 </div></blockquote>
@@ -67,31 +71,35 @@ is usually distributed with the dataset will help you to image your dataset.
 Usually, this script needs to be copied into the calibrated/ directory
 before running it.  In some instances, you may need to start up a different
 version of casa to run the script.  In the example shown here, the calibration
-script uses the pipeline version of CASA (‘casa-4.3.1-el6-pipe’), while the
-imaging script uses the interactive version of CASA (‘casa-4.3.1-el6’), and
+script uses the pipeline version of CASA (‘casa-4.3.1-pipe’), while the
+imaging script uses the interactive version of CASA (‘casa-4.3.1’), and
 these two CASA versions were distributed independently with the names
 as noted in parenthesis.  Thus, to image the data, you would need to open a
-new ‘casa-4.3.1-el6’ container and type ‘casa’ in the prompt.</p>
+new ‘casa-4.3.1’ container and type <code class="docutils literal notranslate"><span class="pre">casa</span></code> in the prompt.</p>
 <p>During imaging, you might find it helpful to open up a regular terminal
 to view and/or edit the imaging script, for example, to copy and paste
 the commands one line at a time into casa (see the
-<a class="reference internal" href="../General_tools/Using_clipboard.html#clipboard"><span class="std std-ref">Using the Clipboard</span></a> tutorial for more information).</p>
+<a class="reference internal" href="../TipsTricks/Using_clipboard.html#clipboard"><span class="std std-ref">Using the Clipboard</span></a> tutorial for more information).</p>
 <blockquote>
 <div><img alt="../_images/3_ready_for_imaging.png" src="../_images/3_ready_for_imaging.png" />
 </div></blockquote>
-<p>Interacting with the CASA viewer while running the tast <em>clean</em>, for
+<p>Interacting with the CASA viewer while running the tast <em>tclean</em>, for
 example, works in the same manner as on a personal desktop machine.</p>
 <blockquote>
 <div><img alt="../_images/4_interactive_clean.png" src="../_images/4_interactive_clean.png" />
 </div></blockquote>
 <p>Once imaging and any desired analysis is complete, you can transfer
-your final files off of the system using, for example,
-<a class="reference internal" href="../General_tools/Using_vostools.html#vostools"><span class="std std-ref">the VOS Tools</span></a>.  In the example below, a small
-subset of files are being transfered to a personal VOSpace page
-using the vcp command.</p>
+your final files off of the system using one of the many
+options available to <a class="reference internal" href="../General_tools/File_transfers.html#filetransfer"><span class="std std-ref">transfer files</span></a>.</p>
 <blockquote>
 <div><img alt="../_images/5_imaging_done_copy_out.png" src="../_images/5_imaging_done_copy_out.png" />
 </div></blockquote>
+<p>In the example above, a small
+subset of files are being transfered to a personal VOSpace page
+using the <a class="reference internal" href="../General_tools/Using_vostools.html#vostools"><span class="std std-ref">vcp</span></a> command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">vcp</span> <span class="n">calibrated_final_cont_image_162622</span><span class="o">-</span><span class="mf">24225.</span><span class="o">*</span> <span class="n">vos</span><span class="p">:</span><span class="n">helenkirk</span><span class="o">/</span>
+</pre></div>
+</div>
 <p>Note that the Science Portal is not intended to be used for long-term data
 storage needs - VOSpace is instead recommended as it has a robust
 backup system in place.</p>
@@ -115,10 +123,25 @@ backup system in place.</p>
 
 <h3>Navigation</h3>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../NewUser/Overview.html">Portal Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../NewUser/Login.html">How to log in</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../NewUser/ProjectSpace.html">Setting up a Project Space</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../NewUser/LaunchDesktop.html">Launching a Desktop session</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../NewUser/LaunchCARTA.html">Launching a CARTA session</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../NewUser/LaunchNotebook.html">Launching a Notebook session</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/File_transfers.html">File Transfer Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_webstorage.html">Using Web Storage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_vostools.html">Using VOS Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_sshfs.html">Using SSHFS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Group_management.html">Group Management Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Notebook/transfer_file.html">Transfer file into Notebook session</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Using_clipboard.html">Copy &amp; Paste Between Desktop Containers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Increase_font.html">Increase Font Size of Desktop Containers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Direct_url.html">Direct URL Upload/Download</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="start_casa.html">Starting CASA</a></li>
@@ -126,18 +149,12 @@ backup system in place.</p>
 <li class="toctree-l1"><a class="reference internal" href="archive_script_download.html">Download data from the ALMA archive (transfer script)</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Example: reduce and image data</a></li>
 </ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_vostools.html">Using VOS Tools</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_clipboard.html">Copy &amp; Paste with the Clipboard</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../Notebook/transfer_file.html">Transfer file into Notebook session</a></li>
-</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
       <li>Previous: <a href="archive_script_download.html" title="previous chapter">Download data from the ALMA archive (transfer script)</a></li>
-      <li>Next: <a href="../General_tools/Using_vostools.html" title="next chapter">Using VOS Tools</a></li>
   </ul></li>
 </ul>
 </div>
@@ -150,7 +167,7 @@ backup system in place.</p>
     </form>
     </div>
 </div>
-<script>$('#searchbox').show(0);</script>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -167,7 +184,7 @@ backup system in place.</p>
       &copy;2022, CANFAR Science Portal.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.4.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
