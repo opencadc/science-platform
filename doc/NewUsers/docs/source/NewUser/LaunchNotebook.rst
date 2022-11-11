@@ -3,14 +3,14 @@
 Launching a Notebook session
 =============================
 
-After logging in to the science portal and clicking the plus sign to launch a 
+After logging in to the Science Portal and clicking the plus sign to launch a 
 new session, choose a session type of 'notebook'.
 
    .. image:: images/notebook/1_select_notebook_session.png
    .. image:: images/notebook/2_choose_notebook.png
 
-Next, choose your prefered container image.  The CASA6.4-notebook has
-CASA version 6.4 already installed.
+Next, choose your prefered container image.  The CASA6.5-notebook has
+CASA version 6.5 already installed.
 
    .. image:: images/notebook/3_choose_casa_container.png
 

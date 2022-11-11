@@ -3,13 +3,14 @@
 Launching a CARTA session
 ===========================
 
-After logging in to the science portal and clicking the plus sign to
+After logging in to the Science Portal and clicking the plus sign to
 launch a new session, choose a session type of 'carta'.
 
    .. image:: images/carta/1_select_carta_session.png
 
 Note that the remaining menu bars and options update automatically after your
-session type selection.  There are currently three options for 'container
+session type selection.  (Please be patient; sometimes it takes a few
+seconds to update.)  There are currently three options for 'container
 image': choose the version of CARTA that you need here (1.4, 2.0, or 3.0 beta).
 
   .. image:: images/carta/2_select_carta_container.png
@@ -42,7 +43,7 @@ Now, hit the launch button and wait for your session to launch.
   .. image:: images/carta/6_launch_carta.png
 
 Congratulations!  You’ve started your first CARTA session.  You are 
-automatically returned to the main science portal page, where your desktop 
+automatically returned to the main Science Portal page, where your CARTA 
 session appears as an icon, with your chosen descriptive name.  Access the 
 session by clicking on the session icon.
 
@@ -55,14 +56,15 @@ Wait while the session loads, after which you arrive at the main landing page.
 
 Now, navigate through to the file that you would like to display on CARTA.
 For information on how to upload files, 
-see :ref:`Using VOS Tools<vostools>`.  This tutorial
+see :ref:`filetransfer` for the options available.  This tutorial
 assumes that you have a file uploaded already.  First, click the 
 icon on the upper left to navigate up one directory.
 
   .. image:: images/carta/10_navigate_files.png
 
-Files saved in your desktop session can be found in the home/[username]
-directory.  Click through the directory structure until you reach your 
+Files saved in your desktop session can be found in the ``home/[username]``
+or ``home/[projectname]`` directory.  
+Click through the directory structure until you reach your 
 desired file.  Select the file and click the load button.
 
   .. image:: images/carta/11_select_file.png

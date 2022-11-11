@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>How to log in &#8212; CANFAR Science Portal  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
@@ -12,11 +12,13 @@
     <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
     <script src="../_static/jquery.js"></script>
     <script src="../_static/underscore.js"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Launching a Desktop session" href="LaunchDesktop.html" />
-    <link rel="prev" title="Welcome to the documentation for CANFAR’s Science Portal!" href="../index.html" />
+    <link rel="next" title="Setting up a Project Space" href="ProjectSpace.html" />
+    <link rel="prev" title="Portal Overview" href="Overview.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -34,18 +36,18 @@
           <div class="body" role="main">
             
   <section id="how-to-log-in">
-<span id="login"></span><h1>How to log in<a class="headerlink" href="#how-to-log-in" title="Permalink to this headline">¶</a></h1>
+<span id="login"></span><h1>How to log in<a class="headerlink" href="#how-to-log-in" title="Permalink to this heading">¶</a></h1>
 <p>You will need a CADC account to access the system.  If you do not have one,
 you can request one here:
 <a class="reference external" href="https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html">https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html</a></p>
-<p>To request authorization to use the science portal, send an email to
+<p>To request authorization to use the Science Portal, send an email to
 <a class="reference external" href="mailto:support&#37;&#52;&#48;canfar&#46;net">support<span>&#64;</span>canfar<span>&#46;</span>net</a>  You may also wish to consider the following:</p>
 <ul class="simple">
-<li><p><em>Project space</em>: If you intend to work on a dataset with collaborators, it may be worth considering whether or not it makes sense to set up a ‘project space’, where a designated group of users all has common access to the files contained within it.  You will need to supply a project name and estimated space requirement to the email address above.</p></li>
+<li><p><em>Project space</em>: If you intend to work on a dataset with collaborators, it is recommended that you set up a <a class="reference internal" href="ProjectSpace.html#projectspace"><span class="std std-ref">project space</span></a>, where a designated group of users all has common access to the files contained within it.  You will need to supply a project name and estimated space requirement to the email address above.</p></li>
 <li><p><em>Communications on Slack</em>: a Slack workspace is used for some aspects of communication around the Science Portal, including notice of service outages and some trouble-shooting support.  You can request that you be added to this space also by contacting the email address listed above.</p></li>
 </ul>
 <p>Once your access has been confirmed, go to the CANFAR page:
-<a class="reference external" href="https://www.canfar.net">https://www.canfar.net</a> and log in to access the science portal</p>
+<a class="reference external" href="https://www.canfar.net">https://www.canfar.net</a> and log in to access the Science Portal</p>
 <blockquote>
 <div><img alt="../_images/1_main_CANFAR_landing.png" src="../_images/1_main_CANFAR_landing.png" />
 </div></blockquote>
@@ -53,18 +55,20 @@ you can request one here:
 <blockquote>
 <div><img alt="../_images/2_after_login.png" src="../_images/2_after_login.png" />
 </div></blockquote>
-<p>There are three different types of sessions that you can choose to launch:
-Desktop, CARTA, and Notebook.  All are described below; in brief, Desktop
+<p>There are four different types of sessions that you can choose to launch:
+Desktop, CARTA, Notebook, and Contributed.  All are described below; in
+brief, Desktop
 provides a linux desktop-like working environment, CARTA corresponds to ALMA’s
-CARTA visualization tool, and Notebook provides a Jupyter Notebook environment.
+CARTA visualization tool, Notebook provides a Jupyter Notebook environment,
+and Contributed contains community-contributed tools such as a time estimator
+for the CASTOR mission.
 Start by selecting the session type in the upper drop-down menu; the
 options will automatically be re-populated for the remaining menu items.</p>
 <blockquote>
 <div><img alt="../_images/3_launch_session_general.png" src="../_images/3_launch_session_general.png" />
 </div></blockquote>
 <p>See the following pages for the subsequent steps.  Note that you can have
-multiple active sessions, but at most one of each type (i.e., a maximum
-of one Desktop, one CARTA, and one Notebook session).</p>
+at most three active sessions of any type.</p>
 <blockquote>
 <div><ul class="simple">
 <li><p><a class="reference internal" href="LaunchDesktop.html#launch-desktop"><span class="std std-ref">Launching a Desktop session</span></a></p></li>
@@ -92,10 +96,25 @@ of one Desktop, one CARTA, and one Notebook session).</p>
 
 <h3>Navigation</h3>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Overview.html">Portal Overview</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">How to log in</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ProjectSpace.html">Setting up a Project Space</a></li>
 <li class="toctree-l1"><a class="reference internal" href="LaunchDesktop.html">Launching a Desktop session</a></li>
 <li class="toctree-l1"><a class="reference internal" href="LaunchCARTA.html">Launching a CARTA session</a></li>
 <li class="toctree-l1"><a class="reference internal" href="LaunchNotebook.html">Launching a Notebook session</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/File_transfers.html">File Transfer Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_webstorage.html">Using Web Storage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_vostools.html">Using VOS Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_sshfs.html">Using SSHFS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../General_tools/Group_management.html">Group Management Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Notebook/transfer_file.html">Transfer file into Notebook session</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Using_clipboard.html">Copy &amp; Paste Between Desktop Containers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Increase_font.html">Increase Font Size of Desktop Containers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../TipsTricks/Direct_url.html">Direct URL Upload/Download</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../ALMA_Desktop/start_casa.html">Starting CASA</a></li>
@@ -103,18 +122,13 @@ of one Desktop, one CARTA, and one Notebook session).</p>
 <li class="toctree-l1"><a class="reference internal" href="../ALMA_Desktop/archive_script_download.html">Download data from the ALMA archive (transfer script)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../ALMA_Desktop/typical_reduction.html">Example: reduce and image data</a></li>
 </ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_vostools.html">Using VOS Tools</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../General_tools/Using_clipboard.html">Copy &amp; Paste with the Clipboard</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../Notebook/transfer_file.html">Transfer file into Notebook session</a></li>
-</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="../index.html" title="previous chapter">Welcome to the documentation for CANFAR’s Science Portal!</a></li>
-      <li>Next: <a href="LaunchDesktop.html" title="next chapter">Launching a Desktop session</a></li>
+      <li>Previous: <a href="Overview.html" title="previous chapter">Portal Overview</a></li>
+      <li>Next: <a href="ProjectSpace.html" title="next chapter">Setting up a Project Space</a></li>
   </ul></li>
 </ul>
 </div>
@@ -127,7 +141,7 @@ of one Desktop, one CARTA, and one Notebook session).</p>
     </form>
     </div>
 </div>
-<script>$('#searchbox').show(0);</script>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -144,7 +158,7 @@ of one Desktop, one CARTA, and one Notebook session).</p>
       &copy;2022, CANFAR Science Portal.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.4.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
