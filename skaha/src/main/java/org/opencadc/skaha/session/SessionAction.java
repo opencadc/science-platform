@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -89,9 +90,15 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.text.DateFormat;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
@@ -368,35 +375,30 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public Session getSession(String forUserID, String sessionID) throws Exception {
+        // get session info
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getSessionCMD = new ArrayList<String>();
-        getSessionCMD.add("kubectl");
-        getSessionCMD.add("get");
-        getSessionCMD.add("--namespace");
-        getSessionCMD.add(k8sNamespace);
-        getSessionCMD.add("pod");
-        getSessionCMD.add("-l");
-        getSessionCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
-        getSessionCMD.add("--no-headers=true");
-        getSessionCMD.add("-o");
-        
-        String customColumns = "custom-columns=" +
-            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
-            "USERID:.metadata.labels.canfar-net-userid," +
-            "IMAGE:.spec.containers[0].image," +
-            "TYPE:.metadata.labels.canfar-net-sessionType," +
-            "STATUS:.status.phase," +
-            "NAME:.metadata.labels.canfar-net-sessionName," +
-            "STARTED:.status.startTime," +
-            "DELETION:.metadata.deletionTimestamp";
-        
-        getSessionCMD.add(customColumns);
-                
-        String vncSession = execute(getSessionCMD.toArray(new String[0]));
+        List<String> sessionCMD = getSessionCMD(k8sNamespace, forUserID, sessionID);
+        String vncSession = execute(sessionCMD.toArray(new String[0]));
         log.debug("VNC Session: " + vncSession);
        
         if (StringUtil.hasLength(vncSession)) {
             Session session = constructSession(vncSession.trim());
+            
+            // get expiry time 
+            List<String> sessionExpiryTimeCMD = getSessionExpiryTimeCMD(k8sNamespace, forUserID, sessionID);
+            String sessionExpiryTime = execute(sessionExpiryTimeCMD.toArray(new String[0]));
+            log.debug("Expiry time: " + sessionExpiryTime + " seconds");
+            Instant instant = Instant.parse(session.getStartTime());
+            instant = instant.plus(Integer.parseInt(sessionExpiryTime), ChronoUnit.SECONDS);
+            session.setExpiryTime(instant.toString());
+            
+            // get RAM and CPU usage
+            List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID, sessionID);
+            String sessionResourceUsage = execute(sessionResourceUsageCMD.toArray(new String[0]));
+            log.debug("Resource used: " + sessionResourceUsage);
+            String resourceUsage[] = sessionResourceUsage.trim().replaceAll("\\s+", " ").split(" ");
+            session.setCoresInUse(resourceUsage[1]);
+            session.setRAMInUse(resourceUsage[2]);
             return session;
         } else {
             throw new ResourceNotFoundException("session " + sessionID + " not found");
@@ -446,6 +448,68 @@ public abstract class SessionAction extends SkahaAction {
         return sessions;
     }
     
+    private List<String> getSessionCMD(String k8sNamespace, String forUserID, String sessionID) {
+        List<String> getSessionCMD = new ArrayList<String>();
+        getSessionCMD.add("kubectl");
+        getSessionCMD.add("get");
+        getSessionCMD.add("--namespace");
+        getSessionCMD.add(k8sNamespace);
+        getSessionCMD.add("pod");
+        getSessionCMD.add("-l");
+        getSessionCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getSessionCMD.add("--no-headers=true");
+        getSessionCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
+            "USERID:.metadata.labels.canfar-net-userid," +
+            "IMAGE:.spec.containers[0].image," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.phase," +
+            "NAME:.metadata.labels.canfar-net-sessionName," +
+            "STARTED:.status.startTime," +
+            "DELETION:.metadata.deletionTimestamp," +
+            "REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
+            "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
+            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia.com/gpu";
+        
+        getSessionCMD.add(customColumns);
+        return getSessionCMD;
+    }
+    
+    private List<String> getSessionExpiryTimeCMD(String k8sNamespace, String forUserID, String sessionID) {
+        List<String> getSessionJobCMD = new ArrayList<String>();
+        getSessionJobCMD.add("kubectl");
+        getSessionJobCMD.add("get");
+        getSessionJobCMD.add("--namespace");
+        getSessionJobCMD.add(k8sNamespace);
+        getSessionJobCMD.add("job");
+        getSessionJobCMD.add("-l");
+        getSessionJobCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getSessionJobCMD.add("--no-headers=true");
+        getSessionJobCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "EXPIRY:.spec.activeDeadlineSeconds";
+        
+        getSessionJobCMD.add(customColumns);
+        return getSessionJobCMD;
+    }
+    
+    private List<String> getSessionResourceUsageCMD(String k8sNamespace, String forUserID, String sessionID) {
+        List<String> getSessionJobCMD = new ArrayList<String>();
+        getSessionJobCMD.add("kubectl");
+        getSessionJobCMD.add("--namespace");
+        getSessionJobCMD.add(k8sNamespace);
+        getSessionJobCMD.add("top");
+        getSessionJobCMD.add("pod");
+        getSessionJobCMD.add("-l");
+        getSessionJobCMD.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getSessionJobCMD.add("--no-headers=true");
+        getSessionJobCMD.add("--use-protocol-buffers=true");
+        return getSessionJobCMD;
+    }
+    
     protected Session constructSession(String k8sOutput) throws IOException {
         log.debug("line: " + k8sOutput);
         String[] parts = k8sOutput.split("\\s+");
@@ -481,8 +545,17 @@ public abstract class SessionAction extends SkahaAction {
             connectURL = SessionAction.getContributedURL(host, id);
         }
 
-        return new Session(id, userid, image, type, status, name, startTime, connectURL);
-        
+        Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
+        if (parts.length > 8) {
+            String requestedRAM = parts[8];
+            String requestedCPUCores = parts[9];
+            String requestedGPUCores = parts[10];
+            session.setRequestedRAM(requestedRAM);
+            session.setRequestedCPUCores(requestedCPUCores);
+            session.setRequestedGPUCores(requestedGPUCores);
+        }
+
+        return session;
     }
     
 }
