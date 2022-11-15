@@ -471,7 +471,7 @@ public class PostAction extends SessionAction {
         String posixID = getPosixId();
         String supplementalGroups = getSupplementalGroupsList();
 
-        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-software.yaml";
+        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
 
         // incoming params ignored for the time being.  set to the 'name' so
