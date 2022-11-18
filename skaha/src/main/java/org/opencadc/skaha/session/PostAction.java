@@ -497,6 +497,7 @@ public class PostAction extends SessionAction {
         String gpuScheduling = getGPUScheduling(0);
         
         String launchString = new String(launchBytes, "UTF-8");
+        launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
