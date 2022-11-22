@@ -113,13 +113,13 @@ public class DeleteAction extends SessionAction {
                         // want to ignore them as we pick the session to be deleted.
                         for (String line : lines) {
                             String[] parts = line.split("\\s+");
-                            if (!TYPE_DESKTOP_APP.equals(parts[0])) {
+                            String type = parts[0];
+                            if (!TYPE_DESKTOP_APP.equals(type)) {
                                 String sessionUserId = parts[1];
                                 if (!userID.equals(sessionUserId)) {
                                     throw new AccessControlException("forbidden");
                                 }   
     
-                                String type = parts[0];
                                 stopSession(userID, type, sessionID);
                                 return;
                             }

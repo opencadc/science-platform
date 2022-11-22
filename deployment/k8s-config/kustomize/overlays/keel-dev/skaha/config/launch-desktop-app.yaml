@@ -12,6 +12,7 @@ spec:
   template:
     metadata:
       labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
         canfar-net-sessionType: "${skaha.sessiontype}"
         canfar-net-userid: "${skaha.userid}"
         job-name: "${software.jobname}"
