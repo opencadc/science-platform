@@ -57,7 +57,7 @@ firefox = canfar-registry.cloud.computecanada.ca/arcade-firefox:latest
 python = canfar-registry.cloud.computecanada.ca/arcade-python:latest
 ```
 
-### launch-novnc.yaml and launch-software.yaml
+### launch-novnc.yaml and launch-desktop-app.yaml
 
 These two kubernetes job configuration files are templates used by skaha to run desktop sessions and science containers.  See the examples in src/examples.
 
