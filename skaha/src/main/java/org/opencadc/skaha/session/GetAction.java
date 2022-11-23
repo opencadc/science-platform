@@ -242,6 +242,7 @@ public class GetAction extends SessionAction {
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");
             if (lines.length > 0) {
+                List<String> keywords = Arrays.asList("Name:", "Capacity:", "cpu:", "memory:");
                 String nodeName = "";
                 boolean hasName = false;
                 boolean hasCapacity = false;
@@ -249,49 +250,47 @@ public class GetAction extends SessionAction {
                 int[] resources = new int[2];
                 for (String line : lines) {
                     String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                    if ("Name:".equals(parts[0])) {
-                        if (!hasName && !hasCapacity && !hasCores) {
-                            nodeName = parts[1];
-                            hasName = true;
-                        } else {
-                            throw new IllegalStateException("Node name " + parts[0] + "was unexpected");
-                        }
-                    } else if ("Capacity:".equals(parts[0])) {
-                        if (hasName && !hasCapacity && !hasCores) {
-                            hasCapacity = true;
-                        } else {
-                            throw new IllegalStateException("Unexpeted 'Capabity' line");
-                        }
-                    } else if ("Allocatable:".equals(parts[0])) {
-                        if (hasName || hasCapacity || hasCores) {
-                            throw new IllegalStateException("Unexpeted 'Allocatable' line");
-                        }
-                    } else if ("cpu:".equals(parts[0])) {
-                        if (hasName && hasCapacity && !hasCores) {
-                            // number of cores from "Capabity.cpu"
-                            int cores = Integer.parseInt(parts[1]);
-                            resources[0] = cores;
-                            hasCores = true;
-                        } else if (!hasName && !hasCapacity && !hasCores) {
-                            // 'Allocatable.cpu' info, ignore
-                        } else {
-                            throw new IllegalStateException("Unexpected 'cpu' line");
-                        }
-                    } else if ("memory:".equals(parts[0])) {
-                        if (hasName && hasCapacity && hasCores) {
-                            // amount of RAM from "Capabity.memory" is in Ki
-                            int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim());
-                            resources[1] = ram;
-                            nodeToResourcesMap.put(nodeName, resources);
-                            nodeName = "";
-                            hasName = false;
-                            hasCapacity = false;
-                            hasCores = false;
-                            resources = new int[2];
-                        } else if (!hasName && !hasCapacity && !hasCores) {
-                            // 'Allocatable.memory' info, ignore
-                        } else {
-                            throw new IllegalStateException("Unexpected 'memory' line");
+                    if (keywords.stream().anyMatch(parts[0]::equals)) {
+                        if ("Name:".equals(parts[0])) {
+                            if (!hasName && !hasCapacity && !hasCores) {
+                                nodeName = parts[1];
+                                hasName = true;
+                            } else {
+                                throw new IllegalStateException("Unexpected 'Name:' line");
+                            }
+                        } else if ("Capacity:".equals(parts[0])) {
+                            if (hasName && !hasCapacity && !hasCores) {
+                                hasCapacity = true;
+                            } else {
+                                throw new IllegalStateException("Unexpected 'Capabity:' line");
+                            }
+                        } else if (hasCapacity) {
+                            if ("cpu:".equals(parts[0])) {
+                                if (hasName && !hasCores) {
+                                    // number of cores from "Capabity.cpu"
+                                    int cores = Integer.parseInt(parts[1]);
+                                    resources[0] = cores;
+                                    hasCores = true;
+                                } else {
+                                    throw new IllegalStateException("Unexpected 'cpu:' line");
+                                }
+                            } else {
+                                // "memory:" equals parts[0] 
+                                if (hasName && hasCores) {
+                                    // finish processing the resources of a node
+                                    // amount of RAM from "Capabity.memory" is in Ki
+                                    int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim());
+                                    resources[1] = ram;
+                                    nodeToResourcesMap.put(nodeName, resources);
+                                    nodeName = "";
+                                    hasName = false;
+                                    hasCapacity = false;
+                                    hasCores = false;
+                                    resources = new int[2];
+                                } else {
+                                    throw new IllegalStateException("Unexpected 'memory:' line");
+                                }
+                            }
                         }
                     }
                 }
