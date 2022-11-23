@@ -299,7 +299,8 @@ public class PostAction extends SessionAction {
         int count = 0;
         for (Session session : sessions) {
             log.debug("checking session: " + session);
-            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())) {
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
+                !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
                       status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
@@ -471,7 +472,7 @@ public class PostAction extends SessionAction {
         String posixID = getPosixId();
         String supplementalGroups = getSupplementalGroupsList();
 
-        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-software.yaml";
+        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
 
         // incoming params ignored for the time being.  set to the 'name' so
@@ -497,6 +498,7 @@ public class PostAction extends SessionAction {
         String gpuScheduling = getGPUScheduling(0);
         
         String launchString = new String(launchBytes, "UTF-8");
+        launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);

@@ -14,7 +14,7 @@ configMapGenerator:
   - config/launch-desktop.yaml
   - config/launch-contributed.yaml
   - config/launch-headless.yaml
-  - config/launch-software.yaml
+  - config/launch-desktop-app.yaml
   - config/k8s-resources.properties
   - config/service-notebook.yaml
   - config/ingress-notebook.yaml

@@ -105,24 +105,33 @@ public class DeleteAction extends SessionAction {
                         "USERID:.metadata.labels.canfar-net-userid"};
                         
                 String session = execute(getSessionCMD);
-                if (!StringUtil.hasText(session)) {
-                    throw new ResourceNotFoundException(sessionID);
+                if (StringUtil.hasText(session)) {
+                    String[] lines = session.split("\n");
+                    if (lines.length > 0) {
+                        // sessionID was added to desktop-app. This resulted in the 
+                        // above kubectl command returning desktop-app as well. We 
+                        // want to ignore them as we pick the session to be deleted.
+                        for (String line : lines) {
+                            String[] parts = line.split("\\s+");
+                            String type = parts[0];
+                            if (!TYPE_DESKTOP_APP.equals(type)) {
+                                String sessionUserId = parts[1];
+                                if (!userID.equals(sessionUserId)) {
+                                    throw new AccessControlException("forbidden");
+                                }   
+    
+                                stopSession(userID, type, sessionID);
+                                return;
+                            }
+                        }
+                    }
                 }
-                String[] lines = session.split("\n");
-                if (lines.length != 1) {
-                    throw new IllegalStateException("found multiple sessions with id " + sessionID);
-                }
-                String[] parts = lines[0].split("\\s+");
-                String type = parts[0];
-                String sessionUserid = parts[1];
-                if (!userID.equals(sessionUserid)) {
-                    throw new AccessControlException("forbidden");
-                }   
                 
-                stopSession(userID, type, sessionID);
+                // no session to delete
+                throw new ResourceNotFoundException(sessionID);
             }
-            return;
         }
+
         if (requestType.equals(REQUEST_TYPE_APP)) {
             throw new UnsupportedOperationException("App killing not supported.");
         }
