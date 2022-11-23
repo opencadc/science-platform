@@ -299,7 +299,8 @@ public class PostAction extends SessionAction {
         int count = 0;
         for (Session session : sessions) {
             log.debug("checking session: " + session);
-            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())) {
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
+                !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
                       status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
