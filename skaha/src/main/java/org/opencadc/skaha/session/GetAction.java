@@ -191,7 +191,7 @@ public class GetAction extends SessionAction {
             return new ResourceStats(desktopCount, headlessCount, totalCount, coresInUse, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.properties", e);
+            throw new IllegalStateException("failed to gather resource statistics", e);
         }
     }
     
