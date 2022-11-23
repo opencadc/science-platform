@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
