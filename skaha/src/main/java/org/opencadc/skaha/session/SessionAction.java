@@ -408,7 +408,7 @@ public abstract class SessionAction extends SkahaAction {
                     Instant instant = Instant.parse(session.getStartTime());
                     String expiryTimesStr = expiryTimes.get(uid);
                     if (expiryTimesStr != null) {
-                        instant = instant.plus(Integer.parseInt(expiryTimes.get(uid)), ChronoUnit.SECONDS);
+                        instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
                     }
                     session.setExpiryTime(instant.toString());
 
