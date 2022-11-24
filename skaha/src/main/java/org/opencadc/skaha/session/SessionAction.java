@@ -453,12 +453,7 @@ public abstract class SessionAction extends SkahaAction {
                 }
             }
         } catch (IOException ex) {
-            if (ex.getMessage().contains("Metrics not available")) {
-                // no session using any resources, return empty resourceUsages
-            } else {
-                // other errors, propagate the exception
-                throw ex;
-            }
+            // error or no session using any resources, return empty resourceUsages
         }
 
         return resourceUsages;
