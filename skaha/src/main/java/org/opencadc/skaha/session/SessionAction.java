@@ -454,6 +454,7 @@ public abstract class SessionAction extends SkahaAction {
             }
         } catch (IOException ex) {
             // error or no session using any resources, return empty resourceUsages
+            log.debug("failed to query for metrics", ex);
         }
 
         return resourceUsages;
