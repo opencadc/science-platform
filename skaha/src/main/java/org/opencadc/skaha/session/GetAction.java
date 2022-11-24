@@ -291,7 +291,7 @@ public class GetAction extends SessionAction {
                         }
                     }
                 }
-
+                // We have finished processing all nodes, all flags should have been cleared. 
                 if (hasName || hasCapacity || hasCores) {
                     throw new IllegalStateException("Not all resources were processed.");
                 }
