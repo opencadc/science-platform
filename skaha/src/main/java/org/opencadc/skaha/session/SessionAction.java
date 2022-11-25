@@ -406,7 +406,10 @@ public abstract class SessionAction extends SkahaAction {
                     // get expiry time 
                     String uid = getUID(line);
                     Instant instant = Instant.parse(session.getStartTime());
-                    instant = instant.plus(Integer.parseInt(expiryTimes.get(uid)), ChronoUnit.SECONDS);
+                    String expiryTimesStr = expiryTimes.get(uid);
+                    if (expiryTimesStr != null) {
+                        instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                    }
                     session.setExpiryTime(instant.toString());
 
                     // get RAM and CPU usage
@@ -453,12 +456,8 @@ public abstract class SessionAction extends SkahaAction {
                 }
             }
         } catch (IOException ex) {
-            if (ex.getMessage().contains("Metrics not available")) {
-                // no session using any resources, return empty resourceUsages
-            } else {
-                // other errors, propagate the exception
-                throw ex;
-            }
+            // error or no session using any resources, return empty resourceUsages
+            log.debug("failed to query for metrics", ex);
         }
 
         return resourceUsages;
