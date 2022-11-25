@@ -38,7 +38,7 @@ spec:
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.9.4
+        image: images.canfar.net/skaha-system/skaha:0.9.6
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
