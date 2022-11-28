@@ -401,16 +401,22 @@ public abstract class SessionAction extends SkahaAction {
 
             String[] lines = sessionList.split("\n");
             for (String line : lines) {
-                Session session = constructSession(line.trim());
+                Session session = constructSession(line);
                 if (forUserID != null) {
                     // get expiry time 
                     String uid = getUID(line);
-                    Instant instant = Instant.parse(session.getStartTime());
-                    String expiryTimesStr = expiryTimes.get(uid);
-                    if (expiryTimesStr != null) {
-                        instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                    String startTimeStr = session.getStartTime();
+                    if (startTimeStr.equalsIgnoreCase("<none>")) {
+                        session.setExpiryTime(startTimeStr);
+                    } else {
+                        Instant instant = Instant.parse(startTimeStr);
+                        String expiryTimesStr = expiryTimes.get(uid);
+                        if (expiryTimesStr == null) {
+                            session.setExpiryTime("<none>");
+                        } else {
+                            instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                        }
                     }
-                    session.setExpiryTime(instant.toString());
 
                     // get RAM and CPU usage
                     String fullName = getFullName(line);
@@ -481,7 +487,7 @@ public abstract class SessionAction extends SkahaAction {
     
     private String getFullName(String line) {
         String name = "";
-        String[] parts = line.split("\\s+");
+        String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
         if (parts.length > 8) {
             name = parts[parts.length - 2];
         }
@@ -491,7 +497,7 @@ public abstract class SessionAction extends SkahaAction {
     
     private String getUID(String line) {
         String uid = "";
-        String[] parts = line.split("\\s+");
+        String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
         if (parts.length > 8) {
             uid = parts[parts.length - 1];
         }
@@ -576,7 +582,7 @@ public abstract class SessionAction extends SkahaAction {
     
     protected Session constructSession(String k8sOutput) throws IOException {
         log.debug("line: " + k8sOutput);
-        String[] parts = k8sOutput.split("\\s+");
+        String[] parts = k8sOutput.trim().replaceAll("\\s+", " ").split(" ");
         String id = parts[0];
         String userid = parts[1];
         String image = parts[2];
