@@ -163,6 +163,7 @@ public class GetAction extends SessionAction {
             int withCores = 0;
             int withRAM = 0;
             Map<String, Integer> rCPUCoreMap = getCPUCores(k8sNamespace);
+            log.debug("done getting CPU cores");
             Map<String, int[]> aResourceMap = getAvailableResources(k8sNamespace);
             List<String> nodeNames = rCPUCoreMap.keySet().stream().collect(Collectors.toList());
             for (String nodeName : nodeNames) {
@@ -236,7 +237,9 @@ public class GetAction extends SessionAction {
 
     private Map<String, int[]> getAvailableResources(String k8sNamespace) throws Exception {
         String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
+        log.debug("command to get available resources: " + getAvailableResourcesCmd);
         String rawResources = execute(getAvailableResourcesCmd.split(" "));
+        log.debug("got the described nodes");
         Map<String, int[]> nodeToResourcesMap = new HashMap<String, int[]>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");
