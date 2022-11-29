@@ -16,8 +16,6 @@ RUN set -x && \
     kubectl version --client
 
 # Install kubectl
-#RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kubectl && \
-#RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.10.11/bin/linux/amd64/kubectl && \
 #RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.22.13/bin/linux/amd64/kubectl && \
 #  chmod +x /usr/bin/kubectl && \
 #  kubectl version --client
