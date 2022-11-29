@@ -214,6 +214,7 @@ public class GetAction extends SessionAction {
                         if (nodeName.length() > 0) {
                             // processing first line of a subsequent nodeName
                             nodeToCoresMap.put(nodeName, nodeCPUCores);
+                            log.debug("Node: " + nodeName + " Cores: " + nodeCPUCores);
                             nodeName = parts[0];
                             nodeCPUCores = Integer.parseInt(parts[2]);
                         } else {
