@@ -195,12 +195,12 @@ public abstract class SessionAction extends SkahaAction {
     
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
-        int status = p.waitFor();
-        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
         String stdout = readStream(p.getInputStream());
         String stderr = readStream(p.getErrorStream());
         log.debug("stdout: " + stdout);
         log.debug("stderr: " + stderr);
+        int status = p.waitFor();
+        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
         if (status != 0) {
             if (allowError) {
                 return stderr;
