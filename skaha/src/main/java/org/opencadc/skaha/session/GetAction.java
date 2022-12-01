@@ -153,10 +153,10 @@ public class GetAction extends SessionAction {
         List<Session> sessions = getAllSessions(null);
         int desktopCount = filter(sessions, "desktop-app", "Running").size();
         int headlessCount = filter(sessions, "headless", "Running").size();
-        int totalCount = sessions.size();
+        int totalCount = filter(sessions, null, "Running").size();
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         try {
-            int coresInUse = 0;
+            int requestedCPUCores = 0;
             int coresAvailable = 0;
             int maxCores = 0;
             int maxRAM = 0;
@@ -184,7 +184,7 @@ public class GetAction extends SessionAction {
                 }
                 
                 int rCPUCores = rCPUCoreMap.get(nodeName);
-                coresInUse = coresInUse + rCPUCores;
+                requestedCPUCores = requestedCPUCores + rCPUCores;
                 coresAvailable = coresAvailable + aCPUCores;
                 log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aRAM + " Ki");
             }
@@ -192,7 +192,7 @@ public class GetAction extends SessionAction {
             // convert RAM unit from Ki to Gi
             String withRAMStr = String.valueOf(withRAM/1048576) + "Gi";
             String maxRAMStr = String.valueOf(maxRAM/1048576) + "Gi";
-            return new ResourceStats(desktopCount, headlessCount, totalCount, coresInUse, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
+            return new ResourceStats(desktopCount, headlessCount, totalCount, requestedCPUCores, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);

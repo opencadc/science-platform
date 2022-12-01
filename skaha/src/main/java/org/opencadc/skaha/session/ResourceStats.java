@@ -81,7 +81,7 @@ public class ResourceStats {
     private Ram ram;
 
     public ResourceStats(int desktopCount, int headlessCount, int totalCount, 
-            int coresInUse, int coresAvailable, int mCores, String withRAM, String mRAM, int withCores) {
+            int requestedCPUCores, int coresAvailable, int mCores, String withRAM, String mRAM, int withCores) {
         instances = new JobInstances(desktopCount, headlessCount, totalCount);
 
         MaxCoreResource maxCores = new MaxCoreResource();
@@ -90,7 +90,7 @@ public class ResourceStats {
         cores = new Core();
         cores.maxCores = maxCores;
         cores.coresAvailable = coresAvailable;
-        cores.coresInUse = coresInUse;
+        cores.requestedCPUCores = requestedCPUCores;
 
         MaxRamResource maxRAM = new MaxRamResource();
         maxRAM.ram = mRAM;
@@ -114,7 +114,7 @@ public class ResourceStats {
     }
     
     class Core {
-        int coresInUse = 0;
+        int requestedCPUCores = 0;
         int coresAvailable = 0;
         MaxCoreResource maxCores;
     }
