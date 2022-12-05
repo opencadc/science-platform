@@ -32,13 +32,15 @@ spec:
           value: skaha-workload
         - name: skaha.maxusersessions
           value: "3"
+        - name: skaha.sessionexpiry
+          value: "1209600"
         - name: skaha.harborhosts
           value: "images.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.9.9
+        image: images.canfar.net/skaha-system/skaha:0.9.10
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat

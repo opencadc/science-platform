@@ -81,6 +81,7 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -115,6 +116,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
     public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
+    public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
@@ -214,7 +216,17 @@ public class PostAction extends SessionAction {
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
                 
             } else {
-                throw new UnsupportedOperationException("Cannot modify an existing session.");
+                String action = syncInput.getParameter("action");
+                if (action.equalsIgnoreCase("renew")) {
+                    String jobName = getJobName(userID, sessionID);
+                    if (StringUtil.hasLength(jobName)) {
+                        renew(jobName);
+                    } else {
+                        throw new IllegalArgumentException("No active job for user " + userID + " with session " + sessionID);
+                    }
+                } else {
+                    throw new UnsupportedOperationException("Cannot modify an existing session.");
+                }
             }
             return;
         }
@@ -236,6 +248,70 @@ public class PostAction extends SessionAction {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
             }
         }
+    }
+    
+    private void renew(String jobName) throws IOException, InterruptedException {
+        String activeDeadlineSeconds = System.getProperty(SKAHA_SESSIONEXPIRY);
+        if (StringUtil.hasLength(activeDeadlineSeconds)) {
+            String k8sNamespace = K8SUtil.getWorkloadNamespace();
+            List<String> getJobNameCmd = new ArrayList<String>();
+            getJobNameCmd.add("kubectl");
+            getJobNameCmd.add("--namespace");
+            getJobNameCmd.add(k8sNamespace);
+            getJobNameCmd.add("patch");
+            getJobNameCmd.add("job");
+            getJobNameCmd.add(jobName);
+            getJobNameCmd.add("--type=json");
+            getJobNameCmd.add("-p");
+            getJobNameCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + activeDeadlineSeconds + "}]");
+            
+            execute(getJobNameCmd.toArray(new String[0]));
+        } else {
+            throw new IllegalStateException("failed to obtain session expiry time");
+        }
+    }
+    
+    private String getJobName(String forUserID, String sessionID) throws Exception {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getJobNameCmd = new ArrayList<String>();
+        getJobNameCmd.add("kubectl");
+        getJobNameCmd.add("get");
+        getJobNameCmd.add("--namespace");
+        getJobNameCmd.add(k8sNamespace);
+        getJobNameCmd.add("job");
+        getJobNameCmd.add("-l");
+        getJobNameCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getJobNameCmd.add("--no-headers=true");
+        getJobNameCmd.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "custom-columns=NAME:.metadata.name," + 
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "STATUS:.status.active";
+        
+        getJobNameCmd.add(customColumns);
+                
+        String jobNameStr = execute(getJobNameCmd.toArray(new String[0]));
+        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + jobNameStr);
+       
+        String jobName = null;
+        if (StringUtil.hasLength(jobNameStr)) {
+            String[] lines = jobNameStr.split("\n");
+            if (lines.length > 0) {
+                for (String line : lines) {
+                    String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
+                    String sessionType = parts[1];
+                    boolean isActive = Integer.parseInt(parts[2]) == 1;
+                    // look for the job ID of an active session
+                    if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(sessionType) &&
+                        !TYPE_DESKTOP_APP.equals(sessionType) && isActive) {
+                        jobName = parts[0];
+                    }
+                }
+            }
+        }
+
+        return jobName;
     }
     
     private void validateName(String name) {
@@ -367,6 +443,7 @@ public class PostAction extends SessionAction {
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, System.getProperty(SKAHA_SESSIONEXPIRY));
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
@@ -505,6 +582,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
+        launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, System.getProperty(SKAHA_SESSIONEXPIRY));
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
