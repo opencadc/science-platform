@@ -8,7 +8,7 @@ metadata:
     canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
 spec:
-  activeDeadlineSeconds: "${skaha.sessionexpiry}"
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
     metadata:

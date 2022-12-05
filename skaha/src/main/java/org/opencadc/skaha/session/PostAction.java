@@ -251,7 +251,7 @@ public class PostAction extends SessionAction {
     }
     
     private void renew(String jobName) throws IOException, InterruptedException {
-        String activeDeadlineSeconds = System.getProperty(SKAHA_SESSIONEXPIRY);
+        String activeDeadlineSeconds = K8SUtil.getSessionExpiry();
         if (StringUtil.hasLength(activeDeadlineSeconds)) {
             String k8sNamespace = K8SUtil.getWorkloadNamespace();
             List<String> getJobNameCmd = new ArrayList<String>();
@@ -443,7 +443,7 @@ public class PostAction extends SessionAction {
         
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, System.getProperty(SKAHA_SESSIONEXPIRY));
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
@@ -582,7 +582,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, System.getProperty(SKAHA_SESSIONEXPIRY));
+        launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
