@@ -218,9 +218,11 @@ public class PostAction extends SessionAction {
             } else {
                 String action = syncInput.getParameter("action");
                 if (action.equalsIgnoreCase("renew")) {
-                    String jobName = getJobName(userID, sessionID);
-                    if (StringUtil.hasLength(jobName)) {
-                        renew(jobName);
+                    List<String> jobNames = getRenewJobNames(userID, sessionID);
+                    if (!jobNames.isEmpty()) {
+                        for (String jobName : jobNames) {
+                            renew(jobName);
+                        }
                     } else {
                         throw new IllegalArgumentException("No active job for user " + userID + " with session " + sessionID);
                     }
@@ -254,64 +256,63 @@ public class PostAction extends SessionAction {
         String activeDeadlineSeconds = K8SUtil.getSessionExpiry();
         if (StringUtil.hasLength(activeDeadlineSeconds)) {
             String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            List<String> getJobNameCmd = new ArrayList<String>();
-            getJobNameCmd.add("kubectl");
-            getJobNameCmd.add("--namespace");
-            getJobNameCmd.add(k8sNamespace);
-            getJobNameCmd.add("patch");
-            getJobNameCmd.add("job");
-            getJobNameCmd.add(jobName);
-            getJobNameCmd.add("--type=json");
-            getJobNameCmd.add("-p");
-            getJobNameCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + activeDeadlineSeconds + "}]");
+            List<String> renewExpiryTimeCmd = new ArrayList<String>();
+            renewExpiryTimeCmd.add("kubectl");
+            renewExpiryTimeCmd.add("--namespace");
+            renewExpiryTimeCmd.add(k8sNamespace);
+            renewExpiryTimeCmd.add("patch");
+            renewExpiryTimeCmd.add("job");
+            renewExpiryTimeCmd.add(jobName);
+            renewExpiryTimeCmd.add("--type=json");
+            renewExpiryTimeCmd.add("-p");
+            renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + activeDeadlineSeconds + "}]");
             
-            execute(getJobNameCmd.toArray(new String[0]));
+            execute(renewExpiryTimeCmd.toArray(new String[0]));
         } else {
             throw new IllegalStateException("failed to obtain session expiry time");
         }
     }
     
-    private String getJobName(String forUserID, String sessionID) throws Exception {
+    private List<String> getRenewJobNames(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getJobNameCmd = new ArrayList<String>();
-        getJobNameCmd.add("kubectl");
-        getJobNameCmd.add("get");
-        getJobNameCmd.add("--namespace");
-        getJobNameCmd.add(k8sNamespace);
-        getJobNameCmd.add("job");
-        getJobNameCmd.add("-l");
-        getJobNameCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
-        getJobNameCmd.add("--no-headers=true");
-        getJobNameCmd.add("-o");
+        List<String> getRenewJobNamesCmd = new ArrayList<String>();
+        getRenewJobNamesCmd.add("kubectl");
+        getRenewJobNamesCmd.add("get");
+        getRenewJobNamesCmd.add("--namespace");
+        getRenewJobNamesCmd.add(k8sNamespace);
+        getRenewJobNamesCmd.add("job");
+        getRenewJobNamesCmd.add("-l");
+        getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getRenewJobNamesCmd.add("--no-headers=true");
+        getRenewJobNamesCmd.add("-o");
         
         String customColumns = "custom-columns=" +
             "custom-columns=NAME:.metadata.name," + 
             "TYPE:.metadata.labels.canfar-net-sessionType," +
             "STATUS:.status.active";
         
-        getJobNameCmd.add(customColumns);
+        getRenewJobNamesCmd.add(customColumns);
                 
-        String jobNameStr = execute(getJobNameCmd.toArray(new String[0]));
-        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + jobNameStr);
+        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
+        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
        
-        String jobName = null;
-        if (StringUtil.hasLength(jobNameStr)) {
-            String[] lines = jobNameStr.split("\n");
+        List<String> renewJobNames = new ArrayList<String>();
+        if (StringUtil.hasLength(renewJobNamesStr)) {
+            String[] lines = renewJobNamesStr.split("\n");
             if (lines.length > 0) {
                 for (String line : lines) {
                     String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
                     String sessionType = parts[1];
-                    boolean isActive = Integer.parseInt(parts[2]) == 1;
+                    String isActiveStr = parts[2];
                     // look for the job ID of an active session
-                    if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(sessionType) &&
-                        !TYPE_DESKTOP_APP.equals(sessionType) && isActive) {
-                        jobName = parts[0];
+                    if (!"<none>".equalsIgnoreCase(isActiveStr) && (Integer.parseInt(isActiveStr) == 1)) {
+                        renewJobNames.add(parts[0]);
                     }
                 }
             }
         }
 
-        return jobName;
+        return renewJobNames;
     }
     
     private void validateName(String name) {
