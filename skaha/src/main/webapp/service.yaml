@@ -149,6 +149,35 @@ paths:
           type: string
           description: If set to 'event', return the scheduling event logs.  If set to 'logs', return the container logs in text/plain format.  Responses are in text/plain format.
           required: false
+    post:
+      description: |
+        Applies an action to the session identified by sessionID.  This applies to all session types. For a 'desktop' session, the action will apply to the 'desktop' session as well as all of the 'desktop-app' that share the same sessionID.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          type: string
+          description: The session on which to apply the action.
+          required: true
+        - name: action
+          in: query
+          type: string
+          description: The action to be applied to the session. Currently the applicable action is 'renew' which sets the session expiry time to the configured activeDeadlineSeconds.
+          required: true
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
     delete:
       description: |
         Delete the session identified by sessionID.
