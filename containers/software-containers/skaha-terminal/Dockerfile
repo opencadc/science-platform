@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && yes | unminimize 
 RUN apt-get update && yes | apt-get install wget man man-db manpages-posix git \
     build-essential zip unzip xdg-utils less emacs nano xterm vim rsync tree gfortran-9 \
-    gimp gimp-gmic acl attr
+    gimp gimp-gmic acl attr mc subversion
 RUN ln -s /usr/bin/gfortran-9 /usr/bin/gfortran
 RUN wget https://repo.anaconda.com/archive/Anaconda3-2020.07-Linux-x86_64.sh -O /tmp/anaconda.sh
 
