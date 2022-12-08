@@ -44,10 +44,10 @@ spec:
         name: skaha-tomcat
         resources:
           requests:
-            memory: "4Gi"
+            memory: "10Gi"
             cpu: "10"
           limits:
-            memory: "8Gi"
+            memory: "30Gi"
             cpu: "20"
         ports:
         - containerPort: 8080
