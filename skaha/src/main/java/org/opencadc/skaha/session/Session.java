@@ -88,13 +88,13 @@ public class Session {
     private String status;
     private String name;
     private String startTime;
+    private String expiryTime;            // in seconds
     private String connectURL;
     private String requestedRAM;
     private String requestedCPUCores;
     private String requestedGPUCores;
     private String coresInUse;
     private String ramInUse;
-    private String expiryTime;            // in seconds
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
         if (id == null) {
