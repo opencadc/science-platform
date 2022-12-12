@@ -217,17 +217,21 @@ public class PostAction extends SessionAction {
                 
             } else {
                 String action = syncInput.getParameter("action");
-                if (action.equalsIgnoreCase("renew")) {
-                    List<String> jobNames = getRenewJobNames(userID, sessionID);
-                    if (!jobNames.isEmpty()) {
-                        for (String jobName : jobNames) {
-                            renew(jobName);
+                if (StringUtil.hasLength(action)) {
+                    if (action.equalsIgnoreCase("renew")) {
+                        List<String> jobNames = getRenewJobNames(userID, sessionID);
+                        if (!jobNames.isEmpty()) {
+                            for (String jobName : jobNames) {
+                                renew(jobName);
+                            }
+                        } else {
+                            throw new IllegalArgumentException("No active job for user " + userID + " with session " + sessionID);
                         }
                     } else {
-                        throw new IllegalArgumentException("No active job for user " + userID + " with session " + sessionID);
+                        throw new UnsupportedOperationException("unrecognized action");
                     }
                 } else {
-                    throw new UnsupportedOperationException("Cannot modify an existing session.");
+                    throw new UnsupportedOperationException("Cannot modify an existing session");
                 }
             }
             return;
@@ -269,7 +273,7 @@ public class PostAction extends SessionAction {
             
             execute(renewExpiryTimeCmd.toArray(new String[0]));
         } else {
-            throw new IllegalStateException("failed to obtain session expiry time");
+            throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
         }
     }
     
