@@ -125,11 +125,11 @@ public class ResourceStats {
 
     class MaxCoreResource {
         public int cores = 0;
-        public String withRam = "0Gi";
+        public String withRam = "0G";
     }
 
     class MaxRamResource {
-        public String ram = "0Gi";
+        public String ram = "0G";
         public int withCores = 0;
     }
 }

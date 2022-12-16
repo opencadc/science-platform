@@ -379,9 +379,9 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "G");
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram.toString() + "G");
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
         
         String jsonLaunchFile = super.stageFile(jobLaunchString);

@@ -433,8 +433,8 @@ public abstract class SessionAction extends SkahaAction {
                             session.setCoresInUse("<none>");
                             session.setRAMInUse("<none>");
                         } else {
-                            session.setCoresInUse(resourceUsage[0]);
-                            session.setRAMInUse(resourceUsage[1]);
+                            session.setCoresInUse(toCoreUnit(resourceUsage[0]));
+                            session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
                     }
                 }
@@ -444,6 +444,37 @@ public abstract class SessionAction extends SkahaAction {
         }
         
         return sessions;
+    }
+    
+    private String toCoreUnit(String cores) {
+        String ret = "<none>";
+        if (StringUtil.hasLength(cores)) {
+            if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
+                // in "m" (millicore) unit, covert to cores
+                String milliCoreString = cores.substring(0, cores.length() - 1);
+                Integer milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1)); 
+                ret = ((Double) (milliCores/Math.pow(10, 3))).toString();
+            } else {
+                ret = cores;
+            }
+        } 
+        
+        return ret;
+    }
+    
+    private String toCommonUnit(String inK8sUnit) {
+        String ret = "<none>";
+        if (StringUtil.hasLength(inK8sUnit)) {
+            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
+                // unit is in Ki, Mi, Gi, etc., remove the i
+                ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
+            } else {
+                // unit is already in K, M, G, etc.
+                ret = inK8sUnit;
+            }
+        } 
+        
+        return ret;
     }
     
     private Map<String, String[]> getResourceUsages(String k8sNamespace, String forUserID) throws Exception {

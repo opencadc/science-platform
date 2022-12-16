@@ -186,12 +186,12 @@ public class GetAction extends SessionAction {
                 int rCPUCores = rCPUCoreMap.get(nodeName);
                 requestedCPUCores = requestedCPUCores + rCPUCores;
                 coresAvailable = coresAvailable + aCPUCores;
-                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aRAM + " Ki");
+                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aRAM + " K");
             }
 
-            // convert RAM unit from Ki to Gi
-            String withRAMStr = String.valueOf(withRAM/1048576) + "Gi";
-            String maxRAMStr = String.valueOf(maxRAM/1048576) + "Gi";
+            // amount of RAM is in 'Ki' unit, use the commonly accepted 'K' unit
+            String withRAMStr = String.valueOf(withRAM) + "K";
+            String maxRAMStr = String.valueOf(maxRAM) + "K";
             return new ResourceStats(desktopCount, headlessCount, totalCount, requestedCPUCores, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
         } catch (Exception e) {
             log.error(e);
@@ -302,7 +302,7 @@ public class GetAction extends SessionAction {
                                     // finish processing the resources of a node
                                     nodeToResourcesMap.put(nodeName, resources);
                                     hasAllocatable = true;
-                                    log.debug("node: " + nodeName + ", cores=" + resources[0] + ", RAM=" + resources[1] +"Ki");
+                                    log.debug("node: " + nodeName + ", cores=" + resources[0] + ", RAM=" + resources[1] +"K");
                                 }
                             }
                         }
