@@ -446,15 +446,15 @@ public abstract class SessionAction extends SkahaAction {
         return sessions;
     }
     
-    private String toCoreUnit(String cores) {
+    protected String toCoreUnit(String cores) {
         String ret = "<none>";
         if (StringUtil.hasLength(cores)) {
             if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
                 // in "m" (millicore) unit, covert to cores
-                String milliCoreString = cores.substring(0, cores.length() - 1);
                 Integer milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1)); 
                 ret = ((Double) (milliCores/Math.pow(10, 3))).toString();
             } else {
+                // use value as is, can be '<none>' or some value
                 ret = cores;
             }
         } 
@@ -462,14 +462,14 @@ public abstract class SessionAction extends SkahaAction {
         return ret;
     }
     
-    private String toCommonUnit(String inK8sUnit) {
+    protected String toCommonUnit(String inK8sUnit) {
         String ret = "<none>";
         if (StringUtil.hasLength(inK8sUnit)) {
             if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
                 // unit is in Ki, Mi, Gi, etc., remove the i
                 ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
             } else {
-                // unit is already in K, M, G, etc.
+                // use value as is, can be '<none>' or some value
                 ret = inK8sUnit;
             }
         } 
@@ -651,9 +651,9 @@ public abstract class SessionAction extends SkahaAction {
             String requestedRAM = parts[8];
             String requestedCPUCores = parts[9];
             String requestedGPUCores = parts[10];
-            session.setRequestedRAM(requestedRAM);
-            session.setRequestedCPUCores(requestedCPUCores);
-            session.setRequestedGPUCores(requestedGPUCores);
+            session.setRequestedRAM(toCommonUnit(requestedRAM));
+            session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
+            session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));
         }
 
         return session;

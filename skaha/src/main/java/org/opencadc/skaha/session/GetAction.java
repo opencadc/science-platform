@@ -73,11 +73,16 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.io.OutputStream;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
@@ -91,6 +96,8 @@ import org.opencadc.skaha.K8SUtil;
 public class GetAction extends SessionAction {
     
     private static final Logger log = Logger.getLogger(GetAction.class);
+    private static final Set<Character> VALID_RAM_UNITS = new HashSet<>(Arrays.asList('T','t','G','g','M','m','K','k'));
+    private static final DecimalFormat formatter = new DecimalFormat("#.###", DecimalFormatSymbols.getInstance( Locale.ENGLISH ));
 
     public GetAction() {
         super();
@@ -159,44 +166,70 @@ public class GetAction extends SessionAction {
             int requestedCPUCores = 0;
             int coresAvailable = 0;
             int maxCores = 0;
-            int maxRAM = 0;
+            long maxRAM = 0;
             int withCores = 0;
-            int withRAM = 0;
+            String withRAM = "0G";
             Map<String, Integer> rCPUCoreMap = getCPUCores(k8sNamespace);
-            Map<String, int[]> aResourceMap = getAvailableResources(k8sNamespace);
+            Map<String, String[]> aResourceMap = getAvailableResources(k8sNamespace);
             List<String> nodeNames = rCPUCoreMap.keySet().stream().collect(Collectors.toList());
             for (String nodeName : nodeNames) {
-                int[] aResources = aResourceMap.get(nodeName);
-                if (aResources == null) {
-                    aResources = new int[] {0, 0};
+                String[] aResources = aResourceMap.get(nodeName);
+                if (aResources != null) {
+                    int aCPUCores = Integer.parseInt(aResources[0]);
+                    if (aCPUCores > maxCores) {
+                        maxCores = aCPUCores;
+                        withRAM = toCommonUnit(aResources[1]);
+                    }
+                    
+                    long aRAM = normalizeToLong(toCommonUnit(aResources[1]));
+                    if (aRAM > maxRAM) {
+                        maxRAM = aRAM;
+                        withCores= aCPUCores;
+                    }
+                    
+                    int rCPUCores = rCPUCoreMap.get(nodeName);
+                    requestedCPUCores = requestedCPUCores + rCPUCores;
+                    coresAvailable = coresAvailable + aCPUCores;
+                    log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + formatter.format(Double.valueOf(aRAM)/(1024 * 1024 * 1024)) + " G");
                 }
-
-                int aCPUCores = aResources[0];
-                if (aCPUCores > maxCores) {
-                    maxCores = aCPUCores;
-                    withRAM = aResources[1];
-                }
-                
-                int aRAM = aResources[1];
-                if (aRAM > maxRAM) {
-                    maxRAM = aRAM;
-                    withCores= aCPUCores;
-                }
-                
-                int rCPUCores = rCPUCoreMap.get(nodeName);
-                requestedCPUCores = requestedCPUCores + rCPUCores;
-                coresAvailable = coresAvailable + aCPUCores;
-                log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + aRAM + " K");
             }
 
             // amount of RAM is in 'Ki' unit, use the commonly accepted 'K' unit
-            String withRAMStr = String.valueOf(withRAM) + "K";
-            String maxRAMStr = String.valueOf(maxRAM) + "K";
+            /*
+            String withRAMStr = String.valueOf(formatter.format(Double.valueOf(normalizeToLong(withRAM))/(1024 * 1024 * 1024))) + "G";
+            String maxRAMStr = String.valueOf(formatter.format(Double.valueOf(maxRAM)/(1024 * 1024 * 1024))) + "G";
+            */
+            String withRAMStr = formatter.format(Double.valueOf((normalizeToLong(withRAM))/(1024 * 1024 * 1024))) + "G";
+            String maxRAMStr = formatter.format(Double.valueOf((maxRAM)/(1024 * 1024 * 1024))) + "G";
             return new ResourceStats(desktopCount, headlessCount, totalCount, requestedCPUCores, coresAvailable, maxCores, withRAMStr, maxRAMStr, withCores);
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
         }
+    }
+    
+    private long normalizeToLong(String ramString) {
+        long value = 0;
+        char unit = ramString.charAt(ramString.length() - 1);
+        if (VALID_RAM_UNITS.contains(unit)) {
+            value = Integer.parseInt(ramString.substring(0, ramString.length() - 1));
+            unit = Character.toUpperCase(unit);
+            if ('K' == unit) {
+                value = value * 1024;
+            } else if ('M' == unit) {
+                value = value * 1024 * 1024;
+            } else if ('G' == unit) {
+                value = value * 1024 * 1024 * 1024;
+            } else if ('T' == unit) {
+                value = value * 1024 * 1024 * 1024 * 1024;
+            }
+        } else if (Character.isDigit(unit)) {
+            value = Integer.parseInt(ramString);
+        } else {
+            throw new IllegalStateException("unknown RAM unit: " + unit);
+        }
+        
+        return value;
     }
     
     private Map<String, Integer> getCPUCores(String k8sNamespace) throws Exception {
@@ -211,6 +244,7 @@ public class GetAction extends SessionAction {
                 String nodeName = "";
                 int nodeCPUCores = 0;
                 for (String line : lines) {
+                    // since we do not request millicores ('m'), no need to check for the 'm' unit
                     String[] parts = line.split("\\s+");
                     if (nodeName.equals(parts[0])) {
                         nodeCPUCores = nodeCPUCores + Integer.parseInt(parts[2]);
@@ -238,10 +272,10 @@ public class GetAction extends SessionAction {
         return nodeToCoresMap;
     }
 
-    private Map<String, int[]> getAvailableResources(String k8sNamespace) throws Exception {
+    private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
         String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
         String rawResources = execute(getAvailableResourcesCmd.split(" "));
-        Map<String, int[]> nodeToResourcesMap = new HashMap<String, int[]>();
+        Map<String, String[]> nodeToResourcesMap = new HashMap<String, String[]>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");
             if (lines.length > 0) {
@@ -253,7 +287,7 @@ public class GetAction extends SessionAction {
                 boolean hasCores = false;
                 boolean hasRAM = false;
                 boolean hasGPU = false;
-                int[] resources = null;
+                String[] resources = null;
                 for (String line : lines) {
                     String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
                     if (keywords.stream().anyMatch(parts[0]::equals)) {
@@ -265,7 +299,7 @@ public class GetAction extends SessionAction {
                             hasCores = false;
                             hasRAM = false;
                             hasGPU = false;
-                            resources = new int[2];
+                            resources = new String[2];
                             nodeName = parts[1];
                         } else if (!hasAllocatable && !hasGPU && hasName) {
                             if ("Capacity:".equals(parts[0])) {
@@ -277,8 +311,8 @@ public class GetAction extends SessionAction {
                             } else if (hasCapacity) {
                                 if ("cpu:".equals(parts[0])) {
                                     if (!hasCores) {
-                                        // number of cores from "Capabity.cpu"
-                                        int cores = Integer.parseInt(parts[1]);
+                                        // number of cores from "Capabity.cpu", 
+                                        String cores = toCoreUnit(parts[1]);
                                         resources[0] = cores;
                                         hasCores = true;
                                     } else {
@@ -287,8 +321,9 @@ public class GetAction extends SessionAction {
                                 } else if ("memory:".equals(parts[0])) {
                                     if (!hasRAM) {
                                         // amount of RAM from "Capabity.memory" is in Ki
-                                        int ram = Integer.parseInt(parts[1].replaceAll("[^0-9]", "").trim());
+                                        String ram = parts[1];
                                         resources[1] = ram;
+                                        
                                         hasRAM = true;
                                     } else {
                                         throw new IllegalStateException("Unexpected 'memory:' line");
@@ -302,7 +337,9 @@ public class GetAction extends SessionAction {
                                     // finish processing the resources of a node
                                     nodeToResourcesMap.put(nodeName, resources);
                                     hasAllocatable = true;
-                                    log.debug("node: " + nodeName + ", cores=" + resources[0] + ", RAM=" + resources[1] +"K");
+                                    // TODO: add RAM unit to debug message
+                                    log.debug("node: " + nodeName + ", cores=" + resources[0] + ", RAM=" + resources[1]);
+                                    
                                 }
                             }
                         }

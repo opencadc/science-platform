@@ -85,16 +85,16 @@ public class ResourceStats {
         instances = new JobInstances(desktopCount, headlessCount, totalCount);
 
         MaxCoreResource maxCores = new MaxCoreResource();
-        maxCores.cores = mCores;
+        maxCores.cpuCores = mCores;
         maxCores.withRam = withRAM;
         cores = new Core();
-        cores.maxCores = maxCores;
-        cores.coresAvailable = coresAvailable;
+        cores.maxCPUCores = maxCores;
+        cores.cpuCoresAvailable = coresAvailable;
         cores.requestedCPUCores = requestedCPUCores;
 
         MaxRamResource maxRAM = new MaxRamResource();
         maxRAM.ram = mRAM;
-        maxRAM.withCores = withCores;
+        maxRAM.withCPUCores = withCores;
         ram = new Ram();
         ram.maxRAM = maxRAM;
     }
@@ -115,8 +115,8 @@ public class ResourceStats {
     
     class Core {
         int requestedCPUCores = 0;
-        int coresAvailable = 0;
-        MaxCoreResource maxCores;
+        int cpuCoresAvailable = 0;
+        MaxCoreResource maxCPUCores;
     }
     
     class Ram {
@@ -124,12 +124,12 @@ public class ResourceStats {
     }
 
     class MaxCoreResource {
-        public int cores = 0;
-        public String withRam = "0G";
+        public int cpuCores = 0;
+        public String withRam = "0K";
     }
 
     class MaxRamResource {
-        public String ram = "0G";
-        public int withCores = 0;
+        public String ram = "0K";
+        public int withCPUCores = 0;
     }
 }
