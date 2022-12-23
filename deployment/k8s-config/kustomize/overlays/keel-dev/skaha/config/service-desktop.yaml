@@ -11,3 +11,5 @@ spec:
     name: http-connection
   selector:
     canfar-net-sessionID: ${skaha.sessionid}
+    canfar-net-sessionType: desktop
+
