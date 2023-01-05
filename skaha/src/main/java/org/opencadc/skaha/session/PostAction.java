@@ -82,6 +82,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -280,17 +281,8 @@ public class PostAction extends SessionAction {
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
             Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
             Instant startTime = Instant.parse(startTimeStr);
-            Instant now = Instant.now();
-            Instant newExpiryTime = startTime.plusSeconds(activeDeadlineSeconds);
-            int counter = 1;
-            while (now.isAfter(newExpiryTime)) {
-                newExpiryTime = newExpiryTime.plusSeconds(activeDeadlineSeconds);
-                counter++;
-            }
-    
-            // we want new expiry time < (now + 2 * activeDeadlineSeconds)
-            counter++;
-            return counter * activeDeadlineSeconds;
+            // add elapsed time (from startTime to now) to the configured expiry time
+            return startTime.until(Instant.now(), ChronoUnit.SECONDS) + activeDeadlineSeconds;
         } else {
             throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
         }
