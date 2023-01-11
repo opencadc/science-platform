@@ -420,9 +420,8 @@ public abstract class SessionAction extends SkahaAction {
                             session.setExpiryTime("<none>");
                         } else {
                             instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                            session.setExpiryTime(instant.toString());
                         }
-                        
-                        session.setExpiryTime(instant.toString());
                     }
 
                     // get RAM and CPU usage
