@@ -9,7 +9,7 @@ metadata:
     canfar-net-userid: "${skaha.userid}"
   name: "${skaha.jobname}"
 spec:
-  activeDeadlineSeconds: 1209600
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
     metadata:

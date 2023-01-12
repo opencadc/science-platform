@@ -374,10 +374,15 @@ public abstract class SessionAction extends SkahaAction {
     public Session getSession(String forUserID, String sessionID) throws Exception {
         List<Session> sessions = getSessions(forUserID, sessionID);
         if (sessions.size() >0) {
-            return sessions.get(0);
-        } else {
-            throw new ResourceNotFoundException("session " + sessionID + " not found");
-        }
+            for (Session session : sessions) {
+                // exclude 'desktop-app'
+                if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
+                    return session;
+                }
+            }
+        } 
+
+        throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
     
     public List<Session> getAllSessions(String forUserID) throws Exception {
@@ -415,6 +420,7 @@ public abstract class SessionAction extends SkahaAction {
                             session.setExpiryTime("<none>");
                         } else {
                             instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                            session.setExpiryTime(instant.toString());
                         }
                     }
 

@@ -100,4 +100,8 @@ public class K8SUtil {
         return System.getenv("skaha.scratchdir");
     }
 
+    public static String getSessionExpiry() {
+        return System.getenv("skaha.sessionexpiry");
+    }
+
 }
