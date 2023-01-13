@@ -208,7 +208,7 @@ public class GetAction extends SessionAction {
         }
     }
     
-    private long normalizeToLong(String ramString) {
+    protected long normalizeToLong(String ramString) {
         long value = 0;
         char unit = ramString.charAt(ramString.length() - 1);
         if (VALID_RAM_UNITS.contains(unit)) {
