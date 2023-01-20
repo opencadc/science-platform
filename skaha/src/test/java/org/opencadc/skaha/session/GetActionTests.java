@@ -66,70 +66,68 @@
  */
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.Log4jInit;
+
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  * @author yeunga
  *
  */
-public class ResourceStats {
+public class GetActionTests {
     
-    private static final Logger log = Logger.getLogger(ResourceStats.class);
+    private static final Logger log = Logger.getLogger(GetActionTests.class);
     
-    private JobInstances instances;
-    private Core cores;
-    private Ram ram;
-
-    public ResourceStats(int desktopCount, int headlessCount, int totalCount, 
-            int requestedCPUCores, int coresAvailable, int mCores, String withRAM, String mRAM, int withCores) {
-        instances = new JobInstances(desktopCount, headlessCount, totalCount);
-
-        MaxCoreResource maxCores = new MaxCoreResource();
-        maxCores.cpuCores = mCores;
-        maxCores.withRam = withRAM;
-        cores = new Core();
-        cores.maxCPUCores = maxCores;
-        cores.cpuCoresAvailable = coresAvailable;
-        cores.requestedCPUCores = requestedCPUCores;
-
-        MaxRamResource maxRAM = new MaxRamResource();
-        maxRAM.ram = mRAM;
-        maxRAM.withCPUCores = withCores;
-        ram = new Ram();
-        ram.maxRAM = maxRAM;
+    static {
+        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
     
-    class JobInstances {
-        private int session;
-        private int desktopApp;
-        private int headless;
-        private int total;
-        
-        public JobInstances(int desktopCount, int headlessCount, int totalCount) {
-            desktopApp = desktopCount;
-            headless = headlessCount;
-            total = totalCount;
-            session = totalCount - desktopCount - headlessCount;
+    private static final long K_UNIT = 1024;
+    private static final long M_UNIT = K_UNIT * K_UNIT;
+    private static final long G_UNIT = K_UNIT * M_UNIT;
+    private static final long T_UNIT = K_UNIT * G_UNIT;
+    
+    private static final long NO_UNIT_VALUE = 100;
+    private static final long K_VALUE = 2 * K_UNIT;
+    private static final long M_VALUE = 3 * M_UNIT;
+    private static final long G_VALUE = 4 * G_UNIT;
+    private static final long T_VALUE = 5 * T_UNIT;
+    private static final long INVALID_VALUE = 6;
+
+    private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
+    private static final String K_VALUE_STR = String.valueOf(2) + "K";
+    private static final String M_VALUE_STR = String.valueOf(3) + "M";
+    private static final String G_VALUE_STR = String.valueOf(4) + "G";
+    private static final String T_VALUE_STR = String.valueOf(5) + "T";
+    private static final String INVALID_VALUE_STR = String.valueOf(5) + "A";
+    
+    public GetActionTests() {
+    }
+    
+    @Test
+    public void testNormalizeToLong() {
+        try {
+            GetAction get = new TestGetAction();
+            Assert.assertEquals(NO_UNIT_VALUE, get.normalizeToLong(NO_UNIT_VALUE_STR));
+            Assert.assertEquals(K_VALUE, get.normalizeToLong(K_VALUE_STR));
+            Assert.assertEquals(M_VALUE, get.normalizeToLong(M_VALUE_STR));
+            Assert.assertEquals(G_VALUE, get.normalizeToLong(G_VALUE_STR));
+            Assert.assertEquals(T_VALUE, get.normalizeToLong(T_VALUE_STR));
+            Assert.assertEquals(INVALID_VALUE, get.normalizeToLong(INVALID_VALUE_STR));
+        } catch (IllegalStateException ex) {
+            if (!ex.getMessage().contains("unknown RAM unit")) {
+                Assert.fail("Unexpected: " + ex.getMessage());
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
         }
     }
     
-    class Core {
-        int requestedCPUCores = 0;
-        int cpuCoresAvailable = 0;
-        MaxCoreResource maxCPUCores;
-    }
-    
-    class Ram {
-        MaxRamResource maxRAM;
-    }
-
-    class MaxCoreResource {
-        public int cpuCores = 0;
-        public String withRam = "0K";
-    }
-
-    class MaxRamResource {
-        public String ram = "0K";
-        public int withCPUCores = 0;
+    class TestGetAction extends GetAction {
+        
     }
 }

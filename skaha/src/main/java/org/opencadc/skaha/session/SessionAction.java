@@ -439,8 +439,8 @@ public abstract class SessionAction extends SkahaAction {
                             session.setCoresInUse("<none>");
                             session.setRAMInUse("<none>");
                         } else {
-                            session.setCoresInUse(resourceUsage[0]);
-                            session.setRAMInUse(resourceUsage[1]);
+                            session.setCoresInUse(toCoreUnit(resourceUsage[0]));
+                            session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
                     }
                 }
@@ -450,6 +450,37 @@ public abstract class SessionAction extends SkahaAction {
         }
         
         return sessions;
+    }
+    
+    protected String toCoreUnit(String cores) {
+        String ret = "<none>";
+        if (StringUtil.hasLength(cores)) {
+            if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
+                // in "m" (millicore) unit, covert to cores
+                Integer milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1)); 
+                ret = ((Double) (milliCores/Math.pow(10, 3))).toString();
+            } else {
+                // use value as is, can be '<none>' or some value
+                ret = cores;
+            }
+        } 
+        
+        return ret;
+    }
+    
+    protected String toCommonUnit(String inK8sUnit) {
+        String ret = "<none>";
+        if (StringUtil.hasLength(inK8sUnit)) {
+            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
+                // unit is in Ki, Mi, Gi, etc., remove the i
+                ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
+            } else {
+                // use value as is, can be '<none>' or some value
+                ret = inK8sUnit;
+            }
+        } 
+        
+        return ret;
     }
     
     private Map<String, String[]> getResourceUsages(String k8sNamespace, String forUserID) throws Exception {
@@ -626,9 +657,9 @@ public abstract class SessionAction extends SkahaAction {
             String requestedRAM = parts[8];
             String requestedCPUCores = parts[9];
             String requestedGPUCores = parts[10];
-            session.setRequestedRAM(requestedRAM);
-            session.setRequestedCPUCores(requestedCPUCores);
-            session.setRequestedGPUCores(requestedGPUCores);
+            session.setRequestedRAM(toCommonUnit(requestedRAM));
+            session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
+            session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));
         }
 
         return session;
