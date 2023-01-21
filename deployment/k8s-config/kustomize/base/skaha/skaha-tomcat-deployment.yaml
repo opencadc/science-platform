@@ -33,7 +33,7 @@ spec:
         - name: skaha.maxusersessions
           value: "3"
         - name: skaha.sessionexpiry
-          value: "1209600"
+          value: "345600"
         - name: skaha.harborhosts
           value: "images.canfar.net"
         - name: skaha.usersgroup
