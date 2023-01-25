@@ -506,7 +506,7 @@ public abstract class SessionAction extends SkahaAction {
         return resourceUsages;
     }
     
-    private Map<String,String> getExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
+    protected Map<String,String> getExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
         Map<String,String> expiryTimes = new HashMap<String,String>(); 
         List<String> sessionExpiryTimeCMD = getSessionExpiryTimeCMD(k8sNamespace, forUserID);
         String sessionExpiryTimeMap = execute(sessionExpiryTimeCMD.toArray(new String[0]));

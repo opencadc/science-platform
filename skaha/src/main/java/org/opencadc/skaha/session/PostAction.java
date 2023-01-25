@@ -260,31 +260,51 @@ public class PostAction extends SessionAction {
         }
     }
     
-    private void renew(Map.Entry<String, String> entry) throws IOException, InterruptedException {
+    private void renew(Map.Entry<String, String> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> renewExpiryTimeCmd = new ArrayList<String>();
-        renewExpiryTimeCmd.add("kubectl");
-        renewExpiryTimeCmd.add("--namespace");
-        renewExpiryTimeCmd.add(k8sNamespace);
-        renewExpiryTimeCmd.add("patch");
-        renewExpiryTimeCmd.add("job");
-        renewExpiryTimeCmd.add(entry.getKey());
-        renewExpiryTimeCmd.add("--type=json");
-        renewExpiryTimeCmd.add("-p");
-        renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
-        execute(renewExpiryTimeCmd.toArray(new String[0]));
+        if (newExpiryTime > 0) {
+            String k8sNamespace = K8SUtil.getWorkloadNamespace();
+            List<String> renewExpiryTimeCmd = new ArrayList<String>();
+            renewExpiryTimeCmd.add("kubectl");
+            renewExpiryTimeCmd.add("--namespace");
+            renewExpiryTimeCmd.add(k8sNamespace);
+            renewExpiryTimeCmd.add("patch");
+            renewExpiryTimeCmd.add("job");
+            renewExpiryTimeCmd.add(entry.getKey());
+            renewExpiryTimeCmd.add("--type=json");
+            renewExpiryTimeCmd.add("-p");
+            renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
+            execute(renewExpiryTimeCmd.toArray(new String[0]));
+        }
     }
     
-    private Long calculateExpiryTime(String startTimeStr) {
-        String activeDeadlineSecondsStr = K8SUtil.getSessionExpiry();
+    private Long calculateExpiryTime(String startTimeStr) throws Exception {
+        String expiryTimeStr = K8SUtil.getSessionExpiry();
+        if (!StringUtil.hasLength(expiryTimeStr)) {
+            throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
+        }
+        Long expiryTime = Long.parseLong(expiryTimeStr);
+
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        Map<String, String> expiryTimeMap = getExpiryTimes(k8sNamespace, userID);
+        String activeDeadlineSecondsStr = expiryTimeMap.get(userID);
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
+            log.info("alinga-- current activeDeadlineSeconds: " + activeDeadlineSecondsStr);
             Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
             Instant startTime = Instant.parse(startTimeStr);
-            // add elapsed time (from startTime to now) to the configured expiry time
-            return startTime.until(Instant.now(), ChronoUnit.SECONDS) + activeDeadlineSeconds;
+            
+            Long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
+            Long timeRemaining = activeDeadlineSeconds - timeUsed;
+            // default to no need to extend the expiry time
+            Long calculatedTime = 0L;
+            if (expiryTime > timeRemaining) {
+                // add elapsed time (from startTime to now) to the configured expiry time
+                calculatedTime = startTime.until(Instant.now(), ChronoUnit.SECONDS) + expiryTime;
+            }
+
+            return calculatedTime;
         } else {
-            throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
+            throw new IllegalStateException("missing configuration item activeDeadlineSeconds");
         }
     }
     
