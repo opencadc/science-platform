@@ -289,7 +289,6 @@ public class PostAction extends SessionAction {
         Map<String, String> expiryTimeMap = getExpiryTimes(k8sNamespace, userID);
         String activeDeadlineSecondsStr = expiryTimeMap.get(userID);
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
-            log.info("alinga-- current activeDeadlineSeconds: " + activeDeadlineSecondsStr);
             Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
             Instant startTime = Instant.parse(startTimeStr);
             
