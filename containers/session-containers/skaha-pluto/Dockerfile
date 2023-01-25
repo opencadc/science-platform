@@ -6,7 +6,7 @@ RUN yum makecache -y && \
     yum clean all
 
 WORKDIR /
-RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.8/julia-1.9.0-beta3-linux-x86_64.tar.gz && \
+RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.9/julia-1.9.0-beta3-linux-x86_64.tar.gz && \
     tar zxvf julia-1.9.0-beta3-linux-x86_64.tar.gz && \
     rm julia-1.9.0-beta3-linux-x86_64.tar.gz
 
