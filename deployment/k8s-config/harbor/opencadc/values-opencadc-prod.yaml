@@ -2,7 +2,7 @@
 logLevel: debug
 
 
-adminPassword: "opencadc23"
+adminPassword: "changeme"
 
 externalURL: https://images.opencadc.org
 
