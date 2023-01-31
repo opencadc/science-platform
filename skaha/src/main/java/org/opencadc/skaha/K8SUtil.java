@@ -68,11 +68,6 @@
 package org.opencadc.skaha;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import ca.nrc.cadc.util.StringUtil;
 
 public class K8SUtil {
     

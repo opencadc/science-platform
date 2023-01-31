@@ -397,10 +397,10 @@ public abstract class SessionAction extends SkahaAction {
         
         List<Session> sessions = new ArrayList<Session>();
         if (StringUtil.hasLength(sessionList)) {
-            Map<String, String> expiryTimes = null;
+            Map<String, String> jobExpiryTimes = null;
             Map<String, String[]> resourceUsages = null;
             if (forUserID != null) {
-                expiryTimes = getExpiryTimes(k8sNamespace, forUserID);
+                jobExpiryTimes = getJobExpiryTimes(k8sNamespace, forUserID);
                 resourceUsages = getResourceUsages(k8sNamespace, forUserID);
             }
 
@@ -415,11 +415,11 @@ public abstract class SessionAction extends SkahaAction {
                         session.setExpiryTime(startTimeStr);
                     } else {
                         Instant instant = Instant.parse(startTimeStr);
-                        String expiryTimesStr = expiryTimes.get(uid);
-                        if (expiryTimesStr == null) {
+                        String jobExpiryTimesStr = jobExpiryTimes.get(uid);
+                        if (jobExpiryTimesStr == null) {
                             session.setExpiryTime("<none>");
                         } else {
-                            instant = instant.plus(Integer.parseInt(expiryTimesStr), ChronoUnit.SECONDS);
+                            instant = instant.plus(Integer.parseInt(jobExpiryTimesStr), ChronoUnit.SECONDS);
                             session.setExpiryTime(instant.toString());
                         }
                     }
@@ -506,20 +506,20 @@ public abstract class SessionAction extends SkahaAction {
         return resourceUsages;
     }
     
-    protected Map<String,String> getExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
-        Map<String,String> expiryTimes = new HashMap<String,String>(); 
-        List<String> sessionExpiryTimeCMD = getSessionExpiryTimeCMD(k8sNamespace, forUserID);
-        String sessionExpiryTimeMap = execute(sessionExpiryTimeCMD.toArray(new String[0]));
-        log.debug("Expiry times: " + sessionExpiryTimeMap);
-        if (StringUtil.hasLength(sessionExpiryTimeMap)) {
-            String[] lines = sessionExpiryTimeMap.split("\n");
+    protected Map<String,String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
+        Map<String,String> jobExpiryTimes = new HashMap<String,String>(); 
+        List<String> jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
+        String jobExpiryTimeMap = execute(jobExpiryTimeCMD.toArray(new String[0]));
+        log.debug("Expiry times: " + jobExpiryTimeMap);
+        if (StringUtil.hasLength(jobExpiryTimeMap)) {
+            String[] lines = jobExpiryTimeMap.split("\n");
             for (String line : lines) {
                 String expiryTime[] = line.trim().replaceAll("\\s+", " ").split(" ");
-                expiryTimes.put(expiryTime[0], expiryTime[1]);
+                jobExpiryTimes.put(expiryTime[0], expiryTime[1]);
             }
         }
         
-        return expiryTimes;
+        return jobExpiryTimes;
     }
     
     private String getFullName(String line) {
@@ -583,7 +583,7 @@ public abstract class SessionAction extends SkahaAction {
         return sessionsCMD;
     }
     
-    private List<String> getSessionExpiryTimeCMD(String k8sNamespace, String forUserID) {
+    private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
         List<String> getSessionJobCMD = new ArrayList<String>();
         getSessionJobCMD.add("kubectl");
         getSessionJobCMD.add("get");
