@@ -328,7 +328,7 @@ public class ExpiryTimeRenewalTest {
                     for (Session s : sessions) {
                         Assert.assertNotNull("session type", s.getType());
                         if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                            Assert.assertNotNull("no carta session status", s.getStatus());
+                            Assert.assertNotNull("no desktop session status", s.getStatus());
                             if (s.getStatus().equals("Running")) {
                                 count++;
                                 Assert.assertNotNull("no desktop session", s.getId());
