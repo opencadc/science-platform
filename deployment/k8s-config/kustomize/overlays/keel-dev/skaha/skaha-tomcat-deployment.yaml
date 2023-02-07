@@ -18,7 +18,7 @@ spec:
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
         - name: skaha.sessionexpiry
           value: "345600"
-        image: images-rc.canfar.net/skaha-system/skaha:0.9.12
+        image: images-rc.canfar.net/skaha-system/skaha:0.9.14
         resources:
           requests:
             memory: "4Gi"
