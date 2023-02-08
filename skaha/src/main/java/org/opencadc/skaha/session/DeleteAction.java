@@ -163,7 +163,7 @@ public class DeleteAction extends SessionAction {
         } catch (IOException ex) {
             String msg = ex.getMessage();
             if (msg.contains("not found")) {
-                // fail to find the object to be delete, log a warning and continue
+                // fail to find the object to be deleted, log a warning and continue
                 log.warn(msg);
             } else {
                 // some other error, propagate the exception
