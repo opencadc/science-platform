@@ -155,7 +155,7 @@ public class DeleteAction extends SessionAction {
         }
     }
     
-    private void delete(String k8sNamespace, String type, String name) throws InterruptedException {
+    private void delete(String k8sNamespace, String type, String name) throws InterruptedException, IOException {
         try {
             String[] cmd = new String[] {
                 "kubectl", "delete", "--namespace", k8sNamespace, type, name};
@@ -163,7 +163,11 @@ public class DeleteAction extends SessionAction {
         } catch (IOException ex) {
             String msg = ex.getMessage();
             if (msg.contains("not found")) {
+                // fail to find the object to be delete, log a warning and continue
                 log.warn(msg);
+            } else {
+                // some other error, propagate the exception
+                throw ex;
             }
         }
     }
