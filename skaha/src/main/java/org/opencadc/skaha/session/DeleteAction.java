@@ -161,14 +161,8 @@ public class DeleteAction extends SessionAction {
                 "kubectl", "delete", "--namespace", k8sNamespace, type, name};
             execute(cmd);
         } catch (IOException ex) {
-            String msg = ex.getMessage();
-            if (msg.contains("NotFound") || msg.contains("not found")) {
-                // fail to find the object to delete, log a warning and continue
-                log.warn(msg);
-            } else {
-                // some other error, propagate the exception
-                throw ex;
-            }
+            // fail to find the object to delete, log a warning and continue
+            log.warn(ex.getMessage());
         }
     }
 }
