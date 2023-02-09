@@ -103,5 +103,5 @@ public class K8SUtil {
     public static String getSessionExpiry() {
         return System.getenv("skaha.sessionexpiry");
     }
-
+    
 }

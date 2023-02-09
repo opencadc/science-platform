@@ -163,7 +163,7 @@ paths:
         - name: action
           in: query
           type: string
-          description: The action to be applied to the session. Currently the applicable action is 'renew' which sets the session expiry time to the configured activeDeadlineSeconds.
+          description: The action to be applied to the session. Currently the applicable action is 'renew' which sets the session expiry time in activeDeadlineseconds based on the configured expiry time in skaha.sessionexpiry.
           required: true
       responses:
         '200':

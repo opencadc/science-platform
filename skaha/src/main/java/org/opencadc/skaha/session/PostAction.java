@@ -84,6 +84,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -223,9 +224,9 @@ public class PostAction extends SessionAction {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
                     if (action.equalsIgnoreCase("renew")) {
-                        Map<String, String> jobNameToStartTimeMap = getJobsToRenew(userID, sessionID);
-                        if (!jobNameToStartTimeMap.isEmpty()) {
-                            for (Map.Entry<String, String> entry : jobNameToStartTimeMap.entrySet()) {
+                        Map<String, List<String>> jobNameToAttributesMap = getJobsToRenew(userID, sessionID);
+                        if (!jobNameToAttributesMap.isEmpty()) {
+                            for (Map.Entry<String, List<String>> entry : jobNameToAttributesMap.entrySet()) {
                                 renew(entry);
                             }
                         } else {
@@ -260,35 +261,58 @@ public class PostAction extends SessionAction {
         }
     }
     
-    private void renew(Map.Entry<String, String> entry) throws IOException, InterruptedException {
+    private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> renewExpiryTimeCmd = new ArrayList<String>();
-        renewExpiryTimeCmd.add("kubectl");
-        renewExpiryTimeCmd.add("--namespace");
-        renewExpiryTimeCmd.add(k8sNamespace);
-        renewExpiryTimeCmd.add("patch");
-        renewExpiryTimeCmd.add("job");
-        renewExpiryTimeCmd.add(entry.getKey());
-        renewExpiryTimeCmd.add("--type=json");
-        renewExpiryTimeCmd.add("-p");
-        renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
-        execute(renewExpiryTimeCmd.toArray(new String[0]));
-    }
-    
-    private Long calculateExpiryTime(String startTimeStr) {
-        String activeDeadlineSecondsStr = K8SUtil.getSessionExpiry();
-        if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
-            Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
-            Instant startTime = Instant.parse(startTimeStr);
-            // add elapsed time (from startTime to now) to the configured expiry time
-            return startTime.until(Instant.now(), ChronoUnit.SECONDS) + activeDeadlineSeconds;
-        } else {
-            throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
+        if (newExpiryTime > 0) {
+            String k8sNamespace = K8SUtil.getWorkloadNamespace();
+            List<String> renewExpiryTimeCmd = new ArrayList<String>();
+            renewExpiryTimeCmd.add("kubectl");
+            renewExpiryTimeCmd.add("--namespace");
+            renewExpiryTimeCmd.add(k8sNamespace);
+            renewExpiryTimeCmd.add("patch");
+            renewExpiryTimeCmd.add("job");
+            renewExpiryTimeCmd.add(entry.getKey());
+            renewExpiryTimeCmd.add("--type=json");
+            renewExpiryTimeCmd.add("-p");
+            renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
+            execute(renewExpiryTimeCmd.toArray(new String[0]));
         }
     }
     
-    private Map<String,String> getJobsToRenew(String forUserID, String sessionID) throws Exception {
+    
+    private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
+        String uid = jobAttributes.get(0);
+        String startTimeStr = jobAttributes.get(1);
+
+        String configuredExpiryStr = K8SUtil.getSessionExpiry();
+        if (!StringUtil.hasLength(configuredExpiryStr)) {
+            throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
+        }
+        Long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
+
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, userID);
+        String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
+        if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
+            Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
+            Instant startTime = Instant.parse(startTimeStr);
+            
+            Long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
+            Long timeRemaining = activeDeadlineSeconds - timeUsed;
+            // default to no need to extend the expiry time
+            Long calculatedTime = 0L;
+            if (configuredExpiryTime > timeRemaining) {
+                // add elapsed time (from startTime to now) to the configured expiry time
+                calculatedTime = startTime.until(Instant.now(), ChronoUnit.SECONDS) + configuredExpiryTime;
+            }
+
+            return calculatedTime;
+        } else {
+            throw new IllegalStateException("missing configuration item activeDeadlineSeconds");
+        }
+    }
+    
+    private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getRenewJobNamesCmd = new ArrayList<String>();
         getRenewJobNamesCmd.add("kubectl");
@@ -303,31 +327,37 @@ public class PostAction extends SessionAction {
         
         String customColumns = "custom-columns=" +
             "NAME:.metadata.name," + 
-            "STATUS:.status.active," +
-            "STATUS:.status.startTime";
+            "UID:.metadata.uid," + 
+            "STATUS:.status.active," + 
+            "START:.status.startTime";
         
         getRenewJobNamesCmd.add(customColumns);
                 
         String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
        
-        Map<String, String> renewJobNamesMap = new HashMap<String, String>();
+        Map<String, List<String>> renewJobMap = new HashMap<String, List<String>>();
         if (StringUtil.hasLength(renewJobNamesStr)) {
             String[] lines = renewJobNamesStr.split("\n");
             if (lines.length > 0) {
                 for (String line : lines) {
+                    List<String> renewJobAttributes = new ArrayList<String>();
                     String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                    String isActiveStr = parts[1];
-                    String startTimeStr = parts[2];
+                    String jobName = parts[0];
+                    String uid = parts[1];
+                    String isActive= parts[2];
+                    String startTime= parts[3];
                     // look for the job ID of an active session
-                    if (!"<none>".equalsIgnoreCase(isActiveStr) && (Integer.parseInt(isActiveStr) == 1)) {
-                        renewJobNamesMap.put(parts[0], startTimeStr);
+                    if (!"<none>".equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
+                        renewJobAttributes.add(uid);
+                        renewJobAttributes.add(startTime);
+                        renewJobMap.put(jobName, renewJobAttributes);
                     }
                 }
             }
         }
 
-        return renewJobNamesMap;
+        return renewJobMap;
     }
     
     private void validateName(String name) {
