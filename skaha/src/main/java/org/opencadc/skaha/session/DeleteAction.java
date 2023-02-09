@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 
+import java.io.IOException;
 import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
@@ -120,7 +121,7 @@ public class DeleteAction extends SessionAction {
                                     throw new AccessControlException("forbidden");
                                 }   
     
-                                stopSession(userID, type, sessionID);
+                                deleteSession(userID, type, sessionID);
                                 return;
                             }
                         }
@@ -137,27 +138,31 @@ public class DeleteAction extends SessionAction {
         }
     }
     
-    public void stopSession(String userID, String type, String sessionID) throws Exception {
+    public void deleteSession(String userID, String type, String sessionID) throws Exception {
         // kill the session specified by sessionID
         log.debug("Stopping " + type + " session: " + sessionID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
         String podName = K8SUtil.getJobName(sessionID, type, userID);
-        String[] cmd = new String[] {
-            "kubectl", "delete", "--namespace", k8sNamespace, "job", podName};
-        execute(cmd);
+        delete(k8sNamespace, "job", podName);
         
         if (!SESSION_TYPE_HEADLESS.equals(type)) {
             String ingressName = K8SUtil.getIngressName(sessionID, type);
-            cmd = new String[] {
-                "kubectl", "delete", "--namespace", k8sNamespace, "ingressroute", ingressName};
-            execute(cmd);
+            delete(k8sNamespace, "ingressroute", ingressName);
             
             String serviceName = K8SUtil.getServiceName(sessionID, type);
-            cmd = new String[] {
-                "kubectl", "delete", "--namespace", k8sNamespace, "service", serviceName};
-            execute(cmd);
+            delete(k8sNamespace, "service", serviceName);
         }
-        
+    }
+    
+    private void delete(String k8sNamespace, String type, String name) throws InterruptedException, IOException {
+        try {
+            String[] cmd = new String[] {
+                "kubectl", "delete", "--namespace", k8sNamespace, type, name};
+            execute(cmd);
+        } catch (Exception ex) {
+            // fail to delete the object, just log a warning and continue
+            log.warn(ex.getMessage());
+        }
     }
 }
