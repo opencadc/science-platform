@@ -164,24 +164,30 @@ public class LifecycleTest {
                     TimeUnit.SECONDS.sleep(10);
                     
                     // verify both desktop and carta sessions
+                    int count = 0;
                     List<Session> sessions = getSessions();
-                    Assert.assertTrue("two sessions", sessions.size() == 2);
                     String desktopSessionID = null;
                     String cartaSessionID = null;
                     for (Session s : sessions) {
                         Assert.assertNotNull("session type", s.getType());
-                        if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                            desktopSessionID = s.getId();
-                        } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
-                            cartaSessionID = s.getId();
-                        } else {
-                            throw new AssertionError("invalid session type: " + s.getType());
+                        Assert.assertNotNull("session has no status", s.getStatus());
+                        if (s.getStatus().equals("Running")) {
+                            if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+                                count++;
+                                desktopSessionID = s.getId();
+                            } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
+                                count++;
+                                cartaSessionID = s.getId();
+                            } else if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)){
+                                throw new AssertionError("invalid session type: " + s.getType());
+                            }
+                            Assert.assertEquals("session name", "inttest", s.getName());
+                            Assert.assertNotNull("session id", s.getId());
+                            Assert.assertNotNull("connect URL", s.getConnectURL());
+                            Assert.assertNotNull("up since", s.getStartTime());
                         }
-                        Assert.assertEquals("session name", "inttest", s.getName());
-                        Assert.assertNotNull("session id", s.getId());
-                        Assert.assertNotNull("connect URL", s.getConnectURL());
-                        Assert.assertNotNull("up since", s.getStartTime());
                     }
+                    Assert.assertTrue("two sessions", count == 2);
                     Assert.assertNotNull("no desktop session", desktopSessionID);
                     Assert.assertNotNull("no carta session", cartaSessionID);
 
@@ -199,8 +205,16 @@ public class LifecycleTest {
                     TimeUnit.SECONDS.sleep(10);
                     
                     // verify that there is no session left
+                    count = 0;
                     sessions = getSessions();
-                    Assert.assertTrue("zero sessions #2", sessions.size() == 0);
+                    for (Session s : sessions) {
+                        Assert.assertNotNull("session ID", s.getId());
+                        if (s.getId().equals(cartaSessionID) || 
+                                s.getId().equals(desktopSessionID)) {
+                            count++;
+                        }
+                    }
+                    Assert.assertTrue("zero sessions #2", count == 0);
 
                     return null;
                 }
@@ -216,11 +230,20 @@ public class LifecycleTest {
     private void initialize() throws MalformedURLException {
         List<Session> sessions = getSessions();
         for (Session session : sessions) {
-            deleteSession(sessionURL, session.getId());
+            // skip dekstop-app, deletion of desktop-app is not supported
+            if (!session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
+                deleteSession(sessionURL, session.getId());
+            }
         }
 
+        int count = 0;
         sessions = getSessions();
-        Assert.assertTrue("zero sessions #1", sessions.size() == 0);
+        for (Session s : sessions) {
+            if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
+                count++;
+            }
+        }
+        Assert.assertTrue("zero sessions #1", count == 0);
     }
     private void createSession(String image) {
         Map<String, Object> params = new HashMap<String, Object>();
@@ -232,14 +255,22 @@ public class LifecycleTest {
     }
 
     private void verifyOneSession(String expectedSessionType, String sessionNumber) {
+        int count = 0;
         List<Session> sessions = getSessions();
-        Assert.assertTrue("one session " + sessionNumber, sessions.size() == 1);
-        Session session = sessions.get(0);
-        Assert.assertEquals("session name", "inttest", session.getName());
-        Assert.assertEquals("session type", expectedSessionType, session.getType());
-        Assert.assertNotNull("session id", session.getId());
-        Assert.assertNotNull("connect URL", session.getConnectURL());
-        Assert.assertNotNull("up since", session.getStartTime());
+        for (Session session : sessions) {
+            Assert.assertNotNull("no session type", session.getType());
+            if (session.getType().equals(expectedSessionType)) {
+                Assert.assertNotNull("no session ID", session.getId());
+                if (session.getStatus().equals("Running"))  {
+                    count++;
+                    Assert.assertEquals("session name", "inttest", session.getName());
+                    Assert.assertNotNull("connect URL", session.getConnectURL());
+                    Assert.assertNotNull("up since", session.getStartTime());
+                }
+            }
+            
+        }
+        Assert.assertTrue("one session " + sessionNumber, count == 1);
     }
 
     private void deleteSession(URL sessionURL, String sessionID) throws MalformedURLException {
