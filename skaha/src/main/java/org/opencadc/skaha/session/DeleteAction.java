@@ -160,8 +160,8 @@ public class DeleteAction extends SessionAction {
             String[] cmd = new String[] {
                 "kubectl", "delete", "--namespace", k8sNamespace, type, name};
             execute(cmd);
-        } catch (IOException ex) {
-            // fail to find the object to delete, log a warning and continue
+        } catch (Exception ex) {
+            // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());
         }
     }
