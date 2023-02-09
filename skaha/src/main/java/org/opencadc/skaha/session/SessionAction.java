@@ -237,7 +237,7 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
     
-    protected void injectProxyCert(final Subject subject, String userid, String posixID)
+    protected synchronized void injectProxyCert(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir
@@ -267,7 +267,6 @@ public abstract class SessionAction extends SkahaAction {
         execute(chown);
         String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
         execute(injectCert);
-        
         
 //        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
 //        execute(chown);
