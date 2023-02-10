@@ -237,7 +237,7 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
     
-    protected synchronized void injectProxyCert(final Subject subject, String userid, String posixID)
+    protected void injectProxyCert(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir
@@ -262,14 +262,7 @@ public abstract class SessionAction extends SkahaAction {
         // inject the proxy cert
         log.debug("Running docker exec to insert cert");
         
-        String tmpFileName = stageFile(proxyCert);
-        String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
-        execute(chown);
-        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
-        execute(injectCert);
-        
-//        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
-//        execute(chown);
+        injectFile(proxyCert, posixID, userid);
     }
     
     protected String getImageName(String image) {
@@ -288,6 +281,33 @@ public abstract class SessionAction extends SkahaAction {
             return "unknown";
         }
 
+    }
+    
+    protected synchronized void injectFile(String data, String posixID, String userid) throws IOException, InterruptedException {
+        // stage file
+        String tmpFileName = "/tmp/" + UUID.randomUUID();
+        File file = new File(tmpFileName);
+        if (!file.setExecutable(true, true)) {
+            log.debug("Failed to set execution permssion on file " + tmpFileName);
+        }
+        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+        writer.write(data + "\n");
+        writer.flush();
+        writer.close();
+        
+        // update file permissions
+        String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
+        execute(chown);
+//        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
+//        execute(chown);
+        
+        // inject file
+        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
+        execute(injectCert);
+        
+        // clean up
+        String[] deleteTmpFile = new String[] {"rm",  "-f", tmpFileName};
+        execute(deleteTmpFile);
     }
     
     protected String stageFile(String data) throws IOException {
