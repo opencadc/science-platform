@@ -93,7 +93,7 @@ public class Session {
     private String requestedRAM;
     private String requestedCPUCores;
     private String requestedGPUCores;
-    private String coresInUse;
+    private String cpuCoresInUse;
     private String ramInUse;
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
@@ -166,12 +166,12 @@ public class Session {
         this.requestedGPUCores = cores;
     }
 
-    public String getCoresInUse() {
-        return coresInUse;
+    public String getCPUCoresInUse() {
+        return cpuCoresInUse;
     }
 
-    public void setCoresInUse(String cores) {
-        this.coresInUse = cores;
+    public void setCPUCoresInUse(String cores) {
+        this.cpuCoresInUse = cores;
     }
 
     public String getRAMInUse() {
