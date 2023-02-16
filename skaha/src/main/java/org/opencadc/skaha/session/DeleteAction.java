@@ -152,6 +152,9 @@ public class DeleteAction extends SessionAction {
             
             String serviceName = K8SUtil.getServiceName(sessionID, type);
             delete(k8sNamespace, "service", serviceName);
+
+            String middlewareName = K8SUtil.getMiddlewareName(sessionID, type);
+            delete(k8sNamespace, "middleware", middlewareName);
         }
     }
     
