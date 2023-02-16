@@ -116,6 +116,8 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
     
+    protected static final String NONE = "<none>";
+    
     protected String requestType;
     protected String sessionID;
     protected String appID;
@@ -430,13 +432,13 @@ public abstract class SessionAction extends SkahaAction {
                     // get expiry time 
                     String uid = getUID(line);
                     String startTimeStr = session.getStartTime();
-                    if (startTimeStr.equalsIgnoreCase("<none>")) {
+                    if (startTimeStr.equalsIgnoreCase(NONE)) {
                         session.setExpiryTime(startTimeStr);
                     } else {
                         Instant instant = Instant.parse(startTimeStr);
                         String jobExpiryTimesStr = jobExpiryTimes.get(uid);
                         if (jobExpiryTimesStr == null) {
-                            session.setExpiryTime("<none>");
+                            session.setExpiryTime(NONE);
                         } else {
                             instant = instant.plus(Integer.parseInt(jobExpiryTimesStr), ChronoUnit.SECONDS);
                             session.setExpiryTime(instant.toString());
@@ -447,18 +449,18 @@ public abstract class SessionAction extends SkahaAction {
                     String fullName = getFullName(line);
                     if (resourceUsages.isEmpty()) {
                         // no job in 'Running' state
-                        session.setCoresInUse("<none>");
-                        session.setRAMInUse("<none>");
+                        session.setCPUCoresInUse(NONE);
+                        session.setRAMInUse(NONE);
                         
                     } else {
                         // at least one job is in 'Running' state
                         String resourceUsage[] = resourceUsages.get(fullName);
                         if (resourceUsage == null) {
                             // job not in 'Running' state
-                            session.setCoresInUse("<none>");
-                            session.setRAMInUse("<none>");
+                            session.setCPUCoresInUse(NONE);
+                            session.setRAMInUse(NONE);
                         } else {
-                            session.setCoresInUse(toCoreUnit(resourceUsage[0]));
+                            session.setCPUCoresInUse(toCoreUnit(resourceUsage[0]));
                             session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
                     }
@@ -472,7 +474,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String toCoreUnit(String cores) {
-        String ret = "<none>";
+        String ret = NONE;
         if (StringUtil.hasLength(cores)) {
             if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
                 // in "m" (millicore) unit, covert to cores
@@ -488,7 +490,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String toCommonUnit(String inK8sUnit) {
-        String ret = "<none>";
+        String ret = NONE;
         if (StringUtil.hasLength(inK8sUnit)) {
             if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
                 // unit is in Ki, Mi, Gi, etc., remove the i
@@ -647,7 +649,7 @@ public abstract class SessionAction extends SkahaAction {
         String name = parts[5];
         String startTime = parts[6];
         String deletionTimestamp = parts[7];
-        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+        if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
         String host = K8SUtil.getHostName();

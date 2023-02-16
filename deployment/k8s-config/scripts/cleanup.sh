@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# This script removes orphaned service and ingress sessions with no corresponding pods.
+# This script removes orphaned service, ingress and middleware sessions with no corresponding pods.
 # The script can be executed in its current directory by typing:
 # ./cleanup.sh
 
 echo "START"
 
-types="service ingressroute"
+types="service ingressroute middleware"
 for type in $types;
 do
   kubectl -n skaha-workload get $type |

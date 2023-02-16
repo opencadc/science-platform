@@ -163,19 +163,19 @@ public class GetAction extends SessionAction {
         int totalCount = filter(sessions, null, "Running").size();
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         try {
-            int requestedCPUCores = 0;
-            int coresAvailable = 0;
-            int maxCores = 0;
+            Double requestedCPUCores = 0.0;
+            Double coresAvailable = 0.0;
+            Double maxCores = 0.0;
             long maxRAM = 0;
-            int withCores = 0;
+            Double withCores = 0.0;
             String withRAM = "0G";
-            Map<String, Integer> rCPUCoreMap = getCPUCores(k8sNamespace);
+            Map<String, Double> rCPUCoreMap = getCPUCores(k8sNamespace);
             Map<String, String[]> aResourceMap = getAvailableResources(k8sNamespace);
             List<String> nodeNames = rCPUCoreMap.keySet().stream().collect(Collectors.toList());
             for (String nodeName : nodeNames) {
                 String[] aResources = aResourceMap.get(nodeName);
                 if (aResources != null) {
-                    int aCPUCores = Integer.parseInt(aResources[0]);
+                    Double aCPUCores = Double.valueOf(aResources[0]);
                     if (aCPUCores > maxCores) {
                         maxCores = aCPUCores;
                         withRAM = toCommonUnit(aResources[1]);
@@ -187,7 +187,7 @@ public class GetAction extends SessionAction {
                         withCores= aCPUCores;
                     }
                     
-                    int rCPUCores = rCPUCoreMap.get(nodeName);
+                    Double rCPUCores = rCPUCoreMap.get(nodeName);
                     requestedCPUCores = requestedCPUCores + rCPUCores;
                     coresAvailable = coresAvailable + aCPUCores;
                     log.debug("Node: " + nodeName + " Cores: " + rCPUCores + "/" + aCPUCores + " RAM: " + formatter.format(Double.valueOf(aRAM)/(1024 * 1024 * 1024)) + " G");
@@ -232,33 +232,39 @@ public class GetAction extends SessionAction {
         return value;
     }
     
-    private Map<String, Integer> getCPUCores(String k8sNamespace) throws Exception {
+    private Map<String, Double> getCPUCores(String k8sNamespace) throws Exception {
         String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " get pods --no-headers=true -o custom-columns=" + 
                 "NODENAME:.spec.nodeName,PODNAME:.metadata.name,CPUCORES:.spec.containers[].resources.requests.cpu " + 
                 "--field-selector status.phase=Running --sort-by=.spec.nodeName";
         String cpuCores = execute(getCPUCoresCmd.split(" "));
-        Map<String, Integer> nodeToCoresMap = new HashMap<String, Integer>();
+        Map<String, Double> nodeToCoresMap = new HashMap<String, Double>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
             if (lines.length > 0) {
                 String nodeName = "";
-                int nodeCPUCores = 0;
+                Double nodeCPUCores = 0.0;
                 for (String line : lines) {
-                    // since we do not request millicores ('m'), no need to check for the 'm' unit
                     String[] parts = line.split("\\s+");
+                    String cores = toCoreUnit(parts[2]);
                     if (nodeName.equals(parts[0])) {
-                        nodeCPUCores = nodeCPUCores + Integer.parseInt(parts[2]);
+                        if (!NONE.equalsIgnoreCase(cores)) {
+                            nodeCPUCores = nodeCPUCores + Double.valueOf(cores);
+                        }
                     } else {
                         if (nodeName.length() > 0) {
                             // processing first line of a subsequent nodeName
                             nodeToCoresMap.put(nodeName, nodeCPUCores);
                             log.debug("Node: " + nodeName + " Cores: " + nodeCPUCores);
                             nodeName = parts[0];
-                            nodeCPUCores = Integer.parseInt(parts[2]);
+                            if (!NONE.equalsIgnoreCase(cores)) {
+                                nodeCPUCores = Double.valueOf(cores);
+                            }
                         } else {
                             // processing first line of first nodeName
                             nodeName = parts[0];
-                            nodeCPUCores = Integer.parseInt(parts[2]);
+                            if (!NONE.equalsIgnoreCase(cores)) {
+                                nodeCPUCores = Double.valueOf(cores);
+                            }
                         }
                     }
                 }
@@ -401,7 +407,7 @@ public class GetAction extends SessionAction {
     public String getEventLogs(String sessionID) throws Exception {
         String events = getEvents(userID, sessionID);
         if (!StringUtil.hasLength(events)) {
-            events = "<none>";
+            events = NONE;
         }
         return events + "\n";
     }
