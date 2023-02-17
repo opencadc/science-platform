@@ -304,12 +304,8 @@ public abstract class SessionAction extends SkahaAction {
 //        execute(chown);
         
         // inject file
-        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
+        String[] injectCert = new String[] {"mv",  "-f", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
         execute(injectCert);
-        
-        // clean up
-        String[] deleteTmpFile = new String[] {"rm",  "-f", tmpFileName};
-        execute(deleteTmpFile);
     }
     
     protected String stageFile(String data) throws IOException {
