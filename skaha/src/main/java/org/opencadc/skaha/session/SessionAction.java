@@ -285,7 +285,7 @@ public abstract class SessionAction extends SkahaAction {
 
     }
     
-    protected synchronized void injectFile(String data, String posixID, String userid) throws IOException, InterruptedException {
+    protected void injectFile(String data, String posixID, String userid) throws IOException, InterruptedException {
         // stage file
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
