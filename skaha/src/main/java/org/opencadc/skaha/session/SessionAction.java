@@ -574,7 +574,7 @@ public abstract class SessionAction extends SkahaAction {
             customColumns = customColumns + 
             ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
             "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
-            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia.com/gpu," +
+            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia\\.com/gpu," +
             "FULLNAME:.metadata.name," +
             "UID:.metadata.ownerReferences[].uid"; 
         }
