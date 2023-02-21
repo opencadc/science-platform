@@ -10,7 +10,7 @@ RUN mkdir /skaha
 ADD src/startup.sh /skaha/
 RUN chmod gou+x /skaha/startup.sh
 
-USER jovyan
+USER coder
 EXPOSE 5000
 
 ENTRYPOINT [ "/skaha/startup.sh" ]
