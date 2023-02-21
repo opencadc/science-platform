@@ -253,7 +253,7 @@ public class PostAction extends SessionAction {
                     throw new IllegalArgumentException("Missing parameter 'image'");
                 }
                 
-                attachSoftware(image, params);
+                attachDesktopApp(image, params);
                 
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
@@ -348,7 +348,7 @@ public class PostAction extends SessionAction {
                     String isActive= parts[2];
                     String startTime= parts[3];
                     // look for the job ID of an active session
-                    if (!"<none>".equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
+                    if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
                         renewJobAttributes.add(uid);
                         renewJobAttributes.add(startTime);
                         renewJobMap.put(jobName, renewJobAttributes);
@@ -551,14 +551,18 @@ public class PostAction extends SessionAction {
 
     }
     
-    public void attachSoftware(String image, List<String> params) throws Exception {
+    public void attachDesktopApp(String image, List<String> params) throws Exception {
         
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
         // Get the IP address based on the session
         String[] getIPCommand = new String[] {
             "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
-                "--no-headers=true", "-o", "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp"};
+                "--no-headers=true", 
+                "-o", "custom-columns=" +
+                    "IPADDR:.status.podIP," +
+                    "DT:.metadata.deletionTimestamp," +
+                    "TYPE:.metadata.labels.canfar-net-sessionType"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
         
@@ -572,7 +576,8 @@ public class PostAction extends SessionAction {
                     log.debug("part: " + part);
                 }
             }
-            if (parts.length > 1 && parts[1].trim().equals("<none>")) {
+            if (parts.length > 1 && parts[1].trim().equals(NONE) && 
+                    SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
@@ -581,7 +586,7 @@ public class PostAction extends SessionAction {
             throw new ResourceNotFoundException("session " + sessionID + " not found");
         }
         
-        log.debug("attaching software: " + image + " to " + targetIP);
+        log.debug("attaching desktop app: " + image + " to " + targetIP);
         
         String name = getImageName(image);
         log.debug("name: " + name);

@@ -116,6 +116,8 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
     
+    protected static final String NONE = "<none>";
+    
     protected String requestType;
     protected String sessionID;
     protected String appID;
@@ -262,15 +264,7 @@ public abstract class SessionAction extends SkahaAction {
         // inject the proxy cert
         log.debug("Running docker exec to insert cert");
         
-        String tmpFileName = stageFile(proxyCert);
-        String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
-        execute(chown);
-        String[] injectCert = new String[] {"cp",  "-rp", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
-        execute(injectCert);
-        
-        
-//        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
-//        execute(chown);
+        injectFile(proxyCert, posixID, userid);
     }
     
     protected String getImageName(String image) {
@@ -289,6 +283,29 @@ public abstract class SessionAction extends SkahaAction {
             return "unknown";
         }
 
+    }
+    
+    protected void injectFile(String data, String posixID, String userid) throws IOException, InterruptedException {
+        // stage file
+        String tmpFileName = "/tmp/" + UUID.randomUUID();
+        File file = new File(tmpFileName);
+        if (!file.setExecutable(true, true)) {
+            log.debug("Failed to set execution permssion on file " + tmpFileName);
+        }
+        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+        writer.write(data + "\n");
+        writer.flush();
+        writer.close();
+        
+        // update file permissions
+        String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
+        execute(chown);
+//        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
+//        execute(chown);
+        
+        // inject file
+        String[] injectCert = new String[] {"mv",  "-f", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
+        execute(injectCert);
     }
     
     protected String stageFile(String data) throws IOException {
@@ -411,13 +428,13 @@ public abstract class SessionAction extends SkahaAction {
                     // get expiry time 
                     String uid = getUID(line);
                     String startTimeStr = session.getStartTime();
-                    if (startTimeStr.equalsIgnoreCase("<none>")) {
+                    if (startTimeStr.equalsIgnoreCase(NONE)) {
                         session.setExpiryTime(startTimeStr);
                     } else {
                         Instant instant = Instant.parse(startTimeStr);
                         String jobExpiryTimesStr = jobExpiryTimes.get(uid);
                         if (jobExpiryTimesStr == null) {
-                            session.setExpiryTime("<none>");
+                            session.setExpiryTime(NONE);
                         } else {
                             instant = instant.plus(Integer.parseInt(jobExpiryTimesStr), ChronoUnit.SECONDS);
                             session.setExpiryTime(instant.toString());
@@ -428,18 +445,18 @@ public abstract class SessionAction extends SkahaAction {
                     String fullName = getFullName(line);
                     if (resourceUsages.isEmpty()) {
                         // no job in 'Running' state
-                        session.setCoresInUse("<none>");
-                        session.setRAMInUse("<none>");
+                        session.setCPUCoresInUse(NONE);
+                        session.setRAMInUse(NONE);
                         
                     } else {
                         // at least one job is in 'Running' state
                         String resourceUsage[] = resourceUsages.get(fullName);
                         if (resourceUsage == null) {
                             // job not in 'Running' state
-                            session.setCoresInUse("<none>");
-                            session.setRAMInUse("<none>");
+                            session.setCPUCoresInUse(NONE);
+                            session.setRAMInUse(NONE);
                         } else {
-                            session.setCoresInUse(toCoreUnit(resourceUsage[0]));
+                            session.setCPUCoresInUse(toCoreUnit(resourceUsage[0]));
                             session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
                     }
@@ -453,7 +470,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String toCoreUnit(String cores) {
-        String ret = "<none>";
+        String ret = NONE;
         if (StringUtil.hasLength(cores)) {
             if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
                 // in "m" (millicore) unit, covert to cores
@@ -469,7 +486,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected String toCommonUnit(String inK8sUnit) {
-        String ret = "<none>";
+        String ret = NONE;
         if (StringUtil.hasLength(inK8sUnit)) {
             if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
                 // unit is in Ki, Mi, Gi, etc., remove the i
@@ -628,7 +645,7 @@ public abstract class SessionAction extends SkahaAction {
         String name = parts[5];
         String startTime = parts[6];
         String deletionTimestamp = parts[7];
-        if (deletionTimestamp != null && !"<none>".equals(deletionTimestamp)) {
+        if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
         String host = K8SUtil.getHostName();
