@@ -467,10 +467,10 @@ public abstract class SessionAction extends SkahaAction {
                             List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
                             String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
                             List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
-                            session.setGPUMemoryUsage(gpuUsage.get(0));
+                            session.setGPURAMInUse(gpuUsage.get(0));
                             session.setGPUUtilization(gpuUsage.get(1));
                         } else {
-                            session.setGPUMemoryUsage(NONE);
+                            session.setGPURAMInUse(NONE);
                             session.setGPUUtilization(NONE);
                         }
                     }
@@ -546,11 +546,13 @@ public abstract class SessionAction extends SkahaAction {
                     String[] segments = line.trim().split("\\|");
                     if (segments.length > 3) {
                         if (segments[3].contains("%")) {
-                            String mem = formatGPUMemoryUsage(segments[2].trim());
                             String util = segments[3].trim().split(" ")[0];
-                            usage.add(mem);
-                            usage.add(util);
-                            break;
+                            if (util.contains("%")) {
+                                String mem = formatGPUMemoryUsage(segments[2].trim());
+                                usage.add(mem);
+                                usage.add(util);
+                                break;
+                            }
                         }
                     }
                 }

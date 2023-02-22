@@ -93,10 +93,10 @@ public class Session {
     private String requestedRAM;
     private String requestedCPUCores;
     private String requestedGPUCores;
-    private String cpuCoresInUse;
-    private String gpuMemoryUsage;
-    private String gpuUtilization;
     private String ramInUse;
+    private String gpuRAMInUse;
+    private String cpuCoresInUse;
+    private String gpuUtilization;
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
         if (id == null) {
@@ -184,12 +184,12 @@ public class Session {
         this.gpuUtilization = util;
     }
 
-    public String getGPUMemoryUsage() {
-        return gpuMemoryUsage;
+    public String getGPURAMInUse() {
+        return gpuRAMInUse;
     }
 
-    public void setGPUMemoryUsage(String util) {
-        this.gpuMemoryUsage = util;
+    public void setGPURAMInUse(String util) {
+        this.gpuRAMInUse = util;
     }
 
     public String getRAMInUse() {
