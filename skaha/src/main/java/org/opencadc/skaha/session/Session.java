@@ -94,6 +94,8 @@ public class Session {
     private String requestedCPUCores;
     private String requestedGPUCores;
     private String cpuCoresInUse;
+    private String gpuMemoryUsage;
+    private String gpuUtilization;
     private String ramInUse;
 
     public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
@@ -172,6 +174,22 @@ public class Session {
 
     public void setCPUCoresInUse(String cores) {
         this.cpuCoresInUse = cores;
+    }
+
+    public String getGPUUtilization() {
+        return gpuUtilization;
+    }
+
+    public void setGPUUtilization(String util) {
+        this.gpuUtilization = util;
+    }
+
+    public String getGPUMemoryUsage() {
+        return gpuMemoryUsage;
+    }
+
+    public void setGPUMemoryUsage(String util) {
+        this.gpuMemoryUsage = util;
     }
 
     public String getRAMInUse() {

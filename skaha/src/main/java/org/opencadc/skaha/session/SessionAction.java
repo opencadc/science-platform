@@ -459,6 +459,20 @@ public abstract class SessionAction extends SkahaAction {
                             session.setCPUCoresInUse(toCoreUnit(resourceUsage[0]));
                             session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
+                        
+                        // if this session usages GPU, get the GPU usage
+                        if (StringUtil.hasText(session.getRequestedGPUCores()) &&
+                                !NONE.equals(session.getRequestedGPUCores()) &&
+                                Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
+                            List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
+                            String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
+                            List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
+                            session.setGPUMemoryUsage(gpuUsage.get(0));
+                            session.setGPUUtilization(gpuUsage.get(1));
+                        } else {
+                            session.setGPUMemoryUsage(NONE);
+                            session.setGPUUtilization(NONE);
+                        }
                     }
                 }
 
@@ -521,6 +535,49 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         return resourceUsages;
+    }
+    
+    private List<String> getGPUUsage(String usageData) {
+        List<String> usage = new ArrayList<String>();
+        if (StringUtil.hasLength(usageData)) {
+            String[] lines = usageData.split("\n");
+            for (String line : lines) {
+                if (line.contains("%")) {
+                    String[] segments = line.trim().split("\\|");
+                    if (segments.length > 3) {
+                        if (segments[3].contains("%")) {
+                            String mem = formatGPUMemoryUsage(segments[2].trim());
+                            String util = segments[3].trim().split(" ")[0];
+                            usage.add(mem);
+                            usage.add(util);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // no GPU
+        if (usage.isEmpty()) {
+            usage.add(NONE);
+            usage.add(NONE);
+        }
+
+        return usage;
+    }
+    
+    private String formatGPUMemoryUsage(String memoryData) {
+        String[] data = memoryData.split("/");
+        String data0 = data[0].trim();
+        if (data0.substring(data0.length() - 1).equalsIgnoreCase("B")) {
+            data0 = toCommonUnit(data0.substring(0, data0.length() - 1));
+        }
+
+        String data1 = data[1].trim();
+        if (data1.substring(data1.length() - 1).equalsIgnoreCase("B")) {
+            data1 = toCommonUnit(data1.substring(0, data1.length() - 1));
+        }
+        return data0 + " / " + data1;
     }
     
     protected Map<String,String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
@@ -632,6 +689,19 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("--use-protocol-buffers=true");
         return getSessionJobCMD;
+    }
+    
+    private List<String> getSessionGPUUsageCMD(String k8sNamespace, String podName) {
+        List<String> getSessionGPUCMD = new ArrayList<String>();
+        getSessionGPUCMD.add("kubectl");
+        getSessionGPUCMD.add("--namespace");
+        getSessionGPUCMD.add(k8sNamespace);
+        getSessionGPUCMD.add("exec");   
+        getSessionGPUCMD.add("-it");    
+        getSessionGPUCMD.add(podName);  
+        getSessionGPUCMD.add("--");     
+        getSessionGPUCMD.add("nvidia-smi");
+        return getSessionGPUCMD;        
     }
     
     protected Session constructSession(String k8sOutput) throws IOException {
