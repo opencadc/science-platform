@@ -1,42 +1,48 @@
 
-logLevel: info
-#logLevel: debug
+logLevel: debug
 
 externalURL: https://images-rc.canfar.net
 
-harborAdminPassword: changeme
-
 containerSecurityContext:
   runAsGroup: 1001
+  runAsUser: 0
   runAsNonRoot: true
 
 podSecurityContext:
   fsGroup: 1001
 
-#***************************************************
-service:
-  type: ClusterIP
-  tls:
-    enabled: true
-    existingSecret: "canfar-net-cert-secret"
-
+exposureType: ingress
 
 #***************************************************
 ingress:
-  enabled: true
 
-  hosts:
-    core: images-rc.canfar.net
-    notary: notary-rc.canfar.net
-  
-  annotations:
-    kubernetes.io/ingress.class: traefik
-    ingress.kubernetes.io/ssl-redirect: "true"
-    ingress.kubernetes.io/proxy-body-size: "0"
-    traefik.ingress.kubernetes.io/router.tls: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: null
-    nginx.ingress.kubernetes.io/proxy-body-size: null
+  core:
+    hostname: images-rc.canfar.net
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - images-rc.canfar.net
+      secretName: canfar-net-cert-secret
 
+  notary: 
+    hostname: notary-rc.canfar.net
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - images-rc.canfar.net
+      secretName: canfar-net-cert-secret
 
 #***************************************************
 notary:
@@ -82,6 +88,7 @@ chartmuseum:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
 
+#***************************************************
 jobservice:
   priorityClassName: uber-user-preempt-high
   affinity:
@@ -92,6 +99,7 @@ jobservice:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
 
+#***************************************************
 registry:
   priorityClassName: uber-user-preempt-high
   affinity:
@@ -102,6 +110,7 @@ registry:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
 
+#***************************************************
 trivy:
   priorityClassName: uber-user-preempt-high
   affinity:
@@ -157,6 +166,7 @@ core:
         - matchExpressions:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
+
 
 
 #***************************************************
@@ -220,9 +230,8 @@ redis:
       storageClass: ""
       subPath: harbor-redis
 
-  slave:
+  replica:
     persistence:
       enabled: true
       storageClass: ""
       subPath: harbor-redis
-
