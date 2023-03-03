@@ -1,0 +1,228 @@
+
+logLevel: debug
+
+
+adminPassword: "changeme"
+
+externalURL: https://images.opencadc.org
+
+exposureType: ingress
+
+
+
+#***************************************************
+ingress:
+
+  core:
+    hostname: images.opencadc.org
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - images.opencadc.org
+      secretName: images-net-cert-secret
+
+  notary:
+    hostname: notary.opencadc.org
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - notary.opencadc.org
+      secretName: notary-net-cert-secret
+
+
+## Notary Parameters
+## 
+notary:
+  enabled: true
+
+  server:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+  signer:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+
+
+portal:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+core:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+jobservice:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+registry:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+chartmuseum:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+trivy:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+
+
+
+#***************************************************
+persistence:
+  enabled: true
+
+  persistentVolumeClaim:
+    registry:
+      existingClaim: ""
+      storageClass: ""
+      subPath: "harbor-registry"
+      accessMode: ReadWriteOnce
+      size: 1000Gi
+
+    jobservice:
+      existingClaim: ""
+      storageClass: ""
+      subPath: "harbor-jobservice"
+      accessMode: ReadWriteOnce
+      size: 10Gi
+
+    chartmuseum:
+      existingClaim: ""
+      storageClass: ""
+      subPath: "harbor-chartmuseum"
+      accessMode: ReadWriteOnce
+      size: 40Gi
+
+    trivy:
+      existingClaim: ""
+      storageClass: ""
+      accessMode: ReadWriteOnce
+      size: 40Gi
+
+  imageChartStorage:
+    disableredirect: true
+
+#***************************************************
+postgresql:
+  enabled: true
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    subPath: harbor-postgresql
+
+  primary:
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+    volumes:
+      - name: postgresql-extended-config
+        configMap:
+          name: cadc-harbor-postgresql-extended-configuration
+          defaultMode: 0640
+      - name: custom-init-scripts
+        configMap:
+          name: cadc-harbor-postgresql-init-scripts
+          defaultMode: 0640
+
+    extraVolumeMounts:
+      - name: writableconf
+        mountPath: /opt/bitnami/postgresql/conf
+      - name: writableconfd
+        mountPath: /opt/bitnami/postgresql/conf/conf.d
+      - name: writabletmp
+        mountPath: /opt/bitnami/postgresql/tmp
+    extraVolumes:
+      - name: writableconf
+        emptyDir: {}
+      - name: writableconfd
+        emptyDir: {}
+      - name: writabletmp
+        emptyDir: {}
+
+
+
+#***************************************************
+redis:
+  enabled: true
+
+  master:
+    priorityClassName: uber-user-preempt-high
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+    persistence:
+      enabled: true
+      storageClass: ""
+      subPath: harbor-redis
+
+  slave:
+    persistence:
+      enabled: true
+      storageClass: "csi-cinder-sc-delete"
+      subPath: harbor-redis
+
