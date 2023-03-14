@@ -5,7 +5,6 @@ externalURL: https://images-rc.canfar.net
 
 containerSecurityContext:
   runAsGroup: 1001
-  runAsUser: 0
   runAsNonRoot: true
 
 podSecurityContext:
