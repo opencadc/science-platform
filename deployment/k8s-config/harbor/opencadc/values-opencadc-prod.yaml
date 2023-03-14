@@ -1,47 +1,61 @@
 
-logLevel: info
-#logLevel: debug
+logLevel: debug
 
-externalURL: https://images-rc.canfar.net
 
-harborAdminPassword: changeme
+adminPassword: "changeme"
 
-containerSecurityContext:
-  runAsGroup: 1001
-  runAsNonRoot: true
+externalURL: https://images.opencadc.org
 
-podSecurityContext:
-  fsGroup: 1001
+exposureType: ingress
 
-#***************************************************
-service:
-  type: ClusterIP
-  tls:
-    enabled: true
-    existingSecret: "canfar-net-cert-secret"
 
 
 #***************************************************
 ingress:
+
+  core:
+    hostname: images.opencadc.org
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - images.opencadc.org
+      secretName: images-net-cert-secret
+
+  notary:
+    hostname: notary.opencadc.org
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: null
+      nginx.ingress.kubernetes.io/proxy-body-size: null
+    extraTls:
+    - hosts:
+        - notary.opencadc.org
+      secretName: notary-net-cert-secret
+
+
+## Notary Parameters
+## 
+notary:
   enabled: true
 
-  hosts:
-    core: images-rc.canfar.net
-    notary: notary-rc.canfar.net
-  
-  annotations:
-    kubernetes.io/ingress.class: traefik
-    ingress.kubernetes.io/ssl-redirect: "true"
-    ingress.kubernetes.io/proxy-body-size: "0"
-    traefik.ingress.kubernetes.io/router.tls: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: null
-    nginx.ingress.kubernetes.io/proxy-body-size: null
-
-
-#***************************************************
-notary:
-  server: 
-    priorityClassName: uber-user-preempt-high
+  server:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: nvidia.com/gpu.count
+              operator: DoesNotExist
+  signer:
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -50,19 +64,8 @@ notary:
             - key: nvidia.com/gpu.count
               operator: DoesNotExist
 
-  signer: 
-    priorityClassName: uber-user-preempt-high
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-          - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
 
-#***************************************************
 portal:
-  priorityClassName: uber-user-preempt-high
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -71,9 +74,7 @@ portal:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
 
-#***************************************************
-chartmuseum:
-  priorityClassName: uber-user-preempt-high
+core:
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -83,7 +84,6 @@ chartmuseum:
             operator: DoesNotExist
 
 jobservice:
-  priorityClassName: uber-user-preempt-high
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -93,7 +93,15 @@ jobservice:
             operator: DoesNotExist
 
 registry:
-  priorityClassName: uber-user-preempt-high
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.count
+            operator: DoesNotExist
+
+chartmuseum:
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -103,7 +111,6 @@ registry:
             operator: DoesNotExist
 
 trivy:
-  priorityClassName: uber-user-preempt-high
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -111,6 +118,9 @@ trivy:
         - matchExpressions:
           - key: nvidia.com/gpu.count
             operator: DoesNotExist
+
+
+
 
 #***************************************************
 persistence:
@@ -122,7 +132,7 @@ persistence:
       storageClass: ""
       subPath: "harbor-registry"
       accessMode: ReadWriteOnce
-      size: 800Gi
+      size: 1000Gi
 
     jobservice:
       existingClaim: ""
@@ -139,25 +149,13 @@ persistence:
       size: 40Gi
 
     trivy:
+      existingClaim: ""
       storageClass: ""
       accessMode: ReadWriteOnce
       size: 40Gi
 
   imageChartStorage:
     disableredirect: true
-
-
-#***************************************************
-core:
-  priorityClassName: uber-user-preempt-high
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
-
 
 #***************************************************
 postgresql:
@@ -202,6 +200,8 @@ postgresql:
       - name: writabletmp
         emptyDir: {}
 
+
+
 #***************************************************
 redis:
   enabled: true
@@ -223,5 +223,6 @@ redis:
   slave:
     persistence:
       enabled: true
-      storageClass: ""
+      storageClass: "csi-cinder-sc-delete"
       subPath: harbor-redis
+
