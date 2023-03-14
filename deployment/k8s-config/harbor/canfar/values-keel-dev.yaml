@@ -225,4 +225,3 @@ redis:
       enabled: true
       storageClass: ""
       subPath: harbor-redis
-
