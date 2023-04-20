@@ -172,7 +172,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     public static String execute(String[] command) throws IOException, InterruptedException {
-        return execute(command, false);
+        return execute(command, true);
     }
     
     public static void execute(String[] command, OutputStream out) throws IOException, InterruptedException {
