@@ -1,2 +1,2 @@
 #!/bin/bash
-helm install -n cadc-harbor cadc-harbor bitnami/harbor -f values-keel-dev.yaml --version 12.3.7
+helm --namespace cadc-harbor install cadc-harbor bitnami/harbor -f values-keel-dev.yaml --version 16.4.6 --set postgresql.image.tag="11.15.0"
