@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: arc-tomcat
 spec:
+  replicas: 1
   template:
     spec:
       containers:
