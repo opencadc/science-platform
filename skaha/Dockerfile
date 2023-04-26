@@ -1,4 +1,4 @@
-FROM cadc-tomcat:latest
+FROM images.opencadc.org/library/cadc-tomcat:1
 
 # install docker
 RUN dnf install -y docker
