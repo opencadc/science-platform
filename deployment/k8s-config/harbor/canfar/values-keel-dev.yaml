@@ -40,7 +40,7 @@ ingress:
       nginx.ingress.kubernetes.io/proxy-body-size: null
     extraTls:
     - hosts:
-        - images-rc.canfar.net
+        - notary-rc.canfar.net
       secretName: canfar-net-cert-secret
 
 #***************************************************
