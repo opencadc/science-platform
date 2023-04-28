@@ -72,19 +72,26 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,22 +107,24 @@ import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 
 /**
- *
  * @author majorb
  */
 public class PostAction extends SessionAction {
-    
+
     private static final Logger log = Logger.getLogger(PostAction.class);
-    
+
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
-    
+
+    private static final int DEFAULT_USER_QUOTA_IN_GB = 10;
+
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
     public static final String SKAHA_USERID = "skaha.userid";
+    public static final String SKAHA_USER_QUOTA_GB = "skaha.userquotagb";
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
@@ -137,6 +146,20 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
+    private static final String SKAHA_ADD_USER_CONFIG_PATH = "add-user/skaha-add-user-keel.yaml";
+
+
+    private static final String[] TEST_USER_BASE_COMMAND = new String[] {
+            "test", "-d", "/arc/home/%s"
+    };
+
+    private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
+            "kubectl", "-n skaha-system", "create", "-f -"
+    };
+
+    //     private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
+    //            "kubectl", "-n skaha-system", "create", "-f skaha-add-user-keel-dev.yaml"
+    //    };
 
 
     public PostAction() {
@@ -145,12 +168,12 @@ public class PostAction extends SessionAction {
 
     @Override
     public void doAction() throws Exception {
-        
+
         super.initRequest();
-        
+
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                                
+
                 String name = syncInput.getParameter("name");
                 String image = syncInput.getParameter("image");
                 String type = syncInput.getParameter("type");
@@ -168,11 +191,11 @@ public class PostAction extends SessionAction {
                 }
                 validateName(name);
                 String validatedType = validateImage(image, type);
-                
+
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
                 checkExistingSessions(userID, validatedType);
-                
+
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
@@ -180,8 +203,8 @@ public class PostAction extends SessionAction {
                 ResourceContexts rc = new ResourceContexts();
                 Integer cores = rc.getDefaultCores(validatedType);
                 Integer ram = rc.getDefaultRAM(validatedType);
-                Integer gpus = 0;
-                
+                int gpus = 0;
+
                 if (coresParam != null) {
                     try {
                         cores = Integer.valueOf(coresParam);
@@ -192,7 +215,7 @@ public class PostAction extends SessionAction {
                         throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
                     }
                 }
-                
+
                 if (ramParam != null) {
                     try {
                         ram = Integer.valueOf(ramParam);
@@ -203,10 +226,10 @@ public class PostAction extends SessionAction {
                         throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
                     }
                 }
-                
+
                 if (gpusParam != null) {
                     try {
-                        gpus = Integer.valueOf(gpusParam);
+                        gpus = Integer.parseInt(gpusParam);
                         if (!rc.getAvailableGPUs().contains(gpus)) {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
@@ -214,12 +237,13 @@ public class PostAction extends SessionAction {
                         throw new IllegalArgumentException("Invalid value for 'gpus': " + gpusParam);
                     }
                 }
-                
+
+                ensureUserBase();
                 createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
-                
+
             } else {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
@@ -230,7 +254,8 @@ public class PostAction extends SessionAction {
                                 renew(entry);
                             }
                         } else {
-                            throw new IllegalArgumentException("No active job for user " + userID + " with session " + sessionID);
+                            throw new IllegalArgumentException(
+                                    "No active job for user " + userID + " with session " + sessionID);
                         }
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
@@ -244,28 +269,83 @@ public class PostAction extends SessionAction {
         if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
                 // create an app
-                
+
                 // gather job parameters
                 String image = syncInput.getParameter("image");
-                List<String> params = syncInput.getParameters("param");
-                
+
                 if (image == null) {
                     throw new IllegalArgumentException("Missing parameter 'image'");
                 }
-                
-                attachDesktopApp(image, params);
-                
+
+                attachDesktopApp(image);
+
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
             }
         }
     }
-    
+
+    void ensureUserBase() throws IOException, InterruptedException {
+        final String[] command = new String[PostAction.TEST_USER_BASE_COMMAND.length];
+        System.arraycopy(PostAction.TEST_USER_BASE_COMMAND, 0, command, 0, command.length);
+
+        command[command.length - 1] = String.format(command[command.length - 1], this.userID);
+        final Process p = Runtime.getRuntime().exec(command);
+
+        if (p.waitFor() != 0) {
+            makeUserBase();
+        }
+    }
+
+    void makeUserBase() throws IOException, InterruptedException {
+        final Process p = Runtime.getRuntime().exec(PostAction.TEST_USER_BASE_COMMAND);
+        final InputStream stdOut = new BufferedInputStream(p.getInputStream());
+        final InputStream stdErr = new BufferedInputStream(p.getErrorStream());
+        final BufferedOutputStream commandInput = new BufferedOutputStream(p.getOutputStream());
+        processCommandInput(commandInput);
+
+        if (p.waitFor() != 0) {
+            final String errorOutput = readStream(stdErr);
+            throw new IOException("Unable to create user home.\n\nMessage from server: " + errorOutput);
+        } else {
+            log.debug(readStream(stdOut));
+        }
+    }
+
+    void processCommandInput(final OutputStream commandInput) throws IOException {
+        final List<String> fileLines = readAddUserConfig();
+
+        fileLines.replaceAll(l -> l.replace("{" + PostAction.SKAHA_USERID + "}", getUserID()));
+        fileLines.replaceAll(l -> l.replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
+                                            Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB)));
+        for (final String line : fileLines) {
+            commandInput.write(line.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * Override to test user ID without processing an entire Request.
+     * @return  String userID, if present.
+     */
+    String getUserID() {
+        return this.userID;
+    }
+
+    /**
+     * Read the config file as a list of String lines.  Tests can override as needed.
+     * @return  List of String instances, never null.
+     * @throws IOException  If the file cannot be read.
+     */
+    List<String> readAddUserConfig() throws IOException {
+        return Files.readAllLines(FileUtil.getFileFromResource(PostAction.SKAHA_ADD_USER_CONFIG_PATH,
+                                                               PostAction.class).toPath());
+    }
+
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
             String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            List<String> renewExpiryTimeCmd = new ArrayList<String>();
+            List<String> renewExpiryTimeCmd = new ArrayList<>();
             renewExpiryTimeCmd.add("kubectl");
             renewExpiryTimeCmd.add("--namespace");
             renewExpiryTimeCmd.add(k8sNamespace);
@@ -274,12 +354,13 @@ public class PostAction extends SessionAction {
             renewExpiryTimeCmd.add(entry.getKey());
             renewExpiryTimeCmd.add("--type=json");
             renewExpiryTimeCmd.add("-p");
-            renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
+            renewExpiryTimeCmd.add(
+                    "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
             execute(renewExpiryTimeCmd.toArray(new String[0]));
         }
     }
-    
-    
+
+
     private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
         String uid = jobAttributes.get(0);
         String startTimeStr = jobAttributes.get(1);
@@ -288,19 +369,19 @@ public class PostAction extends SessionAction {
         if (!StringUtil.hasLength(configuredExpiryStr)) {
             throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
         }
-        Long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
+        long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, userID);
         String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
-            Long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
+            long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
             Instant startTime = Instant.parse(startTimeStr);
-            
-            Long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
-            Long timeRemaining = activeDeadlineSeconds - timeUsed;
+
+            long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
+            long timeRemaining = activeDeadlineSeconds - timeUsed;
             // default to no need to extend the expiry time
-            Long calculatedTime = 0L;
+            long calculatedTime = 0L;
             if (configuredExpiryTime > timeRemaining) {
                 // add elapsed time (from startTime to now) to the configured expiry time
                 calculatedTime = startTime.until(Instant.now(), ChronoUnit.SECONDS) + configuredExpiryTime;
@@ -311,10 +392,10 @@ public class PostAction extends SessionAction {
             throw new IllegalStateException("missing configuration item activeDeadlineSeconds");
         }
     }
-    
+
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getRenewJobNamesCmd = new ArrayList<String>();
+        List<String> getRenewJobNamesCmd = new ArrayList<>();
         getRenewJobNamesCmd.add("kubectl");
         getRenewJobNamesCmd.add("get");
         getRenewJobNamesCmd.add("--namespace");
@@ -324,42 +405,40 @@ public class PostAction extends SessionAction {
         getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
         getRenewJobNamesCmd.add("--no-headers=true");
         getRenewJobNamesCmd.add("-o");
-        
+
         String customColumns = "custom-columns=" +
-            "NAME:.metadata.name," + 
-            "UID:.metadata.uid," + 
-            "STATUS:.status.active," + 
-            "START:.status.startTime";
-        
+                               "NAME:.metadata.name," +
+                               "UID:.metadata.uid," +
+                               "STATUS:.status.active," +
+                               "START:.status.startTime";
+
         getRenewJobNamesCmd.add(customColumns);
-                
+
         String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
-       
+
         Map<String, List<String>> renewJobMap = new HashMap<String, List<String>>();
         if (StringUtil.hasLength(renewJobNamesStr)) {
             String[] lines = renewJobNamesStr.split("\n");
-            if (lines.length > 0) {
-                for (String line : lines) {
-                    List<String> renewJobAttributes = new ArrayList<String>();
-                    String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                    String jobName = parts[0];
-                    String uid = parts[1];
-                    String isActive= parts[2];
-                    String startTime= parts[3];
-                    // look for the job ID of an active session
-                    if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
-                        renewJobAttributes.add(uid);
-                        renewJobAttributes.add(startTime);
-                        renewJobMap.put(jobName, renewJobAttributes);
-                    }
+            for (String line : lines) {
+                List<String> renewJobAttributes = new ArrayList<String>();
+                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
+                String jobName = parts[0];
+                String uid = parts[1];
+                String isActive = parts[2];
+                String startTime = parts[3];
+                // look for the job ID of an active session
+                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
+                    renewJobAttributes.add(uid);
+                    renewJobAttributes.add(startTime);
+                    renewJobMap.put(jobName, renewJobAttributes);
                 }
             }
         }
 
         return renewJobMap;
     }
-    
+
     private void validateName(String name) {
         if (!StringUtil.hasText(name)) {
             throw new IllegalArgumentException("name must have a value");
@@ -368,20 +447,21 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("name can only contain alpha-numeric chars and '-'");
         }
     }
-    
+
     /**
      * Validate and return the session type
-     * 
+     *
      * @param imageID The image to validate
-     * @param type User-provided session type (optional)
+     * @param type    User-provided session type (optional)
      * @return The system recognized session type
-     * @throws ResourceNotFoundException 
+     * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
+     * @throws Exception                 If Harbor calls fail
      */
     private String validateImage(String imageID, String type) throws Exception {
         if (!StringUtil.hasText(imageID)) {
             throw new IllegalArgumentException("image is required");
         }
-        
+
         for (String harborHost : harborHosts) {
             if (imageID.startsWith(harborHost)) {
                 Image image = getImage(imageID);
@@ -394,24 +474,24 @@ public class PostAction extends SessionAction {
                 return image.getType();
             }
         }
-                
+
         if (adminUser && type != null) {
             if (!SESSION_TYPES.contains(type)) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
             }
             return type;
         }
-        
+
         StringBuilder hostList = new StringBuilder("[").append(harborHosts.get(0));
         for (String next : harborHosts.subList(1, harborHosts.size())) {
             hostList.append(",").append(next);
         }
         hostList.append("]");
-        
+
         throw new IllegalArgumentException("session image must come from one of " + hostList);
-        
+
     }
-    
+
     public void checkExistingSessions(String userid, String type) throws Exception {
         // multiple 
         if (SESSION_TYPE_HEADLESS.equals(type)) {
@@ -433,28 +513,29 @@ public class PostAction extends SessionAction {
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
             throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
-                maxUserSessions + " active sessions.");
+                                               maxUserSessions + " active sessions.");
         }
     }
-    
+
     public void createSession(String sessionID, String type, String image, String name,
-        Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs) throws Exception {
-        
+                              Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs)
+            throws Exception {
+
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
         String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
-        
-        String imageSecret = getHarborSecret(image);            
+
+        String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
             imageSecret = "notused";
         }
-        
+
         String supplementalGroups = getSupplementalGroupsList();
-        
-        String jobLaunchPath = null;
-        String servicePath = null;
-        String ingressPath = null;
+
+        final String jobLaunchPath;
+        final String servicePath;
+        final String ingressPath;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
@@ -478,15 +559,17 @@ public class PostAction extends SessionAction {
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
+                servicePath = null;
+                ingressPath = null;
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
-        String jobLaunchString = new String(jobLaunchBytes, "UTF-8");
+        String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         String gpuScheduling = getGPUScheduling(gpus);
-        
+
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
@@ -494,7 +577,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -504,43 +587,43 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram.toString() + "Gi");
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        
+
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-          
+
         String[] launchCmd = new String[] {
-            "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
-        
+
         // insert the user's proxy cert in the home dir
-        Subject subject = AuthenticationUtil.getCurrentSubject();   
+        Subject subject = AuthenticationUtil.getCurrentSubject();
         injectProxyCert(subject, userID, posixID);
-        
+
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
-            String serviceString = new String(serviceBytes, "UTF-8");
+            String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
             launchCmd = new String[] {
-                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
         }
-        
+
         if (ingressPath != null) {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
-            String ingressString = new String(ingressBytes, "UTF-8");
+            String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = new String[] {
-                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
-        
+
         // Removed 3 second delay--container initialization cannot be quantified
         // so this is pointless.
         //try {
@@ -550,22 +633,22 @@ public class PostAction extends SessionAction {
         //}
 
     }
-    
-    public void attachDesktopApp(String image, List<String> params) throws Exception {
-        
+
+    public void attachDesktopApp(String image) throws Exception {
+
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        
+
         // Get the IP address based on the session
         String[] getIPCommand = new String[] {
-            "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
-                "--no-headers=true", 
+                "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
+                "--no-headers=true",
                 "-o", "custom-columns=" +
-                    "IPADDR:.status.podIP," +
-                    "DT:.metadata.deletionTimestamp," +
-                    "TYPE:.metadata.labels.canfar-net-sessionType"};
+                      "IPADDR:.status.podIP," +
+                      "DT:.metadata.deletionTimestamp," +
+                      "TYPE:.metadata.labels.canfar-net-sessionType"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
-        
+
         String targetIP = null;
         String[] ipLines = ipResult.split("\n");
         for (String ipLine : ipLines) {
@@ -576,27 +659,27 @@ public class PostAction extends SessionAction {
                     log.debug("part: " + part);
                 }
             }
-            if (parts.length > 1 && parts[1].trim().equals(NONE) && 
-                    SESSION_TYPE_DESKTOP.equals(parts[2])) {
+            if (parts.length > 1 && parts[1].trim().equals(NONE) &&
+                SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
-        
+
         if (targetIP == null) {
             throw new ResourceNotFoundException("session " + sessionID + " not found");
         }
-        
+
         log.debug("attaching desktop app: " + image + " to " + targetIP);
-        
+
         String name = getImageName(image);
         log.debug("name: " + name);
-        String imageSecret = getHarborSecret(image);            
+        String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
         if (imageSecret == null) {
             imageSecret = "notused";
         }
         log.debug("image secret: " + imageSecret);
-        
+
         String posixID = getPosixId();
         String supplementalGroups = getSupplementalGroupsList();
 
@@ -607,7 +690,7 @@ public class PostAction extends SessionAction {
         // that it becomes the xterm title
         String param = name;
         log.debug("Using parameter: " + param);
-        
+
         String uniqueID = new RandomStringGenerator(3).getID();
         String jobName = sessionID + "-" + uniqueID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
@@ -624,8 +707,8 @@ public class PostAction extends SessionAction {
         }
 
         String gpuScheduling = getGPUScheduling(0);
-        
-        String launchString = new String(launchBytes, "UTF-8");
+
+        String launchString = new String(launchBytes, StandardCharsets.UTF_8);
         launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
@@ -636,42 +719,44 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
-        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups); 
+        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-                       
+
         String launchFile = super.stageFile(launchString);
-        
+
         String[] launchCmd = new String[] {
-            "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
+                "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile
+        };
+
         String createResult = execute(launchCmd);
         log.debug("Create result: " + createResult);
-        
+
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
         injectProxyCert(subject, userID, posixID);
     }
-    
+
     private String getPosixId() {
         Subject s = AuthenticationUtil.getCurrentSubject();
         Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
         int uidNumber = principals.iterator().next().getUidNumber();
         return Integer.toString(uidNumber);
     }
-    
+
     private String setConfigValue(String doc, String key, String value) {
         String regKey = key.replace(".", "\\.");
         String regex = "\\$[{]" + regKey + "[}]";
         return doc.replaceAll(regex, value);
     }
-    
+
     private String getHarborSecret(String image) throws Exception {
         // get the user's cli secret:
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret
-        
-        String harborHost = null; 
+
+        String harborHost = null;
         for (String next : harborHosts) {
             if (image.startsWith(next)) {
                 harborHost = next;
@@ -680,9 +765,9 @@ public class PostAction extends SessionAction {
         if (harborHost == null) {
             throw new IllegalArgumentException("not a skaha harbor image: " + image);
         }
-        
+
         String idToken = super.getIdToken();
-        
+
         log.debug("getting secret from harbor");
         URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
         OutputStream out = new ByteArrayOutputStream();
@@ -709,27 +794,28 @@ public class PostAction extends SessionAction {
         String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
         log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
-        
+
         String secretName = "harbor-secret-" + userID.toLowerCase();
-        
+
         // delete any old secret by this name
         String[] deleteCmd = new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
         try {
             String deleteResult = execute(deleteCmd);
             log.debug("delete secret result: " + deleteResult);
-        } catch (IOException notfound) {
-            log.debug("no secret to delete", notfound);
+        } catch (IOException notFound) {
+            log.debug("no secret to delete", notFound);
         }
-        
+
         // harbor invalidates secrets with the unicode replacement characters 'fffd'.
         if (cliSecret != null && !cliSecret.startsWith("\ufffd")) {
             // create new secret
             String[] createCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry", secretName,
-                 "--docker-server=" + harborHost,
-                 "--docker-username=" + harborUsername,
-                 "--docker-password=" + cliSecret};
+                    "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+                    secretName,
+                    "--docker-server=" + harborHost,
+                    "--docker-username=" + harborUsername,
+                    "--docker-password=" + cliSecret};
             try {
                 String createResult = execute(createCmd);
                 log.debug("create secret result: " + createResult);
@@ -752,15 +838,15 @@ public class PostAction extends SessionAction {
             log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
             return null;
         }
-        
+
         return secretName;
-        
+
     }
-    
-    
+
+
     private String getSupplementalGroupsList() {
         Subject subject = AuthenticationUtil.getCurrentSubject();
-        Class c = (Class<List<Group>>)(Class<?>)List.class;
+        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
         Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
         if (groupCreds.size() == 1) {
             List<Group> memberships = groupCreds.iterator().next();
@@ -776,18 +862,18 @@ public class PostAction extends SessionAction {
         }
         return "";
     }
-    
+
     /**
-      Create the image, command, args, and env sections of the job launch yaml.  Example:
-      
-        image: "${software.imageid}"
-        command: ["/skaha-system/start-desktop-software.sh"]
-        args: [arg1, arg2]
-        env:
-        - name: HOME
-          value: "/cavern/home/${skaha.userid}"
-        - name: SHELL
-          value: "/bin/bash"   
+     * Create the image, command, args, and env sections of the job launch yaml.  Example:
+     * <p>
+     * image: "${software.imageid}"
+     * command: ["/skaha-system/start-desktop-software.sh"]
+     * args: [arg1, arg2]
+     * env:
+     * - name: HOME
+     * value: "/cavern/home/${skaha.userid}"
+     * - name: SHELL
+     * value: "/bin/bash"
      */
     private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
         StringBuilder sb = new StringBuilder();
@@ -822,10 +908,10 @@ public class PostAction extends SessionAction {
                 }
             }
         }
-        
+
         return sb.toString();
     }
-    
+
     private String getGPUScheduling(Integer gpus) {
         StringBuilder sb = new StringBuilder();
         sb.append("affinity:\n");
@@ -845,5 +931,5 @@ public class PostAction extends SessionAction {
         }
         return sb.toString();
     }
-    
+
 }

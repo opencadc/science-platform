@@ -106,11 +106,10 @@ public class SkahaAvailability implements AvailabilityPlugin
             String[] getPods = new String[] {
                 "kubectl", "get", "--namespace", k8sNamespace, "pods"};
             SessionAction.execute(getPods);
+            return STATUS_UP;
         } catch (Exception e) {
-            Availability down = new Availability(false, "failed to run kubectl");
-            return down;
+            return new Availability(false, "failed to run kubectl: " + e.getMessage());
         }
-        return STATUS_UP;
     }
 
     @Override

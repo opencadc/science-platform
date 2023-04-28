@@ -102,9 +102,9 @@ import org.opencadc.gms.GroupURI;
 import org.opencadc.skaha.image.Image;
 
 public abstract class SkahaAction extends RestAction {
-    
+
     private static final Logger log = Logger.getLogger(SkahaAction.class);
-    
+
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
     public static final String SESSION_TYPE_DESKTOP = "desktop";
@@ -112,19 +112,19 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_HEADLESS = "headless";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static List<String> SESSION_TYPES = Arrays.asList(
-        new String[] {SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
-            SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP});
-    
+            SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
+            SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
+
     protected String userID;
     protected boolean adminUser = false;
     protected String server;
     protected String homedir;
     protected String scratchdir;
-    public List<String> harborHosts = new ArrayList<String>();
+    public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected String skahaAdminsGroup;
     protected int maxUserSessions;
-    
+
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
         homedir = System.getenv("skaha.homedir");
@@ -141,8 +141,8 @@ public abstract class SkahaAction extends RestAction {
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
             maxUserSessions = 1;
-        } else {   
-            maxUserSessions = new Integer(maxUsersSessionsString).intValue();
+        } else {
+            maxUserSessions = Integer.parseInt(maxUsersSessionsString);
         }
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
@@ -152,17 +152,17 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
     }
-    
+
     @Override
     protected InlineContentHandler getInlineContentHandler() {
         return null;
     }
 
     protected void initRequest() throws Exception {
-        
+
         final Subject subject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + subject);
-        
+
         if (subject == null || subject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
@@ -172,58 +172,57 @@ public abstract class SkahaAction extends RestAction {
         }
         userID = httpPrincipals.iterator().next().getName();
         log.debug("userID: " + userID);
-        
+
         // ensure user is a part of the skaha group
         if (skahaUsersGroup == null) {
             throw new IllegalStateException("skaha.usersgroup not defined in system properties");
         }
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
-        
+
         // get all the user's groups
         if (!CredUtil.checkCredentials()) {
             throw new IllegalStateException("cannot access delegated credentials");
         }
         GMSClient gmsClient = new GMSClient(gmsSearchURI);
         List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
-        
-        Group skahaUsersGroupObj = null;
+
+        final Group skahaUsersGroupObj;
         try {
-            skahaUsersGroupObj = new Group(new GroupURI(skahaUsersGroup));
+            skahaUsersGroupObj = new Group(new GroupURI(URI.create(skahaUsersGroup)));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        
+
         if (!memberships.contains(skahaUsersGroupObj)) {
             throw new AccessControlException("Not authorized to use the skaha system");
         }
-        
-        Group skahaAdminGroupObj = null;
+
         if (skahaAdminsGroup == null) {
             log.warn("skaha.adminsgroup not defined in system properties");
         } else {
             try {
-                skahaAdminGroupObj = new Group(new GroupURI(skahaAdminsGroup));
-                if (memberships.contains(skahaAdminGroupObj)) {
+                final Group adminGroup = new Group(new GroupURI(URI.create(skahaAdminsGroup)));
+                if (memberships.contains(adminGroup)) {
                     adminUser = true;
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
-        
+
         // save group memberships in subject
         subject.getPublicCredentials().add(memberships);
 
     }
-    
+
     protected String getIdToken() throws Exception {
         LocalAuthority localAuthority = new LocalAuthority();
         URI serviceURI = localAuthority.getServiceURI(Standards.SECURITY_METHOD_OAUTH.toString());
         RegistryClient regClient = new RegistryClient();
         URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
         log.debug("using ac oauth endpoint: " + oauthURL);
-        
+
         log.debug("checking public credentials for idToken");
         Subject subject = AuthenticationUtil.getCurrentSubject();
         if (subject != null) {
@@ -233,11 +232,11 @@ public abstract class SkahaAction extends RestAction {
                 return idTokens.iterator().next().idToken;
             }
         }
-        log.debug("verfifying delegated credentials");
+        log.debug("verifying delegated credentials");
         if (!CredUtil.checkCredentials()) {
             throw new IllegalStateException("cannot access delegated credentials");
         }
-        
+
         log.debug("getting idToken from ac");
         URL acURL = new URL(oauthURL.toString() + "?response_type=id_token&client_id=arbutus-harbor&scope=cli");
         OutputStream out = new ByteArrayOutputStream();
@@ -256,11 +255,13 @@ public abstract class SkahaAction extends RestAction {
         // adding to public credentials
         IDToken tokenClass = new IDToken();
         tokenClass.idToken = idToken;
-        subject.getPublicCredentials().add(tokenClass);
-        
+        if (subject != null) {
+            subject.getPublicCredentials().add(tokenClass);
+        }
+
         return idToken;
     }
-    
+
     public Image getImage(String imageID) throws Exception {
         String idToken = getIdToken();
 
@@ -276,17 +277,17 @@ public abstract class SkahaAction extends RestAction {
         log.debug("project: " + project);
         log.debug("repo: " + repo);
         log.debug("version: " + version);
-        
+
         String artifacts = callHarbor(idToken, harborHost, project, repo);
-        
+
         JSONArray jArtifacts = new JSONArray(artifacts);
 
-        for (int a=0; a<jArtifacts.length(); a++) {
+        for (int a = 0; a < jArtifacts.length(); a++) {
             JSONObject jArtifact = jArtifacts.getJSONObject(a);
-            
+
             if (!jArtifact.isNull("tags")) {
                 JSONArray tags = jArtifact.getJSONArray("tags");
-                for (int j=0; j<tags.length(); j++) {
+                for (int j = 0; j < tags.length(); j++) {
                     JSONObject jTag = tags.getJSONObject(j);
                     String tag = jTag.getString("name");
                     if (version.equals(tag)) {
@@ -306,27 +307,28 @@ public abstract class SkahaAction extends RestAction {
             }
 
         }
-        
-        
+
+
         return null;
     }
-    
+
     protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
-        
-        URL harborURL = null;
-        String message = null;
+
+        final URL harborURL;
+        final String message;
         if (project == null) {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects?page_size=100");
             message = "projects";
         } else if (repo == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
+            harborURL = new URL(
+                    "https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
             message = "repositories";
         } else {
             harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
+                                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
             message = "artifacts";
         }
-        
+
         OutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(harborURL, out);
         get.setRequestProperty("Authorization", "Bearer " + idToken);
@@ -338,7 +340,7 @@ public abstract class SkahaAction extends RestAction {
             log.debug("response code: " + get.getResponseCode());
             throw e;
         }
-     
+
         if (get.getThrowable() != null) {
             log.warn("error listing harbor " + message, get.getThrowable());
             throw new RuntimeException(get.getThrowable());
@@ -347,12 +349,12 @@ public abstract class SkahaAction extends RestAction {
         String output = out.toString();
         log.debug(message + " output: " + output);
         return output;
-        
+
     }
-    
+
     protected Set<String> getTypesFromLabels(JSONArray labels) {
-        Set<String> types = new HashSet<String>();
-        for (int i=0; i<labels.length(); i++) {
+        Set<String> types = new HashSet<>();
+        for (int i = 0; i < labels.length(); i++) {
             JSONObject label = labels.getJSONObject(i);
             String name = label.getString("name");
             log.debug("label: " + name);
@@ -362,12 +364,12 @@ public abstract class SkahaAction extends RestAction {
         }
         return types;
     }
-    
+
     /**
      * Temporary holder of tokens until cadc-util auth package with Token
      * support released.
      */
-    class IDToken {
+    static class IDToken {
         public String idToken;
     }
 }

@@ -87,6 +87,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
@@ -124,11 +125,6 @@ public abstract class SessionAction extends SkahaAction {
     
     public SessionAction() {
         super();
-    }
-    
-    @Override
-    protected InlineContentHandler getInlineContentHandler() {
-        return null;
     }
 
     protected void initRequest() throws Exception {
@@ -168,7 +164,7 @@ public abstract class SessionAction extends SkahaAction {
         while ((nRead = in.read(data, 0, data.length)) != -1) {
             buffer.write(data, 0, nRead);
         }
-        return buffer.toString("UTF-8");
+        return buffer.toString(StandardCharsets.UTF_8);
     }
     
     public static String execute(String[] command) throws IOException, InterruptedException {
@@ -189,12 +185,12 @@ public abstract class SessionAction extends SkahaAction {
             }
             count = rbc.read(buffer);
             if (count != -1) {
-                wbc.write((ByteBuffer)buffer.flip());
+                wbc.write(buffer.flip());
                 buffer.flip();
             }
         }
     }
-    
+
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         String stdout = readStream(p.getInputStream());

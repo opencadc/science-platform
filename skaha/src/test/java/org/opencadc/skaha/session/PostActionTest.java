@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2022.                            (c) 2022.
+ *  (c) 2023.                            (c) 2023.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -62,98 +62,75 @@
  *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
  *                                       <http://www.gnu.org/licenses/>.
  *
+ *
  ************************************************************************
  */
 
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.SSLUtil;
-import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.RegistryClient;
-import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
-
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.lang.reflect.Type;
-import java.net.URI;
-import java.net.URL;
-import java.security.PrivilegedExceptionAction;
-import java.util.List;
-
-import javax.security.auth.Subject;
-
 import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.skaha.image.Image;
 
-/**
- * @author yeunga
- *
- */
-public class ImagesTest {
-    
-    private static final Logger log = Logger.getLogger(ImagesTest.class);
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-    
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+
+public class PostActionTest {
     static {
-        Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
+        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
-    
-    protected URL imageURL;
-    protected Subject userSubject;
-    
-    public ImagesTest() {
-        try {
-            RegistryClient regClient = new RegistryClient();
-            imageURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
-            imageURL = new URL(imageURL.toString() + "/image");
-            log.info("sessions URL: " + imageURL);
-    
-            File cert = FileUtil.getFileFromResource("skaha-test.pem", ImagesTest.class);
-            userSubject = SSLUtil.createSubject(cert);
-            log.debug("userSubject: " + userSubject);
-        } catch (Exception e) {
-            log.error("init exception", e);
-            throw new RuntimeException("init exception", e);
-        }
-    }
-    
-    @Test
-    public void testGetImageList() {
-        try {
-            
-            Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
-                // should have at least one image
-                List<Image> images = getImages();
-                Assert.assertTrue("one or more images", images.size() > 0);
-                return null;
-            });
-            
-        } catch (Exception t) {
-            log.error("unexpected throwable", t);
-            Assert.fail("unexpected throwable: " + t);
-        }
-    }
-    
-    private List<Image> getImages() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(imageURL, out);
-        get.run();
-        Assert.assertNull("get images error", get.getThrowable());
-        Assert.assertEquals("response code", 200, get.getResponseCode());
-        Assert.assertEquals("content-type", "application/json", get.getContentType());
-        String json = out.toString();
-        Type listType = new TypeToken<List<Image>>(){}.getType();
-        Gson gson = new Gson();
-        return gson.fromJson(json, listType);
+    @Test
+    public void processCommandInput() throws Exception {
+        final PostAction testSubject = new PostAction() {
+            @Override
+            String getUserID() {
+                return "TESTUSER";
+            }
+
+            @Override
+            List<String> readAddUserConfig()  {
+                return Arrays.asList("      - name: \"skaha-add-user\"",
+                                     "        image: images.canfar.net/skaha-system/add-user:1.2",
+                                     "        imagePullPolicy: Always",
+                                     "        # Userid for allocation goes in this argument.",
+                                     "        # Second argument is user quota in GB",
+                                     "        # TODO: automate the setting of this in the calling script",
+                                     "        command: [\"/usr/bin/add-user\"]",
+                                     "        args: [\"{skaha.userid}\", \"{skaha.userquotagb}\"]",
+                                     "        volumeMounts:",
+                                     "        - mountPath: \"/config\"",
+                                     "          name: add-user-config",
+                                     "        - mountPath: /root/.ssl/",
+                                     "          name: servops-cert",
+                                     "          readOnly: true");
+            }
+        };
+
+        final String[] expectedConfig =
+                new String[] {"      - name: \"skaha-add-user\"",
+                              "        image: images.canfar.net/skaha-system/add-user:1.2",
+                              "        imagePullPolicy: Always",
+                              "        # Userid for allocation goes in this argument.",
+                              "        # Second argument is user quota in GB",
+                              "        # TODO: automate the setting of this in the calling script",
+                              "        command: [\"/usr/bin/add-user\"]",
+                              "        args: [\"TESTUSER\", \"10\"]",
+                              "        volumeMounts:",
+                              "        - mountPath: \"/config\"",
+                              "          name: add-user-config",
+                              "        - mountPath: /root/.ssl/",
+                              "          name: servops-cert", "          readOnly: true"
+                };
+
+        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        testSubject.processCommandInput(outputStream);
+
+        final String resultConfig = outputStream.toString(StandardCharsets.UTF_8);
+        Assert.assertEquals("Wrong output.", String.join("", expectedConfig), resultConfig);
     }
 }
