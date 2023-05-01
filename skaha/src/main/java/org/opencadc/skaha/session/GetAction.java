@@ -106,8 +106,8 @@ public class GetAction extends SessionAction {
     @Override
     public void doAction() throws Exception {
         super.initRequest();
+        String view = syncInput.getParameter("view");
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
-            String view = syncInput.getParameter("view");
             if (sessionID == null) {
                 if (SESSION_VIEW_STATS.equals(view)) {
                     ResourceStats resourceStats = getResourceStats();
@@ -122,7 +122,6 @@ public class GetAction extends SessionAction {
                     boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
                 
                     String json = listSessions(typeFilter, statusFilter, allUsers);
-                
                     syncOutput.setHeader("Content-Type", "application/json");
                     syncOutput.getOutputStream().write(json.getBytes());
                 }
@@ -146,11 +145,20 @@ public class GetAction extends SessionAction {
             }
             return;
         }
+
         if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
-                throw new UnsupportedOperationException("App listing not supported.");
+                String statusFilter = syncInput.getParameter("status");
+                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
+                String json = listSessions(SessionAction.TYPE_DESKTOP_APP, statusFilter, allUsers);
+                syncOutput.setHeader("Content-Type", "application/json");
+                syncOutput.getOutputStream().write(json.getBytes());
+            } else if (sessionID == null){
+                throw new IllegalArgumentException("Missing session ID for desktop-ap ID " + appID);
             } else {
-                throw new UnsupportedOperationException("App detail viewing not supported.");
+                String json = getSingleDesktopApp(sessionID, appID);
+                syncOutput.setHeader("Content-Type", "application/json");
+                syncOutput.getOutputStream().write(json.getBytes());
             }
         }
     }
@@ -355,6 +363,12 @@ public class GetAction extends SessionAction {
         }
 
         return nodeToResourcesMap;
+    }
+    
+    public String getSingleDesktopApp(String sessionID, String appID) throws Exception {
+        Session session = this.getDesktopApp(userID, sessionID, appID);
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+        return gson.toJson(session);
     }
     
     public String getSingleSession(String sessionID) throws Exception {

@@ -388,9 +388,24 @@ public abstract class SessionAction extends SkahaAction {
         execute(getLogsCmd.toArray(new String[0]), out);
     }
     
+    public Session getDesktopApp(String forUserID, String sessionID, String appID) throws Exception {
+        List<Session> sessions = getSessions(userID, sessionID);
+        if (sessions.size() > 0) {
+            for (Session session : sessions) {
+                // exclude 'desktop-app'
+                if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
+                    (sessionID.equals(session.getId())) && (appID.equals(session.getAppid()))) {
+                    return session;
+                }
+            }
+        } 
+
+        throw new ResourceNotFoundException("desktop app with session " + sessionID + " and app ID " + appID + " was not found");
+    }
+    
     public Session getSession(String forUserID, String sessionID) throws Exception {
         List<Session> sessions = getSessions(forUserID, sessionID);
-        if (sessions.size() >0) {
+        if (sessions.size() > 0) {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
                 if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
@@ -645,7 +660,8 @@ public abstract class SessionAction extends SkahaAction {
             "STATUS:.status.phase," +
             "NAME:.metadata.labels.canfar-net-sessionName," +
             "STARTED:.status.startTime," +
-            "DELETION:.metadata.deletionTimestamp";
+            "DELETION:.metadata.deletionTimestamp," +
+            "APPID:.metadata.labels.canfar-net-appID";
         if (forUserID != null) {
             customColumns = customColumns + 
             ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
@@ -717,6 +733,7 @@ public abstract class SessionAction extends SkahaAction {
         String name = parts[5];
         String startTime = parts[6];
         String deletionTimestamp = parts[7];
+        String appID = parts[8];
         if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
@@ -742,10 +759,12 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        if (parts.length > 8) {
-            String requestedRAM = parts[8];
-            String requestedCPUCores = parts[9];
-            String requestedGPUCores = parts[10];
+        session.setAppid(appID);
+
+        if (parts.length > 9) {
+            String requestedRAM = parts[9];
+            String requestedCPUCores = parts[10];
+            String requestedGPUCores = parts[11];
             session.setRequestedRAM(toCommonUnit(requestedRAM));
             session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
             session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));

@@ -125,6 +125,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
+    public static final String SOFTWARE_APPID = "software.appid";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
@@ -623,6 +624,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
+        launchString = setConfigValue(launchString, SOFTWARE_APPID, uniqueID);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, cores.toString());
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
