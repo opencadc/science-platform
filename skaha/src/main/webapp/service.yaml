@@ -243,6 +243,18 @@ paths:
           type: string
           description: The imageID of the desktop-app to attach
           required: true
+        - name: cores
+          in: query
+          type: string
+          description: |
+              Request this many cores for the desktop app.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+          required: false
+        - name: ram
+          in: query
+          type: string
+          description: |
+              Request this much RAM (GB) for the desktop app.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+          required: false
       responses:
         '200':
           description: Successful response
@@ -266,12 +278,12 @@ paths:
         - name: sessionID
           in: path
           type: string
-          description: The desktop session to get, returned in application/json format.
+          description: Session ID of the desktop app.
           required: true
         - name: appID
           in: path
           type: string
-          description: The desktop app to get, returned in application/json format.
+          description: ID of the desktop app to get, returned in application/json format.
           required: true
       responses:
         '200':
