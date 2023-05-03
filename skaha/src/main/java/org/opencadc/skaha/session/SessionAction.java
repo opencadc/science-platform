@@ -722,6 +722,40 @@ public abstract class SessionAction extends SkahaAction {
         return getSessionGPUCMD;        
     }
     
+    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
+        return execute(getAppJobNameCMD.toArray(new String[0]));
+    }
+    
+    private List<String> getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
+        String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
+        labels = labels + ",canfar-net-userid=" + userID;
+        if (sessionID != null) {
+            labels = labels + ",canfar-net-sessionID=" + sessionID;
+        }
+        if (appID != null) {
+            labels = labels + ",canfar-net-appID=" + appID;
+        }
+
+        List<String> getAppJobNameCMD = new ArrayList<String>();
+        getAppJobNameCMD.add("kubectl");
+        getAppJobNameCMD.add("get");
+        getAppJobNameCMD.add("--namespace");
+        getAppJobNameCMD.add(k8sNamespace);
+        getAppJobNameCMD.add("job");
+        getAppJobNameCMD.add("-l");
+        getAppJobNameCMD.add(labels);
+        getAppJobNameCMD.add("--no-headers=true");
+        getAppJobNameCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "NAME:.metadata.name";
+        
+        getAppJobNameCMD.add(customColumns);
+        return getAppJobNameCMD;
+    }
+
     protected Session constructSession(String k8sOutput) throws IOException {
         log.debug("line: " + k8sOutput);
         String[] parts = k8sOutput.trim().replaceAll("\\s+", " ").split(" ");
