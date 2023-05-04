@@ -70,7 +70,9 @@ package org.opencadc.skaha;
 import java.io.IOException;
 
 public class K8SUtil {
-    
+    public static final String CEPH_USER_VARIABLE_NAME = "skaha.cephfs.user";
+    public static final String CEPH_PATH_VARIABLE_NAME = "skaha.cephfs.path";
+
     public static String getHostName() throws IOException {
         return System.getenv("skaha.hostname");
     }
@@ -107,5 +109,11 @@ public class K8SUtil {
     public static String getSessionExpiry() {
         return System.getenv("skaha.sessionexpiry");
     }
-    
+
+    public static String getCephUser() {
+        return System.getenv(K8SUtil.CEPH_USER_VARIABLE_NAME);
+    }
+    public static String getCephPath() {
+        return System.getenv(K8SUtil.CEPH_PATH_VARIABLE_NAME);
+    }
 }

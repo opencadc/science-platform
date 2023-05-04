@@ -92,6 +92,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,13 +155,8 @@ public class PostAction extends SessionAction {
     };
 
     private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
-            "kubectl", "-n skaha-system", "create", "-f -"
+            "kubectl", "-n", "skaha-system", "create", "-f", "-"
     };
-
-    //     private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
-    //            "kubectl", "-n skaha-system", "create", "-f skaha-add-user-keel-dev.yaml"
-    //    };
-
 
     public PostAction() {
         super();
@@ -298,29 +294,42 @@ public class PostAction extends SessionAction {
     }
 
     void makeUserBase() throws IOException, InterruptedException {
-        final Process p = Runtime.getRuntime().exec(PostAction.TEST_USER_BASE_COMMAND);
-        final InputStream stdOut = new BufferedInputStream(p.getInputStream());
-        final InputStream stdErr = new BufferedInputStream(p.getErrorStream());
-        final BufferedOutputStream commandInput = new BufferedOutputStream(p.getOutputStream());
-        processCommandInput(commandInput);
-
-        if (p.waitFor() != 0) {
-            final String errorOutput = readStream(stdErr);
-            throw new IOException("Unable to create user home.\n\nMessage from server: " + errorOutput);
-        } else {
-            log.debug(readStream(stdOut));
+        log.debug("PostAction.makeUserBase()");
+        final ProcessBuilder processBuilder = new ProcessBuilder().command(PostAction.MAKE_USER_BASE_COMMAND);
+        final Process p = processBuilder.start();
+        try (final BufferedOutputStream commandInput = new BufferedOutputStream(p.getOutputStream())) {
+            processCommandInput(commandInput);
+            commandInput.flush();
         }
+
+        log.debug("Executing " + Arrays.toString(PostAction.MAKE_USER_BASE_COMMAND));
+        final int code = p.waitFor();
+        try (final InputStream stdOut = new BufferedInputStream(p.getInputStream());
+             final InputStream stdErr = new BufferedInputStream(p.getErrorStream())) {
+            if (code != 0) {
+                final String errorOutput = readStream(stdErr);
+                final String commandOutput = readStream(stdOut);
+                throw new IOException("Unable to create user home (code: " + code + ")."
+                                      + "\nError message from server: " + errorOutput
+                                      + "\nOutput from command: " + commandOutput);
+            } else {
+                log.debug(readStream(stdOut));
+                log.debug("Executing " + Arrays.toString(PostAction.MAKE_USER_BASE_COMMAND) + ": OK");
+            }
+        }
+
+        log.debug("PostAction.makeUserBase(): OK");
     }
 
     void processCommandInput(final OutputStream commandInput) throws IOException {
-        final List<String> fileLines = readAddUserConfig();
+        final String fileOutput = readAddUserConfig();
 
-        fileLines.replaceAll(l -> l.replace("{" + PostAction.SKAHA_USERID + "}", getUserID()));
-        fileLines.replaceAll(l -> l.replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
-                                            Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB)));
-        for (final String line : fileLines) {
-            commandInput.write(line.getBytes(StandardCharsets.UTF_8));
-        }
+        commandInput.write(fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
+                                     .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
+                                            Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB))
+                                     .replace("{" + K8SUtil.CEPH_USER_VARIABLE_NAME + "}", getCephUser())
+                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath())
+                                   .getBytes());
     }
 
     /**
@@ -332,13 +341,29 @@ public class PostAction extends SessionAction {
     }
 
     /**
+     * Override to test Ceph values without processing an entire Request.
+     * @return  String Ceph user, if configured.
+     */
+    String getCephUser() {
+        return K8SUtil.getCephUser();
+    }
+
+    /**
+     * Override to test Ceph values without processing an entire Request.
+     * @return  String Ceph path, if configured.
+     */
+    String getCephPath() {
+        return K8SUtil.getCephPath();
+    }
+
+    /**
      * Read the config file as a list of String lines.  Tests can override as needed.
      * @return  List of String instances, never null.
      * @throws IOException  If the file cannot be read.
      */
-    List<String> readAddUserConfig() throws IOException {
-        return Files.readAllLines(FileUtil.getFileFromResource(PostAction.SKAHA_ADD_USER_CONFIG_PATH,
-                                                               PostAction.class).toPath());
+    String readAddUserConfig() throws IOException {
+        return Files.readString(FileUtil.getFileFromResource(PostAction.SKAHA_ADD_USER_CONFIG_PATH,
+                                                             PostAction.class).toPath());
     }
 
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {

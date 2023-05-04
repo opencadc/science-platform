@@ -74,10 +74,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
+
 
 public class PostActionTest {
     static {
@@ -93,44 +90,72 @@ public class PostActionTest {
             }
 
             @Override
-            List<String> readAddUserConfig()  {
-                return Arrays.asList("      - name: \"skaha-add-user\"",
-                                     "        image: images.canfar.net/skaha-system/add-user:1.2",
-                                     "        imagePullPolicy: Always",
-                                     "        # Userid for allocation goes in this argument.",
-                                     "        # Second argument is user quota in GB",
-                                     "        # TODO: automate the setting of this in the calling script",
-                                     "        command: [\"/usr/bin/add-user\"]",
-                                     "        args: [\"{skaha.userid}\", \"{skaha.userquotagb}\"]",
-                                     "        volumeMounts:",
-                                     "        - mountPath: \"/config\"",
-                                     "          name: add-user-config",
-                                     "        - mountPath: /root/.ssl/",
-                                     "          name: servops-cert",
-                                     "          readOnly: true");
+            String getCephUser() {
+                return "TESTCEPHUSER";
+            }
+
+            @Override
+            String getCephPath() {
+                return "/my/ceph/path";
+            }
+
+            @Override
+            String readAddUserConfig() {
+                return "      - name: \"skaha-add-user-{skaha.userid}\""
+                       + "        image: images.canfar.net/skaha-system/add-user:1.2"
+                       + "        imagePullPolicy: Always"
+                       + "        # Userid for allocation goes in this argument."
+                       + "        # Second argument is user quota in GB"
+                       + "        # TODO: automate the setting of this in the calling script"
+                       + "        command: [\"/usr/bin/add-user\"]"
+                       + "        args: [\"{skaha.userid}\", \"{skaha.userquotagb}\"]"
+                       + "        volumeMounts:"
+                       + "        - mountPath: \"/config\""
+                       + "          name: add-user-config"
+                       + "        - mountPath: /root/.ssl/"
+                       + "          name: servops-cert"
+                       + "          readOnly: true"
+                       + "        volumes:"
+                       + "        - name: cavern-volume"
+                       + "          cephfs:"
+                       + "            monitors:"
+                       + "            - 10.30.201.3:6789"
+                       + "            - 10.30.202.3:6789"
+                       + "            - 10.30.203.3:6789"
+                       + "            path: \"{skaha.cephfs.path}\""
+                       + "            user: \"{skaha.cephfs.user}\"";
             }
         };
 
-        final String[] expectedConfig =
-                new String[] {"      - name: \"skaha-add-user\"",
-                              "        image: images.canfar.net/skaha-system/add-user:1.2",
-                              "        imagePullPolicy: Always",
-                              "        # Userid for allocation goes in this argument.",
-                              "        # Second argument is user quota in GB",
-                              "        # TODO: automate the setting of this in the calling script",
-                              "        command: [\"/usr/bin/add-user\"]",
-                              "        args: [\"TESTUSER\", \"10\"]",
-                              "        volumeMounts:",
-                              "        - mountPath: \"/config\"",
-                              "          name: add-user-config",
-                              "        - mountPath: /root/.ssl/",
-                              "          name: servops-cert", "          readOnly: true"
-                };
+        final String expectedConfig =
+                "      - name: \"skaha-add-user-TESTUSER\""
+                + "        image: images.canfar.net/skaha-system/add-user:1.2"
+                + "        imagePullPolicy: Always"
+                + "        # Userid for allocation goes in this argument."
+                + "        # Second argument is user quota in GB"
+                + "        # TODO: automate the setting of this in the calling script"
+                + "        command: [\"/usr/bin/add-user\"]"
+                + "        args: [\"TESTUSER\", \"10\"]"
+                + "        volumeMounts:"
+                + "        - mountPath: \"/config\""
+                + "          name: add-user-config"
+                + "        - mountPath: /root/.ssl/"
+                + "          name: servops-cert"
+                + "          readOnly: true"
+                + "        volumes:"
+                + "        - name: cavern-volume"
+                + "          cephfs:"
+                + "            monitors:"
+                + "            - 10.30.201.3:6789"
+                + "            - 10.30.202.3:6789"
+                + "            - 10.30.203.3:6789"
+                + "            path: \"/my/ceph/path\""
+                + "            user: \"TESTCEPHUSER\"";
 
         final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         testSubject.processCommandInput(outputStream);
 
-        final String resultConfig = outputStream.toString(StandardCharsets.UTF_8);
+        final String resultConfig = outputStream.toString();
         Assert.assertEquals("Wrong output.", String.join("", expectedConfig), resultConfig);
     }
 }
