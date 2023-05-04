@@ -239,22 +239,21 @@ public abstract class SessionAction extends SkahaAction {
             throws PrivilegedActionException, IOException, InterruptedException {
         
         // creating cert home dir
-        execute(new String[] {"mkdir", "-p", homedir + "/" + userid + "/.ssl"});
+        // UPDATE 2023.05.04
+        // This is handled by the user creation script.  Adding this here is very misleading if the user creation
+        // failed!  Keeping this here for now as a record.
+        // jenkinsd
+//        execute(new String[] {"mkdir", "-p", homedir + "/" + userid + "/.ssl"});
         
         // get the proxy cert
         Subject opsSubject = CredUtil.createOpsSubject();
-        String proxyCert = Subject.doAs(opsSubject, new PrivilegedExceptionAction<String>() {
-            @Override
-            public String run() throws Exception {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                String userid = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
-                HttpGet download = new HttpGet(
-                        new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid), out);
-                download.run();
-                String proxyCert = out.toString();
-                    
-                return proxyCert;
-            } 
+        String proxyCert = Subject.doAs(opsSubject, (PrivilegedExceptionAction<String>) () -> {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            String userid1 = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
+            HttpGet download = new HttpGet(
+                    new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid1), out);
+            download.run();
+            return out.toString();
         });
         log.debug("Proxy cert: " + proxyCert);
         // inject the proxy cert

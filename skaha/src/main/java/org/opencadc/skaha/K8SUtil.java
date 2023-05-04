@@ -76,7 +76,15 @@ public class K8SUtil {
     public static String getHostName() throws IOException {
         return System.getenv("skaha.hostname");
     }
-    
+
+    /**
+     * Helps reduce string constants in many places.
+     * @return  The Skaha namespace
+     */
+    public static String getNamespace() {
+        return "skaha-system";
+    }
+
     public static String getWorkloadNamespace() throws IOException {
         return System.getenv("skaha.namespace");
     }

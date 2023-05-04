@@ -78,13 +78,10 @@ import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -148,14 +145,20 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String SKAHA_ADD_USER_CONFIG_PATH = "add-user/skaha-add-user-keel.yaml";
+    private static final String SKAHA_ADD_USER_JOB_ID_TEMPLATE = "skaha-add-user-%s";
+    private static final int SKAHA_ADD_USER_ALLOCATION_TIMEOUT_SECONDS = 15;
 
 
     private static final String[] TEST_USER_BASE_COMMAND = new String[] {
-            "test", "-d", "/arc/home/%s"
+            "test", "-d", "%s/%s"
     };
 
     private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
-            "kubectl", "-n", "skaha-system", "create", "-f", "-"
+            "kubectl", "-n", K8SUtil.getNamespace(), "create", "-f", "-"
+    };
+
+    private static final String[] CHECK_MAKE_USER_BASE_COMMAND = new String[] {
+            "kubectl", "-n", K8SUtil.getNamespace(), "get", "jobs", "--field-selector", "status.successful=1"
     };
 
     public PostAction() {
@@ -285,15 +288,15 @@ public class PostAction extends SessionAction {
         final String[] command = new String[PostAction.TEST_USER_BASE_COMMAND.length];
         System.arraycopy(PostAction.TEST_USER_BASE_COMMAND, 0, command, 0, command.length);
 
-        command[command.length - 1] = String.format(command[command.length - 1], this.userID);
+        command[command.length - 1] = String.format(command[command.length - 1], this.homedir, this.userID);
         final Process p = Runtime.getRuntime().exec(command);
 
         if (p.waitFor() != 0) {
-            makeUserBase();
+            allocateUser();
         }
     }
 
-    void makeUserBase() throws IOException, InterruptedException {
+    void allocateUser() throws IOException, InterruptedException {
         log.debug("PostAction.makeUserBase()");
         final ProcessBuilder processBuilder = new ProcessBuilder().command(PostAction.MAKE_USER_BASE_COMMAND);
         final Process p = processBuilder.start();
@@ -318,18 +321,56 @@ public class PostAction extends SessionAction {
             }
         }
 
+        waitForUserAllocation();
+
         log.debug("PostAction.makeUserBase(): OK");
+    }
+
+    /**
+     * Ensure user allocation is complete.  This is essential before progressing to Session Creation.
+     * @throws IOException              If the process cannot execute.
+     * @throws InterruptedException     If waiting for the process cannot happen or is interrupted.
+     */
+    void waitForUserAllocation() throws IOException, InterruptedException {
+        boolean complete = false;
+        final String jobName = String.format(PostAction.SKAHA_ADD_USER_JOB_ID_TEMPLATE, getUserID());
+        final long startTime = System.currentTimeMillis();
+
+        // TODO: Timeout is 15 seconds.  Enough time?
+        while (!complete && (((System.currentTimeMillis() - startTime) / 1000)
+                             < PostAction.SKAHA_ADD_USER_ALLOCATION_TIMEOUT_SECONDS)) {
+            final Process checkProcess = Runtime.getRuntime().exec(PostAction.CHECK_MAKE_USER_BASE_COMMAND);
+            final int code = checkProcess.waitFor();
+            if (code != 0) {
+                throw new IOException("Unable to create user home(code: " + code + ").");
+            } else {
+                // Read standard out.
+                try (final InputStream stdOut = new BufferedInputStream(checkProcess.getInputStream())) {
+                    final String output = readStream(stdOut);
+                    // Output will be in the form of:
+                    // NAME                          COMPLETIONS   DURATION   AGE
+                    // <JOB_NAME>                    1/1           20s        13m
+                    //
+                    // So look for the job name in the completed job output.
+                    complete = output.contains(jobName);
+                }
+            }
+
+            // Two-second sleep to check again.  Hack.
+            Thread.sleep(2 * 1000);
+        }
     }
 
     void processCommandInput(final OutputStream commandInput) throws IOException {
         final String fileOutput = readAddUserConfig();
-
-        commandInput.write(fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
+        final String processedCommandInput = fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
                                      .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
                                             Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB))
                                      .replace("{" + K8SUtil.CEPH_USER_VARIABLE_NAME + "}", getCephUser())
-                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath())
-                                   .getBytes());
+                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath());
+
+        log.debug("Using file input\n" + processedCommandInput);
+        commandInput.write(processedCommandInput.getBytes());
     }
 
     /**
