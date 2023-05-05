@@ -74,12 +74,15 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.util.UUID;
 
 
 public class PostActionTest {
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
+
+    final UUID jobUUID = UUID.randomUUID();
 
     @Test
     public void processCommandInput() throws Exception {
@@ -101,7 +104,7 @@ public class PostActionTest {
 
             @Override
             String readAddUserConfig() {
-                return "      - name: \"skaha-add-user-{skaha.userid}\""
+                return "      - name: \"skaha-add-user-{skaha.adduser.uuid}\""
                        + "        image: images.canfar.net/skaha-system/add-user:1.2"
                        + "        imagePullPolicy: Always"
                        + "        # Userid for allocation goes in this argument."
@@ -128,7 +131,7 @@ public class PostActionTest {
         };
 
         final String expectedConfig =
-                "      - name: \"skaha-add-user-TESTUSER\""
+                "      - name: \"skaha-add-user-" + jobUUID + "\""
                 + "        image: images.canfar.net/skaha-system/add-user:1.2"
                 + "        imagePullPolicy: Always"
                 + "        # Userid for allocation goes in this argument."
@@ -153,7 +156,8 @@ public class PostActionTest {
                 + "            user: \"TESTCEPHUSER\"";
 
         final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        testSubject.processCommandInput(outputStream);
+
+        testSubject.processCommandInput(outputStream, jobUUID);
 
         final String resultConfig = outputStream.toString();
         Assert.assertEquals("Wrong output.", String.join("", expectedConfig), resultConfig);

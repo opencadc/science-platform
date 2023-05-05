@@ -94,6 +94,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.security.auth.Subject;
 
@@ -145,6 +146,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String SKAHA_ADD_USER_CONFIG_PATH = "add-user/skaha-add-user-keel.yaml";
+    private static final String SKAHA_ADD_USER_JOB_ID_UUID_KEY = "skaha.adduser.uuid";
     private static final String SKAHA_ADD_USER_JOB_ID_TEMPLATE = "skaha-add-user-%s";
     private static final int SKAHA_ADD_USER_ALLOCATION_TIMEOUT_SECONDS = 15;
 
@@ -300,8 +302,9 @@ public class PostAction extends SessionAction {
         log.debug("PostAction.makeUserBase()");
         final ProcessBuilder processBuilder = new ProcessBuilder().command(PostAction.MAKE_USER_BASE_COMMAND);
         final Process p = processBuilder.start();
+        final UUID jobUUID = UUID.randomUUID();
         try (final BufferedOutputStream commandInput = new BufferedOutputStream(p.getOutputStream())) {
-            processCommandInput(commandInput);
+            processCommandInput(commandInput, jobUUID);
             commandInput.flush();
         }
 
@@ -321,7 +324,9 @@ public class PostAction extends SessionAction {
             }
         }
 
-        waitForUserAllocation();
+        // Needs to match what is in the YAML job file.
+        final String jobName = String.format(PostAction.SKAHA_ADD_USER_JOB_ID_TEMPLATE, jobUUID);
+        waitForUserAllocation(jobName);
 
         log.debug("PostAction.makeUserBase(): OK");
     }
@@ -331,9 +336,8 @@ public class PostAction extends SessionAction {
      * @throws IOException              If the process cannot execute.
      * @throws InterruptedException     If waiting for the process cannot happen or is interrupted.
      */
-    void waitForUserAllocation() throws IOException, InterruptedException {
+    void waitForUserAllocation(final String jobName) throws IOException, InterruptedException {
         boolean complete = false;
-        final String jobName = String.format(PostAction.SKAHA_ADD_USER_JOB_ID_TEMPLATE, getUserID());
         final long startTime = System.currentTimeMillis();
 
         // TODO: Timeout is 15 seconds.  Enough time?
@@ -361,13 +365,15 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void processCommandInput(final OutputStream commandInput) throws IOException {
+    void processCommandInput(final OutputStream commandInput, final UUID jobUUID) throws IOException {
         final String fileOutput = readAddUserConfig();
         final String processedCommandInput = fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
                                      .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
                                             Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB))
                                      .replace("{" + K8SUtil.CEPH_USER_VARIABLE_NAME + "}", getCephUser())
-                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath());
+                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath())
+                                     .replace("{" + PostAction.SKAHA_ADD_USER_JOB_ID_UUID_KEY + "}",
+                                              jobUUID.toString());
 
         log.debug("Using file input\n" + processedCommandInput);
         commandInput.write(processedCommandInput.getBytes());
