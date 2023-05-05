@@ -106,9 +106,9 @@ import org.opencadc.skaha.session.SessionAction;
  * @author majorb
  *
  */
-public class LifecycleTest {
+public class SessionLifecycleTest {
     
-    private static final Logger log = Logger.getLogger(LifecycleTest.class);
+    private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
     public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:1.0.2";
@@ -121,14 +121,14 @@ public class LifecycleTest {
     protected URL sessionURL;
     protected Subject userSubject;
     
-    public LifecycleTest() {
+    public SessionLifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
             sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
             sessionURL = new URL(sessionURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);
     
-            File cert = FileUtil.getFileFromResource("skaha-test.pem", LifecycleTest.class);
+            File cert = FileUtil.getFileFromResource("skaha-test.pem", SessionLifecycleTest.class);
             userSubject = SSLUtil.createSubject(cert);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
