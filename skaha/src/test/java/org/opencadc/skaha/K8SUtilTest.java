@@ -66,100 +66,21 @@
  ************************************************************************
  */
 
-package org.opencadc.skaha.session;
+package org.opencadc.skaha;
 
-import ca.nrc.cadc.util.Log4jInit;
-import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.util.UUID;
-
-
-public class PostActionTest {
-    static {
-        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
-    }
-
-    final UUID jobUUID = UUID.randomUUID();
-
+public class K8SUtilTest {
     @Test
-    public void processCommandInput() throws Exception {
-        final PostAction testSubject = new PostAction() {
-            @Override
-            String getUserID() {
-                return "TESTUSER";
-            }
+    public void sanitizeJobName() {
+        Assert.assertEquals("Wrong name", "skaha-type-userid-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "USERID"));
 
-            @Override
-            String getCephUser() {
-                return "TESTCEPHUSER";
-            }
+        Assert.assertEquals("Wrong name", "skaha-type-my-user-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "my_user"));
 
-            @Override
-            String getCephPath() {
-                return "/my/ceph/path";
-            }
-
-            @Override
-            String readAddUserConfig() {
-                return "      - name: \"{skaha.adduser.jobname}\""
-                       + "        image: images.canfar.net/skaha-system/add-user:1.2"
-                       + "        imagePullPolicy: Always"
-                       + "        # Userid for allocation goes in this argument."
-                       + "        # Second argument is user quota in GB"
-                       + "        # TODO: automate the setting of this in the calling script"
-                       + "        command: [\"/usr/bin/add-user\"]"
-                       + "        args: [\"{skaha.userid}\", \"{skaha.userquotagb}\"]"
-                       + "        volumeMounts:"
-                       + "        - mountPath: \"/config\""
-                       + "          name: add-user-config"
-                       + "        - mountPath: /root/.ssl/"
-                       + "          name: servops-cert"
-                       + "          readOnly: true"
-                       + "        volumes:"
-                       + "        - name: cavern-volume"
-                       + "          cephfs:"
-                       + "            monitors:"
-                       + "            - 10.30.201.3:6789"
-                       + "            - 10.30.202.3:6789"
-                       + "            - 10.30.203.3:6789"
-                       + "            path: \"{skaha.cephfs.path}\""
-                       + "            user: \"{skaha.cephfs.user}\"";
-            }
-        };
-
-        final String expectedConfig =
-                "      - name: \"skaha-add-user-job-name\""
-                + "        image: images.canfar.net/skaha-system/add-user:1.2"
-                + "        imagePullPolicy: Always"
-                + "        # Userid for allocation goes in this argument."
-                + "        # Second argument is user quota in GB"
-                + "        # TODO: automate the setting of this in the calling script"
-                + "        command: [\"/usr/bin/add-user\"]"
-                + "        args: [\"TESTUSER\", \"10\"]"
-                + "        volumeMounts:"
-                + "        - mountPath: \"/config\""
-                + "          name: add-user-config"
-                + "        - mountPath: /root/.ssl/"
-                + "          name: servops-cert"
-                + "          readOnly: true"
-                + "        volumes:"
-                + "        - name: cavern-volume"
-                + "          cephfs:"
-                + "            monitors:"
-                + "            - 10.30.201.3:6789"
-                + "            - 10.30.202.3:6789"
-                + "            - 10.30.203.3:6789"
-                + "            path: \"/my/ceph/path\""
-                + "            user: \"TESTCEPHUSER\"";
-
-        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-        testSubject.processCommandInput(outputStream, "skaha-add-user-job-name");
-
-        final String resultConfig = outputStream.toString();
-        Assert.assertEquals("Wrong output.", String.join("", expectedConfig), resultConfig);
+        Assert.assertEquals("Wrong name", "skaha-type-my-us-e-r-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "my|us+e&r"));
     }
 }

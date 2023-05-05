@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "skaha-add-user-{skaha.adduser.uuid}"
+  name: "{skaha.adduser.jobname}"
 spec:
   ttlSecondsAfterFinished: 3600
   backoffLimit: 0

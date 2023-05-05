@@ -67,13 +67,12 @@
 
 package org.opencadc.skaha;
 
-import java.io.IOException;
 
 public class K8SUtil {
     public static final String CEPH_USER_VARIABLE_NAME = "skaha.cephfs.user";
     public static final String CEPH_PATH_VARIABLE_NAME = "skaha.cephfs.path";
 
-    public static String getHostName() throws IOException {
+    public static String getHostName() {
         return System.getenv("skaha.hostname");
     }
 
@@ -85,12 +84,22 @@ public class K8SUtil {
         return "skaha-system";
     }
 
-    public static String getWorkloadNamespace() throws IOException {
+    public static String getWorkloadNamespace() {
         return System.getenv("skaha.namespace");
     }
-    
+
+    /**
+     * Filter out anything not in the alphanumeric or hyphen character set.
+     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object names</a>
+     * @param sessionID     The provided session ID.
+     * @param type          The defined type (desktop, notebook, etc.)
+     * @param userID        The running User's ID.
+     * @return              String sanitized name.  Never null.
+     */
     public static String getJobName(String sessionID, String type, String userID) {
-        return "skaha-" + type + "-" + userID.toLowerCase() + "-" + sessionID;
+        // Replace values that are NOT alphanumeric or a hyphen.
+        final String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
+        return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
     
     //skaha-notebook-svc-rdcc0219
