@@ -19,11 +19,9 @@ spec:
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
         - name: skaha.sessionexpiry
           value: "345600"
-        - name: skaha.cephfs.path
-          value: "/volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e"
-        - name: skaha.cephfs.user
-          value: "kanfarnetes_dev"
-        image: images-rc.canfar.net/skaha-system/skaha:0.9.21
+        - name: skaha.defaultquotagb
+          value: "10"
+        image: images-rc.canfar.net/skaha-system/skaha:0.10.0
         resources:
           requests:
             memory: "4Gi"

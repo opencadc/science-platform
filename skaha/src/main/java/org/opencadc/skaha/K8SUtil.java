@@ -69,8 +69,8 @@ package org.opencadc.skaha;
 
 
 public class K8SUtil {
-    public static final String CEPH_USER_VARIABLE_NAME = "skaha.cephfs.user";
-    public static final String CEPH_PATH_VARIABLE_NAME = "skaha.cephfs.path";
+
+    static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     public static String getHostName() {
         return System.getenv("skaha.hostname");
@@ -127,10 +127,11 @@ public class K8SUtil {
         return System.getenv("skaha.sessionexpiry");
     }
 
-    public static String getCephUser() {
-        return System.getenv(K8SUtil.CEPH_USER_VARIABLE_NAME);
-    }
-    public static String getCephPath() {
-        return System.getenv(K8SUtil.CEPH_PATH_VARIABLE_NAME);
+    /**
+     * Obtain the configured default quota size in Gigabytes.
+     * @return  integer in GB.
+     */
+    public static String getDefaultQuota() {
+        return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
     }
 }

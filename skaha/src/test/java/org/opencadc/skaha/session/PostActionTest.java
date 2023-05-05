@@ -93,17 +93,12 @@ public class PostActionTest {
             }
 
             @Override
-            String getCephUser() {
-                return "TESTCEPHUSER";
+            String getDefaultQuota() {
+                return "14";
             }
 
             @Override
-            String getCephPath() {
-                return "/my/ceph/path";
-            }
-
-            @Override
-            String readAddUserConfig() {
+            String readAddUserJobFile() {
                 return "      - name: \"{skaha.adduser.jobname}\""
                        + "        image: images.canfar.net/skaha-system/add-user:1.2"
                        + "        imagePullPolicy: Always"
@@ -125,8 +120,8 @@ public class PostActionTest {
                        + "            - 10.30.201.3:6789"
                        + "            - 10.30.202.3:6789"
                        + "            - 10.30.203.3:6789"
-                       + "            path: \"{skaha.cephfs.path}\""
-                       + "            user: \"{skaha.cephfs.user}\"";
+                       + "            path: \"/my/ceph/path\""
+                       + "            user: \"cephuser\"";
             }
         };
 
@@ -138,7 +133,7 @@ public class PostActionTest {
                 + "        # Second argument is user quota in GB"
                 + "        # TODO: automate the setting of this in the calling script"
                 + "        command: [\"/usr/bin/add-user\"]"
-                + "        args: [\"TESTUSER\", \"10\"]"
+                + "        args: [\"TESTUSER\", \"14\"]"
                 + "        volumeMounts:"
                 + "        - mountPath: \"/config\""
                 + "          name: add-user-config"
@@ -153,7 +148,7 @@ public class PostActionTest {
                 + "            - 10.30.202.3:6789"
                 + "            - 10.30.203.3:6789"
                 + "            path: \"/my/ceph/path\""
-                + "            user: \"TESTCEPHUSER\"";
+                + "            user: \"cephuser\"";
 
         final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 

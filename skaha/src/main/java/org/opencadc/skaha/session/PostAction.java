@@ -72,13 +72,13 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -115,8 +115,6 @@ public class PostAction extends SessionAction {
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
 
-    private static final int DEFAULT_USER_QUOTA_IN_GB = 10;
-
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
@@ -144,10 +142,8 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
-    private static final String SKAHA_ADD_USER_CONFIG_PATH = "add-user/skaha-add-user-keel.yaml";
     private static final String SKAHA_ADD_USER_JOB_NAME_KEY = "skaha.adduser.jobname";
-    private static final String SKAHA_ADD_USER_TYPE = "skaha-add-user";
-    private static final int SKAHA_ADD_USER_ALLOCATION_TIMEOUT_SECONDS = 15;
+    private static final String SKAHA_ADD_USER_TYPE = "add-user";
 
 
     private static final String[] TEST_USER_BASE_COMMAND = new String[] {
@@ -336,40 +332,28 @@ public class PostAction extends SessionAction {
      */
     void waitForUserAllocation(final String jobName) throws IOException, InterruptedException {
         boolean complete = false;
-        final long startTime = System.currentTimeMillis();
 
-        // TODO: Timeout is 15 seconds.  Enough time?
-        while (!complete && (((System.currentTimeMillis() - startTime) / 1000)
-                             < PostAction.SKAHA_ADD_USER_ALLOCATION_TIMEOUT_SECONDS)) {
-            final Process checkProcess = Runtime.getRuntime().exec(PostAction.CHECK_MAKE_USER_BASE_COMMAND);
-            final int code = checkProcess.waitFor();
-            if (code != 0) {
-                throw new IOException("Unable to create user home(code: " + code + ").");
-            } else {
-                // Read standard out.
-                try (final InputStream stdOut = new BufferedInputStream(checkProcess.getInputStream())) {
-                    final String output = readStream(stdOut);
-                    // Output will be in the form of:
-                    // NAME                          COMPLETIONS   DURATION   AGE
-                    // <JOB_NAME>                    1/1           20s        13m
-                    //
-                    // So look for the job name in the completed job output.
-                    complete = output.contains(jobName);
-                }
-            }
+        while (!complete) {
+            final String output = SessionAction.execute(PostAction.CHECK_MAKE_USER_BASE_COMMAND);
+
+            // Output will be in the form of:
+            // NAME                          COMPLETIONS   DURATION   AGE
+            // <JOB_NAME>                    1/1           20s        13m
+            // <OTHER_JOB_NAME>              1/1           86s        4m
+            //
+            // So look for the job name in the completed job output.
+            complete = output.contains(jobName);
 
             // Two-second sleep to check again.  Hack.
+            // TODO: Implement wait/notify to improve efficiency.
             Thread.sleep(2 * 1000);
         }
     }
 
     void processCommandInput(final OutputStream commandInput, final String jobName) throws IOException {
-        final String fileOutput = readAddUserConfig();
+        final String fileOutput = readAddUserJobFile();
         final String processedCommandInput = fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
-                                     .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}",
-                                            Integer.toString(PostAction.DEFAULT_USER_QUOTA_IN_GB))
-                                     .replace("{" + K8SUtil.CEPH_USER_VARIABLE_NAME + "}", getCephUser())
-                                     .replace("{" + K8SUtil.CEPH_PATH_VARIABLE_NAME + "}", getCephPath())
+                                     .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}", getDefaultQuota())
                                      .replace("{" + PostAction.SKAHA_ADD_USER_JOB_NAME_KEY + "}", jobName);
 
         log.debug("Using file input\n" + processedCommandInput);
@@ -385,19 +369,11 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Override to test Ceph values without processing an entire Request.
-     * @return  String Ceph user, if configured.
+     * Override to test injected quota value without processing an entire Request.
+     * @return  String quota number in GB, or null if not configured.
      */
-    String getCephUser() {
-        return K8SUtil.getCephUser();
-    }
-
-    /**
-     * Override to test Ceph values without processing an entire Request.
-     * @return  String Ceph path, if configured.
-     */
-    String getCephPath() {
-        return K8SUtil.getCephPath();
+    String getDefaultQuota() {
+        return K8SUtil.getDefaultQuota();
     }
 
     /**
@@ -405,9 +381,8 @@ public class PostAction extends SessionAction {
      * @return  List of String instances, never null.
      * @throws IOException  If the file cannot be read.
      */
-    String readAddUserConfig() throws IOException {
-        return Files.readString(FileUtil.getFileFromResource(PostAction.SKAHA_ADD_USER_CONFIG_PATH,
-                                                             PostAction.class).toPath());
+    String readAddUserJobFile() throws IOException {
+        return Files.readString(new File(System.getProperty("user.home") + "/config/add-user.yaml").toPath());
     }
 
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
@@ -692,17 +667,15 @@ public class PostAction extends SessionAction {
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
-
-        // Removed 3 second delay--container initialization cannot be quantified
-        // so this is pointless.
-        //try {
-        //    log.debug("3 second wait for container initialization");
-        //    Thread.sleep(3000);
-        //} catch (InterruptedException ignore) {
-        //}
-
     }
 
+    /**
+     * Attach a desktop application.
+     * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
+     * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
+     * @param image         Container image name.
+     * @throws Exception    For any unexpected errors.
+     */
     public void attachDesktopApp(String image) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();

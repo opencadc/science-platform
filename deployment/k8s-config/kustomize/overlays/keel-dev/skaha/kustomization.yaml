@@ -9,6 +9,7 @@ configMapGenerator:
   behavior: merge
   files:
   - config/catalina.properties
+  - config/add-user.yaml
   - config/k8s-resources.properties
   - config/launch-carta.yaml
   - config/launch-notebook.yaml
