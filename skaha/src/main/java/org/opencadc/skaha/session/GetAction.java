@@ -154,7 +154,7 @@ public class GetAction extends SessionAction {
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else if (sessionID == null){
-                throw new IllegalArgumentException("Missing session ID for desktop-ap ID " + appID);
+                throw new IllegalArgumentException("Missing session ID for desktop-app ID " + appID);
             } else {
                 String json = getSingleDesktopApp(sessionID, appID);
                 syncOutput.setHeader("Content-Type", "application/json");

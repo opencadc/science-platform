@@ -602,8 +602,8 @@ public class PostAction extends SessionAction {
         log.debug("Using cores: " + cores.toString());
         log.debug("Using ram: " + ram.toString() + "Gi");
         
-        String uniqueID = new RandomStringGenerator(3).getID();
-        String jobName = sessionID + "-" + uniqueID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
+        appID = new RandomStringGenerator(3).getID();
+        String jobName = sessionID + "-" + appID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
@@ -624,7 +624,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
-        launchString = setConfigValue(launchString, SOFTWARE_APPID, uniqueID);
+        launchString = setConfigValue(launchString, SOFTWARE_APPID, appID);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, cores.toString());
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
@@ -643,7 +643,6 @@ public class PostAction extends SessionAction {
         String[] launchCmd = new String[] {
             "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
         String createResult = execute(launchCmd);
-        appID = uniqueID;
         log.debug("Create result: " + createResult);
         
         // refresh the user's proxy cert
