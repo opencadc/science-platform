@@ -394,7 +394,7 @@ public abstract class SessionAction extends SkahaAction {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
                 if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
-                    (sessionID.equals(session.getId())) && (appID.equals(session.getAppid()))) {
+                    (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
                     return session;
                 }
             }
@@ -793,7 +793,7 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        session.setAppid(appID);
+        session.setAppId(appID);
 
         if (parts.length > 9) {
             String requestedRAM = parts[9];

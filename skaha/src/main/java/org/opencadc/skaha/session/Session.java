@@ -209,12 +209,12 @@ public class Session {
         this.expiryTime = timeInSeconds;
     }
     
-    public String getAppid() {
+    public String getAppId() {
         return appid;
     }
     
-    public void setAppid(String appid) {
-        this.appid = appid;
+    public void setAppId(String appId) {
+        this.appid = appId;
     }
     
     @Override
