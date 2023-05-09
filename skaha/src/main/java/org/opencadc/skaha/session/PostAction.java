@@ -85,6 +85,7 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -144,11 +145,6 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String SKAHA_ADD_USER_JOB_NAME_KEY = "skaha.adduser.jobname";
     private static final String SKAHA_ADD_USER_TYPE = "add-user";
-
-
-    private static final String[] TEST_USER_BASE_COMMAND = new String[] {
-            "test", "-d", "%s/%s"
-    };
 
     private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
             "kubectl", "-n", K8SUtil.getNamespace(), "create", "-f", "-"
@@ -282,13 +278,9 @@ public class PostAction extends SessionAction {
     }
 
     void ensureUserBase() throws IOException, InterruptedException {
-        final String[] command = new String[PostAction.TEST_USER_BASE_COMMAND.length];
-        System.arraycopy(PostAction.TEST_USER_BASE_COMMAND, 0, command, 0, command.length);
+        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
 
-        command[command.length - 1] = String.format(command[command.length - 1], this.homedir, this.userID);
-        final Process p = Runtime.getRuntime().exec(command);
-
-        if (p.waitFor() != 0) {
+        if (Files.notExists(homeDir)) {
             allocateUser();
         }
     }
