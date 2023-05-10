@@ -392,7 +392,7 @@ public abstract class SessionAction extends SkahaAction {
         List<Session> sessions = getSessions(userID, sessionID);
         if (sessions.size() > 0) {
             for (Session session : sessions) {
-                // exclude 'desktop-app'
+                // only include 'desktop-app'
                 if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
                     (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
                     return session;
