@@ -1,0 +1,126 @@
+#!/bin/bash
+
+get_resource_options() {
+    while read line; do
+        local prefix=${line%%"="*}
+        local index=$(( ${#prefix} + 2 ))
+        if [[ ${line} == *"cores-default = "* ]]; then
+            core_default=${line:$index}
+        elif [[ ${line} == *"cores-options = "* ]]; then
+            core_options=${line:$index}
+        elif [[ ${line} == *"mem-gb-default = "* ]]; then
+            ram_default=${line:$index}
+        elif [[ ${line} == *"mem-gb-options = "* ]]; then
+            ram_options=${line:$index}
+        fi
+    done < ~/config/k8s-resources.properties
+}
+
+get_cores() {
+    default_cores=1
+    cores=${default_cores}
+    c=0
+    read -t 3 -p "Please enter number of cores (default ${cores_default}) ${core_options}: " input_cores
+    while [[ $c -lt 3 ]]; do
+        if [[ -z "${input_cores}" ]]; then
+            cores=${default_cores}
+            echo
+            break
+        elif [[ "${input_cores}" =~ ^[0-9]+$ && "${input_cores}" -gt 0 ]]; then
+            cores=${input_cores}
+            break
+        else
+            read -t 3 -p "Wrong input: ${input_cores}. Please enter number ${core_options}" input_cores
+            c=$(( c + 1 ))
+        fi
+    done
+
+    if [[ $c -gt 2 ]]; then
+        exit 1
+    fi
+}
+
+get_ram() {
+    default_ram=4
+    ram=${default_ram}
+    c=0
+    read -t 3 -p "Please enter the amount of memory (number of G, ${ram_default}) ${ram_options}: " input_ram
+    while [[ $c -lt 3 ]]; do
+        if [[ -z "${input_ram}" ]]; then
+            ram=${default_ram}
+            echo
+            break
+        elif [[ "${input_ram}" =~ ^[0-9]+$ && "${input_ram}" -gt 0 ]]; then
+            ram=${input_ram}
+            break
+        else
+            read -t 3 -p "Wrong input: ${input_ram}. Please enter number ${ram_options}" input_cores
+            c=$(( c + 1 ))
+        fi
+    done
+
+    if [[ $c -gt 2 ]]; then
+        exit 1
+    fi
+}
+
+get_resources() {
+    get_resource_options
+    get_cores
+    get_ram
+}
+
+check_command() {
+    $1
+    if [[ $? -eq 0 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+check_status() {
+    status=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/session/${VNC_PW} | grep '"status"'`
+    echo "Status: ${status}"
+    if [[ ${status} == *"status"* ]]; then
+        IFS=': ' read -a array <<< ${status}
+        echo "array[1]: ${array[1]}"
+        while [[ ${array[1]} == *"Pending"* ]]
+        do
+            echo "."
+            sleep 1
+            status=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/session/${VNC_PW} | grep '"status"'`
+            if [[ ${status} == *"status"* ]]; then
+                IFS=':' read -a array <<< ${status}
+            else
+                echo "Failed to determine launch status."
+                exit 1
+            fi
+        done
+
+        if [[ ${array[1]} == *"Running"* ]]; then
+            echo "Successfully launched app."
+        else
+            echo "Failed to launch app."
+            exit 1
+        fi
+    else
+        echo "Failed to determine launch status."
+    fi
+}
+
+check_command get_resources
+if [[ $? -eq 0 ]]; then
+    echo "get_resources succeeded"
+else
+    echo "get_resources failed"
+fi
+
+echo "cores = $cores";
+echo "memory = ${ram}G"
+
+echo ${skaha_hostname}
+echo ${VNC_PW}
+`/opt/shibboleth/bin/curl -v -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=${IMAGE_ID}" --data-urlencode "param={NAME}" https://${skaha_hostname}/skaha/session/${VNC_PW}/app`
+
+check_status

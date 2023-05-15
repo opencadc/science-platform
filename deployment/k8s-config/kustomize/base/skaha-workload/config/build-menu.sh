@@ -128,11 +128,15 @@ build_menu_item () {
   name=$2
   category=$3
   executable="${EXECUTABLE_DIR}/${name}.sh"
+  start_executable="${EXECUTABLE_DIR}/start-${name}.sh"
   desktop="${DESKTOP_DIR}/${name}.desktop"
   cp ${STARTUP_DIR}/software-sh.template $executable
+  cp ${STARTUP_DIR}/start-software-sh.template ${start_executable}
   cp ${STARTUP_DIR}/software-category.template $desktop
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $executable
+  sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${start_executable}
+  sed -i -e "s#(NAME)#${name}#g" ${start_executable}
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
