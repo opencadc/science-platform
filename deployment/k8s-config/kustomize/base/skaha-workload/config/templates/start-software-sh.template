@@ -17,6 +17,11 @@ get_resource_options() {
 }
 
 get_cores() {
+    core_list=( ${core_options} )
+    for v in "${core_list[@]}"; do
+        core_map[$v]=1
+    done
+
     default_cores=1
     cores=${default_cores}
     c=0
@@ -26,11 +31,11 @@ get_cores() {
             cores=${default_cores}
             echo
             break
-        elif [[ "${input_cores}" =~ ^[0-9]+$ && "${input_cores}" -gt 0 ]]; then
+        elif [[ -n "${core_map[${input_cores}]}" ]]; then
             cores=${input_cores}
             break
         else
-            read -t 3 -p "Wrong input: ${input_cores}. Please enter number ${core_options}" input_cores
+            read -t 3 -p "Wrong input: ${input_cores}. Please enter a number in (${core_options}) " input_cores
             c=$(( c + 1 ))
         fi
     done
@@ -41,20 +46,25 @@ get_cores() {
 }
 
 get_ram() {
+    ram_list=( ${ram_options} )
+    for v in "${ram_list[@]}"; do
+        ram_map[$v]=1
+    done
+
     default_ram=4
     ram=${default_ram}
     c=0
-    read -t 3 -p "Please enter the amount of memory (number of G, ${ram_default}) ${ram_options}: " input_ram
+    read -t 3 -p "Please enter the amount of memory (number of G, default ${ram_default}) ${ram_options}: " input_ram
     while [[ $c -lt 3 ]]; do
         if [[ -z "${input_ram}" ]]; then
             ram=${default_ram}
             echo
             break
-        elif [[ "${input_ram}" =~ ^[0-9]+$ && "${input_ram}" -gt 0 ]]; then
+        elif [[ -n "${ram_map[${input_ram}]}" ]]; then
             ram=${input_ram}
             break
         else
-            read -t 3 -p "Wrong input: ${input_ram}. Please enter number ${ram_options}" input_cores
+            read -t 3 -p "Wrong input: ${input_ram}. Please enter a number in (${ram_options}) " input_ram
             c=$(( c + 1 ))
         fi
     done
