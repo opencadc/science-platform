@@ -10,6 +10,7 @@ configMapGenerator:
   files:
   - config/start-desktop.sh
   - config/build-menu.sh
+  - config/sleep-forever.sh
 - name: templates
   files:
   - config/templates/skaha-resolutions.properties

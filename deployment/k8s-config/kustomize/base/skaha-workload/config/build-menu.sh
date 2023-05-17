@@ -38,6 +38,9 @@ init () {
   if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
     ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
   fi
+
+  # sleep-forever.sh is used on desktop-app start up, refer to start-software-sh.template
+  cp ${STARTUP_DIR}/sleep-forever.sh ${EXECUTABLE_DIR}/.
 }
 
 build_resolution_items () {
