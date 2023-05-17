@@ -10,6 +10,7 @@ configMapGenerator:
   files:
   - config/start-desktop.sh
   - config/build-menu.sh
+  - config/k8s-resources.properties
   - config/sleep-forever.sh
 - name: templates
   files:

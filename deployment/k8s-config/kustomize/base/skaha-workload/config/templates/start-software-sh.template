@@ -21,7 +21,7 @@ get_resource_options() {
         elif [[ ${line} == *"mem-gb-options = "* ]]; then
             ram_options=${line:$index}
         fi
-    done < ~/config/k8s-resources.properties
+    done < /config/k8s-resources.properties
 }
 
 get_cores() {
