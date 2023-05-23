@@ -66,6 +66,9 @@
  */
 package org.opencadc.skaha.image;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * @author majorb
  *
@@ -73,21 +76,21 @@ package org.opencadc.skaha.image;
 public class Image {
     
     private String id;
-    private String type;
+    private Set<String> types;
     private String digest;
     
-    public Image(String id, String type, String digest) {
+    public Image(String id, Set<String> types, String digest) {
         if (id == null) {
             throw new IllegalArgumentException("id requried");
         }
-        if (type == null) {
+        if (types == null || types.isEmpty()) {
             throw new IllegalArgumentException("type required");
         }
         if (digest == null) {
             throw new IllegalArgumentException("digest requried");
         }
         this.id = id;
-        this.type = type;
+        this.types = new HashSet<String>(types);
         this.digest = digest;
     }
 
@@ -95,8 +98,8 @@ public class Image {
         return id;
     }
 
-    public String getType() {
-        return type;
+    public Set<String> getTypes() {
+        return types;
     }
 
     public String getDigest() {
@@ -107,9 +110,26 @@ public class Image {
     public boolean equals(Object o) {
         if (o instanceof Image) {
             Image i = (Image) o;
-            return i.id.equals(this.id) && i.digest.equals(this.digest) && i.type.equals(this.type);
+            return i.id.equals(this.id) && i.digest.equals(this.digest) && hasSameTypes(i.types);
         }
         return false;
     }
 
+    private boolean hasSameTypes(Set<String> inputTypes) {
+        for (String iType : inputTypes) {
+            boolean found = false;
+            for (String type : this.types) {
+                if (type.equals(iType)) {
+                   found = true;
+                   break;
+                }
+            }
+            
+            if (!found) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
 }

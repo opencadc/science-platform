@@ -388,10 +388,10 @@ public class PostAction extends SessionAction {
                 if (image == null) {
                     throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
                 }
-                if (type != null && !type.equals(image.getType())) {
+                if (type != null && !image.getTypes().contains(type)) {
                     throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
                 }
-                return image.getType();
+                return type;
             }
         }
                 
