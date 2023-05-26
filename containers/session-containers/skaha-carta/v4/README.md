@@ -22,4 +22,4 @@ In order to push images to this registry, you need to be a publishing member of 
 1. When prompted by harbor to enter an identification, type your CADC Userid or another name by which you wish to be known within the harbor registry.
 1. Copy your CLI Secret to your clipboard under the `User Profile` menu item in the top right corner of the Harbor portal.
 1. Log docker into harbor by typing `docker login <CADC Userid>`.  Use the CLI Secret in your clipboard when prompted for a password.
-1. Push the image to harbor:  `docker push images.canfar.net/carta/skaha-carta:1.4`
+1. Push the image to harbor:  `docker push images.canfar.net/carta/skaha-carta:4.0-beta`
