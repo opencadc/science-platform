@@ -2,14 +2,14 @@
 
 ## About
 
-A CARTA 4.0.0-beta session container for skaha based on CARTA-remote (https://github.com/CARTAvis).
+A CARTA 4.0-beta session container for skaha based on CARTA-remote (https://github.com/CARTAvis).
 
 A wrapper script, `skaha-carta`, is added to the container that calls the CARTA binary `carta`.
 
 ## Building
 
 ```
-docker build -t images.canfar.net/skaha/carta:4.0.0-beta -f Dockerfile .
+docker build -t images.canfar.net/skaha/carta:4.0-beta -f Dockerfile .
 ```
 
 ## Publishing to the image registry
