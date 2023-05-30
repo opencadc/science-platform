@@ -118,17 +118,17 @@
     
     <servlet-mapping>
         <servlet-name>SessionServlet</servlet-name>
-        <url-pattern>/session/*</url-pattern>
+        <url-pattern>/v0/session/*</url-pattern>
     </servlet-mapping>
     
     <servlet-mapping>
         <servlet-name>ContextServlet</servlet-name>
-        <url-pattern>/context/*</url-pattern>
+        <url-pattern>/v0/context/*</url-pattern>
     </servlet-mapping>
     
     <servlet-mapping>
         <servlet-name>ImageServlet</servlet-name>
-        <url-pattern>/image/*</url-pattern>
+        <url-pattern>/v0/image/*</url-pattern>
     </servlet-mapping>
         
     <servlet-mapping>
