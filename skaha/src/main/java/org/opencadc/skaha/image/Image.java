@@ -116,6 +116,10 @@ public class Image {
     }
 
     private boolean hasSameTypes(Set<String> inputTypes) {
+        if (inputTypes == null || inputTypes.isEmpty()) {
+            return false;
+        }
+
         for (String iType : inputTypes) {
             boolean found = false;
             for (String type : this.types) {
