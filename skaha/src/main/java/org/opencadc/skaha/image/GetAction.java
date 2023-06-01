@@ -258,7 +258,6 @@ public class GetAction extends SkahaAction {
                     if (!jArtifact.isNull("tags")) {
                         JSONArray tags = jArtifact.getJSONArray("tags");
                         for (int j=0; j<tags.length(); j++) {
-                            long perTagStart = System.currentTimeMillis();
                             JSONObject jTag = tags.getJSONObject(j);
                             String tag = jTag.getString("name");
                             String imageID = harborHost + "/" + rName + ":" + tag;
