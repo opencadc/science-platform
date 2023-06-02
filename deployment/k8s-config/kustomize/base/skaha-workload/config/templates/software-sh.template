@@ -1,3 +1,3 @@
 #!/bin/bash 
 
-xterm -ls -e "sleep 5; (HOME)/.local/skaha/bin/start-(NAME).sh; sleep 15"
+xterm -ls -e "sleep 5; ${HOME}/.local/skaha/bin/start-(NAME).sh; sleep 15"
