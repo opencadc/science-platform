@@ -18,6 +18,7 @@ configMapGenerator:
   - config/templates/xfce-directory.template
   - config/templates/xfce-applications-menu-item.template
   - config/templates/software-sh.template
+  - config/templates/start-software-sh.template
   - config/templates/software-category.template
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template

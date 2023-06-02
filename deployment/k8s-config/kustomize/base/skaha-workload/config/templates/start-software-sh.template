@@ -116,6 +116,6 @@ check_status() {
 
 get_resources
 
-`/opt/shibboleth/bin/curl -v -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=${IMAGE_ID}" --data-urlencode "param={NAME}" https://${skaha_hostname}/skaha/session/${VNC_PW}/app`
+`/opt/shibboleth/bin/curl -v -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=${IMAGE_ID}" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/session/${VNC_PW}/app`
 
 check_status
