@@ -1,7 +1,13 @@
 FROM images.opencadc.org/library/cadc-tomcat:1
 
+# add often used tools
+RUN dnf -y install which
+
+# PAM LDAP access
+RUN dnf -y install sssd-client acl 
+
 # install docker
-RUN dnf install -y docker
+RUN dnf -y install docker
 
 # needed to get/set quota when adding users.
 RUN dnf -y install attr
