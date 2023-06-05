@@ -7,7 +7,6 @@ configMapGenerator:
 - name: skaha-config
   files:
   - config/catalina.properties
-  - config/add-user.yaml
   - config/LocalAuthority.properties
   - config/RsaSignaturePub.key
   - config/launch-carta.yaml

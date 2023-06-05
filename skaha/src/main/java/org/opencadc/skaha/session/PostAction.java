@@ -75,12 +75,8 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -143,16 +139,8 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
-    private static final String SKAHA_ADD_USER_JOB_NAME_KEY = "skaha.adduser.jobname";
-    private static final String SKAHA_ADD_USER_TYPE = "add-user";
+    private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
 
-    private static final String[] MAKE_USER_BASE_COMMAND = new String[] {
-            "kubectl", "-n", K8SUtil.getNamespace(), "create", "-f", "-"
-    };
-
-    private static final String[] CHECK_MAKE_USER_BASE_COMMAND = new String[] {
-            "kubectl", "-n", K8SUtil.getNamespace(), "get", "jobs", "--field-selector", "status.successful=1"
-    };
 
     public PostAction() {
         super();
@@ -281,75 +269,41 @@ public class PostAction extends SessionAction {
         final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
 
         if (Files.notExists(homeDir)) {
+            log.debug("Allocating new user home to " + homeDir);
             allocateUser();
+            log.debug("Allocating new user home to " + homeDir + ": OK");
         }
     }
 
     void allocateUser() throws IOException, InterruptedException {
         log.debug("PostAction.makeUserBase()");
-        final ProcessBuilder processBuilder = new ProcessBuilder().command(PostAction.MAKE_USER_BASE_COMMAND);
-        final Process p = processBuilder.start();
-        final String jobName = K8SUtil.getJobName(this.sessionID, PostAction.SKAHA_ADD_USER_TYPE, this.userID);
-        try (final BufferedOutputStream commandInput = new BufferedOutputStream(p.getOutputStream())) {
-            processCommandInput(commandInput, jobName);
-            commandInput.flush();
-        }
+        final String[] allocateUserCommand = new String[] {
+                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getDefaultQuota()
+        };
 
-        log.debug("Executing " + Arrays.toString(PostAction.MAKE_USER_BASE_COMMAND));
-        final int code = p.waitFor();
-        try (final InputStream stdOut = new BufferedInputStream(p.getInputStream());
-             final InputStream stdErr = new BufferedInputStream(p.getErrorStream())) {
-            if (code != 0) {
-                final String errorOutput = readStream(stdErr);
-                final String commandOutput = readStream(stdOut);
-                throw new IOException("Unable to create user home (code: " + code + ")."
+        log.debug("Executing " + Arrays.toString(allocateUserCommand));
+        try (final ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
+             final ByteArrayOutputStream standardError = new ByteArrayOutputStream()) {
+            executeCommand(allocateUserCommand, standardOutput, standardError);
+
+            final String errorOutput = standardError.toString();
+            final String commandOutput = standardOutput.toString();
+
+            if (StringUtil.hasText(errorOutput)) {
+                throw new IOException("Unable to create user home."
                                       + "\nError message from server: " + errorOutput
                                       + "\nOutput from command: " + commandOutput);
             } else {
-                log.debug(readStream(stdOut));
-                log.debug("Executing " + Arrays.toString(PostAction.MAKE_USER_BASE_COMMAND) + ": OK");
+                log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
         }
-
-        // Needs to match what is in the YAML job file.
-        waitForUserAllocation(jobName);
 
         log.debug("PostAction.makeUserBase(): OK");
     }
 
-    /**
-     * Ensure user allocation is complete.  This is essential before progressing to Session Creation.
-     * @throws IOException              If the process cannot execute.
-     * @throws InterruptedException     If waiting for the process cannot happen or is interrupted.
-     */
-    void waitForUserAllocation(final String jobName) throws IOException, InterruptedException {
-        boolean complete = false;
-
-        while (!complete) {
-            final String output = SessionAction.execute(PostAction.CHECK_MAKE_USER_BASE_COMMAND);
-
-            // Output will be in the form of:
-            // NAME                          COMPLETIONS   DURATION   AGE
-            // <JOB_NAME>                    1/1           20s        13m
-            // <OTHER_JOB_NAME>              1/1           86s        4m
-            //
-            // So look for the job name in the completed job output.
-            complete = output.contains(jobName);
-
-            // Two-second sleep to check again.  Hack.
-            // TODO: Implement wait/notify to improve efficiency.
-            Thread.sleep(2 * 1000);
-        }
-    }
-
-    void processCommandInput(final OutputStream commandInput, final String jobName) throws IOException {
-        final String fileOutput = readAddUserJobFile();
-        final String processedCommandInput = fileOutput.replace("{" + PostAction.SKAHA_USERID + "}", getUserID())
-                                     .replace("{" + PostAction.SKAHA_USER_QUOTA_GB + "}", getDefaultQuota())
-                                     .replace("{" + PostAction.SKAHA_ADD_USER_JOB_NAME_KEY + "}", jobName);
-
-        log.debug("Using file input\n" + processedCommandInput);
-        commandInput.write(processedCommandInput.getBytes());
+    void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
+            throws IOException, InterruptedException {
+        SessionAction.execute(command, standardOut, standardErr);
     }
 
     /**
@@ -366,15 +320,6 @@ public class PostAction extends SessionAction {
      */
     String getDefaultQuota() {
         return K8SUtil.getDefaultQuota();
-    }
-
-    /**
-     * Read the config file as a list of String lines.  Tests can override as needed.
-     * @return  List of String instances, never null.
-     * @throws IOException  If the file cannot be read.
-     */
-    String readAddUserJobFile() throws IOException {
-        return Files.readString(new File(System.getProperty("user.home") + "/config/add-user.yaml").toPath());
     }
 
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {

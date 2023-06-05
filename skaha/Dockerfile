@@ -3,6 +3,9 @@ FROM images.opencadc.org/library/cadc-tomcat:1
 # install docker
 RUN dnf install -y docker
 
+# needed to get/set quota when adding users.
+RUN dnf -y install attr
+
 # install kubernetes client
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.22.13/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 
@@ -22,4 +25,4 @@ RUN set -x && \
 
 COPY build/libs/skaha.war /usr/share/tomcat/webapps/
 
-
+COPY src/scripts/* /usr/local/bin/

@@ -74,6 +74,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.UUID;
 
 
@@ -82,10 +84,8 @@ public class PostActionTest {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-    final UUID jobUUID = UUID.randomUUID();
-
     @Test
-    public void processCommandInput() throws Exception {
+    public void allocateUserError() throws Exception {
         final PostAction testSubject = new PostAction() {
             @Override
             String getUserID() {
@@ -98,63 +98,44 @@ public class PostActionTest {
             }
 
             @Override
-            String readAddUserJobFile() {
-                return "      - name: \"{skaha.adduser.jobname}\""
-                       + "        image: images.canfar.net/skaha-system/add-user:1.2"
-                       + "        imagePullPolicy: Always"
-                       + "        # Userid for allocation goes in this argument."
-                       + "        # Second argument is user quota in GB"
-                       + "        # TODO: automate the setting of this in the calling script"
-                       + "        command: [\"/usr/bin/add-user\"]"
-                       + "        args: [\"{skaha.userid}\", \"{skaha.userquotagb}\"]"
-                       + "        volumeMounts:"
-                       + "        - mountPath: \"/config\""
-                       + "          name: add-user-config"
-                       + "        - mountPath: /root/.ssl/"
-                       + "          name: servops-cert"
-                       + "          readOnly: true"
-                       + "        volumes:"
-                       + "        - name: cavern-volume"
-                       + "          cephfs:"
-                       + "            monitors:"
-                       + "            - 10.30.201.3:6789"
-                       + "            - 10.30.202.3:6789"
-                       + "            - 10.30.203.3:6789"
-                       + "            path: \"/my/ceph/path\""
-                       + "            user: \"cephuser\"";
+            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
+                    throws IOException {
+                standardOut.write("".getBytes());
+                standardErr.write("Forbidden to write.".getBytes());
             }
         };
 
-        final String expectedConfig =
-                "      - name: \"skaha-add-user-job-name\""
-                + "        image: images.canfar.net/skaha-system/add-user:1.2"
-                + "        imagePullPolicy: Always"
-                + "        # Userid for allocation goes in this argument."
-                + "        # Second argument is user quota in GB"
-                + "        # TODO: automate the setting of this in the calling script"
-                + "        command: [\"/usr/bin/add-user\"]"
-                + "        args: [\"TESTUSER\", \"14\"]"
-                + "        volumeMounts:"
-                + "        - mountPath: \"/config\""
-                + "          name: add-user-config"
-                + "        - mountPath: /root/.ssl/"
-                + "          name: servops-cert"
-                + "          readOnly: true"
-                + "        volumes:"
-                + "        - name: cavern-volume"
-                + "          cephfs:"
-                + "            monitors:"
-                + "            - 10.30.201.3:6789"
-                + "            - 10.30.202.3:6789"
-                + "            - 10.30.203.3:6789"
-                + "            path: \"/my/ceph/path\""
-                + "            user: \"cephuser\"";
+        try {
+            testSubject.allocateUser();
+            Assert.fail("Should throw IOException");
+        } catch (IOException exception) {
+            // Good.
+            Assert.assertEquals("Wrong message.", "Unable to create user home."
+                                                  + "\nError message from server: Forbidden to write."
+                                                  + "\nOutput from command: ", exception.getMessage());
+        }
+    }
 
-        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    @Test
+    public void allocateUser() throws Exception {
+        final PostAction testSubject = new PostAction() {
+            @Override
+            String getUserID() {
+                return "TESTUSER";
+            }
 
-        testSubject.processCommandInput(outputStream, "skaha-add-user-job-name");
+            @Override
+            String getDefaultQuota() {
+                return "14";
+            }
 
-        final String resultConfig = outputStream.toString();
-        Assert.assertEquals("Wrong output.", String.join("", expectedConfig), resultConfig);
+            @Override
+            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
+                    throws IOException {
+                standardOut.write("Created /home/dir".getBytes());
+            }
+        };
+
+        testSubject.allocateUser();
     }
 }

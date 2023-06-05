@@ -74,6 +74,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.util.StringUtil;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -209,6 +210,29 @@ public abstract class SessionAction extends SkahaAction {
         } 
         return stdout.trim();
     }
+
+    public static void execute(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
+            throws IOException, InterruptedException {
+        final Process p = Runtime.getRuntime().exec(command);
+        final int code = p.waitFor();
+        try (final InputStream stdOut = new BufferedInputStream(p.getInputStream());
+             final InputStream stdErr = new BufferedInputStream(p.getErrorStream())) {
+            final String commandOutput = readStream(stdOut);
+            if (code != 0) {
+                final String errorOutput = readStream(stdErr);
+                log.error("Code (" + code + ") found from command " + Arrays.toString(command));
+                log.error(errorOutput);
+                standardErr.write(errorOutput.getBytes());
+                standardErr.flush();
+            } else {
+                log.debug(commandOutput);
+                log.debug("Executing " + Arrays.toString(command) + ": OK");
+            }
+            standardOut.write(commandOutput.getBytes());
+            standardOut.flush();
+        }
+    }
+
     
     public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
         // vnc_light.html accepts title and resize

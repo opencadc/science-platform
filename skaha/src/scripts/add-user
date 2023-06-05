@@ -1,0 +1,109 @@
+#!/bin/bash
+
+set -e
+
+### Give the SSSD container time to initialize
+sleep 10
+
+SELF=add-user
+CONFDIR=/add-user-config
+
+TS=$(date)
+echo "$TS $SELF START"
+
+if [ -z "$2" ]
+  then
+    echo "Usage: add-user <userid> <quota in GB>"
+    exit 2
+fi
+USERID=$1
+QUOTA=$2
+
+BASHRC="$CONFDIR/bashrc"
+XRESOURCES="$CONFDIR/Xresources"
+CASACONFIG="$CONFDIR/casa-config.tar"
+CERTFILE="/root/.ssl/cadcproxy.pem"
+
+if [ ! -f $CONFDIR/homedir ]
+  then
+    echo "No file homedir found in $CONFDIR"
+    exit  2
+fi
+
+if [ ! -f $CONFDIR/skahagroup ]
+  then
+    echo "No file skahagroup found in $CONFDIR"
+    exit  2
+fi
+
+if [ ! -f $CASACONFIG ]
+  then
+    echo "No file casa-config.tar found in $CONFDIR"
+    exit  2
+fi
+
+if [ ! -f $CERTFILE ]
+  then
+    echo "No file cadcproxy.pem found in $CONFDIR"
+    exit  2
+fi
+
+if [ ! -f $BASHRC ]
+  then
+    echo "No file .bashrc found in $CONFDIR"
+    exit  2
+fi
+
+if [ ! -f $XRESOURCES ]
+  then
+    echo "No file .Xresources found in $CONFDIR"
+    exit  2
+fi
+
+HOMEBASE=`cat $CONFDIR/homedir`
+HOMEDIR="$HOMEBASE/$USERID"
+SKAHAGROUP=`cat $CONFDIR/skahagroup`
+
+echo "  Certfile: $CERTFILE"
+echo "  skaha group: $SKAHAGROUP"
+
+echo "Creating allocation for $USERID"
+echo -n "  Creating home dir $HOMEDIR..."
+mkdir $HOMEDIR
+chown $USERID:$USERID $HOMEDIR
+chmod 700 $HOMEDIR
+echo " Done"
+
+echo -n "  Adding home dir config files..."
+cp $BASHRC $HOMEDIR/.bashrc
+chown $USERID:$USERID $HOMEDIR/.bashrc
+cp $XRESOURCES $HOMEDIR/.Xresources
+chown $USERID:$USERID $HOMEDIR/.Xresources
+# xrdb is run on .Xresources later to load the config
+echo " Done"
+
+echo -n "  Creating home .ssl directory ..."
+mkdir $HOMEDIR/.ssl
+chown $USERID:$USERID $HOMEDIR/.ssl
+echo " Done"
+
+echo -n "  Adding CASA configuration..."
+mkdir $HOMEDIR/.casa
+cp $CASACONFIG $HOMEDIR/.casa/
+cd $HOMEDIR/.casa
+tar xf casa-config.tar
+rm casa-config.tar
+chown -R $USERID:$USERID $HOMEDIR/.casa
+echo " Done"
+
+echo -n "  Adding user to skaha group..."
+curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERID?idType=http"
+echo " Done"
+
+echo -n "  Setting user quota to ${QUOTA}G..."
+setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
+setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
+echo " Done"
+
+TS=$(date)
+echo "$TS $SELF DONE"
