@@ -3,7 +3,7 @@
 handle_error() {
     echo "$1"
     echo "Please enter Ctl+C when you are ready to exit the xterm."
-    ${HOME}/.local/skaha/bin/test-sleep.sh &
+    ${HOME}/.local/skaha/bin/sleep-forever.sh &
     wait
     exit 1
 }

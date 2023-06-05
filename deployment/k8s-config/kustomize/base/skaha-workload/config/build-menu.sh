@@ -40,7 +40,7 @@ init () {
   fi
 
   # sleep-forever.sh is used on desktop-app start up, refer to start-software-sh.template
-  cp ${STARTUP_DIR}/sleep-forever.sh ${EXECUTABLE_DIR}/.
+  cp /skaha-system/sleep-forever.sh ${EXECUTABLE_DIR}/.
 }
 
 build_resolution_items () {
