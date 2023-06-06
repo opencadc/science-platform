@@ -6,11 +6,13 @@ configMapGenerator:
 - name: start-jupyterlab
   files:
   - config/start-jupyterlab.sh
+- name: desktop-config
+  files:
+  - config/k8s-resources.properties
 - name: start-desktop
   files:
   - config/start-desktop.sh
   - config/build-menu.sh
-  - config/k8s-resources.properties
   - config/sleep-forever.sh
 - name: templates
   files:
