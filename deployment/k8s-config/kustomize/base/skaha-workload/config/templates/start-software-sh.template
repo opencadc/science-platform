@@ -30,13 +30,12 @@ get_cores() {
         local core_map[$v]=1
     done
 
-    default_cores=1
-    cores=${default_cores}
+    cores=${core_default}
     local c=0
-    read -t 3 -p "Please enter number of cores (default ${cores_default}) ${core_options}: " input_cores
+    read -t 3 -p "Please enter number of cores (default ${core_default}) ${core_options}: " input_cores
     while (( c < 3 )); do
         if [[ -z "${input_cores}" ]]; then
-            cores=${default_cores}
+            cores=${core_default}
             echo
             break
         elif [[ -n "${core_map[${input_cores}]}" ]]; then
@@ -59,13 +58,12 @@ get_ram() {
         local ram_map[$v]=1
     done
 
-    default_ram=4
-    ram=${default_ram}
+    ram=${ram_default}
     local c=0
     read -t 3 -p "Please enter the amount of memory (number of G, default ${ram_default}) ${ram_options}: " input_ram
     while (( c < 3 )); do
         if [[ -z "${input_ram}" ]]; then
-            ram=${default_ram}
+            ram=${ram_default}
             echo
             break
         elif [[ -n "${ram_map[${input_ram}]}" ]]; then
