@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  version: 0.3
+  version: 0.10.0
   title: skaha
   description: |
     skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using skaha can be found here:  https://github.com/opencadc/science-platform/tree/master/doc
@@ -8,7 +8,7 @@ schemes:
   - https
 basePath: /skaha
 paths:
-  /session:
+  /v0/session:
     get:
       description: |
         List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>User ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect URL<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and 'headless'.
@@ -117,7 +117,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /session/{sessionID}:
+  /v0/session/{sessionID}:
     get:
       description: |
         Get the session identified by sessionID as a JSON object.
@@ -202,7 +202,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /session/{sessionID}/app:
+  /v0/session/{sessionID}/app:
     post:
       description: |
         Attach a desktop-app to the session identified by sessionID.  This only applies to sessions of type 'desktop'.
@@ -232,7 +232,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /image:
+  /v0/image:
     get:
       description: |
         List the images available for launching to the calling user, returned as a JSON array.  Image attributes include:<br/><br/>Image ID<br/>Image Type<br/>Digest (checksum)
@@ -257,7 +257,7 @@ paths:
         type: string
         description: Only show images of this type (desktop, notebook, or carta)
         required: false
-  /context:
+  /v0/context:
     get:
       description: |
         List the CPU cores and Random Access Memory available for launching to the calling user, returned as JSON objects.  The default values for both cores and RAM are also returned.
