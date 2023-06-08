@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -e
+
+### Give the SSSD container time to initialize
+
+SELF=skaha-carta
+
+TS=$(date)
+echo "$TS $SELF START"
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: skaha-carta <folder>"
+    exit 2
+    # ROOT="/"
+fi
+ROOT=$1
+FOLDER=$2
+echo "root: $ROOT"
+echo "folder: $FOLDER"
+echo "command: carta --no_browser --top_level_folder=$ROOT --port=6901 --idle_timeout=100000 --debug_no_auth $FOLDER"
+carta --no_browser --top_level_folder=$ROOT --port=6901 --idle_timeout=100000 --debug_no_auth $FOLDER
+# A bit over a day timeout. Disable token authentication.
+
+# echo "Done"
+
+# ### Listen to the log file until the process ends
+# sleep 5
+
+# PID=$(pgrep -x 'carta_backend')
+# echo "PID: $PID"
+
+# LOGFILE=/carta/CARTA/log/skaha-carta.log
+
+# tail --pid $PID -F $LOGFILE
+
+# TS=$(date)
+# echo "$TS $SELF DONE"

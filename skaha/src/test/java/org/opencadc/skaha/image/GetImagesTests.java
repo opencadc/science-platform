@@ -71,7 +71,9 @@ import ca.nrc.cadc.util.Log4jInit;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -170,7 +172,9 @@ public class GetImagesTests {
             String json = gson.toJson(images);
             log.info(json);
             Assert.assertEquals("image count",  5, images.size());
-            Image test = new Image("test/petuan/new-earth-snap:0.1.1", "notebook",
+            Set<String> types = new HashSet<String>();
+            types.add("notebook");
+            Image test = new Image("test/petuan/new-earth-snap:0.1.1", types,
                 "sha256:439cadced5731d0946018fa3e2371444309c7cb8b6fc762c8f96ef915fc49ae4");
             Assert.assertTrue("exists", images.contains(test));
             

@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2021.                            (c) 2021.
+ *  (c) 2023.                            (c) 2023.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -62,78 +62,25 @@
  *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
  *                                       <http://www.gnu.org/licenses/>.
  *
+ *
  ************************************************************************
  */
-package org.opencadc.skaha.image;
 
-import java.util.HashSet;
-import java.util.Set;
+package org.opencadc.skaha;
 
-/**
- * @author majorb
- *
- */
-public class Image {
-    
-    private String id;
-    private Set<String> types;
-    private String digest;
-    
-    public Image(String id, Set<String> types, String digest) {
-        if (id == null) {
-            throw new IllegalArgumentException("id requried");
-        }
-        if (types == null || types.isEmpty()) {
-            throw new IllegalArgumentException("type required");
-        }
-        if (digest == null) {
-            throw new IllegalArgumentException("digest requried");
-        }
-        this.id = id;
-        this.types = new HashSet<String>(types);
-        this.digest = digest;
-    }
+import org.junit.Assert;
+import org.junit.Test;
 
-    public String getId() {
-        return id;
-    }
+public class K8SUtilTest {
+    @Test
+    public void sanitizeJobName() {
+        Assert.assertEquals("Wrong name", "skaha-type-userid-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "USERID"));
 
-    public Set<String> getTypes() {
-        return types;
-    }
+        Assert.assertEquals("Wrong name", "skaha-type-my-user-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "my_user"));
 
-    public String getDigest() {
-        return digest;
-    }
-    
-    @Override
-    public boolean equals(Object o) {
-        if (o instanceof Image) {
-            Image i = (Image) o;
-            return i.id.equals(this.id) && i.digest.equals(this.digest) && hasSameTypes(i.types);
-        }
-        return false;
-    }
-
-    private boolean hasSameTypes(Set<String> inputTypes) {
-        if (inputTypes == null || inputTypes.isEmpty()) {
-            return false;
-        }
-
-        for (String iType : inputTypes) {
-            boolean found = false;
-            for (String type : this.types) {
-                if (type.equals(iType)) {
-                   found = true;
-                   break;
-                }
-            }
-            
-            if (!found) {
-                return false;
-            }
-        }
-        
-        return true;
+        Assert.assertEquals("Wrong name", "skaha-type-my-us-e-r-sess",
+                            K8SUtil.getJobName("SESS", "TYPE", "my|us+e&r"));
     }
 }
