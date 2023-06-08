@@ -36,7 +36,7 @@ get_cores() {
     while (( c < 3 )); do
         if [[ -z "${input_cores}" ]]; then
             cores=${core_default}
-            echo
+            echo "${cores}"
             break
         elif [[ -n "${core_map[${input_cores}]}" ]]; then
             cores=${input_cores}
@@ -64,7 +64,7 @@ get_ram() {
     while (( c < 3 )); do
         if [[ -z "${input_ram}" ]]; then
             ram=${ram_default}
-            echo
+            echo "${ram}"
             break
         elif [[ -n "${ram_map[${input_ram}]}" ]]; then
             ram=${input_ram}
@@ -93,12 +93,17 @@ check_status() {
     if [[ ${status} == *"status"* ]]; then
         echo "${status}"
         IFS=': ' read -a array <<< ${status}
+        count=0
         while [[ ${array[1]} == *"Pending"* ]]
         do
             sleep 1
+            count=$(( $count + 1 ))
             status=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/session/${VNC_PW}/app/$1 | grep '"status"'`
             if [[ ${status} == *"status"* ]]; then
-                echo "${status}"
+                if test $count -eq 15 ; then
+                    echo "${status}"
+                    count=0
+                fi
                 IFS=':' read -a array <<< ${status}
             else
                 handle_error "Failed to determine launch status, ${status}"
@@ -117,6 +122,6 @@ check_status() {
 
 get_resources
 
-app_id=`/opt/shibboleth/bin/curl -v -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/session/${VNC_PW}/app`
+app_id=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/session/${VNC_PW}/app`
 
 check_status ${app_id}
