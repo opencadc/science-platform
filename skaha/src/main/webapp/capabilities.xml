@@ -24,15 +24,15 @@
 
   <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">https://replace.me.com/skaha</accessURL>
+        <accessURL use="base">https://replace.me.com/skaha/v0</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#cookie"/>
     </interface>
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">https://replace.me.com/skaha</accessURL>
+        <accessURL use="base">https://replace.me.com/skaha/v0</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#tls-with-certificate"/>
     </interface>
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
-      <accessURL use="base">https://replace.me.com/skaha</accessURL>
+        <accessURL use="base">https://replace.me.com/skaha/v0</accessURL>
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>

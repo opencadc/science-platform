@@ -258,19 +258,11 @@ public class GetAction extends SkahaAction {
                     if (!jArtifact.isNull("tags")) {
                         JSONArray tags = jArtifact.getJSONArray("tags");
                         for (int j=0; j<tags.length(); j++) {
-                            long perTagStart = System.currentTimeMillis();
                             JSONObject jTag = tags.getJSONObject(j);
                             String tag = jTag.getString("name");
                             String imageID = harborHost + "/" + rName + ":" + tag;
                             Image image = null;
-                            if (typeFilter == null) {
-                                // TODO: Sort out the cardinality problem with images types.
-                                // Images can have multiple types (labels), but running images
-                                // have a single type.
-                                image = new Image(imageID, types.iterator().next(), digest);
-                            } else {
-                                image = new Image(imageID, typeFilter, digest);
-                            }
+                            image = new Image(imageID, types, digest);
                             // collect this image
                             images.add(image);
                             log.debug("Added image: " + imageID);
