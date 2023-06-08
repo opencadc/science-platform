@@ -24,5 +24,12 @@ configMapGenerator:
   - config/ingress-carta.yaml
   - config/service-contributed.yaml
   - config/ingress-contributed.yaml
+- name: add-user-config
+  files:
+  - add-user-config/bashrc
+  - add-user-config/casa-config.tar
+  - add-user-config/homedir
+  - add-user-config/skahagroup
+  - add-user-config/Xresources
 generatorOptions:
  disableNameSuffixHash: true

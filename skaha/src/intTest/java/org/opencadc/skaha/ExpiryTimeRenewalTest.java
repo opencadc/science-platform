@@ -175,7 +175,7 @@ public class ExpiryTimeRenewalTest {
                             }
                         }
                     }
-                    Assert.assertTrue("one sessions", count == 1);
+                    Assert.assertEquals("should have one session", 1, count);
     
                     //renew session
                     renewSession(sessionURL, cartaSessionID);
@@ -198,12 +198,12 @@ public class ExpiryTimeRenewalTest {
                             }
                         }
                     }
-                    Assert.assertTrue("one sessions", count == 1);
+                    Assert.assertEquals("one sessions", 1, count);
     
                     // Pre-condition: activeDeadlineSeconds == skaha.sessionexpiry
                     // If the pre-condition has changed, the conditional code below needs to be updated
                     long changedTime = timeToLiveAfterRenewal - timeToLive;
-                    if (!(changedTime > SLEEP_TIME) && (changedTime < SLEEP_TIME * 2)) {
+                    if (changedTime <= SLEEP_TIME) {
                         // renew failed
                         Assert.fail("activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test.");
                     }
@@ -259,7 +259,7 @@ public class ExpiryTimeRenewalTest {
                             }
                         }
                     }
-                    Assert.assertTrue("one session", count == 1);
+                    Assert.assertEquals("one session", 1, count);
                     
                     //renew session
                     renewSession(sessionURL, headlessSessionID);
@@ -280,7 +280,7 @@ public class ExpiryTimeRenewalTest {
                             }
                         }
                     }
-                    Assert.assertTrue("one session", count == 1);
+                    Assert.assertEquals("one session", 1, count);
                     
                     // Pre-condition: activeDeadlineSeconds > skaha.sessionexpiry
                     // If the pre-condition has changed, this test needs to be updated
@@ -305,133 +305,122 @@ public class ExpiryTimeRenewalTest {
     }
     
     @Test
-    public void testRenewDesktop() {
-        try {
-            
-            Subject.doAs(userSubject, new PrivilegedExceptionAction<Object>() {
+    public void testRenewDesktop() throws Exception {
+        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
-                public Object run() throws Exception {
-                    
-                    // ensure that there is no active session
-                    initialize();
-                    
-                    // create desktop session
-                    createSession(DESKTOP_IMAGE);
-                    
-                    TimeUnit.SECONDS.sleep(SLEEP_TIME);
-                    
-                    // get time to live (start time - stop time) before renewal
-                    int count = 0;
-                    String desktopSessionID = null;
-                    long desktopTimeToLive = 0L;
-                    List<Session> sessions = getSessions();
-                    for (Session s : sessions) {
-                        Assert.assertNotNull("session type", s.getType());
-                        if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                            Assert.assertNotNull("no desktop session status", s.getStatus());
-                            if (s.getStatus().equals("Running")) {
-                                count++;
-                                Assert.assertNotNull("no desktop session", s.getId());
-                                desktopSessionID = s.getId();
-                                Instant startTime = Instant.parse(s.getStartTime());
-                                Instant expiryTime = Instant.parse(s.getExpiryTime());
-                                desktopTimeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
-                            }
-                        }
+            // ensure that there is no active session
+            initialize();
+
+            // create desktop session
+            createSession(DESKTOP_IMAGE);
+
+            TimeUnit.SECONDS.sleep(SLEEP_TIME);
+
+            // get time to live (start time - stop time) before renewal
+            int count = 0;
+            String desktopSessionID = null;
+            long desktopTimeToLive = 0L;
+            List<Session> sessions = getSessions();
+            for (Session s : sessions) {
+                Assert.assertNotNull("session type", s.getType());
+                if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+                    Assert.assertNotNull("no desktop session status", s.getStatus());
+                    if (s.getStatus().equals("Running")) {
+                        count++;
+                        Assert.assertNotNull("no desktop session", s.getId());
+                        desktopSessionID = s.getId();
+                        Instant startTime = Instant.parse(s.getStartTime());
+                        Instant expiryTime = Instant.parse(s.getExpiryTime());
+                        desktopTimeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
                     }
-                    Assert.assertTrue("one session", count == 1);
-                    
-                    // create desktop app
-                    URL desktopAppURL = new URL(sessionURL.toString() + "/" + desktopSessionID + "/app");
-                    createApp(TERMINAL_IMAGE, desktopAppURL);
-
-                    // get time to live (start time - stop time) before renewal
-                    count = 0;
-                    long desktopAppTimeToLive = 0L;
-                    sessions = getSessions();
-                    for (Session session : sessions) {
-                        Assert.assertNotNull("no desktop session", session.getId());
-                        if (session.getId().equals(desktopSessionID)) {
-                            count++;
-                            Assert.assertNotNull("session type", session.getType());
-                            if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                                Instant startTime = Instant.parse(session.getStartTime());
-                                Instant expiryTime = Instant.parse(session.getExpiryTime());
-                                desktopAppTimeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
-                            }
-                        }
-                    }
-                
-                    // verify that we found the desktop-app
-                    Assert.assertTrue("two sessions", count == 2);
-                    Assert.assertTrue("failed to calculate desktop app time-to-live", desktopAppTimeToLive != 0L);
-
-                    TimeUnit.SECONDS.sleep(SLEEP_TIME);
-                    
-                    //renew desktop session, the associated desktop-app should also be renewed
-                    renewSession(sessionURL, desktopSessionID);
-                    
-                    // get time to live (start time - stop time) after renewal
-                    count = 0;
-                    long desktopTimeToLiveAfterRenewal = 0L;
-                    long desktopAppTimeToLiveAfterRenewal = 0L;
-                    sessions = getSessions();
-                    for (Session session : sessions) {
-                        Assert.assertNotNull("no desktop session", session.getId());
-                        if (session.getId().equals(desktopSessionID)) {
-                            count++;
-                            Assert.assertNotNull("session type", session.getType());
-                            if (session.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                                Instant startTime = Instant.parse(session.getStartTime());
-                                Instant expiryTime = Instant.parse(session.getExpiryTime());
-                                desktopTimeToLiveAfterRenewal = startTime.until(expiryTime, ChronoUnit.SECONDS);
-                            } else if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                                Instant startTime = Instant.parse(session.getStartTime());
-                                Instant expiryTime = Instant.parse(session.getExpiryTime());
-                                desktopAppTimeToLiveAfterRenewal = startTime.until(expiryTime, ChronoUnit.SECONDS);
-                            } else {
-                                throw new AssertionError("invalid session type: " + session.getType());
-                            }
-                        }
-                    }
-                        
-                    // verify that we found the renewed desktop and desktop-app
-                    Assert.assertTrue("two sessions", count == 2);
-                    Assert.assertTrue("failed to calculate the renewed desktop time-to-live", desktopAppTimeToLiveAfterRenewal != 0L);
-                    Assert.assertTrue("failed to calculate the renewed desktop app time-to-live", desktopAppTimeToLiveAfterRenewal != 0L);
-
-                    // Pre-condition: activeDeadlineSeconds == skaha.sessionexpiry
-                    // If the pre-condition has changed, the conditional code below needs to be updated
-                    long desktopChangedTime = desktopTimeToLiveAfterRenewal - desktopTimeToLive;
-                    if (!((desktopChangedTime > SLEEP_TIME * 2) && (desktopChangedTime < SLEEP_TIME * 4))) {
-                        // renew failed
-                        Assert.fail("if activeDeadlineSeconds and/or skaha.sessionexpiry for a Desktop session has been changed, please update this test.");
-                    }
-                    long desktopAppChangedTime = desktopAppTimeToLiveAfterRenewal - desktopAppTimeToLive;
-                    if (!((desktopAppChangedTime > SLEEP_TIME * 1) && (desktopAppChangedTime < SLEEP_TIME * 2))) {
-                        // renew failed
-                        Assert.fail("if activeDeadlineSeconds and/or skaha.sessionexpiry for a Desktop app has been changed, please update this test.");
-                    }
-
-                    // delete desktop session, no need to delete the desktop-app
-                    deleteSession(sessionURL, desktopSessionID);
-                    
-                    TimeUnit.SECONDS.sleep(10);
-                    
-                    // verify that there is no session left
-                    verifyNoSession(desktopSessionID, SessionAction.SESSION_TYPE_DESKTOP);
-
-                    return null;
                 }
-            });
-            
-        } catch (Exception t) {
-            log.error("unexpected throwable", t);
-            Assert.fail("unexpected throwable: " + t);
-        }
+            }
+            Assert.assertEquals("one session", 1, count);
+
+            // create desktop app
+            URL desktopAppURL = new URL(sessionURL.toString() + "/" + desktopSessionID + "/app");
+            createApp(TERMINAL_IMAGE, desktopAppURL);
+
+            // get time to live (start time - stop time) before renewal
+            count = 0;
+            long desktopAppTimeToLive = 0L;
+            sessions = getSessions();
+            for (Session session : sessions) {
+                Assert.assertNotNull("no desktop session", session.getId());
+                if (session.getId().equals(desktopSessionID)) {
+                    count++;
+                    Assert.assertNotNull("session type", session.getType());
+                    if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
+                        Instant startTime = Instant.parse(session.getStartTime());
+                        Instant expiryTime = Instant.parse(session.getExpiryTime());
+                        desktopAppTimeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
+                    }
+                }
+            }
+
+            // verify that we found the desktop-app
+            Assert.assertEquals("two sessions", 2, count);
+            Assert.assertTrue("failed to calculate desktop app time-to-live", desktopAppTimeToLive != 0L);
+
+            TimeUnit.SECONDS.sleep(SLEEP_TIME);
+
+            //renew desktop session, the associated desktop-app should also be renewed
+            renewSession(sessionURL, desktopSessionID);
+
+            // get time to live (start time - stop time) after renewal
+            count = 0;
+            long desktopTimeToLiveAfterRenewal = 0L;
+            long desktopAppTimeToLiveAfterRenewal = 0L;
+            sessions = getSessions();
+            for (Session session : sessions) {
+                Assert.assertNotNull("no desktop session", session.getId());
+                if (session.getId().equals(desktopSessionID)) {
+                    count++;
+                    Assert.assertNotNull("session type", session.getType());
+                    if (session.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+                        Instant startTime = Instant.parse(session.getStartTime());
+                        Instant expiryTime = Instant.parse(session.getExpiryTime());
+                        desktopTimeToLiveAfterRenewal = startTime.until(expiryTime, ChronoUnit.SECONDS);
+                    } else if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
+                        Instant startTime = Instant.parse(session.getStartTime());
+                        Instant expiryTime = Instant.parse(session.getExpiryTime());
+                        desktopAppTimeToLiveAfterRenewal = startTime.until(expiryTime, ChronoUnit.SECONDS);
+                    } else {
+                        throw new AssertionError("invalid session type: " + session.getType());
+                    }
+                }
+            }
+
+            // verify that we found the renewed desktop and desktop-app
+            Assert.assertEquals("two sessions", 2, count);
+            Assert.assertTrue("failed to calculate the renewed desktop app time-to-live", desktopAppTimeToLiveAfterRenewal != 0L);
+
+            // Pre-condition: activeDeadlineSeconds == skaha.sessionexpiry
+            // If the pre-condition has changed, the conditional code below needs to be updated
+            long desktopChangedTime = desktopTimeToLiveAfterRenewal - desktopTimeToLive;
+            if (!((desktopChangedTime > SLEEP_TIME * 2) && (desktopChangedTime < SLEEP_TIME * 4))) {
+                // renew failed
+                Assert.fail("if activeDeadlineSeconds and/or skaha.sessionexpiry for a Desktop session has been changed, please update this test.");
+            }
+            long desktopAppChangedTime = desktopAppTimeToLiveAfterRenewal - desktopAppTimeToLive;
+            if (!((desktopAppChangedTime > SLEEP_TIME) && (desktopAppChangedTime < SLEEP_TIME * 2))) {
+                // renew failed
+                Assert.fail("if activeDeadlineSeconds and/or skaha.sessionexpiry for a Desktop app has been changed, please update this test.");
+            }
+
+            // delete desktop session, no need to delete the desktop-app
+            deleteSession(sessionURL, desktopSessionID);
+
+            TimeUnit.SECONDS.sleep(10);
+
+            // verify that there is no session left
+            verifyNoSession(desktopSessionID, SessionAction.SESSION_TYPE_DESKTOP);
+
+            return null;
+        });
     }
     
-    private void initialize() throws MalformedURLException, InterruptedException {
+    private void initialize() throws MalformedURLException {
         List<Session> sessions = getSessions();
         for (Session session : sessions) {
             // skip dekstop-app, deletion of desktop-app is not supported
@@ -447,7 +436,7 @@ public class ExpiryTimeRenewalTest {
                 count++;
             }
         }
-        Assert.assertTrue("zero sessions #1", count == 0);
+        Assert.assertEquals("zero sessions #1", 0, count);
     }
     private void createApp(String image, URL appURL) {
         Map<String, Object> params = new HashMap<String, Object>();
@@ -494,7 +483,7 @@ public class ExpiryTimeRenewalTest {
         Type listType = new TypeToken<List<Session>>(){}.getType();
         Gson gson = new Gson();
         List<Session> sessions = gson.fromJson(json, listType);
-        List<Session> active = new ArrayList<Session>();
+        List<Session> active = new ArrayList<>();
         for (Session s : sessions) {
             if (!s.getStatus().equals(Session.STATUS_TERMINATING)) {
                 active.add(s);
@@ -504,7 +493,7 @@ public class ExpiryTimeRenewalTest {
     }
     
     private void renewSession(URL sessionURL, String sessionID) throws MalformedURLException {
-        Map<String, Object> params = new HashMap<String, Object>();
+        Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
         HttpPost post = new HttpPost(new URL(sessionURL.toString() + "/" + sessionID), params, false);
         post.run();
@@ -521,6 +510,6 @@ public class ExpiryTimeRenewalTest {
                 count++;
             }
         }
-        Assert.assertTrue("zero session", count == 0);
+        Assert.assertEquals("zero session", 0, count);
     }
 }
