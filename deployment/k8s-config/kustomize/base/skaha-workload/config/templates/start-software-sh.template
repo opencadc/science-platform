@@ -88,7 +88,7 @@ get_resources() {
 
 check_status() {
     sleep 1
-    status=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
+    status=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
     echo "desktop app ID is $1"
     if [[ ${status} == *"status"* ]]; then
         echo "${status}"
@@ -98,7 +98,7 @@ check_status() {
         do
             sleep 1
             count=$(( $count + 1 ))
-            status=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
+            status=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
             if [[ ${status} == *"status"* ]]; then
                 if test $count -eq 15 ; then
                     echo "${status}"
@@ -122,6 +122,6 @@ check_status() {
 
 get_resources
 
-app_id=`/opt/shibboleth/bin/curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
 
 check_status ${app_id}
