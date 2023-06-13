@@ -138,93 +138,82 @@ public class SessionLifecycleTest {
     }
     
     @Test
-    public void testCreateDeleteSessions() {
-        try {
-            
-            Subject.doAs(userSubject, new PrivilegedExceptionAction<Object>() {
+    public void testCreateDeleteSessions() throws Exception {
+        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
-                public Object run() throws Exception {
-                    
-                    // ensure that there is no active session
-                    initialize();
-                    
-                    // create desktop session
-                    createSession(DESKTOP_IMAGE);
-                    
-                    // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been 
-                    // addressed, just wait for a bit.
-                    TimeUnit.SECONDS.sleep(10);
-                    
-                    // verify desktop session
-                    verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#1");
-                    
-                    // create carta session
-                    createSession(CARTA_IMAGE);
-                    
-                    TimeUnit.SECONDS.sleep(10);
-                    
-                    // verify both desktop and carta sessions
-                    int count = 0;
-                    List<Session> sessions = getSessions();
-                    String desktopSessionID = null;
-                    String cartaSessionID = null;
-                    for (Session s : sessions) {
-                        Assert.assertNotNull("session type", s.getType());
-                        Assert.assertNotNull("session has no status", s.getStatus());
-                        if (s.getStatus().equals("Running")) {
-                            if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                                count++;
-                                desktopSessionID = s.getId();
-                            } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
-                                count++;
-                                cartaSessionID = s.getId();
-                            } else if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)){
-                                throw new AssertionError("invalid session type: " + s.getType());
-                            }
-                            Assert.assertEquals("session name", "inttest", s.getName());
-                            Assert.assertNotNull("session id", s.getId());
-                            Assert.assertNotNull("connect URL", s.getConnectURL());
-                            Assert.assertNotNull("up since", s.getStartTime());
-                        }
+            // ensure that there is no active session
+            initialize();
+
+            // create desktop session
+            createSession(DESKTOP_IMAGE);
+
+            // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been
+            // addressed, just wait for a bit.
+            TimeUnit.SECONDS.sleep(10);
+
+            // verify desktop session
+            verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#1");
+
+            // create carta session
+            createSession(CARTA_IMAGE);
+
+            TimeUnit.SECONDS.sleep(10);
+
+            // verify both desktop and carta sessions
+            int count = 0;
+            List<Session> sessions = getSessions();
+            String desktopSessionID = null;
+            String cartaSessionID = null;
+            for (Session s : sessions) {
+                Assert.assertNotNull("session type", s.getType());
+                Assert.assertNotNull("session has no status", s.getStatus());
+                if (s.getStatus().equals("Running")) {
+                    if (s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+                        count++;
+                        desktopSessionID = s.getId();
+                    } else if (s.getType().equals(SessionAction.SESSION_TYPE_CARTA)) {
+                        count++;
+                        cartaSessionID = s.getId();
+                    } else if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)){
+                        throw new AssertionError("invalid session type: " + s.getType());
                     }
-                    Assert.assertTrue("two sessions", count == 2);
-                    Assert.assertNotNull("no desktop session", desktopSessionID);
-                    Assert.assertNotNull("no carta session", cartaSessionID);
-
-                    // delete desktop session
-                    deleteSession(sessionURL, desktopSessionID);
-                    
-                    TimeUnit.SECONDS.sleep(10);
-                    
-                    // verify remaining carta session
-                    verifyOneSession(SessionAction.SESSION_TYPE_CARTA, "#2");
-                    
-                    // delete carta session
-                    deleteSession(sessionURL, cartaSessionID);
-                    
-                    TimeUnit.SECONDS.sleep(10);
-                    
-                    // verify that there is no session left
-                    count = 0;
-                    sessions = getSessions();
-                    for (Session s : sessions) {
-                        Assert.assertNotNull("session ID", s.getId());
-                        if (s.getId().equals(cartaSessionID) || 
-                                s.getId().equals(desktopSessionID)) {
-                            count++;
-                        }
-                    }
-                    Assert.assertTrue("zero sessions #2", count == 0);
-
-                    return null;
+                    Assert.assertEquals("session name", "inttest", s.getName());
+                    Assert.assertNotNull("session id", s.getId());
+                    Assert.assertNotNull("connect URL", s.getConnectURL());
+                    Assert.assertNotNull("up since", s.getStartTime());
                 }
-            });
-            
-        } catch (Exception t) {
-            log.error("unexpected throwable", t);
-            Assert.fail("unexpected throwable: " + t);
-        }
-        
+            }
+            Assert.assertEquals("should have two sessions", 2, count);
+            Assert.assertNotNull("no desktop session", desktopSessionID);
+            Assert.assertNotNull("no carta session", cartaSessionID);
+
+            // delete desktop session
+            deleteSession(sessionURL, desktopSessionID);
+
+            TimeUnit.SECONDS.sleep(10);
+
+            // verify remaining carta session
+            verifyOneSession(SessionAction.SESSION_TYPE_CARTA, "#2");
+
+            // delete carta session
+            deleteSession(sessionURL, cartaSessionID);
+
+            TimeUnit.SECONDS.sleep(10);
+
+            // verify that there is no session left
+            count = 0;
+            sessions = getSessions();
+            for (Session s : sessions) {
+                Assert.assertNotNull("session ID", s.getId());
+                if (s.getId().equals(cartaSessionID) ||
+                        s.getId().equals(desktopSessionID)) {
+                    count++;
+                }
+            }
+            Assert.assertEquals("zero sessions #2", 0, count);
+
+            return null;
+        });
     }
     
     private void initialize() throws MalformedURLException {
@@ -243,10 +232,10 @@ public class SessionLifecycleTest {
                 count++;
             }
         }
-        Assert.assertTrue("zero sessions #1", count == 0);
+        Assert.assertEquals("zero sessions #1", 0, count);
     }
     private void createSession(String image) {
-        Map<String, Object> params = new HashMap<String, Object>();
+        Map<String, Object> params = new HashMap<>();
         params.put("name", "inttest");
         params.put("image", image);
         HttpPost post = new HttpPost(sessionURL, params, false);
@@ -270,7 +259,7 @@ public class SessionLifecycleTest {
             }
             
         }
-        Assert.assertTrue("one session " + sessionNumber, count == 1);
+        Assert.assertEquals("should have one session " + sessionNumber, 1, count);
     }
 
     private void deleteSession(URL sessionURL, String sessionID) throws MalformedURLException {
@@ -289,7 +278,7 @@ public class SessionLifecycleTest {
         Type listType = new TypeToken<List<Session>>(){}.getType();
         Gson gson = new Gson();
         List<Session> sessions = gson.fromJson(json, listType);
-        List<Session> active = new ArrayList<Session>();
+        List<Session> active = new ArrayList<>();
         for (Session s : sessions) {
             if (!(s.getStatus().equals(Session.STATUS_TERMINATING) || s.getStatus().equals(Session.STATUS_SUCCEEDED))) {
                 active.add(s);

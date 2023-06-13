@@ -70,6 +70,8 @@ package org.opencadc.skaha;
 
 public class K8SUtil {
 
+    static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
+
     public static String getHostName() {
         return System.getenv("skaha.hostname");
     }
@@ -123,5 +125,13 @@ public class K8SUtil {
 
     public static String getSessionExpiry() {
         return System.getenv("skaha.sessionexpiry");
+    }
+
+    /**
+     * Obtain the configured default quota size in Gigabytes.
+     * @return  integer in GB.
+     */
+    public static String getDefaultQuota() {
+        return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
     }
 }

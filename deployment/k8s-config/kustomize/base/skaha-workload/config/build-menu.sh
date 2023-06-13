@@ -4,7 +4,8 @@ HOST=$1
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
-XFCE_DESKTOP_DIR="$HOME/.local/share/applications"
+XFCE_DESKTOP_DIR_PARENT="$HOME/.local/share"
+XFCE_DESKTOP_DIR="${XFCE_DESKTOP_DIR_PARENT}/applications"
 DESKTOP_DIR="$HOME/.local/skaha/share/applications"
 DIRECTORIES_DIR="$HOME/.local/skaha/share/desktop-directories"
 START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
@@ -35,7 +36,9 @@ init () {
   fi
 
   # create soft link if there isn't one already
+  # ensure the parent directory is created first
   if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
+    mkdir -p ${XFCE_DESKTOP_DIR_PARENT}
     ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
   fi
 

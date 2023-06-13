@@ -6,7 +6,7 @@ set -e
 sleep 10
 
 SELF=add-user
-CONFDIR=/config
+CONFDIR=/add-user-config
 
 TS=$(date)
 echo "$TS $SELF START"
