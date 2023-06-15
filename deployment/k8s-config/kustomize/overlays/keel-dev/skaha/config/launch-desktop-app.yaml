@@ -59,8 +59,8 @@ spec:
             cpu: "${software.requests.cores}"
             ephemeral-storage: "20Gi"
           limits:
-            memory: "192Gi"
-            cpu: "8"
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
             ephemeral-storage: "200Gi"
         ports:
         - containerPort: 6000

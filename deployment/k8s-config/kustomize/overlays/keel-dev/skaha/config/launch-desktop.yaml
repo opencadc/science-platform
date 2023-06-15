@@ -71,7 +71,7 @@ spec:
         volumeMounts:
         - mountPath: "/desktopstartup"
           name: templates
-        - mountPath: "/config"
+        - mountPath: "/desktop-config"
           name: desktop-config
         - mountPath: "/skaha-system"
           name: start-desktop
