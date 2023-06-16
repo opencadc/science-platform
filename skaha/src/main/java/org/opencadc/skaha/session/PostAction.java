@@ -152,37 +152,42 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
         
+        String validatedType = null;
+        Integer cores = null;
+        Integer ram = null;
+        ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
-            throw new IllegalArgumentException("Missing parameter 'image'");
-        }
-
-        ResourceContexts rc = new ResourceContexts();
-        String type = syncInput.getParameter("type");
-        String validatedType = validateImage(image, type);
-        Integer cores = rc.getDefaultCores(validatedType);
-        Integer ram = rc.getDefaultRAM(validatedType);
-        String coresParam = syncInput.getParameter("cores");
-        String ramParam = syncInput.getParameter("ram");
-        if (coresParam != null) {
-            try {
-                cores = Integer.valueOf(coresParam);
-                if (!rc.getAvailableCores().contains(cores)) {
-                    throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
+            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
+                throw new IllegalArgumentException("Missing parameter 'image'");
             }
-        }
-        
-        if (ramParam != null) {
-            try {
-                ram = Integer.valueOf(ramParam);
-                if (!rc.getAvailableRAM().contains(ram)) {
-                    throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+        } else {
+            String type = syncInput.getParameter("type");
+            validatedType = validateImage(image, type);
+            cores = rc.getDefaultCores(validatedType);
+            ram = rc.getDefaultRAM(validatedType);
+            String coresParam = syncInput.getParameter("cores");
+            String ramParam = syncInput.getParameter("ram");
+            if (coresParam != null) {
+                try {
+                    cores = Integer.valueOf(coresParam);
+                    if (!rc.getAvailableCores().contains(cores)) {
+                        throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
                 }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+            }
+            
+            if (ramParam != null) {
+                try {
+                    ram = Integer.valueOf(ramParam);
+                    if (!rc.getAvailableRAM().contains(ram)) {
+                        throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+                }
             }
         }
 
