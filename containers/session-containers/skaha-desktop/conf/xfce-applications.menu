@@ -182,6 +182,11 @@
         <Include>
             <All/>
         </Include>
+        <Exclude>
+            <Or>
+                <Filename>xterm.desktop</Filename>
+            </Or>
+        </Exclude>
     </Menu>
 
 </Menu>
