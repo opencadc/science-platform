@@ -165,6 +165,7 @@
                 <Not><Category>Screensaver</Category></Not>
                 <Not><Filename>gpk-application.desktop</Filename></Not>
                 <Not><Filename>gpk-update-viewer.desktop</Filename></Not>
+                <Not><Filename>xterm.desktop</Filename></Not>
             </And>
         </Include>
         <Exclude>
