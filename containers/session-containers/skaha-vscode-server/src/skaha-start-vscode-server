@@ -1,0 +1,17 @@
+#!/bin/bash
+
+UNAME=$1
+SESSIONID=$2
+
+echo "Running vscode-server session $SESSIONID for user $UNAME"
+
+echo "Adding user to users group"
+usermod -a -G users $UNAME
+echo "Done"
+
+echo "Running vscode-server"
+
+sudo SESSIONID=$SESSIONID \
+    su -s /bin/bash -c 'export HOME=/home/jovyan; echo "HOME: $HOME"; start-vscode-server.sh' $UNAME
+
+echo "Exiting"

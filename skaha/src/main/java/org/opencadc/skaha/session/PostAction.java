@@ -479,7 +479,7 @@ public class PostAction extends SessionAction {
     }
 
     public void checkExistingSessions(String userid, String type) throws Exception {
-        // multiple 
+        // multiple
         if (SESSION_TYPE_HEADLESS.equals(type)) {
             return;
         }
@@ -547,6 +547,11 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
+                break;
+            case SessionAction.SESSION_TYPE_VSCODE_SERVER:
+                jobLaunchPath = System.getProperty("user.home") + "/config/launch-vscode-server.yaml";
+                servicePath = System.getProperty("user.home") + "/config/service-vscode-server.yaml";
+                ingressPath = System.getProperty("user.home") + "/config/ingress-vscode-server.yaml";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -682,7 +687,7 @@ public class PostAction extends SessionAction {
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
             int pos = MAX_JOB_NAME_LENGTH;
             jobName = jobName.substring(0, pos--);
-            // ensure that the trimmed job name is valid, i.e. starts and ends with 
+            // ensure that the trimmed job name is valid, i.e. starts and ends with
             // an alphanumeric character
             while (!jobName.matches("(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?")) {
                 // invalid job name, continue to trim

@@ -1,0 +1,15 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-vscode-server-ingress-${skaha.sessionid}
+spec:
+  entryPoints:
+    - web
+  routes:
+  - kind: Rule
+    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/session/vscode-server/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-vscode-server-svc-${skaha.sessionid}
+      port: 8889
+      scheme: http

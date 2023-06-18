@@ -10,6 +10,9 @@ configMapGenerator:
   files:
   - config/start-desktop.sh
   - config/build-menu.sh
+- name: start-vscode-server
+  files:
+  - config/start-vscode-server.sh
 - name: templates
   files:
   - config/templates/skaha-resolutions.properties
