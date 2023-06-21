@@ -32,7 +32,7 @@ get_cores() {
 
     cores=${core_default}
     local c=0
-    read -t 3 -p "Please enter number of cores (default ${core_default}) ${core_options}: " input_cores
+    read -t 3 -p "Please enter the number of cores (default ${core_default}) ${core_options}: " input_cores
     while (( c < 3 )); do
         if [[ -z "${input_cores}" ]]; then
             cores=${core_default}
@@ -82,7 +82,7 @@ get_ram() {
 
 get_resources() {
     get_resource_options || handle_error "Error obtaining resource defaults or options."
-    get_cores || handle_error "Error obtaining number of cores to allocate."
+    get_cores || handle_error "Error obtaining the number of cores to allocate."
     get_ram || handle_error "Error obtaining amount of ram to allocate."
 }
 
