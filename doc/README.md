@@ -169,7 +169,7 @@ Tokens can be obtained from the CANFAR Access Control service by providing your 
 
 The token returned can then be used for making authenticated requests to skaha.  For example:
 
-```curl -H "Authorization: Bearer <token>" https://ws-uv.canfar.net/skaha/session```
+```curl -H "Authorization: Bearer <token>" https://ws-uv.canfar.net/skaha/v0/session```
 
 Tokens are valid for 48 hours.
 
@@ -201,7 +201,7 @@ All jobs will be run as the calling user.  All jobs have the `/arc` filesystem m
 
 Example: launch a headless job, overriding the command and providing two arguments:
 
-```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session -d "name=headless-test" -d "image=images.canfar.net/skaha/terminal:0.1" --data-urlencode "cmd=touch" --data-urlencode "args=/arc/home/majorb/headless-test-1a /arc/home/majorb/headless-test-1b"```
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/v0/session -d "name=headless-test" -d "image=images.canfar.net/skaha/terminal:0.1" --data-urlencode "cmd=touch" --data-urlencode "args=/arc/home/majorb/headless-test-1a /arc/home/majorb/headless-test-1b"```
 
 skaha will return the `sessionID` on a successful post (job launch).  The job will remain in the system for 1 hour after completion (success or failure).
 
@@ -214,18 +214,18 @@ Job phases:
 - Unknown
 
 To view all sessions and jobs:
-```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session```
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/v0/session```
 
 To view a single session or job:
-```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>```
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/v0/session/<sessionID>```
 
 To view logs for session:
-```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>?view=logs```
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/v0/session/<sessionID>?view=logs```
 
 This shows the complete output (stdout and stderr) for the image for the job.
 
 To view scheduling events for session:
-```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>?view=events```
+```curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/v0/session/<sessionID>?view=events```
 
 Scheduling events will only be seen when there are issues scheduling the job on a node.
 
