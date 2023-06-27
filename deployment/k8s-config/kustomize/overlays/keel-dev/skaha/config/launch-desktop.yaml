@@ -71,8 +71,6 @@ spec:
         volumeMounts:
         - mountPath: "/desktopstartup"
           name: templates
-        - mountPath: "/desktop-config"
-          name: desktop-config
         - mountPath: "/skaha-system"
           name: start-desktop
         - mountPath: "/arc"
@@ -88,10 +86,6 @@ spec:
       - name: templates
         configMap:
           name: templates
-          defaultMode: 0777
-      - name: desktop-config
-        configMap:
-          name: desktop-config
           defaultMode: 0777
       - name: start-desktop
         configMap:

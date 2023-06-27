@@ -8,20 +8,15 @@ handle_error() {
     exit 1
 }
 
+get_k8s_resources() {
+}
+
 get_resource_options() {
-    while read line; do
-        local prefix=${line%%"="*}
-        local index=$(( ${#prefix} + 2 ))
-        if [[ ${line} == *"cores-default = "* ]]; then
-            core_default=${line:$index}
-        elif [[ ${line} == *"cores-options = "* ]]; then
-            core_options=${line:$index}
-        elif [[ ${line} == *"mem-gb-default = "* ]]; then
-            ram_default=${line:$index}
-        elif [[ ${line} == *"mem-gb-options = "* ]]; then
-            ram_options=${line:$index}
-        fi
-    done < /desktop-config/k8s-resources.properties
+     resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/context`
+     core_default=`echo $resources | jq .defaultCores`
+     core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
+     ram_default=`echo $resources | jq .defaultRAM`
+     ram_options=`echo $resources | jq .availableRAM[] | tr '\n' ' '`
 }
 
 get_cores() {
