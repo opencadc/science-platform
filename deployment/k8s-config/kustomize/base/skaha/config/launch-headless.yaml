@@ -31,6 +31,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+        allowPrivilegeEscalation: false
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
