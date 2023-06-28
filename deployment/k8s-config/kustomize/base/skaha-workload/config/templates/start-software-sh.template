@@ -8,9 +8,6 @@ handle_error() {
     exit 1
 }
 
-get_k8s_resources() {
-}
-
 get_resource_options() {
      resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/context`
      core_default=`echo $resources | jq .defaultCores`

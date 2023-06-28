@@ -9,7 +9,8 @@ LABEL io.k8s.description="Headless VNC Container with Xfce window manager, firef
       io.openshift.non-scalable=true
 
 # BM: Install fonts so remote displays work
-RUN yum update -y && yum install -y xorg-x11-fonts* gedit rsync gimp gimp-gmic gnome-terminal epel-release jq
+RUN yum update -y && yum install -y xorg-x11-fonts* gedit rsync gimp gimp-gmic gnome-terminal epel-release 
+RUN yum update -y && yum install -y jq
 
 ## Connection ports for controlling the UI:
 # VNC port:5901
