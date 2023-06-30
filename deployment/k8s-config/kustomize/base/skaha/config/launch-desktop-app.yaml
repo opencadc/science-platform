@@ -27,7 +27,6 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-        allowPrivilegeEscalation: false
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
