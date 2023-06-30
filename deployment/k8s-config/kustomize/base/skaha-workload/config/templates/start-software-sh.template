@@ -80,7 +80,8 @@ get_resources() {
 
 check_status() {
     sleep 1
-    status=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
+    curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+    status=`echo ${curl_out} | grep '"status"'`
     echo "desktop app ID is $1"
     if [[ ${status} == *"status"* ]]; then
         echo "${status}"
@@ -90,7 +91,8 @@ check_status() {
         do
             sleep 1
             count=$(( $count + 1 ))
-            status=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1 | grep '"status"'`
+            curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+            status=`echo ${curl_out} | grep '"status"'`
             if [[ ${status} == *"status"* ]]; then
                 if test $count -eq 15 ; then
                     echo "${status}"
@@ -108,7 +110,7 @@ check_status() {
             handle_error "Failed to launch app, status is ${array[1]}."
         fi
     else
-        handle_error "Failed to locate launch status, ${status}"
+        handle_error "Failed to locate launch status, ${curl_out}"
     fi
 }
 
