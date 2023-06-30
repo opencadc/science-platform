@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skaha-workload
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cadc-harbor
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cadc-openharbor
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cadc-loki
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cadc-sssd
+---
+# likewise
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia-device-plugin

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "prepare-cluster.fullname" . }}-cadc-harbor-registry-pv
+  labels:
+  {{- include "prepare-cluster.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  claimRef:
+    name: cadc-harbor-registry
+    namespace: cadc-harbor
+  csi:
+    driver: cinder.csi.openstack.org
+    fsType: ext4
+    volumeHandle: 0BE253DD-ACC8-43AD-82D4-743096E5CEF7
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  volumeMode: Filesystem

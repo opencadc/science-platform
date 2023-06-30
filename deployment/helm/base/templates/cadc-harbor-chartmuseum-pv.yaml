@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "prepare-cluster.fullname" . }}-cadc-harbor-chartmuseum-pv
+  labels:
+  {{- include "prepare-cluster.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 40Gi
+  claimRef:
+    name: cadc-harbor-chartmuseum
+    namespace: cadc-harbor
+  csi:
+    driver: cinder.csi.openstack.org
+    fsType: ext4
+    volumeHandle: 76261B76-DD7B-4FE9-B1F0-429DCC122326
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  volumeMode: Filesystem
