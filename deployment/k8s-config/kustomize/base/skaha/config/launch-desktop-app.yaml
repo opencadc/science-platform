@@ -44,6 +44,8 @@ spec:
           value: "1"
         - name: SHELL
           value: "/bin/bash"
+        securityContext:
+          allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
         imagePullPolicy: Always

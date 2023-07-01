@@ -31,10 +31,11 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-        allowPrivilegeEscalation: false
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
+        securityContext:
+          allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
         imagePullPolicy: Always
         resources:

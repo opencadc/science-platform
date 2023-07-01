@@ -27,7 +27,6 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-        allowPrivilegeEscalation: false
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
@@ -45,6 +44,8 @@ spec:
           value: "1"
         - name: SHELL
           value: "/bin/bash"
+        securityContext:
+          allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
         imagePullPolicy: Always
