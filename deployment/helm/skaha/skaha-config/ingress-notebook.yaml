@@ -1,0 +1,15 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-notebook-ingress-${skaha.sessionid}
+spec:
+  entryPoints:
+    - web
+  routes:
+  - kind: Rule
+    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/session/notebook/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-notebook-svc-${skaha.sessionid}
+      port: 8888
+      scheme: http

@@ -1,0 +1,109 @@
+# Default values for skaha.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+deployment:
+  containers:
+    skaha:
+      image: images.canfar.net/skaha-system/skaha:0.11.0
+      env:
+      - name: skaha.hostname
+        value: ws-uv.canfar.net
+      - name: skaha.homedir
+        value: /arc/home
+      - name: skaha.namespace
+        value: skaha-workload
+      - name: skaha.maxusersessions
+        value: "3"
+      - name: skaha.sessionexpiry
+        value: "345600"
+      - name: skaha.defaultquotagb
+        value: "200"
+      - name: skaha.harborhosts
+        value: "images.canfar.net"
+      - name: skaha.usersgroup
+        value: "ivo://cadc.nrc.ca/gms?skaha-users"
+      - name: skaha.adminsgroup
+        value: "ivo://cadc.nrc.ca/gms?skaha-admins"
+  
+      resources:
+        requests:
+          memory: "10Gi"
+          cpu: 10
+        limits:
+          memory: "30Gi"
+          cpu: 10
+      ports:
+      - containerPort: 8080
+        protocol: TCP
+      volumeMounts:
+       - mountPath: "/config"
+         name: config-volume
+       - mountPath: "/add-user-config"
+         name: add-user-config
+       - mountPath: /root/.ssl/
+         name: servops-cert
+         readOnly: true
+       - mountPath: "/arc"
+         name: cavern-volume
+         subPath: cavern
+       - mountPath: /var/lib/sss/pipes
+         name: sssd-dir
+         readOnly: true
+      securityContext:
+        runAsUser: 0
+      priorityClassName: uber-user-preempt-high
+      serviceAccountName: skaha
+      volumes:
+        - name: config-volume
+          configMap:
+            name: skaha-config
+        - name: add-user-config
+          configMap:
+            name: add-user-config
+        - name: servops-cert
+          secret:
+            defaultMode: 420
+            secretName: servops-clientcert
+        - name: cavern-volume
+          cephfs:
+            monitors:
+            - 10.30.201.3:6789
+            - 10.30.202.3:6789
+            - 10.30.203.3:6789
+            path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
+            user: keel_prod
+            secretRef:
+              name: cephfs-cephx-key
+            readOnly: false
+        - name: sssd-dir
+          hostPath:
+            path: /var/lib/ubernetes
+            type: Directory
+
+service:
+  skaha-tomcat-svc:
+    ports:
+    - port: 8080
+      name: http-connection
+      protocol: TCP
+      
+ingress:
+  skaha-ingress:
+    tls:
+    - hosts:
+      - ws-uv.canfar.net
+      secretName: canfar-net-cert-secret
+    rules:
+    - host: ws-uv.canfar.net
+      http:
+        paths:
+        - path: /skaha(/|$)(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: skaha-tomcat-svc
+              port:
+                number: 8080
