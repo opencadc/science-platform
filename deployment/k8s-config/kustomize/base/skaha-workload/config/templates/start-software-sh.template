@@ -24,7 +24,7 @@ get_cores() {
 
     cores=${core_default}
     local c=0
-    read -t 3 -p "Please enter the number of cores (default ${core_default}) ${core_options}: " input_cores
+    read -p "Please enter the number of cores (default ${core_default}) ${core_options}: " input_cores
     while (( c < 3 )); do
         if [[ -z "${input_cores}" ]]; then
             cores=${core_default}
@@ -52,7 +52,7 @@ get_ram() {
 
     ram=${ram_default}
     local c=0
-    read -t 3 -p "Please enter the amount of memory (number of G, default ${ram_default}) ${ram_options}: " input_ram
+    read -p "Please enter the amount of memory (number of G, default ${ram_default}) ${ram_options}: " input_ram
     while (( c < 3 )); do
         if [[ -z "${input_ram}" ]]; then
             ram=${ram_default}
@@ -72,10 +72,25 @@ get_ram() {
     fi
 }
 
+prompt_user() {
+    while true; do
+        read -p "Do you want to specify resources (cores/RAM) for the container? (y/n) " yn
+        case $yn in
+            [yY] ) get_resource_options || handle_error "Error obtaining resource defaults or options.";
+                get_cores || handle_error "Error obtaining the number of cores to allocate.";
+                get_ram || handle_error "Error obtaining the amount of ram to allocate.";
+                cmd='curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app';
+                break;;
+            [nN] ) cmd='curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app';
+                break;;
+            * ) echo invalid response;;
+        esac
+    done
+}
+
 get_resources() {
     get_resource_options || handle_error "Error obtaining resource defaults or options."
-    get_cores || handle_error "Error obtaining the number of cores to allocate."
-    get_ram || handle_error "Error obtaining amount of ram to allocate."
+    prompt_user || handle_error "Error prompting user inputs."
 }
 
 check_status() {
@@ -116,6 +131,7 @@ check_status() {
 
 get_resources
 
-app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+#app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+app_id=`$cmd`
 
 check_status ${app_id}
