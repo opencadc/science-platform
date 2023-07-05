@@ -68,8 +68,8 @@ This will install an NFS service ready to use.  It is an easy way to isolate the
       - name: my-shared-volume
         nfs: 
           # URL for the NFS server
-          # Can be accessed at the <helm-install-name>-nfs-server.skaha-nfs.svc.cluster.local hostname.
-          server: "canfar-science-platform-base-nfs-server.skaha-nfs.svc.cluster.local" # Change this!
+          # Can be accessed at the <helm-install-name>-nfs-server.skaha-system.svc.cluster.local hostname.
+          server: "canfar-science-platform-base-nfs-server.skaha-system.svc.cluster.local" # Change this!
           path: /
 ```
 
