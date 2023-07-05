@@ -1,6 +1,6 @@
 apiVersion: v2
-name: canfar-science-platform-base
-description: Base Objects needed before CANFAR Science Platform services can be installed.
+name: base
+description: A Helm chart for Kubernetes
 # A chart can be either an 'application' or a 'library' chart.
 #
 # Application charts are a collection of templates that can be packaged into versioned archives
@@ -19,9 +19,3 @@ version: 0.1.0
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "0.1.0"
-
-# Install a Traefik proxy.
-dependencies:
-  - name: traefik
-    version: "v23.1.0"   # This if the version of this Chart's release, NOT of Traefik.
-    repository: "https://traefik.github.io/charts"

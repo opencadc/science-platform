@@ -1,9 +1,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "prepare-cluster.fullname" . }}-skaha-general-workload-binding
+  name: {{ include "base.fullname" . }}-skaha-general-workload-binding
   labels:
-  {{- include "prepare-cluster.labels" . | nindent 4 }}
+  {{- include "base.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -14,5 +14,5 @@ subjects:
   name: canfarops
   namespace: '{{ .Release.Namespace }}'
 - kind: ServiceAccount
-  name: '{{ include "prepare-cluster.fullname" . }}-skaha'
+  name: '{{ include "base.fullname" . }}-skaha'
   namespace: '{{ .Release.Namespace }}'

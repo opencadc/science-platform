@@ -1,13 +1,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "prepare-cluster.fullname" . }}-canfarops-pods-cadc-sssd-binding
+  name: {{ include "base.fullname" . }}-canfarops-pods-cadc-sssd-binding
   labels:
-  {{- include "prepare-cluster.labels" . | nindent 4 }}
+  {{- include "base.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "prepare-cluster.fullname" . }}-pods-clusterrole'
+  name: '{{ include "base.fullname" . }}-pods-clusterrole'
 subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: Group
