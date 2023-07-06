@@ -34,7 +34,7 @@ get_cores() {
             cores=${input_cores}
             break
         else
-            read -t 3 -p "Wrong input: ${input_cores}. Please enter a number in (${core_options}) " input_cores
+            read -p "Please enter the number of cores (default ${core_default}) ${core_options}: " input_cores
             c=$(( c + 1 ))
         fi
     done
@@ -62,7 +62,7 @@ get_ram() {
             ram=${input_ram}
             break
         else
-            read -t 3 -p "Wrong input: ${input_ram}. Please enter a number in (${ram_options}) " input_ram
+            read -p "Please enter the amount of memory (number of G, default ${ram_default}) ${ram_options}: " input_ram
             c=$(( c + 1 ))
         fi
     done
