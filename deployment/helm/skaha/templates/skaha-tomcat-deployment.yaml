@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: skaha-tomcat
+  name: skaha-tomcat
+  namespace: skaha-system
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: skaha-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: skaha-tomcat
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.count
+                operator: DoesNotExist
+      containers:
+      - image: {{ .Values.deployment.containers.skaha.image }}
+        env: {{ toYaml .Values.deployment.containers.skaha.env | nindent 8 }}
+        #imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        name: skaha-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.containers.skaha.resources.requests.memory }}
+            cpu: {{ .Values.deployment.containers.skaha.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.containers.skaha.resources.limits.memory }}
+            cpu: {{ .Values.deployment.containers.skaha.resources.limits.cpu }}
+        ports: {{ toYaml .Values.deployment.containers.skaha.ports | nindent 8 }}
+        volumeMounts: {{ toYaml .Values.deployment.containers.skaha.volumeMounts | nindent 8 }}
+        securityContext:
+          runAsUser: {{ .Values.deployment.containers.skaha.securityContext.runAsUser }}
+      priorityClassName: {{ .Values.deployment.containers.skaha.priorityClassName }}
+      serviceAccountName: {{ .Values.deployment.containers.skaha.serviceAccountName }}
+      volumes: {{ toYaml .Values.deployment.containers.skaha.volumes | nindent 6 }}

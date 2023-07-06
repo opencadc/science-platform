@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: add-user-config
+  namespace: skaha-system
+data:
+  {{- (.Files.Glob "add-user-config/*").AsConfig | nindent 2 }}
+
