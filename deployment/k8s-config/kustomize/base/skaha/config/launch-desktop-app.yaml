@@ -47,8 +47,6 @@ spec:
         - name: SHELL
           value: "/bin/bash"
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
@@ -59,8 +57,8 @@ spec:
             cpu: "${software.requests.cores}"
             ephemeral-storage: "20Gi"
           limits:
-            memory: "${software.requests.ram}"
-            cpu: "${software.requests.cores}"
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
             ephemeral-storage: "200Gi"
         ports:
         - containerPort: 6000

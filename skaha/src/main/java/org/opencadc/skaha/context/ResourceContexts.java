@@ -83,11 +83,15 @@ public class ResourceContexts {
     
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
     
+    private Integer defaultRequestCores;
+    private Integer defaultLimitCores;
     private Integer defaultCores;
     private Integer defaultCoresHeadless;
     private List<Integer> availableCores = new ArrayList<Integer>();
     
     // units in GB
+    private Integer defaultRequestRAM;
+    private Integer defaultLimitRAM;
     private Integer defaultRAM;
     private Integer defaultRAMHeadless;
     private List<Integer> availableRAM = new ArrayList<Integer>();
@@ -98,8 +102,12 @@ public class ResourceContexts {
         try {
             PropertiesReader reader = new PropertiesReader("k8s-resources.properties");
             MultiValuedProperties mvp = reader.getAllProperties();
+            defaultRequestCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-request"));
+            defaultLimitCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-limit"));
             defaultCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default"));
             defaultCoresHeadless = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-headless"));
+            defaultRequestRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-request"));
+            defaultLimitRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-limit"));
             defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
             defaultRAMHeadless = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-headless"));
             String cOptions = mvp.getFirstPropertyValue("cores-options");
@@ -121,6 +129,14 @@ public class ResourceContexts {
         }
     }
 
+    public Integer getDefaultRequestCores() {
+        return defaultRequestCores;
+    }
+
+    public Integer getDefaultLimitCores() {
+        return defaultLimitCores;
+    }
+
     public Integer getDefaultCores(String sessionType) {
         if (SkahaAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
             return defaultCoresHeadless;
@@ -130,6 +146,14 @@ public class ResourceContexts {
 
     public List<Integer> getAvailableCores() {
         return availableCores;
+    }
+
+    public Integer getDefaultRequestRAM() {
+        return defaultRequestRAM;
+    }
+
+    public Integer getDefaultLimitRAM() {
+        return defaultLimitRAM;
     }
 
     public Integer getDefaultRAM(String sessionType) {
