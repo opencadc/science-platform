@@ -79,9 +79,9 @@ prompt_user() {
             [yY] ) get_resource_options || handle_error "Error obtaining resource defaults or options.";
                 get_cores || handle_error "Error obtaining the number of cores to allocate.";
                 get_ram || handle_error "Error obtaining the amount of ram to allocate.";
-                cmd='curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app';
+                app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`;
                 break;;
-            [nN] ) cmd='curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app';
+            [nN] ) app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`;
                 break;;
             * ) echo invalid response;;
         esac
@@ -98,31 +98,32 @@ check_status() {
     curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
     status=`echo ${curl_out} | grep '"status"'`
     echo "desktop app ID is $1"
-    if [[ ${status} == *"status"* ]]; then
-        echo "${status}"
-        IFS=': ' read -a array <<< ${status}
+    if [[ ${curl_out} == *"status"* ]]; then
+        status=`echo ${curl_out} | jq .status`
+        echo "status: ${status}"
         count=0
-        while [[ ${array[1]} == *"Pending"* ]]
+        while [[ ${status} == *"Pending"* ]]
         do
             sleep 1
             count=$(( $count + 1 ))
             curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
             status=`echo ${curl_out} | grep '"status"'`
-            if [[ ${status} == *"status"* ]]; then
+            if [[ ${curl_out} == *"status"* ]]; then
+                status=`echo ${curl_out} | jq .status`
+                echo "status: ${status}"
                 if test $count -eq 15 ; then
-                    echo "${status}"
                     count=0
                 fi
                 IFS=':' read -a array <<< ${status}
             else
-                handle_error "Failed to determine launch status, ${status}"
+                handle_error "Failed to determine launch status, ${curl_out}"
             fi
         done
 
-        if [[ ${array[1]} == *"Running"* ]]; then
+        if [[ ${status} == *"Running"* ]]; then
             echo "Successfully launched app."
         else
-            handle_error "Failed to launch app, status is ${array[1]}."
+            handle_error "Failed to launch app, status is ${status}."
         fi
     else
         handle_error "Failed to locate launch status, ${curl_out}"
@@ -130,8 +131,5 @@ check_status() {
 }
 
 get_resources
-
-#app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
-app_id=`$cmd`
 
 check_status ${app_id}
