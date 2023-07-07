@@ -8,17 +8,15 @@ Installation depends on a working Kubernetes cluster version 1.23 or greater.
 
 The base install also installs the Traefik proxy, which is needed by the Ingress when the Science Platform services are installed.
 
-**Note**: It is essential that the `skaha-system` namespace be used and created here!
-
 ```sh
 $ git clone https://github.com/opencadc/science-platform.git
 $ cd science-platform/deployment/helm
-$ helm install --dependency-update --create-namespace --namespace skaha-system <name> ./base
+$ helm install --dependency-update <name> ./base
 ```
 
 Where `<name>` is the name of this installation.  Example:
 ```sh
-$ helm install --dependency-update --create-namespace --namespace skaha-system canfar-science-platform-base ./base
+$ helm install --dependency-update canfar-science-platform-base ./base
 ```
 This will create the core namespace (`skaha-system`), and install the Traefik proxy dependency.  Expected output:
 ```
@@ -34,12 +32,10 @@ TEST SUITE: None
 
 The Helm repository contains the current stable version as well.
 
-**Note**: It is essential that the `skaha-system` namespace be used and created here!
-
 ```sh
 $ helm repo add canfar-skaha-system https://images.canfar.net/chartrepo/skaha-system
 $ helm repo update
-$ helm install --dependency-update --create-namespace --namespace skaha-system canfar-science-platform-base canfar-skaha-system/base
+$ helm install --dependency-update canfar-science-platform-base canfar-skaha-system/base
 ```
 
 ## Verification
