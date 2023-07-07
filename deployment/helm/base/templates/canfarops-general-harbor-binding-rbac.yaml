@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "base.fullname" . }}-canfarops-general-harbor-binding
+  name: canfarops-general-harbor-binding
   labels:
   {{- include "base.labels" . | nindent 4 }}
 roleRef:

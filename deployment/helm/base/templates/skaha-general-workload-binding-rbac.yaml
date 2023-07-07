@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "base.fullname" . }}-skaha-general-workload-binding
+  name: skaha-general-workload-binding
   labels:
   {{- include "base.labels" . | nindent 4 }}
 roleRef:
@@ -14,5 +14,5 @@ subjects:
   name: canfarops
   namespace: '{{ .Release.Namespace }}'
 - kind: ServiceAccount
-  name: '{{ include "base.fullname" . }}-skaha'
+  name: 'skaha'
   namespace: '{{ .Release.Namespace }}'

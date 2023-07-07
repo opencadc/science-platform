@@ -1,5 +1,6 @@
 kubernetesClusterDomain: cluster.local
 nfsServer:
+  namespace: skaha-nfs
   nfsServer:
     containerSecurityContext:
       privileged: true
@@ -27,3 +28,17 @@ nfsServer:
     targetPort: 0
   replicas: 1
   type: ClusterIP
+sssd:
+  namespace: cadc-sssd
+loki:
+  namespace: cadc-loki
+harbor:
+  namespace: cadc-harbor
+openharbor:
+  namespace: cadc-openharbor
+skaha:
+  namespace: skaha-system
+skaha-workload:
+  namespace: skaha-workload
+nvidia-device-plugin:
+  namespace: nvidia-device-plugin

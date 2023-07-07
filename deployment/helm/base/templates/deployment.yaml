@@ -1,21 +1,22 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "base.fullname" . }}-sss
+  name: sss
+  namespace: {{ .Values.sssd.namespace }}
   labels:
   {{- include "base.labels" . | nindent 4 }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "base.fullname" . }}-skaha
+  name: skaha
   labels:
   {{- include "base.labels" . | nindent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "base.fullname" . }}-nfs-server
+  name: nfs-server
   labels:
   {{- include "base.labels" . | nindent 4 }}
 spec:
@@ -34,8 +35,7 @@ spec:
       - env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        image: {{ .Values.nfsServer.nfsServer.image.repository }}:{{ .Values.nfsServer.nfsServer.image.tag
-          | default .Chart.AppVersion }}
+        image: {{ .Values.nfsServer.nfsServer.image.repository }}:{{ .Values.nfsServer.nfsServer.image.tag | default .Chart.AppVersion }}
         name: nfs-server
         ports:
         - containerPort: 2049
