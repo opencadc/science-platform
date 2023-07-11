@@ -123,18 +123,19 @@ public class ResourceStats {
     }
     
     class Ram {
-        String requestedRAM = "0K";
-        String ramAvailable = "0K";
+        String requestedRAM = "0G";
+        String ramAvailable = "0G";
         MaxRamResource maxRAM;
     }
 
     class MaxCoreResource {
         public Double cpuCores = 0.0;
-        public String withRam = "0K";
+        public String withRam = "0G";
     }
 
     class MaxRamResource {
-        public String ram = "0K";
+        public String ram = "0G";
+        
         public Double withCPUCores = 0.0;
     }
 }
