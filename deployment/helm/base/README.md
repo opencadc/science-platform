@@ -11,12 +11,12 @@ The base install also installs the Traefik proxy, which is needed by the Ingress
 ```sh
 $ git clone https://github.com/opencadc/science-platform.git
 $ cd science-platform/deployment/helm
-$ helm install --dependency-update <name> ./base
+$ helm install --dependency-update --values ./base/values.yaml <name> ./base
 ```
 
 Where `<name>` is the name of this installation.  Example:
 ```sh
-$ helm install --dependency-update canfar-science-platform-base ./base
+$ helm install --dependency-update --values ./base/values.yaml canfar-science-platform-base ./base
 ```
 This will create the core namespace (`skaha-system`), and install the Traefik proxy dependency.  Expected output:
 ```
@@ -35,7 +35,7 @@ The Helm repository contains the current stable version as well.
 ```sh
 $ helm repo add canfar-skaha-system https://images.canfar.net/chartrepo/skaha-system
 $ helm repo update
-$ helm install --dependency-update canfar-science-platform-base canfar-skaha-system/base
+$ helm install --dependency-update --values canfar-skaha-system/base/values.yaml canfar-science-platform-base canfar-skaha-system/base
 ```
 
 ## Verification
