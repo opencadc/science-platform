@@ -81,7 +81,8 @@ public class ResourceStats {
     private Ram ram;
 
     public ResourceStats(int desktopCount, int headlessCount, int totalCount, 
-            Double requestedCPUCores, Double coresAvailable, Double mCores, String withRAM, String mRAM, Double withCores) {
+            Double requestedCPUCores, String requestedRAM, Double coresAvailable, String ramAvailable, 
+            Double mCores, String withRAM, String mRAM, Double withCores) {
         instances = new JobInstances(desktopCount, headlessCount, totalCount);
 
         MaxCoreResource maxCores = new MaxCoreResource();
@@ -97,6 +98,8 @@ public class ResourceStats {
         maxRAM.withCPUCores = withCores;
         ram = new Ram();
         ram.maxRAM = maxRAM;
+        ram.ramAvailable = ramAvailable;
+        ram.requestedRAM = requestedRAM;
     }
     
     class JobInstances {
@@ -120,16 +123,19 @@ public class ResourceStats {
     }
     
     class Ram {
+        String requestedRAM = "0G";
+        String ramAvailable = "0G";
         MaxRamResource maxRAM;
     }
 
     class MaxCoreResource {
         public Double cpuCores = 0.0;
-        public String withRam = "0K";
+        public String withRam = "0G";
     }
 
     class MaxRamResource {
-        public String ram = "0K";
+        public String ram = "0G";
+        
         public Double withCPUCores = 0.0;
     }
 }
