@@ -1,0 +1,24 @@
+tests:
+  test-1:
+    testUrl: http://localhost:8081/skaha/v0/context
+    expectedStatusCode: 200
+    iam: http://localhost:8080
+    user:
+      name: test-user-1
+      password: password
+      clientId: c942d267-b8d9-4d07-9696-85f9020c49d1
+      clientSecret: AOifEfPYxZyp68hMhU7COgk0Rfk73dVJel4jFLQKXNhMAQimg8s-TQBLJMzTDgZNAFJ-WSX1DrYI0uK4X2ybvIg
+  test-2:
+    testUrl: http://localhost:8081/skaha/v0/context
+    expectedStatusCode: 403
+    iam: http://localhost:8080
+    user:
+      name: test-user-2
+      password: password
+      clientId: c942d267-b8d9-4d07-9696-85f9020c49d1
+      clientSecret: AOifEfPYxZyp68hMhU7COgk0Rfk73dVJel4jFLQKXNhMAQimg8s-TQBLJMzTDgZNAFJ-WSX1DrYI0uK4X2ybvIg
+  test-3:
+    testUrl: http://localhost:8081/skaha/v0/context
+    expectedStatusCode: 401
+    user:
+      token: INVALID_TOKEN
