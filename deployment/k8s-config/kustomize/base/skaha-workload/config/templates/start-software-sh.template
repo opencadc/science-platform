@@ -75,17 +75,19 @@ get_ram() {
 prompt_user() {
     while true; do
         read -p "Do you want to specify resources for (NAME)? (y/n) [n]" yn
-        if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N"]]; then
-            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`;
-            break;;
-        elif [[ ${yn} == "y" || ${yn} == "Y"]]; then
-            get_resource_options || handle_error "Error obtaining resource defaults or options.";
-            get_cores || handle_error "Error obtaining the number of cores to allocate.";
-            get_ram || handle_error "Error obtaining the amount of ram to allocate.";
-            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`;
-            break;;
+        if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
+            echo "Launching (NAME)..."
+            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            break
+        elif [[ ${yn} == "y" || ${yn} == "Y" ]]; then
+            get_resource_options || handle_error "Error obtaining resource defaults or options."
+            get_cores || handle_error "Error obtaining the number of cores to allocate."
+            get_ram || handle_error "Error obtaining the amount of ram to allocate."
+            echo "Launching (NAME)..."
+            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            break
         else 
-            echo invalid response;;
+            echo invalid response
         fi
     done
 }
@@ -96,7 +98,6 @@ get_resources() {
 }
 
 check_status() {
-    echo "Launching (NAME)..."
     sleep 1
     curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
     status=`echo ${curl_out} | grep '"status"'`
