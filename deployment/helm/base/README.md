@@ -2,6 +2,11 @@
 
 ## Install
 
+### Dependencies
+
+A valid Client Proxy Certificate called `cadcproxy.pem` is required to be put alongside the `values.yaml` file as it creates a volume
+based on it for the Web Services to use for authenticated calls.
+
 ### From source
 
 Installation depends on a working Kubernetes cluster version 1.23 or greater.
@@ -65,7 +70,7 @@ This will install an NFS service ready to use.  It is an easy way to isolate the
         nfs: 
           # URL for the NFS server
           # Can be accessed at the <helm-install-name>-nfs-server.skaha-system.svc.cluster.local hostname.
-          server: "canfar-science-platform-base-nfs-server.skaha-system.svc.cluster.local" # Change this!
+          server: "canfar-science-platform-base.nfs-server.skaha-system.svc.cluster.local" # Change this!
           path: /
 ```
 

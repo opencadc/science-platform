@@ -17,24 +17,4 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .Values.harbor.namespace }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.openharbor.namespace }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.loki.namespace }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.sssd.namespace }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: {{ index .Values "nvidia-device-plugin" "namespace" }}
