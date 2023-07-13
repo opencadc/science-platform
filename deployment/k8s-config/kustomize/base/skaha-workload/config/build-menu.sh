@@ -13,6 +13,7 @@ END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 TERMINAL_VERSION="terminal:"
+TOPCAT_VERSION="topcat:"
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -126,6 +127,14 @@ update_terminal_desktop () {
   rm /tmp/terminal.desktop
 }
 
+update_topcat_desktop () {
+  script_name="${EXECUTABLE_DIR}/$2.sh"
+  cp ${STARTUP_DIR}/topcat.desktop.template /tmp/topcat.desktop
+  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/topcat.desktop
+  cp /tmp/topcat.desktop $1
+  rm /tmp/topcat.desktop
+}
+
 build_menu_item () {
   image_id=$1
   name=$2
@@ -145,6 +154,11 @@ build_menu_item () {
       update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
       # terminal.desktop accessed via terminal icon on desktop
       update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
+  fi
+  if [[ ${image_id} == *"/skaha/topcat:"* ]] && [[ "${name}" > "${TOPCAT_VERSION}" ]]; then
+      TOPCAT_VERSION=${name}
+      # terminal.desktop accessed via terminal icon on desktop
+      update_topcat_desktop /headless/Desktop/topcat.desktop ${name}
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
   rm -f ${DESKTOP_DIR}/*-e

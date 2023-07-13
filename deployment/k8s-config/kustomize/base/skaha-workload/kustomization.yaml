@@ -20,6 +20,7 @@ configMapGenerator:
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template
   - config/templates/terminal.desktop.template
+  - config/templates/topcat.desktop.template
   - config/templates/astrosoftware-top.menu
   - config/templates/astrosoftware-bottom.menu
 generatorOptions:
