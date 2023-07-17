@@ -138,7 +138,11 @@ check_status() {
             else
                 handle_error "Failed to launch app, status is ${status}."
             fi
+        else
+            echo "Failed to get status, ${curl_out}, no more retries."
         fi
+    else
+        echo "Failed to get status, ${curl_out}, no more retries."
     fi
 }
 
