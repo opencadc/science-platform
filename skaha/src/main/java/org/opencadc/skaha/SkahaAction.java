@@ -68,16 +68,12 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.ac.Role;
-import ca.nrc.cadc.ac.UserNotFoundException;
-import ca.nrc.cadc.ac.client.GMSClient;
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -85,13 +81,10 @@ import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -134,7 +127,6 @@ public abstract class SkahaAction extends RestAction {
     protected String scratchdir;
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
-    protected String skahaAdminsGroup;
     protected int maxUserSessions;
 
     public SkahaAction() {
@@ -148,7 +140,6 @@ public abstract class SkahaAction extends RestAction {
             harborHosts = Arrays.asList(harborHostList.split(" "));
         }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
-        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
         String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
@@ -161,7 +152,6 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
-        log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
     }
 
@@ -193,10 +183,6 @@ public abstract class SkahaAction extends RestAction {
         URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
 
         log.debug("using iam to fetch group details");
-        cacheGroupsWithIAM(subject, gmsSearchURI);
-    }
-
-    private void cacheGroupsWithIAM(Subject subject, URI gmsSearchURI) throws IOException, InterruptedException, ResourceNotFoundException {
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         GroupURI skahaUsersGroupUri = new GroupURI(URI.create(skahaUsersGroup));
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
@@ -211,44 +197,6 @@ public abstract class SkahaAction extends RestAction {
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
-
-    }
-
-    private void cacheGroupsWithForLDAP(Subject subject, URI gmsSearchURI) throws CertificateExpiredException, CertificateNotYetValidException, UserNotFoundException, IOException {
-        // get all the user's groups
-        if (!CredUtil.checkCredentials()) {
-            throw new IllegalStateException("cannot access delegated credentials");
-        }
-        GMSClient gmsClient = new GMSClient(gmsSearchURI);
-        List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
-
-        final Group skahaUsersGroupObj;
-        try {
-            skahaUsersGroupObj = new Group(new GroupURI(URI.create(skahaUsersGroup)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        if (!memberships.contains(skahaUsersGroupObj)) {
-            throw new AccessControlException("Not authorized to use the skaha system");
-        }
-
-        if (skahaAdminsGroup == null) {
-            log.warn("skaha.adminsgroup not defined in system properties");
-        } else {
-            try {
-                final Group adminGroup = new Group(new GroupURI(URI.create(skahaAdminsGroup)));
-                if (memberships.contains(adminGroup)) {
-                    adminUser = true;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        // save group memberships in subject
-        subject.getPublicCredentials().add(memberships);
-
     }
 
     protected String getIdToken() throws Exception {
