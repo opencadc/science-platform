@@ -104,11 +104,11 @@ get_status() {
     sleep 1
     curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
     while [[ ${curl_out} != *"status"* ]]; do
+        n=$(( n + 1 ))
         if test $n -eq 10 ; then
             echo "Failed to get status, ${curl_out}, retrying..."
             n=0
         fi
-        n=$(( n + 1 ))
         sleep 1
         curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
     done
