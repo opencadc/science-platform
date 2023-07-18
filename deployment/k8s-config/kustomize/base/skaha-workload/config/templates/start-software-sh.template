@@ -103,7 +103,6 @@ get_status() {
     local n=0
     sleep 1
     curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
-    status=`echo ${curl_out} | grep '"status"'`
     while [[ ${curl_out} != *"status"* ]]; do
         if test $n -eq 10 ; then
             echo "Failed to get status, ${curl_out}, retrying..."
@@ -112,7 +111,6 @@ get_status() {
         n=$(( n + 1 ))
         sleep 1
         curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
-        status=`echo ${curl_out} | grep '"status"'`
     done
 }
 
