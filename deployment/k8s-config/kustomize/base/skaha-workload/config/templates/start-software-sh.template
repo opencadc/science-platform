@@ -132,6 +132,7 @@ check_status() {
 
     if [[ ${status} == *"Running"* ]]; then
         echo "Successfully launched app."
+        sleep 1
     else
         handle_error "Failed to launch app, status is ${status}."
     fi
