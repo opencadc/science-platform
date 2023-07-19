@@ -12,6 +12,7 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
+DS9="ds9:"
 TERMINAL_VERSION="terminal:"
 TOPCAT_VERSION="topcat:"
 
@@ -119,6 +120,14 @@ build_menu () {
   rm -f ${DIRECTORIES_DIR}/*-e
 }
 
+update_ds9_desktop () {
+  script_name="${EXECUTABLE_DIR}/$2.sh"
+  cp ${STARTUP_DIR}/ds9.desktop.template /tmp/ds9.desktop
+  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/ds9.desktop
+  cp /tmp/ds9.desktop $1
+  rm /tmp/ds9.desktop
+}
+
 update_terminal_desktop () {
   script_name="${EXECUTABLE_DIR}/$2.sh"
   cp ${STARTUP_DIR}/terminal.desktop.template /tmp/terminal.desktop
@@ -148,6 +157,11 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
+  if [[ ${image_id} == *"/skaha/ds9:"* ]] && [[ "${name}" > "${DS9_VERSION}" ]]; then
+      DS9_VERSION=${name}
+      # terminal.desktop accessed via terminal icon on desktop
+      update_ds9_desktop /headless/Desktop/ds9.desktop ${name}
+  fi
   if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
       TERMINAL_VERSION=${name}
       # terminal.desktop accessed via "Applications->terminal"

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=ds9
+Comment=Graphical viewer and editor for tabular data
+Keywords=ds9
+Exec=(SCRIPT)
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/ds9.png
+Type=Application
+Categories=X-Xfce-Toplevel;
