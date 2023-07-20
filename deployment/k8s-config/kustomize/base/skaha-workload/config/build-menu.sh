@@ -12,9 +12,9 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
-DS9="ds9:"
-TERMINAL_VERSION="terminal:"
-TOPCAT_VERSION="topcat:"
+ds9_version="ds9:"
+terminal_version="terminal:"
+topcat_version="topcat:"
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -157,20 +157,20 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ ${image_id} == *"/skaha/ds9:"* ]] && [[ "${name}" > "${DS9_VERSION}" ]]; then
-      DS9_VERSION=${name}
+  if [[ ${image_id} == *"/skaha/ds9:"* ]] && [[ "${name}" > "${ds9_version}" ]]; then
+      ds9_version=${name}
       # terminal.desktop accessed via terminal icon on desktop
       update_ds9_desktop /headless/Desktop/ds9.desktop ${name}
   fi
-  if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${TERMINAL_VERSION}" ]]; then
-      TERMINAL_VERSION=${name}
+  if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${terminal_version}" ]]; then
+      terminal_version=${name}
       # terminal.desktop accessed via "Applications->terminal"
       update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
       # terminal.desktop accessed via terminal icon on desktop
       update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
   fi
-  if [[ ${image_id} == *"/skaha/topcat:"* ]] && [[ "${name}" > "${TOPCAT_VERSION}" ]]; then
-      TOPCAT_VERSION=${name}
+  if [[ ${image_id} == *"/skaha/topcat:"* ]] && [[ "${name}" > "${topcat_version}" ]]; then
+      topcat_version=${name}
       # terminal.desktop accessed via terminal icon on desktop
       update_topcat_desktop /headless/Desktop/topcat.desktop ${name}
   fi
