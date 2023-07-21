@@ -45,8 +45,6 @@ spec:
         - name: SHELL
           value: "/bin/bash"
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "/arc/home/${skaha.userid}"
