@@ -6,6 +6,6 @@ Keywords=ds9
 Exec=(SCRIPT)
 Terminal=false
 X-MultipleArgs=false
-Icon=/headless/.icons/ds9.png
+Icon=/headless/.icons/ds9.svg
 Type=Application
 Categories=X-Xfce-Toplevel;
