@@ -95,11 +95,11 @@ public class GetSessionsTests {
     }
     
     private static final String K8S_LIST =
-        "pud05npw   majorb  imageID carta      Running   brian   2021-02-02T17:49:55Z   <none>\n" +
-        "e37lmx4m   majorb  imageID desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>\n" +
-        "gspc0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n" +
-        "abcd0n8m   majorb  imageID notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>\n" +
-        "defg0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>\n";
+        "pud05npw   majorb  imageID carta      Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n" +
+        "e37lmx4m   majorb  imageID desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n" +
+        "gspc0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
+        "abcd0n8m   majorb  imageID notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
+        "defg0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n";
 
     public GetSessionsTests() {
     }

@@ -106,29 +106,44 @@ import org.opencadc.skaha.session.SessionAction;
  * @author majorb
  *
  */
-public class LifecycleTest {
+public class SessionLifecycleTest {
     
-    private static final Logger log = Logger.getLogger(LifecycleTest.class);
+    private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
+    private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
-    public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:1.0.2";
-    public static final String CARTA_IMAGE = "images.canfar.net/skaha/carta:2.0";
-    
+    public static final String DESKTOP_IMAGE_SUFFIX = "/skaha/desktop:1.0.2";
+    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
+    public static final String PROD_IMAGE_HOST = "images.canfar.net";
+    public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
+ 
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
     
     protected URL sessionURL;
     protected Subject userSubject;
-    
-    public LifecycleTest() {
+    protected String imageHost = PROD_IMAGE_HOST;
+
+    public SessionLifecycleTest() {
         try {
+            // determine image host
+            String hostP = System.getProperty(HOST_PROPERTY);
+            if (hostP == null || hostP.trim().length() == 0) {
+                throw new IllegalArgumentException("missing server host, check " + HOST_PROPERTY);
+            } else {
+                hostP = hostP.trim();
+                if (hostP.startsWith("rc-")) {
+                    imageHost = DEV_IMAGE_HOST;
+                }
+            }
+            
             RegistryClient regClient = new RegistryClient();
             sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
             sessionURL = new URL(sessionURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);
     
-            File cert = FileUtil.getFileFromResource("skaha-test.pem", LifecycleTest.class);
+            File cert = FileUtil.getFileFromResource("skaha-test.pem", SessionLifecycleTest.class);
             userSubject = SSLUtil.createSubject(cert);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
@@ -145,7 +160,7 @@ public class LifecycleTest {
             initialize();
 
             // create desktop session
-            createSession(DESKTOP_IMAGE);
+            createSession(imageHost + DESKTOP_IMAGE_SUFFIX);
 
             // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been
             // addressed, just wait for a bit.
@@ -155,7 +170,7 @@ public class LifecycleTest {
             verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#1");
 
             // create carta session
-            createSession(CARTA_IMAGE);
+            createSession(imageHost + CARTA_IMAGE_SUFFIX);
 
             TimeUnit.SECONDS.sleep(10);
 
@@ -280,7 +295,7 @@ public class LifecycleTest {
         List<Session> sessions = gson.fromJson(json, listType);
         List<Session> active = new ArrayList<>();
         for (Session s : sessions) {
-            if (!s.getStatus().equals(Session.STATUS_TERMINATING)) {
+            if (!(s.getStatus().equals(Session.STATUS_TERMINATING) || s.getStatus().equals(Session.STATUS_SUCCEEDED))) {
                 active.add(s);
             }
         }

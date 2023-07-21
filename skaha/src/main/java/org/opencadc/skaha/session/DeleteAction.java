@@ -134,7 +134,7 @@ public class DeleteAction extends SessionAction {
         }
 
         if (requestType.equals(REQUEST_TYPE_APP)) {
-            throw new UnsupportedOperationException("App killing not supported.");
+            deleteSession(userID, TYPE_DESKTOP_APP, sessionID);
         }
     }
     
@@ -143,18 +143,34 @@ public class DeleteAction extends SessionAction {
         log.debug("Stopping " + type + " session: " + sessionID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         
-        String podName = K8SUtil.getJobName(sessionID, type, userID);
-        delete(k8sNamespace, "job", podName);
-        
-        if (!SESSION_TYPE_HEADLESS.equals(type)) {
-            String ingressName = K8SUtil.getIngressName(sessionID, type);
-            delete(k8sNamespace, "ingressroute", ingressName);
+        if (TYPE_DESKTOP_APP.equalsIgnoreCase(type)) {
+            // deleting a desktop-app
+            if (StringUtil.hasText(appID)) {
+                log.debug("appID " + appID);
+                String jobName = this.getAppJobName(sessionID, userID, appID);
+                if (StringUtil.hasText(jobName)) {
+                    delete(k8sNamespace, "job", jobName);
+                } else {
+                    log.warn("no job deleted, desktop-app job name not found for userID " + userID + ", sessionID " + sessionID + ", appID " + appID);
+                }
+            } else {
+                throw new IllegalArgumentException("Missing app ID");
+            }
+        } else {
+            // deleting a session
+            String jobName = K8SUtil.getJobName(sessionID, type, userID);
+            delete(k8sNamespace, "job", jobName);
             
-            String serviceName = K8SUtil.getServiceName(sessionID, type);
-            delete(k8sNamespace, "service", serviceName);
-
-            String middlewareName = K8SUtil.getMiddlewareName(sessionID, type);
-            delete(k8sNamespace, "middleware", middlewareName);
+            if (!SESSION_TYPE_HEADLESS.equals(type)) {
+                String ingressName = K8SUtil.getIngressName(sessionID, type);
+                delete(k8sNamespace, "ingressroute", ingressName);
+                
+                String serviceName = K8SUtil.getServiceName(sessionID, type);
+                delete(k8sNamespace, "service", serviceName);
+    
+                String middlewareName = K8SUtil.getMiddlewareName(sessionID, type);
+                delete(k8sNamespace, "middleware", middlewareName);
+            }
         }
     }
     

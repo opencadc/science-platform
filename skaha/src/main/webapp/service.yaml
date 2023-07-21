@@ -202,7 +202,31 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/session/{sessionID}/app:
+  /session/{sessionID}/app:
+    get:
+      description: |
+        List the desktop apps for the calling user, returned as a JSON array.  Desktop app attributes include:<br/><br/>Desktop Session ID<br/>App ID<br/>User ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect URL<br/><br/>Valid type is 'desktop-app'.
+      tags:
+        - Session Management
+      parameters:
+        - name: status
+          in: query
+          type: string
+          description: Only show sessions with this status (Pending, Running, Terminating, Succeeded, Error)
+          required: false
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
     post:
       description: |
         Attach a desktop-app to the session identified by sessionID.  This only applies to sessions of type 'desktop'.
@@ -218,6 +242,79 @@ paths:
           in: query
           type: string
           description: The imageID of the desktop-app to attach
+          required: true
+        - name: cores
+          in: query
+          type: string
+          description: |
+              Request this many cores for the desktop app.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+          required: false
+        - name: ram
+          in: query
+          type: string
+          description: |
+              Request this much RAM (GB) for the desktop app.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+          required: false
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+  /session/{sessionID}/app/{appID}:
+    get:
+      description: |
+        Get the desktop app identified by sessionID and appID as a JSON object.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          type: string
+          description: Session ID of the desktop app.
+          required: true
+        - name: appID
+          in: path
+          type: string
+          description: ID of the desktop app to get, returned in application/json format.
+          required: true
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '404':
+          description: Not found
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
+    delete:
+      description: |
+        Delete the desktop app identified by sessionID and appID.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          type: string
+          description: Session ID of the desktop app to delete.
+          required: true
+        - name: appID
+          in: path
+          type: string
+          description: ID of the desktop app to delete.
           required: true
       responses:
         '200':
