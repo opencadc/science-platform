@@ -83,6 +83,7 @@ public class Session {
     
     private String id;
     private String userid;
+    private String appid;
     private String image;
     private String type;
     private String status;
@@ -206,6 +207,14 @@ public class Session {
 
     public void setExpiryTime(String timeInSeconds) {
         this.expiryTime = timeInSeconds;
+    }
+    
+    public String getAppId() {
+        return appid;
+    }
+    
+    public void setAppId(String appId) {
+        this.appid = appId;
     }
     
     @Override

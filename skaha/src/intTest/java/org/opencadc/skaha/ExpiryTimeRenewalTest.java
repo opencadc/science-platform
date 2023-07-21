@@ -111,11 +111,14 @@ import org.opencadc.skaha.session.SessionAction;
 public class ExpiryTimeRenewalTest {
     
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
+    private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
-    public static final String DESKTOP_IMAGE = "images.canfar.net/skaha/desktop:1.0.2";
-    public static final String TERMINAL_IMAGE = "images.canfar.net/skaha/terminal:1.1.2";
-    public static final String CARTA_IMAGE = "images.canfar.net/skaha/carta:2.0";
+    public static final String DESKTOP_IMAGE_SUFFIX = "/skaha/desktop:1.0.2";
+    public static final String TERMINAL_IMAGE_SUFFIX = "/skaha/terminal:1.1.2";
+    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
+    public static final String PROD_IMAGE_HOST = "images.canfar.net";
+    public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
     public static final int SLEEP_TIME = 10;
     
     static {
@@ -124,9 +127,21 @@ public class ExpiryTimeRenewalTest {
     
     protected URL sessionURL;
     protected Subject userSubject;
+    protected String imageHost = PROD_IMAGE_HOST;
     
     public ExpiryTimeRenewalTest() {
         try {
+            // determine image host
+            String hostP = System.getProperty(HOST_PROPERTY);
+            if (hostP == null || hostP.trim().length() == 0) {
+                throw new IllegalArgumentException("missing server host, check " + HOST_PROPERTY);
+            } else {
+                hostP = hostP.trim();
+                if (hostP.startsWith("rc-")) {
+                    imageHost = DEV_IMAGE_HOST;
+                }
+            }
+
             RegistryClient regClient = new RegistryClient();
             sessionURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
             sessionURL = new URL(sessionURL.toString() + "/session");
@@ -152,7 +167,7 @@ public class ExpiryTimeRenewalTest {
                     initialize();
                     
                     // create carta session
-                    createSession(CARTA_IMAGE);
+                    createSession(imageHost + CARTA_IMAGE_SUFFIX);
                     
                     TimeUnit.SECONDS.sleep(SLEEP_TIME);
                     
@@ -238,7 +253,7 @@ public class ExpiryTimeRenewalTest {
                     initialize();
                     
                     // create headless session
-                    createHeadlessSession(TERMINAL_IMAGE);
+                    createHeadlessSession(imageHost + TERMINAL_IMAGE_SUFFIX);
                     
                     TimeUnit.SECONDS.sleep(SLEEP_TIME);
                     
@@ -312,7 +327,7 @@ public class ExpiryTimeRenewalTest {
             initialize();
 
             // create desktop session
-            createSession(DESKTOP_IMAGE);
+            createSession(imageHost + DESKTOP_IMAGE_SUFFIX);
 
             TimeUnit.SECONDS.sleep(SLEEP_TIME);
 
@@ -339,7 +354,7 @@ public class ExpiryTimeRenewalTest {
 
             // create desktop app
             URL desktopAppURL = new URL(sessionURL.toString() + "/" + desktopSessionID + "/app");
-            createApp(TERMINAL_IMAGE, desktopAppURL);
+            createApp(imageHost + TERMINAL_IMAGE_SUFFIX, desktopAppURL);
 
             // get time to live (start time - stop time) before renewal
             count = 0;

@@ -64,6 +64,8 @@ spec:
           value: "${software.requests.cores}"
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
+        securityContext:
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         command: ["/skaha-system/start-jupyterlab.sh"]
         args:

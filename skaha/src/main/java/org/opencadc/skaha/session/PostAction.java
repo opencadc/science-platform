@@ -128,6 +128,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
+    public static final String SOFTWARE_APPID = "software.appid";
     public static final String SOFTWARE_CONTAINERNAME = "software.containername";
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
@@ -150,15 +151,31 @@ public class PostAction extends SessionAction {
     public void doAction() throws Exception {
 
         super.initRequest();
+        
+        String validatedType = null;
+        ResourceContexts rc = new ResourceContexts();
+        String image = syncInput.getParameter("image");
+        if (image == null) {
+            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
+                throw new IllegalArgumentException("Missing parameter 'image'");
+            }
+        } 
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-
-                String name = syncInput.getParameter("name");
-                String image = syncInput.getParameter("image");
                 String type = syncInput.getParameter("type");
-                String coresParam = syncInput.getParameter("cores");
-                String ramParam = syncInput.getParameter("ram");
+                validatedType = validateImage(image, type);
+                Integer cores = getCoresParam();
+                if (cores == null) {
+                    cores = rc.getDefaultCores(validatedType);
+                }
+                
+                Integer ram = getRamParam();
+                if (ram == null ) {
+                    ram = rc.getDefaultRAM(validatedType);
+                }
+                
+                String name = syncInput.getParameter("name");
                 String gpusParam = syncInput.getParameter("gpus");
                 String cmd = syncInput.getParameter("cmd");
                 String args = syncInput.getParameter("args");
@@ -166,11 +183,8 @@ public class PostAction extends SessionAction {
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
-                if (image == null) {
-                    throw new IllegalArgumentException("Missing parameter 'image'");
-                }
+
                 validateName(name);
-                String validatedType = validateImage(image, type);
 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
@@ -180,33 +194,7 @@ public class PostAction extends SessionAction {
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
 
-                ResourceContexts rc = new ResourceContexts();
-                Integer cores = rc.getDefaultCores(validatedType);
-                Integer ram = rc.getDefaultRAM(validatedType);
-                int gpus = 0;
-
-                if (coresParam != null) {
-                    try {
-                        cores = Integer.valueOf(coresParam);
-                        if (!rc.getAvailableCores().contains(cores)) {
-                            throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
-                        }
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
-                    }
-                }
-
-                if (ramParam != null) {
-                    try {
-                        ram = Integer.valueOf(ramParam);
-                        if (!rc.getAvailableRAM().contains(ram)) {
-                            throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
-                        }
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
-                    }
-                }
-
+                Integer gpus = 0;
                 if (gpusParam != null) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
@@ -223,7 +211,6 @@ public class PostAction extends SessionAction {
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
-
             } else {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
@@ -245,20 +232,26 @@ public class PostAction extends SessionAction {
                 }
             }
             return;
-        }
-        if (requestType.equals(REQUEST_TYPE_APP)) {
+        } else if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
                 // create an app
-
-                // gather job parameters
-                String image = syncInput.getParameter("image");
-
-                if (image == null) {
-                    throw new IllegalArgumentException("Missing parameter 'image'");
+                Integer requestCores = getCoresParam();
+                Integer limitCores = requestCores;
+                if (requestCores == null) {
+                    requestCores = rc.getDefaultRequestCores();
+                    limitCores = rc.getDefaultLimitCores();
                 }
 
-                attachDesktopApp(image);
+                Integer requestRAM = getRamParam();
+                Integer limitRAM = requestRAM;
+                if (requestRAM == null) {
+                    requestRAM = rc.getDefaultRequestRAM();
+                    limitRAM = rc.getDefaultLimitRAM();
+                }
 
+                attachDesktopApp(image, requestCores, limitCores, requestRAM, limitRAM);
+                syncOutput.setHeader("Content-Type", "text/plain");
+                syncOutput.getOutputStream().write((appID + "\n").getBytes());
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
             }
@@ -322,6 +315,43 @@ public class PostAction extends SessionAction {
         return K8SUtil.getDefaultQuota();
     }
 
+    private Integer getCoresParam() {
+        Integer cores = null;
+        String coresParam = syncInput.getParameter("cores");
+        if (coresParam != null) {
+            try {
+                cores = Integer.valueOf(coresParam);
+                ResourceContexts rc = new ResourceContexts();
+                if (!rc.getAvailableCores().contains(cores)) {
+                    throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
+                }
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
+            }
+        }
+        
+        return cores;
+    }
+    
+    private Integer getRamParam() {
+        Integer ram = null;
+        String ramParam = syncInput.getParameter("ram");
+        if (ramParam != null) {
+            try {
+                ram = Integer.valueOf(ramParam);
+                ResourceContexts rc = new ResourceContexts();
+                if (!rc.getAvailableRAM().contains(ram)) {
+                    throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+                }
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+            }
+        }
+        
+        return ram;
+    }
+    
+    
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -618,7 +648,7 @@ public class PostAction extends SessionAction {
      * @param image         Container image name.
      * @throws Exception    For any unexpected errors.
      */
-    public void attachDesktopApp(String image) throws Exception {
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -627,9 +657,10 @@ public class PostAction extends SessionAction {
                 "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
                 "--no-headers=true",
                 "-o", "custom-columns=" +
-                      "IPADDR:.status.podIP," +
-                      "DT:.metadata.deletionTimestamp," +
-                      "TYPE:.metadata.labels.canfar-net-sessionType"};
+                    "IPADDR:.status.podIP," +
+                    "DT:.metadata.deletionTimestamp," +
+                    "TYPE:.metadata.labels.canfar-net-sessionType," +
+                    "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -674,9 +705,13 @@ public class PostAction extends SessionAction {
         // that it becomes the xterm title
         String param = name;
         log.debug("Using parameter: " + param);
-
-        String uniqueID = new RandomStringGenerator(3).getID();
-        String jobName = sessionID + "-" + uniqueID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
+        log.debug("Using requests.cores: " + requestCores.toString());
+        log.debug("Using limits.cores: " + limitCores.toString());
+        log.debug("Using requests.ram: " + requestRAM.toString() + "Gi");
+        log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
+        
+        appID = new RandomStringGenerator(3).getID();
+        String jobName = sessionID + "-" + appID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
@@ -697,7 +732,12 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
         launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
+        launchString = setConfigValue(launchString, SOFTWARE_APPID, appID);
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, requestCores.toString());
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, limitCores.toString());
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi");
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM.toString() + "Gi");
         launchString = setConfigValue(launchString, SKAHA_USERID, userID);
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
@@ -736,6 +776,7 @@ public class PostAction extends SessionAction {
     }
 
     private String getHarborSecret(String image) throws Exception {
+        
         // get the user's cli secret:
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret

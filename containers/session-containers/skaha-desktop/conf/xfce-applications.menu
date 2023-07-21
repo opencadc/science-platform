@@ -163,15 +163,12 @@
                 </Or>
                 <Not><Category>Settings</Category></Not>
                 <Not><Category>Screensaver</Category></Not>
+                <Not><Category>TerminalEmulator</Category></Not>
                 <Not><Filename>gpk-application.desktop</Filename></Not>
                 <Not><Filename>gpk-update-viewer.desktop</Filename></Not>
+                <Not><Filename>xfce4-session-logout.desktop</Filename></Not>
             </And>
         </Include>
-        <Exclude>
-            <Or>
-                <Filename>xfce4-session-logout.desktop</Filename>
-            </Or>
-        </Exclude>
     </Menu>
 
     <Menu>
@@ -179,7 +176,12 @@
         <Directory>xfce-other.directory</Directory>
         <OnlyUnallocated/>
         <Include>
-            <All/>
+            <And>
+                <Or>
+                    <All/>
+                </Or>
+                <Not><Category>TerminalEmulator</Category></Not>
+            </And>
         </Include>
     </Menu>
 

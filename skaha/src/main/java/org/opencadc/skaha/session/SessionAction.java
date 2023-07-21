@@ -407,9 +407,24 @@ public abstract class SessionAction extends SkahaAction {
         execute(getLogsCmd.toArray(new String[0]), out);
     }
     
+    public Session getDesktopApp(String forUserID, String sessionID, String appID) throws Exception {
+        List<Session> sessions = getSessions(userID, sessionID);
+        if (sessions.size() > 0) {
+            for (Session session : sessions) {
+                // only include 'desktop-app'
+                if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
+                    (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
+                    return session;
+                }
+            }
+        } 
+
+        throw new ResourceNotFoundException("desktop app with session " + sessionID + " and app ID " + appID + " was not found");
+    }
+    
     public Session getSession(String forUserID, String sessionID) throws Exception {
         List<Session> sessions = getSessions(forUserID, sessionID);
-        if (sessions.size() >0) {
+        if (sessions.size() > 0) {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
                 if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
@@ -664,7 +679,8 @@ public abstract class SessionAction extends SkahaAction {
             "STATUS:.status.phase," +
             "NAME:.metadata.labels.canfar-net-sessionName," +
             "STARTED:.status.startTime," +
-            "DELETION:.metadata.deletionTimestamp";
+            "DELETION:.metadata.deletionTimestamp," +
+            "APPID:.metadata.labels.canfar-net-appID";
         if (forUserID != null) {
             customColumns = customColumns + 
             ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
@@ -725,6 +741,40 @@ public abstract class SessionAction extends SkahaAction {
         return getSessionGPUCMD;        
     }
     
+    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
+        return execute(getAppJobNameCMD.toArray(new String[0]));
+    }
+    
+    private List<String> getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
+        String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
+        labels = labels + ",canfar-net-userid=" + userID;
+        if (sessionID != null) {
+            labels = labels + ",canfar-net-sessionID=" + sessionID;
+        }
+        if (appID != null) {
+            labels = labels + ",canfar-net-appID=" + appID;
+        }
+
+        List<String> getAppJobNameCMD = new ArrayList<String>();
+        getAppJobNameCMD.add("kubectl");
+        getAppJobNameCMD.add("get");
+        getAppJobNameCMD.add("--namespace");
+        getAppJobNameCMD.add(k8sNamespace);
+        getAppJobNameCMD.add("job");
+        getAppJobNameCMD.add("-l");
+        getAppJobNameCMD.add(labels);
+        getAppJobNameCMD.add("--no-headers=true");
+        getAppJobNameCMD.add("-o");
+        
+        String customColumns = "custom-columns=" +
+            "NAME:.metadata.name";
+        
+        getAppJobNameCMD.add(customColumns);
+        return getAppJobNameCMD;
+    }
+
     protected Session constructSession(String k8sOutput) throws IOException {
         log.debug("line: " + k8sOutput);
         String[] parts = k8sOutput.trim().replaceAll("\\s+", " ").split(" ");
@@ -736,6 +786,7 @@ public abstract class SessionAction extends SkahaAction {
         String name = parts[5];
         String startTime = parts[6];
         String deletionTimestamp = parts[7];
+        String appID = parts[8];
         if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
             status = Session.STATUS_TERMINATING;
         }
@@ -761,10 +812,12 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        if (parts.length > 8) {
-            String requestedRAM = parts[8];
-            String requestedCPUCores = parts[9];
-            String requestedGPUCores = parts[10];
+        session.setAppId(appID);
+
+        if (parts.length > 9) {
+            String requestedRAM = parts[9];
+            String requestedCPUCores = parts[10];
+            String requestedGPUCores = parts[11];
             session.setRequestedRAM(toCommonUnit(requestedRAM));
             session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
             session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));
