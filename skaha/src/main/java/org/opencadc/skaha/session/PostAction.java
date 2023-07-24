@@ -97,6 +97,7 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.opencadc.skaha.AccessTokenUtil;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
@@ -140,7 +141,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-
+    private static final String ACCESS_TOKEN_KEY = "access_token";
 
     public PostAction() {
         super();
@@ -575,6 +576,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, ACCESS_TOKEN_KEY, new AccessTokenUtil().credential());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -707,6 +709,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
+        launchString = setConfigValue(launchString, ACCESS_TOKEN_KEY, new AccessTokenUtil().credential());
 
         String launchFile = super.stageFile(launchString);
 

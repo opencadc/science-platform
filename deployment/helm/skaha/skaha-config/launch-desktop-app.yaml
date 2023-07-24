@@ -29,6 +29,13 @@ spec:
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
+      initContainers:
+      - name: setup-access-token
+        image: busybox
+        command: ["sh", "-c", "echo '${access_token}' > /etc/tokens/access-token"]
+        volumeMounts:
+        - name: token-dir
+          mountPath: /etc/tokens
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
@@ -92,6 +99,8 @@ spec:
             name: cephfs-cephx-key
           readOnly: false          
       - name: scratch-dir
+        emptyDir: {}
+      - name: token-dir
         emptyDir: {}
       - name: sssd-dir
         hostPath:

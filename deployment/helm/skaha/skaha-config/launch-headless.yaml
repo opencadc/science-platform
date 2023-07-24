@@ -31,6 +31,13 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+      initContainers:
+      - name: setup-access-token
+        image: busybox
+        command: ["sh", "-c", "echo '${access_token}' > /etc/tokens/access-token"]
+        volumeMounts:
+        - name: token-dir
+          mountPath: /etc/tokens
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
@@ -73,6 +80,8 @@ spec:
             name: cephfs-cephx-key
           readOnly: false
       - name: scratch-dir
+        emptyDir: {}
+      - name: token-dir
         emptyDir: {}
       - name: sssd-dir
         hostPath:
