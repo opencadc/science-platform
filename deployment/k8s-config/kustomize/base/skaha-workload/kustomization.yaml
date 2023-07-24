@@ -22,6 +22,7 @@ configMapGenerator:
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template
   - config/templates/ds9.desktop.template
+  - config/templates/ds9-bypass-xterm.desktop.template
   - config/templates/terminal.desktop.template
   - config/templates/topcat.desktop.template
   - config/templates/astrosoftware-top.menu
