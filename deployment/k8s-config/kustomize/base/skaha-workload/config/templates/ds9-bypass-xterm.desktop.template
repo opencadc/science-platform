@@ -1,8 +1,8 @@
 [Desktop Entry]
 Version=4.8.8
-Name=ds9
-Comment=Graphical viewer and editor for tabular data, a user will launch ds9 from within an xterm.
-Keywords=ds9
+Name=ds9-bypass-xterm
+Comment=Graphical viewer and editor for tabular data, ds9 starts up directly, bypassing the xterm.
+Keywords=ds9-bypass-xterm
 Exec=(SCRIPT)
 Terminal=false
 X-MultipleArgs=false

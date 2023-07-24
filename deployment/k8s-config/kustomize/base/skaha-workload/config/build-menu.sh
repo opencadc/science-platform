@@ -123,13 +123,21 @@ build_menu () {
   rm -f ${DIRECTORIES_DIR}/*-e
 }
 
-update_ds9_desktop () {
+update_desktop () {
   script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/ds9.desktop.template /tmp/ds9.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/ds9.desktop
-  cp /tmp/ds9.desktop $1
-  rm /tmp/ds9.desktop
+  cp ${STARTUP_DIR}/$1.desktop.template /tmp/$1.desktop
+  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/$1.desktop
+  cp /tmp/$1.desktop /headless/Desktop/$1.desktop
+  rm /tmp/$1.desktop
 }
+
+#update_ds9_desktop () {
+#  script_name="${EXECUTABLE_DIR}/$2.sh"
+#  cp ${STARTUP_DIR}/ds9.desktop.template /tmp/ds9.desktop
+#  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/ds9.desktop
+#  cp /tmp/ds9.desktop $1
+#  rm /tmp/ds9.desktop
+#}
 
 update_terminal_desktop () {
   script_name="${EXECUTABLE_DIR}/$2.sh"
@@ -139,13 +147,13 @@ update_terminal_desktop () {
   rm /tmp/terminal.desktop
 }
 
-update_topcat_desktop () {
-  script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/topcat.desktop.template /tmp/topcat.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/topcat.desktop
-  cp /tmp/topcat.desktop $1
-  rm /tmp/topcat.desktop
-}
+#update_topcat_desktop () {
+#  script_name="${EXECUTABLE_DIR}/$2.sh"
+#  cp ${STARTUP_DIR}/topcat.desktop.template /tmp/topcat.desktop
+#  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/topcat.desktop
+#  cp /tmp/topcat.desktop $1
+#  rm /tmp/topcat.desktop
+#}
 
 build_menu_item () {
   image_id=$1
@@ -164,10 +172,12 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ ${image_id} == *"/skaha/ds9:"* ]] && [[ "${name}" > "${ds9_version}" ]]; then
+  if [[ ${image_id} == *"/skaha/ds9"* ]] && [[ "${name}" > "${ds9_version}" ]]; then
       ds9_version=${name}
-      # terminal.desktop accessed via terminal icon on desktop
-      update_ds9_desktop /headless/Desktop/ds9.desktop ${name}
+      name_version_array=($(echo $name | tr "\" "\n"))
+      short_name=${name_version_array[0]}
+      # ds9 desktop accessed via ds9 icon on desktop
+      update_desktop ${short_name} ${name}
   fi
   if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${terminal_version}" ]]; then
       terminal_version=${name}
@@ -176,10 +186,12 @@ build_menu_item () {
       # terminal.desktop accessed via terminal icon on desktop
       update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
   fi
-  if [[ ${image_id} == *"/skaha/topcat:"* ]] && [[ "${name}" > "${topcat_version}" ]]; then
+  if [[ ${image_id} == *"/skaha/topcat"* ]] && [[ "${name}" > "${topcat_version}" ]]; then
       topcat_version=${name}
-      # terminal.desktop accessed via terminal icon on desktop
-      update_topcat_desktop /headless/Desktop/topcat.desktop ${name}
+      name_version_array=($(echo $name | tr "\" "\n"))
+      short_name=${name_version_array[0]}
+      # topcat desktop accessed via topcat icon on desktop
+      update_desktop ${short_name} ${name}
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
   rm -f ${DESKTOP_DIR}/*-e
