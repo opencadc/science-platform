@@ -34,10 +34,10 @@ spec:
       initContainers:
       - name: setup-access-token
         image: busybox
-        command: ["sh", "-c", "echo '${access_token}' > ${access_token_path}/${access_token_file}"]
+        command: ["sh", "-c", "echo '${skaha.accesstoken}' > ${skaha.accesstoken.path}/${skaha.accesstoken.file}"]
         volumeMounts:
         - name: token-dir
-          mountPath: ${access_token_path}
+          mountPath: ${skaha.accesstoken.path}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -91,7 +91,7 @@ spec:
           protocol: TCP
           name: notebook-port
         volumeMounts:
-        - mountPath: "${access_token_path}"
+        - mountPath: "${skaha.accesstoken.path}"
           name: token-dir
           readOnly: true
         - mountPath: "/skaha-system"

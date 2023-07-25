@@ -141,9 +141,9 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-    private static final String ACCESS_TOKEN_KEY = "access_token";
-    private static final String ACCESS_TOKEN_FILE_PATH_KEY = "access_token_path";
-    private static final String ACCESS_TOKEN_FILE_NAME_KEY = "access_token_file";
+    private static final String ACCESS_TOKEN_KEY = "skaha.accesstoken";
+    private static final String ACCESS_TOKEN_FILE_PATH_KEY = "skaha.accesstoken.path";
+    private static final String ACCESS_TOKEN_FILE_NAME_KEY = "skaha.accesstoken.file";
     private static final String ACCESS_TOKEN_FILE_PATH_VALUE = "/etc/token";
     private static final String ACCESS_TOKEN_FILE_NAME_VALUE = "access_token";
 
