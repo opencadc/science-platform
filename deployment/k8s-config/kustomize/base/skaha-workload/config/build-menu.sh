@@ -12,9 +12,11 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
-ds9_version="ds9"
+ds9_version="ds9:"
+ds9_terminal_version="ds9-terminal:"
 terminal_version="terminal:"
-topcat_version="topcat"
+topcat_version="topcat:"
+topcat_terminal_version="topcat-terminal:"
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -160,8 +162,11 @@ build_menu_item () {
     name_version_array=($(echo $name | tr ":" "\n"))
     short_name=${name_version_array[0]}
     # ds9 desktop accessed via ds9 icon on desktop
-    if [[ "${name}" > "${ds9_version}" ]]; then
+    if [[ ${name} == *"${ds9_version}"* && "${name}" > "${ds9_version}" ]]; then
       ds9_version=${name}
+      update_desktop ${short_name} ${name}
+    elif [[ ${name} == *"${ds9_terminal_version}"* && "${name}" > "${ds9_terminal_version}" ]]; then
+      ds9_terminal_version=${name}
       update_desktop ${short_name} ${name}
     fi
   fi
@@ -176,8 +181,11 @@ build_menu_item () {
     name_version_array=($(echo $name | tr ":" "\n"))
     short_name=${name_version_array[0]}
     # topcat desktop accessed via topcat icon on desktop
-    if [[ "${name}" > "${topcat_version}" ]]; then
+    if [[ ${name} == *"${topcat_version}"* && "${name}" > "${topcat_version}" ]]; then
       topcat_version=${name}
+      update_desktop ${short_name} ${name}
+    elif [[ ${name} == *"${topcat_terminal_version}"* && "${name}" > "${topcat_terminal_version}" ]]; then
+      topcat_terminal_version=${name}
       update_desktop ${short_name} ${name}
     fi
   fi
