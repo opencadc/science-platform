@@ -40,8 +40,5 @@ RUN chmod 755 /usr/share/topcat/msg.sh
 RUN bash /usr/share/topcat/msg.sh /usr/bin/topcat-full.jar >/usr/share/topcat/msg.txt
 RUN echo "cat /usr/share/topcat/msg.txt" >/etc/bash.bashrc
 
-# start up topcat directly, bypassing the xterm
-RUN mkdir /skaha
-COPY src/startup.sh /skaha/startup.sh
-RUN chmod +x /skaha/startup.sh
-
+# Check TOPCAT version if applicable.
+CMD ["topcat", "-version"]

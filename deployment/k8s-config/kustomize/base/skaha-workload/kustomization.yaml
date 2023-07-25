@@ -21,7 +21,11 @@ configMapGenerator:
   - config/templates/software-category.template
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template
+  - config/templates/ds9-terminal.desktop.template
+  - config/templates/ds9.desktop.template
   - config/templates/terminal.desktop.template
+  - config/templates/topcat-terminal.desktop.template
+  - config/templates/topcat.desktop.template
   - config/templates/astrosoftware-top.menu
   - config/templates/astrosoftware-bottom.menu
 generatorOptions:
