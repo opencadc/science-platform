@@ -1,7 +1,7 @@
 [Desktop Entry]
-Version=4.8.8
+Version=8.4.1
 Name=ds9-bypass-xterm
-Comment=Graphical viewer and editor for tabular data, ds9 starts up directly, bypassing the xterm.
+Comment=An image display and visualization tool for astronomical data. ds9 starts up directly, bypassing the xterm.
 Keywords=ds9-bypass-xterm
 Exec=(SCRIPT)
 Terminal=false

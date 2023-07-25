@@ -1,7 +1,7 @@
 [Desktop Entry]
-Version=4.8.8
+Version=8.4.1
 Name=ds9
-Comment=Graphical viewer and editor for tabular data, a user will launch ds9 from within an xterm.
+Comment=An image display and visualization tool. A user launches ds9 from within an xterm.
 Keywords=ds9
 Exec=(SCRIPT)
 Terminal=false
