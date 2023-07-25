@@ -12,9 +12,9 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
-ds9_version="ds9:"
+ds9_version="ds9"
 terminal_version="terminal:"
-topcat_version="topcat:"
+topcat_version="topcat"
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -131,14 +131,6 @@ update_desktop () {
   rm /tmp/$1.desktop
 }
 
-#update_ds9_desktop () {
-#  script_name="${EXECUTABLE_DIR}/$2.sh"
-#  cp ${STARTUP_DIR}/ds9.desktop.template /tmp/ds9.desktop
-#  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/ds9.desktop
-#  cp /tmp/ds9.desktop $1
-#  rm /tmp/ds9.desktop
-#}
-
 update_terminal_desktop () {
   script_name="${EXECUTABLE_DIR}/$2.sh"
   cp ${STARTUP_DIR}/terminal.desktop.template /tmp/terminal.desktop
@@ -146,14 +138,6 @@ update_terminal_desktop () {
   cp /tmp/terminal.desktop $1
   rm /tmp/terminal.desktop
 }
-
-#update_topcat_desktop () {
-#  script_name="${EXECUTABLE_DIR}/$2.sh"
-#  cp ${STARTUP_DIR}/topcat.desktop.template /tmp/topcat.desktop
-#  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/topcat.desktop
-#  cp /tmp/topcat.desktop $1
-#  rm /tmp/topcat.desktop
-#}
 
 build_menu_item () {
   image_id=$1
