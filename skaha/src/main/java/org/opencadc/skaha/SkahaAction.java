@@ -108,7 +108,6 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_CONTRIB = "contributed";
     public static final String SESSION_TYPE_HEADLESS = "headless";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
-    public static final String TRUE = "true";
     public static List<String> SESSION_TYPES = Arrays.asList(
             SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
             SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
