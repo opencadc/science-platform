@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=4.8.8
 Name=topcat-terminal
-Comment=Graphical viewer and editor for tabular data. A user starts topcat from within an xterm.
+Comment=Graphical viewer and editor for tabular data. A user launches topcat from within an xterm.
 Keywords=topcat-terminal
 Exec=(SCRIPT)
 Terminal=false
