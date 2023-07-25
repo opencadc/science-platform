@@ -157,13 +157,13 @@ build_menu_item () {
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
   if [[ ${image_id} == *"/skaha/ds9"* ]]; then
-    if [[ "${name}" > "${ds9_version}" ]]; then
-      ds9_version=${name}
-    fi
     name_version_array=($(echo $name | tr ":" "\n"))
     short_name=${name_version_array[0]}
     # ds9 desktop accessed via ds9 icon on desktop
-    update_desktop ${short_name} ${name}
+    if [[ "${name}" > "${ds9_version}" ]]; then
+      ds9_version=${name}
+      update_desktop ${short_name} ${name}
+    fi
   fi
   if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${terminal_version}" ]]; then
     terminal_version=${name}
@@ -173,13 +173,13 @@ build_menu_item () {
     update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
   fi
   if [[ ${image_id} == *"/skaha/topcat"* ]]; then
-    if [[ "${name}" > "${topcat_version}" ]]; then
-      topcat_version=${name}
-    fi
     name_version_array=($(echo $name | tr ":" "\n"))
     short_name=${name_version_array[0]}
     # topcat desktop accessed via topcat icon on desktop
-    update_desktop ${short_name} ${name}
+    if [[ "${name}" > "${topcat_version}" ]]; then
+      topcat_version=${name}
+      update_desktop ${short_name} ${name}
+    fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
   rm -f ${DESKTOP_DIR}/*-e
