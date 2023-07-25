@@ -22,6 +22,7 @@ RUN yum clean all -y
 # install ds9, no packages
 RUN curl https://ds9.si.edu/download/centos7/ds9.centos7.8.4.1.tar.gz | tar -zx -f - -C /usr/bin/
 
+# start up DS9 directly, bypassing the xterm
 RUN mkdir /skaha
 COPY src/startup.sh /skaha/startup.sh
 RUN chmod +x /skaha/startup.sh

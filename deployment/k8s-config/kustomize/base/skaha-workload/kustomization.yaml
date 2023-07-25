@@ -25,6 +25,7 @@ configMapGenerator:
   - config/templates/ds9-bypass-xterm.desktop.template
   - config/templates/terminal.desktop.template
   - config/templates/topcat.desktop.template
+  - config/templates/topcat-bypass-xterm.desktop.template
   - config/templates/astrosoftware-top.menu
   - config/templates/astrosoftware-bottom.menu
 generatorOptions:
