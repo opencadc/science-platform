@@ -2,13 +2,14 @@ package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
-import org.springframework.util.StringUtils;
 
 import javax.security.auth.Subject;
 import java.util.Set;
 
 public class AccessTokenUtil {
 
+
+    public static final String EMPTY_STRING = "";
 
     public AccessTokenUtil() {
     }
@@ -24,9 +25,13 @@ public class AccessTokenUtil {
 
     public String credential() {
         AuthorizationToken authorizationToken = authorizationToken();
-        if (StringUtils.isEmpty(authorizationToken.getCredentials())) {
+        if (!isNotEmpty(authorizationToken.getCredentials())) {
             throw new UnsupportedOperationException("access token can not be empty");
         }
         return authorizationToken.getCredentials();
+    }
+
+    private boolean isNotEmpty(String string) {
+        return null != string && !EMPTY_STRING.equals(string.trim());
     }
 }

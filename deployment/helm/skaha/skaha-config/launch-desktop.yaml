@@ -34,10 +34,10 @@ spec:
       initContainers:
       - name: setup-access-token
         image: busybox
-        command: ["sh", "-c", "echo '${access_token}' > /etc/tokens/access-token"]
+        command: ["sh", "-c", "echo '${access_token}' > ${access_token_path}/${access_token_file}"]
         volumeMounts:
         - name: token-dir
-          mountPath: /etc/tokens
+          mountPath: ${access_token_path}
       containers:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
@@ -76,6 +76,9 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
+        - mountPath: "${access_token_path}"
+          name: token-dir
+          readOnly: true
         - mountPath: "/desktopstartup"
           name: templates
         - mountPath: "/skaha-system"

@@ -68,10 +68,7 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.auth.NotAuthenticatedException;
+import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
@@ -85,25 +82,21 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.opencadc.auth.StandardIdentityManager;
+
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.skaha.image.Image;
-import org.springframework.util.StringUtils;
+
 
 import static java.util.stream.Collectors.toList;
-import static org.springframework.util.CollectionUtils.isEmpty;
+
 
 public abstract class SkahaAction extends RestAction {
 
@@ -188,17 +181,20 @@ public abstract class SkahaAction extends RestAction {
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
         log.debug("skahaUsersGroupUriSet is " + skahaUsersGroupUriSet);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
-            log.info("user is not a member of skaha user group ");
+            log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");
         }
         log.info("user is a member of skaha user group ");
-        List<Group> groups = !isEmpty(skahaUsersGroupUriSet) ?
+        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
                 skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
     }
 
+    private boolean isNotEmpty(Collection<?> collection) {
+        return null != collection && !collection.isEmpty();
+    }
     protected String getIdToken() throws Exception {
         LocalAuthority localAuthority = new LocalAuthority();
         URI serviceURI = localAuthority.getServiceURI(Standards.SECURITY_METHOD_OAUTH.toString());
