@@ -13,8 +13,3 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ index .Values "skaha-workload" "namespace" }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ index .Values "nvidia-device-plugin" "namespace" }}

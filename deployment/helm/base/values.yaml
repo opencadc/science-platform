@@ -40,5 +40,3 @@ skaha:
   namespace: skaha-system
 skaha-workload:
   namespace: skaha-workload
-nvidia-device-plugin:
-  namespace: nvidia-device-plugin
