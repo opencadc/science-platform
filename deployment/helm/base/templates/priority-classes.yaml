@@ -1,0 +1,14 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-preempt-high
+value: 1000000
+description: "High priority pre-empt."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-preempt-medium
+value: 1000001
+description: "Medium priority pre-empt."
+

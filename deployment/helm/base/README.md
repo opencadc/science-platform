@@ -2,23 +2,26 @@
 
 ## Install
 
+### Dependencies
+
+A valid Client Proxy Certificate called `cadcproxy.pem` is required to be put alongside the `values.yaml` file as it creates a volume
+based on it for the Web Services to use for authenticated calls.
+
 ### From source
 
 Installation depends on a working Kubernetes cluster version 1.23 or greater.
 
 The base install also installs the Traefik proxy, which is needed by the Ingress when the Science Platform services are installed.
 
-**Note**: It is essential that the `skaha-system` namespace be used and created here!
-
 ```sh
 $ git clone https://github.com/opencadc/science-platform.git
 $ cd science-platform/deployment/helm
-$ helm install --dependency-update --create-namespace --namespace skaha-system <name> ./base
+$ helm install --dependency-update --values ./base/values.yaml <name> ./base
 ```
 
 Where `<name>` is the name of this installation.  Example:
 ```sh
-$ helm install --dependency-update --create-namespace --namespace skaha-system canfar-science-platform-base ./base
+$ helm install --dependency-update --values ./base/values.yaml canfar-science-platform-base ./base
 ```
 This will create the core namespace (`skaha-system`), and install the Traefik proxy dependency.  Expected output:
 ```
@@ -34,12 +37,10 @@ TEST SUITE: None
 
 The Helm repository contains the current stable version as well.
 
-**Note**: It is essential that the `skaha-system` namespace be used and created here!
-
 ```sh
 $ helm repo add canfar-skaha-system https://images.canfar.net/chartrepo/skaha-system
 $ helm repo update
-$ helm install --dependency-update --create-namespace --namespace skaha-system canfar-science-platform-base canfar-skaha-system/base
+$ helm install --dependency-update --values canfar-skaha-system/base/values.yaml canfar-science-platform-base canfar-skaha-system/base
 ```
 
 ## Verification
@@ -69,7 +70,7 @@ This will install an NFS service ready to use.  It is an easy way to isolate the
         nfs: 
           # URL for the NFS server
           # Can be accessed at the <helm-install-name>-nfs-server.skaha-system.svc.cluster.local hostname.
-          server: "canfar-science-platform-base-nfs-server.skaha-system.svc.cluster.local" # Change this!
+          server: "canfar-science-platform-base.nfs-server.skaha-system.svc.cluster.local" # Change this!
           path: /
 ```
 
@@ -88,7 +89,7 @@ The `ClusterIP` needs to be known to the Docker VM's name resolution.  A simple 
 ```sh
 $ docker run --rm -it -v /:/vm-root alpine sh
 $ echo "nameserver 10.96.0.10" >> /vm-root/etc/resolv.conf
-$ cat /vm-root-etc/resolv.conf
+$ cat /vm-root/etc/resolv.conf
 # DNS requests are forwarded to the host. DHCP DNS options are ignored.
 nameserver 192.168.65.7
 nameserver 10.96.0.10

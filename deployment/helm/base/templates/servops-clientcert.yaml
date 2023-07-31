@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  namespace: {{ .Values.skaha.namespace }}
+  name: servops-clientcert
+data:
+  cadcproxy.pem:
+{{ .Files.Get "cadcproxy.pem" | b64enc | quote | nindent 4 }}

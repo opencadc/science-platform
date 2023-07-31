@@ -1,0 +1,6 @@
+/**/dependencies
+/**/.idea
+/**/.gradle 
+/**/build
+/**/bin
+.vscode

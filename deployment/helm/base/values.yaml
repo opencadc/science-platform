@@ -1,29 +1,46 @@
 kubernetesClusterDomain: cluster.local
 nfsServer:
+  namespace: skaha-nfs
   nfsServer:
-    containerSecurityContext:
-      privileged: true
     image:
       repository: registry.k8s.io/volume-nfs
       tag: "0.8"
     resources:
       limits:
         cpu: 500m
-        memory: 750M
+        memory: 500M
       requests:
         cpu: 250m
-        memory: 500M
-  ports:
-  - name: nfs
-    port: 2049
-    protocol: TCP
-    targetPort: 0
-  - name: mountd
-    port: 20048
-    targetPort: 0
-  - name: rpcbind
-    port: 111
-    protocol: UDP
-    targetPort: 0
+        memory: 250M
+    ports:
+    - name: nfs
+      port: 2049
+      protocol: TCP
+      targetPort: 0
+    - name: mountd
+      port: 20048
+      targetPort: 0
+    - name: rpcbind
+      port: 111
+      protocol: UDP
+      targetPort: 0
   replicas: 1
   type: ClusterIP
+sssd:
+  namespace: cadc-sssd
+harbor:
+  namespace: cadc-harbor
+openharbor:
+  namespace: cadc-openharbor
+skaha:
+  namespace: skaha-system
+skaha-workload:
+  namespace: skaha-workload
+
+# traefik:
+#   experimental:
+#     plugins:
+#       enabled: true
+#   additionalArguments:
+#     - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
+#     - "--experimental.plugins.htransformation.version=v0.2.7"

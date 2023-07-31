@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "base.fullname" . }}-skaha-restricted-sssd-workload-binding
+  name: skaha-restricted-sssd-workload-binding
   labels:
   {{- include "base.labels" . | nindent 4 }}
 roleRef:
@@ -10,8 +10,8 @@ roleRef:
   name: restricted-sssd-clusterrole
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "base.fullname" . }}-skaha'
-  namespace: '{{ .Release.Namespace }}'
+  name: 'skaha'
+  namespace: '{{ .Values.skaha.namespace }}'
 - kind: ServiceAccount
   name: default
   namespace: '{{ .Release.Namespace }}'
