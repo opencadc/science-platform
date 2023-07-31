@@ -89,7 +89,7 @@ The `ClusterIP` needs to be known to the Docker VM's name resolution.  A simple 
 ```sh
 $ docker run --rm -it -v /:/vm-root alpine sh
 $ echo "nameserver 10.96.0.10" >> /vm-root/etc/resolv.conf
-$ cat /vm-root-etc/resolv.conf
+$ cat /vm-root/etc/resolv.conf
 # DNS requests are forwarded to the host. DHCP DNS options are ignored.
 nameserver 192.168.65.7
 nameserver 10.96.0.10
