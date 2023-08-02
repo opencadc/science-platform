@@ -11,13 +11,14 @@ CONFDIR=/add-user-config
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$2" ]
+if [ -z "$3" ]
   then
-    echo "Usage: add-user <userid> <quota in GB>"
+    echo "Usage: add-user <username> <uid> <quota in GB>"
     exit 2
 fi
-USERID=$1
-QUOTA=$2
+USERNAME=$1
+USERID=$2
+QUOTA=$3
 
 BASHRC="$CONFDIR/bashrc"
 XRESOURCES="$CONFDIR/Xresources"
@@ -61,15 +62,15 @@ if [ ! -f $XRESOURCES ]
 fi
 
 HOMEBASE=`cat $CONFDIR/homedir`
-HOMEDIR="$HOMEBASE/$USERID"
+HOMEDIR="$HOMEBASE/$USERNAME"
 SKAHAGROUP=`cat $CONFDIR/skahagroup`
 
 echo "  Certfile: $CERTFILE"
 echo "  skaha group: $SKAHAGROUP"
 
-echo "Creating allocation for $USERID"
+echo "Creating allocation for $USERNAME"
 echo -n "  Creating home dir $HOMEDIR..."
-mkdir $HOMEDIR
+mkdir -p $HOMEDIR
 chown $USERID:$USERID $HOMEDIR
 chmod 700 $HOMEDIR
 echo " Done"
@@ -97,11 +98,11 @@ chown -R $USERID:$USERID $HOMEDIR/.casa
 echo " Done"
 
 echo -n "  Adding user to skaha group..."
-curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERID?idType=http"
+curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERNAME?idType=http"
 echo " Done"
 
 echo -n "  Setting user quota to ${QUOTA}G..."
-setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
+#setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR
 setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
 echo " Done"
 

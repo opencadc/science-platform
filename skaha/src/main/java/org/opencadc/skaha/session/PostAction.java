@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -90,6 +91,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.security.auth.Subject;
@@ -278,7 +280,7 @@ public class PostAction extends SessionAction {
     void allocateUser() throws IOException, InterruptedException {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getDefaultQuota()
+                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getPosixId(), getDefaultQuota()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -722,11 +724,26 @@ public class PostAction extends SessionAction {
         injectProxyCert(subject, userID, posixID);
     }
 
-    private String getPosixId() {
+    String getPosixId() {
         Subject s = AuthenticationUtil.getCurrentSubject();
         Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
-        int uidNumber = principals.iterator().next().getUidNumber();
+        final int uidNumber;
+
+        if (principals.isEmpty()) {
+            uidNumber = generatePosixID(getUserID());
+        } else {
+            uidNumber = principals.iterator().next().getUidNumber();
+        }
         return Integer.toString(uidNumber);
+    }
+
+    int generatePosixID(final String usernameKey) {
+        int result = 0;
+        for (final char c : usernameKey.toCharArray()) {
+            result += c;
+        }
+
+        return  1000 + result;
     }
 
     private String setConfigValue(String doc, String key, String value) {
@@ -835,10 +852,12 @@ public class PostAction extends SessionAction {
         if (groupCreds.size() == 1) {
             List<Group> memberships = groupCreds.iterator().next();
             log.debug("Adding " + memberships.size() + " supplemental groups");
-            if (memberships.size() > 0) {
+            if (!memberships.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 for (Group g : memberships) {
-                    sb.append(g.gid).append(", ");
+                    final int groupID =
+                            Objects.requireNonNullElseGet(g.gid, () -> generatePosixID(g.getID().getName()));
+                    sb.append(groupID).append(", ");
                 }
                 sb.setLength(sb.length() - 2);
                 return sb.toString();

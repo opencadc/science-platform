@@ -17,3 +17,5 @@ rules:
   - update
   - patch
   - delete
+
+  # Error from server (Forbidden): error when creating "/tmp/a57952b3-beb9-4e4e-a20b-38d42cc48276": jobs.batch is forbidden: User "system:serviceaccount:skaha-system:skaha" cannot create resource "jobs" in API group "batch" in the namespace "skaha-workload": RBAC: clusterrole.rbac.authorization.k8s.io "skaha-nodes-namespaces-clusterrole" not found

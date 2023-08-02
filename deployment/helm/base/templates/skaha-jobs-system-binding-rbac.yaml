@@ -15,4 +15,4 @@ subjects:
   namespace: '{{ .Release.Namespace }}'
 - kind: ServiceAccount
   name: 'skaha'
-  namespace: '{{ .Release.Namespace }}'
+  namespace: {{ .Values.skaha.namespace }}

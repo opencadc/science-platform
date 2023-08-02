@@ -93,6 +93,11 @@ public class PostActionTest {
             }
 
             @Override
+            String getPosixId() {
+                return "11678";
+            }
+
+            @Override
             String getDefaultQuota() {
                 return "14";
             }
@@ -125,6 +130,11 @@ public class PostActionTest {
             }
 
             @Override
+            String getPosixId() {
+                return "883939";
+            }
+
+            @Override
             String getDefaultQuota() {
                 return "14";
             }
@@ -137,5 +147,11 @@ public class PostActionTest {
         };
 
         testSubject.allocateUser();
+    }
+
+    @Test
+    public void generatePosixID() {
+        final PostAction testSubject = new PostAction();
+        Assert.assertEquals("Wrong value.", 1715, testSubject.generatePosixID("CADCtest"));
     }
 }
