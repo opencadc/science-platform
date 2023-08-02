@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nfs-server
-  namespace: {{ .Values.nfsServer.namespace }}
+  namespace: {{ .Values.skaha.namespace }}
   labels:
   {{- include "base.labels" . | nindent 4 }}
 spec:
@@ -38,7 +38,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nfs-service
-  namespace: {{ .Values.nfsServer.namespace }}
+  namespace: {{ .Values.skaha.namespace }}
   labels:
   {{- include "base.labels" . | nindent 4 }}
 spec:
@@ -49,18 +49,19 @@ spec:
   ports:
 {{ .Values.nfsServer.nfsServer.ports | toYaml | nindent 2 }}
 
+# Volume and claim for Skaha
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: cavern-volume-pv
-  namespace: {{ .Values.nfsServer.namespace }}
+  name: {{ .Values.skaha.namespace }}-cavern-pv
+  namespace: {{ .Values.skaha.namespace }}
   labels:
     app: nfs-data
 spec:
   claimRef:
     namespace: {{ .Values.skaha.namespace }}
-    name: cavern-volume-pvc
+    name: {{ .Values.skaha.namespace }}-cavern-pvc
   accessModes:
     - ReadWriteMany
   capacity:
@@ -68,14 +69,14 @@ spec:
   nfs: 
     # URL for the NFS server
     # Can be accessed at the nfs-server.<nfs-namespace>.svc.cluster.local hostname.
-    server: "nfs-service.{{ .Values.nfsServer.namespace }}.svc.cluster.local"
+    server: "nfs-service.{{ .Values.skaha.namespace }}.svc.cluster.local"
     path: "/"  # Refers to root of /exports folder on the NFS server
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cavern-volume-pvc
+  name: {{ .Values.skaha.namespace }}-cavern-pvc
   namespace: {{ .Values.skaha.namespace }}
 spec:
   accessModes:
@@ -87,3 +88,43 @@ spec:
   selector:
     matchLabels:
       app: nfs-data
+
+---
+# Volume and claim for Jobs
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ index .Values "skaha-workload" "namespace" }}-cavern-pv
+  namespace: {{ index .Values "skaha-workload" "namespace" }}
+  labels:
+    app: workload-nfs-data
+spec:
+  claimRef:
+    namespace: {{ index .Values "skaha-workload" "namespace" }}
+    name: {{ index .Values "skaha-workload" "namespace" }}-cavern-pvc
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 10Gi
+  nfs: 
+    # URL for the NFS server
+    # Can be accessed at the nfs-server.<nfs-namespace>.svc.cluster.local hostname.
+    server: "nfs-service.{{ .Values.skaha.namespace }}.svc.cluster.local"
+    path: "/"  # Refers to root of /exports folder on the NFS server
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ index .Values "skaha-workload" "namespace" }}-cavern-pvc
+  namespace: {{ index .Values "skaha-workload" "namespace" }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      app: workload-nfs-data
