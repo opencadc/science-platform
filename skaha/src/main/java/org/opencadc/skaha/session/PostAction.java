@@ -582,9 +582,6 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, ACCESS_TOKEN_KEY, new AccessTokenUtil().credential());
-        jobLaunchString = setConfigValue(jobLaunchString, ACCESS_TOKEN_FILE_PATH_KEY, ACCESS_TOKEN_FILE_PATH_VALUE);
-        jobLaunchString = setConfigValue(jobLaunchString, ACCESS_TOKEN_FILE_NAME_KEY, ACCESS_TOKEN_FILE_NAME_VALUE);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -596,7 +593,7 @@ public class PostAction extends SessionAction {
 
         // insert the user's proxy cert in the home dir
         Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert(subject, userID, posixID);
+        injectCredentials(subject, userID, posixID);
 
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
@@ -732,7 +729,7 @@ public class PostAction extends SessionAction {
 
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert(subject, userID, posixID);
+        injectCredentials(subject, userID, posixID);
     }
 
     String getPosixId() {
