@@ -22,12 +22,15 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: skaha-carta-ingress-${skaha.sessionid}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   entryPoints:
-    - web
+    - websecure
   routes:
   - kind: Rule
-    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/session/carta/http/${skaha.sessionid}`)
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/carta/http/${skaha.sessionid}`)
     services:
     - kind: Service
       name: skaha-carta-svc-${skaha.sessionid}
@@ -36,7 +39,7 @@ spec:
     middlewares:
       - name: skaha-carta-http-middleware-${skaha.sessionid}
   - kind: Rule
-    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/session/carta/ws/${skaha.sessionid}`)
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/carta/ws/${skaha.sessionid}`)
     services:
     - kind: Service
       name: skaha-carta-svc-${skaha.sessionid}

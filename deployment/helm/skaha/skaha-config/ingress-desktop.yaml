@@ -12,12 +12,15 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: skaha-desktop-ingress-${skaha.sessionid}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   entryPoints:
-    - web
+    - websecure
   routes:
   - kind: Rule
-    match: Host(`ws-uv.canfar.net`) && PathPrefix(`/session/desktop/${skaha.sessionid}/`)
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/desktop/${skaha.sessionid}/`)
     services:
     - kind: Service
       name: skaha-desktop-svc-${skaha.sessionid}

@@ -4,78 +4,87 @@
 
 replicaCount: 1
 
+skaha:
+  namespace: skaha-system
+skaha-workload:
+  namespace: skaha-workload
+
 deployment:
+  hostname: ws-uv.canfar.net  # Change this!
   containers:
     skaha:
-      image: images.canfar.net/skaha-system/skaha:0.11.0
-      pullPolicy: IfNotPresent
+      image: images-rc.canfar.net/skaha-system/skaha:0.11.0-20230802T204848
+      imagePullPolicy: IfNotPresent
       env:
-      - name: skaha.hostname
-        value: ws-uv.canfar.net
-      - name: skaha.homedir
-        value: /arc/home
-      - name: skaha.namespace
-        value: skaha-workload
-      - name: skaha.maxusersessions
-        value: "3"
-      - name: skaha.sessionexpiry
-        value: "345600"
-      - name: skaha.defaultquotagb
-        value: "200"
-      - name: skaha.harborhosts
-        value: "images.canfar.net"
-      - name: skaha.usersgroup
-        value: "ivo://cadc.nrc.ca/gms?skaha-users"
-      - name: skaha.adminsgroup
-        value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-  
+        - name: skaha.hostname
+          value: ws-uv.canfar.net  # Change this!
+        - name: skaha.homedir
+          value: /arc/home
+        - name: skaha.namespace
+          value: skaha-workload
+        - name: skaha.maxusersessions
+          value: "3"
+        - name: skaha.sessionexpiry
+          value: "345600"
+        - name: skaha.defaultquotagb
+          value: "10"
+        - name: skaha.harborhosts
+          value: "images.canfar.net"
+        - name: skaha.usersgroup
+          value: "ivo://cadc.nrc.ca/gms?skaha-users"
+        - name: skaha.adminsgroup
+          value: "ivo://cadc.nrc.ca/gms?skaha-admins"
+        - name: CATALINA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+        - name: JAVA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+      name: skaha-tomcat
       resources:
         requests:
-          memory: "4Gi"
-          cpu: 1
+          memory: "500M"
+          cpu: "500m"
         limits:
-          memory: "8Gi"
-          cpu: 1
+          memory: "500M"
+          cpu: "500m"
       ports:
       - containerPort: 8080
         protocol: TCP
+      - containerPort: 5555
+        protocol: TCP
       volumeMounts:
-       - mountPath: "/config"
-         name: config-volume
-       - mountPath: "/add-user-config"
-         name: add-user-config
-       - mountPath: /root/.ssl/
-         name: servops-cert
-         readOnly: true
-       - mountPath: "/arc"
-         name: cavern-volume
-         subPath: cavern
-       - mountPath: /var/lib/sss/pipes
-         name: sssd-dir
-         readOnly: true
+      - mountPath: "/config"
+        name: config-volume
+      - mountPath: "/config/cacerts"
+        name: cacert-volume
+      - mountPath: "/add-user-config"
+        name: add-user-config
+      - mountPath: /root/.ssl/
+        name: servops-cert
+        readOnly: true
+      - mountPath: "/arc"
+        name: cavern-volume
+        subPath: cavern
       securityContext:
         runAsUser: 0
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:
-        - name: config-volume
-          configMap:
-            name: skaha-config
-        - name: add-user-config
-          configMap:
-            name: add-user-config
-        - name: servops-cert
-          secret:
-            defaultMode: 420
-            secretName: servops-clientcert
-        - name: cavern-volume
-          hostPath:
-            path: /tmp/arc
-            type: Directory
-        - name: sssd-dir
-          hostPath:
-            path: /var/lib/ubernetes
-            type: Directory
+      - name: config-volume
+        configMap:
+          name: skaha-config
+      - name: add-user-config
+        configMap:
+          name: add-user-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: servops-clientcert
+      - name: cacert-volume
+        configMap:
+          name: cacert-config
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-system-cavern-pvc
 
 service:
   skaha_tomcat_svc:
@@ -83,21 +92,18 @@ service:
     - port: 8080
       name: http-connection
       protocol: TCP
-      
+    - port: 5555
+      protocol: TCP
+      name: java-debug
+
 ingress:
   skahaIngress:
-#    tls:
-#    - hosts:
-#      - ws-uv.canfar.net
-#      secretName: canfar-net-cert-secret
-    rules:
-    - host: ws-uv.canfar.net
-      http:
-        paths:
-        - path: /skaha(/|$)(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: skaha-tomcat-svc
-              port:
-                number: 8080
+    http:
+      paths:
+      - path: /skaha
+        pathType: Prefix
+        backend:
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080

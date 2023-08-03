@@ -69,7 +69,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -610,6 +609,7 @@ public class PostAction extends SessionAction {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = new String[] {
                     "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
