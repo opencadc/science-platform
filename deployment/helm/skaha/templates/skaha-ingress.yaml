@@ -1,25 +1,13 @@
-#apiVersion: networking.k8s.io/v1
-#kind: Ingress
-#metadata:
-#  name: skaha-ingress
-#  annotations:
-#    kubernetes.io/ingress.class: traefik
-#spec:
-#  rules:
-#  - host: ws-uv.canfar.net
-#    http:
-#      paths:
-#      - path: /skaha
-#        pathType: Prefix
-#        backend:
-#          service:
-#            name: skaha-tomcat-svc
-#            port:
-#              number: 8080
-#      - path: /skaha/
-#        pathType: Prefix
-#        backend:
-#          service:
-#            name: skaha-tomcat-svc
-#            port:
-#              number: 8080
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: skaha-ingress
+  namespace: {{ .Values.skaha.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    # traefik.ingress.kubernetes.io/router.middlewares: default-traefik-passtlsclientcert@kubernetescrd,default-traefik-header-transform@kubernetescrd
+    # traefik.ingress.kubernetes.io/router.tls.options: default-traefik-client-cert-option@kubernetescrd
+spec:
+  rules:
+  - host: {{ .Values.deployment.hostname }}
+{{ toYaml .Values.ingress.skahaIngress | nindent 4 }}

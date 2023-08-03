@@ -26,12 +26,6 @@ nfsServer:
       targetPort: 0
   replicas: 1
   type: ClusterIP
-sssd:
-  namespace: cadc-sssd
-harbor:
-  namespace: cadc-harbor
-openharbor:
-  namespace: cadc-openharbor
 skaha:
   namespace: skaha-system
 skaha-workload:

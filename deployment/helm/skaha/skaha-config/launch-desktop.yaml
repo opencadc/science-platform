@@ -42,7 +42,7 @@ spec:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
         args:
-        - "ws-uv.canfar.net"
+        - "${skaha.hostname}"
         env:
         - name: HOME
           value: "/arc/home/${skaha.userid}"
@@ -61,13 +61,13 @@ spec:
         imagePullPolicy: Always
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "250m"
+            memory: "250Mi"
+            cpu: "100m"
             ephemeral-storage: "2Gi"
           limits:
-            memory: "4Gi"
-            cpu: "1"
-            ephemeral-storage: "10Gi"
+            memory: "500Mi"
+            cpu: "250m"
+            ephemeral-storage: "5Gi"
         ports:
         - containerPort: 5901
           protocol: TCP
@@ -89,9 +89,6 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-          readOnly: true
       volumes:
       - name: templates
         configMap:
@@ -102,21 +99,9 @@ spec:
           name: start-desktop
           defaultMode: 0777
       - name: cavern-volume
-        cephfs:
-          monitors:
-          - 10.30.201.3:6789
-          - 10.30.202.3:6789
-          - 10.30.203.3:6789
-          path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
-          user: keel_prod
-          secretRef:
-            name: cephfs-cephx-key
-          readOnly: false          
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
       - name: scratch-dir
         emptyDir: {}
       - name: token-dir
         emptyDir: {}
-      - name: sssd-dir
-        hostPath:
-          path: /var/lib/ubernetes
-          type: Directory
