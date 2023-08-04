@@ -98,11 +98,11 @@ public class GetActionTests {
     private static final long INVALID_VALUE = 6;
 
     private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
-    private static final String K_VALUE_STR = String.valueOf(2) + "K";
-    private static final String M_VALUE_STR = String.valueOf(3) + "M";
-    private static final String G_VALUE_STR = String.valueOf(4) + "G";
-    private static final String T_VALUE_STR = String.valueOf(5) + "T";
-    private static final String INVALID_VALUE_STR = String.valueOf(5) + "A";
+    private static final String K_VALUE_STR = 2 + "K";
+    private static final String M_VALUE_STR = 3 + "M";
+    private static final String G_VALUE_STR = 4 + "G";
+    private static final String T_VALUE_STR = 5 + "T";
+    private static final String INVALID_VALUE_STR = 5 + "A";
     
     public GetActionTests() {
     }
@@ -127,7 +127,7 @@ public class GetActionTests {
         }
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         
     }
 }

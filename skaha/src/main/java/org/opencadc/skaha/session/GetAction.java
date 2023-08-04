@@ -214,13 +214,15 @@ public class GetAction extends SessionAction {
             String withRAMStr = String.valueOf(formatter.format(Double.valueOf(normalizeToLong(withRAM))/(1024 * 1024 * 1024))) + "G";
             String maxRAMStr = String.valueOf(formatter.format(Double.valueOf(maxRAM)/(1024 * 1024 * 1024))) + "G";
             */
-            String withRAMStr = formatter.format(Double.valueOf(
-                    (double) (normalizeToLong(withRAM)) / (1024 * 1024 * 1024))) + "G";
-            String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024))) + "G";
-            String requestedRAMStr = formatter.format(requestedRAM) + "G";
-            String ramAvailableStr = formatter.format(Double.valueOf((double) (ramAvailable) / (1024 * 1024 * 1024))) + "G";
-            return new ResourceStats(desktopCount, headlessCount, totalCount, requestedCPUCores, requestedRAMStr, 
-                                     coresAvailable, ramAvailableStr, maxCores, withRAMStr, maxRAMStr, withCores);
+//            String withRAMStr = formatter.format(Double.valueOf(
+//                    (double) (normalizeToLong(withRAM)) / (1024 * 1024 * 1024))) + "G";
+//            String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024))) + "G";
+//            String requestedRAMStr = formatter.format(requestedRAM) + "G";
+//            String ramAvailableStr = formatter.format(Double.valueOf((double) (ramAvailable) / (1024 * 1024 * 1024))) + "G";
+            return new ResourceStats(desktopCount, headlessCount, totalCount, requestedCPUCores, requestedRAM,
+                                     coresAvailable, ramAvailable, maxCores,
+                                     (double) (normalizeToLong(withRAM)) / (1024 * 1024 * 1024),
+                                     (double) (maxRAM) / (1024 * 1024 * 1024), withCores);
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);

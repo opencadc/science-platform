@@ -73,41 +73,41 @@ import org.apache.log4j.Logger;
  *
  */
 public class ResourceStats {
-    
+
     private static final Logger log = Logger.getLogger(ResourceStats.class);
-    
+
     private JobInstances instances;
     private Core cores;
     private Ram ram;
 
-    public ResourceStats(int desktopCount, int headlessCount, int totalCount, 
-            Double requestedCPUCores, String requestedRAM, Double coresAvailable, String ramAvailable, 
-            Double mCores, String withRAM, String mRAM, Double withCores) {
+    public ResourceStats(int desktopCount, int headlessCount, int totalCount,
+                         Double requestedCPUCores, Double requestedRAMGB, Double coresAvailable, Double ramAvailableGB,
+                         Double mCores, Double withRAMGB, Double mRAMGB, Double withCores) {
         instances = new JobInstances(desktopCount, headlessCount, totalCount);
 
         MaxCoreResource maxCores = new MaxCoreResource();
         maxCores.cpuCores = mCores;
-        maxCores.withRam = withRAM;
+        maxCores.withRamGB = withRAMGB;
         cores = new Core();
         cores.maxCPUCores = maxCores;
         cores.cpuCoresAvailable = coresAvailable;
         cores.requestedCPUCores = requestedCPUCores;
 
         MaxRamResource maxRAM = new MaxRamResource();
-        maxRAM.ram = mRAM;
+        maxRAM.ramGB = mRAMGB;
         maxRAM.withCPUCores = withCores;
         ram = new Ram();
         ram.maxRAM = maxRAM;
-        ram.ramAvailable = ramAvailable;
-        ram.requestedRAM = requestedRAM;
+        ram.ramAvailableGB = ramAvailableGB;
+        ram.requestedRAMGB = requestedRAMGB;
     }
-    
+
     class JobInstances {
         private int session;
         private int desktopApp;
         private int headless;
         private int total;
-        
+
         public JobInstances(int desktopCount, int headlessCount, int totalCount) {
             desktopApp = desktopCount;
             headless = headlessCount;
@@ -115,27 +115,27 @@ public class ResourceStats {
             session = totalCount - desktopCount - headlessCount;
         }
     }
-    
+
     class Core {
-        Double requestedCPUCores = 0.0;
-        Double cpuCoresAvailable = 0.0;
+        Double requestedCPUCores = 0.0D;
+        Double cpuCoresAvailable = 0.0D;
         MaxCoreResource maxCPUCores;
     }
-    
+
     class Ram {
-        String requestedRAM = "0G";
-        String ramAvailable = "0G";
+        Double requestedRAMGB = 0.0D;
+        Double ramAvailableGB = 0.0D;
         MaxRamResource maxRAM;
     }
 
     class MaxCoreResource {
-        public Double cpuCores = 0.0;
-        public String withRam = "0G";
+        public Double cpuCores = 0.0D;
+        public Double withRamGB = 0.0D;
     }
 
     class MaxRamResource {
-        public String ram = "0G";
-        
-        public Double withCPUCores = 0.0;
+        public Double ramGB = 0.0D;
+
+        public Double withCPUCores = 0.0D;
     }
 }
