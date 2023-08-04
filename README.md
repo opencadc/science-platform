@@ -12,7 +12,7 @@
 
 ## CANFAR Science Portal Documentation
 
-User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](doc)
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](https://github.com/opencadc/science-containers/blob/main/doc)
 Additional documentation for new users can be found here: [New User Documentation](https://canfar-scienceportal.readthedocs.io/en/latest/)
 
 ## Acknowledgements
@@ -44,13 +44,13 @@ The CANFAR Science Platform, a web interface to skaha, is here: https://www.canf
 
 ## Session Containers
 
-Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [Containers](containers) directory.
+Session containers are HTML5/websocket applications that can run in shaka.  Currently this consists of Jupyter Labs, CARTA Visualization, and NoVNC desktops.  More information on session containers and how they can be used in skaha can be found in the [science-containers](https://github.com/opencadc/science-containers/blob/main/containers) github repository.
 
 ## Software Containers
 
 These are some of the astronomy science containers that have been built for skaha.  They run as applications within skaha.  The graphical aspects of the containers are displayed in skaha-desktop by sending the DISPLAY to skaha-desktop.
 
-More information on software containers can be found in the [Containers](containers) directory.
+More information on software containers can be found in the [science-containers](https://github.com/opencadc/science-containers/blob/main/containers) github repository.
 
 ## Dependencies
 
