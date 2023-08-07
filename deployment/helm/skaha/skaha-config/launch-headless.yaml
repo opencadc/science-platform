@@ -31,13 +31,6 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-      initContainers:
-      - name: setup-access-token
-        image: busybox
-        command: ["sh", "-c", "echo '${skaha.accesstoken}' > ${skaha.accesstoken.path}/${skaha.accesstoken.file}"]
-        volumeMounts:
-        - name: token-dir
-          mountPath: ${skaha.accesstoken.path}
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
@@ -58,9 +51,6 @@ spec:
             nvidia.com/gpu: "${software.limits.gpus}"
             ephemeral-storage: "200Gi"
         volumeMounts:
-        - mountPath: "${skaha.accesstoken.path}"
-          name: token-dir
-          readOnly: true
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -83,8 +73,6 @@ spec:
             name: cephfs-cephx-key
           readOnly: false
       - name: scratch-dir
-        emptyDir: {}
-      - name: token-dir
         emptyDir: {}
       - name: sssd-dir
         hostPath:

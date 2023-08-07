@@ -67,10 +67,16 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.reg.Standards;
+import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.util.StringUtil;
 
@@ -83,6 +89,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
@@ -93,12 +100,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import javax.security.auth.Subject;
 
@@ -258,32 +260,38 @@ public abstract class SessionAction extends SkahaAction {
     public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
-    
-    protected void injectProxyCert(final Subject subject, String userid, String posixID)
+
+    protected void injectCredentials(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
-        
-        // creating cert home dir
-        // UPDATE 2023.05.04
-        // This is handled by the user creation script.  Adding this here is very misleading if the user creation
-        // failed!  Keeping this here for now as a record.
-        // jenkinsd
-//        execute(new String[] {"mkdir", "-p", homedir + "/" + userid + "/.ssl"});
-        
-        // get the proxy cert
-        Subject opsSubject = CredUtil.createOpsSubject();
-        String proxyCert = Subject.doAs(opsSubject, (PrivilegedExceptionAction<String>) () -> {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            String userid1 = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
-            HttpGet download = new HttpGet(
-                    new URL("https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/priv/userid/" + userid1), out);
-            download.run();
-            return out.toString();
-        });
-        log.debug("Proxy cert: " + proxyCert);
-        // inject the proxy cert
-        log.debug("Running docker exec to insert cert");
-        
-        injectFile(proxyCert, posixID, userid);
+
+        // inject a token if available
+        try {
+            Set<AuthorizationToken> tokens = subject.getPublicCredentials(AuthorizationToken.class);
+            if (!tokens.isEmpty()) {
+                AuthorizationToken token = tokens.iterator().next();
+                injectFile(token.getCredentials(), posixID, homedir + "/" + userid + "/.tokens/" + token.getType());
+                log.debug("injected token: " + token.getType());
+            }
+        } catch (Exception e) {
+            log.debug("failed to inject token: " + e.getMessage(), e);
+        }
+
+        // inject a delegated proxy certificate if available
+        try {
+            LocalAuthority localAuthority = new LocalAuthority();
+            URI serviceID = localAuthority.getServiceURI(Standards.CRED_PROXY_10.toString());
+            if (serviceID != null) {
+                CredUtil.checkCredentials();
+                CredClient credClient = new CredClient(serviceID);
+                X509CertificateChain chain = credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), 14);
+                if (chain != null) {
+                    injectFile(chain.certificateString(), posixID, homedir + "/" + userid + "/.ssl/cadcproxy.pem");
+                    log.debug("injected certificate");
+                }
+            }
+        } catch (Exception e) {
+            log.debug("failed to inject cert: " + e.getMessage(), e);
+        }
     }
     
     protected String getImageName(String image) {
@@ -303,8 +311,8 @@ public abstract class SessionAction extends SkahaAction {
         }
 
     }
-    
-    protected void injectFile(String data, String posixID, String userid) throws IOException, InterruptedException {
+
+    protected void injectFile(String data, String posixID, String path) throws IOException, InterruptedException {
         // stage file
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
@@ -315,16 +323,16 @@ public abstract class SessionAction extends SkahaAction {
         writer.write(data + "\n");
         writer.flush();
         writer.close();
-        
+
         // update file permissions
         String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
         execute(chown);
 //        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
 //        execute(chown);
-        
+
         // inject file
-        String[] injectCert = new String[] {"mv",  "-f", tmpFileName, homedir + "/" + userid + "/.ssl/cadcproxy.pem"};
-        execute(injectCert);
+        String[] inject = new String[] {"mv",  "-f", tmpFileName, path};
+        execute(inject);
     }
     
     protected String stageFile(String data) throws IOException {
