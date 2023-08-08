@@ -38,6 +38,8 @@ spec:
         - ${skaha.userid}
         - ${software.containerparam}
         env:
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         - name: HOME
           value: "/arc/home/${skaha.userid}"
         - name: DISPLAY
