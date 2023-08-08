@@ -31,10 +31,37 @@ skaha:
 skaha-workload:
   namespace: skaha-workload
 
-# traefik:
-#   experimental:
-#     plugins:
-#       enabled: true
-#   additionalArguments:
-#     - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
-#     - "--experimental.plugins.htransformation.version=v0.2.7"
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted to use client certificates.
+  # cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+  # default-certificate:
+    # Uncomment to enable server certificates that match your domain.
+    # tls.crt: <base64 encoded server certificate>
+    # tls.key: <base64 encoded server certificate key>
+
+traefik:
+  # experimental:
+  #   plugins:
+  #     enabled: true
+  # additionalArguments:
+  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
+  #   - "--experimental.plugins.htransformation.version=v0.2.7"
+  # tlsStore:
+  #   default:
+  #     defaultCertificate:
+  #       # See default-certificate secret(s) above
+  #       secretName: default-certificate
+  # tlsOptions:
+  #   traefik-client-cert-option:
+  #     clientAuth:
+  #       clientAuthType: VerifyClientCertIfGiven
+  #       secretNames:
+  #         - cacert-secret
+  # websecure:
+  #   middlewares: 
+  #     - default-traefik-passtlsclientcert@kubernetescrd
+  #     - default-traefik-header-transform@kubernetescrd
+  #   tls:
+  #     options:
+  #       - default-traefik-client-cert-option@kubernetescrd
