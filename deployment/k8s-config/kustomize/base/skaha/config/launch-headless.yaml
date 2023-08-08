@@ -34,9 +34,14 @@ spec:
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
         imagePullPolicy: Always

@@ -48,8 +48,7 @@ spec:
         - name: MOZ_FORCE_DISABLE_E10S
           value: "1"
         securityContext:
-          runAsUser: ${skaha.posixid} 
-          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         imagePullPolicy: Always
         resources:

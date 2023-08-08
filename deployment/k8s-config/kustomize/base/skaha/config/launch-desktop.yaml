@@ -45,11 +45,12 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         - name: MOZ_FORCE_DISABLE_E10S
           value: "1"
         securityContext:
-          runAsUser: ${skaha.posixid} 
-          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         imagePullPolicy: Always
         resources:

@@ -38,6 +38,8 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
@@ -64,6 +66,8 @@ spec:
           value: "${software.requests.cores}"
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
+        securityContext:
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         command: ["/skaha-system/start-jupyterlab.sh"]
         args:

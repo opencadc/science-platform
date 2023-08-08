@@ -39,8 +39,7 @@ spec:
         - name: skaha_username
           value: "${skaha.userid}"
         securityContext:
-          runAsUser: ${skaha.posixid} 
-          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
