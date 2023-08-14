@@ -33,8 +33,8 @@ spec:
         supplementalGroups: [${skaha.supgroups}]
       containers:
       - name: "${skaha.jobname}"
+        # image and start of the 'env' label comes from the image bundle
         ${headless.image.bundle}
-        env:
         - name: skaha_hostname
           value: "${skaha.hostname}"
         - name: skaha_username
