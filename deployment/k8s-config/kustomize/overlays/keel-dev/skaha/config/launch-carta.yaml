@@ -38,6 +38,8 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         securityContext:
           allowPrivilegeEscalation: false
         image: ${software.imageid}

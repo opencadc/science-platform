@@ -34,6 +34,17 @@ spec:
       containers:
       - name: "${skaha.jobname}"
         ${headless.image.bundle}
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
         securityContext:
           allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
