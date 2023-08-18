@@ -20,6 +20,7 @@ spec:
         canfar-net-userid: "${skaha.userid}"
         job-name: "${skaha.jobname}"
     spec:
+      enableServiceLinks: false
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
       imagePullSecrets:
