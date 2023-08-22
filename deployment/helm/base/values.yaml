@@ -39,6 +39,15 @@ secrets:
     # Uncomment to enable server certificates that match your domain.
     # tls.crt: <base64 encoded server certificate>
     # tls.key: <base64 encoded server certificate key>
+volumes:
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop  # Single node docker-desktop for macOS and Windows.
 
 traefik:
   # experimental:

@@ -148,6 +148,7 @@ public class PostAction extends SessionAction {
     private static final String ACCESS_TOKEN_FILE_NAME_KEY = "skaha.accesstoken.file";
     private static final String ACCESS_TOKEN_FILE_PATH_VALUE = "/etc/token";
     private static final String ACCESS_TOKEN_FILE_NAME_VALUE = "access_token";
+    private static final String DEFAULT_HARBOR_SECRET = "notused";
 
     public PostAction() {
         super();
@@ -200,7 +201,7 @@ public class PostAction extends SessionAction {
                 // (VNC passwords are only good up to 8 characters)
                 sessionID = new RandomStringGenerator(8).getID();
 
-                Integer gpus = 0;
+                int gpus = 0;
                 if (gpusParam != null) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
@@ -547,11 +548,8 @@ public class PostAction extends SessionAction {
         String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
 
-        String imageSecret = getHarborSecret(image);
+        final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
-        if (imageSecret == null) {
-            imageSecret = "notused";
-        }
 
         String supplementalGroups = getSupplementalGroupsList();
 
@@ -695,11 +693,7 @@ public class PostAction extends SessionAction {
 
         String name = getImageName(image);
         log.debug("name: " + name);
-        String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
-        if (imageSecret == null) {
-            imageSecret = "notused";
-        }
+        final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
         String posixID = getPosixId();
@@ -816,7 +810,12 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("not a skaha harbor image: " + image);
         }
 
-        String idToken = super.getIdToken();
+        String idToken = getIdToken();
+
+        // Default secret name if no ID Token is found.
+        if (!StringUtil.hasText(idToken)) {
+            return PostAction.DEFAULT_HARBOR_SECRET;
+        }
 
         log.debug("getting secret from harbor");
         URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
@@ -831,11 +830,11 @@ public class PostAction extends SessionAction {
             } else {
                 log.warn("user not found in harbor");
             }
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
         if (get.getThrowable() != null) {
             log.warn("error obtaining harbor secret. response code: " + get.getResponseCode());
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
         String userJson = out.toString();
         log.debug("harbor user info: " + userJson);
@@ -845,7 +844,7 @@ public class PostAction extends SessionAction {
         log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
 
-        String secretName = "harbor-secret-" + userID.toLowerCase();
+        final String secretName = "harbor-secret-" + userID.toLowerCase();
 
         // delete any old secret by this name
         String[] deleteCmd = new String[] {
@@ -886,11 +885,10 @@ public class PostAction extends SessionAction {
             }
         } else {
             log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
 
         return secretName;
-
     }
 
 
