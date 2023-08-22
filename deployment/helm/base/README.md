@@ -4,9 +4,6 @@
 
 ### Dependencies
 
-A valid Client Proxy Certificate called `cadcproxy.pem` is required to be put alongside the `values.yaml` file as it creates a volume
-based on it for the Web Services to use for authenticated calls.
-
 Kubernetes 1.14 and up are supported.
 
 ### From source
