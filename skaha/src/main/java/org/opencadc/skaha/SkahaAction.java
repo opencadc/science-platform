@@ -93,6 +93,10 @@ import org.json.JSONObject;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.posix.UserGroupUtil;
+import org.opencadc.skaha.posix.client.EtcdCustomClient;
+import org.opencadc.skaha.posix.client.EtcdPosixClient;
+import org.opencadc.skaha.posix.client.PosixClient;
 
 
 import static java.util.stream.Collectors.toList;
@@ -120,6 +124,9 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
+
+    protected PosixClient posixClient;
+    protected UserGroupUtil userGroupUtil;
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -189,6 +196,12 @@ public abstract class SkahaAction extends RestAction {
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
+        posixClient = new EtcdPosixClient(new EtcdCustomClient());
+        List<String> groupNames = groups.stream()
+                .filter(Objects::nonNull)
+                .map(group -> group.getID().getName())
+                .collect(toList());
+        userGroupUtil = new UserGroupUtil(userID, skahaUsersGroup, homedir, groupNames, posixClient);
     }
 
     private boolean isNotEmpty(Collection<?> collection) {

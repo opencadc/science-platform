@@ -71,8 +71,8 @@ services:
     #   dockerfile: Dockerfile
     environment:
       - IAM_HOST=localhost:8080
-      - IAM_BASE_URL= http//localhost:8080/
-      - IAM_ISSUER= http//localhost:8080/
+      - IAM_BASE_URL=http://localhost:8080
+      - IAM_ISSUER=http://localhost:8080
       - IAM_DB_ALLOW_PUBLIC_KEY=true
       - IAM_FORWARD_HEADERS_STRATEGY=native
       - IAM_DB_HOST=db
