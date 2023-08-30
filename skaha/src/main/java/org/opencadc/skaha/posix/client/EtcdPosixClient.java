@@ -1,5 +1,7 @@
 package org.opencadc.skaha.posix.client;
 
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +13,7 @@ import static java.lang.String.valueOf;
 
 public class EtcdPosixClient implements PosixClient {
 
-    private final EtcdCustomClient etcdCustomClient;
+    private final Etcd etcd;
     public static final int USER_POSIX_ID_START = 100000; // 1 Lakh
     public static final int GROUP_ID_START = 1000000; // 10 Lakh
     private static final String USER_KEY = "user_";
@@ -20,8 +22,8 @@ public class EtcdPosixClient implements PosixClient {
     private static final String ENTRY_KEY = "entry_";
     private static final String LIST_KEY = "list_";
 
-    public EtcdPosixClient(EtcdCustomClient etcdCustomClient) {
-        this.etcdCustomClient = etcdCustomClient;
+    public EtcdPosixClient(Etcd etcd) {
+        this.etcd = etcd;
     }
 
     private static String posixIdKey(String userId) {
@@ -44,26 +46,27 @@ public class EtcdPosixClient implements PosixClient {
         return groupIdKey(META_KEY);
     }
 
-    private static String groupEntryKey(String groupMame) {
-        return GROUP_KEY + ENTRY_KEY + groupMame;
+    private static String groupEntryKey(String groupName) {
+        return GROUP_KEY + ENTRY_KEY + groupName;
     }
 
     private static String groupListKey(String userId) {
         return GROUP_KEY + LIST_KEY + userId;
     }
 
+    private static final Logger log = Logger.getLogger(EtcdPosixClient.class);
 
     @Override
     public boolean userExists(String userId) throws ExecutionException, InterruptedException {
         if (null == userId)
             throw new RuntimeException("user name is null");
-        return etcdCustomClient.exists(posixIdKey(userId));
+        return etcd.exists(posixIdKey(userId));
     }
 
 
     @Override
     public int getPosixId(String userId) throws ExecutionException, InterruptedException {
-        Optional<String> optionalPosixId = etcdCustomClient.get(posixIdKey(userId));
+        Optional<String> optionalPosixId = etcd.get(posixIdKey(userId));
         if (optionalPosixId.isEmpty()) {
             throw new RuntimeException("unknown user");
         }
@@ -72,15 +75,16 @@ public class EtcdPosixClient implements PosixClient {
 
     @Override
     public int savePosixId(String userId) throws ExecutionException, InterruptedException {
-        Optional<String> lastUsedPosixId = etcdCustomClient.get(posixIdMetaKey());
+        Optional<String> lastUsedPosixId = etcd.get(posixIdMetaKey());
         int newPosixId = lastUsedPosixId.map(lastId -> parseInt(lastId) + 1).orElse(USER_POSIX_ID_START);
-        etcdCustomClient.put(posixIdKey(userId), valueOf(newPosixId));
+        etcd.put(posixIdKey(userId), valueOf(newPosixId));
+        etcd.put(posixIdMetaKey(), valueOf(newPosixId));
         return newPosixId;
     }
 
     @Override
     public String getPosixEntry(String userId) throws ExecutionException, InterruptedException {
-        Optional<String> optionalUserPosixEntry = etcdCustomClient.get(posixEntryKey(userId));
+        Optional<String> optionalUserPosixEntry = etcd.get(posixEntryKey(userId));
         if (optionalUserPosixEntry.isEmpty()) throw new RuntimeException("unknown user");
         return optionalUserPosixEntry.get();
     }
@@ -88,30 +92,32 @@ public class EtcdPosixClient implements PosixClient {
 
     @Override
     public void savePosixEntry(String userId, String posixEntry) throws ExecutionException, InterruptedException {
-        etcdCustomClient.get(posixEntryKey(userId));
+        log.debug("saving posix entry with key " + posixEntryKey(userId) + " value " + posixEntry);
+        etcd.put(posixEntryKey(userId), posixEntry);
     }
 
     @Override
     public List<String> getGroupForUser(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
         String groupListKey = groupListKey(userId);
-        Optional<List<String>> optionalGroupList = etcdCustomClient.getAsList(groupListKey);
+        Optional<List<String>> optionalGroupList = etcd.getAsList(groupListKey);
         if (optionalGroupList.isEmpty()) throw new RuntimeException("no groups for user");
         return optionalGroupList.get();
     }
     @Override
     public void addGroupToUser(String userId, String groupId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
         String groupListKey = groupListKey(userId);
-        Optional<List<String>> optionalGroupList = etcdCustomClient.getAsList(groupListKey);
-        List<String> updatedGroupList = new ArrayList<>();
-        if (optionalGroupList.isEmpty()) updatedGroupList.add(groupId);
-        else updatedGroupList.addAll(optionalGroupList.get());
-        etcdCustomClient.put(groupListKey, updatedGroupList);
+        Optional<List<String>> optionalGroupList = etcd.getAsList(groupListKey);
+        List<String> updatedGroupList;
+        updatedGroupList = optionalGroupList.orElseGet(ArrayList::new);
+        updatedGroupList.add(groupId);
+        etcd.put(groupListKey, updatedGroupList);
     }
+
 
     @Override
     public boolean userExistsInGroup(String userId, String groupMame) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
         String groupListKey = groupListKey(userId);
-        Optional<List<String>> optionalGroupList = etcdCustomClient.getAsList(groupListKey);
+        Optional<List<String>> optionalGroupList = etcd.getAsList(groupListKey);
         if (optionalGroupList.isEmpty()) throw new RuntimeException("no groups for user");
         return optionalGroupList.get().contains(groupMame);
     }
@@ -120,27 +126,28 @@ public class EtcdPosixClient implements PosixClient {
     @Override
     public boolean groupExist(String groupMame) throws ExecutionException, InterruptedException {
         if (null == groupMame) throw new RuntimeException("group name is null");
-        return etcdCustomClient.exists(groupIdKey(groupMame));
+        return etcd.exists(groupIdKey(groupMame));
     }
 
     @Override
     public int getGroupId(String groupMame) throws ExecutionException, InterruptedException {
-        Optional<String> optionalGroupId = etcdCustomClient.get(groupIdKey(groupMame));
+        Optional<String> optionalGroupId = etcd.get(groupIdKey(groupMame));
         if (optionalGroupId.isEmpty()) throw new RuntimeException("unknown group");
         return parseInt(optionalGroupId.get());
     }
 
     @Override
     public int saveGroupId(String groupMame) throws ExecutionException, InterruptedException {
-        Optional<String> lastUsedGroupId = etcdCustomClient.get(groupIdMetaKey());
+        Optional<String> lastUsedGroupId = etcd.get(groupIdMetaKey());
         int newGroupId = lastUsedGroupId.map(lastId -> parseInt(lastId) + 1).orElse(GROUP_ID_START);
-        etcdCustomClient.put(groupIdKey(groupMame), valueOf(newGroupId));
+        etcd.put(groupIdKey(groupMame), valueOf(newGroupId));
+        etcd.put(groupIdMetaKey(), valueOf(newGroupId));
         return newGroupId;
     }
 
     @Override
     public String getGroupEntry(String groupMame) throws ExecutionException, InterruptedException {
-        Optional<String> optionalGroupEntry = etcdCustomClient.get(groupEntryKey(groupMame));
+        Optional<String> optionalGroupEntry = etcd.get(groupEntryKey(groupMame));
         if (optionalGroupEntry.isEmpty()) throw new RuntimeException("unknown group");
         return optionalGroupEntry.get();
     }
@@ -148,7 +155,21 @@ public class EtcdPosixClient implements PosixClient {
 
     @Override
     public void saveGroupEntry(String groupMame, String groupEntry) throws ExecutionException, InterruptedException {
-        etcdCustomClient.put(groupEntryKey(groupEntry), groupEntry);
+        log.debug("saving group entry with key " + groupEntryKey(groupMame) + " value " + groupEntry);
+        etcd.put(groupEntryKey(groupMame), groupEntry);
     }
 
+    @Override
+    public String groupEntries(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
+        List<String> groups = getGroupForUser(userId);
+        StringBuilder groupEntries = new StringBuilder();
+        for (String group : groups)
+            try {
+                groupEntries.append("\n").append(getGroupEntry(group));
+            } catch (Exception e) {
+                log.error(e);
+                e.printStackTrace();
+            }
+        return groupEntries.toString();
+    }
 }

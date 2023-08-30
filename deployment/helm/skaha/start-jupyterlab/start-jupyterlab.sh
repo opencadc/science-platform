@@ -5,6 +5,11 @@
 # HOME is defined at runtime.
 cd ${HOME}
 
+echo "user entry"
+echo $2
+echo "group entry"
+echo $3
+
 jupyter lab \
 	--NotebookApp.base_url=session/notebook/"$1" \
 	--NotebookApp.notebook_dir=/ \

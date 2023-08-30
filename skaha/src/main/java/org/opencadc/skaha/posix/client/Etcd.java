@@ -8,6 +8,7 @@ import io.etcd.jetcd.KV;
 import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.options.PutOption;
+import org.apache.log4j.Logger;
 
 import java.io.*;
 import java.util.List;
@@ -19,20 +20,22 @@ import static io.etcd.jetcd.ByteSequence.from;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 
-public class EtcdCustomClient {
+public class Etcd {
+
+    private static final Logger log = Logger.getLogger(Etcd.class);
 
     public static final String CADC_REGISTRY_PROPERTIES = "cadc-registry.properties";
     private final Client client;
 
-    public EtcdCustomClient() {
+    public Etcd() {
         this(fetchFromPropertiesFile());
     }
 
-    public EtcdCustomClient(List<String> urls) {
+    public Etcd(List<String> urls) {
         client = Client.builder().endpoints(buildUrls(urls)).build();
     }
 
-    public EtcdCustomClient(String url, String... peerUrls) {
+    public Etcd(String url, String... peerUrls) {
         client = Client.builder().endpoints(buildUrls(url, peerUrls)).build();
     }
 
@@ -42,6 +45,7 @@ public class EtcdCustomClient {
         List<String> urls = mvp.getProperty("posix.database.url");
         if (urls.isEmpty())
             throw new RuntimeException("posix database url is not present");
+        log.debug("etcd url " + urls);
         return urls;
     }
 

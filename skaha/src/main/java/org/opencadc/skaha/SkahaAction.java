@@ -68,7 +68,10 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.*;
+import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
@@ -94,7 +97,7 @@ import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.posix.UserGroupUtil;
-import org.opencadc.skaha.posix.client.EtcdCustomClient;
+import org.opencadc.skaha.posix.client.Etcd;
 import org.opencadc.skaha.posix.client.EtcdPosixClient;
 import org.opencadc.skaha.posix.client.PosixClient;
 
@@ -196,12 +199,16 @@ public abstract class SkahaAction extends RestAction {
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
-        posixClient = new EtcdPosixClient(new EtcdCustomClient());
+        Etcd etcd = new Etcd();
+        log.debug("etcd custom client loaded");
+        log.debug("home directory is "+homedir);
+        posixClient = new EtcdPosixClient(etcd);
         List<String> groupNames = groups.stream()
                 .filter(Objects::nonNull)
                 .map(group -> group.getID().getName())
                 .collect(toList());
-        userGroupUtil = new UserGroupUtil(userID, skahaUsersGroup, homedir, groupNames, posixClient);
+        userGroupUtil = new UserGroupUtil(userID, homedir, groupNames, posixClient);
+        log.debug("userGroupUtil loaded");
     }
 
     private boolean isNotEmpty(Collection<?> collection) {
