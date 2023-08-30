@@ -22,7 +22,7 @@ public class UserGroupUtil {
     private final String homeDir;
     private final List<String> groups;
     private boolean isLDAPConnected = false;
-    Set<PosixPrincipal> principals;
+    PosixPrincipal principal;
 
     public UserGroupUtil(String userId,
                          String homeDir, List<String> groups,
@@ -40,10 +40,12 @@ public class UserGroupUtil {
 
     private boolean isLDAPConnected() {
         Subject s = AuthenticationUtil.getCurrentSubject();
-        principals = s.getPrincipals(PosixPrincipal.class);
-        if (!principals.isEmpty())
-            isLDAPConnected = true;
-        return isLDAPConnected;
+        Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
+        if (principals.isEmpty())
+            return false;
+        principal = principals.iterator().next();
+        isLDAPConnected = true;
+        return true;
     }
 
     public void setupForIAM() throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
@@ -86,7 +88,7 @@ public class UserGroupUtil {
 
     public String posixId() throws ExecutionException, InterruptedException {
         if (isLDAPConnected)
-            return valueOf(principals.iterator().next().getUidNumber());
+            return valueOf(principal.getUidNumber());
         return valueOf(posixClient.getPosixId(userId));
     }
 
