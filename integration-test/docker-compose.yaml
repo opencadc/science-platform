@@ -11,6 +11,7 @@ services:
     environment:
       - skaha.usersgroup=ivo://cadc.nrc.ca/gms?mini-src-test-group
       - skaha.homedir=/arc/home
+      - skaha.harborhosts=images.canfar.net
     volumes:
       - ./configs/skaha:/config:ro
     links:
