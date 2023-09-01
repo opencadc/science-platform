@@ -89,6 +89,7 @@ import java.util.*;
 
 import javax.security.auth.Subject;
 
+import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -182,7 +183,7 @@ public abstract class SkahaAction extends RestAction {
             throw new IllegalStateException("skaha.usersgroup not defined in system properties");
         }
         LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
+        URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
 
         log.debug("using iam to fetch group details");
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
@@ -214,12 +215,23 @@ public abstract class SkahaAction extends RestAction {
     private boolean isNotEmpty(Collection<?> collection) {
         return null != collection && !collection.isEmpty();
     }
+
+    /**
+     * Obtain an ID Token.  This is only available with a subset of Identity Managers, and so will return null if
+     * not supported.
+     * @return  String ID Token, or null if none.
+     * @throws Exception    Access Control and/or Malformed URL Exceptions
+     */
     protected String getIdToken() throws Exception {
         LocalAuthority localAuthority = new LocalAuthority();
         URI serviceURI = localAuthority.getServiceURI(Standards.SECURITY_METHOD_OAUTH.toString());
         RegistryClient regClient = new RegistryClient();
         URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
         log.debug("using ac oauth endpoint: " + oauthURL);
+
+        if (oauthURL == null) {
+            return null;
+        }
 
         log.debug("checking public credentials for idToken");
         Subject subject = AuthenticationUtil.getCurrentSubject();
@@ -236,7 +248,7 @@ public abstract class SkahaAction extends RestAction {
         }
 
         log.debug("getting idToken from ac");
-        URL acURL = new URL(oauthURL.toString() + "?response_type=id_token&client_id=arbutus-harbor&scope=cli");
+        URL acURL = new URL(oauthURL + "?response_type=id_token&client_id=arbutus-harbor&scope=cli");
         OutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(acURL, out);
         get.run();
@@ -246,7 +258,7 @@ public abstract class SkahaAction extends RestAction {
         }
         String idToken = out.toString();
         log.debug("idToken: " + idToken);
-        if (idToken == null || idToken.trim().length() == 0) {
+        if (idToken == null || idToken.trim().isEmpty()) {
             log.warn("null id token returned");
             return null;
         }
@@ -293,7 +305,7 @@ public abstract class SkahaAction extends RestAction {
                             String digest = jArtifact.getString("digest");
                             JSONArray labels = jArtifact.getJSONArray("labels");
                             Set<String> types = getTypesFromLabels(labels);
-                            if (types.size() > 0) {
+                            if (!types.isEmpty()) {
                                 return new Image(imageID, types, digest);
                             }
                         }
@@ -326,7 +338,9 @@ public abstract class SkahaAction extends RestAction {
 
         OutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(harborURL, out);
-        get.setRequestProperty("Authorization", "Bearer " + idToken);
+        if (StringUtil.hasText(idToken)) {
+            get.setRequestProperty("Authorization", "Bearer " + idToken);
+        }
         log.debug("calling " + harborURL + " for " + message);
         try {
             get.run();

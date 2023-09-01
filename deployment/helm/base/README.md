@@ -4,8 +4,7 @@
 
 ### Dependencies
 
-A valid Client Proxy Certificate called `cadcproxy.pem` is required to be put alongside the `values.yaml` file as it creates a volume
-based on it for the Web Services to use for authenticated calls.
+Kubernetes 1.14 and up are supported.
 
 ### From source
 
@@ -51,27 +50,32 @@ After the install, there should exist the necessary Namespaces and Objects.  See
 $ kubectl get namespaces
 NAME                   STATUS   AGE
 ...
-cadc-harbor            Active   28m
-cadc-loki              Active   28m
-cadc-openharbor        Active   28m
-cadc-sssd              Active   28m
-nvidia-device-plugin   Active   28m
-skaha-nfs              Active   28m
 skaha-system           Active   28m
 skaha-workload         Active   28m
 ```
 
-## NFS Service
+## Proxy using Traefik
 
-This will install an NFS service ready to use.  It is an easy way to isolate the shared storage that is required by both the Skaha (https://ws-uv.canfar.net/skaha) and Cavern (Arc) (https://ws-uv.canfar.net/arc) web services.
+The [Traefik](https://traefik.io/traefik/) proxy server is also installed as a dependency, which handles SSL termination.  Helm options are under the `traefik` key in the `values.yaml` file.
+
+You can create your own secrets to contain your self-signed server certificates to be used by
+the SSL termination.  See the `values.yaml` file for more, and don't forget to `base64` encode
+the values.
+
+## Shared Storage
+
+Shared Storage is handled by the `local` Persistent Volume types.
 
 ```yaml
-      - name: my-shared-volume
-        nfs: 
-          # URL for the NFS server
-          # Can be accessed at the <helm-install-name>-nfs-server.skaha-system.svc.cluster.local hostname.
-          server: "canfar-science-platform-base.nfs-server.skaha-system.svc.cluster.local" # Change this!
-          path: /
+...
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data/skaha-storage
+...
 ```
 
 ### DNS on macOS
