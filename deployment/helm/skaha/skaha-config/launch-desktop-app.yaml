@@ -29,13 +29,6 @@ spec:
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
-      initContainers:
-      - name: setup-access-token
-        image: busybox
-        command: ["sh", "-c", "echo '${skaha.accesstoken}' > ${skaha.accesstoken.path}/${skaha.accesstoken.file}"]
-        volumeMounts:
-        - name: token-dir
-          mountPath: ${skaha.accesstoken.path}
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
@@ -71,9 +64,6 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
-        - mountPath: "${skaha.accesstoken.path}"
-          name: token-dir
-          readOnly: true
         - mountPath: "/skaha-system"
           name: start-desktop-software
         - mountPath: "/arc"
@@ -91,6 +81,4 @@ spec:
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc  
       - name: scratch-dir
-        emptyDir: {}
-      - name: token-dir
         emptyDir: {}
