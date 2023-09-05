@@ -97,10 +97,21 @@ public class UserGroupUtil {
             return null;
         return posixClient.getPosixEntry(userId);
     }
-
     public String groupEntries() throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
         if (isLDAPConnected)
             return null;
         return posixClient.groupEntries(userId);
+//        return posixClient.getGroupEntry(userId);
     }
+
+    public String userGroupIds() throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
+        if (isLDAPConnected)
+            return null;
+        return posixClient.userGroupIds(userId)
+                .stream()
+                .map(Object::toString)
+                .reduce((i, j) -> i + ", " + j)
+                .orElse("");
+    }
+
 }

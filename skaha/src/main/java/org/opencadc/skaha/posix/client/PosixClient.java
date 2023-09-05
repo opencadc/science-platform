@@ -32,4 +32,6 @@ public interface PosixClient {
     void addGroupToUser(String userId, String groupId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException;
 
     String groupEntries(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException;
+
+    List<Integer> userGroupIds(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException;
 }

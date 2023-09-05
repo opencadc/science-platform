@@ -4,7 +4,7 @@ services:
     container_name: skaha
     ports:
       - "8081:8080"
-    image: skaha:latest # build the image manually, context can not be applied here
+    image: abhishek1009/skaha:latest # build the image manually, context can not be applied here
     # build:
     #   context: ./dependencies/science-platform/skaha
     #   dockerfile: Dockerfile

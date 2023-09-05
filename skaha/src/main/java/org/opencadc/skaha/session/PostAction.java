@@ -98,7 +98,6 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.opencadc.skaha.AccessTokenUtil;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
@@ -143,12 +142,9 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-    private static final String ACCESS_TOKEN_KEY = "skaha.accesstoken";
-    private static final String ACCESS_TOKEN_FILE_PATH_KEY = "skaha.accesstoken.path";
-    private static final String ACCESS_TOKEN_FILE_NAME_KEY = "skaha.accesstoken.file";
-    private static final String ACCESS_TOKEN_FILE_PATH_VALUE = "/etc/token";
-    private static final String ACCESS_TOKEN_FILE_NAME_VALUE = "access_token";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
+    private static final String USER_POSIX_ENTRY = "user.posix.entry";
+    private static final String USER_GROUP_ENTRY = "user.group.entry";
 
     public PostAction() {
         super();
@@ -545,7 +541,8 @@ public class PostAction extends SessionAction {
             throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
-        String posixID = getPosixId();
+//        String posixID = getPosixId();
+        String posixID = userGroupUtil.posixId();
         log.debug("Posix id: " + posixID);
 
         final String imageSecret = getHarborSecret(image);
@@ -597,7 +594,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, userGroupUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -609,6 +607,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, userGroupUtil.posixEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, userGroupUtil.groupEntries());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -748,9 +748,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_KEY, new AccessTokenUtil().credential());
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_FILE_PATH_KEY, ACCESS_TOKEN_FILE_PATH_VALUE);
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_FILE_NAME_KEY, ACCESS_TOKEN_FILE_NAME_VALUE);
+
 
         String launchFile = super.stageFile(launchString);
 

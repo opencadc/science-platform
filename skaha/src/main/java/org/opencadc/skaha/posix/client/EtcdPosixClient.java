@@ -13,6 +13,7 @@ import static java.lang.String.valueOf;
 
 public class EtcdPosixClient implements PosixClient {
 
+    private static final String SEPARATOR = ";";
     private final Etcd etcd;
     public static final int USER_POSIX_ID_START = 100000; // 1 Lakh
     public static final int GROUP_ID_START = 1000000; // 10 Lakh
@@ -79,6 +80,7 @@ public class EtcdPosixClient implements PosixClient {
         int newPosixId = lastUsedPosixId.map(lastId -> parseInt(lastId) + 1).orElse(USER_POSIX_ID_START);
         etcd.put(posixIdKey(userId), valueOf(newPosixId));
         etcd.put(posixIdMetaKey(), valueOf(newPosixId));
+        etcd.put(groupIdKey(userId), valueOf(newPosixId));
         return newPosixId;
     }
 
@@ -132,7 +134,7 @@ public class EtcdPosixClient implements PosixClient {
     @Override
     public int getGroupId(String groupMame) throws ExecutionException, InterruptedException {
         Optional<String> optionalGroupId = etcd.get(groupIdKey(groupMame));
-        if (optionalGroupId.isEmpty()) throw new RuntimeException("unknown group");
+        if (optionalGroupId.isEmpty()) throw new RuntimeException("unknown group "+groupMame);
         return parseInt(optionalGroupId.get());
     }
 
@@ -163,13 +165,25 @@ public class EtcdPosixClient implements PosixClient {
     public String groupEntries(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
         List<String> groups = getGroupForUser(userId);
         StringBuilder groupEntries = new StringBuilder();
-        for (String group : groups)
+        for (int i = 0; i < groups.size(); i++) {
             try {
-                groupEntries.append("\n").append(getGroupEntry(group));
+                groupEntries.append(getGroupEntry(groups.get(i)));
+                if (i != groups.size() - 1)
+                    groupEntries.append(SEPARATOR);
             } catch (Exception e) {
-                log.error(e);
-                e.printStackTrace();
+                log.error("error is ", e);
             }
+        }
         return groupEntries.toString();
     }
+
+    @Override
+    public List<Integer> userGroupIds(String userId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
+        List<String> groups = getGroupForUser(userId);
+        List<Integer> userGroupIds = new ArrayList<>();
+        for (String group : groups)
+            userGroupIds.add(getGroupId(group));
+        return userGroupIds;
+    }
+
 }

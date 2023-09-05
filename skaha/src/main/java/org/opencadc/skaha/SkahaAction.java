@@ -200,16 +200,13 @@ public abstract class SkahaAction extends RestAction {
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
-        Etcd etcd = new Etcd();
-        log.debug("etcd custom client loaded");
         log.debug("home directory is "+homedir);
-        posixClient = new EtcdPosixClient(etcd);
+        posixClient = new EtcdPosixClient(new Etcd());
         List<String> groupNames = groups.stream()
                 .filter(Objects::nonNull)
                 .map(group -> group.getID().getName())
                 .collect(toList());
         userGroupUtil = new UserGroupUtil(userID, homedir, groupNames, posixClient);
-        log.debug("userGroupUtil loaded");
     }
 
     private boolean isNotEmpty(Collection<?> collection) {
