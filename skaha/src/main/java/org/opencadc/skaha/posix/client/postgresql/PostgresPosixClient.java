@@ -218,6 +218,12 @@ public class PostgresPosixClient implements PosixClient {
         return null;
     }
 
+    @Override
+    public List < Integer > userGroupIds ( String userId ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
+
+        return null;
+    }
+
     public static void main ( String args[] ) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
 
         PostgresPosixClient postgresPosixClient = new PostgresPosixClient();
