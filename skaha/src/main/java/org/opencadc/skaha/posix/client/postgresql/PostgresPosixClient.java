@@ -221,7 +221,15 @@ public class PostgresPosixClient implements PosixClient {
     @Override
     public List < Integer > userGroupIds ( String userId ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
 
-        return null;
+        if (userExists(userId)) {
+            Users savedUser = postgress.getUsers(userId);
+            List < Integer > groupidList = new ArrayList <>();
+            savedUser.getGroupDetailList().stream().forEach(group -> groupidList.add(group.getGroupId()));
+            return groupidList;
+        } else {
+            log.error("User dont exits=" + userId);
+            return new ArrayList < Integer >();
+        }
     }
 
     public static void main ( String args[] ) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
@@ -236,6 +244,7 @@ public class PostgresPosixClient implements PosixClient {
         postgresPosixClient.addGroupToUser("user1","Admin");
         postgresPosixClient.addGroupToUser("user2","root");
         */
+        System.out.println(postgresPosixClient.userGroupIds("user1"));
         postgress.closeSession();
     }
 }
