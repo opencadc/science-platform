@@ -1,6 +1,7 @@
 package org.opencadc.skaha.posix.client.postgresql;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.posix.client.PosixClient;
+import org.opencadc.skaha.posix.client.postgresql.enitities.CommonGroup;
 import org.opencadc.skaha.posix.client.postgresql.enitities.Groups;
 import org.opencadc.skaha.posix.client.postgresql.enitities.Users;
 
@@ -12,10 +13,10 @@ import java.util.concurrent.ExecutionException;
 public class PostgresPosixClient implements PosixClient {
     static Postgress postgress = new Postgress();
     private static final Logger log = Logger.getLogger(PostgresPosixClient.class);
+    CommonGroup genricCommonGroup = new CommonGroup(9999, "Common Group");
 
     @Override
     public boolean userExists ( String userId ) {
-
         try {
             Users user = postgress.getUsers(userId);
             if (user != null) {
@@ -34,34 +35,32 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public int savePosixId ( String userId ) throws ExecutionException, InterruptedException {
-
         try {
-            if (!userExists(userId) && !groupExist(userId)) {
+            if (!userExists(userId)) {
                 Users newUser = new Users(); // Create a new Users object
                 newUser.setUserid(userId);
-                newUser.setUserActive(true);
                 postgress.saveUser(newUser);
                 int posixid = getPosixId(userId);
-                Groups privateGroup = new Groups();//Creating Private group for each new user
-                privateGroup.setGroupName(userId);
-                privateGroup.setGroupActive(true);
-                postgress.saveGroups(privateGroup);
-                addGroupToUser(userId, userId); //Saving the Private group in User
+                //Creating Genric group List for each new user
+                postgress.saveCommonGroup(genricCommonGroup);
+                List < CommonGroup > commonGroupList = new ArrayList <>();
+                commonGroupList.add(genricCommonGroup);
+                newUser.setCommonGroups(commonGroupList);//Saving the Genric Common group in User
+                postgress.saveUser(newUser);
                 log.info("Saving Posixid=" + posixid + " for user " + userId);
                 return posixid;
             } else {
-                log.info("User " + userId + " Already Exist with PosixId " + getPosixId(userId) + "and user active status is " + postgress.getUsers(userId).getUserActive());
+                log.info("User " + userId + " Already Exist with PosixId " + getPosixId(userId));
                 return getPosixId(userId);
             }
         } catch (Exception e) {
-            log.error("User " + userId + " Already Exist with PosixId " + getPosixId(userId) + "and user active status is " + postgress.getUsers(userId).getUserActive());
+            log.error("User " + userId + " Already Exist with PosixId " + getPosixId(userId));
             return getPosixId(userId);
         }
     }
 
     @Override
     public boolean groupExist ( String groupMame ) {
-
         try {
             Groups groups = postgress.getGroups(groupMame);
             if (groups != null) {
@@ -79,7 +78,6 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public int getGroupId ( String groupMame ) {
-
         try {
             Groups groups = postgress.getGroups(groupMame);
             if (groups != null) {
@@ -97,34 +95,30 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public int saveGroupId ( String groupMame ) throws ExecutionException, InterruptedException {
-
         try {
             if (!groupExist(groupMame)) {
                 Groups newGroup = new Groups(); // Create a new Users object
                 newGroup.setGroupName(groupMame);
-                newGroup.setGroupActive(true);
                 postgress.saveGroups(newGroup);
                 int groupId = getGroupId(groupMame);
                 log.info("Saving GroupId=" + groupId + " for group " + groupMame);
                 return groupId;
             } else {
-                log.info("Group " + groupMame + " Already Exist with GroupId " + getGroupId(groupMame) + "and Group active status is " + postgress.getGroups(groupMame).getGroupActive());
+                log.info("Group " + groupMame + " Already Exist with GroupId " + getGroupId(groupMame));
                 return getGroupId(groupMame);
             }
         } catch (Exception e) {
-            log.info("Group " + groupMame + " Already Exist with GroupId " + getGroupId(groupMame) + "and Group active status is " + postgress.getGroups(groupMame).getGroupActive());
+            log.info("Group " + groupMame + " Already Exist with GroupId " + getGroupId(groupMame));
             return getGroupId(groupMame);
         }
     }
 
     @Override
     public void saveGroupEntry ( String groupMame, String groupEntry ) throws ExecutionException, InterruptedException {
-
     }
 
     @Override
     public int getPosixId ( String userId ) throws ExecutionException, InterruptedException {
-
         if (userExists(userId)) {
             Users savedUser = postgress.getUsers(userId);
             int posixid = savedUser.getPosixid();
@@ -138,7 +132,6 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public boolean userExistsInGroup ( String userId, String groupMame ) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
-
         try {
             if (userExists(userId) && groupExist(groupMame)) {
                 Users savedUser = postgress.getUsers(userId);
@@ -156,24 +149,20 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public String getGroupEntry ( String groupMame ) throws ExecutionException, InterruptedException {
-
         return null;
     }
 
     @Override
     public void savePosixEntry ( String userId, String posixEntry ) throws ExecutionException, InterruptedException {
-
     }
 
     @Override
     public String getPosixEntry ( String userId ) throws ExecutionException, InterruptedException {
-
         return null;
     }
 
     @Override
     public List < String > getGroupForUser ( String userId ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
-
         if (userExists(userId)) {
             Users savedUser = postgress.getUsers(userId);
             return Collections.singletonList(savedUser.getGroupDetailList().stream().toString());
@@ -185,7 +174,6 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public void addGroupToUser ( String userId, String groupMame ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
-
         if (userExists(userId) && groupExist(groupMame) && !userExistsInGroup(userId, groupMame)) {
             Users savedUser = postgress.getUsers(userId);
             Groups savedGroup = postgress.getGroups(groupMame);
@@ -199,7 +187,6 @@ public class PostgresPosixClient implements PosixClient {
     }
 
     public void removeUsersGroup ( String userid, String groupName ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
-
         if (userExists(userid) && groupExist(groupName) && userExistsInGroup(userid, groupName)) {
             Users savedUser = postgress.getUsers(userid);
             Groups savedGroup = postgress.getGroups(groupName);
@@ -214,26 +201,28 @@ public class PostgresPosixClient implements PosixClient {
 
     @Override
     public String groupEntries ( String userId ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
-
         return null;
     }
 
     @Override
     public List < Integer > userGroupIds ( String userId ) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
-
-        if (userExists(userId)) {
-            Users savedUser = postgress.getUsers(userId);
-            List < Integer > groupidList = new ArrayList <>();
-            savedUser.getGroupDetailList().stream().forEach(group -> groupidList.add(group.getGroupId()));
+        List < Integer > groupidList = new ArrayList <>();
+        try {
+            if (userExists(userId)) {
+                Users savedUser = postgress.getUsers(userId);
+                savedUser.getGroupDetailList().stream().forEach(group -> groupidList.add(group.getGroupId()));
+                return groupidList;
+            } else {
+                log.error("User dont exits=" + userId);
+                return groupidList;
+            }
+        } catch (NullPointerException e) {
+            log.error("User is not present in any group " + e.getMessage());
             return groupidList;
-        } else {
-            log.error("User dont exits=" + userId);
-            return new ArrayList < Integer >();
         }
     }
 
-    public static void main ( String args[] ) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
-
+    public static void main ( String[] args ) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
         PostgresPosixClient postgresPosixClient = new PostgresPosixClient();
         postgresPosixClient.savePosixId("user1");
         postgresPosixClient.savePosixId("user2");
