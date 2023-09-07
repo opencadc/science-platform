@@ -11,7 +11,7 @@ configMapGenerator:
   files:
   - config/catalina.properties
   - config/Cavern.properties
-  - config/LocalAuthority.properties
+  - config/cadc-registry.properties
   - config/VOSpaceWS.properties
   - config/war-rename.conf
 - name: arc-sshd-config

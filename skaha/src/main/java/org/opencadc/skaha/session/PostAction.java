@@ -943,10 +943,6 @@ public class PostAction extends SessionAction {
             }
         }
         sb.append("\n        env:");
-        sb.append("\n        - name: HOME");
-        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
-        sb.append("\n        - name: PWD");
-        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
         if (envs != null && !envs.isEmpty()) {
             for (String env : envs) {
                 String[] keyVal = env.split("=");
