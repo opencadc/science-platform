@@ -115,6 +115,9 @@ public class EtcdPosixClient implements PosixClient {
         etcd.put(groupListKey, updatedGroupList);
     }
 
+    @Override
+    public void addGroupsToUser(String userId, List< String > groupId) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException {
+    }
 
     @Override
     public boolean userExistsInGroup(String userId, String groupMame) throws ExecutionException, InterruptedException, IOException, ClassNotFoundException {
