@@ -4,7 +4,12 @@
 
 ### Dependencies
 
-Kubernetes 1.14 and up are supported.
+Kubernetes 1.23 and up are supported.
+
+#### Volumes
+
+See the `required-setup/persistent-volumes.yaml` file for an example.  A Persistent Volume Claim is created on install that
+depends on a Persistent Volume (Or Storage Class) that match the configured labels.
 
 ### From source
 

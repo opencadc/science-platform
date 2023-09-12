@@ -1,55 +1,32 @@
 kubernetesClusterDomain: cluster.local
-nfsServer:
-  namespace: skaha-nfs
-  nfsServer:
-    image:
-      repository: registry.k8s.io/volume-nfs
-      tag: "0.8"
-    resources:
-      limits:
-        cpu: 500m
-        memory: 500M
-      requests:
-        cpu: 250m
-        memory: 250M
-    ports:
-    - name: nfs
-      port: 2049
-      protocol: TCP
-      targetPort: 0
-    - name: mountd
-      port: 20048
-      targetPort: 0
-    - name: rpcbind
-      port: 111
-      protocol: UDP
-      targetPort: 0
-  replicas: 1
-  type: ClusterIP
 skaha:
   namespace: skaha-system
 skaha-workload:
   namespace: skaha-workload
 
+# Set these labels appropriately
+storage:
+  skaha:
+    claim:
+      labels:
+        storage: my-great-storage
+  sessions:
+    claim:
+      labels:
+        storage: my-great-storage
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted to use client certificates.
   # cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
-  # default-certificate:
-    # Uncomment to enable server certificates that match your domain.
-    # tls.crt: <base64 encoded server certificate>
-    # tls.key: <base64 encoded server certificate key>
-volumes:
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - docker-desktop  # Single node docker-desktop for macOS and Windows.
+  # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
+  # For server domains with self-signed certificates, add the Base64 encoded file content here.
+    # tls.crt: <base64 encoded server cert>
+    # tls.key: <base64 encoded server key>
 
+# Comment the traefik block out if Traefik is already installed
 traefik:
+  # install: true
   # experimental:
   #   plugins:
   #     enabled: true
