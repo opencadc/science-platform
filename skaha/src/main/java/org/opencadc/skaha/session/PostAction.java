@@ -899,9 +899,6 @@ public class PostAction extends SessionAction {
         Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
         if (groupCreds.size() == 1) {
             List<Group> memberships = groupCreds.iterator().next();
-            memberships.forEach(group -> {
-                log.info("Adding: " + group + " (" + group.description + ")");
-            });
             List<Integer> membershipGIDs = memberships.stream().filter(group -> group.gid != null)
                                                       .map(group -> group.gid).collect(Collectors.toList());
             log.debug("Adding " + membershipGIDs.size() + " supplemental groups");
