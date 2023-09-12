@@ -1,0 +1,124 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      restartPolicy: OnFailure
+      ${skaha.schedulegpu}
+      imagePullSecrets:
+        - name: "${software.imagesecret}"
+      securityContext:
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      # initContainers:
+      # - name: setup-access-token
+      #   image: busybox
+      #   command: ["sh", "-c", "echo '${skaha.accesstoken}' > ${skaha.accesstoken.path}/${skaha.accesstoken.file}"]
+      #   volumeMounts:
+      #   - name: token-dir
+      #     mountPath: ${skaha.accesstoken.path}
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: JUPYTER_TOKEN
+          value: "${skaha.sessionid}"
+        - name: JUPYTER_CONFIG_DIR
+          value: "/arc/home/${skaha.userid}"
+        - name: JUPYTER_PATH
+          value: "/arc/home/${skaha.userid}"
+#        - name: JUPYTERLAB_DIR
+#          value: "/arc/home/${skaha.userid}/skaha-lab"
+        - name: NB_USER
+          value: "${skaha.userid}"
+        - name: NB_UID
+          value: "${skaha.posixid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        - name: XDG_CACHE_HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
+        image: ${software.imageid}
+        command: ["/skaha-system/start-jupyterlab.sh"]
+        args:
+        - ${skaha.sessionid}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "5Gi"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
+            ephemeral-storage: "5Gi"
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+          name: notebook-port
+        volumeMounts:
+        # - mountPath: "${skaha.accesstoken.path}"
+        #   name: token-dir
+        #   readOnly: true
+        - mountPath: "/skaha-system"
+          name: start-jupyterlab
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+      volumes:
+      - name: start-jupyterlab
+        configMap:
+          name: start-jupyterlab
+          defaultMode: 0777
+      - name: cavern-volume
+        cephfs:
+          monitors:
+          - 10.30.201.3:6789
+          - 10.30.202.3:6789
+          - 10.30.203.3:6789
+          path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
+          user: kanfarnetes_dev
+          secretRef:
+            name: cephfs-cephx-key
+          readOnly: false
+      - name: scratch-dir
+        emptyDir: {}
+      - name: token-dir
+        emptyDir: {}

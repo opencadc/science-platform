@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skaha-config
+  namespace: {{ .Values.skaha.namespace }}
+data:
+  {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}

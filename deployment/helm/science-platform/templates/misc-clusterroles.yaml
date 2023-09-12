@@ -1,0 +1,41 @@
+# Allow creation, modification, and deletion of serviceaccounts.
+# Should be okay for users to do this in their own namespace;
+# even if the default serviceaccount gets accidentally deleted it will be automatically remade.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: serviceaccount-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["create", "get", "list", "update", "delete"]
+---
+# read-only access to monitor node resource usage and see namespaces
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nodes-namespaces-clusterrole
+rules:
+  # nodes
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # node metrics via metrics-server
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+# read node leases (for kubectl describe node)
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: kube-node-lease
+  name: node-lease-role
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list"]

@@ -1,0 +1,96 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${software.jobname}"
+spec:
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${software.jobname}"
+    spec:
+      restartPolicy: OnFailure
+      ${skaha.schedulegpu}
+      imagePullSecrets:
+      - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      - name: setup-access-token
+        image: busybox
+        command: ["sh", "-c", "echo '${skaha.accesstoken}' > ${skaha.accesstoken.path}/${skaha.accesstoken.file}"]
+        volumeMounts:
+        - name: token-dir
+          mountPath: ${skaha.accesstoken.path}
+      containers:
+      - name: "${software.containername}"
+        command: ["/skaha-system/start-desktop-software.sh"]
+        args:
+        - ${skaha.userid}
+        - ${software.containerparam}
+        env:
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: DISPLAY
+          value: "${software.targetip}"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        securityContext:
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
+        image: "${software.imageid}"
+        workingDir: "/arc/home/${skaha.userid}"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1"
+            ephemeral-storage: "20Gi"
+          limits:
+            memory: "192Gi"
+            cpu: "16"
+            ephemeral-storage: "200Gi"
+        ports:
+        - containerPort: 6000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "${skaha.accesstoken.path}"
+          name: token-dir
+          readOnly: true
+        - mountPath: "/skaha-system"
+          name: start-desktop-software
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+      volumes:
+      - name: start-desktop-software
+        configMap:
+          name: start-desktop-software
+          defaultMode: 0777
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc  
+      - name: scratch-dir
+        emptyDir: {}
+      - name: token-dir
+        emptyDir: {}
