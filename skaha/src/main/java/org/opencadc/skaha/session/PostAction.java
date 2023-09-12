@@ -92,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.security.auth.Subject;
 
@@ -898,17 +899,19 @@ public class PostAction extends SessionAction {
         Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
         if (groupCreds.size() == 1) {
             List<Group> memberships = groupCreds.iterator().next();
-            log.debug("Adding " + memberships.size() + " supplemental groups");
-            if (!memberships.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (Group g : memberships) {
-                    final int groupID =
-                            Objects.requireNonNullElseGet(g.gid, () -> generatePosixID(g.getID().getName()));
-                    sb.append(groupID).append(", ");
-                }
+            memberships.forEach(group -> {
+                log.info("Adding: " + group + " (" + group.description + ")");
+            });
+            List<Integer> membershipGIDs = memberships.stream().filter(group -> group.gid != null)
+                                                      .map(group -> group.gid).collect(Collectors.toList());
+            log.debug("Adding " + membershipGIDs.size() + " supplemental groups");
+            StringBuilder sb = new StringBuilder();
+            membershipGIDs.forEach(gid -> sb.append(gid).append(", "));
+
+            if (sb.length() > 0) {
                 sb.setLength(sb.length() - 2);
-                return sb.toString();
             }
+            return sb.toString();
         }
         return "";
     }
