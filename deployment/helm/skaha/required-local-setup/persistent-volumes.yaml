@@ -23,3 +23,20 @@ spec:
           operator: In
           values:
           - docker-desktop  # Single node docker-desktop for macOS and Windows.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: local-storage-pvc
+  namespace: skaha-system
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      storage: local-storage

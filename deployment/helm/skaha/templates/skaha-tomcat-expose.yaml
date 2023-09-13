@@ -6,6 +6,16 @@ metadata:
   labels:
     run: skaha-tomcat-svc
 spec:
-  ports: {{ toYaml .Values.service.skaha_tomcat_svc.ports | nindent 2 }}
+  ports: 
+  - port: 8080
+    name: http-connection
+    protocol: TCP
+  {{ with .Values.service }}
+    {{ with .skaha }}
+      {{ with .extraPorts }}
+  {{- toYaml . | nindent 2 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
   selector:
     run: skaha-tomcat
