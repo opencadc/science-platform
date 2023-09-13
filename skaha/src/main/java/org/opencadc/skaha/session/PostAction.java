@@ -542,7 +542,7 @@ public class PostAction extends SessionAction {
 
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
 //        String posixID = getPosixId();
-        String posixID = userGroupUtil.posixId();
+        String posixID = posixUtil.posixId();
         log.debug("Posix id: " + posixID);
 
         final String imageSecret = getHarborSecret(image);
@@ -595,7 +595,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
 //        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, userGroupUtil.userGroupIds());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -607,8 +607,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, userGroupUtil.posixEntry());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, userGroupUtil.groupEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();

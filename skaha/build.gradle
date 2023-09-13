@@ -47,7 +47,6 @@ dependencies {
 
     testImplementation 'junit:junit:[4.0,)'
 
-    implementation 'io.etcd:jetcd-core:0.7.6'
     implementation group: 'org.hibernate.orm', name: 'hibernate-core', version: '6.2.0.Final'
     implementation group: 'org.postgresql', name: 'postgresql', version: '42.6.0'
 }
