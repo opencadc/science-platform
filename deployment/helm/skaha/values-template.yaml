@@ -1,0 +1,169 @@
+# Default values for skaha.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+kubernetesClusterDomain: cluster.local
+
+replicaCount: 1
+
+skaha:
+  namespace: skaha-system
+skaha-workload:
+  namespace: skaha-workload
+
+# Skaha web service deployment
+deployment:
+  hostname: nrc-023054.cadc.dao.nrc.ca  # Change this!
+  containers:
+    skaha:
+      image: images.canfar.net/skaha-system/skaha:0.13.0
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: skaha.hostname
+          value: nrc-023054.cadc.dao.nrc.ca  # Change this!
+        - name: skaha.homedir
+          value: /arc/home
+        - name: skaha.namespace
+          value: skaha-workload
+        - name: skaha.maxusersessions
+          value: "3"
+        - name: skaha.sessionexpiry
+          value: "345600"
+        - name: skaha.defaultquotagb
+          value: "10"
+        - name: skaha.harborhosts
+          value: "images.canfar.net"   # Change this, or add hostname of different allowed registry
+        - name: skaha.usersgroup
+          value: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+        - name: skaha.adminsgroup
+          value: "ivo://cadc.nrc.ca/gms?skaha-admins"
+        # Optionally set the DEBUG port.
+        # - name: CATALINA_OPTS
+        #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+        # - name: JAVA_OPTS
+        #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+      name: skaha-tomcat
+      resources:
+        requests:
+          memory: "500M"
+          cpu: "500m"
+        limits:
+          memory: "500M"
+          cpu: "500m"
+      ports:
+      - containerPort: 8080
+        protocol: TCP
+      # Uncomment to debug.  Requires options above as well as service port exposure below.
+      # - containerPort: 5555
+      #   protocol: TCP
+      volumeMounts:
+      - mountPath: "/config"
+        name: config-volume
+      # - mountPath: "/config/cacerts"
+      #   name: cacert-volume
+      - mountPath: "/add-user-config"
+        name: add-user-config
+      - mountPath: /root/.ssl/
+        name: servops-cert
+        readOnly: true
+      - mountPath: "/arc"
+        name: cavern-volume
+        subPath: cavern
+      securityContext:
+        runAsUser: 0
+      priorityClassName: uber-user-preempt-high
+      serviceAccountName: skaha
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config
+      - name: add-user-config
+        configMap:
+          name: add-user-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: servops-clientcert
+      # - name: cacert-volume
+      #   secret:
+      #     defaultMode: 420
+      #     secretName: cacert-secret
+      - name: cavern-volume
+        persistentVolumeClaim:
+          # Important!  The claimName needs to match the name of {science-platform-base.skaha.namespace}-cavern-pvc
+          claimName: skaha-system-cavern-pvc
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+  # Server certificates for Traefik to use for SSL termination.  Must match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName below.
+  # default-certificate:
+    # tls.crt: <base64 encoded server cert>
+    # tls.key: <base64 encoded server key>
+  servops-clientcert:
+    # Set the cadcproxy.pem!
+    # cadcproxy.pem: <base64 encoded PEM servops certificate>
+
+# Exposed ports.  Uncomment the java-debug port to expose and debug issues.
+service:
+  skaha_tomcat_svc:
+    ports:
+    - port: 8080
+      name: http-connection
+      protocol: TCP
+    # - port: 5555
+    #   protocol: TCP
+    #   name: java-debug
+
+ingress:
+  skahaIngress:
+    http:
+      paths:
+      - path: /skaha
+        pathType: Prefix
+        backend:
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080
+
+# Set these labels appropriately to match your Persistent Volume labels.
+storage:
+  skaha:
+    claim:
+      # storageClassName: ""
+      labels:
+        storage: local-storage
+  sessions:
+    claim:
+      # storageClassName: ""
+      labels:
+        storage: local-storage
+
+# Comment the traefik block out if Traefik is already installed
+traefik:
+  # experimental:
+  #   plugins:
+  #     enabled: true
+  # additionalArguments:
+  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
+  #   - "--experimental.plugins.htransformation.version=v0.2.7"
+  tlsStore:
+    default:
+      defaultCertificate:
+        # See default-certificate secret(s) above
+        secretName: default-certificate
+  # tlsOptions:
+  #   traefik-client-cert-option:
+  #     clientAuth:
+  #       clientAuthType: VerifyClientCertIfGiven
+  #       secretNames:
+  #         - cacert-secret
+  # websecure:
+  #   middlewares: 
+  #     - default-traefik-passtlsclientcert@kubernetescrd
+  #     - default-traefik-header-transform@kubernetescrd
+  #   tls:
+  #     options:
+  #       - default-traefik-client-cert-option@kubernetescrd
+
