@@ -12,21 +12,24 @@ services:
       - skaha.usersgroup=ivo://cadc.nrc.ca/gms?mini-src-test-group
       - skaha.homedir=/arc/home
       - skaha.harborhosts=images.canfar.net
+      - POSIX_DATABASE_URL=jdbc:postgresql://postgres:5432/skaha
+      - POSIX_DATABASE_USERNAME=postgres
+      - POSIX_DATABASE_PASSWORD=postgres
     volumes:
       - ./configs/skaha:/config:ro
     links:
       - reg
       - gms
-      - etcd0
+      - postgres
     depends_on:
       - reg
       - gms
-      - etcd0
+      - postgres
     networks:
       - science-platform
   reg:
     container_name: reg
-    image: reg:latest # build the image manually, context can not be applied here
+    image: abhishek1009/reg:latest # build the image manually, context can not be applied here
     # build:
     #   context: ./dependencies/reg/reg
     #   dockerfile: Dockerfile
@@ -51,51 +54,18 @@ services:
       - science-platform
     depends_on:
       - iam
-  etcd0:
-    image: quay.io/coreos/etcd:v3.5.0
-    command:
-      etcd --name etcd0
-           --initial-advertise-peer-urls http://etcd0:2380
-           --listen-peer-urls http://0.0.0.0:2380
-           --advertise-client-urls http://etcd0:2379
-           --listen-client-urls http://0.0.0.0:2379
-           --initial-cluster-token etcd-cluster-1
-           --initial-cluster etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-           --initial-cluster-state new
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
     ports:
-      - 2379:2379
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
     volumes:
-      - etcd0-data:/etcd-data
-    networks:
-      - science-platform  
-  etcd1:
-    image: quay.io/coreos/etcd:v3.5.0
-    command:
-      etcd --name etcd1
-           --initial-advertise-peer-urls http://etcd1:2380
-           --listen-peer-urls http://0.0.0.0:2380
-           --advertise-client-urls http://etcd1:2379
-           --listen-client-urls http://0.0.0.0:2379
-           --initial-cluster-token etcd-cluster-1
-           --initial-cluster etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-           --initial-cluster-state new
-    volumes:
-      - etcd1-data:/etcd-data
-    networks:
-      - science-platform  
-  etcd2:
-    image: quay.io/coreos/etcd:v3.5.0
-    command:
-      etcd --name etcd2
-           --initial-advertise-peer-urls http://etcd2:2380
-           --listen-peer-urls http://0.0.0.0:2380
-           --advertise-client-urls http://etcd2:2379
-           --listen-client-urls http://0.0.0.0:2379
-           --initial-cluster-token etcd-cluster-1
-           --initial-cluster etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
-           --initial-cluster-state new
-    volumes:
-      - etcd2-data:/etcd-data
+      - postgres:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - science-platform
   db:
@@ -152,8 +122,6 @@ services:
 volumes:
   logs:
   db_data:
-  etcd0-data:
-  etcd1-data:
-  etcd2-data:
+  postgres:
 networks:
   science-platform:
