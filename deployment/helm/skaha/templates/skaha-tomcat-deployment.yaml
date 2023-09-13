@@ -29,7 +29,7 @@ spec:
       containers:
       - env: 
         - name: skaha.hostname
-          value: "{{ .Values.deployment.skaha.hostname }}"
+          value: "{{ .Values.deployment.hostname }}"
         - name: skaha.homedir
           value: "{{ .Values.deployment.skaha.homeDir }}"
         - name: skaha.namespace
