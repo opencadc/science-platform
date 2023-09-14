@@ -23,7 +23,7 @@ version: 0.1.1
 # It is recommended to use it with quotes.
 appVersion: "0.11.0"
 
-dependencies:
-  - name: harbor
-    version: "1.12.4"
-    repository: https://helm.goharbor.io
+# dependencies:
+#   - name: harbor
+#     version: "1.12.4"
+#     repository: https://helm.goharbor.io

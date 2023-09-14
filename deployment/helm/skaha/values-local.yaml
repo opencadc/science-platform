@@ -6,15 +6,16 @@ replicaCount: 1
 
 skaha:
   namespace: skaha-system
-skaha-workload:
+skaha_workload:
   namespace: skaha-workload
 
 deployment:
   hostname: proxy.host.name  # Change this!
   containers:
     skaha:
-      image: images-rc.canfar.net/skaha-system/skaha:0.12.0
-      imagePullPolicy: IfNotPresent
+      # image: images-rc.canfar.net/skaha-system/skaha:0.12.0
+      image: abhishek1009/skaha:latest
+      imagePullPolicy: Always
       env:
         - name: skaha.hostname
           value: proxy.host.name  # Change this!
@@ -31,21 +32,25 @@ deployment:
         - name: skaha.harborhosts
           value: "images.canfar.net proxy.host.name"   # Change this or remove proxy.host.name if no local harbor!
         - name: skaha.usersgroup
-          value: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
-        - name: skaha.adminsgroup
-          value: "ivo://cadc.nrc.ca/gms?skaha-admins"
+          value: "ivo://cadc.nrc.ca/gms?prototyping-groups/mini-src/platform-users"
         - name: CATALINA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
         - name: JAVA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+        - name: POSIX_DATABASE_URL
+          value: http://postgres.skaha-system.svc.cluster.local:5432/skaha
+        - name: POSIX_DATABASE_USERNAME
+          value: postgres
+        - name: POSIX_DATABASE_PASSWORD
+          value: postgres
       name: skaha-tomcat
       resources:
         requests:
-          memory: "500M"
-          cpu: "500m"
+          memory: "1000M"
+          cpu: "1000m"
         limits:
-          memory: "500M"
-          cpu: "500m"
+          memory: "1000M"
+          cpu: "1000m"
       ports:
       - containerPort: 8080
         protocol: TCP

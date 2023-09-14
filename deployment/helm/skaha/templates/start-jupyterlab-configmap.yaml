@@ -2,6 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: start-jupyterlab
-  namespace: {{ .Values.skaha.namespace }}
+  namespace: "skaha-workload"
 data:
   {{- (.Files.Glob "start-jupyterlab/*").AsConfig | nindent 2 }}

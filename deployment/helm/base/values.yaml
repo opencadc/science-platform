@@ -49,7 +49,7 @@ volumes:
           values:
           - docker-desktop  # Single node docker-desktop for macOS and Windows.
 
-traefik:
+#traefik:
   # experimental:
   #   plugins:
   #     enabled: true
