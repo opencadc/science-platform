@@ -20,6 +20,7 @@ spec:
         canfar-net-userid: "${skaha.userid}"
         job-name: "${skaha.jobname}"
     spec:
+      enableServiceLinks: false
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
       imagePullSecrets:
@@ -29,7 +30,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-      priorityClassName: uber-user-preempt-medium
+      priorityClassName: uber-user-significant
       hostname: "${software.hostname}"
       containers:
       - name: "${skaha.jobname}"
@@ -38,6 +39,8 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
