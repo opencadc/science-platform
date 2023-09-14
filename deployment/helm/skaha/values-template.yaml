@@ -28,6 +28,10 @@ deployment:
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
+    posixDatabaseURL: "http://..."
+    posixDatabaseUsername: "postgres"
+    posixDatabasePassword: "postgres"
+
     # Optionally set the DEBUG port.
     # extraEnv:
     # - name: CATALINA_OPTS
@@ -95,3 +99,7 @@ storage:
       # storageClassName: ""
       labels:
         storage: local-storage
+
+# If the base is already installed.  Omission defaults to true, so beware.
+science-platform-base:
+  install: false
