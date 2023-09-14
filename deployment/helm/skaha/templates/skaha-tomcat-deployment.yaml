@@ -33,7 +33,7 @@ spec:
         - name: skaha.homedir
           value: "{{ .Values.deployment.skaha.homeDir }}"
         - name: skaha.namespace
-          value: "{{ index .Values "skaha-workload" "namespace" }}"
+          value: "{{ .Values.skahaWorkload.namespace }}"
         - name: skaha.maxusersessions
           value: "{{ .Values.deployment.skaha.maxUserSessions }}"
         - name: skaha.sessionexpiry

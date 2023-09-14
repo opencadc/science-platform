@@ -7,7 +7,7 @@
 
 skaha:
   namespace: skaha-system
-skaha-workload:
+skahaWorkload:
   namespace: skaha-workload
 
 # Skaha web service deployment
