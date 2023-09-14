@@ -4,7 +4,6 @@
 
 # Tell Kubernetes to spin up multiple instances.
 # replicaCount: 1
-
 skaha:
   namespace: skaha-system
 skahaWorkload:
@@ -86,40 +85,13 @@ secrets:
   #     protocol: TCP
   #     name: java-debug
 
-# Set these labels appropriately to match your Persistent Volume labels.
+# Set these appropriately to match your Persistent Volume labels.
 storage:
   service:
     spec:
+      # YAML for service mounted storage
   sessions:
     claim:
       # storageClassName: ""
       labels:
         storage: local-storage
-
-# Comment the traefik block out if Traefik is already installed
-traefik:
-  # experimental:
-  #   plugins:
-  #     enabled: true
-  # additionalArguments:
-  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
-  #   - "--experimental.plugins.htransformation.version=v0.2.7"
-  tlsStore:
-    default:
-      defaultCertificate:
-        # See default-certificate secret(s) above
-        secretName: default-certificate
-  # tlsOptions:
-  #   traefik-client-cert-option:
-  #     clientAuth:
-  #       clientAuthType: VerifyClientCertIfGiven
-  #       secretNames:
-  #         - cacert-secret
-  # websecure:
-  #   middlewares: 
-  #     - default-traefik-passtlsclientcert@kubernetescrd
-  #     - default-traefik-header-transform@kubernetescrd
-  #   tls:
-  #     options:
-  #       - default-traefik-client-cert-option@kubernetescrd
-
