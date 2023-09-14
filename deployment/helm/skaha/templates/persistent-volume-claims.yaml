@@ -12,7 +12,7 @@ spec:
     requests:
       storage: 5Gi
   {{- if not (eq .Values.storage.sessions.claim.storageClassName nil) }}
-  storageClassName: {{ .Values.storage.sessions.claim.storageClassName }}
+  storageClassName: ""
   {{- end }}
   selector:
     matchLabels:
