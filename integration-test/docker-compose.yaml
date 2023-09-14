@@ -4,25 +4,32 @@ services:
     container_name: skaha
     ports:
       - "8081:8080"
-    image: skaha:latest # build the image manually, context can not be applied here
+    image: abhishek1009/skaha:latest # build the image manually, context can not be applied here
     # build:
     #   context: ./dependencies/science-platform/skaha
     #   dockerfile: Dockerfile
     environment:
       - skaha.usersgroup=ivo://cadc.nrc.ca/gms?mini-src-test-group
+      - skaha.homedir=/arc/home
+      - skaha.harborhosts=images.canfar.net
+      - POSIX_DATABASE_URL=jdbc:postgresql://postgres:5432/skaha
+      - POSIX_DATABASE_USERNAME=postgres
+      - POSIX_DATABASE_PASSWORD=postgres
     volumes:
       - ./configs/skaha:/config:ro
     links:
       - reg
       - gms
+      - postgres
     depends_on:
       - reg
       - gms
+      - postgres
     networks:
       - science-platform
   reg:
     container_name: reg
-    image: reg:latest # build the image manually, context can not be applied here
+    image: abhishek1009/reg:latest # build the image manually, context can not be applied here
     # build:
     #   context: ./dependencies/reg/reg
     #   dockerfile: Dockerfile
@@ -47,10 +54,26 @@ services:
       - science-platform
     depends_on:
       - iam
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - science-platform
   db:
     container_name: db
     restart: unless-stopped
     image: mysql
+    ports:
+      - "3306:3306"
     # volumes:
     #   - ./data.sql:/data.sql
     # command: --init-file /data.sql
@@ -71,8 +94,8 @@ services:
     #   dockerfile: Dockerfile
     environment:
       - IAM_HOST=localhost:8080
-      - IAM_BASE_URL= http//localhost:8080/
-      - IAM_ISSUER= http//localhost:8080/
+      - IAM_BASE_URL=http://localhost:8080
+      - IAM_ISSUER=http://localhost:8080
       - IAM_DB_ALLOW_PUBLIC_KEY=true
       - IAM_FORWARD_HEADERS_STRATEGY=native
       - IAM_DB_HOST=db
@@ -99,5 +122,6 @@ services:
 volumes:
   logs:
   db_data:
+  postgres:
 networks:
   science-platform:

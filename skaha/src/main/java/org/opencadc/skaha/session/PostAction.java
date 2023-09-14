@@ -1,69 +1,69 @@
 /*
-************************************************************************
-*******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
-**************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
-*
-*  (c) 2020.                            (c) 2020.
-*  Government of Canada                 Gouvernement du Canada
-*  National Research Council            Conseil national de recherches
-*  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
-*  All rights reserved                  Tous droits réservés
-*
-*  NRC disclaims any warranties,        Le CNRC dénie toute garantie
-*  expressed, implied, or               énoncée, implicite ou légale,
-*  statutory, of any kind with          de quelque nature que ce
-*  respect to the software,             soit, concernant le logiciel,
-*  including without limitation         y compris sans restriction
-*  any warranty of merchantability      toute garantie de valeur
-*  or fitness for a particular          marchande ou de pertinence
-*  purpose. NRC shall not be            pour un usage particulier.
-*  liable in any event for any          Le CNRC ne pourra en aucun cas
-*  damages, whether direct or           être tenu responsable de tout
-*  indirect, special or general,        dommage, direct ou indirect,
-*  consequential or incidental,         particulier ou général,
-*  arising from the use of the          accessoire ou fortuit, résultant
-*  software.  Neither the name          de l'utilisation du logiciel. Ni
-*  of the National Research             le nom du Conseil National de
-*  Council of Canada nor the            Recherches du Canada ni les noms
-*  names of its contributors may        de ses  participants ne peuvent
-*  be used to endorse or promote        être utilisés pour approuver ou
-*  products derived from this           promouvoir les produits dérivés
-*  software without specific prior      de ce logiciel sans autorisation
-*  written permission.                  préalable et particulière
-*                                       par écrit.
-*
-*  This file is part of the             Ce fichier fait partie du projet
-*  OpenCADC project.                    OpenCADC.
-*
-*  OpenCADC is free software:           OpenCADC est un logiciel libre ;
-*  you can redistribute it and/or       vous pouvez le redistribuer ou le
-*  modify it under the terms of         modifier suivant les termes de
-*  the GNU Affero General Public        la “GNU Affero General Public
-*  License as published by the          License” telle que publiée
-*  Free Software Foundation,            par la Free Software Foundation
-*  either version 3 of the              : soit la version 3 de cette
-*  License, or (at your option)         licence, soit (à votre gré)
-*  any later version.                   toute version ultérieure.
-*
-*  OpenCADC is distributed in the       OpenCADC est distribué
-*  hope that it will be useful,         dans l’espoir qu’il vous
-*  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
-*  without even the implied             GARANTIE : sans même la garantie
-*  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
-*  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
-*  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
-*  General Public License for           Générale Publique GNU Affero
-*  more details.                        pour plus de détails.
-*
-*  You should have received             Vous devriez avoir reçu une
-*  a copy of the GNU Affero             copie de la Licence Générale
-*  General Public License along         Publique GNU Affero avec
-*  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
-*  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
-*                                       <http://www.gnu.org/licenses/>.
-*
-************************************************************************
-*/
+ ************************************************************************
+ *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
+ **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
+ *
+ *  (c) 2020.                            (c) 2020.
+ *  Government of Canada                 Gouvernement du Canada
+ *  National Research Council            Conseil national de recherches
+ *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+ *  All rights reserved                  Tous droits réservés
+ *
+ *  NRC disclaims any warranties,        Le CNRC dénie toute garantie
+ *  expressed, implied, or               énoncée, implicite ou légale,
+ *  statutory, of any kind with          de quelque nature que ce
+ *  respect to the software,             soit, concernant le logiciel,
+ *  including without limitation         y compris sans restriction
+ *  any warranty of merchantability      toute garantie de valeur
+ *  or fitness for a particular          marchande ou de pertinence
+ *  purpose. NRC shall not be            pour un usage particulier.
+ *  liable in any event for any          Le CNRC ne pourra en aucun cas
+ *  damages, whether direct or           être tenu responsable de tout
+ *  indirect, special or general,        dommage, direct ou indirect,
+ *  consequential or incidental,         particulier ou général,
+ *  arising from the use of the          accessoire ou fortuit, résultant
+ *  software.  Neither the name          de l'utilisation du logiciel. Ni
+ *  of the National Research             le nom du Conseil National de
+ *  Council of Canada nor the            Recherches du Canada ni les noms
+ *  names of its contributors may        de ses  participants ne peuvent
+ *  be used to endorse or promote        être utilisés pour approuver ou
+ *  products derived from this           promouvoir les produits dérivés
+ *  software without specific prior      de ce logiciel sans autorisation
+ *  written permission.                  préalable et particulière
+ *                                       par écrit.
+ *
+ *  This file is part of the             Ce fichier fait partie du projet
+ *  OpenCADC project.                    OpenCADC.
+ *
+ *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
+ *  you can redistribute it and/or       vous pouvez le redistribuer ou le
+ *  modify it under the terms of         modifier suivant les termes de
+ *  the GNU Affero General Public        la “GNU Affero General Public
+ *  License as published by the          License” telle que publiée
+ *  Free Software Foundation,            par la Free Software Foundation
+ *  either version 3 of the              : soit la version 3 de cette
+ *  License, or (at your option)         licence, soit (à votre gré)
+ *  any later version.                   toute version ultérieure.
+ *
+ *  OpenCADC is distributed in the       OpenCADC est distribué
+ *  hope that it will be useful,         dans l’espoir qu’il vous
+ *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
+ *  without even the implied             GARANTIE : sans même la garantie
+ *  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
+ *  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
+ *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
+ *  General Public License for           Générale Publique GNU Affero
+ *  more details.                        pour plus de détails.
+ *
+ *  You should have received             Vous devriez avoir reçu une
+ *  a copy of the GNU Affero             copie de la Licence Générale
+ *  General Public License along         Publique GNU Affero avec
+ *  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
+ *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
+ *                                       <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************
+ */
 
 package org.opencadc.skaha.session;
 
@@ -99,7 +99,6 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.opencadc.skaha.AccessTokenUtil;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
@@ -144,12 +143,9 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-    private static final String ACCESS_TOKEN_KEY = "skaha.accesstoken";
-    private static final String ACCESS_TOKEN_FILE_PATH_KEY = "skaha.accesstoken.path";
-    private static final String ACCESS_TOKEN_FILE_NAME_KEY = "skaha.accesstoken.file";
-    private static final String ACCESS_TOKEN_FILE_PATH_VALUE = "/etc/token";
-    private static final String ACCESS_TOKEN_FILE_NAME_VALUE = "access_token";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
+    private static final String USER_POSIX_ENTRY = "user.posix.entry";
+    private static final String USER_GROUP_ENTRY = "user.group.entry";
 
     public PostAction() {
         super();
@@ -159,7 +155,7 @@ public class PostAction extends SessionAction {
     public void doAction() throws Exception {
 
         super.initRequest();
-        
+
         String validatedType = null;
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
@@ -167,7 +163,7 @@ public class PostAction extends SessionAction {
             if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
                 throw new IllegalArgumentException("Missing parameter 'image'");
             }
-        } 
+        }
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
@@ -177,12 +173,12 @@ public class PostAction extends SessionAction {
                 if (cores == null) {
                     cores = rc.getDefaultCores(validatedType);
                 }
-                
+
                 Integer ram = getRamParam();
                 if (ram == null ) {
                     ram = rc.getDefaultRAM(validatedType);
                 }
-                
+
                 String name = syncInput.getParameter("name");
                 String gpusParam = syncInput.getParameter("gpus");
                 String cmd = syncInput.getParameter("cmd");
@@ -292,8 +288,8 @@ public class PostAction extends SessionAction {
 
             if (StringUtil.hasText(errorOutput)) {
                 throw new IOException("Unable to create user home."
-                                      + "\nError message from server: " + errorOutput
-                                      + "\nOutput from command: " + commandOutput);
+                        + "\nError message from server: " + errorOutput
+                        + "\nOutput from command: " + commandOutput);
             } else {
                 log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
@@ -337,10 +333,10 @@ public class PostAction extends SessionAction {
                 throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
             }
         }
-        
+
         return cores;
     }
-    
+
     private Integer getRamParam() {
         Integer ram = null;
         String ramParam = syncInput.getParameter("ram");
@@ -355,11 +351,11 @@ public class PostAction extends SessionAction {
                 throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
             }
         }
-        
+
         return ram;
     }
-    
-    
+
+
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -426,10 +422,10 @@ public class PostAction extends SessionAction {
         getRenewJobNamesCmd.add("-o");
 
         String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name," +
-                               "UID:.metadata.uid," +
-                               "STATUS:.status.active," +
-                               "START:.status.startTime";
+                "NAME:.metadata.name," +
+                "UID:.metadata.uid," +
+                "STATUS:.status.active," +
+                "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
 
@@ -517,7 +513,7 @@ public class PostAction extends SessionAction {
     }
 
     public void checkExistingSessions(String userid, String type) throws Exception {
-        // multiple 
+        // multiple
         if (SESSION_TYPE_HEADLESS.equals(type)) {
             return;
         }
@@ -526,10 +522,10 @@ public class PostAction extends SessionAction {
         for (Session session : sessions) {
             log.debug("checking session: " + session);
             if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
-                !TYPE_DESKTOP_APP.equals(session.getType())) {
+                    !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                        status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
@@ -537,7 +533,7 @@ public class PostAction extends SessionAction {
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
             throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
-                                               maxUserSessions + " active sessions.");
+                    maxUserSessions + " active sessions.");
         }
     }
 
@@ -546,7 +542,8 @@ public class PostAction extends SessionAction {
             throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
-        String posixID = getPosixId();
+//        String posixID = getPosixId();
+        String posixID = posixUtil.posixId();
         log.debug("Posix id: " + posixID);
 
         final String imageSecret = getHarborSecret(image);
@@ -598,7 +595,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -610,6 +608,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -663,10 +663,10 @@ public class PostAction extends SessionAction {
                 "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
                 "--no-headers=true",
                 "-o", "custom-columns=" +
-                    "IPADDR:.status.podIP," +
-                    "DT:.metadata.deletionTimestamp," +
-                    "TYPE:.metadata.labels.canfar-net-sessionType," +
-                    "NAME:.metadata.name"};
+                "IPADDR:.status.podIP," +
+                "DT:.metadata.deletionTimestamp," +
+                "TYPE:.metadata.labels.canfar-net-sessionType," +
+                "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -681,7 +681,7 @@ public class PostAction extends SessionAction {
                 }
             }
             if (parts.length > 1 && parts[1].trim().equals(NONE) &&
-                SESSION_TYPE_DESKTOP.equals(parts[2])) {
+                    SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
@@ -711,7 +711,7 @@ public class PostAction extends SessionAction {
         log.debug("Using limits.cores: " + limitCores.toString());
         log.debug("Using requests.ram: " + requestRAM.toString() + "Gi");
         log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
-        
+
         appID = new RandomStringGenerator(3).getID();
         String jobName = sessionID + "-" + appID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
@@ -719,7 +719,7 @@ public class PostAction extends SessionAction {
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
             int pos = MAX_JOB_NAME_LENGTH;
             jobName = jobName.substring(0, pos--);
-            // ensure that the trimmed job name is valid, i.e. starts and ends with 
+            // ensure that the trimmed job name is valid, i.e. starts and ends with
             // an alphanumeric character
             while (!jobName.matches("(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?")) {
                 // invalid job name, continue to trim
@@ -749,9 +749,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_KEY, new AccessTokenUtil().credential());
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_FILE_PATH_KEY, ACCESS_TOKEN_FILE_PATH_VALUE);
-        launchString = setConfigValue(launchString, ACCESS_TOKEN_FILE_NAME_KEY, ACCESS_TOKEN_FILE_NAME_VALUE);
+
 
         String launchFile = super.stageFile(launchString);
 
@@ -796,7 +794,7 @@ public class PostAction extends SessionAction {
     }
 
     private String getHarborSecret(String image) throws Exception {
-        
+
         // get the user's cli secret:
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret

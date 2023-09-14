@@ -46,6 +46,12 @@ spec:
           value: "{{ .Values.deployment.skaha.usersGroup }}"
         - name: skaha.adminsgroup
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
+        - name: POSIX_DATABASE_URL
+          value: "{{ .Values.deployment.skaha.posixDatabaseURL }}"
+        - name: POSIX_DATABASE_USERNAME
+          value: "{{ .Values.deployment.skaha.posixDatabaseUsername }}"
+        - name: POSIX_DATABASE_PASSWORD
+          value: "{{ .Values.deployment.skaha.posixDatabasePassword }}"
         {{- with .Values.deployment.skaha.extraEnv }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

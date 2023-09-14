@@ -24,9 +24,9 @@ secrets:
     # tls.crt: <base64 encoded server cert>
     # tls.key: <base64 encoded server key>
 
-# Comment the traefik block out if Traefik is already installed
+# Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
 traefik:
-  # install: true
+  install: false
   # experimental:
   #   plugins:
   #     enabled: true

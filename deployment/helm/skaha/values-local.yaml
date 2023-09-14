@@ -1,17 +1,14 @@
 # Default values for skaha.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-# Default values for skaha.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
 skaha:
   namespace: skaha-system
-skaha-workload:
+skaha_workload:
   namespace: skaha-workload
 
 # Skaha web service deployment
 deployment:
-  hostname: nrc-023054.cadc.dao.nrc.ca  # Change this!
+  hostname: host.example.com  # Change this!
   skaha:
     image: images-rc.canfar.net/skaha-system/skaha:0.13.0-20230908T225226
     imagePullPolicy: IfNotPresent
@@ -28,6 +25,10 @@ deployment:
     usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
+
+    posixDatabaseURL: "http://..."
+    posixDatabaseUsername: "postgres"
+    posixDatabasePassword: "postgres"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -96,29 +97,3 @@ storage:
 science-platform-base:
   install: false
 
-# Comment the traefik block out if Traefik is already installed
-traefik:
-  # experimental:
-  #   plugins:
-  #     enabled: true
-  # additionalArguments:
-  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
-  #   - "--experimental.plugins.htransformation.version=v0.2.7"
-  tlsStore:
-    default:
-      defaultCertificate:
-        # See default-certificate secret(s) above
-        secretName: default-certificate
-  # tlsOptions:
-  #   traefik-client-cert-option:
-  #     clientAuth:
-  #       clientAuthType: VerifyClientCertIfGiven
-  #       secretNames:
-  #         - cacert-secret
-  # websecure:
-  #   middlewares: 
-  #     - default-traefik-passtlsclientcert@kubernetescrd
-  #     - default-traefik-header-transform@kubernetescrd
-  #   tls:
-  #     options:
-  #       - default-traefik-client-cert-option@kubernetescrd

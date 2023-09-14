@@ -68,7 +68,10 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.*;
+import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
@@ -76,25 +79,22 @@ import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
+import ca.nrc.cadc.util.StringUtil;
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.gms.IvoaGroupClient;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.posix.*;
 
+import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
 import java.util.*;
-
-import javax.security.auth.Subject;
-
-import ca.nrc.cadc.util.StringUtil;
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import org.opencadc.gms.GroupURI;
-import org.opencadc.gms.IvoaGroupClient;
-import org.opencadc.skaha.image.Image;
-
 
 import static java.util.stream.Collectors.toList;
 
@@ -121,6 +121,10 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
+
+    protected Postgress postgress;
+    protected PosixClient posixClient;
+    protected PosixUtil posixUtil;
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -175,21 +179,35 @@ public abstract class SkahaAction extends RestAction {
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
 
-        log.debug("using iam to fetch group details");
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         GroupURI skahaUsersGroupUri = new GroupURI(URI.create(skahaUsersGroup));
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
-        log.debug("skahaUsersGroupUriSet is " + skahaUsersGroupUriSet);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");
         }
-        log.info("user is a member of skaha user group ");
+        log.debug("user is a member of skaha user group ");
         List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
                 skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
                 : new ArrayList<>();
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
+
+        List<String> groupNames = groups.stream()
+                .filter(Objects::nonNull)
+                .map(group -> group.getID().getName())
+                .collect(toList());
+
+        postgress = Postgress.instance()
+                .entityClass(User.class, org.opencadc.skaha.posix.Group.class)
+                .build();
+        posixClient = new PostgresPosixClient(postgress);
+        posixUtil = new PostgresPosixUtil()
+                .userName(userID)
+                .groupNames(groupNames)
+                .homeDir(homedir)
+                .useClient(posixClient);
+        posixUtil.load();
     }
 
     private boolean isNotEmpty(Collection<?> collection) {
