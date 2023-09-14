@@ -1,19 +1,8 @@
 kubernetesClusterDomain: cluster.local
 skaha:
   namespace: skaha-system
-skaha-workload:
+skahaWorkload:
   namespace: skaha-workload
-
-# Set these labels appropriately
-storage:
-  skaha:
-    claim:
-      labels:
-        storage: my-great-storage
-  sessions:
-    claim:
-      labels:
-        storage: my-great-storage
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted to use client certificates.
