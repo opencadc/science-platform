@@ -37,6 +37,12 @@ deployment:
           value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
         - name: JAVA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+        - name: POSIX_DATABASE_URL
+          value: http://postgres.skaha-system.svc.cluster.local:5432/skaha
+        - name: POSIX_DATABASE_USERNAME
+          value: postgres
+        - name: POSIX_DATABASE_PASSWORD
+          value: postgres
       name: skaha-tomcat
       resources:
         requests:

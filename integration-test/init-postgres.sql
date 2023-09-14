@@ -1,5 +1,7 @@
-CREATE DATABASE IF NOT EXISTS skaha;
-use skaha;
+SELECT 'CREATE DATABASE skaha'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'skaha')\gexec
+
+\c skaha;
 
 CREATE TABLE Users
 (
@@ -27,13 +29,8 @@ ALTER TABLE Users_groups
 ALTER TABLE Users_groups
     ADD CONSTRAINT fk_usegro_on_user FOREIGN KEY (Users_uid) REFERENCES Users (uid);
 
-create sequence groups_groupid_seq1
-    start with 1000000;
-
-alter sequence groups_groupid_seq1 owner to skaha;
-
-create sequence users_posixid_seq1
+create sequence groups_gid_seq1
     start with 10000;
 
-alter sequence users_posixid_seq1 owner to skaha;
-
+create sequence users_uid_seq1
+    start with 10000;
