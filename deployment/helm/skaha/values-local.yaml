@@ -38,7 +38,7 @@ deployment:
         - name: JAVA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
         - name: POSIX_DATABASE_URL
-          value: http://postgres.skaha-system.svc.cluster.local:5432/skaha
+          value: jdbc:postgresql://postgres-client.skaha-system.svc.cluster.local/skaha
         - name: POSIX_DATABASE_USERNAME
           value: postgres
         - name: POSIX_DATABASE_PASSWORD
@@ -46,11 +46,11 @@ deployment:
       name: skaha-tomcat
       resources:
         requests:
-          memory: "1000M"
-          cpu: "1000m"
+          memory: "2000M"
+          cpu: "2000m"
         limits:
-          memory: "1000M"
-          cpu: "1000m"
+          memory: "2000M"
+          cpu: "2000m"
       ports:
       - containerPort: 8080
         protocol: TCP
