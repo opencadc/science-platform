@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: skaha-general-workload-binding
-  namespace: {{ index .Values "skaha-workload" "namespace" }}
+  namespace: {{ .Values.skahaWorkload.namespace }}
   labels:
   {{- include "base.labels" . | nindent 4 }}
 roleRef:

@@ -6,7 +6,7 @@ metadata:
   name: skaha-tomcat
   namespace: {{ .Values.skaha.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ default 1 .Values.replicaCount }}
   selector:
     matchLabels:
       run: skaha-tomcat
@@ -22,23 +22,86 @@ spec:
       - name: init-skaha-service
         image: busybox
         command: ['sh', '-c', 'mkdir -p /arc/home && mkdir -p /arc/projects']  # Expected to have /arc mounted
-        volumeMounts: {{ toYaml .Values.deployment.containers.skaha.volumeMounts | nindent 8 }}
+        volumeMounts:
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: cavern
       containers:
-      - image: {{ .Values.deployment.containers.skaha.image }}
-        env: {{ toYaml .Values.deployment.containers.skaha.env | nindent 8 }}
-        imagePullPolicy: {{ .Values.deployment.containers.skaha.imagePullPolicy }}
+      - env: 
+        - name: skaha.hostname
+          value: "{{ .Values.deployment.hostname }}"
+        - name: skaha.homedir
+          value: "{{ .Values.deployment.skaha.homeDir }}"
+        - name: skaha.namespace
+          value: "{{ .Values.skahaWorkload.namespace }}"
+        - name: skaha.maxusersessions
+          value: "{{ .Values.deployment.skaha.maxUserSessions }}"
+        - name: skaha.sessionexpiry
+          value: "{{ .Values.deployment.skaha.sessionExpiry }}"
+        - name: skaha.defaultquotagb
+          value: "{{ .Values.deployment.skaha.defaultQuotaGB }}"
+        - name: skaha.harborhosts
+          value: "{{ .Values.deployment.skaha.registryHosts }}"
+        - name: skaha.usersgroup
+          value: "{{ .Values.deployment.skaha.usersGroup }}"
+        - name: skaha.adminsgroup
+          value: "{{ .Values.deployment.skaha.adminsGroup }}"
+        - name: POSIX_DATABASE_URL
+          value: "{{ .Values.deployment.skaha.posixDatabaseURL }}"
+        - name: POSIX_DATABASE_USERNAME
+          value: "{{ .Values.deployment.skaha.posixDatabaseUsername }}"
+        - name: POSIX_DATABASE_PASSWORD
+          value: "{{ .Values.deployment.skaha.posixDatabasePassword }}"
+        {{- with .Values.deployment.skaha.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        image: {{ .Values.deployment.skaha.image }}
+        imagePullPolicy: {{ .Values.deployment.skaha.imagePullPolicy }}
         name: skaha-tomcat
         resources:
           requests:
-            memory: {{ .Values.deployment.containers.skaha.resources.requests.memory }}
-            cpu: {{ .Values.deployment.containers.skaha.resources.requests.cpu }}
+            memory: {{ .Values.deployment.skaha.resources.requests.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.requests.cpu }}
           limits:
-            memory: {{ .Values.deployment.containers.skaha.resources.limits.memory }}
-            cpu: {{ .Values.deployment.containers.skaha.resources.limits.cpu }}
-        ports: {{ toYaml .Values.deployment.containers.skaha.ports | nindent 8 }}
-        volumeMounts: {{ toYaml .Values.deployment.containers.skaha.volumeMounts | nindent 8 }}
+            memory: {{ .Values.deployment.skaha.resources.limits.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.limits.cpu }}
+        ports: 
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.skaha.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts: 
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: "/add-user-config"
+          name: add-user-config
+        - mountPath: /root/.ssl/
+          name: servops-cert
+          readOnly: true
+        - mountPath: "/arc"
+          name: cavern-volume
+          subPath: cavern
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         securityContext:
-          runAsUser: {{ .Values.deployment.containers.skaha.securityContext.runAsUser }}
-      priorityClassName: {{ .Values.deployment.containers.skaha.priorityClassName }}
-      serviceAccountName: {{ .Values.deployment.containers.skaha.serviceAccountName }}
-      volumes: {{ toYaml .Values.deployment.containers.skaha.volumes | nindent 6 }}
+          runAsUser: 0
+      priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
+      serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config
+      - name: add-user-config
+        configMap:
+          name: add-user-config
+      - name: servops-cert
+        secret:
+          defaultMode: 420
+          secretName: servops-clientcert
+      - name: cavern-volume
+        {{- toYaml .Values.storage.service.spec | nindent 8 }}
+      {{- with .Values.deployment.skaha.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

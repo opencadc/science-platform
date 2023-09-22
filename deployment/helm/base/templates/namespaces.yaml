@@ -7,9 +7,4 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .Values.nfsServer.namespace }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ index .Values "skaha-workload" "namespace" }}
+  name: {{ .Values.skahaWorkload.namespace }}
