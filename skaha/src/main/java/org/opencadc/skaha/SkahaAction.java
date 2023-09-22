@@ -87,6 +87,7 @@ import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.posix.*;
+import org.opencadc.skaha.utils.CollectionUtils;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
@@ -122,8 +123,6 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaUsersGroup;
     protected int maxUserSessions;
 
-    protected Postgress postgress;
-    protected PosixClient posixClient;
     protected PosixUtil posixUtil;
 
     public SkahaAction() {
@@ -187,7 +186,7 @@ public abstract class SkahaAction extends RestAction {
             throw new AccessControlException("Not authorized to use the skaha system");
         }
         log.debug("user is a member of skaha user group ");
-        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
+        List<Group> groups = CollectionUtils.isNotEmpty(skahaUsersGroupUriSet) ?
                 skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
                 : new ArrayList<>();
         // adding all groups to the Subject
@@ -198,20 +197,16 @@ public abstract class SkahaAction extends RestAction {
                 .map(group -> group.getID().getName())
                 .collect(toList());
 
-        postgress = Postgress.instance()
+        Postgress postgress = Postgress.instance()
                 .entityClass(User.class, org.opencadc.skaha.posix.Group.class)
                 .build();
-        posixClient = new PostgresPosixClient(postgress);
+        PosixClient posixClient = new PostgresPosixClient(postgress);
         posixUtil = new PostgresPosixUtil()
                 .userName(userID)
                 .groupNames(groupNames)
                 .homeDir(homedir)
                 .useClient(posixClient);
         posixUtil.load();
-    }
-
-    private boolean isNotEmpty(Collection<?> collection) {
-        return null != collection && !collection.isEmpty();
     }
 
     /**

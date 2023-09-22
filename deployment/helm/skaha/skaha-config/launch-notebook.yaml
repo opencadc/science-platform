@@ -25,12 +25,29 @@ spec:
       imagePullSecrets:
         - name: "${software.imagesecret}"
       securityContext:
-        # runAsUser: ${skaha.posixid} 
-        # runAsGroup: ${skaha.posixid}
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
+      initContainers:
+      - name: init-notebook
+        image: ${software.imageid}
+        command: ["/skaha-system/init-jupyterlab.sh"]
+        args:
+        - ${user.posix.entry}
+        - ${user.group.entry}
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/skaha-system"
+          name: start-jupyterlab
+        securityContext:
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -68,8 +85,7 @@ spec:
         command: ["/skaha-system/start-jupyterlab.sh"]
         args:
         - ${skaha.sessionid}
-        - ${user.posix.entry}
-        - ${user.group.entry}
+        - ${user.token}
         imagePullPolicy: Always
         resources:
           requests:
@@ -86,6 +102,12 @@ spec:
           protocol: TCP
           name: notebook-port
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group  
         - mountPath: "/skaha-system"
           name: start-jupyterlab
         - mountPath: "/arc"
@@ -103,4 +125,8 @@ spec:
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc
       - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
         emptyDir: {}

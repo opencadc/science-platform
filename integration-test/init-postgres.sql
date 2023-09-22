@@ -23,14 +23,9 @@ CREATE TABLE Users_groups
     groups_gid INTEGER NOT NULL
 );
 
-ALTER TABLE Users_groups
-    ADD CONSTRAINT fk_usegro_on_group FOREIGN KEY (groups_gid) REFERENCES Groups (gid);
+ALTER TABLE Users_groups ADD CONSTRAINT fk_usegro_on_group FOREIGN KEY (groups_gid) REFERENCES Groups (gid);
+ALTER TABLE Users_groups ADD CONSTRAINT fk_usegro_on_user FOREIGN KEY (Users_uid) REFERENCES Users (uid);
 
-ALTER TABLE Users_groups
-    ADD CONSTRAINT fk_usegro_on_user FOREIGN KEY (Users_uid) REFERENCES Users (uid);
+create sequence users_uid_seq1 start with 100000;
+create sequence groups_gid_seq1 start with 1000000;
 
-create sequence groups_gid_seq1
-    start with 10000;
-
-create sequence users_uid_seq1
-    start with 10000;
