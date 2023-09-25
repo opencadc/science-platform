@@ -69,7 +69,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -90,7 +89,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -262,7 +260,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws IOException, InterruptedException {
+    void ensureUserBase() throws Exception {
         final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
 
         if (Files.notExists(homeDir)) {
@@ -272,10 +270,10 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void allocateUser() throws IOException, InterruptedException {
+    void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getPosixId(), getDefaultQuota()
+                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), posixUtil.posixId(), getDefaultQuota()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -542,7 +540,6 @@ public class PostAction extends SessionAction {
             throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
-//        String posixID = getPosixId();
         String posixID = posixUtil.posixId();
         log.debug("Posix id: " + posixID);
 
@@ -595,7 +592,9 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        if (StringUtil.hasText(supplementalGroups)) {
+            jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
@@ -654,7 +653,8 @@ public class PostAction extends SessionAction {
      * @param image         Container image name.
      * @throws Exception    For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
+                                 Integer limitRAM) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -697,7 +697,7 @@ public class PostAction extends SessionAction {
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-        String posixID = getPosixId();
+        String posixID = posixUtil.posixId();
         String supplementalGroups = getSupplementalGroupsList();
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
@@ -763,28 +763,6 @@ public class PostAction extends SessionAction {
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
         injectCredentials(subject, userID, posixID);
-    }
-
-    String getPosixId() {
-        Subject s = AuthenticationUtil.getCurrentSubject();
-        Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
-        final int uidNumber;
-
-        if (principals.isEmpty()) {
-            uidNumber = generatePosixID(getUserID());
-        } else {
-            uidNumber = principals.iterator().next().getUidNumber();
-        }
-        return Integer.toString(uidNumber);
-    }
-
-    int generatePosixID(final String usernameKey) {
-        int result = 0;
-        for (final char c : usernameKey.toCharArray()) {
-            result += c;
-        }
-
-        return  1000 + result;
     }
 
     private String setConfigValue(String doc, String key, String value) {
