@@ -73,7 +73,14 @@ import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
 
+import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -84,22 +91,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import javax.security.auth.Subject;
-
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
 
 /**
  * @author majorb
@@ -142,6 +135,7 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
+    private static final String USER_TOKEN = "user.token";
     private static final String USER_POSIX_ENTRY = "user.posix.entry";
     private static final String USER_GROUP_ENTRY = "user.group.entry";
 
@@ -547,6 +541,9 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
+        log.debug("supplementalGroups are " + supplementalGroups);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -580,6 +577,8 @@ public class PostAction extends SessionAction {
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
+
+
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
@@ -595,7 +594,6 @@ public class PostAction extends SessionAction {
         if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -607,19 +605,24 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntriesAsString());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntriesAsString());
+
+        try {
+            jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
+        } catch (Exception ex) {
+            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
+        }
+
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
         String[] launchCmd = new String[] {
                 "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
         // insert the user's proxy cert in the home dir
-        Subject subject = AuthenticationUtil.getCurrentSubject();
+
         injectCredentials(subject, userID, posixID);
 
         if (servicePath != null) {

@@ -69,50 +69,30 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
-import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
-import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.util.StringUtil;
+import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import javax.security.auth.Subject;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.Set;
-
-import javax.security.auth.Subject;
-
-import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
+import java.util.*;
 
 public abstract class SessionAction extends SkahaAction {
     
@@ -266,18 +246,22 @@ public abstract class SessionAction extends SkahaAction {
     public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
+
+    protected AuthorizationToken token(final Subject subject) {
+        return subject
+                .getPublicCredentials(AuthorizationToken.class)
+                .iterator()
+                .next();
+    }
+
     
     protected void injectCredentials(final Subject subject, String userid, String posixID)
             throws PrivilegedActionException, IOException, InterruptedException {
-        
         // inject a token if available
         try {
-            Set<AuthorizationToken> tokens = subject.getPublicCredentials(AuthorizationToken.class);
-            if (!tokens.isEmpty()) {
-                AuthorizationToken token = tokens.iterator().next();
-                injectFile(token.getCredentials(), posixID, homedir + "/" + userid + "/.tokens/" + token.getType());
-                log.debug("injected token: " + token.getType());
-            }
+            AuthorizationToken token = token(subject);
+            injectFile(token.getCredentials(), posixID, homedir + "/" + userid + "/.tokens/" + token.getType());
+            log.debug("injected token: " + token.getType());
         } catch (Exception e) {
             log.debug("failed to inject token: " + e.getMessage(), e);
         }

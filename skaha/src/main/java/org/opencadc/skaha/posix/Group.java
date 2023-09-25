@@ -10,8 +10,8 @@ public class Group {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY, generator = "groups_gid_seq1")
-    @SequenceGenerator(name = "groups_gid_seq1", sequenceName = "groups_gid_seq1", allocationSize = 1, initialValue = 10000)
-    private int gid;
+    @SequenceGenerator(name = "groups_gid_seq1", sequenceName = "groups_gid_seq1", allocationSize = 1, initialValue = 1000000)
+    private Integer gid;
 
     private String groupname;
 
@@ -22,11 +22,11 @@ public class Group {
         this.groupname = groupname;
     }
 
-    public int getGid() {
+    public Integer getGid() {
         return gid;
     }
 
-    public void setGid(int gid) {
+    public void setGid(Integer gid) {
         this.gid = gid;
     }
 

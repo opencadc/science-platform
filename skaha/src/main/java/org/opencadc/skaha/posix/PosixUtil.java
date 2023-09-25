@@ -17,9 +17,13 @@ public interface PosixUtil {
 
     String posixId() throws Exception;
 
-    String posixEntry() throws Exception;
+    List<String> posixEntries() throws Exception;
 
-    String groupEntries() throws Exception;
+    String posixEntriesAsString() throws Exception;
+
+    List<String> groupEntries() throws Exception;
+
+    String groupEntriesAsString() throws Exception;
 
     String userGroupIds() throws Exception;
 }
