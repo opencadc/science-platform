@@ -79,8 +79,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.skaha.session.GetAction;
-import org.opencadc.skaha.session.Session;
+import org.opencadc.auth.PosixMapperClient;
+
 
 /**
  * @author majorb
@@ -172,7 +172,7 @@ public class GetSessionsTests {
         }
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         
         @Override
         public List<Session> getAllSessions(String forUserID) throws Exception {
@@ -184,6 +184,15 @@ public class GetSessionsTests {
             }
             return sessions;
         }
-        
+
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected PosixMapperClient getPosixMapperClient(String resourceID) {
+            return new TestPosixMapperClient();
+        }
     }
 }

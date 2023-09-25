@@ -76,6 +76,8 @@ import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;

@@ -399,14 +399,14 @@ public class GetAction extends SessionAction {
     }
     
     public String getSingleSession(String sessionID) throws Exception {
-        Session session = this.getSession(posixPrincipal.username, sessionID);
+        Session session = this.getSession(getUsername(), sessionID);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
     }
 
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
-        final String forUser = allUsers ? null : posixPrincipal.username;
+        final String forUser = allUsers ? null : getUsername();
         final List<Session> sessions = getAllSessions(forUser);
 
         log.debug("typeFilter=" + typeFilter);
@@ -442,7 +442,7 @@ public class GetAction extends SessionAction {
     }
 
     public String getEventLogs(String sessionID) throws Exception {
-        String events = getEvents(posixPrincipal.username, sessionID);
+        String events = getEvents(getUsername(), sessionID);
         if (!StringUtil.hasLength(events)) {
             events = NONE;
         }
@@ -450,6 +450,6 @@ public class GetAction extends SessionAction {
     }
 
     public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
-        streamPodLogs(posixPrincipal.username, sessionID, out);
+        streamPodLogs(getUsername(), sessionID, out);
     }
 }

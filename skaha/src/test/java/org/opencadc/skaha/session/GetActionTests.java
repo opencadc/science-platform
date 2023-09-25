@@ -72,6 +72,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.auth.PosixMapperClient;
 
 /**
  * @author yeunga
@@ -128,6 +129,14 @@ public class GetActionTests {
     }
     
     class TestGetAction extends GetAction {
-        
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected PosixMapperClient getPosixMapperClient(String resourceID) {
+            return new TestPosixMapperClient();
+        }
     }
 }

@@ -79,6 +79,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.auth.PosixMapperClient;
+import org.opencadc.skaha.session.TestPosixMapperClient;
 
 /**
  * @author majorb
@@ -216,6 +218,16 @@ public class GetImagesTests {
         @Override
         protected String getIdToken() {
             return "";
+        }
+
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected PosixMapperClient getPosixMapperClient(String resourceID) {
+            return new TestPosixMapperClient();
         }
     }
 }

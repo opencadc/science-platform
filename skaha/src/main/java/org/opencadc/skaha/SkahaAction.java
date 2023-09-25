@@ -155,7 +155,11 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
 
-        posixMapperClient = new PosixMapperClient(URI.create(configuredPosixMapperResourceID));
+        posixMapperClient = getPosixMapperClient(configuredPosixMapperResourceID);
+    }
+
+    protected PosixMapperClient getPosixMapperClient(final String resourceID) {
+        return new PosixMapperClient(URI.create(resourceID));
     }
 
     @Override
@@ -199,6 +203,10 @@ public abstract class SkahaAction extends RestAction {
 
         // adding all groups to the Subject
         subject.getPublicCredentials().add(groups);
+    }
+
+    protected String getUsername() {
+        return posixPrincipal.username;
     }
 
     /**
