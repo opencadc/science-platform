@@ -73,10 +73,8 @@ import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.UUID;
 
 
 public class PostActionTest {
@@ -90,11 +88,6 @@ public class PostActionTest {
             @Override
             String getUserID() {
                 return "TESTUSER";
-            }
-
-            @Override
-            String getPosixId() {
-                return "11678";
             }
 
             @Override
@@ -130,11 +123,6 @@ public class PostActionTest {
             }
 
             @Override
-            String getPosixId() {
-                return "883939";
-            }
-
-            @Override
             String getDefaultQuota() {
                 return "14";
             }
@@ -147,11 +135,5 @@ public class PostActionTest {
         };
 
         testSubject.allocateUser();
-    }
-
-    @Test
-    public void generatePosixID() {
-        final PostAction testSubject = new PostAction();
-        Assert.assertEquals("Wrong value.", 1715, testSubject.generatePosixID("CADCtest"));
     }
 }

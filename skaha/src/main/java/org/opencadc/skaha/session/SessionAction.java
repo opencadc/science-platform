@@ -89,7 +89,6 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedActionException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -143,7 +142,7 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("request type: " + requestType);
         log.debug("sessionID: " + sessionID);
         log.debug("appID: " + appID);
-        log.debug("userID: " + userID);
+        log.debug("userID: " + posixPrincipal);
     }
     
     protected static String readStream(InputStream in) throws IOException {
@@ -255,12 +254,13 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     
-    protected void injectCredentials(final Subject subject, String userid, String posixID)
-            throws PrivilegedActionException, IOException, InterruptedException {
+    protected void injectCredentials() {
+        final Subject subject = AuthenticationUtil.getCurrentSubject();
+        final String username = posixPrincipal.username;
         // inject a token if available
         try {
             AuthorizationToken token = token(subject);
-            injectFile(token.getCredentials(), posixID, homedir + "/" + userid + "/.tokens/" + token.getType());
+            injectFile(token.getCredentials(), homedir + "/" + username + "/.tokens/" + token.getType());
             log.debug("injected token: " + token.getType());
         } catch (Exception e) {
             log.debug("failed to inject token: " + e.getMessage(), e);
@@ -275,7 +275,7 @@ public abstract class SessionAction extends SkahaAction {
                 CredClient credClient = new CredClient(serviceID);
                 X509CertificateChain chain = credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), 14);
                 if (chain != null) {
-                    injectFile(chain.certificateString(), posixID, homedir + "/" + userid + "/.ssl/cadcproxy.pem");
+                    injectFile(chain.certificateString(), homedir + "/" + username + "/.ssl/cadcproxy.pem");
                     log.debug("injected certificate");
                 }
             }
@@ -288,7 +288,7 @@ public abstract class SessionAction extends SkahaAction {
         try {
             // return the last segment of the path
             int lastSlash = image.lastIndexOf("/");
-            String name = image.substring(lastSlash + 1, image.length());
+            String name = image.substring(lastSlash + 1);
             log.debug("cleaning up name: " + name);
             // replace colons and dots and underscores with dash
             name = name.replaceAll(":", "-");
@@ -302,7 +302,8 @@ public abstract class SessionAction extends SkahaAction {
 
     }
     
-    protected void injectFile(String data, String posixID, String path) throws IOException, InterruptedException {
+    protected void injectFile(String data, String path) throws IOException, InterruptedException {
+        final int uid = posixPrincipal.getUidNumber();
         // stage file
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
@@ -315,11 +316,9 @@ public abstract class SessionAction extends SkahaAction {
         writer.close();
         
         // update file permissions
-        String[] chown = new String[] {"chown", posixID + ":" + posixID, tmpFileName};
+        String[] chown = new String[] {"chown", uid + ":" + uid, tmpFileName};
         execute(chown);
-//        String[] chown = new String[] {"chown", "-R", "guest:guest", "/home/" + userid + "/.ssl"};
-//        execute(chown);
-        
+
         // inject file
         String[] inject = new String[] {"mv",  "-f", tmpFileName, path};
         execute(inject);
@@ -340,7 +339,7 @@ public abstract class SessionAction extends SkahaAction {
     
     public String getPodID(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getPodCMD = new ArrayList<String>();
+        List<String> getPodCMD = new ArrayList<>();
         getPodCMD.add("kubectl");
         getPodCMD.add("--namespace");
         getPodCMD.add(k8sNamespace);
@@ -393,7 +392,7 @@ public abstract class SessionAction extends SkahaAction {
     
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getLogsCmd = new ArrayList<String>();
+        List<String> getLogsCmd = new ArrayList<>();
         getLogsCmd.add("kubectl");
         getLogsCmd.add("--namespace");
         getLogsCmd.add(k8sNamespace);
@@ -405,9 +404,9 @@ public abstract class SessionAction extends SkahaAction {
         execute(getLogsCmd.toArray(new String[0]), out);
     }
     
-    public Session getDesktopApp(String forUserID, String sessionID, String appID) throws Exception {
-        List<Session> sessions = getSessions(userID, sessionID);
-        if (sessions.size() > 0) {
+    public Session getDesktopApp(String sessionID, String appID) throws Exception {
+        List<Session> sessions = getSessions(posixPrincipal.username, sessionID);
+        if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
                 if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
@@ -422,7 +421,7 @@ public abstract class SessionAction extends SkahaAction {
     
     public Session getSession(String forUserID, String sessionID) throws Exception {
         List<Session> sessions = getSessions(forUserID, sessionID);
-        if (sessions.size() > 0) {
+        if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
                 if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
@@ -444,7 +443,7 @@ public abstract class SessionAction extends SkahaAction {
         String sessionList = execute(sessionsCMD.toArray(new String[0]));
         log.debug("Session list: " + sessionList);
         
-        List<Session> sessions = new ArrayList<Session>();
+        List<Session> sessions = new ArrayList<>();
         if (StringUtil.hasLength(sessionList)) {
             Map<String, String> jobExpiryTimes = null;
             Map<String, String[]> resourceUsages = null;
@@ -482,7 +481,7 @@ public abstract class SessionAction extends SkahaAction {
                         
                     } else {
                         // at least one job is in 'Running' state
-                        String resourceUsage[] = resourceUsages.get(fullName);
+                        String[] resourceUsage = resourceUsages.get(fullName);
                         if (resourceUsage == null) {
                             // job not in 'Running' state
                             session.setCPUCoresInUse(NONE);
@@ -518,9 +517,9 @@ public abstract class SessionAction extends SkahaAction {
     protected String toCoreUnit(String cores) {
         String ret = NONE;
         if (StringUtil.hasLength(cores)) {
-            if ("m".equals(cores.substring(cores.length() - 1, cores.length()))) {
+            if ("m".equals(cores.substring(cores.length() - 1))) {
                 // in "m" (millicore) unit, covert to cores
-                Integer milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1)); 
+                int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
                 ret = ((Double) (milliCores/Math.pow(10, 3))).toString();
             } else {
                 // use value as is, can be '<none>' or some value
@@ -534,7 +533,7 @@ public abstract class SessionAction extends SkahaAction {
     protected String toCommonUnit(String inK8sUnit) {
         String ret = NONE;
         if (StringUtil.hasLength(inK8sUnit)) {
-            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1, inK8sUnit.length()))) {
+            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1))) {
                 // unit is in Ki, Mi, Gi, etc., remove the i
                 ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
             } else {
@@ -547,7 +546,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     private Map<String, String[]> getResourceUsages(String k8sNamespace, String forUserID) throws Exception {
-        Map<String, String[]> resourceUsages = new HashMap<String, String[]>(); 
+        Map<String, String[]> resourceUsages = new HashMap<>();
         List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID);
         try {
             String sessionResourceUsageMap = execute(sessionResourceUsageCMD.toArray(new String[0]));
@@ -555,7 +554,7 @@ public abstract class SessionAction extends SkahaAction {
             if (StringUtil.hasLength(sessionResourceUsageMap)) {
                 String[] lines = sessionResourceUsageMap.split("\n");
                 for (String line : lines) {
-                    String resourceUsage[] = line.trim().replaceAll("\\s+", " ").split(" ");
+                    String[] resourceUsage = line.trim().replaceAll("\\s+", " ").split(" ");
                     String fullName = resourceUsage[0];
                     String[] resources = {resourceUsage[1], resourceUsage[2]};
                     resourceUsages.put(fullName, resources);
@@ -570,7 +569,7 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     private List<String> getGPUUsage(String usageData) {
-        List<String> usage = new ArrayList<String>();
+        List<String> usage = new ArrayList<>();
         if (StringUtil.hasLength(usageData)) {
             String[] lines = usageData.split("\n");
             for (String line : lines) {
@@ -615,14 +614,14 @@ public abstract class SessionAction extends SkahaAction {
     }
     
     protected Map<String,String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
-        Map<String,String> jobExpiryTimes = new HashMap<String,String>(); 
+        Map<String,String> jobExpiryTimes = new HashMap<>();
         List<String> jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
         String jobExpiryTimeMap = execute(jobExpiryTimeCMD.toArray(new String[0]));
         log.debug("Expiry times: " + jobExpiryTimeMap);
         if (StringUtil.hasLength(jobExpiryTimeMap)) {
             String[] lines = jobExpiryTimeMap.split("\n");
             for (String line : lines) {
-                String expiryTime[] = line.trim().replaceAll("\\s+", " ").split(" ");
+                String[] expiryTime = line.trim().replaceAll("\\s+", " ").split(" ");
                 jobExpiryTimes.put(expiryTime[0], expiryTime[1]);
             }
         }

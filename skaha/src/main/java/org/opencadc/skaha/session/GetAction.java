@@ -393,20 +393,20 @@ public class GetAction extends SessionAction {
     }
     
     public String getSingleDesktopApp(String sessionID, String appID) throws Exception {
-        Session session = this.getDesktopApp(userID, sessionID, appID);
+        Session session = this.getDesktopApp(sessionID, appID);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
     }
     
     public String getSingleSession(String sessionID) throws Exception {
-        Session session = this.getSession(userID, sessionID);
+        Session session = this.getSession(posixPrincipal.username, sessionID);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
     }
 
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
-        final String forUser = allUsers ? null : userID;
+        final String forUser = allUsers ? null : posixPrincipal.username;
         final List<Session> sessions = getAllSessions(forUser);
 
         log.debug("typeFilter=" + typeFilter);
@@ -442,7 +442,7 @@ public class GetAction extends SessionAction {
     }
 
     public String getEventLogs(String sessionID) throws Exception {
-        String events = getEvents(userID, sessionID);
+        String events = getEvents(posixPrincipal.username, sessionID);
         if (!StringUtil.hasLength(events)) {
             events = NONE;
         }
@@ -450,6 +450,6 @@ public class GetAction extends SessionAction {
     }
 
     public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
-        streamPodLogs(userID, sessionID, out);
+        streamPodLogs(posixPrincipal.username, sessionID, out);
     }
 }
