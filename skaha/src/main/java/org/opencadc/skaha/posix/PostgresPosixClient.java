@@ -22,6 +22,11 @@ public class PostgresPosixClient implements PosixClient {
     }
 
     @Override
+    public List<User> getAllUser() throws Exception {
+        return postgress.findAll(User.class, "findAllUser", new HashMap<>());
+    }
+
+    @Override
     public User saveUser(User user) throws Exception {
         return postgress.save(user);
     }

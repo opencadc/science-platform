@@ -68,106 +68,14 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.util.Log4jInit;
-import org.apache.log4j.Level;
-import org.junit.Assert;
-import org.junit.Test;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import org.opencadc.auth.PosixMapperClient;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URL;
+import java.net.URI;
 
-
-public class PostActionTest {
-    static {
-        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
+public class TestPosixMapperClient extends PosixMapperClient {
+    public TestPosixMapperClient() throws IOException, ResourceNotFoundException {
+        super(URI.create("ivo://test.org/pm"));
     }
-
-    @Test
-    public void allocateUserError() throws Exception {
-        final PostAction testSubject = new PostAction() {
-            @Override
-            protected String getUsername() {
-                return "TESTUSER";
-            }
-
-            @Override
-            protected int getUID() {
-                return 997;
-            }
-
-            @Override
-            String getDefaultQuota() {
-                return "14";
-            }
-
-            @Override
-            protected URL lookupGroupMapperURL() {
-                return null;
-            }
-
-            @Override
-            protected URL lookupUserMapperURL() {
-                return null;
-            }
-
-            @Override
-            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
-                    throws IOException {
-                standardOut.write("".getBytes());
-                standardErr.write("Forbidden to write.".getBytes());
-            }
-        };
-
-        try {
-            testSubject.allocateUser();
-            Assert.fail("Should throw IOException");
-        } catch (IOException exception) {
-            // Good.
-            Assert.assertEquals("Wrong message.", "Unable to create user home."
-                                                  + "\nError message from server: Forbidden to write."
-                                                  + "\nOutput from command: ", exception.getMessage());
-        }
-    }
-
-    @Test
-    public void allocateUser() throws Exception {
-        final PostAction testSubject = new PostAction() {
-            @Override
-            protected String getUsername() {
-                return "TESTUSER";
-            }
-
-            @Override
-            protected int getUID() {
-                return 997;
-            }
-
-            @Override
-            String getDefaultQuota() {
-                return "14";
-            }
-
-            @Override
-            protected URL lookupGroupMapperURL() {
-                return null;
-            }
-
-            @Override
-            protected URL lookupUserMapperURL() {
-                return null;
-            }
-
-
-            @Override
-            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
-                    throws IOException {
-                standardOut.write("Created /home/dir".getBytes());
-            }
-        };
-
-        testSubject.allocateUser();
-    }
-
 }

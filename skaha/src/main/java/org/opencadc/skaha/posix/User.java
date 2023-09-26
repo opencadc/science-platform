@@ -6,6 +6,7 @@ import java.util.List;
 
 
 @NamedQueries({
+        @NamedQuery(name = "findAllUser", query = "SELECT u FROM Users u"),
         @NamedQuery(name = "findUserByUsername", query = "SELECT u FROM Users u WHERE u.username = :username"),
         @NamedQuery(name = "findAllUsersForGroupId", query = "SELECT u FROM Users u JOIN u.groups g WHERE g.gid = :gid")
 })
@@ -15,7 +16,7 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY, generator = "users_uid_seq1")
-    @SequenceGenerator(name = "users_uid_seq1", sequenceName = "users_uid_seq1", allocationSize = 1, initialValue = 10000)
+    @SequenceGenerator(name = "users_uid_seq1", sequenceName = "users_uid_seq1", allocationSize = 1, initialValue = 100000)
     private Integer uid;
 
     private String username;

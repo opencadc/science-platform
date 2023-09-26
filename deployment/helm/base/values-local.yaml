@@ -1,48 +1,51 @@
+# Good template for a local (laptop) installation.
+
 kubernetesClusterDomain: cluster.local
 skaha:
   namespace: skaha-system
 skahaWorkload:
   namespace: skaha-workload
-  
+
 # Underlying storage creation.  You may not be privileged enough to create PersistentVolumes, so this is
 # configurable here.  When installing on a laptop, for example, these will likely be set to true.
 # Default is false.
 storage:
   # Whether to create the PersistentVolume that will provide a PersistentVolumeClaim to the Skaha service.
   service:
-    create: false
+    create: true
     claimName: skaha-pvc
     labels:
       storage: skaha-storage # Labels are VERY relevant.  They should match the values.yaml configuration.  Match this up with the PersistentVolumeClaim when installing Skaha.
-
   # Whether to create the PersistentVolume that will provide a PersistentVolumeClaim to the User Sesisons.
   session:
-    create: false
-    storage: local-storage
+    create: true
+    labels:
+      storage: local-storage
 
+# Put in certificate values here!
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted to use client certificates.
-  # cacert-secret:
-  #   ca.crt: <base64 encoded CA crt>
-  # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
+  cacert-secret:
+    ca.crt: <base64 encoded CA crt>
+  default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
   # For server domains with self-signed certificates, add the Base64 encoded file content here.
-    # tls.crt: <base64 encoded server cert>
-    # tls.key: <base64 encoded server key>
+    tls.crt: <base64 encoded server cert>
+    tls.key: <base64 encoded server key>
 
 # Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
 traefik:
-  install: false
+  install: true
   # experimental:
   #   plugins:
   #     enabled: true
   # additionalArguments:
   #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
   #   - "--experimental.plugins.htransformation.version=v0.2.7"
-  # tlsStore:
-  #   default:
-  #     defaultCertificate:
+  tlsStore:
+    default:
+      defaultCertificate:
   #       # See default-certificate secret(s) above
-  #       secretName: default-certificate
+        secretName: default-certificate
   # tlsOptions:
   #   traefik-client-cert-option:
   #     clientAuth:

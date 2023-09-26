@@ -1,6 +1,4 @@
-# Default values for skaha.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Sample Local install values file.
 
 # Tell Kubernetes to spin up multiple instances.  Defaults to 1.
 replicaCount: 1
@@ -13,7 +11,7 @@ skahaWorkload:
 
 # Skaha web service deployment
 deployment:
-  hostname: myhost.example.com  # Change this!
+  hostname: proxy.host.name  # Change this!
   skaha:
     image: images.canfar.net/skaha-system/skaha:0.13.0
     imagePullPolicy: IfNotPresent
@@ -26,12 +24,14 @@ deployment:
     registryHosts: "images.canfar.net"
 
     # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users" 
+    # usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperURI: "ivo://opencadc.org/posix-mapper"
+    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -70,31 +70,29 @@ deployment:
     #     defaultMode: 420
     #     secretName: cacert-secret
 
-secrets:
-  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  # cacert-secret:
-  #   ca.crt: <base64 encoded CA crt>
-  # Server certificates for Traefik to use for SSL termination.  Must match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName below.
-  # default-certificate:
-    # tls.crt: <base64 encoded server cert>
-    # tls.key: <base64 encoded server key>
-  servops-clientcert:
-    # Set the cadcproxy.pem!
-    # cadcproxy.pem: <base64 encoded PEM servops certificate>
-
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:
-#   skaha:
-#     extraPorts:
-  #   - port: 5555
-  #     protocol: TCP
-  #     name: java-debug
+#   extraPorts:
+  # - port: 5555
+  #   protocol: TCP
+  #   name: java-debug
 
-# Set these appropriately to match your Persistent Volume labels.
+# Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
 storage:
   service:
     spec:
-      # YAML for service mounted storage
+      persistentVolumeClaim:
+        claimName: local-storage-pvc
   sessions:
     claim:
       # storageClassName: ""

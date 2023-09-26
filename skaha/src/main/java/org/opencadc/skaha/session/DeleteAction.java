@@ -117,11 +117,11 @@ public class DeleteAction extends SessionAction {
                             String type = parts[0];
                             if (!TYPE_DESKTOP_APP.equals(type)) {
                                 String sessionUserId = parts[1];
-                                if (!userID.equals(sessionUserId)) {
+                                if (!posixPrincipal.equals(sessionUserId)) {
                                     throw new AccessControlException("forbidden");
                                 }   
     
-                                deleteSession(userID, type, sessionID);
+                                deleteSession(posixPrincipal.username, type, sessionID);
                                 return;
                             }
                         }
@@ -134,7 +134,7 @@ public class DeleteAction extends SessionAction {
         }
 
         if (requestType.equals(REQUEST_TYPE_APP)) {
-            deleteSession(userID, TYPE_DESKTOP_APP, sessionID);
+            deleteSession(posixPrincipal.username, TYPE_DESKTOP_APP, sessionID);
         }
     }
     

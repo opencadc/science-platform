@@ -34,9 +34,9 @@ public class Postgress {
     private Properties properties() {
         Properties properties = new Properties();
         properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
-        properties.put("hibernate.connection.url", getEnvOrElse("POSIX_DATABASE_URL", "jdbc:postgresql://localhost:5432/postgres"));
-        properties.put("hibernate.connection.username", getEnvOrElse("POSIX_DATABASE_USERNAME", "postgres"));
-        properties.put("hibernate.connection.password", getEnvOrElse("POSIX_DATABASE_PASSWORD", "postgres"));
+        properties.put("hibernate.connection.url", getFromEnv("POSIX_DATABASE_URL"));
+        properties.put("hibernate.connection.username", getFromEnv("POSIX_DATABASE_USERNAME"));
+        properties.put("hibernate.connection.password", getFromEnv("POSIX_DATABASE_PASSWORD"));
         properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         properties.put("hibernate.show_sql", "false");
         properties.put("hibernate.format_sql", "false");

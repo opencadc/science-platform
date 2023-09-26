@@ -9,6 +9,8 @@ public interface PosixClient {
 
     User getUser(String userId) throws Exception;
 
+    List<User> getAllUser() throws Exception;
+
     User saveUser(User user) throws Exception;
 
     User updateUser(User user) throws Exception;

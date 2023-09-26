@@ -1,16 +1,18 @@
 package org.opencadc.skaha.posix;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.utils.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
 
 public class PostgresPosixUtil implements PosixUtil {
     private static final Logger log = Logger.getLogger(PostgresPosixUtil.class);
-    private static final String SEPARATE = ";";
+    private static final String SEPARATOR = ";";
 
     private String userName;
     private String homeDir;
@@ -71,30 +73,66 @@ public class PostgresPosixUtil implements PosixUtil {
     }
 
     @Override
-    public String posixEntry() throws Exception {
-        String posixId = posixId();
-        return format("%s:x:%s:%s::%s/%s:/bin/bash", this.userName, posixId, posixId, homeDir, this.userName);
+    public List<String> posixEntries() throws Exception {
+//        return posixEntries(posixClient.getAllUser(), homeDir);
+        return posixEntries(List.of(user), homeDir);
+    }
+
+    public List<String> posixEntries(List<User> users, String homeDir) throws Exception {
+        return users.stream()
+                .map(oneUser -> posixEntry(oneUser, homeDir))
+                .collect(Collectors.toList());
+    }
+
+
+    private String posixEntry(User user, String homeDir) {
+        return format("%s:x:%d:%d::%s/%s:/bin/bash", user.getUsername(), user.getUid(), user.getUid(), homeDir, user.getUsername());
     }
 
     @Override
-    public String groupEntries() throws Exception {
-        List<Group> groups = user.getGroups();
-        List<String> groupEntries = new ArrayList<>();
-        String userPrivateGroupEntry = user.getUsername() + ":x:" + user.getUid() + ":" + user.getUsername();
-        groupEntries.add(userPrivateGroupEntry);
-        for (Group group : groups) {
-            List<User> userPerGroup = posixClient.getUsersForGroup(group.getGid());
-            String concatenatedUserName = userPerGroup
-                    .stream()
-                    .map(User::getUsername)
-                    .reduce((i, j) -> i + "," + j)
-                    .orElse("");
-            String entry = group.getGroupname() + ":x" + ":" + group.getGid() + ":" + concatenatedUserName;
-            groupEntries.add(entry);
-        }
-        return groupEntries.stream().reduce((i, j) -> i + SEPARATE + j).orElse("");
+    public String posixEntriesAsString() throws Exception {
+        return listToString(posixEntries(), SEPARATOR);
     }
 
+    @Override
+    public List<String> groupEntries() throws Exception {
+        List<Group> groups = user.getGroups();
+        List<String> groupEntries = new ArrayList<>();
+        groupEntries.add(userPrivateGroupEntry(user));
+        for (Group group : groups)
+            groupEntries.add(supplementalGroupsEntry(group, List.of(user)));
+//            groupEntries.add(supplementalGroupsEntry(group, posixClient.getUsersForGroup(group.getGid())));
+        return groupEntries;
+    }
+
+    private String userPrivateGroupEntry(User user) {
+        return user.getUsername() + ":x:" + user.getUid() + ":" + user.getUsername();
+    }
+
+    private String supplementalGroupsEntry(Group group, List<User> users) {
+        return group.getGroupname() + ":x" + ":" + group.getGid() + ":" + concatenateUserNames(users);
+    }
+
+    private static String concatenateUserNames(List<User> users) {
+        return users
+                .stream()
+                .map(User::getUsername)
+                .reduce((i, j) -> i + "," + j)
+                .orElse("");
+    }
+
+    @Override
+    public String groupEntriesAsString() throws Exception {
+        return listToString(groupEntries(), SEPARATOR);
+    }
+
+    public String listToString(List<String> lines, String separator) {
+        if (CollectionUtils.isNotEmpty(lines))
+            return lines.stream()
+                    .reduce((i, j) -> i + separator + j)
+                    .orElse("");
+        return "";
+    }
     @Override
     public String userGroupIds() throws Exception {
         return user.getGroups()

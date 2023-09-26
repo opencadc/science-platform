@@ -11,6 +11,11 @@ Kubernetes 1.23 and up are supported.
 See the `required-setup/persistent-volumes.yaml` file for an example.  A Persistent Volume Claim is created on install that
 depends on a Persistent Volume (Or Storage Class) that match the configured labels.
 
+As not all deployers will have privileges to install `PersistentVolume`s, this step is omitted from the installation.  In a Production
+environment, it is likely that one role will create these objects (`base` install), then a deployer role will install the `skaha` system.
+
+![Simple Skaha structure](./skaha.png)
+
 ### From source
 
 Installation depends on a working Kubernetes cluster version 1.23 or greater.

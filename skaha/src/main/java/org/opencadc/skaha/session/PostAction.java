@@ -69,12 +69,20 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
 
+import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -85,23 +93,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import javax.security.auth.Subject;
-
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
 
 /**
  * @author majorb
@@ -144,8 +137,9 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
-    private static final String USER_POSIX_ENTRY = "user.posix.entry";
-    private static final String USER_GROUP_ENTRY = "user.group.entry";
+    private static final String USER_TOKEN = "user.token";
+    private static final String POSIX_USER_MAPPER_SERVICE_URL_KEY = "posix.mapper.user.service.url";
+    private static final String POSIX_GROUP_MAPPER_SERVICE_URL_KEY = "posix.mapper.group.service.url";
 
     public PostAction() {
         super();
@@ -156,7 +150,7 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
 
-        String validatedType = null;
+        final String validatedType;
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
@@ -192,7 +186,7 @@ public class PostAction extends SessionAction {
 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkExistingSessions(userID, validatedType);
+                checkExistingSessions(posixPrincipal.username, validatedType);
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
@@ -219,14 +213,15 @@ public class PostAction extends SessionAction {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
                     if (action.equalsIgnoreCase("renew")) {
-                        Map<String, List<String>> jobNameToAttributesMap = getJobsToRenew(userID, sessionID);
+                        Map<String, List<String>> jobNameToAttributesMap = getJobsToRenew(posixPrincipal.username,
+                                                                                          sessionID);
                         if (!jobNameToAttributesMap.isEmpty()) {
                             for (Map.Entry<String, List<String>> entry : jobNameToAttributesMap.entrySet()) {
                                 renew(entry);
                             }
                         } else {
                             throw new IllegalArgumentException(
-                                    "No active job for user " + userID + " with session " + sessionID);
+                                    "No active job for user " + posixPrincipal + " with session " + sessionID);
                         }
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
@@ -262,8 +257,8 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws IOException, InterruptedException {
-        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
+    void ensureUserBase() throws Exception {
+        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, getUsername()));
 
         if (Files.notExists(homeDir)) {
             log.debug("Allocating new user home to " + homeDir);
@@ -272,10 +267,11 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void allocateUser() throws IOException, InterruptedException {
+    void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getPosixId(), getDefaultQuota()
+                PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
+                getDefaultQuota()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -301,14 +297,6 @@ public class PostAction extends SessionAction {
     void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
             throws IOException, InterruptedException {
         SessionAction.execute(command, standardOut, standardErr);
-    }
-
-    /**
-     * Override to test user ID without processing an entire Request.
-     * @return  String userID, if present.
-     */
-    String getUserID() {
-        return this.userID;
     }
 
     /**
@@ -387,7 +375,7 @@ public class PostAction extends SessionAction {
         long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, userID);
+        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, posixPrincipal.username);
         String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
             long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
@@ -532,8 +520,8 @@ public class PostAction extends SessionAction {
         }
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
-                    maxUserSessions + " active sessions.");
+            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
+                                               maxUserSessions + " active sessions.");
         }
     }
 
@@ -541,15 +529,15 @@ public class PostAction extends SessionAction {
                               Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs)
             throws Exception {
 
-        String jobName = K8SUtil.getJobName(sessionID, type, userID);
-//        String posixID = getPosixId();
-        String posixID = posixUtil.posixId();
-        log.debug("Posix id: " + posixID);
+        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
+        log.debug("supplementalGroups are " + supplementalGroups);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -583,6 +571,8 @@ public class PostAction extends SessionAction {
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
+
+
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
@@ -593,10 +583,12 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
+                                         Integer.toString(posixPrincipal.getUidNumber()));
+        if (StringUtil.hasText(supplementalGroups)) {
+            jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -608,20 +600,26 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
+
+        try {
+            jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
+        } catch (Exception ex) {
+            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
+        }
+
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_MAPPER_SERVICE_URL_KEY,
+                                         lookupUserMapperURL().toExternalForm());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_MAPPER_SERVICE_URL_KEY,
+                                         lookupGroupMapperURL().toExternalForm());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
         String[] launchCmd = new String[] {
                 "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
         // insert the user's proxy cert in the home dir
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectCredentials(subject, userID, posixID);
+        injectCredentials();
 
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
@@ -654,7 +652,8 @@ public class PostAction extends SessionAction {
      * @param image         Container image name.
      * @throws Exception    For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
+                                 Integer limitRAM) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -697,7 +696,6 @@ public class PostAction extends SessionAction {
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-        String posixID = getPosixId();
         String supplementalGroups = getSupplementalGroupsList();
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
@@ -713,7 +711,8 @@ public class PostAction extends SessionAction {
         log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
-        String jobName = sessionID + "-" + appID + "-" + userID.toLowerCase() + "-" + name.toLowerCase();
+        String jobName = sessionID + "-" + appID + "-" + posixPrincipal.username.toLowerCase() + "-"
+                         + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
@@ -738,13 +737,13 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, requestCores.toString());
         launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, limitCores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi");
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM.toString() + "Gi");
-        launchString = setConfigValue(launchString, SKAHA_USERID, userID);
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM + "Gi");
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM + "Gi");
+        launchString = setConfigValue(launchString, SKAHA_USERID, posixPrincipal.username);
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
-        launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
+        launchString = setConfigValue(launchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
         launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
@@ -761,30 +760,7 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectCredentials(subject, userID, posixID);
-    }
-
-    String getPosixId() {
-        Subject s = AuthenticationUtil.getCurrentSubject();
-        Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
-        final int uidNumber;
-
-        if (principals.isEmpty()) {
-            uidNumber = generatePosixID(getUserID());
-        } else {
-            uidNumber = principals.iterator().next().getUidNumber();
-        }
-        return Integer.toString(uidNumber);
-    }
-
-    int generatePosixID(final String usernameKey) {
-        int result = 0;
-        for (final char c : usernameKey.toCharArray()) {
-            result += c;
-        }
-
-        return  1000 + result;
+        injectCredentials();
     }
 
     private String setConfigValue(String doc, String key, String value) {
@@ -843,7 +819,7 @@ public class PostAction extends SessionAction {
         log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
 
-        final String secretName = "harbor-secret-" + userID.toLowerCase();
+        final String secretName = "harbor-secret-" + posixPrincipal.username.toLowerCase();
 
         // delete any old secret by this name
         String[] deleteCmd = new String[] {
@@ -891,24 +867,25 @@ public class PostAction extends SessionAction {
     }
 
 
-    private String getSupplementalGroupsList() {
+    private String getSupplementalGroupsList() throws Exception {
         Subject subject = AuthenticationUtil.getCurrentSubject();
         Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
-        if (groupCreds.size() == 1) {
-            List<Group> memberships = groupCreds.iterator().next();
-            List<Integer> membershipGIDs = memberships.stream().filter(group -> group.gid != null)
-                                                      .map(group -> group.gid).collect(Collectors.toList());
-            log.debug("Adding " + membershipGIDs.size() + " supplemental groups");
-            StringBuilder sb = new StringBuilder();
-            membershipGIDs.forEach(gid -> sb.append(gid).append(", "));
-
-            if (sb.length() > 0) {
-                sb.setLength(sb.length() - 2);
-            }
-            return sb.toString();
+        Set<List<Group>> groupCredentials = subject.getPublicCredentials(c);
+        if (groupCredentials.size() == 1) {
+            return toGIDs(groupCredentials.iterator().next().stream()
+                                          .map(Group::getID)
+                                          .collect(Collectors.toList())
+                         )
+                    .stream()
+                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
+                    .collect(Collectors.joining(","));
+        } else {
+            return "";
         }
-        return "";
+    }
+
+    List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
+        return getPosixMapperClient().getGID(groupURIS);
     }
 
     /**

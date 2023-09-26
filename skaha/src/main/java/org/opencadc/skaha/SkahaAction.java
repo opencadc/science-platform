@@ -70,8 +70,8 @@ package org.opencadc.skaha;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
+import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
@@ -83,10 +83,11 @@ import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.posix.*;
+import org.opencadc.skaha.utils.CollectionUtils;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
@@ -94,6 +95,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
+import java.security.PrivilegedExceptionAction;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -102,6 +104,7 @@ import static java.util.stream.Collectors.toList;
 public abstract class SkahaAction extends RestAction {
 
     private static final Logger log = Logger.getLogger(SkahaAction.class);
+    private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
 
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
@@ -113,7 +116,7 @@ public abstract class SkahaAction extends RestAction {
             SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
             SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
 
-    protected String userID;
+    protected PosixPrincipal posixPrincipal;
     protected boolean adminUser = false;
     protected String server;
     protected String homedir;
@@ -121,10 +124,7 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
-
-    protected Postgress postgress;
-    protected PosixClient posixClient;
-    protected PosixUtil posixUtil;
+    protected final URI posixMapperResourceID;
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -144,12 +144,34 @@ public abstract class SkahaAction extends RestAction {
         } else {
             maxUserSessions = Integer.parseInt(maxUsersSessionsString);
         }
+
+        final String configuredPosixMapperResourceID = System.getenv(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY);
+
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
+        log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
+
+        if (StringUtil.hasText(configuredPosixMapperResourceID)) {
+            posixMapperResourceID = URI.create(configuredPosixMapperResourceID);
+        } else {
+            posixMapperResourceID = null;
+        }
+    }
+
+    protected PosixMapperClient getPosixMapperClient() {
+        return new PosixMapperClient(posixMapperResourceID);
+    }
+
+    protected URL lookupGroupMapperURL() {
+        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_GROUPMAP, AuthMethod.TOKEN);
+    }
+
+    protected URL lookupUserMapperURL() {
+        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_USERMAP, AuthMethod.TOKEN);
     }
 
     @Override
@@ -159,18 +181,20 @@ public abstract class SkahaAction extends RestAction {
 
     protected void initRequest() throws Exception {
 
-        final Subject subject = AuthenticationUtil.getCurrentSubject();
-        log.debug("Subject: " + subject);
+        final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
+        Subject.doAs(currentSubject, (PrivilegedExceptionAction<Subject>) () ->
+                getPosixMapperClient().augment(currentSubject));
+        log.debug("Subject: " + currentSubject);
 
-        if (subject == null || subject.getPrincipals().isEmpty()) {
+        if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
-        Set<HttpPrincipal> httpPrincipals = subject.getPrincipals(HttpPrincipal.class);
-        if (httpPrincipals.isEmpty()) {
-            throw new AccessControlException("No HTTP Principal");
+        Set<PosixPrincipal> posixPrincipals = currentSubject.getPrincipals(PosixPrincipal.class);
+        if (posixPrincipals.isEmpty()) {
+            throw new AccessControlException("No POSIX Principal");
         }
-        userID = httpPrincipals.iterator().next().getName();
-        log.debug("userID: " + userID);
+        posixPrincipal = posixPrincipals.iterator().next();
+        log.debug("userID: " + posixPrincipal);
 
         // ensure user is a part of the skaha group
         if (skahaUsersGroup == null) {
@@ -187,31 +211,20 @@ public abstract class SkahaAction extends RestAction {
             throw new AccessControlException("Not authorized to use the skaha system");
         }
         log.debug("user is a member of skaha user group ");
-        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
+        List<Group> groups = CollectionUtils.isNotEmpty(skahaUsersGroupUriSet) ?
                 skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
                 : new ArrayList<>();
+
         // adding all groups to the Subject
-        subject.getPublicCredentials().add(groups);
-
-        List<String> groupNames = groups.stream()
-                .filter(Objects::nonNull)
-                .map(group -> group.getID().getName())
-                .collect(toList());
-
-        postgress = Postgress.instance()
-                .entityClass(User.class, org.opencadc.skaha.posix.Group.class)
-                .build();
-        posixClient = new PostgresPosixClient(postgress);
-        posixUtil = new PostgresPosixUtil()
-                .userName(userID)
-                .groupNames(groupNames)
-                .homeDir(homedir)
-                .useClient(posixClient);
-        posixUtil.load();
+        currentSubject.getPublicCredentials().add(groups);
     }
 
-    private boolean isNotEmpty(Collection<?> collection) {
-        return null != collection && !collection.isEmpty();
+    protected String getUsername() {
+        return posixPrincipal.username;
+    }
+
+    protected int getUID() {
+        return posixPrincipal.getUidNumber();
     }
 
     /**
