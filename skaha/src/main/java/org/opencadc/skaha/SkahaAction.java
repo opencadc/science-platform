@@ -74,7 +74,6 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -92,11 +91,11 @@ import org.opencadc.skaha.utils.CollectionUtils;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
+import java.security.PrivilegedExceptionAction;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -163,8 +162,7 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
-    protected PosixMapperClient getPosixMapperClient()
-            throws IOException, ResourceNotFoundException {
+    protected PosixMapperClient getPosixMapperClient() {
         return new PosixMapperClient(posixMapperResourceID);
     }
 
@@ -183,13 +181,15 @@ public abstract class SkahaAction extends RestAction {
 
     protected void initRequest() throws Exception {
 
-        final Subject subject = getPosixMapperClient().augment(AuthenticationUtil.getCurrentSubject());
-        log.debug("Subject: " + subject);
+        final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
+        Subject.doAs(currentSubject, (PrivilegedExceptionAction<Subject>) () ->
+                getPosixMapperClient().augment(currentSubject));
+        log.debug("Subject: " + currentSubject);
 
-        if (subject == null || subject.getPrincipals().isEmpty()) {
+        if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
-        Set<PosixPrincipal> posixPrincipals = subject.getPrincipals(PosixPrincipal.class);
+        Set<PosixPrincipal> posixPrincipals = currentSubject.getPrincipals(PosixPrincipal.class);
         if (posixPrincipals.isEmpty()) {
             throw new AccessControlException("No POSIX Principal");
         }
@@ -216,7 +216,7 @@ public abstract class SkahaAction extends RestAction {
                 : new ArrayList<>();
 
         // adding all groups to the Subject
-        subject.getPublicCredentials().add(groups);
+        currentSubject.getPublicCredentials().add(groups);
     }
 
     protected String getUsername() {
