@@ -1,0 +1,42 @@
+# Example Persistent Volume declaration.  The labels to match on is configurable.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: science-platform-volume  # Name is irrelevant
+  labels:
+    storage: local-storage # Labels are VERY relevant.  They should match the values.yaml configuration.
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data/skaha-workload
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop  # Single node docker-desktop for macOS and Windows.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: local-storage-pvc
+  namespace: skaha-system
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      storage: local-storage

@@ -8,4 +8,12 @@ metadata:
 spec:
   rules:
   - host: {{ .Values.deployment.hostname }}
-{{ toYaml .Values.ingress.skahaIngress | nindent 4 }}
+    http:
+      paths:
+      - path: /skaha
+        pathType: Prefix
+        backend:
+          service:
+            name: skaha-tomcat-svc
+            port:
+              number: 8080

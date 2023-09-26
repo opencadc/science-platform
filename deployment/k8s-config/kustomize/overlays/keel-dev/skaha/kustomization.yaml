@@ -8,6 +8,7 @@ configMapGenerator:
 - name: skaha-config
   behavior: merge
   files:
+  - config/cadc-registry.properties
   - config/catalina.properties
   - config/k8s-resources.properties
   - config/launch-carta.yaml
