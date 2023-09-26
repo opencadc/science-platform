@@ -74,6 +74,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.opencadc.auth.PosixMapperClient;
 
+import java.net.URL;
+
 /**
  * @author yeunga
  *
@@ -128,15 +130,25 @@ public class GetActionTests {
         }
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         @Override
         protected String getUsername() {
             return null;
         }
 
         @Override
-        protected PosixMapperClient getPosixMapperClient(String resourceID) {
-            return new TestPosixMapperClient();
+        protected int getUID() {
+            return 32635;
+        }
+
+        @Override
+        protected URL lookupGroupMapperURL() {
+            return null;
+        }
+
+        @Override
+        protected URL lookupUserMapperURL() {
+            return null;
         }
     }
 }

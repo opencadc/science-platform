@@ -76,6 +76,7 @@ import org.opencadc.auth.PosixMapperClient;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URL;
 
 
 public class PostActionTest {
@@ -87,8 +88,13 @@ public class PostActionTest {
     public void allocateUserError() throws Exception {
         final PostAction testSubject = new PostAction() {
             @Override
-            String getUserID() {
+            protected String getUsername() {
                 return "TESTUSER";
+            }
+
+            @Override
+            protected int getUID() {
+                return 997;
             }
 
             @Override
@@ -97,8 +103,13 @@ public class PostActionTest {
             }
 
             @Override
-            protected PosixMapperClient getPosixMapperClient(String resourceID) {
-                return new TestPosixMapperClient();
+            protected URL lookupGroupMapperURL() {
+                return null;
+            }
+
+            @Override
+            protected URL lookupUserMapperURL() {
+                return null;
             }
 
             @Override
@@ -124,8 +135,13 @@ public class PostActionTest {
     public void allocateUser() throws Exception {
         final PostAction testSubject = new PostAction() {
             @Override
-            String getUserID() {
+            protected String getUsername() {
                 return "TESTUSER";
+            }
+
+            @Override
+            protected int getUID() {
+                return 997;
             }
 
             @Override
@@ -134,9 +150,15 @@ public class PostActionTest {
             }
 
             @Override
-            protected PosixMapperClient getPosixMapperClient(String resourceID) {
-                return new TestPosixMapperClient();
+            protected URL lookupGroupMapperURL() {
+                return null;
             }
+
+            @Override
+            protected URL lookupUserMapperURL() {
+                return null;
+            }
+
 
             @Override
             void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)

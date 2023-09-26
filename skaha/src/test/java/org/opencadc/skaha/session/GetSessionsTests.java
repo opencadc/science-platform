@@ -72,6 +72,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,7 +80,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.auth.PosixMapperClient;
 
 
 /**
@@ -176,7 +176,7 @@ public class GetSessionsTests {
         
         @Override
         public List<Session> getAllSessions(String forUserID) throws Exception {
-            List<Session> sessions = new ArrayList<Session>();
+            List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
                 Session session = constructSession(line);
@@ -191,8 +191,18 @@ public class GetSessionsTests {
         }
 
         @Override
-        protected PosixMapperClient getPosixMapperClient(String resourceID) {
-            return new TestPosixMapperClient();
+        protected int getUID() {
+            return 997;
+        }
+
+        @Override
+        protected URL lookupGroupMapperURL() {
+            return null;
+        }
+
+        @Override
+        protected URL lookupUserMapperURL() {
+            return null;
         }
     }
 }

@@ -1,13 +1,12 @@
-# Default values for skaha.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Sample Local install values file.
 
-# Default values for skaha.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+replicaCount: 1
+
+# It's best to keep these set as such, unless you're willing to change these in several places.
 skaha:
   namespace: skaha-system
-skaha-workload:
+skahaWorkload:
   namespace: skaha-workload
 
 # Skaha web service deployment
@@ -29,6 +28,10 @@ deployment:
     usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
+
+    # The Resource ID of the Service that contains the Posix Mapping information
+    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -75,25 +78,27 @@ deployment:
   #   name: java-debug
 
 # Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
 storage:
   service:
     spec:
-      cephfs:
-        monitors:
-        - 10.30.201.3:6789
-        - 10.30.202.3:6789
-        - 10.30.203.3:6789
-        path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
-        user: kanfarnetes_dev
-        secretRef:
-          name: cephfs-cephx-key
-        readOnly: false
+      persistentVolumeClaim:
+        claimName: local-storage-pvc
   sessions:
     claim:
       # storageClassName: ""
       labels:
-        storage: keel-dev-cephfs
+        storage: local-storage
 
-# If the base is already installed.
+# If the base is already installed.  Omission defaults to true, so beware.
 science-platform-base:
   install: false

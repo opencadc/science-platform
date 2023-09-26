@@ -34,10 +34,11 @@ spec:
       initContainers:
       - name: init-notebook
         image: ${software.imageid}
-        command: ["/skaha-system/init-jupyterlab.sh"]
+        command: ["/skaha-system/init-users-groups.sh"]
         args:
-        - ${user.posix.entry}
-        - ${user.group.entry}
+        - ${user.token}
+        - ${posix.mapper.user.service.url}
+        - ${posix.mapper.group.service.url}
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd

@@ -138,6 +138,8 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String USER_TOKEN = "user.token";
+    private static final String POSIX_USER_MAPPER_SERVICE_URL_KEY = "posix.mapper.user.service.url";
+    private static final String POSIX_GROUP_MAPPER_SERVICE_URL_KEY = "posix.mapper.group.service.url";
 
     public PostAction() {
         super();
@@ -256,7 +258,7 @@ public class PostAction extends SessionAction {
     }
 
     void ensureUserBase() throws Exception {
-        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.posixPrincipal));
+        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, getUsername()));
 
         if (Files.notExists(homeDir)) {
             log.debug("Allocating new user home to " + homeDir);
@@ -268,7 +270,8 @@ public class PostAction extends SessionAction {
     void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getDefaultQuota()
+                PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
+                getDefaultQuota()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -294,14 +297,6 @@ public class PostAction extends SessionAction {
     void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
             throws IOException, InterruptedException {
         SessionAction.execute(command, standardOut, standardErr);
-    }
-
-    /**
-     * Override to test user ID without processing an entire Request.
-     * @return  String userID, if present.
-     */
-    String getUserID() {
-        return this.posixPrincipal.username;
     }
 
     /**
@@ -525,7 +520,7 @@ public class PostAction extends SessionAction {
         }
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + posixPrincipal + " has reached the maximum of " +
+            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
                                                maxUserSessions + " active sessions.");
         }
     }
@@ -588,8 +583,9 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, posixPrincipal.username);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
+                                         Integer.toString(posixPrincipal.getUidNumber()));
         if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
@@ -604,8 +600,6 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-//        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, uidPosixEntries());
-//        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntriesAsString());
 
         try {
             jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
@@ -613,6 +607,10 @@ public class PostAction extends SessionAction {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
 
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_MAPPER_SERVICE_URL_KEY,
+                                         lookupUserMapperURL().toExternalForm());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_MAPPER_SERVICE_URL_KEY,
+                                         lookupGroupMapperURL().toExternalForm());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String[] launchCmd = new String[] {
@@ -698,7 +696,6 @@ public class PostAction extends SessionAction {
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-//        String posixID = posixUtil.posixId();
         String supplementalGroups = getSupplementalGroupsList();
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
@@ -870,21 +867,25 @@ public class PostAction extends SessionAction {
     }
 
 
-    private String getSupplementalGroupsList() {
+    private String getSupplementalGroupsList() throws Exception {
         Subject subject = AuthenticationUtil.getCurrentSubject();
         Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
         Set<List<Group>> groupCredentials = subject.getPublicCredentials(c);
         if (groupCredentials.size() == 1) {
-            return posixMapperClient.getGID(groupCredentials.iterator().next().stream()
-                                                            .map(Group::getID)
-                                                            .collect(Collectors.toList())
-                                           )
-                                    .stream()
-                                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
-                                    .collect(Collectors.joining(","));
+            return toGIDs(groupCredentials.iterator().next().stream()
+                                          .map(Group::getID)
+                                          .collect(Collectors.toList())
+                         )
+                    .stream()
+                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
+                    .collect(Collectors.joining(","));
         } else {
             return "";
         }
+    }
+
+    List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
+        return getPosixMapperClient().getGID(groupURIS);
     }
 
     /**

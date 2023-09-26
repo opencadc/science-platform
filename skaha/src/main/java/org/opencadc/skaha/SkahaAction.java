@@ -74,6 +74,7 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -91,6 +92,7 @@ import org.opencadc.skaha.utils.CollectionUtils;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
@@ -123,8 +125,7 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
-
-    protected PosixMapperClient posixMapperClient;
+    protected final URI posixMapperResourceID;
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -155,11 +156,24 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
 
-        posixMapperClient = getPosixMapperClient(configuredPosixMapperResourceID);
+        if (StringUtil.hasText(configuredPosixMapperResourceID)) {
+            posixMapperResourceID = URI.create(configuredPosixMapperResourceID);
+        } else {
+            posixMapperResourceID = null;
+        }
     }
 
-    protected PosixMapperClient getPosixMapperClient(final String resourceID) {
-        return new PosixMapperClient(URI.create(resourceID));
+    protected PosixMapperClient getPosixMapperClient()
+            throws IOException, ResourceNotFoundException {
+        return new PosixMapperClient(posixMapperResourceID);
+    }
+
+    protected URL lookupGroupMapperURL() {
+        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_GROUPMAP, AuthMethod.TOKEN);
+    }
+
+    protected URL lookupUserMapperURL() {
+        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_USERMAP, AuthMethod.TOKEN);
     }
 
     @Override
@@ -169,7 +183,7 @@ public abstract class SkahaAction extends RestAction {
 
     protected void initRequest() throws Exception {
 
-        final Subject subject = AuthenticationUtil.getCurrentSubject();
+        final Subject subject = getPosixMapperClient().augment(AuthenticationUtil.getCurrentSubject());
         log.debug("Subject: " + subject);
 
         if (subject == null || subject.getPrincipals().isEmpty()) {
@@ -207,6 +221,10 @@ public abstract class SkahaAction extends RestAction {
 
     protected String getUsername() {
         return posixPrincipal.username;
+    }
+
+    protected int getUID() {
+        return posixPrincipal.getUidNumber();
     }
 
     /**
