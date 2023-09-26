@@ -1,3 +1,5 @@
+# Good template for a local (laptop) installation.
+
 kubernetesClusterDomain: cluster.local
 skaha:
   namespace: skaha-system
