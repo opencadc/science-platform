@@ -74,14 +74,7 @@ import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
 
-import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -92,7 +85,23 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javax.security.auth.Subject;
+
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
 
 /**
  * @author majorb
@@ -135,7 +144,6 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
-    private static final String USER_TOKEN = "user.token";
     private static final String USER_POSIX_ENTRY = "user.posix.entry";
     private static final String USER_GROUP_ENTRY = "user.group.entry";
 
@@ -254,7 +262,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws Exception {
+    void ensureUserBase() throws IOException, InterruptedException {
         final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
 
         if (Files.notExists(homeDir)) {
@@ -264,7 +272,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void allocateUser() throws Exception {
+    void allocateUser() throws IOException, InterruptedException {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
                 PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getPosixId(), getDefaultQuota()
@@ -541,11 +549,7 @@ public class PostAction extends SessionAction {
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-//        String supplementalGroups = getSupplementalGroupsList();
-        String supplementalGroups = posixUtil.userGroupIds();
-        log.debug("supplementalGroups are " + supplementalGroups);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Subject subject = AuthenticationUtil.getCurrentSubject();
+        String supplementalGroups = getSupplementalGroupsList();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -579,8 +583,6 @@ public class PostAction extends SessionAction {
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
-
-
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
@@ -593,7 +595,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -605,24 +608,19 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntriesAsString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntriesAsString());
-
-        try {
-            jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
-        } catch (Exception ex) {
-            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
-        }
-
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+
         String[] launchCmd = new String[] {
                 "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
         // insert the user's proxy cert in the home dir
-
+        Subject subject = AuthenticationUtil.getCurrentSubject();
         injectCredentials(subject, userID, posixID);
 
         if (servicePath != null) {
@@ -767,14 +765,13 @@ public class PostAction extends SessionAction {
         injectCredentials(subject, userID, posixID);
     }
 
-    String getPosixId() throws Exception {
+    String getPosixId() {
         Subject s = AuthenticationUtil.getCurrentSubject();
         Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
         final int uidNumber;
 
         if (principals.isEmpty()) {
-//            uidNumber = generatePosixID(getUserID());
-            uidNumber = Integer.parseInt(posixUtil.posixId());
+            uidNumber = generatePosixID(getUserID());
         } else {
             uidNumber = principals.iterator().next().getUidNumber();
         }
@@ -900,17 +897,16 @@ public class PostAction extends SessionAction {
         Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
         if (groupCreds.size() == 1) {
             List<Group> memberships = groupCreds.iterator().next();
-            log.debug("Adding " + memberships.size() + " supplemental groups");
-            if (!memberships.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (Group g : memberships) {
-                    final int groupID =
-                            Objects.requireNonNullElseGet(g.gid, () -> generatePosixID(g.getID().getName()));
-                    sb.append(groupID).append(", ");
-                }
+            List<Integer> membershipGIDs = memberships.stream().filter(group -> group.gid != null)
+                                                      .map(group -> group.gid).collect(Collectors.toList());
+            log.debug("Adding " + membershipGIDs.size() + " supplemental groups");
+            StringBuilder sb = new StringBuilder();
+            membershipGIDs.forEach(gid -> sb.append(gid).append(", "));
+
+            if (sb.length() > 0) {
                 sb.setLength(sb.length() - 2);
-                return sb.toString();
             }
+            return sb.toString();
         }
         return "";
     }
@@ -945,10 +941,6 @@ public class PostAction extends SessionAction {
             }
         }
         sb.append("\n        env:");
-        sb.append("\n        - name: HOME");
-        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
-        sb.append("\n        - name: PWD");
-        sb.append("\n          value: \"").append(homedir).append("/").append(userID).append("\"");
         if (envs != null && !envs.isEmpty()) {
             for (String env : envs) {
                 String[] keyVal = env.split("=");
