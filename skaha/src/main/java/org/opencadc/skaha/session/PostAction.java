@@ -146,6 +146,7 @@ public class PostAction extends SessionAction {
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String USER_POSIX_ENTRY = "user.posix.entry";
     private static final String USER_GROUP_ENTRY = "user.group.entry";
+    private static final String USER_TOKEN = "user.token";
 
     public PostAction() {
         super();
@@ -262,7 +263,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws IOException, InterruptedException {
+    void ensureUserBase() throws Exception {
         final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
 
         if (Files.notExists(homeDir)) {
@@ -272,7 +273,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void allocateUser() throws IOException, InterruptedException {
+    void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
         final String[] allocateUserCommand = new String[] {
                 PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getPosixId(), getDefaultQuota()
@@ -542,14 +543,16 @@ public class PostAction extends SessionAction {
             throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, userID);
-//        String posixID = getPosixId();
-        String posixID = posixUtil.posixId();
+        String posixID = getPosixId();
         log.debug("Posix id: " + posixID);
 
         final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-        String supplementalGroups = getSupplementalGroupsList();
+//        String supplementalGroups = getSupplementalGroupsList();
+        String supplementalGroups = posixUtil.userGroupIds();
+        log.debug("supplementalGroups are " + supplementalGroups);
+        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -595,8 +598,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-//        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, posixUtil.userGroupIds());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -608,8 +610,13 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntry());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_POSIX_ENTRY, posixUtil.posixEntriesAsString());
+        jobLaunchString = setConfigValue(jobLaunchString, USER_GROUP_ENTRY, posixUtil.groupEntriesAsString());
+        try {
+            jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
+        } catch (Exception ex) {
+            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
+        }
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -620,7 +627,6 @@ public class PostAction extends SessionAction {
         log.debug("Create job result: " + createResult);
 
         // insert the user's proxy cert in the home dir
-        Subject subject = AuthenticationUtil.getCurrentSubject();
         injectCredentials(subject, userID, posixID);
 
         if (servicePath != null) {
@@ -765,13 +771,14 @@ public class PostAction extends SessionAction {
         injectCredentials(subject, userID, posixID);
     }
 
-    String getPosixId() {
+    String getPosixId() throws Exception {
         Subject s = AuthenticationUtil.getCurrentSubject();
         Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
         final int uidNumber;
 
         if (principals.isEmpty()) {
-            uidNumber = generatePosixID(getUserID());
+//            uidNumber = generatePosixID(getUserID());
+            uidNumber = Integer.parseInt(posixUtil.posixId());
         } else {
             uidNumber = principals.iterator().next().getUidNumber();
         }
