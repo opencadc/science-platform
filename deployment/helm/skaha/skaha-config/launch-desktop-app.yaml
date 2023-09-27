@@ -29,6 +29,24 @@ spec:
         supplementalGroups: [${skaha.supgroups}]
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
+      initContainers:
+      - name: init-users-groups
+        image: ${software.imageid}
+        command: ["/init-users-groups/init-users-groups.sh"]
+        args:
+        - ${user.token}
+        - ${posix.mapper.user.service.url}
+        - ${posix.mapper.group.service.url}
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/init-users-groups"
+          name: init-users-groups
+        securityContext:
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
       containers:
       - name: "${software.containername}"
         command: ["/skaha-system/start-desktop-software.sh"]
@@ -64,6 +82,12 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
         - mountPath: "/skaha-system"
           name: start-desktop-software
         - mountPath: "/arc"
@@ -77,8 +101,16 @@ spec:
         configMap:
           name: start-desktop-software
           defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc  
       - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
         emptyDir: {}

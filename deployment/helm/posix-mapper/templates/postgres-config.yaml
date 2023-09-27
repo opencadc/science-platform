@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: posix-mapper-postgres-config
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    app: posix-mapper-postgres
+data:
+  POSTGRES_DB: {{ .Values.postgresql.auth.database }}
+  POSTGRES_USER: {{ .Values.postgresql.auth.username }}
+  POSTGRES_PASSWORD: {{ .Values.postgresql.auth.password }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: posix-mapper-postgres-init
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    app: posix-mapper-postgres
+data:
+  init_schema.sql: |
+      create schema {{ .Values.postgresql.auth.schema }};
