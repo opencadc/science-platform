@@ -1,10 +1,13 @@
-# Example Persistent Volume declaration.  The labels to match on is configurable.
+# Example Persistent Volume declaration for the Skaha web service to use.  The labels to match on is configurable.  This is for LOCAL storage 
+# only for the services (i.e. running on a laptop), and will not be installed by default, but could be used on a new Cluster.
+# In the values file for Skaha, the name of the PersistentVolumeClaim below will be referenced.
+{{- if .Values.storage.session.create }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: science-platform-volume  # Name is irrelevant
   labels:
-    storage: local-storage # Labels are VERY relevant.  They should match the values.yaml configuration.
+{{- toYaml .Values.storage.session.labels | nindent 4 }}
 spec:
   capacity:
     storage: 10Gi
@@ -29,8 +32,8 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: local-storage-pvc
-  namespace: skaha-system
+  name: {{ .Values.skahaWorkload.namespace }}-cavern-pvc
+  namespace: {{ .Values.skahaWorkload.namespace }}
 spec:
   accessModes:
   - ReadWriteMany
@@ -39,4 +42,5 @@ spec:
       storage: 5Gi
   selector:
     matchLabels:
-      storage: local-storage
+{{- toYaml .Values.storage.session.labels | nindent 6 }}
+{{ end }}

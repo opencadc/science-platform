@@ -1,6 +1,4 @@
-# Default values for skaha.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Sample Local install values file.
 
 # Tell Kubernetes to spin up multiple instances.  Defaults to 1.
 replicaCount: 1
@@ -13,7 +11,7 @@ skahaWorkload:
 
 # Skaha web service deployment
 deployment:
-  hostname: myhost.example.com  # Change this!
+  hostname: example.host.com # Change this!
   skaha:
     image: images.canfar.net/skaha-system/skaha:0.13.0
     imagePullPolicy: IfNotPresent
@@ -26,12 +24,14 @@ deployment:
     registryHosts: "images.canfar.net"
 
     # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users" 
+    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperURI: "ivo://opencadc.org/posix-mapper"
+    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -55,48 +55,60 @@ deployment:
     #   protocol: TCP
 
     # Optionally mount a custom CA certificate
-    # extraVolumeMounts:
-    # - mountPath: "/config/cacerts"
-    #   name: cacert-volume
+    extraVolumeMounts:
+    - mountPath: "/config/cacerts"
+      name: cacert-volume
 
     # If the base names have changed, then change them here, otherwise leave them.
     priorityClassName: uber-user-preempt-high
     serviceAccountName: skaha
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
-    # extraVolumes:
-    # - name: cacert-volume
-    #   secret:
-    #     defaultMode: 420
-    #     secretName: skaha-cacert-secret
+    extraVolumes:
+    - name: cacert-volume
+      secret:
+        defaultMode: 420
+        secretName: skaha-cacert-secret
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  # skaha-cacert-secret:
-  #   ca.crt: <base64 encoded CA crt>
+  skaha-cacert-secret:
+    ca.crt: <base64 encoded CA crt>
   servops-clientcert:
     # Set the cadcproxy.pem!
-    # cadcproxy.pem: <base64 encoded PEM servops certificate>
+    cadcproxy.pem: <base64 encoded PEM crt>
 
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:
-#   skaha:
-#     extraPorts:
-  #   - port: 5555
-  #     protocol: TCP
-  #     name: java-debug
+#   extraPorts:
+  # - port: 5555
+  #   protocol: TCP
+  #   name: java-debug
 
-# Set these appropriately to match your Persistent Volume labels.
+# Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
 storage:
   service:
     spec:
-      # YAML for service mounted storage
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
   sessions:
     claim:
       # storageClassName: ""
       labels:
-        storage: local-storage
+        storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
 
 # If the base is already installed.  Omission defaults to true, so beware.
+# See the template values file (https://github.com/opencadc/science-platform/blob/SP-3544/deployment/helm/base/values-template.yaml)
+# for all options.
 science-platform-base:
   install: false

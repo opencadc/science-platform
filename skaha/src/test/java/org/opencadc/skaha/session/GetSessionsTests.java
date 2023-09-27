@@ -72,6 +72,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,8 +80,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.skaha.session.GetAction;
-import org.opencadc.skaha.session.Session;
+
 
 /**
  * @author majorb
@@ -172,11 +172,11 @@ public class GetSessionsTests {
         }
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         
         @Override
         public List<Session> getAllSessions(String forUserID) throws Exception {
-            List<Session> sessions = new ArrayList<Session>();
+            List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
                 Session session = constructSession(line);
@@ -184,6 +184,25 @@ public class GetSessionsTests {
             }
             return sessions;
         }
-        
+
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected int getUID() {
+            return 997;
+        }
+
+        @Override
+        protected URL lookupGroupMapperURL() {
+            return null;
+        }
+
+        @Override
+        protected URL lookupUserMapperURL() {
+            return null;
+        }
     }
 }

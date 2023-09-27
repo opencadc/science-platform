@@ -149,7 +149,7 @@ public class GetAction extends SkahaAction {
         }
 
         // process each project in its own thread
-        List<Image> images = new ArrayList<Image>();
+        List<Image> images = new ArrayList<>();
         ExecutorService taskExecutor = null;
         try {
             if (tasks.size() > MAX_PROJECT_NTHREADS) {

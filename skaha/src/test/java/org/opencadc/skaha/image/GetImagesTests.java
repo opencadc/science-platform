@@ -71,6 +71,7 @@ import ca.nrc.cadc.util.Log4jInit;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -79,6 +80,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.auth.PosixMapperClient;
+import org.opencadc.skaha.session.TestPosixMapperClient;
 
 /**
  * @author majorb
@@ -197,7 +200,7 @@ public class GetImagesTests {
         
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         
         @Override
         protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
@@ -216,6 +219,26 @@ public class GetImagesTests {
         @Override
         protected String getIdToken() {
             return "";
+        }
+
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected int getUID() {
+            return 747;
+        }
+
+        @Override
+        protected URL lookupGroupMapperURL() {
+            return null;
+        }
+
+        @Override
+        protected URL lookupUserMapperURL() {
+            return null;
         }
     }
 }
