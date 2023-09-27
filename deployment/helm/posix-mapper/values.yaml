@@ -9,7 +9,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
-    image: images.opencadc.org/posix-mapper:0.1.0
+    image: images.opencadc.org/platform/posix-mapper:0.1.0
     imagePullPolicy: IfNotPresent
 
     # Optionally set the DEBUG port.
@@ -62,3 +62,8 @@ postgresql:
     spec:
       hostPath:
         path: "/posix-mapper/data"
+
+# An omission equals true, so set this explicitly.
+base:
+  install: false
+

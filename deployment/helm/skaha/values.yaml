@@ -15,7 +15,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.canfar.net/skaha-system/skaha:0.13.0
+    image: images.opencadc.org/platform/skaha:0.13.0
     imagePullPolicy: IfNotPresent
     homeDir: "/arc/home"
     maxUserSessions: "3"
@@ -97,6 +97,6 @@ storage:
       labels:
         storage: local-storage
 
-# If the base is already installed.  Omission defaults to true, so beware.
-science-platform-base:
+# If the base is already installed.  Omission defaults to true, so set this explicitly.
+base:
   install: false

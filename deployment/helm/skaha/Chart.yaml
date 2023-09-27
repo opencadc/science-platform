@@ -24,7 +24,7 @@ version: 0.2.1
 appVersion: "0.13.0"
 
 dependencies:
-  - name: science-platform-base
+  - name: base
     version: "0.1.5"
-    repository: "https://images.canfar.net/chartrepo/skaha-system"
-    condition: science-platform-base.install
+    repository: "https://images.opencadc.org/chartrepo/platform"
+    condition: base.install
