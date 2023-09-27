@@ -57,6 +57,7 @@ postgresql:
     username: posixmapper
     password: posixmapperpwd
     database: mapping
+    schema: mapping
   storage:
     spec:
       hostPath:

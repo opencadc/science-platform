@@ -19,4 +19,4 @@ metadata:
     app: posix-mapper-postgres
 data:
   init_schema.sql: |
-      create schema mapping;
+      create schema {{ .Values.postgresql.auth.schema }};

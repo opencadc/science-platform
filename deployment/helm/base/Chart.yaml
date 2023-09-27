@@ -1,5 +1,5 @@
 apiVersion: v2
-name: science-platform-base
+name: base
 description: "A Helm chart to install base components of the CANFAR Science Platform"
 # A chart can be either an 'application' or a 'library' chart.
 #

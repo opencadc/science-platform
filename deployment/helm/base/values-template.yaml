@@ -21,9 +21,6 @@ storage:
     storage: local-storage
 
 secrets:
-  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted to use client certificates.
-  # cacert-secret:
-  #   ca.crt: <base64 encoded CA crt>
   # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
   # For server domains with self-signed certificates, add the Base64 encoded file content here.
     # tls.crt: <base64 encoded server cert>
