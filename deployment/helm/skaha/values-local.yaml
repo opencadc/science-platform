@@ -11,7 +11,7 @@ skahaWorkload:
 
 # Skaha web service deployment
 deployment:
-  hostname: proxy.host.name  # Change this!
+  hostname: example.host.com # Change this!
   skaha:
     image: images.canfar.net/skaha-system/skaha:0.13.0
     imagePullPolicy: IfNotPresent
@@ -24,8 +24,8 @@ deployment:
     registryHosts: "images.canfar.net"
 
     # The group name to verify users against for permission to use the Science Platform.
-    # usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
-    usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
+    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
@@ -55,20 +55,28 @@ deployment:
     #   protocol: TCP
 
     # Optionally mount a custom CA certificate
-    # extraVolumeMounts:
-    # - mountPath: "/config/cacerts"
-    #   name: cacert-volume
+    extraVolumeMounts:
+    - mountPath: "/config/cacerts"
+      name: cacert-volume
 
     # If the base names have changed, then change them here, otherwise leave them.
     priorityClassName: uber-user-preempt-high
     serviceAccountName: skaha
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
-    # extraVolumes:
-    # - name: cacert-volume
-    #   secret:
-    #     defaultMode: 420
-    #     secretName: cacert-secret
+    extraVolumes:
+    - name: cacert-volume
+      secret:
+        defaultMode: 420
+        secretName: skaha-cacert-secret
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  skaha-cacert-secret:
+    ca.crt: <base64 encoded CA crt>
+  servops-clientcert:
+    # Set the cadcproxy.pem!
+    cadcproxy.pem: <base64 encoded PEM crt>
 
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:

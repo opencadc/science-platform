@@ -68,16 +68,12 @@ deployment:
     # - name: cacert-volume
     #   secret:
     #     defaultMode: 420
-    #     secretName: cacert-secret
+    #     secretName: skaha-cacert-secret
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  # cacert-secret:
+  # skaha-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
-  # Server certificates for Traefik to use for SSL termination.  Must match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName below.
-  # default-certificate:
-    # tls.crt: <base64 encoded server cert>
-    # tls.key: <base64 encoded server key>
   servops-clientcert:
     # Set the cadcproxy.pem!
     # cadcproxy.pem: <base64 encoded PEM servops certificate>
