@@ -5,7 +5,7 @@ replicaCount: 1
 skaha:
   namespace: skaha-system
 
-# Skaha web service deployment
+# POSIX Mapper web service deployment
 deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
