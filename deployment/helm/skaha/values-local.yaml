@@ -92,13 +92,15 @@ storage:
   service:
     spec:
       persistentVolumeClaim:
-        claimName: local-storage-pvc
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
   sessions:
     claim:
       # storageClassName: ""
       labels:
-        storage: local-storage
+        storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
 
 # If the base is already installed.  Omission defaults to true, so beware.
+# See the template values file (https://github.com/opencadc/science-platform/blob/SP-3544/deployment/helm/base/values-template.yaml)
+# for all options.
 science-platform-base:
   install: false

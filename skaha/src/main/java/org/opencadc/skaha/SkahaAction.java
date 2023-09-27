@@ -182,8 +182,6 @@ public abstract class SkahaAction extends RestAction {
     protected void initRequest() throws Exception {
 
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-        Subject.doAs(currentSubject, (PrivilegedExceptionAction<Subject>) () ->
-                getPosixMapperClient().augment(currentSubject));
         log.debug("Subject: " + currentSubject);
 
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
