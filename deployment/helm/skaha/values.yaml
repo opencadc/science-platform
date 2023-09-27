@@ -31,7 +31,7 @@ deployment:
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperURI: "ivo://opencadc.org/posix-mapper"
+    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
     registryURL: https://spsrc27.iaa.csic.es/reg
 
     # Optionally set the DEBUG port.
