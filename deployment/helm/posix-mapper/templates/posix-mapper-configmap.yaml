@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: posix-mapper-config
+  namespace: {{ .Values.skaha.namespace }}
+data:
+  {{- (.Files.Glob "config/*").AsConfig | nindent 2 }}
