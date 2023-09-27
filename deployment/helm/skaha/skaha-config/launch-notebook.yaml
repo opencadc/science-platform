@@ -108,7 +108,7 @@ spec:
           subPath: passwd
         - mountPath: "/etc/group"
           name: etc-group
-          subPath: group  
+          subPath: group
         - mountPath: "/skaha-system"
           name: start-jupyterlab
         - mountPath: "/arc"
