@@ -6,16 +6,6 @@
 
 Kubernetes 1.23 and up are supported.
 
-#### Volumes
-
-See the `required-setup/persistent-volumes.yaml` file for an example.  A Persistent Volume Claim is created on install that
-depends on a Persistent Volume (Or Storage Class) that match the configured labels.
-
-As not all deployers will have privileges to install `PersistentVolume`s, this step is omitted from the installation.  In a Production
-environment, it is likely that one role will create these objects (`base` install), then a deployer role will install the `skaha` system.
-
-![Simple Skaha structure](./skaha.png)
-
 ### From source
 
 Installation depends on a working Kubernetes cluster version 1.23 or greater.
@@ -30,11 +20,11 @@ $ helm install --dependency-update --values ./base/values.yaml <name> ./base
 
 Where `<name>` is the name of this installation.  Example:
 ```sh
-$ helm install --dependency-update --values ./base/values.yaml canfar-science-platform-base ./base
+$ helm install --dependency-update --values ./base/values.yaml base ./base
 ```
 This will create the core namespace (`skaha-system`), and install the Traefik proxy dependency.  Expected output:
 ```
-NAME: canfar-science-platform-base
+NAME: base
 LAST DEPLOYED: <Timestamp e.g. Fri Jun 30 10:39:04 2023>
 NAMESPACE: skaha-system
 STATUS: deployed
