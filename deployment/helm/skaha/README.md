@@ -1,5 +1,7 @@
 # Helm Chart for the Skaha web service CANFAR Science Platform
 
+See the [Deployment Guide](../README.md) for a better idea of a full system.
+
 ## Install
 
 The `values-local.yaml` and `values-k8s.yaml` provide different configuration for your deployment.  This `README` will focus on the
@@ -7,14 +9,9 @@ The `values-local.yaml` and `values-k8s.yaml` provide different configuration fo
 
 It is assumed that the `base` install has already been performed.  See https://github.com/opencadc/science-platform/tree/SP-3544/deployment/helm/base.
 
-It is also assumed that an IVOA Registry is running that will direct service lookups to appropriate URLs.  A sample deployment of such a Registry
-can be found at https://github.com/at88mph/science-platform/tree/SP-3544-LOCAL/deployment/reg.  Copy it, update necessary values, and run `kubectl apply -k ./` inside the reg folder.
+It is assumed that the `posix-mapper` install has already been performed.  See https://github.com/opencadc/science-platform/tree/SP-3544/deployment/helm/posix-mapper.
 
-### Dependencies
-
-A valid base64-encoded Client Proxy Certificate called `cadcproxy.pem` is required to be put into the list of secrets in `values-local.yaml` file.  
-
-Kubernetes 1.14 and up are supported.
+It is also assumed that an IVOA Registry is running that will direct service lookups to appropriate URLs.
 
 ### From source
 
@@ -25,16 +22,16 @@ The base install also installs the Traefik proxy, which is needed by the Ingress
 ```sh
 $ git clone https://github.com/opencadc/science-platform.git
 $ cd science-platform/deployment/helm
-$ helm install --dependency-update --values ./skaha/values-local.yaml <name> ./skaha
+$ helm install -n skaha-system --dependency-update --values my-values-local.yaml <name> ./skaha
 ```
 
 Where `<name>` is the name of this installation.  Example:
 ```sh
-$ helm install --dependency-update --values ./skaha/values-local.yaml canfar-science-platform-base ./skaha
+$ helm install -n skaha-system --dependency-update --values my-values-local.yaml skaha ./skaha
 ```
-This will install the Harbor service dependency, as well as the Skaha webservice and any necessary Ingress.
+This will install Skaha service dependency, as well as the Skaha webservice and any necessary Ingress.
 ```
-NAME: canfar-science-platform-skaha
+NAME: skaha
 LAST DEPLOYED: <Timestamp e.g. Fri Jun 30 10:39:04 2023>
 STATUS: deployed
 REVISION: 1
@@ -46,20 +43,10 @@ TEST SUITE: None
 After the install, there should exist the necessary Namespaces and Objects.  See the Namespaces:
 
 ```sh
-$ kubectl get services -A
+$ kubectl -n skaha-system get services
 NAME                   STATUS   AGE
 ...
-default        harbor                       ClusterIP      10.102.253.73    <none>        80/TCP,4443/TCP              41m
-default        skaha-harbor-core            ClusterIP      10.100.19.190    <none>        80/TCP                       41m
-default        skaha-harbor-database        ClusterIP      10.97.16.95      <none>        5432/TCP                     41m
-default        skaha-harbor-jobservice      ClusterIP      10.99.11.91      <none>        80/TCP                       41m
-default        skaha-harbor-notary-server   ClusterIP      10.106.9.205     <none>        4443/TCP                     41m
-default        skaha-harbor-notary-signer   ClusterIP      10.102.43.0      <none>        7899/TCP                     41m
-default        skaha-harbor-portal          ClusterIP      10.97.203.76     <none>        80/TCP                       41m
-default        skaha-harbor-redis           ClusterIP      10.106.76.136    <none>        6379/TCP                     41m
-default        skaha-harbor-registry        ClusterIP      10.97.41.121     <none>        5000/TCP,8080/TCP            41m
-default        skaha-harbor-trivy           ClusterIP      10.100.142.130   <none>        8080/TCP                     41m
-skaha-system   skaha-tomcat-svc             ClusterIP      10.108.202.148   <none>        8080/TCP,5555/TCP            41m
+skaha-system   skaha-tomcat-svc             ClusterIP      10.108.202.148   <none>        8080/TCP            41m
 ```
 
 The [IVOA VOSI availability](https://www.ivoa.net/documents/VOSI/20170524/REC-VOSI-1.1.html#tth_sEc5.5) endpoint can be used to 

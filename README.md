@@ -28,6 +28,10 @@ skaha is a general purpose online platform for running science containers intera
 
 The CANFAR Science Platform Architecture.  Skaha is the API to the Science Platform box.
 
+## Helm Installation
+
+Deploying the Skaha service is made up of a small number of Helm installations.  See the [Deployment Guide](./deployment/helm/README.md) for installations.
+
 ## System Components
 
 Components of skaha are containers that can be scaled out on a cluster of nodes to meet the storage and processing demands of the scientific software containers.
