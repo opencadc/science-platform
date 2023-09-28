@@ -19,7 +19,7 @@ spec:
   persistentVolumeReclaimPolicy: Delete
   storageClassName: local-storage
   local:
-    path: /data/skaha
+    path: /data
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -27,7 +27,7 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - docker-desktop  # Single node docker-desktop for macOS and Windows.
+            - docker-desktop  # Single node docker-desktop for macOS and Windows.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -38,10 +38,12 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 spec:
   accessModes:
-  - ReadWriteMany
+    - ReadWriteMany
+  volumeName: skaha-volume
+  storageClassName: local-storage
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
   selector:
     matchLabels:
 {{- toYaml .Values.storage.service.labels | nindent 6 }}

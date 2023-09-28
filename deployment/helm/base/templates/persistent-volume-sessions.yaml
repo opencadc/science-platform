@@ -17,7 +17,7 @@ spec:
   persistentVolumeReclaimPolicy: Delete
   storageClassName: local-storage
   local:
-    path: /data/skaha-workload
+    path: /data
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -36,10 +36,12 @@ metadata:
   namespace: {{ .Values.skahaWorkload.namespace }}
 spec:
   accessModes:
-  - ReadWriteMany
+    - ReadWriteMany
+  storageClassName: local-storage
+  volumeName: science-platform-volume
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
   selector:
     matchLabels:
 {{- toYaml .Values.storage.session.labels | nindent 6 }}
