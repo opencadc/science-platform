@@ -25,6 +25,6 @@ appVersion: "0.13.0"
 
 dependencies:
   - name: posixmapper
-    version: "0.1.3"
+    version: "0.1.4"
     repository: "https://images.opencadc.org/chartrepo/platform"
     condition: posixmapper.install
