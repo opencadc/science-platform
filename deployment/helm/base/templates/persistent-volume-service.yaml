@@ -2,33 +2,9 @@
 # when Skaha is installed.  This is done by matching th labels.  The intent is that a Cluster Administrator will have a PersistentVolume setup,
 # and will direct deployers on what label to use to bind to it.
 # This will be used by the User Sessions when starting up to gain access to the shared Storage with the Skaha service.
+# This default will create a hostPath volume with no declared PV.
 #
 {{- if .Values.storage.service.create }}
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: skaha-volume  # Name is irrelevant
-  labels:
-{{- toYaml .Values.storage.service.labels | nindent 4 }}
-spec:
-  capacity:
-    storage: 10Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Delete
-  storageClassName: local-storage
-  local:
-    path: /data/skaha
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - docker-desktop  # Single node docker-desktop for macOS and Windows.
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -38,10 +14,11 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 spec:
   accessModes:
-  - ReadWriteMany
+    - ReadWriteMany
+  # storageClassName: local-storage
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
   selector:
     matchLabels:
 {{- toYaml .Values.storage.service.labels | nindent 6 }}
