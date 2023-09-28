@@ -12,7 +12,7 @@ helm repo add science-platform https://images.opencadc.org/chartrepo/platform
 helm repo update
 
 helm install --values my-base-local-values-file.yaml base science-platform/base
-helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posix-mapper science-platform/posix-mapper
+helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
 ```
 
@@ -123,7 +123,7 @@ secrets:
 #   storage:
 #     spec:
 #       hostPath:
-#         path: "/posix-mapper/data"
+#         path: "/posixmapper/data"
 
 # An omission equals true, so set this explicitly to false as we already installed it.
 base:
@@ -132,7 +132,7 @@ base:
 
 It is recommended to install into the `skaha-system` namespace, but not required.
 ```bash
-helm install -n skaha-system  --values posix-mapper-values-local.yaml posixmapper science-platform/posix-mapper
+helm install -n skaha-system  --values posixmapper-values-local.yaml posixmapper science-platform/posixmapper
 
 NAME: posixmapper
 LAST DEPLOYED: Thu Sep 28 07:28:45 2023
