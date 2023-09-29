@@ -1,25 +1,9 @@
 # Sample Local install values file.
 
-# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
-replicaCount: 1
-
-# It's best to keep these set as such, unless you're willing to change these in several places.
-skaha:
-  namespace: skaha-system
-skahaWorkload:
-  namespace: skaha-workload
-
 # Skaha web service deployment
 deployment:
   hostname: example.host.com # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.13.0
-    imagePullPolicy: IfNotPresent
-    homeDir: "/arc/home"
-    maxUserSessions: "3"
-    sessionExpiry: "345600"
-    defaultQuotaGB: "10"
-
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
 
@@ -74,9 +58,6 @@ secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   skaha-cacert-secret:
     ca.crt: <base64 encoded CA crt>
-  servops-clientcert:
-    # Set the cadcproxy.pem!
-    cadcproxy.pem: <base64 encoded PEM crt>
 
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:

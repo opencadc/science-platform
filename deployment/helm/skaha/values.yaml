@@ -75,9 +75,6 @@ secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
-  servops-clientcert:
-    # Set the cadcproxy.pem!
-    # cadcproxy.pem: <base64 encoded PEM servops certificate>
 
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:
