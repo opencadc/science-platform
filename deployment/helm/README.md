@@ -30,10 +30,10 @@ helm repo update
 
 The [Base](base) install will create ServiceAccount, Role, Namespace, and RBAC objects needed to place the Skaha service.
 
-Create a `base-values-local.yaml` file to override Values from the main [template `values.yaml` file](base/values.yaml).  Mainly the
+Create a `my-base-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](base/values.yaml).  Mainly the
 Traefik Default Server certificate (optional if needed):
 
-`base-values-local.yaml`
+`my-base-local-values-file.yaml`
 ```yaml
 secrets:
     default-certificate:
@@ -42,7 +42,7 @@ secrets:
 ```
 
 ```bash
-helm install --values base-values-local.yaml base science-platform/base
+helm install --values my-base-local-values-file.yaml base science-platform/base
 
 NAME: base
 LAST DEPLOYED: Thu Sep 28 07:28:45 2023
@@ -235,7 +235,7 @@ posixmapper:
 
 It is recommended to install into the `skaha-system` namespace, but not required.
 ```bash
-helm install -n skaha-system --values skaha-values-local.yaml skaha science-platform/skaha
+helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
 
 NAME: skaha
 LAST DEPLOYED: Thu Sep 28 07:31:10 2023
