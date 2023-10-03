@@ -57,9 +57,9 @@ The [POSIX Mapper Service](posix-mapper) is required to provide a UID to Usernam
 
 This service is required to be installed _before_ the Skaha service.
 
-Create a `posix-mapper-values-local.yaml` file to override Values from the main [template `values.yaml` file](posix-mapper/values.yaml).
+Create a `my-posix-mapper-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](posix-mapper/values.yaml).
 
-`posix-mapper-values-local.yaml`
+`my-posix-mapper-local-values-file.yaml`
 ```yaml
 # POSIX Mapper web service deployment
 deployment:
@@ -132,7 +132,7 @@ base:
 
 It is recommended to install into the `skaha-system` namespace, but not required.
 ```bash
-helm install -n skaha-system  --values posixmapper-values-local.yaml posixmapper science-platform/posixmapper
+helm install -n skaha-system  --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 
 NAME: posixmapper
 LAST DEPLOYED: Thu Sep 28 07:28:45 2023
