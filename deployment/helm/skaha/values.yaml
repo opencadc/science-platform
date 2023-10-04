@@ -32,6 +32,13 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+
+    # URI or URL of the OIDC (IAM) server
+    oidcURI: https://ska-iam.stfc.ac.uk/
+
+    # ID (URI) of the GMS Service.
+    gmsID: ivo://skao.int/gms
+
     registryURL: https://spsrc27.iaa.csic.es/reg
 
     # Optionally set the DEBUG port.
