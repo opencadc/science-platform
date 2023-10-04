@@ -91,11 +91,6 @@ storage:
       # YAML for service mounted storage
       persistentVolumeClaim:
         claimName: skaha-pvc
-  sessions:
-    claim:
-      # storageClassName: ""
-      labels:
-        storage: local-storage
 
 # If the posixmapper is already installed.  Omission defaults to true, so set this explicitly.
 posixmapper:
