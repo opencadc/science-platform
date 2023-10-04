@@ -26,5 +26,5 @@ data:
     ca.nrc.cadc.auth.PrincipalExtractor.enableClientCertHeader=true
     ca.nrc.cadc.util.Log4jInit.messageOnly=true
     # (default: ca.nrc.cadc.auth.NoOpIdentityManager)
-    ca.nrc.cadc.auth.IdentityManager=org.opencadc.auth.StandardIdentityManager
+    ca.nrc.cadc.auth.IdentityManager={{ .Values.deployment.skaha.identityManagerClass }}
   {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}
