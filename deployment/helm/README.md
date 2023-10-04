@@ -107,6 +107,13 @@ deployment:
     #     defaultMode: 420
     #     secretName: posix-manager-cacert-secret
 
+# Declare the storage for the skaha service to use.
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
 #   posix-manager-cacert-secret:
