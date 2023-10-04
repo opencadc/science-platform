@@ -222,6 +222,23 @@ deployment:
     #     defaultMode: 420
     #     secretName: posix-manager-cacert-secret
 
+# Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
 #   posix-manager-cacert-secret:
