@@ -64,6 +64,9 @@ deployment:
     priorityClassName: uber-user-preempt-high
     serviceAccountName: skaha
 
+    # The IdentityManager class handling authentication.  This should generally be left alone
+    identityManagerClass: org.opencadc.auth.StandardIdentityManager
+
     # Create the CA certificate volume to be mounted in extraVolumeMounts
     # extraVolumes:
     # - name: cacert-volume
