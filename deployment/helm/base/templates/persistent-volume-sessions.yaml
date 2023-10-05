@@ -14,7 +14,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  # storageClassName: local-storage
+  storageClassName: hostpath
+  volumeMode: Filesystem
   resources:
     requests:
       storage: 10Gi
