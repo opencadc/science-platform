@@ -215,7 +215,14 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    registryURL: https://nrc-023054.cadc.dao.nrc.ca/reg
+
+    # URI or URL of the OIDC (IAM) server
+    # oidcURI: https://ska-iam.stfc.ac.uk/
+
+    # ID (URI) of the GMS Service.
+    # gmsID: ivo://skao.int/gms
+
+    registryURL: https://spsrc27.iaa.csic.es/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
