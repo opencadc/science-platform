@@ -15,7 +15,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: hostpath
+  {{- if .Values.storage.service.storageClassName }}
+  storageClassName: {{ .Values.storage.service.storageClassName -}}
+  {{ end }}
   volumeMode: Filesystem
   resources:
     requests:

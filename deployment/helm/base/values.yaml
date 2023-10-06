@@ -14,11 +14,15 @@ storage:
     claimName: skaha-pvc
     labels:
       storage: skaha-storage # Labels are VERY relevant.  They should match the values.yaml configuration.  Match this up with the PersistentVolumeClaim when installing Skaha.
+    # Only use the storageClassName if create is set to true.  It can be left commented out to use the default class.
+    # storageClassName: hostpath
 
   # Whether to create the PersistentVolume that will provide a PersistentVolumeClaim to the User Sesisons.
   session:
     create: false
     storage: local-storage
+    # Only use the storageClassName if create is set to true.  It can be left commented out to use the default class.
+    # storageClassName: hostpath
 
 secrets:
   # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
