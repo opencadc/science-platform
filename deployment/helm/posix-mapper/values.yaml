@@ -7,10 +7,12 @@ skaha:
 
 # POSIX Mapper web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  hostname: posix-mapper-tomcat-svc.skaha-system.svc.cluster.local    # Change this!
   posixMapper:
-    image: images.opencadc.org/platform/posix-mapper:0.2.0
-    imagePullPolicy: IfNotPresent
+    # image: images.opencadc.org/platform/posix-mapper:0.2.0
+    image: abhishek1009/posix-mapper:latest
+    # imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     resourceID: ivo://opencadc.org/posix-mapper
 
     # Optionally set the DEBUG port.
@@ -31,12 +33,13 @@ deployment:
         memory: "500M"
         cpu: "500m"
       limits:
-        memory: "500M"
-        cpu: "500m"
+        memory: "1500M"
+        cpu: "1500m"
 
-    minUID: 1000
+    minUID: 10000
     minGID: 900000
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # registryURL: https://spsrc27.iaa.csic.es/reg
+    registryURL: http://reg.skaha-system.svc.cluster.local/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -52,8 +55,8 @@ deployment:
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  posix-manager-cacert-secret:
-    ca.crt: <base64 encoded ca crt>
+  # posix-manager-cacert-secret:
+  #   ca.crt: <base64 encoded ca crt>
 
 # These values are preset in the catalina.properties, and this default database only exists beside this service.
 # It's usually safe to leave these as-is, but make sure they match the values in catalina.properties.
