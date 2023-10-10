@@ -140,6 +140,7 @@ public class PostAction extends SessionAction {
     private static final String USER_TOKEN = "user.token";
     private static final String POSIX_USER_MAPPER_SERVICE_URL_KEY = "posix.mapper.user.service.url";
     private static final String POSIX_GROUP_MAPPER_SERVICE_URL_KEY = "posix.mapper.group.service.url";
+    private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
         super();
@@ -611,6 +612,7 @@ public class PostAction extends SessionAction {
                                          lookupUserMapperURL().toExternalForm());
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_MAPPER_SERVICE_URL_KEY,
                                          lookupGroupMapperURL().toExternalForm());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String[] launchCmd = new String[] {
