@@ -56,7 +56,7 @@ spec:
         - "${skaha.hostname}"
         env:
         - name: HOME
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: VNC_PW
           value: "${skaha.sessionid}"
         - name: skaha_hostname
@@ -97,7 +97,7 @@ spec:
           name: templates
         - mountPath: "/skaha-system"
           name: start-desktop
-        - mountPath: "/arc"
+        - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"

@@ -55,7 +55,7 @@ spec:
         - ${software.containerparam}
         env:
         - name: HOME
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: DISPLAY
           value: "${software.targetip}"
         - name: GDK_SYNCHRONIZE
@@ -67,7 +67,7 @@ spec:
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
-        workingDir: "/arc/home/${skaha.userid}"
+        workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
         imagePullPolicy: Always
         resources:
           requests:
@@ -90,7 +90,7 @@ spec:
           subPath: group
         - mountPath: "/skaha-system"
           name: start-desktop-software
-        - mountPath: "/arc"
+        - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"
