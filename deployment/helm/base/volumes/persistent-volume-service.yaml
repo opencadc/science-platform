@@ -5,6 +5,33 @@
 # This default will create a hostPath volume with no declared PV.
 #
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-pv
+  labels:
+    storage: skaha-storage
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
@@ -13,11 +40,12 @@ metadata:
   namespace: skaha-system
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   volumeMode: Filesystem
+  storageClassName: local-storage
   resources:
     requests:
       storage: 10Gi
   selector:
     matchLabels:
-      storage: skaha-storage
+      storage: skaha-storage 
