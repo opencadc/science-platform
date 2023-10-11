@@ -138,8 +138,8 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String USER_TOKEN = "user.token";
-    private static final String POSIX_USER_MAPPER_SERVICE_URL_KEY = "posix.mapper.user.service.url";
-    private static final String POSIX_GROUP_MAPPER_SERVICE_URL_KEY = "posix.mapper.group.service.url";
+    private static final String POSIX_USER_ENTRY = "posix.user.entry";
+    private static final String POSIX_GROUP_ENTRY = "posix.group.entry";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
@@ -607,11 +607,8 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_MAPPER_SERVICE_URL_KEY,
-                                         lookupUserMapperURL().toExternalForm());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_MAPPER_SERVICE_URL_KEY,
-                                         lookupGroupMapperURL().toExternalForm());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_ENTRY, userEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_ENTRY, groupEntries());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
@@ -868,16 +865,17 @@ public class PostAction extends SessionAction {
         return secretName;
     }
 
-
+    private String userEntry() {
+        return String.format("%s:x:%d:%d::%s/home/%s:/bin/bash",
+                posixPrincipal.username,
+                posixPrincipal.getUidNumber(), posixPrincipal.getUidNumber(),
+                skahaTld, posixPrincipal.username
+        );
+    }
     private String getSupplementalGroupsList() throws Exception {
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        Set<List<Group>> groupCredentials = subject.getPublicCredentials(c);
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
-            return toGIDs(groupCredentials.iterator().next().stream()
-                                          .map(Group::getID)
-                                          .collect(Collectors.toList())
-                         )
+            return buildGroupUriList(groupCredentials)
                     .stream()
                     .map(posixGroup -> Integer.toString(posixGroup.getGID()))
                     .collect(Collectors.joining(","));
@@ -886,8 +884,39 @@ public class PostAction extends SessionAction {
         }
     }
 
+    private String groupEntries() throws Exception {
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        if (groupCredentials.size() == 1) {
+            return groupEntry(posixPrincipal.username, posixPrincipal.getUidNumber(), posixPrincipal.username)
+                    + ";"
+                    + buildGroupUriList(groupCredentials).stream()
+                    .map(group -> groupEntry(group.getGroupURI().getName(), group.getGID(), posixPrincipal.username))
+                    .collect(Collectors.joining(";"));
+        } else {
+            return "";
+        }
+    }
+
+    private String groupEntry(String groupName, int gid, String username) {
+        return String.format("%s:x:%d:%s", groupName, gid, username);
+    }
+
+    private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
+        return toGIDs(groupCredentials.iterator().next().stream()
+                .map(Group::getID)
+                .collect(Collectors.toList())
+        );
+    }
+
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
         return getPosixMapperClient().getGID(groupURIS);
+    }
+
+    private static Set<List<Group>> getCachedGroupsFromSubject() {
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
+        Set<List<Group>> groupCredentials = subject.getPublicCredentials(c);
+        return groupCredentials;
     }
 
     /**
