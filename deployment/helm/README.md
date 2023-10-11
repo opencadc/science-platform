@@ -51,6 +51,24 @@ STATUS: deployed
 REVISION: 1
 ```
 
+### Persistent Volumes and Persistent Volume Claims
+
+**Note** 
+The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims! 
+
+It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at
+this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
+
+#### Required Persistent Volume Claim
+
+It is expected that there is a Persistent Volume Claim with the name of the Skaha Workload namespace hyphenated with `cavern-pvc`.  This will provide the
+backing storage to the User Sessions.  Using the default values, this means:
+
+`skaha-workload-cavern-pvc`
+
+will exist as a Persistent Volume Claim in the `skaha-workload` namespace.
+
+
 ### POSIX Mapper install
 
 The [POSIX Mapper Service](posix-mapper) is required to provide a UID to Username mapping, and a GID to Group Name mapping so that any Terminal access properly showed System Users in User Sessions.  It will generate UIDs when a user is requested, or a GID when a Group is requested, and then keep track of them.
@@ -87,7 +105,7 @@ deployment:
         cpu: "500m"
 
     # Used to set the minimum UID.  Useful to avoid conflicts.
-    minUID: 1000
+    minUID: 10000
 
     # Used to set the minimum GID.  Keep this much higher than the minUID so that default Groups can be set for new users.
     minGID: 900000
@@ -276,7 +294,6 @@ curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" https://example.host.com
 
 []%
 
-
 # xxxxxx is the returned session ID.
 curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" -d "ram=1" -d "cores=1" -d "image=images.canfar.net/canucs/canucs:1.2.5" -d "name=myjupyternotebook" "https://example.host.com/skaha/v0/session"
 
@@ -286,7 +303,6 @@ xxxxxx
 ## Obtaining a Bearer Token
 
 See the [JIRA Confluence page](https://confluence.skatelescope.org/display/SRCSC/RED-10+Using+oidc-agent+to+authenticate+to+OpenCADC+services) on obtaining a Bearer Token.
-
 
 ## Flow
 
