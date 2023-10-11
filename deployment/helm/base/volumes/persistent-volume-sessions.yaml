@@ -3,25 +3,20 @@
 # In the values file for Skaha, the name of the PersistentVolumeClaim below will be referenced.
 # This default will create a hostPath volume with no declared PV.
 #
-{{- if .Values.storage.session.create }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: {{ .Values.skahaWorkload.namespace }}-cavern-pvc
-  namespace: {{ .Values.skahaWorkload.namespace }}
+  name: skaha-workload-cavern-pvc
+  namespace: skaha-workload
 spec:
   accessModes:
     - ReadWriteMany
-  {{- if .Values.storage.session.storageClassName }}
-  storageClassName: {{ .Values.storage.session.storageClassName -}}
-  {{ end }}
   volumeMode: Filesystem
   resources:
     requests:
       storage: 10Gi
   selector:
     matchLabels:
-{{- toYaml .Values.storage.session.labels | nindent 6 }}
-{{ end }}
+      storage: local-storage

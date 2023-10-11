@@ -4,25 +4,20 @@
 # This will be used by the User Sessions when starting up to gain access to the shared Storage with the Skaha service.
 # This default will create a hostPath volume with no declared PV.
 #
-{{- if .Values.storage.service.create }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: {{ .Values.storage.service.claimName }}
-  namespace: {{ .Values.skaha.namespace }}
+  name: skaha-pvc
+  namespace: skaha-system
 spec:
   accessModes:
     - ReadWriteMany
-  {{- if .Values.storage.service.storageClassName }}
-  storageClassName: {{ .Values.storage.service.storageClassName -}}
-  {{ end }}
   volumeMode: Filesystem
   resources:
     requests:
       storage: 10Gi
   selector:
     matchLabels:
-{{- toYaml .Values.storage.service.labels | nindent 6 }}
-{{ end }}
+      storage: skaha-storage
