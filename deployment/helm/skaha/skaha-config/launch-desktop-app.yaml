@@ -35,8 +35,8 @@ spec:
         command: ["/init-users-groups/init-users-groups.sh"]
         args:
         - ${user.token}
-        - ${posix.mapper.user.service.url}
-        - ${posix.mapper.group.service.url}
+        - ${posix.user.entry}
+        - ${posix.group.entry}
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd

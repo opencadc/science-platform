@@ -726,6 +726,7 @@ public class PostAction extends SessionAction {
         }
 
         String gpuScheduling = getGPUScheduling(0);
+        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         String launchString = new String(launchBytes, StandardCharsets.UTF_8);
         launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
@@ -747,6 +748,14 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
+
+        try {
+            launchString = setConfigValue(launchString, USER_TOKEN, token(subject).getCredentials());
+        } catch (Exception ex) {
+            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
+        }
+        launchString = setConfigValue(launchString, POSIX_USER_ENTRY, userEntry());
+        launchString = setConfigValue(launchString, POSIX_GROUP_ENTRY, groupEntries());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
