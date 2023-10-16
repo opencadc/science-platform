@@ -99,7 +99,7 @@ spec:
       volumes:
       - name: start-desktop-software
         configMap:
-          name: start-desktop-software
+          name: launch-scripts
           defaultMode: 0777
       - name: init-users-groups
         configMap:

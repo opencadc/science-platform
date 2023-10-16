@@ -110,7 +110,7 @@ spec:
           defaultMode: 0777
       - name: start-desktop
         configMap:
-          name: start-desktop
+          name: launch-scripts
           defaultMode: 0777
       - name: cavern-volume
         persistentVolumeClaim:

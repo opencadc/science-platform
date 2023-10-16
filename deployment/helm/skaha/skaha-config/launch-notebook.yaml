@@ -120,7 +120,7 @@ spec:
       volumes:
       - name: start-jupyterlab
         configMap:
-          name: start-jupyterlab
+          name: launch-scripts
           defaultMode: 0777
       - name: init-users-groups
         configMap:
