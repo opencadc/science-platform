@@ -1,6 +1,7 @@
 #!/bin/bash
 
 HOST=$1
+TOKEN=$2
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
