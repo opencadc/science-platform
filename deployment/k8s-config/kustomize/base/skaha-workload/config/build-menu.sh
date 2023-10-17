@@ -12,11 +12,18 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
-ds9_version="ds9:"
-ds9_terminal_version="ds9-terminal:"
-terminal_version="terminal:"
-topcat_version="topcat:"
-topcat_terminal_version="topcat-terminal:"
+declare -A app_version
+
+init_app_version () {
+  while IFS= read -r line; do
+    apps_to_add="${line}"
+  done < ${STARTUP_DIR}/desktop-apps-icon.properties
+
+  for app_name in ${apps_to_add}
+  do
+    app_version[${app_name}]="${app_name}:"
+  done
+}
 
 init_dir () {
   if [[ -d "$1" ]]; then
@@ -28,6 +35,7 @@ init_dir () {
 }
 
 init () {
+  init_app_version
   dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
     init_dir ${dir}
@@ -126,19 +134,11 @@ build_menu () {
 }
 
 update_desktop () {
-  script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/$1.desktop.template /tmp/$1.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/$1.desktop
-  cp /tmp/$1.desktop /headless/Desktop/$1.desktop
-  rm /tmp/$1.desktop
-}
-
-update_terminal_desktop () {
-  script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/terminal.desktop.template /tmp/terminal.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/terminal.desktop
-  cp /tmp/terminal.desktop $1
-  rm /tmp/terminal.desktop
+  script_name="${EXECUTABLE_DIR}/$3.sh"
+  cp ${STARTUP_DIR}/$2.desktop.template /tmp/$2.desktop
+  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/$2.desktop
+  cp /tmp/$2.desktop $1
+  rm /tmp/$2.desktop
 }
 
 build_menu_item () {
@@ -158,35 +158,17 @@ build_menu_item () {
   sed -i -e "s#(NAME)#${name}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ ${image_id} == *"/skaha/ds9"* ]]; then
-    name_version_array=($(echo $name | tr ":" "\n"))
-    short_name=${name_version_array[0]}
-    # ds9 desktop accessed via ds9 icon on desktop
-    if [[ ${name} == *"${ds9_version}"* && "${name}" > "${ds9_version}" ]]; then
-      ds9_version=${name}
-      update_desktop ${short_name} ${name}
-    elif [[ ${name} == *"${ds9_terminal_version}"* && "${name}" > "${ds9_terminal_version}" ]]; then
-      ds9_terminal_version=${name}
-      update_desktop ${short_name} ${name}
-    fi
-  fi
-  if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${terminal_version}" ]]; then
-    terminal_version=${name}
-    # terminal.desktop accessed via "Applications->terminal"
-    update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
-    # terminal.desktop accessed via terminal icon on desktop
-    update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
-  fi
-  if [[ ${image_id} == *"/skaha/topcat"* ]]; then
-    name_version_array=($(echo $name | tr ":" "\n"))
-    short_name=${name_version_array[0]}
-    # topcat desktop accessed via topcat icon on desktop
-    if [[ ${name} == *"${topcat_version}"* && "${name}" > "${topcat_version}" ]]; then
-      topcat_version=${name}
-      update_desktop ${short_name} ${name}
-    elif [[ ${name} == *"${topcat_terminal_version}"* && "${name}" > "${topcat_terminal_version}" ]]; then
-      topcat_terminal_version=${name}
-      update_desktop ${short_name} ${name}
+  name_version_array=($(echo $name | tr ":" "\n"))
+  short_name=${name_version_array[0]}
+  if [[ "${apps_to_add}" =~ (" "|^)${short_name}(" "|$) ]]; then
+    if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
+      app_version[${short_name}]="${name}"
+      # accessed via icon on desktop
+      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
+      if [[ "${short_name}" == "terminal" ]]; then
+        # accessed via "Applications->terminal" as well
+        update_desktop /usr/share/applications/${short_name}.desktop ${short_name} ${name}
+      fi
     fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
