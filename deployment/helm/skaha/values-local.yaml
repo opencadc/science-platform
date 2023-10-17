@@ -2,7 +2,7 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: example.host.com # Change this!
+  hostname: skaha-tomcat-svc.skaha-system.svc.cluster.local # Change this!
   skaha:
     image: abhishek1009/skaha:latest
     imagePullPolicy: Always

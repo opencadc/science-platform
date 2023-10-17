@@ -53,7 +53,8 @@ spec:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
         args:
-        - "${skaha.hostname}"
+        - ${skaha.hostname}
+        - ${user.token}
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"

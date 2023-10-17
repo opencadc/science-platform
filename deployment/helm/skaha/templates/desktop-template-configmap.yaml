@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: templates
+  namespace: {{ .Values.skahaWorkload.namespace }}
+data:
+  {{- (.Files.Glob "desktop-template/*").AsConfig | nindent 2 }}
