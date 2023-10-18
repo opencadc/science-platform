@@ -178,30 +178,27 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/v0/image?type=desktop-app | grep '"id"')
-if [[ ${apps} == *"id"* ]]; then
-  project_array=()
-  while IFS= read -r line
-  do
-    parts_array=($(echo $line | tr "\"" "\n"))
-    if [[ ${#parts_array[@]} -ge 4 && ${parts_array[0]} == "id" ]]; then
-      image_id=${parts_array[2]}
-      echo "[skaha] image_id: ${image_id}"
-      image_array=($(echo ${image_id} | tr "/" "\n"))
-      if [[ ${#image_array[@]} -ge 3 ]]; then
-        project=${image_array[1]}
-        name=${image_array[2]}
-	if [[ ! " ${project_array[*]} " =~ " ${project} " ]]; then
-          project_array=(${project_array[@]} ${project})
-          build_menu ${project} ${name}
-        fi
-          build_menu_item ${image_id} ${name} ${project}
-      fi
-    fi
-  done < <(printf '%s\n' "$apps")
-else
+curl_out=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/v0/image?type=desktop-app)
+if [[ $(echo ${curl_out} | jq '[.[] | .id | length] | add') == 0 ]]; then
   echo "[skaha] no desktop-app"
+  echo "${curl_out}"
   exit 1
+else
+  image_id_list=$(echo ${curl_out} | jq -r '.[] | .id')
+  for image_id in ${image_id_list}
+  do
+    echo "[skaha] image_id: ${image_id}"
+    image_array=($(echo ${image_id} | tr "/" "\n"))
+    if [[ ${#image_array[@]} -ge 3 ]]; then
+      project=${image_array[1]}
+      name=${image_array[2]}
+      if [[ ! " ${project_array[*]} " =~ " ${project} " ]]; then
+        project_array=(${project_array[@]} ${project})
+        build_menu ${project} ${name}
+      fi
+      build_menu_item ${image_id} ${name} ${project}
+    fi
+  done
 fi
 complete_merged_applications_menu
 echo "[skaha] Finish building menu."
