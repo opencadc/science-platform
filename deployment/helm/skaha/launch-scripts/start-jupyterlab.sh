@@ -7,7 +7,7 @@ cd ${HOME}
 
 
 mkdir -p ${HOME}/.token
-echo $2 >> ${HOME}/.token/Bearer
+echo $2 > ${HOME}/.token/Bearer
 
 jupyter lab \
 	--NotebookApp.base_url=session/notebook/"$1" \

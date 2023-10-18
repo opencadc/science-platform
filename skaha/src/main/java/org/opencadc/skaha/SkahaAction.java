@@ -121,6 +121,7 @@ public abstract class SkahaAction extends RestAction {
     protected String server;
     protected String homedir;
     protected String scratchdir;
+    protected String skahaTld;
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
@@ -129,6 +130,7 @@ public abstract class SkahaAction extends RestAction {
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
         homedir = System.getenv("skaha.homedir");
+        skahaTld= System.getenv("SKAHA_TLD");
         scratchdir = System.getenv("skaha.scratchdir");
         String harborHostList = System.getenv("skaha.harborhosts");
         if (harborHostList == null) {
@@ -149,6 +151,7 @@ public abstract class SkahaAction extends RestAction {
 
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
+        log.debug("SKAHA_TLD=" + skahaTld);
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
