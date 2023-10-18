@@ -15,9 +15,10 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.13.0
+    image: images.opencadc.org/platform/skaha:0.14.0
     imagePullPolicy: IfNotPresent
-    homeDir: "/arc/home"
+    # homeDir: "/arc/home"
+    skahaTld: "/arc"
     maxUserSessions: "3"
     sessionExpiry: "345600"
     defaultQuotaGB: "10"

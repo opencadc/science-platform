@@ -72,9 +72,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.auth.PosixMapperClient;
-
-import java.net.URL;
 
 /**
  * @author yeunga
@@ -139,16 +136,6 @@ public class GetActionTests {
         @Override
         protected int getUID() {
             return 32635;
-        }
-
-        @Override
-        protected URL lookupGroupMapperURL() {
-            return null;
-        }
-
-        @Override
-        protected URL lookupUserMapperURL() {
-            return null;
         }
     }
 }

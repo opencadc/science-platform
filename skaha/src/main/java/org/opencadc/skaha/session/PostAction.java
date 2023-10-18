@@ -138,8 +138,9 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String USER_TOKEN = "user.token";
-    private static final String POSIX_USER_MAPPER_SERVICE_URL_KEY = "posix.mapper.user.service.url";
-    private static final String POSIX_GROUP_MAPPER_SERVICE_URL_KEY = "posix.mapper.group.service.url";
+    private static final String POSIX_USER_ENTRY = "posix.user.entry";
+    private static final String POSIX_GROUP_ENTRY = "posix.group.entry";
+    private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
         super();
@@ -397,7 +398,35 @@ public class PostAction extends SessionAction {
     }
 
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        final List<String> getRenewJobNamesCmd = PostAction.getRenewJobNamesCmd(forUserID, sessionID);
+
+        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
+        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
+
+        Map<String, List<String>> renewJobMap = new HashMap<>();
+        if (StringUtil.hasLength(renewJobNamesStr)) {
+            String[] lines = renewJobNamesStr.split("\n");
+            for (String line : lines) {
+                List<String> renewJobAttributes = new ArrayList<>();
+                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
+                String jobName = parts[0];
+                String uid = parts[1];
+                String isActive = parts[2];
+                String startTime = parts[3];
+                // look for the job ID of an active session
+                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
+                    renewJobAttributes.add(uid);
+                    renewJobAttributes.add(startTime);
+                    renewJobMap.put(jobName, renewJobAttributes);
+                }
+            }
+        }
+
+        return renewJobMap;
+    }
+
+    private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
+        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getRenewJobNamesCmd = new ArrayList<>();
         getRenewJobNamesCmd.add("kubectl");
         getRenewJobNamesCmd.add("get");
@@ -416,30 +445,7 @@ public class PostAction extends SessionAction {
                 "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
-
-        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
-        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
-
-        Map<String, List<String>> renewJobMap = new HashMap<String, List<String>>();
-        if (StringUtil.hasLength(renewJobNamesStr)) {
-            String[] lines = renewJobNamesStr.split("\n");
-            for (String line : lines) {
-                List<String> renewJobAttributes = new ArrayList<String>();
-                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                String jobName = parts[0];
-                String uid = parts[1];
-                String isActive = parts[2];
-                String startTime = parts[3];
-                // look for the job ID of an active session
-                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
-                    renewJobAttributes.add(uid);
-                    renewJobAttributes.add(startTime);
-                    renewJobMap.put(jobName, renewJobAttributes);
-                }
-            }
-        }
-
-        return renewJobMap;
+        return getRenewJobNamesCmd;
     }
 
     private void validateName(String name) {
@@ -606,11 +612,9 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_MAPPER_SERVICE_URL_KEY,
-                                         lookupUserMapperURL().toExternalForm());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_MAPPER_SERVICE_URL_KEY,
-                                         lookupGroupMapperURL().toExternalForm());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_ENTRY, userEntry());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_ENTRY, groupEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
         String[] launchCmd = new String[] {
@@ -727,6 +731,7 @@ public class PostAction extends SessionAction {
         }
 
         String gpuScheduling = getGPUScheduling(0);
+        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         String launchString = new String(launchBytes, StandardCharsets.UTF_8);
         launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
@@ -749,6 +754,14 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
 
+        try {
+            launchString = setConfigValue(launchString, USER_TOKEN, token(subject).getCredentials());
+        } catch (Exception ex) {
+            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
+        }
+        launchString = setConfigValue(launchString, POSIX_USER_ENTRY, userEntry());
+        launchString = setConfigValue(launchString, POSIX_GROUP_ENTRY, groupEntries());
+        launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
 
@@ -866,16 +879,17 @@ public class PostAction extends SessionAction {
         return secretName;
     }
 
-
+    private String userEntry() {
+        return String.format("%s:x:%d:%d::%s/home/%s:/bin/bash",
+                posixPrincipal.username,
+                posixPrincipal.getUidNumber(), posixPrincipal.getUidNumber(),
+                skahaTld, posixPrincipal.username
+        );
+    }
     private String getSupplementalGroupsList() throws Exception {
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        Set<List<Group>> groupCredentials = subject.getPublicCredentials(c);
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
-            return toGIDs(groupCredentials.iterator().next().stream()
-                                          .map(Group::getID)
-                                          .collect(Collectors.toList())
-                         )
+            return buildGroupUriList(groupCredentials)
                     .stream()
                     .map(posixGroup -> Integer.toString(posixGroup.getGID()))
                     .collect(Collectors.joining(","));
@@ -884,8 +898,38 @@ public class PostAction extends SessionAction {
         }
     }
 
+    private String groupEntries() throws Exception {
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        if (groupCredentials.size() == 1) {
+            return groupEntry(posixPrincipal.username, posixPrincipal.getUidNumber(), posixPrincipal.username)
+                    + ";"
+                    + buildGroupUriList(groupCredentials).stream()
+                    .map(group -> groupEntry(group.getGroupURI().getName(), group.getGID(), posixPrincipal.username))
+                    .collect(Collectors.joining(";"));
+        } else {
+            return "";
+        }
+    }
+
+    private String groupEntry(String groupName, int gid, String username) {
+        return String.format("%s:x:%d:%s", groupName, gid, username);
+    }
+
+    private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
+        return toGIDs(groupCredentials.iterator().next().stream()
+                .map(Group::getID)
+                .collect(Collectors.toList())
+        );
+    }
+
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
-        return getPosixMapperClient().getGID(groupURIS);
+        return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIS);
+    }
+
+    private static Set<List<Group>> getCachedGroupsFromSubject() {
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
+        return subject.getPublicCredentials(c);
     }
 
     /**

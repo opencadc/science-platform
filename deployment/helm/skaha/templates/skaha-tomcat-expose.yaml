@@ -10,6 +10,10 @@ spec:
   - port: 8080
     name: http-connection
     protocol: TCP
+  - port: 80
+    targetPort: 8080
+    name: http-connection-automatic
+    protocol: TCP  
   {{ with .Values.service }}
     {{ with .skaha }}
       {{ with .extraPorts }}

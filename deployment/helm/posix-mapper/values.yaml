@@ -34,7 +34,7 @@ deployment:
         memory: "500M"
         cpu: "500m"
 
-    minUID: 1000
+    minUID: 10000
     minGID: 900000
     registryURL: https://spsrc27.iaa.csic.es/reg
 
@@ -52,8 +52,8 @@ deployment:
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  posix-manager-cacert-secret:
-    ca.crt: <base64 encoded ca crt>
+  # posix-manager-cacert-secret:
+  #   ca.crt: <base64 encoded ca crt>
 
 # These values are preset in the catalina.properties, and this default database only exists beside this service.
 # It's usually safe to leave these as-is, but make sure they match the values in catalina.properties.
@@ -67,8 +67,3 @@ postgresql:
     spec:
       hostPath:
         path: "/posix-mapper/data"
-
-# An omission equals true, so set this explicitly.
-base:
-  install: false
-
