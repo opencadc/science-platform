@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -106,6 +107,8 @@ public class PostAction extends SessionAction {
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
+
+    private static final String POSIX_DELIMITER = ";";
 
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
@@ -612,8 +615,8 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_ENTRY, userEntry());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_ENTRY, groupEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_ENTRY, getUserEntries());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_ENTRY, getGroupEntries());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
@@ -759,8 +762,8 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-        launchString = setConfigValue(launchString, POSIX_USER_ENTRY, userEntry());
-        launchString = setConfigValue(launchString, POSIX_GROUP_ENTRY, groupEntries());
+        launchString = setConfigValue(launchString, POSIX_USER_ENTRY, getUserEntries());
+        launchString = setConfigValue(launchString, POSIX_GROUP_ENTRY, getGroupEntries());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
@@ -879,13 +882,25 @@ public class PostAction extends SessionAction {
         return secretName;
     }
 
-    private String userEntry() {
-        return String.format("%s:x:%d:%d::%s/home/%s:/bin/bash",
-                posixPrincipal.username,
-                posixPrincipal.getUidNumber(), posixPrincipal.getUidNumber(),
-                skahaTld, posixPrincipal.username
-        );
+    private String getUserEntries() throws Exception {
+        final StringBuilder userEntryBuilder = new StringBuilder();
+        for (final Iterator<PosixPrincipal> posixPrincipalIterator =
+             posixMapperConfiguration.getPosixMapperClient().getUserMap(); posixPrincipalIterator.hasNext();) {
+            final PosixPrincipal nextPosixPrincipal = posixPrincipalIterator.next();
+            userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", nextPosixPrincipal.username,
+                                                  nextPosixPrincipal.getUidNumber(),
+                                                  nextPosixPrincipal.getUidNumber(),
+                                                  PostAction.POSIX_DELIMITER));
+        }
+
+        final String userEntriesString = userEntryBuilder.toString();
+        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
+            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
+        } else {
+            return userEntryBuilder.toString();
+        }
     }
+
     private String getSupplementalGroupsList() throws Exception {
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
@@ -898,16 +913,22 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private String groupEntries() throws Exception {
-        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
-        if (groupCredentials.size() == 1) {
-            return groupEntry(posixPrincipal.username, posixPrincipal.getUidNumber(), posixPrincipal.username)
-                    + ";"
-                    + buildGroupUriList(groupCredentials).stream()
-                    .map(group -> groupEntry(group.getGroupURI().getName(), group.getGID(), posixPrincipal.username))
-                    .collect(Collectors.joining(";"));
+    private String getGroupEntries() throws Exception {
+        final StringBuilder groupEntryBuilder = new StringBuilder();
+        for (final Iterator<PosixGroup> posixGroupIterator =
+             posixMapperConfiguration.getPosixMapperClient().getGroupMap(); posixGroupIterator.hasNext();) {
+            final PosixGroup nextPosixGroup = posixGroupIterator.next();
+            groupEntryBuilder.append(String.format("%s:x:%d:%s",
+                                                   nextPosixGroup.getGroupURI().getURI().getQuery(),
+                                                   nextPosixGroup.getGID(),
+                                                   PostAction.POSIX_DELIMITER));
+        }
+
+        final String groupEntriesString = groupEntryBuilder.toString();
+        if (groupEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
+            return groupEntryBuilder.substring(0, groupEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
         } else {
-            return "";
+            return groupEntryBuilder.toString();
         }
     }
 

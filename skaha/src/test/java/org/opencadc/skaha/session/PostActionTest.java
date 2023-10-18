@@ -147,5 +147,4 @@ public class PostActionTest {
 
         testSubject.allocateUser();
     }
-
 }

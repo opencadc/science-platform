@@ -36,9 +36,8 @@ spec:
         image: ${software.imageid}
         command: ["/init-users-groups/init-users-groups.sh"]
         args:
-        - ${user.token}
-        - ${posix.user.entry}
-        - ${posix.group.entry}
+        - "${posix.user.entry}"
+        - "${posix.group.entry}"
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
