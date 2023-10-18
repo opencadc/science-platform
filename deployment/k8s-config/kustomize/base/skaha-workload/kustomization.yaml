@@ -29,5 +29,17 @@ configMapGenerator:
   - config/templates/topcat.desktop.template
   - config/templates/astrosoftware-top.menu
   - config/templates/astrosoftware-bottom.menu
+- name: icons
+  files:
+  - config/icons/ban.svg
+  - config/icons/ban.svg.png
+  - config/icons/comments.svg
+  - config/icons/comments.svg.png
+  - config/icons/desktop.svg
+  - config/icons/ds9.svg
+  - config/icons/firefox-logo.png
+  - config/icons/terminal.svg
+  - config/icons/terminal.svg.png
+  - config/icons/topcat.svg
 generatorOptions:
  disableNameSuffixHash: true
