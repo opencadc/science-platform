@@ -145,6 +145,9 @@ build_menu_item () {
   image_id=$1
   name=$2
   category=$3
+  name_version_array=($(echo $name | tr ":" "\n"))
+  short_name=${name_version_array[0]}
+  version=${name_version_array[1]}
   executable="${EXECUTABLE_DIR}/${name}.sh"
   start_executable="${EXECUTABLE_DIR}/start-${name}.sh"
   desktop="${DESKTOP_DIR}/${name}.desktop"
@@ -156,14 +159,16 @@ build_menu_item () {
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${start_executable}
   sed -i -e "s#(NAME)#${name}#g" ${start_executable}
   sed -i -e "s#(NAME)#${name}#g" $desktop
+  sed -i -e "s#(VERSION)#${version}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  name_version_array=($(echo $name | tr ":" "\n"))
-  short_name=${name_version_array[0]}
   if [[ "${apps_to_add}" =~ (" "|^)${short_name}(" "|$) ]]; then
     if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
+      # pick the latest version
       app_version[${short_name}]="${name}"
       # accessed via icon on desktop
+      cp $desktop /headless/Desktop/${short_name}.desktop
+      sed 's/X-MultipleArgs=false\nIcon=/headless/.icons/${short_name}.svg' /headless/Desktop/${short_name}.desktop
       update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
       if [[ "${short_name}" == "terminal" ]]; then
         # accessed via "Applications->terminal" as well
