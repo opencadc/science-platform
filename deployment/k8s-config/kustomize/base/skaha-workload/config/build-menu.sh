@@ -134,11 +134,18 @@ build_menu () {
 }
 
 update_desktop () {
-  script_name="${EXECUTABLE_DIR}/$3.sh"
-  cp ${STARTUP_DIR}/$2.desktop.template /tmp/$2.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/$2.desktop
-  cp /tmp/$2.desktop $1
-  rm /tmp/$2.desktop
+  dest=$1
+  short_name=$2
+  name=$3
+  tmp_file=/tmp/${short_name}.desktop
+  cp ${STARTUP_DIR}/app-desktop.template ${tmp_file}
+  sed -i -e "s#(VERSION)#${version}#g" ${tmp_file}
+  sed -i -e "s#(SHORTNAME)#${short_name}#g" ${tmp_file}
+  sed -i -e "s#(NAME)#${name}#g" ${tmp_file}
+  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" ${tmp_file}
+  sed -i -e "s#(CATEGORY)#${category}#g" ${tmp_file}
+  cp ${tmp_file} ${dest}
+  rm ${tmp_file}
 }
 
 build_menu_item () {
@@ -167,8 +174,6 @@ build_menu_item () {
       # pick the latest version
       app_version[${short_name}]="${name}"
       # accessed via icon on desktop
-      cp $desktop /headless/Desktop/${short_name}.desktop
-      sed 's/X-MultipleArgs=false\nIcon=/headless/.icons/${short_name}.svg' /headless/Desktop/${short_name}.desktop
       update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
       if [[ "${short_name}" == "terminal" ]]; then
         # accessed via "Applications->terminal" as well

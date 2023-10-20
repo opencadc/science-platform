@@ -20,6 +20,7 @@ configMapGenerator:
   - config/templates/software-sh.template
   - config/templates/start-software-sh.template
   - config/templates/software-category.template
+  - config/templates/app-desktop.template
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template
   - config/templates/astrosoftware-top.menu
@@ -27,8 +28,10 @@ configMapGenerator:
 - name: icons
   files:
   - config/app-icons/ds9.svg
+  - config/app-icons/ds9-terminal.svg
   - config/app-icons/terminal.svg
   - config/app-icons/topcat.svg
+  - config/app-icons/topcat-terminal.svg
   - config/desktop-icons/ban.svg
   - config/desktop-icons/ban.svg.png
   - config/desktop-icons/comments.svg
