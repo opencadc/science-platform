@@ -883,22 +883,24 @@ public class PostAction extends SessionAction {
     }
 
     private String getUserEntries() throws Exception {
-        final StringBuilder userEntryBuilder = new StringBuilder();
-        for (final Iterator<PosixPrincipal> posixPrincipalIterator =
-             posixMapperConfiguration.getPosixMapperClient().getUserMap(); posixPrincipalIterator.hasNext();) {
-            final PosixPrincipal nextPosixPrincipal = posixPrincipalIterator.next();
-            userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", nextPosixPrincipal.username,
-                                                  nextPosixPrincipal.getUidNumber(),
-                                                  nextPosixPrincipal.getUidNumber(),
-                                                  PostAction.POSIX_DELIMITER));
-        }
-
-        final String userEntriesString = userEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
-            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
-        } else {
-            return userEntryBuilder.toString();
-        }
+        return String.format("%s:x:%d:%d:::", posixPrincipal.username, posixPrincipal.getUidNumber(),
+                             posixPrincipal.getUidNumber());
+//        final StringBuilder userEntryBuilder = new StringBuilder();
+//        for (final Iterator<PosixPrincipal> posixPrincipalIterator =
+//             posixMapperConfiguration.getPosixMapperClient().getUserMap(); posixPrincipalIterator.hasNext();) {
+//            final PosixPrincipal nextPosixPrincipal = posixPrincipalIterator.next();
+//            userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", nextPosixPrincipal.username,
+//                                                  nextPosixPrincipal.getUidNumber(),
+//                                                  nextPosixPrincipal.getUidNumber(),
+//                                                  PostAction.POSIX_DELIMITER));
+//        }
+//
+//        final String userEntriesString = userEntryBuilder.toString();
+//        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
+//            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
+//        } else {
+//            return userEntryBuilder.toString();
+//        }
     }
 
     private String getSupplementalGroupsList() throws Exception {
@@ -914,22 +916,13 @@ public class PostAction extends SessionAction {
     }
 
     private String getGroupEntries() throws Exception {
-        final StringBuilder groupEntryBuilder = new StringBuilder();
-        for (final Iterator<PosixGroup> posixGroupIterator =
-             posixMapperConfiguration.getPosixMapperClient().getGroupMap(); posixGroupIterator.hasNext();) {
-            final PosixGroup nextPosixGroup = posixGroupIterator.next();
-            groupEntryBuilder.append(String.format("%s:x:%d:%s",
-                                                   nextPosixGroup.getGroupURI().getURI().getQuery(),
-                                                   nextPosixGroup.getGID(),
-                                                   PostAction.POSIX_DELIMITER));
-        }
-
-        final String groupEntriesString = groupEntryBuilder.toString();
-        if (groupEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
-            return groupEntryBuilder.substring(0, groupEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
-        } else {
-            return groupEntryBuilder.toString();
-        }
+        return posixMapperConfiguration.getPosixMapperClient().getGID(Collections.emptyList())
+                                       .stream().map(nextPosixGroup -> String.format("%s:x:%d:%s",
+                                                                                     nextPosixGroup.getGroupURI()
+                                                                                                   .getURI().getQuery(),
+                                                                                     nextPosixGroup.getGID(),
+                                                                                     PostAction.POSIX_DELIMITER))
+                                       .collect(Collectors.joining());
     }
 
     private String groupEntry(String groupName, int gid, String username) {
