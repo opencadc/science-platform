@@ -68,5 +68,3 @@ TEST SUITE: None
 ## Endpoints
 
 The system will be available at the `/science-portal` endpoint, (i.e. https://example.com/science-portal).  Authenticating to the system is mandatory.
-
-Of note, the Science Portal will launch jobs into Kubernetes, and as such, will create new `IngressRoute`s that carry the `/session` endpoint along with a path to the Session itself.
