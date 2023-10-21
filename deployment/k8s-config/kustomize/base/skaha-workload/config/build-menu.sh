@@ -175,10 +175,6 @@ build_menu_item () {
       app_version[${short_name}]="${name}"
       # accessed via icon on desktop
       update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
-      if [[ "${short_name}" == "terminal" ]]; then
-        # accessed via "Applications->terminal" as well
-        update_desktop /usr/share/applications/${short_name}.desktop ${short_name} ${name}
-      fi
     fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
