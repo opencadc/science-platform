@@ -151,6 +151,8 @@ build_menu_item () {
   desktop="${DESKTOP_DIR}/${name}.desktop"
   cp ${STARTUP_DIR}/software-sh.template $executable
   cp ${STARTUP_DIR}/start-software-sh.template ${start_executable}
+  sed -i -e "s#(HOST)#$HOST#g" $start_executable
+  sed -i -e "s#(TOKEN)#$TOKEN#g" $start_executable 
   cp ${STARTUP_DIR}/software-category.template $desktop
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $executable
@@ -218,7 +220,7 @@ if [[ ${apps} == *"id"* ]]; then
           build_menu_item ${image_id} ${name} ${project}
       fi
     fi
-  done < <(printf '%s\n' "$apps")
+  done  < <(printf '%s\n' "$apps")
 else
   echo "[skaha] no desktop-app"
   exit 1
