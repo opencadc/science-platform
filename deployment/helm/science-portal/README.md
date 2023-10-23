@@ -41,12 +41,29 @@ deployment:
       # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
       scope: "openid profile offline_access"
 
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: science-portal-cacert-secret
+
     # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
     skahaResourceID: ivo://example.org/skaha
 
     # The logo in the top left.  No link associated, just the image.  This can be relative, or absolute.
     # Default is the SRCNet Logo.
     # logoURL: /science-portal/images/SRCNetLogo.png
+
+# secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # science-portal-cacert-secret:
+    # ca.crt: <base64 encoded ca.crt blob>
 ```
 
 ### Run with configured values
