@@ -1,3 +1,5 @@
+kubernetesClusterDomain: cluster.local
+
 # Tell Kubernetes to spin up multiple instances.  Defaults to 1.
 replicaCount: 1
 

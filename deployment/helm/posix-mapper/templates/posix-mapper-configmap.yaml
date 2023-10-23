@@ -31,7 +31,7 @@ data:
     org.opencadc.posix.mapper.maxActive=4
     org.opencadc.posix.mapper.username={{ .Values.postgresql.auth.username }}
     org.opencadc.posix.mapper.password={{ .Values.postgresql.auth.password }}
-    org.opencadc.posix.mapper.url=jdbc:postgresql://posix-mapper-postgres.skaha-system.svc.cluster.local:5432/{{ .Values.postgresql.auth.database }}
+    org.opencadc.posix.mapper.url=jdbc:postgresql://posix-mapper-postgres.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:5432/{{ .Values.postgresql.auth.database }}
   posix-mapper.properties: |
     # service identity
     org.opencadc.posix.mapper.resourceID={{ .Values.deployment.posixMapper.resourceID }}
