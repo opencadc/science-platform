@@ -21,17 +21,22 @@ spec:
       initContainers:
       - name: init-skaha-service
         image: busybox
-        command: ['sh', '-c', 'mkdir -p /arc/home && mkdir -p /arc/projects']  # Expected to have /arc mounted
+        command: ['sh', '-c', 'mkdir -p ${SKAHA_TLD}/home && mkdir -p ${SKAHA_TLD}/projects']  # Expected to have /arc mounted
         volumeMounts:
-        - mountPath: "/arc"
+        - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
           name: cavern-volume
           subPath: cavern
+        env:
+        - name: SKAHA_TLD
+          value: "{{ .Values.deployment.skaha.skahaTld }}"
       containers:
       - env: 
         - name: skaha.hostname
           value: "{{ .Values.deployment.hostname }}"
+        - name: SKAHA_TLD
+          value: "{{ .Values.deployment.skaha.skahaTld }}"  
         - name: skaha.homedir
-          value: "{{ .Values.deployment.skaha.homeDir }}"
+          value: "{{ .Values.deployment.skaha.skahaTld }}/home"
         - name: skaha.namespace
           value: "{{ .Values.skahaWorkload.namespace }}"
         - name: skaha.maxusersessions
@@ -72,7 +77,7 @@ spec:
           name: config-volume
         - mountPath: "/add-user-config"
           name: add-user-config
-        - mountPath: "/arc"
+        - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
           name: cavern-volume
           subPath: cavern
         {{- with .Values.deployment.skaha.extraVolumeMounts }}

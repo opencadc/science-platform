@@ -1,0 +1,142 @@
+#!/bin/bash
+
+handle_error() {
+    echo "$1"
+    echo "Please enter Ctl+C when you are ready to exit the xterm."
+    ${HOME}/.local/skaha/bin/sleep-forever.sh &
+    wait
+    exit 1
+}
+
+get_resource_options() {
+     resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/context`
+     core_default=`echo $resources | jq .defaultCores`
+     core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
+     ram_default=`echo $resources | jq .defaultRAM`
+     ram_options=`echo $resources | jq .availableRAM[] | tr '\n' ' '`
+}
+
+get_cores() {
+    local core_list=( ${core_options} )
+    for v in "${core_list[@]}"; do
+        local core_map[$v]=1
+    done
+
+    cores=${core_default}
+    local c=0
+    read -p "Please enter the number of cores (${core_options}) [${core_default}]: " input_cores
+    while (( c < 3 )); do
+        if [[ -z "${input_cores}" ]]; then
+            cores=${core_default}
+            echo "${cores}"
+            break
+        elif [[ -n "${core_map[${input_cores}]}" ]]; then
+            cores=${input_cores}
+            break
+        else
+            read -p "Please enter the number of cores (${core_options}) [${core_default}]: " input_cores
+            c=$(( c + 1 ))
+        fi
+    done
+
+    if (( c > 2 )); then
+        handle_error "Failed to get the number of cores from user."
+    fi
+}
+
+get_ram() {
+    local ram_list=( ${ram_options} )
+    for v in "${ram_list[@]}"; do
+        local ram_map[$v]=1
+    done
+
+    ram=${ram_default}
+    local c=0
+    read -p "Please enter the amount of memory in GB (${ram_options}) [${ram_default}]: " input_ram
+    while (( c < 3 )); do
+        if [[ -z "${input_ram}" ]]; then
+            ram=${ram_default}
+            echo "${ram}"
+            break
+        elif [[ -n "${ram_map[${input_ram}]}" ]]; then
+            ram=${input_ram}
+            break
+        else
+            read -p "Please enter the amount of memory in GB (${ram_options}) [${ram_default}]: " input_ram
+            c=$(( c + 1 ))
+        fi
+    done
+
+    if (( c > 2 )); then
+        handle_error "Failed to get the amount of ram from user."
+    fi
+}
+
+prompt_user() {
+    while true; do
+        read -p "Do you want to specify resources for (NAME)? (y/n) [n]" yn
+        if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
+            echo "Launching (NAME)..."
+            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            break
+        elif [[ ${yn} == "y" || ${yn} == "Y" ]]; then
+            get_resource_options || handle_error "Error obtaining resource defaults or options."
+            get_cores || handle_error "Error obtaining the number of cores to allocate."
+            get_ram || handle_error "Error obtaining the amount of ram to allocate."
+            echo "Launching (NAME)..."
+            app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            break
+        else 
+            echo invalid response
+        fi
+    done
+}
+
+launch_app() {
+    get_resource_options || handle_error "Error obtaining resource defaults or options."
+    prompt_user || handle_error "Error prompting user inputs."
+}
+
+get_status() {
+    curl_out=""
+    status=""
+    local n=0
+    sleep 1
+    curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+    while [[ ${curl_out} != *"status"* ]]; do
+        n=$(( n + 1 ))
+        if test $n -eq 10 ; then
+            echo "Failed to get status, ${curl_out}, retrying..."
+            n=0
+        fi
+        sleep 1
+        curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+    done
+}
+
+check_status() {
+    get_status $1
+    status=`echo ${curl_out} | jq .status`
+    echo "status: ${status}"
+    local count=0
+    while [[ ${status} == *"Pending"* ]]
+    do
+        count=$(( $count + 1 ))
+        get_status $1
+        status=`echo ${curl_out} | jq .status`
+        if test $count -eq 10 ; then
+            echo "status: ${status}"
+            count=0
+        fi
+    done
+
+    if [[ ${status} == *"Running"* ]]; then
+        echo "Successfully launched app."
+        sleep 1
+    else
+        handle_error "Failed to launch app, status is ${status}."
+    fi
+}
+
+launch_app
+check_status ${app_id}

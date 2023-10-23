@@ -1,0 +1,3 @@
+#!/bin/bash 
+
+gnome-terminal -q --title="(NAME) launcher" -- ${HOME}/.local/skaha/bin/start-(NAME).sh

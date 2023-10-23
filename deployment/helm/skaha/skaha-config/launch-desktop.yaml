@@ -36,9 +36,8 @@ spec:
         image: ${software.imageid}
         command: ["/init-users-groups/init-users-groups.sh"]
         args:
-        - ${user.token}
-        - ${posix.mapper.user.service.url}
-        - ${posix.mapper.group.service.url}
+        - "${posix.user.entry}"
+        - "${posix.group.entry}"
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -53,10 +52,11 @@ spec:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
         args:
-        - "${skaha.hostname}"
+        - ${skaha.hostname}
+        - ${user.token}
         env:
         - name: HOME
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: VNC_PW
           value: "${skaha.sessionid}"
         - name: skaha_hostname
@@ -97,7 +97,7 @@ spec:
           name: templates
         - mountPath: "/skaha-system"
           name: start-desktop
-        - mountPath: "/arc"
+        - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"
@@ -110,7 +110,7 @@ spec:
           defaultMode: 0777
       - name: start-desktop
         configMap:
-          name: start-desktop
+          name: launch-scripts
           defaultMode: 0777
       - name: cavern-volume
         persistentVolumeClaim:

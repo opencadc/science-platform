@@ -36,9 +36,8 @@ spec:
         image: ${software.imageid}
         command: ["/init-users-groups/init-users-groups.sh"]
         args:
-        - ${user.token}
-        - ${posix.mapper.user.service.url}
-        - ${posix.mapper.group.service.url}
+        - "${posix.user.entry}"
+        - "${posix.group.entry}"
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -59,21 +58,21 @@ spec:
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: JUPYTER_PATH
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
 #        - name: JUPYTERLAB_DIR
-#          value: "/arc/home/${skaha.userid}/skaha-lab"
+#          value: "${SKAHA_TLD}/home/${skaha.userid}/skaha-lab"
         - name: NB_USER
           value: "${skaha.userid}"
         - name: NB_UID
           value: "${skaha.posixid}"
         - name: HOME
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: PWD
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: XDG_CACHE_HOME
-          value: "/arc/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: JULIA_NUM_THREADS
           value: "${software.requests.cores}"
         - name: OPENBLAS_NUM_THREADS
@@ -111,7 +110,7 @@ spec:
           subPath: group
         - mountPath: "/skaha-system"
           name: start-jupyterlab
-        - mountPath: "/arc"
+        - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
         - mountPath: "/scratch"
@@ -120,7 +119,7 @@ spec:
       volumes:
       - name: start-jupyterlab
         configMap:
-          name: start-jupyterlab
+          name: launch-scripts
           defaultMode: 0777
       - name: init-users-groups
         configMap:

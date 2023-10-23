@@ -4,8 +4,12 @@
 deployment:
   hostname: example.host.com # Change this!
   skaha:
+    imagePullPolicy: Always
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
+
+    # Root of shared storage
+    skahaTld: "/arc"
 
     # The group name to verify users against for permission to use the Science Platform.
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
@@ -40,8 +44,8 @@ deployment:
 
     # Optionally mount a custom CA certificate
     extraVolumeMounts:
-    - mountPath: "/config/cacerts"
-      name: cacert-volume
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
 
     # If the base names have changed, then change them here, otherwise leave them.
     priorityClassName: uber-user-preempt-high
@@ -49,15 +53,15 @@ deployment:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
     extraVolumes:
-    - name: cacert-volume
-      secret:
-        defaultMode: 420
-        secretName: skaha-cacert-secret
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  skaha-cacert-secret:
-    ca.crt: <base64 encoded CA crt>
+  # skaha-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
 
 # Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
 # service:

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: launch-scripts
+  namespace: {{ .Values.skahaWorkload.namespace }}
+data:
+  {{- (.Files.Glob "launch-scripts/*").AsConfig | nindent 2 }}

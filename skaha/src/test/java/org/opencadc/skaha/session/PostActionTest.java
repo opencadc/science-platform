@@ -72,11 +72,9 @@ import ca.nrc.cadc.util.Log4jInit;
 import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.auth.PosixMapperClient;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URL;
 
 
 public class PostActionTest {
@@ -100,16 +98,6 @@ public class PostActionTest {
             @Override
             String getDefaultQuota() {
                 return "14";
-            }
-
-            @Override
-            protected URL lookupGroupMapperURL() {
-                return null;
-            }
-
-            @Override
-            protected URL lookupUserMapperURL() {
-                return null;
             }
 
             @Override
@@ -149,16 +137,6 @@ public class PostActionTest {
                 return "14";
             }
 
-            @Override
-            protected URL lookupGroupMapperURL() {
-                return null;
-            }
-
-            @Override
-            protected URL lookupUserMapperURL() {
-                return null;
-            }
-
 
             @Override
             void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
@@ -169,5 +147,4 @@ public class PostActionTest {
 
         testSubject.allocateUser();
     }
-
 }
