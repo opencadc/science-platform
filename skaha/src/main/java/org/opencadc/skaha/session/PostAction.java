@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.io.ResourceIterator;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -883,24 +884,23 @@ public class PostAction extends SessionAction {
     }
 
     private String getUserEntries() throws Exception {
-        return String.format("%s:x:%d:%d:::", posixPrincipal.username, posixPrincipal.getUidNumber(),
-                             posixPrincipal.getUidNumber());
-//        final StringBuilder userEntryBuilder = new StringBuilder();
-//        for (final Iterator<PosixPrincipal> posixPrincipalIterator =
-//             posixMapperConfiguration.getPosixMapperClient().getUserMap(); posixPrincipalIterator.hasNext();) {
-//            final PosixPrincipal nextPosixPrincipal = posixPrincipalIterator.next();
-//            userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", nextPosixPrincipal.username,
-//                                                  nextPosixPrincipal.getUidNumber(),
-//                                                  nextPosixPrincipal.getUidNumber(),
-//                                                  PostAction.POSIX_DELIMITER));
-//        }
-//
-//        final String userEntriesString = userEntryBuilder.toString();
-//        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
-//            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
-//        } else {
-//            return userEntryBuilder.toString();
-//        }
+        final StringBuilder userEntryBuilder = new StringBuilder();
+        try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
+                     posixMapperConfiguration.getPosixMapperClient().getUserMap()) {
+            posixPrincipalIterator.forEachRemaining(pp -> {
+                userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", pp.username,
+                                                      pp.getUidNumber(),
+                                                      pp.getUidNumber(),
+                                                      PostAction.POSIX_DELIMITER));
+            });
+        }
+
+        final String userEntriesString = userEntryBuilder.toString();
+        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
+            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
+        } else {
+            return userEntryBuilder.toString();
+        }
     }
 
     private String getSupplementalGroupsList() throws Exception {
@@ -916,6 +916,14 @@ public class PostAction extends SessionAction {
     }
 
     private String getGroupEntries() throws Exception {
+        final StringBuilder groupEntryBuilder = new StringBuilder();
+        try (final ResourceIterator<PosixGroup> posixGroupIterator =
+                     posixMapperConfiguration.getPosixMapperClient().getGroupMap()) {
+            posixGroupIterator.forEachRemaining(pg -> {
+
+            });
+
+        }
         return posixMapperConfiguration.getPosixMapperClient().getGID(Collections.emptyList())
                                        .stream().map(nextPosixGroup -> String.format("%s:x:%d:%s",
                                                                                      nextPosixGroup.getGroupURI()
