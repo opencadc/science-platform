@@ -137,13 +137,11 @@ update_desktop () {
   dest=$1
   short_name=$2
   name=$3
-  suffix=$4
   tmp_file=/tmp/${short_name}.desktop
   cp ${STARTUP_DIR}/app-desktop.template ${tmp_file}
   sed -i -e "s#(VERSION)#${version}#g" ${tmp_file}
   sed -i -e "s#(SHORTNAME)#${short_name}#g" ${tmp_file}
   sed -i -e "s#(NAME)#${name}#g" ${tmp_file}
-  sed -i -e "s#(SUFFIX)#${suffix}#g" ${tmp_file}
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" ${tmp_file}
   sed -i -e "s#(CATEGORY)#${category}#g" ${tmp_file}
   cp ${tmp_file} ${dest}
@@ -175,12 +173,8 @@ build_menu_item () {
     if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
       # pick the latest version
       app_version[${short_name}]="${name}"
-      suffix="svg"
-      if [[ "${short_name}" == "terminal" ]]; then
-        suffix="svg.png"
-      fi
       # accessed via icon on desktop
-      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name} ${suffix}
+      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
     fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e

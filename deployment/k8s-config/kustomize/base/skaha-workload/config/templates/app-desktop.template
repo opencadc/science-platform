@@ -6,6 +6,6 @@ Keywords=(NAME)
 Exec=(EXECUTABLE)/(NAME).sh
 Terminal=false
 X-MultipleArgs=false
-Icon=/headless/.icons/(SHORTNAME).(SUFFIX)
+Icon=/headless/.icons/(SHORTNAME).svg
 Type=Application
 Categories=(CATEGORY);

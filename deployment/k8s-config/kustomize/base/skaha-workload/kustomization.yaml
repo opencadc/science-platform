@@ -30,7 +30,6 @@ configMapGenerator:
   - config/app-icons/ds9.svg
   - config/app-icons/ds9-terminal.svg
   - config/app-icons/terminal.svg
-  - config/app-icons/terminal.svg.png
   - config/app-icons/topcat.svg
   - config/app-icons/topcat-terminal.svg
   - config/desktop-icons/ban.svg
@@ -39,5 +38,6 @@ configMapGenerator:
   - config/desktop-icons/comments.svg.png
   - config/desktop-icons/desktop.svg
   - config/desktop-icons/firefox-logo.png
+  - config/desktop-icons/terminal.svg.png
 generatorOptions:
  disableNameSuffixHash: true
