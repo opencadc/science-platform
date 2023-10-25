@@ -86,6 +86,8 @@ import org.opencadc.skaha.image.Image;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
@@ -142,8 +144,7 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String USER_TOKEN = "user.token";
-    private static final String POSIX_USER_ENTRY = "posix.user.entry";
-    private static final String POSIX_GROUP_ENTRY = "posix.group.entry";
+    private static final String POSIX_MAPPING_SECRET = "POSIX_MAPPING_SECRET";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
@@ -616,8 +617,9 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_USER_ENTRY, getUserEntries());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_GROUP_ENTRY, getGroupEntries());
+
+        final String secretName = createPosixMappingSecret(sessionID);
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, secretName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
@@ -763,8 +765,8 @@ public class PostAction extends SessionAction {
         } catch (Exception ex) {
             log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
         }
-        launchString = setConfigValue(launchString, POSIX_USER_ENTRY, getUserEntries());
-        launchString = setConfigValue(launchString, POSIX_GROUP_ENTRY, getGroupEntries());
+        final String secretName = createPosixMappingSecret(sessionID);
+        launchString = setConfigValue(launchString, POSIX_MAPPING_SECRET, secretName);
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
@@ -883,16 +885,45 @@ public class PostAction extends SessionAction {
         return secretName;
     }
 
+    private String createPosixMappingSecret(final String sessionID) throws Exception {
+        final String posixMappingSecretName = "posix-mapping-" + sessionID;
+        final Path holdingDir =
+                Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), posixMappingSecretName);
+        final File uidMappingFile = new File(holdingDir.toString(), "uidmap.txt");
+        final File gidMappingFile = new File(holdingDir.toString(), "gidmap.txt");
+
+        try (final FileWriter uidMappingWriter = new FileWriter(uidMappingFile)) {
+            uidMappingWriter.write(getUserEntries());
+            uidMappingWriter.flush();
+        }
+
+        try (final FileWriter gidMappingWriter = new FileWriter(gidMappingFile)) {
+            gidMappingWriter.write(getGroupEntries());
+            gidMappingWriter.flush();
+        }
+
+        // create new secret
+        final String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
+                posixMappingSecretName,
+                "--from-file=" + uidMappingFile.getAbsolutePath(),
+                "--from-file=" + gidMappingFile.getAbsolutePath()
+                };
+
+        final String createResult = execute(createCmd);
+        log.debug("create secret result: " + createResult);
+
+        return posixMappingSecretName;
+    }
+
     private String getUserEntries() throws Exception {
         final StringBuilder userEntryBuilder = new StringBuilder();
         try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
                      posixMapperConfiguration.getPosixMapperClient().getUserMap()) {
-            posixPrincipalIterator.forEachRemaining(pp -> {
-                userEntryBuilder.append(String.format("%s:x:%d:%d:::%s", pp.username,
-                                                      pp.getUidNumber(),
-                                                      pp.getUidNumber(),
-                                                      PostAction.POSIX_DELIMITER));
-            });
+            posixPrincipalIterator.forEachRemaining(pp -> userEntryBuilder.append(
+                    String.format("%s:x:%d:%d:::\n", pp.username,
+                                  pp.getUidNumber(),
+                                  pp.getUidNumber())));
         }
 
         final String userEntriesString = userEntryBuilder.toString();
@@ -919,22 +950,18 @@ public class PostAction extends SessionAction {
         final StringBuilder groupEntryBuilder = new StringBuilder();
         try (final ResourceIterator<PosixGroup> posixGroupIterator =
                      posixMapperConfiguration.getPosixMapperClient().getGroupMap()) {
-            posixGroupIterator.forEachRemaining(pg -> {
-
-            });
-
+            posixGroupIterator.forEachRemaining(pg -> groupEntryBuilder.append(
+                    String.format("%s:x:%d:\n",
+                                  pg.getGroupURI().getURI().getQuery(),
+                                  pg.getGID())));
         }
-        return posixMapperConfiguration.getPosixMapperClient().getGID(Collections.emptyList())
-                                       .stream().map(nextPosixGroup -> String.format("%s:x:%d:%s",
-                                                                                     nextPosixGroup.getGroupURI()
-                                                                                                   .getURI().getQuery(),
-                                                                                     nextPosixGroup.getGID(),
-                                                                                     PostAction.POSIX_DELIMITER))
-                                       .collect(Collectors.joining());
-    }
 
-    private String groupEntry(String groupName, int gid, String username) {
-        return String.format("%s:x:%d:%s", groupName, gid, username);
+        final String userEntriesString = groupEntryBuilder.toString();
+        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
+            return groupEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
+        } else {
+            return groupEntryBuilder.toString();
+        }
     }
 
     private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {

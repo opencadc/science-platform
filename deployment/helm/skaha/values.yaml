@@ -15,7 +15,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.14.0
+    image: images.opencadc.org/platform/skaha:0.14.1
     imagePullPolicy: IfNotPresent
     skahaTld: "/arc"
     maxUserSessions: "3"

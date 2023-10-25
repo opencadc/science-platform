@@ -7,20 +7,28 @@
 cp /etc/passwd /etc-passwd/passwd
 cp /etc/group /etc-group/group
 
+UID_MAP_FILE="/posix-mapping/uidmap.txt"
+GID_MAP_FILE="/posix-mapping/gidmap.txt"
 SAVEIFS=$IFS
-IFS=';'
+IFS='\n'
 
-read -ra USER_MAPPINGS <<< "${1}"
-# USER_MAPPINGS will be in the POSIX format already, delimited with ${IFS}
-for USER_ENTRY in "${USER_MAPPINGS[@]}"; do
+if [[ ! -f "${UID_MAP_FILE}" ]]; then
+    echo "Required file ${UID_MAP_FILE} is missing."
+    exit 1
+fi
+
+if [[ ! -f "${GID_MAP_FILE}" ]]; then
+    echo "Required file ${GID_MAP_FILE} is missing."
+    exit 1
+fi
+
+while read USER_ENTRY; do
         echo "${USER_ENTRY}" >> /etc-passwd/passwd
-done
+done < "${UID_MAP_FILE}"
 
-read -ra GROUP_MAPPINGS <<< "${2}"
-# GROUP_MAPPINGS are a list of group POSIX entries delimited with ${IFS}
-for GROUP_ENTRY in "${GROUP_MAPPINGS[@]}"; do
+while read GROUP_ENTRY; do
         echo "${GROUP_ENTRY}" >> /etc-group/group
-done
+done < "${GID_MAP_FILE}"
 
 # restore $IFS
 IFS=$SAVEIFS
