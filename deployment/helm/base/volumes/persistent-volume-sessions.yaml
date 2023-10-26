@@ -20,7 +20,7 @@ spec:
   persistentVolumeReclaimPolicy: Delete
   storageClassName: local-storage
   local:
-    path: /workload
+    path: /var/lib/k8s-pvs/science-platform
   nodeAffinity:
     required:
       nodeSelectorTerms:
