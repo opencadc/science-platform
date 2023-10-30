@@ -13,20 +13,31 @@ configMapGenerator:
   - config/sleep-forever.sh
 - name: templates
   files:
+  - config/templates/desktop-apps-icon.properties
   - config/templates/skaha-resolutions.properties
   - config/templates/xfce-directory.template
   - config/templates/xfce-applications-menu-item.template
   - config/templates/software-sh.template
   - config/templates/start-software-sh.template
   - config/templates/software-category.template
+  - config/templates/app-desktop.template
   - config/templates/resolution-sh.template
   - config/templates/resolution-desktop.template
-  - config/templates/ds9-terminal.desktop.template
-  - config/templates/ds9.desktop.template
-  - config/templates/terminal.desktop.template
-  - config/templates/topcat-terminal.desktop.template
-  - config/templates/topcat.desktop.template
   - config/templates/astrosoftware-top.menu
   - config/templates/astrosoftware-bottom.menu
+- name: icons
+  files:
+  - config/app-icons/ds9.svg
+  - config/app-icons/ds9-terminal.svg
+  - config/app-icons/terminal.svg
+  - config/app-icons/topcat.svg
+  - config/app-icons/topcat-terminal.svg
+  - config/desktop-icons/ban.svg
+  - config/desktop-icons/ban.svg.png
+  - config/desktop-icons/comments.svg
+  - config/desktop-icons/comments.svg.png
+  - config/desktop-icons/desktop.svg
+  - config/desktop-icons/firefox-logo.png
+  - config/desktop-icons/terminal.svg.png
 generatorOptions:
  disableNameSuffixHash: true
