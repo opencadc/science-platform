@@ -22,13 +22,8 @@ if [[ ! -f "${GID_MAP_FILE}" ]]; then
     exit 1
 fi
 
-while read USER_ENTRY; do
-        echo "${USER_ENTRY}" >> /etc-passwd/passwd
-done < "${UID_MAP_FILE}"
-
-while read GROUP_ENTRY; do
-        echo "${GROUP_ENTRY}" >> /etc-group/group
-done < "${GID_MAP_FILE}"
+cat "${UID_MAP_FILE}" >> /etc-passwd/passwd
+cat "${GID_MAP_FILE}" >> /etc-group/group
 
 # restore $IFS
 IFS=$SAVEIFS
