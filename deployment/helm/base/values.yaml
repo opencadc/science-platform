@@ -4,22 +4,6 @@ skaha:
 skahaWorkload:
   namespace: skaha-workload
   
-# Underlying storage creation.  You may not be privileged enough to create PersistentVolumes, so this is
-# configurable here.  When installing on a laptop, for example, these will likely be set to true.
-# Default is false.
-storage:
-  # Whether to create the PersistentVolume that will provide a PersistentVolumeClaim to the Skaha service.
-  service:
-    create: false
-    claimName: skaha-pvc
-    labels:
-      storage: skaha-storage # Labels are VERY relevant.  They should match the values.yaml configuration.  Match this up with the PersistentVolumeClaim when installing Skaha.
-
-  # Whether to create the PersistentVolume that will provide a PersistentVolumeClaim to the User Sesisons.
-  session:
-    create: false
-    storage: local-storage
-
 secrets:
   # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
   # For server domains with self-signed certificates, add the Base64 encoded file content here.

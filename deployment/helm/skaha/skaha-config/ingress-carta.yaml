@@ -23,10 +23,11 @@ kind: IngressRoute
 metadata:
   name: skaha-carta-ingress-${skaha.sessionid}
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   entryPoints:
+    - web
     - websecure
   routes:
   - kind: Rule

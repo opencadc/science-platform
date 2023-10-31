@@ -1,23 +1,29 @@
 #!/bin/bash
 
-# Three arguments expected: 
-# 1. the current user's bearer token
-# 2. the URL to the user (UID) mapping service
-# 3. the URL to the group (GID) mapping service
+# Two arguments expected: 
+# 1. the URL to the user (UID) mapping service
+# 2. the URL to the group (GID) mapping service
 
 cp /etc/passwd /etc-passwd/passwd
 cp /etc/group /etc-group/group
 
+UID_MAP_FILE="/posix-mapping/uidmap.txt"
+GID_MAP_FILE="/posix-mapping/gidmap.txt"
 SAVEIFS=$IFS
-IFS=';'
-# USER_MAPPINGS will be in the POSIX format already
-echo "${2}" >> /etc-passwd/passwd
+IFS='\n'
 
-read -ra GROUP_MAPPINGS <<< "${3}"
-# GROUP_MAPPINGS are a list of group entries concatenated with :
-for GROUP_ENTRY in "${GROUP_MAPPINGS[@]}"; do
-        echo "${GROUP_ENTRY}" >> /etc-group/group
-done
+if [[ ! -f "${UID_MAP_FILE}" ]]; then
+    echo "Required file ${UID_MAP_FILE} is missing."
+    exit 1
+fi
+
+if [[ ! -f "${GID_MAP_FILE}" ]]; then
+    echo "Required file ${GID_MAP_FILE} is missing."
+    exit 1
+fi
+
+cat "${UID_MAP_FILE}" >> /etc-passwd/passwd
+cat "${GID_MAP_FILE}" >> /etc-group/group
 
 # restore $IFS
 IFS=$SAVEIFS

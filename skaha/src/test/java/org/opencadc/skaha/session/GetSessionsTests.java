@@ -72,7 +72,6 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -114,8 +113,8 @@ public class GetSessionsTests {
             Gson gson = new Gson();
             Type listType = new TypeToken<List<Session>>(){}.getType();
             List<Session> sessions2 = gson.fromJson(json, listType);
-            Assert.assertTrue(sessions1.size() == K8S_LIST.split("\n").length);
-            Assert.assertTrue("session count", sessions1.size() == sessions2.size());
+            Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+            Assert.assertEquals("session count", sessions1.size(), sessions2.size());
             for (Session s : sessions1) {
                 Assert.assertTrue(s.getId(), sessions2.contains(s));
             }
@@ -133,7 +132,7 @@ public class GetSessionsTests {
             List<Session> sessions = get.getAllSessions(null);
             List<Session> filtered = get.filter(sessions, "notebook", null);
             for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
+                Assert.assertEquals(s.getId(), "notebook", s.getType());
             }
         } catch (Throwable t) {
             log.error("Unexpected", t);
@@ -148,7 +147,7 @@ public class GetSessionsTests {
             List<Session> sessions = get.getAllSessions(null);
             List<Session> filtered = get.filter(sessions, null, "Running");
             for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
+                Assert.assertEquals(s.getId(), "Running", s.getStatus());
             }
         } catch (Throwable t) {
             log.error("Unexpected", t);
@@ -163,8 +162,8 @@ public class GetSessionsTests {
             List<Session> sessions = get.getAllSessions(null);
             List<Session> filtered = get.filter(sessions, "notebook", "Running");
             for (Session s : filtered) {
-                Assert.assertTrue(s.getId(), s.getType().equals("notebook"));
-                Assert.assertTrue(s.getId(), s.getStatus().equals("Running"));
+                Assert.assertEquals(s.getId(), "notebook", s.getType());
+                Assert.assertEquals(s.getId(), "Running", s.getStatus());
             }
         } catch (Throwable t) {
             log.error("Unexpected", t);
@@ -193,16 +192,6 @@ public class GetSessionsTests {
         @Override
         protected int getUID() {
             return 997;
-        }
-
-        @Override
-        protected URL lookupGroupMapperURL() {
-            return null;
-        }
-
-        @Override
-        protected URL lookupUserMapperURL() {
-            return null;
         }
     }
 }
