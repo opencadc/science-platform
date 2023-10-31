@@ -30,10 +30,6 @@ spec:
       - name: init-users-groups
         image: ${software.imageid}
         command: ["/init-users-groups/init-users-groups.sh"]
-        args:
-        - ${user.token}
-        - ${posix.user.entry}
-        - ${posix.group.entry}
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -41,6 +37,8 @@ spec:
           name: etc-group
         - mountPath: "/init-users-groups"
           name: init-users-groups
+        - mountPath: "/posix-mapping"
+          name: posix-mapping
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
@@ -95,3 +93,7 @@ spec:
         emptyDir: {}
       - name: etc-passwd
         emptyDir: {}
+      - name: posix-mapping
+        secret:
+          defaultMode: 420
+          secretName: ${POSIX_MAPPING_SECRET}

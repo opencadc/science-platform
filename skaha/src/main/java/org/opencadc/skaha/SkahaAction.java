@@ -91,11 +91,11 @@ import org.opencadc.skaha.utils.CollectionUtils;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.AccessControlException;
-import java.security.PrivilegedExceptionAction;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -125,12 +125,12 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected int maxUserSessions;
-    protected final URI posixMapperResourceID;
+    protected final PosixMapperConfiguration posixMapperConfiguration;
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
         homedir = System.getenv("skaha.homedir");
-        skahaTld= System.getenv("SKAHA_TLD");
+        skahaTld = System.getenv("SKAHA_TLD");
         scratchdir = System.getenv("skaha.scratchdir");
         String harborHostList = System.getenv("skaha.harborhosts");
         if (harborHostList == null) {
@@ -158,23 +158,16 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
 
-        if (StringUtil.hasText(configuredPosixMapperResourceID)) {
-            posixMapperResourceID = URI.create(configuredPosixMapperResourceID);
-        } else {
-            posixMapperResourceID = null;
+        try {
+            if (StringUtil.hasText(configuredPosixMapperResourceID)) {
+                final URI configuredPosixMapperResourceURI = URI.create(configuredPosixMapperResourceID);
+                posixMapperConfiguration = new PosixMapperConfiguration(configuredPosixMapperResourceURI);
+            } else {
+                posixMapperConfiguration = null;
+            }
+        } catch (IOException ioException) {
+            throw new IllegalArgumentException(ioException.getMessage(), ioException);
         }
-    }
-
-    protected PosixMapperClient getPosixMapperClient() {
-        return new PosixMapperClient(posixMapperResourceID);
-    }
-
-    protected URL lookupGroupMapperURL() {
-        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_GROUPMAP, AuthMethod.TOKEN);
-    }
-
-    protected URL lookupUserMapperURL() {
-        return new RegistryClient().getServiceURL(posixMapperResourceID, Standards.POSIX_USERMAP, AuthMethod.TOKEN);
     }
 
     @Override
@@ -392,5 +385,35 @@ public abstract class SkahaAction extends RestAction {
      */
     static class IDToken {
         public String idToken;
+    }
+
+    /**
+     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic
+     * based on how the Resource ID of the POSIX mapper was set (URI or URL).
+     */
+    protected static class PosixMapperConfiguration {
+        final URI resourceID;
+        final URL baseURL;
+
+        protected PosixMapperConfiguration(final URI configuredPosixMapperID) throws IOException {
+            if ("ivo".equals(configuredPosixMapperID.getScheme())) {
+                resourceID = configuredPosixMapperID;
+                baseURL = null;
+            } else if ("https".equals(configuredPosixMapperID.getScheme())) {
+                resourceID = null;
+                baseURL = configuredPosixMapperID.toURL();
+            } else {
+                throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
+                                                + configuredPosixMapperID + ").");
+            }
+        }
+
+        public PosixMapperClient getPosixMapperClient() {
+            if (resourceID == null) {
+                return new PosixMapperClient(baseURL);
+            } else {
+                return new PosixMapperClient(resourceID);
+            }
+        }
     }
 }

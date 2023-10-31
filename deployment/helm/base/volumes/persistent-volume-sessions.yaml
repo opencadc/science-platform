@@ -1,0 +1,50 @@
+# Example Persistent Volume declaration for the Skaha web service to use.  The labels to match on is configurable.  This is for LOCAL storage 
+# only for the services (i.e. running on a laptop), and will not be installed by default, but could be used on a new Cluster.
+# In the values file for Skaha, the name of the PersistentVolumeClaim below will be referenced.
+# This default will create a hostPath volume with no declared PV.
+#
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-workload-pv
+  labels:
+    storage: skaha-workload-storage
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/k8s-pvs/science-platform
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-workload-cavern-pvc
+  namespace: skaha-workload
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      storage: skaha-workload-storage

@@ -107,23 +107,21 @@ public class DeleteAction extends SessionAction {
                         
                 String session = execute(getSessionCMD);
                 if (StringUtil.hasText(session)) {
-                    String[] lines = session.split("\n");
-                    if (lines.length > 0) {
-                        // sessionID was added to desktop-app. This resulted in the 
-                        // above kubectl command returning desktop-app as well. We 
-                        // want to ignore them as we pick the session to be deleted.
-                        for (String line : lines) {
-                            String[] parts = line.split("\\s+");
-                            String type = parts[0];
-                            if (!TYPE_DESKTOP_APP.equals(type)) {
-                                String sessionUserId = parts[1];
-                                if (!posixPrincipal.equals(sessionUserId)) {
-                                    throw new AccessControlException("forbidden");
-                                }   
-    
-                                deleteSession(posixPrincipal.username, type, sessionID);
-                                return;
+                    final String[] lines = session.split("\n");
+                    // sessionID was added to desktop-app. This resulted in the
+                    // above kubectl command returning desktop-app as well. We
+                    // want to ignore them as we pick the session to be deleted.
+                    for (String line : lines) {
+                        String[] parts = line.split("\\s+");
+                        String type = parts[0];
+                        if (!TYPE_DESKTOP_APP.equals(type)) {
+                            String sessionUserId = parts[1];
+                            if (!posixPrincipal.username.equals(sessionUserId)) {
+                                throw new AccessControlException("forbidden");
                             }
+
+                            deleteSession(posixPrincipal.username, type, sessionID);
+                            return;
                         }
                     }
                 }

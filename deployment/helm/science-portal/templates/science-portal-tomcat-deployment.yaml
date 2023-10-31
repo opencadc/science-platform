@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: science-portal-tomcat
+  name: science-portal-tomcat
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: science-portal-tomcat
+  template:
+    metadata:
+      labels:
+        run: science-portal-tomcat
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - image: {{ .Values.deployment.sciencePortal.image }}
+        imagePullPolicy: {{ .Values.deployment.sciencePortal.imagePullPolicy }}
+        name: science-portal-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.sciencePortal.resources.requests.memory }}
+            cpu: {{ .Values.deployment.sciencePortal.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.sciencePortal.resources.limits.memory }}
+            cpu: {{ .Values.deployment.sciencePortal.resources.limits.cpu }}
+        ports: 
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.sciencePortal.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts: 
+        - mountPath: "/config"
+          name: config-volume
+        {{- with .Values.deployment.sciencePortal.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.deployment.sciencePortal.extraEnv }}
+        env:
+        {{- with .Values.deployment.sciencePortal.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: science-portal-config
+      {{- with .Values.deployment.sciencePortal.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

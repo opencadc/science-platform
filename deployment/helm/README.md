@@ -30,10 +30,10 @@ helm repo update
 
 The [Base](base) install will create ServiceAccount, Role, Namespace, and RBAC objects needed to place the Skaha service.
 
-Create a `base-values-local.yaml` file to override Values from the main [template `values.yaml` file](base/values.yaml).  Mainly the
+Create a `my-base-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](base/values.yaml).  Mainly the
 Traefik Default Server certificate (optional if needed):
 
-`base-values-local.yaml`
+`my-base-local-values-file.yaml`
 ```yaml
 secrets:
     default-certificate:
@@ -42,7 +42,7 @@ secrets:
 ```
 
 ```bash
-helm install --values base-values-local.yaml base science-platform/base
+helm install --values my-base-local-values-file.yaml base science-platform/base
 
 NAME: base
 LAST DEPLOYED: Thu Sep 28 07:28:45 2023
@@ -50,6 +50,24 @@ NAMESPACE: default
 STATUS: deployed
 REVISION: 1
 ```
+
+### Persistent Volumes and Persistent Volume Claims
+
+**Note** 
+The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims! 
+
+It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at
+this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
+
+#### Required Persistent Volume Claim
+
+It is expected that there is a Persistent Volume Claim with the name of the Skaha Workload namespace hyphenated with `cavern-pvc`.  This will provide the
+backing storage to the User Sessions.  Using the default values, this means:
+
+`skaha-workload-cavern-pvc`
+
+will exist as a Persistent Volume Claim in the `skaha-workload` namespace.
+
 
 ### POSIX Mapper install
 
@@ -87,7 +105,7 @@ deployment:
         cpu: "500m"
 
     # Used to set the minimum UID.  Useful to avoid conflicts.
-    minUID: 1000
+    minUID: 10000
 
     # Used to set the minimum GID.  Keep this much higher than the minUID so that default Groups can be set for new users.
     minGID: 900000
@@ -170,7 +188,7 @@ via the IVOA Registry:
 ```
 ...
 # Ensure the hostname matches the deployment hostname.
-ivo://opencadc.org/posix-mapper = https://example.host.com/posix-mapper/capabilities
+ivo://example.org/posix-mapper = https://example.host.com/posix-mapper/capabilities
 ...
 ```
 
@@ -190,6 +208,10 @@ deployment:
     # extraPorts:
     # - containerPort: 5555
     #   protocol: TCP
+
+    # Optional.  Rename the main root folder to something else.  For existing installs, this can be
+    # omitted.
+    # skahaTld: "/arc"
 
     # Resources provided to the Skaha service.
     resources:
@@ -215,7 +237,14 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    registryURL: https://nrc-023054.cadc.dao.nrc.ca/reg
+
+    # URI or URL of the OIDC (IAM) server
+    # oidcURI: https://ska-iam.stfc.ac.uk/
+
+    # ID (URI) of the GMS Service.
+    # gmsID: ivo://skao.int/gms
+
+    registryURL: https://spsrc27.iaa.csic.es/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -228,6 +257,23 @@ deployment:
     #   secret:
     #     defaultMode: 420
     #     secretName: posix-manager-cacert-secret
+
+# Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
@@ -242,7 +288,7 @@ posixmapper:
 
 It is recommended to install into the `skaha-system` namespace, but not required.
 ```bash
-helm install -n skaha-system --values skaha-values-local.yaml skaha science-platform/skaha
+helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
 
 NAME: skaha
 LAST DEPLOYED: Thu Sep 28 07:31:10 2023
@@ -259,17 +305,79 @@ curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" https://example.host.com
 
 []%
 
-
 # xxxxxx is the returned session ID.
 curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" -d "ram=1" -d "cores=1" -d "image=images.canfar.net/canucs/canucs:1.2.5" -d "name=myjupyternotebook" "https://example.host.com/skaha/v0/session"
 
 xxxxxx
 ```
 
+### Science Portal User Interface install
+
+The Skaha service will manage User Sessions.  It relies on the Skaha service being deployed, and available to be found
+via the IVOA Registry:
+
+`/reg/resource-caps`
+```
+...
+# Ensure the hostname matches the deployment hostname.
+ivo://example.org/skaha = https://example.host.com/skaha/capabilities
+...
+```
+
+Please read the [minimum configuration](./science-portal/README.md).  A quick look is:
+
+```yaml
+deployment:
+  hostname: example.com # Change this!
+  sciencePortal:
+    # OIDC (IAM) server configuration.  These are required
+    oidc:
+      # Location of the OpenID Provider (OIdP), and where users will login
+      uri: https://ska-iam.stfc.ac.uk/
+
+      # The Client ID as listed on the OIdP.  Create one at the uri above.
+      clientID: my-client-id
+
+      # The Client Secret, which should be generated by the OIdP.
+      clientSecret:  my-client-secret
+
+      # Where the OIdP should send the User after successful authentication.  This is also known as the redirect_uri in OpenID.
+      redirectURI: https://example.com/science-portal/oidc-callback
+
+      # Where to redirect to after the redirectURI callback has completed.  This will almost always be the URL to the /science-portal main page (https://example.com/science-portal).
+      callbackURI: redirectURI: https://example.com/science-portal/
+
+      # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
+      scope: "openid profile offline_access"
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: science-portal-cacert-secret
+
+    # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
+    skahaResourceID: ivo://example.org/skaha
+
+    # The logo in the top left.  No link associated, just the image.  This can be relative, or absolute.
+    # Default is the SRCNet Logo.
+    # logoURL: /science-portal/images/SRCNetLogo.png
+
+# secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # science-portal-cacert-secret:
+    # ca.crt: <base64 encoded ca.crt blob>
+```
+
 ## Obtaining a Bearer Token
 
 See the [JIRA Confluence page](https://confluence.skatelescope.org/display/SRCSC/RED-10+Using+oidc-agent+to+authenticate+to+OpenCADC+services) on obtaining a Bearer Token.
-
 
 ## Flow
 

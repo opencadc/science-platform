@@ -43,11 +43,11 @@ if [ ! -f $CASACONFIG ]
     exit  2
 fi
 
-if [ ! -f $CERTFILE ]
-  then
-    echo "No file cadcproxy.pem found in $CONFDIR"
-    exit  2
-fi
+#if [ ! -f $CERTFILE ]
+#  then
+#    echo "No file cadcproxy.pem found in $CONFDIR"
+#    exit  2
+#fi
 
 if [ ! -f $BASHRC ]
   then
@@ -97,9 +97,11 @@ rm casa-config.tar
 chown -R $USERID:$USERID $HOMEDIR/.casa
 echo " Done"
 
-echo -n "  Adding user to skaha group..."
-curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERNAME?idType=http"
-echo " Done"
+if [[ -f "${CERTFILE}" ]]; then
+  echo -n "  Adding user to skaha group..."
+  curl -X PUT -E $CERTFILE "https://ws-cadc.canfar.net/ac/groups/$SKAHAGROUP/userMembers/$USERNAME?idType=http"
+  echo " Done"
+fi
 
 echo -n "  Setting user quota to ${QUOTA}G..."
 # setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: science-portal-config
+  namespace: {{ .Values.skaha.namespace }}
+binaryData:
+  RsaSignaturePub.key: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF2aXR3Z2g5OVVsTFROVWdaV0t5M2JEQit1NysrUVgvaQpHcGIzSC9wMG8wZENRdXJPSEg5TlNXa1VIOXBvMENEbkRHVE4wWkZvTFVlR0JERGwvcENOMkxrK0FZbXg3c2p4VVk3WWlQQTZpWEsxCnpMUXRQcUtaQy9vWjdDcUYycHlVWm9TWTZZL3hqN1FiekZUaEZSK21DN2RYdFAwR2l1Mmw4N3dZc3pOVUF6U2JBQXV5Zm1taXBFalQKUWZmUFRBWitRWFk1SmlsZFM3OC80T2lCTU8zcm9PeUl5dUFhczlrTjRJaSt2WllPd3FYTWpRQWhNQk1Wem03V3dRK2E2cDFYNDNtWQpSa0trbUxZL0h0U3pOOENZL1k2QkY1Q3FIZ0lJZWN3OWVEVlZTTjNyNzFaWldSNnZ4V3laeWQ1TmlPeG5lU3FQMHJBVEczdThURStQCklTUUM3d0lEQVFBQgotLS0tLUVORCBQVUJMSUMgS0VZLS0tLS0K
+data:
+  org.opencadc.science-portal.properties: |+
+    org.opencadc.science-portal.sessions.resourceID = {{ .Values.deployment.sciencePortal.skahaResourceID }}
+    org.opencadc.science-portal.sessions.standard = vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0
+    org.opencadc.science-portal.logoURL = {{ .Values.deployment.sciencePortal.logoURL }}
+
+    {{- with .Values.deployment.sciencePortal.oidc }}
+    org.opencadc.science-portal.oidc.clientID = {{ .clientID }}
+    org.opencadc.science-portal.oidc.clientSecret = {{ .clientSecret }}
+    org.opencadc.science-portal.oidc.callbackURI = {{ .callbackURI }}
+    org.opencadc.science-portal.oidc.redirectURI = {{ .redirectURI }}
+    org.opencadc.science-portal.oidc.scope = {{ .scope }}
+    {{- end }}
+  cadc-registry.properties: |+
+    #
+    # local authority map
+    #
+    # <base standardID> = <authority>
+  
+    ivo://ivoa.net/std/GMS#search-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
+    ivo://ivoa.net/std/GMS#users-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
+    ivo://ivoa.net/std/UMS#users-0.1 = {{ .Values.deployment.sciencePortal.gmsID }}
+    ivo://ivoa.net/std/UMS#users-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
+    {{- if .Values.deployment.sciencePortal.oidc }}
+    ivo://ivoa.net/sso#OAuth = {{ .Values.deployment.sciencePortal.oidc.uri }}
+    ivo://ivoa.net/sso#OpenID = {{ .Values.deployment.sciencePortal.oidc.uri }}
+    {{- else }}
+    ivo://ivoa.net/sso#OAuth = {{ .Values.deployment.sciencePortal.gmsID }}
+    ivo://ivoa.net/sso#OpenID = {{ .Values.deployment.sciencePortal.gmsID }}
+    {{- end }}
+    
+    ca.nrc.cadc.reg.client.RegistryClient.baseURL = {{ .Values.deployment.sciencePortal.registryURL }}
+  
+  catalina.properties: |-
+    tomcat.connector.scheme=https
+    tomcat.connector.proxyName={{ .Values.deployment.hostname }}
+    tomcat.connector.proxyPort=443
+    ca.nrc.cadc.auth.PrincipalExtractor.enableClientCertHeader=true
+    ca.nrc.cadc.util.Log4jInit.messageOnly=true
+    # (default: ca.nrc.cadc.auth.NoOpIdentityManager)
+    ca.nrc.cadc.auth.IdentityManager={{ .Values.deployment.sciencePortal.identityManagerClass }}
