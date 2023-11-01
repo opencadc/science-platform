@@ -704,7 +704,7 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("-o");
         
         String customColumns = "custom-columns=" +
-            "UID:.spec.selector.matchLabels.controller-uid," +
+            "UID:.metadata.uid," +
             "EXPIRY:.spec.activeDeadlineSeconds";
         
         getSessionJobCMD.add(customColumns);

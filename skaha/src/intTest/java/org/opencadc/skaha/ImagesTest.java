@@ -68,8 +68,9 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.SSLUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.FileUtil;
@@ -83,6 +84,7 @@ import java.io.File;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
@@ -107,18 +109,24 @@ public class ImagesTest {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
     
-    protected URL imageURL;
-    protected Subject userSubject;
+    protected final URL imageURL;
+    protected final Subject userSubject;
     
     public ImagesTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            imageURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.CERT);
-            imageURL = new URL(imageURL.toString() + "/image");
+            final URL imageServiceURL =
+                    regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+            imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
             log.info("sessions URL: " + imageURL);
-    
-            File cert = FileUtil.getFileFromResource("skaha-test.pem", ImagesTest.class);
-            userSubject = SSLUtil.createSubject(cert);
+
+            final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token",
+                                                                ImagesTest.class);
+            final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
+            userSubject = new Subject();
+            userSubject.getPublicCredentials().add(
+                    new AuthorizationToken("Bearer", bearerToken.replaceAll("\n", ""),
+                                           List.of(NetUtil.getDomainName(imageURL))));
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
             log.error("init exception", e);
@@ -133,8 +141,8 @@ public class ImagesTest {
             Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
                 // should have at least one image
-                List<Image> images = getImages();
-                Assert.assertTrue("one or more images", images.size() > 0);
+                List<Image> images = ImagesTest.getImages(imageURL);
+                Assert.assertFalse("one or more images", images.isEmpty());
                 return null;
             });
             
@@ -144,7 +152,7 @@ public class ImagesTest {
         }
     }
     
-    private List<Image> getImages() {
+    protected static List<Image> getImages(final URL imageURL) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(imageURL, out);
         get.run();

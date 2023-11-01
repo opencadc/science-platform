@@ -15,7 +15,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.14.1
+    image: images.opencadc.org/platform/skaha:0.14.2
     imagePullPolicy: IfNotPresent
     skahaTld: "/arc"
     maxUserSessions: "3"
@@ -51,10 +51,10 @@ deployment:
     # Resources provided to the Skaha service.
     resources:
       requests:
-        memory: "500M"
+        memory: "1Gi"
         cpu: "500m"
       limits:
-        memory: "500M"
+        memory: "1Gi"
         cpu: "500m"
 
     # Uncomment to debug.  Requires options above as well as service port exposure below.
