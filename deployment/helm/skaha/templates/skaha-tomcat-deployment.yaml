@@ -21,6 +21,7 @@ spec:
       initContainers:
       - name: init-skaha-service
         image: busybox
+        imagePullPolicy: IfNotPresent
         command: ['sh', '-c', 'mkdir -p ${SKAHA_TLD}/home && mkdir -p ${SKAHA_TLD}/projects']  # Expected to have /arc mounted
         volumeMounts:
         - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"

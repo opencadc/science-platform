@@ -68,7 +68,7 @@ spec:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
         image: ${software.imageid}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "250Mi"

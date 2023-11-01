@@ -66,16 +66,16 @@ spec:
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
         workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
-        imagePullPolicy: Always
-        # resources:
-        #   requests:
-        #     memory: "4Gi"
-        #     cpu: "1"
-        #     ephemeral-storage: "20Gi"
-        #   limits:
-        #     memory: "192Gi"
-        #     cpu: "16"
-        #     ephemeral-storage: "200Gi"
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1"
+            ephemeral-storage: "10Gi"
+          limits:
+            memory: "20Gi"
+            cpu: "6"
+            ephemeral-storage: "10Gi"
         ports:
         - containerPort: 6000
           protocol: TCP
