@@ -5,6 +5,7 @@ metadata:
   labels:
     canfar-net-sessionID: "${skaha.sessionid}"
     canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-appID: "${software.appid}"
     canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
 spec:
@@ -14,6 +15,7 @@ spec:
     metadata:
       labels:
         canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-appID: "${software.appid}"
         canfar-net-sessionType: "${skaha.sessiontype}"
         canfar-net-userid: "${skaha.userid}"
         job-name: "${software.jobname}"
