@@ -104,7 +104,3 @@ storage:
       # is specified.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
-
-# If the posixmapper is already installed.  Omission defaults to true, so set this explicitly.
-posixmapper:
-  install: false
