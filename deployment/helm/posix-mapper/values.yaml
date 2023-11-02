@@ -12,7 +12,7 @@ deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
     image: images.opencadc.org/platform/posix-mapper:0.2.1
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     resourceID: ivo://opencadc.org/posix-mapper
 
     # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
