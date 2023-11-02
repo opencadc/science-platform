@@ -10,7 +10,7 @@ deployment:
   hostname: example.host.com    # Change this!
   sciencePortal:
     image: images.opencadc.org/platform/science-portal:0.1.1
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
 
     # Optionally set the DEBUG port.
     # extraEnv:
