@@ -2,7 +2,7 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: example.host.com # Change this!
+  hostname: skaha-tomcat-svc.skaha-system.svc.cluster.local
   skaha:
     image: abhishek1009/skaha:latest
     imagePullPolicy: IfNotPresent
@@ -30,13 +30,14 @@ deployment:
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
 
     # Resources provided to the Skaha service.
+    registryURL: http://reg.skaha-system.svc.cluster.local/reg
     resources:
       requests:
         memory: "500M"
         cpu: "500m"
       limits:
-        memory: "500M"
-        cpu: "500m"
+        memory: "1500M"
+        cpu: "1500m"
 
     # Uncomment to debug.  Requires options above as well as service port exposure below.
     # extraPorts:

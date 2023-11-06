@@ -18,7 +18,7 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Delete
-  storageClassName: manual
+  storageClassName: local-storage
   hostPath:
     path: /var/lib/k8s-pvs/science-platform
 ---
@@ -33,7 +33,7 @@ spec:
   accessModes:
     - ReadWriteMany
   volumeMode: Filesystem
-  storageClassName: manual
+  storageClassName: local-storage
   resources:
     requests:
       storage: 10Gi
