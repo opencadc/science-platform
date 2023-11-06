@@ -1,0 +1,116 @@
+kubernetesClusterDomain: cluster.local
+
+# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+replicaCount: 1
+
+# It's best to keep these set as such, unless you're willing to change these in several places.
+skaha:
+  namespace: skaha-system
+
+# Skaha web service deployment
+deployment:
+  hostname: example.org  # Change this!
+  cavern:
+    image: images.opencadc.org/platform/cavern:0.5.2
+    imagePullPolicy: Always
+
+    # How cavern identifies itself.
+    resourceID: "ivo://example.org/cavern"
+
+    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
+
+    # The endpoint to serve this from.  Defaults to /cavern.
+    # endpoint: "/cavern"
+
+    filesystem:
+      # persistent data directory in container
+      dataDir: "/data"
+
+      # relative path to the node/file content that could be mounted in other containers
+      subPath: "/cavern"
+
+      # The adminUsername is required to be set whomever has admin access over the
+      # filesystem.dataDir above.
+      rootOwner:
+        adminUsername: "root"
+        # username: "root"
+        # uid: 1000
+        # gid: 1000
+
+      # (optional) keys to generate pre-auth URLs to cavern
+      # keys:
+        # private: <private key file>
+        # public: <public key file>
+
+      # (optional) base directory exposed for sshfs mounts
+      # sshfs:
+      #   serverBase: {server}[:{port}]:{path}
+
+    # The IdentityManager class handling authentication.  This should generally be left alone
+    identityManagerClass: org.opencadc.auth.StandardIdentityManager
+
+    # When using a database to connect to UWS.
+    uws:
+      db:
+        username: uwsuser
+        password: uwspwd
+        database: uws
+        schema: uws
+        maxActive: 2
+        # storage:
+        #   spec:
+        #     hostPath:
+        #       path: "/cavern-uws/data"
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # cavern-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+
+# Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
+# service:
+#   cavern:
+#     extraPorts:
+  #   - port: 5555
+  #     protocol: TCP
+  #     name: java-debug
+
+# Set these appropriately to match your Persistent Volume Claim labels.
+storage:
+  service:
+    spec:
+      # YAML for service mounted storage.
+      # Example is the persistentVolumeClaim below.  Do not uncomment this
+      # or Helm will use it as the default, even if a different spec
+      # is specified.
+      # persistentVolumeClaim:
+      #   claimName: skaha-pvc
