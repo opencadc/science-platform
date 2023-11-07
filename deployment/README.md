@@ -20,8 +20,6 @@ Browser based application to interaface with authentication as well as the Skaha
 
 ## Endpoints
 
-<div id="endpoint-container" class="endpoints">
-
 | Endpoint   | Service  | Purpose |
 |:----------|:---------|:---------|
 | `/skaha`   | `skaha`  | Versioned (`/v0`) API to provide access to session managment as well as the IVOA capabilities (`/capabilities`) and availability (`/availability`) endpoints.  Visit the `/skaha` endpoint in the browser to see all available endpoints. |
@@ -30,5 +28,3 @@ Browser based application to interaface with authentication as well as the Skaha
 | `/science-portal` | `science-portal` | Browser user interface endpoint for session listing, creation, and deletion.  This is a Single Page Application (SPA) using React and Plain Javascript, with a Java backend. |
 | `/cavern` (**TODO**) | `cavern` (**TODO**) | (**TODO**) [IVOA VOSpace](https://www.ivoa.net/documents/VOSpace/20180620/REC-VOSpace-2.1.html) endpoint for accessing the User Storage. |
 | `/storage` (**TODO**) | `storage-ui` (**TODO**) | (**TODO**) Browser application to manage Storage Items in the User Storage API (`/cavern`).  It provides Upload and Download, Folder creation, and Group setting. |
-
-</div>

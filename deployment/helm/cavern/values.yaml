@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.org  # Change this!
   cavern:
-    image: images.opencadc.org/platform/cavern:0.5.2
+    image: images.opencadc.org/platform/cavern:0.5.4
     imagePullPolicy: Always
 
     # How cavern identifies itself.
