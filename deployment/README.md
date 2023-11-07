@@ -1,8 +1,3 @@
-<style>
-    .endpoints tr:nth-child(5), .endpoints tr:nth-child(6) {
-        background-color: rgba(200, 50, 50, 0.3);
-    }
-</style>
 # Science Platform Deployment
 
 ## APIs
@@ -33,7 +28,7 @@ Browser based application to interaface with authentication as well as the Skaha
 | `/session` | `skaha`  | Provides access to the User Sessions (i.e. Desktop, Notebook) from the browser.  This endpoint is dynamically generated, and cannot be used by itself.  See the session listing from the `/skaha/v0/session` endpoint to get the full session endpoint. |
 | `/posix-mapper` | `posix-mapper` | Provides access to the UID and GID mapping in plain POSIX text or TSV output.  Visit the `/posix-mapper` endpoint in the browser to see all available endpoints. |
 | `/science-portal` | `science-portal` | Browser user interface endpoint for session listing, creation, and deletion.  This is a Single Page Application (SPA) using React and Plain Javascript, with a Java backend. |
-| `/cavern` | `cavern` | (**TODO**) [IVOA VOSpace](https://www.ivoa.net/documents/VOSpace/20180620/REC-VOSpace-2.1.html) endpoint for accessing the User Storage. |
-| `/storage` | `storage-ui` | (**TODO**) Browser application to manage Storage Items in the User Storage API (`/cavern`).  It provides Upload and Download, Folder creation, and Group setting. |
+| `/cavern` (**TODO**) | `cavern` (**TODO**) | (**TODO**) [IVOA VOSpace](https://www.ivoa.net/documents/VOSpace/20180620/REC-VOSpace-2.1.html) endpoint for accessing the User Storage. |
+| `/storage` (**TODO**) | `storage-ui` (**TODO**) | (**TODO**) Browser application to manage Storage Items in the User Storage API (`/cavern`).  It provides Upload and Download, Folder creation, and Group setting. |
 
 </div>
