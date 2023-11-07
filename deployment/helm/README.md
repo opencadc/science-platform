@@ -1,5 +1,18 @@
 # Deployment Guide
 
+- [Dependencies](#dependencies)
+- [Helm](#helm-repository)
+- [Quick Start](#quick-start)
+  - [Base install](#base-install)
+  - [Persistent Volumes](#persistent-volumes-and-persistent-volume-claims)
+  - [POSIX Mapper install](#posix-mapper-install)
+  - [Skaha install](#skaha-install)
+  - [Science Portal install](#science-portal-user-interface-install)
+  - [Cavern install](#cavern-user-storage-install)
+- [Obtaining a bearer token](#obtaining-a-bearer-token)
+- [Flow](#flow)
+- [Structure](#structure)
+
 ## Dependencies
 
 - An existing Kubernetes cluster.
@@ -14,6 +27,7 @@ helm repo update
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
+helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
 ```
 
 More details below.
@@ -54,10 +68,16 @@ REVISION: 1
 ### Persistent Volumes and Persistent Volume Claims
 
 **Note** 
-The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims! 
+The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims!
+
+**Important**
+There are two (2) Persistent Volume Claims that are used in the system, due to the fact that there are two (2) Namespaces (`skaha-system` and `skaha-workload`).  These PVCs, while
+having potentially different configurations, **SHOULD** point to the same storage.  For example, if two `hostPath` PVCs are created, the `hostPath.path` **MUST** point to the same
+folder in order to have shared content between the Services (`skaha`, `cavern`) and the User Sessions (Notebooks, CARTA, etc.).
 
 It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at
 this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
+
 
 #### Required Persistent Volume Claim
 
@@ -345,7 +365,7 @@ deployment:
       redirectURI: https://example.com/science-portal/oidc-callback
 
       # Where to redirect to after the redirectURI callback has completed.  This will almost always be the URL to the /science-portal main page (https://example.com/science-portal).
-      callbackURI: redirectURI: https://example.com/science-portal/
+      callbackURI: https://example.com/science-portal/
 
       # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
       scope: "openid profile offline_access"
@@ -373,6 +393,111 @@ deployment:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # science-portal-cacert-secret:
     # ca.crt: <base64 encoded ca.crt blob>
+```
+
+### Cavern (User Storage) install
+
+The Cavern API provides access to the User Storage which is shared between Skaha and all of the User Sessions.  A [Bearer token](#obtaining-a-bearer-token) is required when trying to read
+private access, or any writing.
+
+Please see the [minimum configuration](./cavern/README.md).  A quick look is:
+
+```yaml
+# Skaha web service deployment
+deployment:
+  hostname: example.org  # Change this!
+  cavern:
+    # How cavern identifies itself.
+    resourceID: "ivo://example.org/cavern"
+
+    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
+
+    # The endpoint to serve this from.  Defaults to /cavern.
+    # endpoint: "/cavern"
+
+    filesystem:
+      # persistent data directory in container
+      dataDir: "/data"
+
+      # relative path to the node/file content that could be mounted in other containers, including Skaha.
+      subPath: "/cavern"
+
+      # See https://github.com/opencadc/vos/tree/master/cavern for documentation.  For deployments using OpenID Connect,
+      # the rootOwner MUST be an object with the following properties set.
+      rootOwner:
+        # The adminUsername is required to be set whomever has admin access over the filesystem.dataDir above.
+        adminUsername: 
+
+        # The username of the root owner.
+        username: 
+
+        # The UID of the root owner.
+        uid: 
+
+        # The GID of the root owner.
+        gid: 
+
+      # (optional) keys to generate pre-auth URLs to cavern
+      # keys:
+        # private: <private key file>
+        # public: <public key file>
+
+    # When using a database to connect to UWS.  These can stay as-is, unless you would like to use
+    # a different database.
+    # uws:
+    #   db:
+    #     username: uwsuser
+    #     password: uwspwd
+    #     database: uws
+    #     schema: uws
+    #     maxActive: 2
+    #     storage:
+    #       spec:
+    #         hostPath:
+    #           path: "/cavern-uws/data"
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # cavern-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+
+# Set these appropriately to match your Persistent Volume Claim labels.
+storage:
+  service:
+    spec:
+      # YAML for service mounted storage.
+      # Example is the persistentVolumeClaim below.  This should match whatever Skaha used.
+      # persistentVolumeClaim:
+      #   claimName: skaha-pvc
 ```
 
 ## Obtaining a Bearer Token
