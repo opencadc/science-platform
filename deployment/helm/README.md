@@ -27,6 +27,7 @@ helm repo update
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
+helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
 ```
 
 More details below.
@@ -67,10 +68,16 @@ REVISION: 1
 ### Persistent Volumes and Persistent Volume Claims
 
 **Note** 
-The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims! 
+The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims!
+
+**Important**
+There are two (2) Persistent Volume Claims that are used in the system, due to the fact that there are two (2) Namespaces (`skaha-system` and `skaha-workload`).  These PVCs, while
+having potentially different configurations, **SHOULD** point to the same storage.  For example, if two `hostPath` PVCs are created, the `hostPath.path` **MUST** point to the same
+folder in order to have shared content between the Services (`skaha`, `cavern`) and the User Sessions (Notebooks, CARTA, etc.).
 
 It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at
 this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
+
 
 #### Required Persistent Volume Claim
 
