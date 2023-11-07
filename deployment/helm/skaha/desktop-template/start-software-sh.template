@@ -7,15 +7,10 @@ handle_error() {
     wait
     exit 1
 }
-CONTEXT_PATH="/skaha/v0/context"
 
 get_resource_options() {
-   if [ -e "~/.ssl/cadcproxy.pem" ]; then
-      resources=`curl -s -L -k -E ~/.ssl/cadcproxy.pem http://(HOST)${CONTEXT_PATH}`
-  else
-      TOKEN=$(cat ${HOME}/.token/Bearer)
-      resources=`curl -s -L -k --header "Authorization: Bearer $TOKEN" http://(HOST)${CONTEXT_PATH}`
-   fi         
+     #resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/context`
+     resources=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" http://(HOST)/skaha/${SKAHA_API_VERSION}/context`
      core_default=`echo $resources | jq .defaultCores`
      core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
      ram_default=`echo $resources | jq .defaultRAM`
@@ -79,29 +74,20 @@ get_ram() {
 }
 
 prompt_user() {
-    SESSION_PATH="/skaha/v0/session/${VNC_PW}/app"
     while true; do
         read -p "Do you want to specify resources for (NAME)? (y/n) [n]" yn
         if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
             echo "Launching (NAME)..."
-               if [ -e "~/.ssl/cadcproxy.pem" ]; then
-                  app_id=`curl -s -L -k -E  ~/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)${SESSION_PATH}`
-                else
-                  TOKEN=$(cat ${HOME}/.token/Bearer)
-                  app_id=`curl -s -L -k --header "Authorization: Bearer $TOKEN" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)${SESSION_PATH}`
-                fi
+            #app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            app_id=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             break
         elif [[ ${yn} == "y" || ${yn} == "Y" ]]; then
             get_resource_options || handle_error "Error obtaining resource defaults or options."
             get_cores || handle_error "Error obtaining the number of cores to allocate."
             get_ram || handle_error "Error obtaining the amount of ram to allocate."
             echo "Launching (NAME)..."
-            if [ -e "~/.ssl/cadcproxy.pem" ]; then
-              app_id=`curl -s -L -k -E ~/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)${SESSION_PATH}`
-            else
-              TOKEN=$(cat ${HOME}/.token/Bearer)
-              app_id=`curl -s -L -k --header "Authorization: Bearer $TOKEN" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)${SESSION_PATH}`
-            fi
+            #app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app`
+            app_id=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             break
         else 
             echo invalid response
@@ -119,13 +105,8 @@ get_status() {
     status=""
     local n=0
     sleep 1
-    SESSION_PATH="/skaha/v0/session/${VNC_PW}/app/$1"
-    if [ -e "~/.ssl/cadcproxy.pem" ]; then
-        curl_out=$(curl -s -k -E ~/.ssl/cadcproxy.pem http://(HOST)$SESSION_PATH`
-    else    
-        TOKEN=$(cat ${HOME}/.token/Bearer)
-        curl_out=$(curl -s -k --header "Authorization: Bearer $TOKEN" http://(HOST)${SESSION_PATH}`
-    fi
+    #curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+    curl_out=`curl -s -L -k --header "Authorization: Bearer (TOKEN)"http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     while [[ ${curl_out} != *"status"* ]]; do
         n=$(( n + 1 ))
         if test $n -eq 10 ; then
@@ -133,13 +114,8 @@ get_status() {
             n=0
         fi
         sleep 1
-        if [ -e "~/.ssl/cadcproxy.pem" ]; then
-          curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)${SESSION_PATH}`
-        else
-          TOKEN=$(cat ${HOME}/.token/Bearer)    
-          curl_out=`curl -s -L -k --header "Authorization: Bearer $TOKEN" http://(HOST)${SESSION_PATH}`
-        fi
-
+        # curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://${skaha_hostname}/skaha/v0/session/${VNC_PW}/app/$1`
+        curl_out=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     done
 }
 

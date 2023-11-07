@@ -64,6 +64,8 @@ spec:
           value: "${skaha.userid}"
         - name: MOZ_FORCE_DISABLE_E10S
           value: "1"
+        - name: SKAHA_API_VERSION
+          value: "v0"  
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}
