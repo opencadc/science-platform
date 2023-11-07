@@ -4,30 +4,5 @@ metadata:
   name: skaha-config
   namespace: {{ .Values.skaha.namespace }}
 data:
-  cadc-registry.properties: |+
-    #
-    # local authority map
-    #
-    # <base standardID> = <authority>
-  
-    ivo://ivoa.net/std/GMS#search-1.0 = {{ .Values.deployment.skaha.gmsID }}
-    ivo://ivoa.net/std/GMS#users-1.0 = {{ .Values.deployment.skaha.gmsID }}
-    ivo://ivoa.net/std/UMS#users-0.1 = {{ .Values.deployment.skaha.gmsID }}
-    ivo://ivoa.net/std/UMS#users-1.0 = {{ .Values.deployment.skaha.gmsID }}
-    ivo://ivoa.net/sso#OAuth = {{ .Values.deployment.skaha.oidcURI }}
-    ivo://ivoa.net/sso#OpenID = {{ .Values.deployment.skaha.oidcURI }}
-  
-    http://www.opencadc.org/std/posix#group-mapping-0.1 = {{ .Values.deployment.skaha.posixMapperResourceID }}
-    http://www.opencadc.org/std/posix#user-mapping-0.1 = {{ .Values.deployment.skaha.posixMapperResourceID }}
-  
-    ca.nrc.cadc.reg.client.RegistryClient.baseURL = {{ .Values.deployment.skaha.registryURL }}
-  
-  catalina.properties: |-
-    tomcat.connector.scheme=https
-    tomcat.connector.proxyName={{ .Values.deployment.hostname }}
-    tomcat.connector.proxyPort=443
-    ca.nrc.cadc.auth.PrincipalExtractor.enableClientCertHeader=true
-    ca.nrc.cadc.util.Log4jInit.messageOnly=true
-    # (default: ca.nrc.cadc.auth.NoOpIdentityManager)
-    ca.nrc.cadc.auth.IdentityManager={{ .Values.deployment.skaha.identityManagerClass }}
+{{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
   {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}

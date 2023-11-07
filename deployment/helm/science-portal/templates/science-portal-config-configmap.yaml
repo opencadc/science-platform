@@ -4,43 +4,4 @@ metadata:
   name: science-portal-config
   namespace: {{ .Values.skaha.namespace }}
 data:
-  org.opencadc.science-portal.properties: |+
-    org.opencadc.science-portal.sessions.resourceID = {{ .Values.deployment.sciencePortal.skahaResourceID }}
-    org.opencadc.science-portal.sessions.standard = vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0
-    org.opencadc.science-portal.logoURL = {{ .Values.deployment.sciencePortal.logoURL }}
-
-    {{- with .Values.deployment.sciencePortal.oidc }}
-    org.opencadc.science-portal.oidc.clientID = {{ .clientID }}
-    org.opencadc.science-portal.oidc.clientSecret = {{ .clientSecret }}
-    org.opencadc.science-portal.oidc.callbackURI = {{ .callbackURI }}
-    org.opencadc.science-portal.oidc.redirectURI = {{ .redirectURI }}
-    org.opencadc.science-portal.oidc.scope = {{ .scope }}
-    {{- end }}
-  cadc-registry.properties: |+
-    #
-    # local authority map
-    #
-    # <base standardID> = <authority>
-  
-    ivo://ivoa.net/std/GMS#search-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
-    ivo://ivoa.net/std/GMS#users-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
-    ivo://ivoa.net/std/UMS#users-0.1 = {{ .Values.deployment.sciencePortal.gmsID }}
-    ivo://ivoa.net/std/UMS#users-1.0 = {{ .Values.deployment.sciencePortal.gmsID }}
-    {{- if .Values.deployment.sciencePortal.oidc }}
-    ivo://ivoa.net/sso#OAuth = {{ .Values.deployment.sciencePortal.oidc.uri }}
-    ivo://ivoa.net/sso#OpenID = {{ .Values.deployment.sciencePortal.oidc.uri }}
-    {{- else }}
-    ivo://ivoa.net/sso#OAuth = {{ .Values.deployment.sciencePortal.gmsID }}
-    ivo://ivoa.net/sso#OpenID = {{ .Values.deployment.sciencePortal.gmsID }}
-    {{- end }}
-    
-    ca.nrc.cadc.reg.client.RegistryClient.baseURL = {{ .Values.deployment.sciencePortal.registryURL }}
-  
-  catalina.properties: |-
-    tomcat.connector.scheme=https
-    tomcat.connector.proxyName={{ .Values.deployment.hostname }}
-    tomcat.connector.proxyPort=443
-    ca.nrc.cadc.auth.PrincipalExtractor.enableClientCertHeader=true
-    ca.nrc.cadc.util.Log4jInit.messageOnly=true
-    # (default: ca.nrc.cadc.auth.NoOpIdentityManager)
-    ca.nrc.cadc.auth.IdentityManager={{ .Values.deployment.sciencePortal.identityManagerClass }}
+{{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
