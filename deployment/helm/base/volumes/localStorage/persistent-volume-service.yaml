@@ -17,7 +17,7 @@ spec:
     storage: 10Gi
   volumeMode: Filesystem
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   persistentVolumeReclaimPolicy: Delete
   storageClassName: local-storage
   local:
@@ -40,7 +40,7 @@ metadata:
   namespace: skaha-system
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   volumeMode: Filesystem
   storageClassName: local-storage
   resources:
