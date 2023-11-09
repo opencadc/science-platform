@@ -201,10 +201,10 @@ init
 create_merged_applications_menu
 if [ -e "${HOME}/.token/Bearer" ]; then
   echo "token is used in build menu"
-  apps=$(curl -s -k --header "Authorization: Bearer ${TOKEN}" http://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+  apps=$(curl -s -k --header "Authorization: Bearer ${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
 else
   echo "certificate is used in build menu"
-  apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem http://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+  apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
 fi
 if [[ ${apps} == *"id"* ]]; then
   project_array=()
