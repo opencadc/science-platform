@@ -25,22 +25,19 @@ init_app_version () {
   done
 }
 
-init_dir () {
-  if [[ -d "$1" ]]; then
-    # empty the directory
-    rm -f $1/*
-  else
-    mkdir -p "$1"
+init_skaha_dir () {
+  if [[ -d "${SKAHA_DIR}" ]]; then
+    # remove the directory
+    rm -rf ${SKAHA_DIR}
   fi
-}
 
-init () {
-  init_app_version
   dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
-    init_dir ${dir}
+    mkdir -p ${dir}
   done
+}
 
+init_applications_dir () {
   # XFCE is hardcoded to use ~/.local/share/applications
   if [[ -d ${XFCE_DESKTOP_DIR} ]]; then
     # directory already exists, delete it
@@ -53,6 +50,12 @@ init () {
     mkdir -p ${XFCE_DESKTOP_DIR_PARENT}
     ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
   fi
+}
+
+init () {
+  init_app_version
+  init_skaha_dir
+  init_applications_dir
 
   # sleep-forever.sh is used on desktop-app start up, refer to start-software-sh.template
   cp /skaha-system/sleep-forever.sh ${EXECUTABLE_DIR}/.
@@ -123,7 +126,7 @@ build_menu () {
   project=$1
   directory="xfce-$1.directory"
   cat ${STARTUP_DIR}/xfce-applications-menu-item.template >> ${ASTROSOFTWARE_MENU}
-  sed -i -e "s#(NAME)#${project}#g" ${ASTROSOFTWARE_MENU}
+  sed -i -e "s#(PROJECT)#${project}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(DIRECTORY)#${directory}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(CATEGORY)#${project}#g" ${ASTROSOFTWARE_MENU}
   rm -f ${MERGED_DIR}/*-e
