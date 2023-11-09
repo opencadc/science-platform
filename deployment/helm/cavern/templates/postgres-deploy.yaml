@@ -25,11 +25,15 @@ spec:
           volumeMounts:
             - mountPath: /docker-entrypoint-initdb.d
               name: postgresinit
+            {{- if .Values.deployment.cavern.uws.db.storage }}
             - mountPath: /var/lib/postgresql/data
               name: postgresdb
+            {{- end }}
       volumes:
+        {{- if .Values.deployment.cavern.uws.db.storage }}
         - name: postgresdb
           {{- toYaml .Values.deployment.cavern.uws.db.storage.spec | nindent 10 }}
+        {{- end }}
         - name: postgresinit
           configMap:
             name: cavern-uws-postgres-init
