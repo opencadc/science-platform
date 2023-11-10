@@ -2,9 +2,8 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: skaha-tomcat-svc.skaha-system.svc.cluster.local
+  hostname: example.org # change this
   skaha:
-    image: abhishek1009/skaha:latest
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
@@ -30,7 +29,6 @@ deployment:
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
 
     # Resources provided to the Skaha service.
-    registryURL: http://reg.skaha-system.svc.cluster.local/reg
     resources:
       requests:
         memory: "500M"
@@ -93,9 +91,3 @@ storage:
       # storageClassName: ""
       labels:
         storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
-
-# If the base is already installed.  Omission defaults to true, so set this explicitly.
-# See the template values file (https://github.com/opencadc/science-platform/blob/SP-3544/deployment/helm/base/values.yaml)
-# for all options.
-base:
-  install: false
