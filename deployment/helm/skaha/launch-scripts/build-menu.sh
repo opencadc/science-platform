@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/bin/bash -x
 
 HOST=$1
-TOKEN=$2
+TOKEN=$(cat ${HOME}/.token/Bearer)
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
@@ -151,6 +151,8 @@ build_menu_item () {
   desktop="${DESKTOP_DIR}/${name}.desktop"
   cp ${STARTUP_DIR}/software-sh.template $executable
   cp ${STARTUP_DIR}/start-software-sh.template ${start_executable}
+  sed -i -e "s#(HOST)#$HOST#g" $start_executable
+  sed -i -e "s#(TOKEN)#$TOKEN#g" $start_executable 
   cp ${STARTUP_DIR}/software-category.template $desktop
   sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
   sed -i -e "s#(NAME)#${name}#g" $executable
@@ -197,8 +199,13 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-# apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/v0/image?type=desktop-app | grep '"id"')
-apps=$(curl -s -k --header "Authorization: Bearer ${TOKEN}" http://${HOST}/skaha/v0/image?type=desktop-app | grep '"id"')
+if [ -e "${HOME}/.token/Bearer" ]; then
+  echo "token is used in build menu"
+  apps=$(curl -s -k --header "Authorization: Bearer ${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+else
+  echo "certificate is used in build menu"
+  apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+fi
 if [[ ${apps} == *"id"* ]]; then
   project_array=()
   while IFS= read -r line
@@ -218,7 +225,7 @@ if [[ ${apps} == *"id"* ]]; then
           build_menu_item ${image_id} ${name} ${project}
       fi
     fi
-  done < <(printf '%s\n' "$apps")
+  done  < <(printf '%s\n' "$apps")
 else
   echo "[skaha] no desktop-app"
   exit 1
