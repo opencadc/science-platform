@@ -2,9 +2,9 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: example.host.com # Change this!
+  hostname: example.org # change this
   skaha:
-    imagePullPolicy: Always
+    imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
 
@@ -34,8 +34,8 @@ deployment:
         memory: "500M"
         cpu: "500m"
       limits:
-        memory: "500M"
-        cpu: "500m"
+        memory: "1500M"
+        cpu: "1500m"
 
     # Uncomment to debug.  Requires options above as well as service port exposure below.
     # extraPorts:
@@ -91,9 +91,3 @@ storage:
       # storageClassName: ""
       labels:
         storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
-
-# If the base is already installed.  Omission defaults to true, so set this explicitly.
-# See the template values file (https://github.com/opencadc/science-platform/blob/SP-3544/deployment/helm/base/values.yaml)
-# for all options.
-base:
-  install: false

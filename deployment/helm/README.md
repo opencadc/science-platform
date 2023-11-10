@@ -420,7 +420,7 @@ deployment:
       # persistent data directory in container
       dataDir: "/data"
 
-      # relative path to the node/file content that could be mounted in other containers, including Skaha.
+      # (Optional) relative path to the node/file content that could be mounted in other containers, including Skaha.
       subPath: "/cavern"
 
       # See https://github.com/opencadc/vos/tree/master/cavern for documentation.  For deployments using OpenID Connect,
