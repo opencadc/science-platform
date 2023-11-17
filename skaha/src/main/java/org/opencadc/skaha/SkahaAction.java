@@ -70,6 +70,7 @@ package org.opencadc.skaha;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
@@ -188,7 +189,21 @@ public abstract class SkahaAction extends RestAction {
             throw new AccessControlException("No POSIX Principal");
         }
         posixPrincipal = posixPrincipals.iterator().next();
-        log.debug("userID: " + posixPrincipal);
+
+        // If the PosixPrincipal's username is not populated, then do that here with an attempt at the HTTPPrincipal.
+        if (posixPrincipal.username == null) {
+            final Set<HttpPrincipal> httpPrincipals = currentSubject.getPrincipals(HttpPrincipal.class);
+            if (!httpPrincipals.isEmpty()) {
+                posixPrincipal.username = httpPrincipals.iterator().next().getName();
+            }
+        }
+
+        // The username is necessary.
+        if (posixPrincipal.username == null) {
+            throw new AccessControlException("POSIX Principal is incomplete (no username).");
+        }
+
+        log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
         if (skahaUsersGroup == null) {
