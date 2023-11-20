@@ -27,6 +27,8 @@ configMapGenerator:
   - config/templates/astrosoftware-bottom.menu
 - name: icons
   files:
+  - config/app-icons/aladin.svg
+  - config/app-icons/visivo.svg
   - config/app-icons/ds9.svg
   - config/app-icons/ds9-terminal.svg
   - config/app-icons/terminal.svg
