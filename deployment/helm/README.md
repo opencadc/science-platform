@@ -411,6 +411,9 @@ deployment:
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
 
+    # Set the Registry URL pointing to the desired registry
+    registryURL: "https://registry.example.org/reg"
+
     # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
