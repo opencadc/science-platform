@@ -17,6 +17,9 @@ deployment:
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
 
+    # Set the Registry URL pointing to the desired registry
+    registryURL: https://spsrc27.iaa.csic.es/reg
+
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
 
