@@ -27,6 +27,7 @@ helm repo update
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
+helm install -n skaha-system --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
 helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
 ```
 
@@ -395,7 +396,7 @@ deployment:
     # ca.crt: <base64 encoded ca.crt blob>
 ```
 
-### Cavern (User Storage) install
+### Cavern (User Storage API) install
 
 The Cavern API provides access to the User Storage which is shared between Skaha and all of the User Sessions.  A [Bearer token](#obtaining-a-bearer-token) is required when trying to read
 private access, or any writing.
@@ -438,7 +439,8 @@ deployment:
         # The GID of the root owner.
         gid: 
 
-      # (optional) keys to generate pre-auth URLs to cavern
+      # Public/private key pair to generate pre-auth URLs to cavern.  This is required to enable the User Storage UI's non-public downloads.
+      # See https://github.com/opencadc/core/tree/master/cadc-keygen for instructions.
       # keys:
         # private: <private key file>
         # public: <public key file>
@@ -499,6 +501,14 @@ storage:
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
 ```
+
+#### Public and private keyset to support pre-authorized URLs in the User Storage UI
+The User Storage UI relies on redirecting the user to pre-authorized URLs for downloads.  To facilitate this, the API (Cavern) needs
+to generate those URLs based on some keyset.  The key set can be generated using these instructions:
+https://github.com/opencadc/core/tree/master/cadc-keygen
+
+then add ther resulting files into the `config` folder of the Cavern deployment, and re-install or upgrade, then restart the
+deployment.  Don't forget to update the Helm `values` file with the file name you chose.
 
 ## Obtaining a Bearer Token
 
