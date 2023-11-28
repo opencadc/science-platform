@@ -10,8 +10,7 @@
 
 ## OpenID Connect
 
-Browser based applications use the Authorization Code flow to authenticate users to the OIdP (OpenId Provider).  A good example
-of how that works is shown at [Medium.com](https://darutk.medium.com/diagrams-of-all-the-openid-connect-flows-6968e3990660#c027), with `openid` included in the `scope` parameter.
+Browser based applications use the Authorization Code flow to authenticate users to the OpenId Provider (OIdP).  A good example of how that works is shown at [Medium.com](https://darutk.medium.com/diagrams-of-all-the-openid-connect-flows-6968e3990660#c027), with `openid` included in the `scope` parameter.
 
 Once that flow succeeds, the OpenID Connect Client (the application) will have an Access Token (and Refresh Token) to use to make authenticated calls on behalf of the user to an API, such as Cavern or Skaha.
 
@@ -74,7 +73,7 @@ The application now has what it needs to make authenticated calls to the API(s).
 
 ## BFF Pattern
 
-The UI applications use the Backend For Frontend (BFF) pattern to securely store tokens in a server-side cache, and can only be retrieve with an encrypted, HTTP-Only, and Secure, first-party cookie from the browser.  First-party cookies are cookies retrieved from a site from a direct visit to the site, rather than a request made from the page using JavaScript.  As browsers tighten security on cookies, this helps to future proof it.
+The UI applications use the Backend For Frontend (BFF) pattern to securely store tokens in a server-side cache, and can only be retrieved with an encrypted, HTTP-Only, and Secure, first-party cookie from the browser.  First-party cookies are cookies retrieved from a site from a direct visit to the site, rather than a request made from the page using JavaScript.  As browsers tighten security on cookies, this helps to future proof it.
 
 All OpenID Connect (OIDC) interaction is handled by the [Nimbus OAuth2 Java Library](https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/src/master/).
 
