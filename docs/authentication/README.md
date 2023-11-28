@@ -1,5 +1,13 @@
 # Authentication in browser based applications (Science Portal & Storage User Interface)
 
+- [OpenID Connect](#openid-connect)
+  - [Login](#login)
+- [BFF Pattern](#bff-pattern)
+  - [After Successful Login](#after-successful-login)
+  - [Authenticated Requests](#authenticated-requests)
+    - [Flow](#general-steps)
+
+
 ## OpenID Connect
 
 Browser based applications use the Authorization Code flow to authenticate users to the OIdP (OpenId Provider).  A good example
@@ -57,19 +65,19 @@ The UI applications use the Backend For Frontend (BFF) pattern to securely store
 
 All OpenID Connect (OIDC) interaction is handled by the [Nimbus OAuth2 Java Library](https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/src/master/).
 
-### After successful login
+### After Successful Login
 
 The JSON document with a token set represents the Assets.  These Assets are stored in a Redis cache on the server, and a key is issued to retrieve them.  Each application has its own Token Cache.  The Assets are made up of the `access_token`, `refresh_token`, and the `expires_in` values.
 
 That returned Assets key is SHA-256 encrypted, and set in the browser in a secure cookie.  That cookie is only good for this application, and cannot be read by JavaScript (`http-only`).
 
-### Authenticated requests
+### Authenticated Requests
 
 That encrypted cookie can now be used with the application to make authenticated requests.  The browser will send the cookie with each request, and follow the path as laid out in the diagram.
 
 ![BFF Pattern](./BFF.png)
 
-#### General steps
+#### General Steps
 
 1. User makes a request for a resource from a browser application
 2. If there is no first-party cookie, then proceed as though anonymous.  If the resource is protected, then a 401 or 403 status code is returned.
