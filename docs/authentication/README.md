@@ -41,8 +41,10 @@ The `redirect_uri` endpoint can then pull the `code` query parameter, and use th
 
 **Example**:
 ```java
+final String codeFromCallbackURI = request.getParameter("code");
 final ClientID clientID = new ClientID(this.clientID);
 final Secret clientSecret = new Secret(this.clientSecret);
+final AuthorizationCodeGrant codeGrant = new AuthorizationCodeGrant(codeFromCallbackURI);
 
 // Basic Authentication to obtain a Token from the IAM service.
 final ClientAuthentication clientAuth = new ClientSecretBasic(clientID, clientSecret);
@@ -73,7 +75,7 @@ The application now has what it needs to make authenticated calls to the API(s).
 
 ## BFF Pattern
 
-The UI applications use the Backend For Frontend (BFF) pattern to securely store tokens in a server-side cache, and can only be retrieved with an encrypted, HTTP-Only, and Secure, first-party cookie from the browser.  First-party cookies are cookies retrieved from a site from a direct visit to the site, rather than a request made from the page using JavaScript.  As browsers tighten security on cookies, this helps to future proof it.
+The UI applications use the Backend For Frontend (BFF) pattern to securely store tokens in a server-side cache, and can only be retrieved with an encrypted, HTTP-Only, and Secure, first-party cookie from the browser.  First-party cookies are obtained from a direct visit to the site, such as from a redirect, rather than from a request made from the page using JavaScript (third-party).  As browsers tighten security on cookies, this helps to future proof it.
 
 All OpenID Connect (OIDC) interaction is handled by the [Nimbus OAuth2 Java Library](https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/src/master/).
 
