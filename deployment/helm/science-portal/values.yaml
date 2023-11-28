@@ -77,3 +77,9 @@ deployment:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # science-portal-cacert-secret:
   #   ca.crt: <base64 encoded ca crt>
+
+# For the token caching
+redis:
+  architecture: 'standalone'
+  auth:
+    enabled: false

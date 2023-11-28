@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.org  # Change this!
   cavern:
-    image: images.opencadc.org/platform/cavern:0.5.4
+    image: images.opencadc.org/platform/cavern:0.5.7
     imagePullPolicy: Always
 
     # How cavern identifies itself.
@@ -39,7 +39,7 @@ deployment:
       # The adminUsername is required to be set whomever has admin access over the
       # filesystem.dataDir above.
       # rootOwner:
-      #   adminUsername: "root"
+        # adminUsername: "root"
         # username: "root"
         # uid: 1000
         # gid: 1000
