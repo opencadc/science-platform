@@ -16,6 +16,19 @@ spec:
       labels:
         run: cavern-tomcat
     spec:
+      # The keys are enabled by default in the main values.yaml file.
+      {{- with .Values.deployment.cavern.keys }}
+      initContainers:
+      - name: init-keys
+        image: alpine:latest
+        command: ['sh', '-c', 'apk --no-cache add openssh-keygen && ssh-keygen -b 2048 -t rsa -m pkcs8 -f ${TMP_KEY} -q -N "" && ssh-keygen -e -m pkcs8 -f ${TMP_KEY}.pub > /keys/{{ .public }} -q -N "" && mv ${TMP_KEY} /keys/{{ .private }}']
+        env:
+          - name: TMP_KEY
+            value: temp-{{ $.Release.Name }}
+        volumeMounts:
+        - mountPath: "/keys"
+          name: keys-volume
+      {{- end }}
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
@@ -37,15 +50,21 @@ spec:
         {{- with .Values.deployment.cavern.extraPorts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        volumeMounts: 
+        volumeMounts:
         - mountPath: "/config"
           name: config-volume
+        {{- with .Values.deployment.cavern.keys }}
+        - mountPath: "/config/{{ .subDir }}"
+          name: keys-volume
+        {{- end }}
         - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
           name: cavern-volume
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+      - name: keys-volume
+        emptyDir: {}
       - name: config-volume
         configMap:
           name: cavern-config

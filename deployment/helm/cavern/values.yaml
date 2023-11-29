@@ -44,10 +44,20 @@ deployment:
         # uid: 1000
         # gid: 1000
 
-      # (optional) keys to generate pre-auth URLs to cavern
-      # keys:
-        # private: <private key file>
-        # public: <public key file>
+    # Public/private key pair to generate pre-auth URLs to cavern.  This is required to enable the User Storage UI's non-public downloads, but optional
+    # if not running the Storage UI.
+    # 
+    # By default, an initContainer will generate keys with the given name, in the given sub directory.  For an easy setup system, these can be left alone safely.
+    #
+    # Deployers can override these files if they want to inject them separately.
+    # See https://github.com/opencadc/core/tree/master/cadc-keygen for instructions on creating the key pair.
+    keys:
+      private: cavern-private.key
+      public: cavern-public.key
+
+      # Keys will be available in the "keys" folder in the default config folder.
+      subDir: keys
+
 
       # (optional) base directory exposed for sshfs mounts
       # sshfs:
