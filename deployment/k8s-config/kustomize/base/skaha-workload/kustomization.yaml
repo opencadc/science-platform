@@ -13,7 +13,6 @@ configMapGenerator:
   - config/sleep-forever.sh
 - name: templates
   files:
-  - config/templates/desktop-apps-icon.properties
   - config/templates/skaha-resolutions.properties
   - config/templates/xfce-directory.template
   - config/templates/xfce-applications-menu-item.template
