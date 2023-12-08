@@ -62,6 +62,7 @@ spec:
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
             ephemeral-storage: "5Gi"
         ports:
         - containerPort: 5000

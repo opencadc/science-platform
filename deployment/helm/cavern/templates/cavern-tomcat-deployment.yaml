@@ -16,19 +16,16 @@ spec:
       labels:
         run: cavern-tomcat
     spec:
-      # The keys are enabled by default in the main values.yaml file.
-      {{- with .Values.deployment.cavern.keys }}
+      securityContext:
+        fsGroup: {{ .Values.deployment.cavern.filesystem.rootOwner.gid }}
       initContainers:
-      - name: init-keys
-        image: alpine:latest
-        command: ['sh', '-c', 'apk --no-cache add openssh-keygen && ssh-keygen -b 2048 -t rsa -m pkcs8 -f ${TMP_KEY} -q -N "" && ssh-keygen -e -m pkcs8 -f ${TMP_KEY}.pub > /keys/{{ .public }} -q -N "" && mv ${TMP_KEY} /keys/{{ .private }}']
-        env:
-          - name: TMP_KEY
-            value: temp-{{ $.Release.Name }}
+      - name: init-cavern-fs
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'mkdir -p {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/home && mkdir -p {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/projects && chown {{ .Values.deployment.cavern.filesystem.rootOwner.uid }}:{{ .Values.deployment.cavern.filesystem.rootOwner.gid }} {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/home && chown {{ .Values.deployment.cavern.filesystem.rootOwner.uid }}:{{ .Values.deployment.cavern.filesystem.rootOwner.gid }} {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/projects']
         volumeMounts:
-        - mountPath: "/keys"
-          name: keys-volume
-      {{- end }}
+        - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
+          name: cavern-volume
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
@@ -53,18 +50,12 @@ spec:
         volumeMounts:
         - mountPath: "/config"
           name: config-volume
-        {{- with .Values.deployment.cavern.keys }}
-        - mountPath: "/config/{{ .subDir }}"
-          name: keys-volume
-        {{- end }}
         - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
           name: cavern-volume
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
-      - name: keys-volume
-        emptyDir: {}
       - name: config-volume
         configMap:
           name: cavern-config

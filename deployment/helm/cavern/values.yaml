@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.org  # Change this!
   cavern:
-    image: images.opencadc.org/platform/cavern:0.5.7
+    image: images.opencadc.org/platform/cavern:0.6.1
     imagePullPolicy: Always
 
     # How cavern identifies itself.
@@ -33,9 +33,6 @@ deployment:
       # persistent data directory in container
       # dataDir: "/data"
 
-      # (Optional) relative path to the node/file content that could be mounted in other containers.
-      # subPath: "/cavern"
-
       # The adminUsername is required to be set whomever has admin access over the
       # filesystem.dataDir above.
       # rootOwner:
@@ -43,21 +40,6 @@ deployment:
         # username: "root"
         # uid: 1000
         # gid: 1000
-
-    # Public/private key pair to generate pre-auth URLs to cavern.  This is required to enable the User Storage UI's non-public downloads, but optional
-    # if not running the Storage UI.
-    # 
-    # By default, an initContainer will generate keys with the given name, in the given sub directory.  For an easy setup system, these can be left alone safely.
-    #
-    # Deployers can override these files if they want to inject them separately.
-    # See https://github.com/opencadc/core/tree/master/cadc-keygen for instructions on creating the key pair.
-    keys:
-      private: cavern-private.key
-      public: cavern-public.key
-
-      # Keys will be available in the "keys" folder in the default config folder.
-      subDir: keys
-
 
       # (optional) base directory exposed for sshfs mounts
       # sshfs:
@@ -78,6 +60,9 @@ deployment:
         #   spec:
         #     hostPath:
         #       path: "/cavern-uws/data"
+
+    # Optional rename of the application from the default "cavern"
+    # applicationName: 'cavern'
 
     # Optionally set the DEBUG port.
     # extraEnv:
