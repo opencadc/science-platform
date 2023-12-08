@@ -71,8 +71,6 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
-        - mountPath: "/headless/.icons"
-          name: icons
         - mountPath: "/desktopstartup"
           name: templates
         - mountPath: "/skaha-system"
@@ -87,10 +85,6 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
-      - name: icons
-        configMap:
-          name: icons
-          defaultMode: 0777
       - name: templates
         configMap:
           name: templates
