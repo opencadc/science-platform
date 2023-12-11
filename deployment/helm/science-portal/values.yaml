@@ -9,7 +9,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   sciencePortal:
-    image: images.opencadc.org/platform/science-portal:0.1.1
+    image: images.opencadc.org/platform/science-portal:0.2.0
     imagePullPolicy: Always
 
     # Optionally set the DEBUG port.
@@ -72,7 +72,7 @@ deployment:
     #     secretName: science-portal-cacert-secret
 
     # Can be an absolute or relative URL.  This is injected as-is into the HTML <img> tag.
-    logoURL: /science-portal/images/SRCNetLogo.png
+    themeName: src
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
