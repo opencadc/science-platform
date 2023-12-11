@@ -1,6 +1,9 @@
-# CHANGELOG for Science Portal UI (Chart 0.1.2)
+# CHANGELOG for Science Portal UI (Chart 0.2.2)
 
-## 2023.11.XX (0.1.2)
+## 2023.12.11 (0.2.2)
+- OpenID Connect login support
+
+## 2023.11.25 (0.1.2)
 - Properly report a missing configuration for a Skaha API
 - Application version correction to make in line with `main` branch
 

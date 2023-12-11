@@ -1,8 +1,9 @@
 # CHANGELOG for Skaha User Session API (0.3.0)
 
 ## 2023.11.14 (0.3.0)
-- Fix to call menu building using Tokens
-- Fix Desktop and Desktop App launching to use Tokens for authenciated access back to Skaha
+- Desktop sessions are still not complete, but have improved.
+  - Fix to call menu building using Tokens
+  - Fix Desktop and Desktop App launching to use Tokens for authenciated access back to Skaha
 - Fix PosixPrincipal username if missing
 
 ## 2023.11.02 (0.2.17)
