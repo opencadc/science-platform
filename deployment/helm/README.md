@@ -414,15 +414,12 @@ deployment:
     # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
-    # The endpoint to serve this from.  Defaults to /cavern.
-    # endpoint: "/cavern"
-
     filesystem:
       # persistent data directory in container
       dataDir: "/data"
 
-      # (Optional) relative path to the node/file content that could be mounted in other containers, including Skaha.
-      subPath: "/cavern"
+      # RELATIVE path to the node/file content that could be mounted in other containers
+      subPath: "cavern"
 
       # See https://github.com/opencadc/vos/tree/master/cavern for documentation.  For deployments using OpenID Connect,
       # the rootOwner MUST be an object with the following properties set.
@@ -439,25 +436,26 @@ deployment:
         # The GID of the root owner.
         gid: 
 
-      # Public/private key pair to generate pre-auth URLs to cavern.  This is required to enable the User Storage UI's non-public downloads.
-      # See https://github.com/opencadc/core/tree/master/cadc-keygen for instructions.
-      # keys:
-        # private: <private key file>
-        # public: <public key file>
-
     # When using a database to connect to UWS.  These can stay as-is, unless you would like to use
     # a different database.
-    # uws:
-    #   db:
-    #     username: uwsuser
-    #     password: uwspwd
-    #     database: uws
-    #     schema: uws
-    #     maxActive: 2
-    #     storage:
-    #       spec:
-    #         hostPath:
-    #           path: "/cavern-uws/data"
+    uws:
+      db:
+        username: uwsuser
+        password: uwspwd
+        database: uws
+        schema: uws
+        maxActive: 2
+        # storage:
+        #   spec:
+        #     hostPath:
+        #       path: "/cavern-uws/data"
+
+    # Optional rename of the application from the default "cavern"
+    # applicationName: "cavern"
+
+    # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
+    # Don't forget to update your registry entries!
+    # endpoint: "/cavern"
 
     # Optionally set the DEBUG port.
     # extraEnv:
