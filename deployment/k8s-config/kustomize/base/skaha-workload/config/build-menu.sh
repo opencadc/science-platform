@@ -1,6 +1,7 @@
 #!/bin/bash
 
 HOST=$1
+ICON_DIR="/headless/.icons"
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
@@ -14,12 +15,34 @@ MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
 declare -A app_version
 
-init_app_version () {
-  while IFS= read -r line; do
-    apps_to_add="${line}"
-  done < ${STARTUP_DIR}/desktop-apps-icon.properties
+# generate a list of candidate icon names
+generate_candidates () {
+  current_dir=${PWD}
+  cd ${ICON_DIR}
+  png_files=`ls *.png`
+  svg_files=`ls *.svg`
+  non_candidates=()
+  for file in ${png_files}
+  do
+    non_candidates+=(`echo ${file} | cut -f1 -d"."`)
+  done
+  echo "[skaha] non icon candidates: ${non_candidates[@]}"
 
-  for app_name in ${apps_to_add}
+  candidates=()
+  for file in ${svg_files[@]}
+  do
+    candidate=(`echo ${file} | cut -f1 -d"."`)
+    if [[ ! "${non_candidates[@]}" =~ ${candidate} ]]; then
+      candidates+=(${candidate})
+    fi
+  done
+  echo "[skaha] icon candidates: ${candidates[@]}"
+  cd ${current_dir}
+}
+
+init_app_version () {
+  generate_candidates
+  for app_name in ${candidates[@]}
   do
     app_version[${app_name}]="${app_name}:"
   done
@@ -172,7 +195,7 @@ build_menu_item () {
   sed -i -e "s#(VERSION)#${version}#g" $desktop
   sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
   sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ "${apps_to_add}" =~ (" "|^)${short_name}(" "|$) ]]; then
+  if [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]]; then
     if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
       # pick the latest version
       app_version[${short_name}]="${name}"
