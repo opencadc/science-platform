@@ -8,7 +8,7 @@
   - [POSIX Mapper install](#posix-mapper-install)
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
-  - [Cavern install](#cavern-user-storage-install)
+  - [Cavern install](#cavern-user-storage-api-install)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
