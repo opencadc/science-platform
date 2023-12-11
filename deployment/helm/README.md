@@ -411,6 +411,9 @@ deployment:
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
 
+    # Set the Registry URL pointing to the desired registry
+    registryURL: "https://registry.example.org/reg"
+
     # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
@@ -500,7 +503,7 @@ storage:
       #   claimName: skaha-pvc
 ```
 
-### User Storage UI installation
+### User Storage UI installation (Not yet available)
 
 Please read the [minimum configuration](./storage-ui/README.md).  A quick look is:
 
@@ -555,14 +558,6 @@ deployment:
   # science-portal-cacert-secret:
     # ca.crt: <base64 encoded ca.crt blob>
 ```
-
-#### Public and private keyset to support pre-authorized URLs in the User Storage UI
-The User Storage UI relies on redirecting the user to pre-authorized URLs for downloads.  To facilitate this, the API (Cavern) needs
-to generate those URLs based on some keyset.  The key set can be generated using these instructions:
-https://github.com/opencadc/core/tree/master/cadc-keygen
-
-then add ther resulting files into the `config` folder of the Cavern deployment, and re-install or upgrade, then restart the
-deployment.  Don't forget to update the Helm `values` file with the file name you chose.
 
 ## Obtaining a Bearer Token
 

@@ -118,7 +118,7 @@ get_status() {
     local n=0
     sleep 1
     if [ -e "${HOME}/.token/Bearer" ]; then
-        curl_out=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}"https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+        curl_out=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     else
         curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     fi
