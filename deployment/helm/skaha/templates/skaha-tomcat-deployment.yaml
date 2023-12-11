@@ -80,6 +80,7 @@ spec:
           name: add-user-config
         - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
           name: cavern-volume
+          # This subpath needs to match the subpath in Cavern's deployment.  If that one is configurable, so must this one be!
           subPath: cavern
         {{- with .Values.deployment.skaha.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}

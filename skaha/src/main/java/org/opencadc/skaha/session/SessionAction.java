@@ -270,17 +270,17 @@ public abstract class SessionAction extends SkahaAction {
         try {
             LocalAuthority localAuthority = new LocalAuthority();
             URI serviceID = localAuthority.getServiceURI(Standards.CRED_PROXY_10.toString());
-            if (serviceID != null) {
-                CredUtil.checkCredentials();
-                CredClient credClient = new CredClient(serviceID);
-                X509CertificateChain chain = credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), 14);
-                if (chain != null) {
-                    injectFile(chain.certificateString(), homedir + "/" + username + "/.ssl/cadcproxy.pem");
-                    log.debug("injected certificate");
-                }
+            CredUtil.checkCredentials();
+            CredClient credClient = new CredClient(serviceID);
+            X509CertificateChain chain = credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), 14);
+            if (chain != null) {
+                injectFile(chain.certificateString(), homedir + "/" + username + "/.ssl/cadcproxy.pem");
+                log.debug("injected certificate");
             }
+        } catch (NoSuchElementException noSuchElementException) {
+            log.debug("Not using proxy certificates.  Skipping certificate injection...");
         } catch (Exception e) {
-            log.debug("failed to inject cert: " + e.getMessage(), e);
+            log.warn("failed to inject cert: " + e.getMessage(), e);
         }
     }
     

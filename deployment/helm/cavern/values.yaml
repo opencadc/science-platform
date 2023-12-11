@@ -9,10 +9,13 @@ skaha:
 
 # Skaha web service deployment
 deployment:
-  hostname: example.org  # Change this!
+  hostname: example.org
   cavern:
-    image: images.opencadc.org/platform/cavern:0.5.4
+    image: images.opencadc.org/platform/cavern:0.6.1
     imagePullPolicy: Always
+
+    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
+    registryURL: https://spsrc27.iaa.csic.es/reg
 
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
@@ -21,7 +24,7 @@ deployment:
     registryURL: https://spsrc27.iaa.csic.es/reg
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
     oidcURI: https://ska-iam.stfc.ac.uk/
@@ -29,28 +32,20 @@ deployment:
     # ID (URI) of the GMS Service.
     gmsID: ivo://skao.int/gms
 
-    # The endpoint to serve this from.  Defaults to /cavern.
-    # endpoint: "/cavern"
-
     # filesystem:
       # persistent data directory in container
       # dataDir: "/data"
 
-      # (Optional) relative path to the node/file content that could be mounted in other containers.
-      # subPath: "/cavern"
+      # RELATIVE path to the node/file content that could be mounted in other containers
+      # subPath: "cavern"
 
       # The adminUsername is required to be set whomever has admin access over the
       # filesystem.dataDir above.
       # rootOwner:
-      #   adminUsername: "root"
+        # adminUsername: "root"
         # username: "root"
         # uid: 1000
         # gid: 1000
-
-      # (optional) keys to generate pre-auth URLs to cavern
-      # keys:
-        # private: <private key file>
-        # public: <public key file>
 
       # (optional) base directory exposed for sshfs mounts
       # sshfs:
@@ -71,6 +66,13 @@ deployment:
         #   spec:
         #     hostPath:
         #       path: "/cavern-uws/data"
+
+    # Optional rename of the application from the default "cavern".
+    # applicationName: "cavern"
+
+    # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
+    # Don't forget to update your registry entries!
+    # endpoint: "/cavern"
 
     # Optionally set the DEBUG port.
     # extraEnv:

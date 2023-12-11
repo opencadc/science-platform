@@ -1,5 +1,5 @@
         <Menu>
-            <Name>(NAME)</Name>
+            <Name>(PROJECT)</Name>
             <Directory>(DIRECTORY)</Directory>
             <Include>
                 <Category>(CATEGORY)</Category>

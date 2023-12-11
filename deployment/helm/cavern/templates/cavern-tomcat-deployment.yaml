@@ -16,6 +16,16 @@ spec:
       labels:
         run: cavern-tomcat
     spec:
+      securityContext:
+        fsGroup: {{ .Values.deployment.cavern.filesystem.rootOwner.gid }}
+      initContainers:
+      - name: init-cavern-fs
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'mkdir -p {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/home && mkdir -p {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/projects && chown {{ .Values.deployment.cavern.filesystem.rootOwner.uid }}:{{ .Values.deployment.cavern.filesystem.rootOwner.gid }} {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/home && chown {{ .Values.deployment.cavern.filesystem.rootOwner.uid }}:{{ .Values.deployment.cavern.filesystem.rootOwner.gid }} {{ .Values.deployment.cavern.filesystem.dataDir }}/cavern/projects']
+        volumeMounts:
+        - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
+          name: cavern-volume
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
@@ -37,7 +47,7 @@ spec:
         {{- with .Values.deployment.cavern.extraPorts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        volumeMounts: 
+        volumeMounts:
         - mountPath: "/config"
           name: config-volume
         - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"

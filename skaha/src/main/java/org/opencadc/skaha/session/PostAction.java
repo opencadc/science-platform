@@ -721,8 +721,8 @@ public class PostAction extends SessionAction {
         log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
-        String jobName = sessionID + "-" + appID + "-" + posixPrincipal.username.toLowerCase() + "-"
-                         + name.toLowerCase();
+        String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
+        String jobName = sessionID + "-" + appID + "-" + userJobID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
