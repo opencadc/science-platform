@@ -15,10 +15,17 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.2.1
+version: 0.2.2
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "0.6.1"
+
+# Chart version 12.12.10 installs PostgreSQL 15
+# Chart version 13.2.24 installs PostgreSQL 16
+dependencies:
+  - name: "postgresql"
+    version: "13.2.24"
+    repository: "oci://registry-1.docker.io/bitnamicharts"

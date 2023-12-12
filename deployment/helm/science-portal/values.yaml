@@ -71,7 +71,7 @@ deployment:
     #     defaultMode: 420
     #     secretName: science-portal-cacert-secret
 
-    # Can be an absolute or relative URL.  This is injected as-is into the HTML <img> tag.
+    # Supported theme name (src or canfar).
     themeName: src
 
 # secrets:
