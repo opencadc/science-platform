@@ -34,7 +34,7 @@ deployment:
       # dataDir: "/data"
 
       # RELATIVE path to the node/file content that could be mounted in other containers
-      # This will be used in a `dataDir`/`subPath` manner.
+      # This will be used in a `dataDir`/`subPath` manner to remove shared data from the root folder.
       # subPath: "cavern"
 
       # The adminUsername is required to be set whomever has admin access over the
@@ -118,6 +118,7 @@ storage:
 
 # UWS Database
 postgresql:
+  install: true
   volumePermissions: 
     enabled: true
   auth:
@@ -125,6 +126,7 @@ postgresql:
     password: "uwspwd"
     database: "uws"
   image:
+    # Forcing the use of version 13 to compatibility reasons (SCRAM not supported)
     tag: "13.13.0"
   primary:
     initdb:
