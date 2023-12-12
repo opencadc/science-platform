@@ -439,19 +439,10 @@ deployment:
         # The GID of the root owner.
         gid: 
 
-    # When using a database to connect to UWS.  These can stay as-is, unless you would like to use
-    # a different database.
+    # Further UWS settings for the Tomcat Pool setup.
     uws:
-      db:
-        username: uwsuser
-        password: uwspwd
-        database: uws
-        schema: uws
-        maxActive: 2
-        # storage:
-        #   spec:
-        #     hostPath:
-        #       path: "/cavern-uws/data"
+      schema: uws
+      maxActive: 2
 
     # Optional rename of the application from the default "cavern"
     # applicationName: "cavern"
@@ -501,6 +492,10 @@ storage:
       # Example is the persistentVolumeClaim below.  This should match whatever Skaha used.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# UWS Database
+postgresql:
+  install: true  # To run your own database, set this to false and override auth settings.
 ```
 
 ### User Storage UI installation (Not yet available)
