@@ -28,6 +28,7 @@ spec:
       securityContext:
         runAsUser: 0
       serviceAccountName: skaha
+      automountServiceAccountToken: false
       volumes:
       - name: add-project-config
         configMap:

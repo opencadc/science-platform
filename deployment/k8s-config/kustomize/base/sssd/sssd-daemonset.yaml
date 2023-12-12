@@ -45,6 +45,7 @@ spec:
       securityContext:
         runAsUser: 0
       serviceAccountName: sss
+      automountServiceAccountToken: false
       priorityClassName: uber-user-preempt-high
       volumes:
       - name: sssd-config-vol
