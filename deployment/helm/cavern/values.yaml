@@ -14,13 +14,10 @@ deployment:
     image: images.opencadc.org/platform/cavern:0.6.1
     imagePullPolicy: Always
 
-    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
-    registryURL: https://spsrc27.iaa.csic.es/reg
-
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
 
-    # Set the Registry URL pointing to the desired registry
+    # Set the Registry URL pointing to the desired registry (https:// URL)
     registryURL: https://spsrc27.iaa.csic.es/reg
 
     # The Resource ID of the Service that contains the Posix Mapping information
@@ -37,6 +34,7 @@ deployment:
       # dataDir: "/data"
 
       # RELATIVE path to the node/file content that could be mounted in other containers
+      # This will be used in a `dataDir`/`subPath` manner.
       # subPath: "cavern"
 
       # The adminUsername is required to be set whomever has admin access over the
@@ -54,25 +52,17 @@ deployment:
     # The IdentityManager class handling authentication.  This should generally be left alone
     identityManagerClass: org.opencadc.auth.StandardIdentityManager
 
-    # When using a database to connect to UWS.
+    # For the UWS database.
     uws:
-      db:
-        username: uwsuser
-        password: uwspwd
-        database: uws
-        schema: uws
-        maxActive: 2
-        # storage:
-        #   spec:
-        #     hostPath:
-        #       path: "/cavern-uws/data"
+      schema: "uws"
+      maxActive: 2
 
     # Optional rename of the application from the default "cavern".
-    # applicationName: "cavern"
+    applicationName: "cavern"
 
     # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
     # Don't forget to update your registry entries!
-    # endpoint: "/cavern"
+    endpoint: "/cavern"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -125,3 +115,17 @@ storage:
       # is specified.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# UWS Database
+postgresql:
+  volumePermissions: 
+    enabled: true
+  auth:
+    username: "uwsuser"
+    password: "uwspwd"
+    database: "uws"
+  image:
+    tag: "13.13.0"
+  primary:
+    initdb:
+      scriptsConfigMap: "{{ $.Release.Name }}-uws-configmap"
