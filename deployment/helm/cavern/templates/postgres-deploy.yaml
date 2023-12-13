@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cavern-uws-postgres
+  name: {{ .Release.Name }}-uws-postgres
   namespace: {{ .Values.skaha.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: cavern-uws-postgres
+      app: {{ .Release.Name }}-uws-postgres
   template:
     metadata:
       labels:
-        app: cavern-uws-postgres
+        app: {{ .Release.Name }}-uws-postgres
     spec:
       securityContext:
         runAsUser: {{ .Values.deployment.cavern.uws.db.runUID }}
@@ -23,7 +23,7 @@ spec:
             - containerPort: 5432  # Exposes container port
           envFrom:
             - configMapRef:
-                name: cavern-uws-postgres-config
+                name: {{ .Release.Name }}-uws-postgres-config
           volumeMounts:
             - mountPath: /docker-entrypoint-initdb.d
               name: postgresinit
@@ -38,4 +38,4 @@ spec:
         {{- end }}
         - name: postgresinit
           configMap:
-            name: cavern-uws-postgres-init
+            name: {{ .Release.Name }}-uws-postgres-init
