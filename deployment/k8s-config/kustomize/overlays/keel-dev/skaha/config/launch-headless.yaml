@@ -21,6 +21,7 @@ spec:
         canfar-net-userid: "${skaha.userid}"
         job-name: "${skaha.jobname}"
     spec:
+      automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: Never
       ${skaha.schedulegpu}
