@@ -65,7 +65,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: cavern-config
+          name: {{ .Release.Name }}-config
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.cavern.extraVolumes }}
