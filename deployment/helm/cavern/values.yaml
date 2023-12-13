@@ -54,8 +54,12 @@ deployment:
 
     # For the UWS database.
     uws:
-      schema: "uws"
-      maxActive: 2
+      db:
+        username: "uwsuser"
+        password: "uwspwd"
+        database: "uws"
+        schema: "uws"
+        maxActive: 2
 
     # Optional rename of the application from the default "cavern".
     applicationName: "cavern"
@@ -115,19 +119,3 @@ storage:
       # is specified.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
-
-# UWS Database
-postgresql:
-  install: true
-  volumePermissions: 
-    enabled: true
-  auth:
-    username: "uwsuser"
-    password: "uwspwd"
-    database: "uws"
-  image:
-    # Forcing the use of version 13 to compatibility reasons (SCRAM not supported)
-    tag: "13.13.0"
-  primary:
-    initdb:
-      scriptsConfigMap: "{{ $.Release.Name }}-uws-configmap"
