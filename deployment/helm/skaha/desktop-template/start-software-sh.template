@@ -10,11 +10,13 @@ handle_error() {
 }
 
 get_resource_options() {
-     
-    if [ -e "${HOME}/.token/Bearer" ]; then
+
+    if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then 
+      resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
+    elif [ -e "${HOME}/.token/Bearer" ]; then
       resources=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
     else
-       resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
+      handle_error "[skaha] No credentials to call back to Skaha with."
     fi   
      core_default=`echo $resources | jq .defaultCores`
      core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
@@ -83,11 +85,12 @@ prompt_user() {
         read -p "Do you want to specify resources for (NAME)? (y/n) [n]" yn
         if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
             echo "Launching (NAME)..."
-            if [ -e "${HOME}/.token/Bearer" ]; then
+            if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then 
+              app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+            elif [ -e "${HOME}/.token/Bearer" ]; then
               app_id=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
-               app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
-
+              handle_error "[skaha] No credentials to call back to Skaha with."
             fi 
             break
         elif [[ ${yn} == "y" || ${yn} == "Y" ]]; then
@@ -95,10 +98,12 @@ prompt_user() {
             get_cores || handle_error "Error obtaining the number of cores to allocate."
             get_ram || handle_error "Error obtaining the amount of ram to allocate."
             echo "Launching (NAME)..."
-            if [ -e "${HOME}/.token/Bearer" ]; then
+            if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
+              app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+            elif [ -e "${HOME}/.token/Bearer" ]; then
               app_id=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
-              app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+              handle_error "[skaha] No credentials to call back to Skaha with."
             fi   
             break
         else 
@@ -117,10 +122,12 @@ get_status() {
     status=""
     local n=0
     sleep 1
-    if [ -e "${HOME}/.token/Bearer" ]; then
+    if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
+        curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+    elif [ -e "${HOME}/.token/Bearer" ]; then
         curl_out=`curl -s -L -k --header "Authorization: Bearer ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     else
-        curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+        handle_error "[skaha] No credentials to call back to Skaha with."
     fi
     while [[ ${curl_out} != *"status"* ]]; do
         n=$(( n + 1 ))
@@ -129,10 +136,12 @@ get_status() {
             n=0
         fi
         sleep 1
-        if [ -e "${HOME}/.token/Bearer" ]; then
-           curl_out=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+        if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
+          curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1` 
+        elif [ -e "${HOME}/.token/Bearer" ]; then
+          curl_out=`curl -s -L -k --header "Authorization: Bearer (TOKEN)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
         else
-           curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+          handle_error "[skaha] No credentials to call back to Skaha with."
         fi   
              
     done
