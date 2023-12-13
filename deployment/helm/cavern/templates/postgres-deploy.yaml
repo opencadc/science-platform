@@ -14,7 +14,7 @@ spec:
         app: cavern-uws-postgres
     spec:
       securityContext:
-        runAsUser: {{- .Values.deployment.cavern.uws.db.runUID }}
+        runAsUser: {{ .Values.deployment.cavern.uws.db.runUID }}
       containers:
         - name: postgres
           image: postgres:13
