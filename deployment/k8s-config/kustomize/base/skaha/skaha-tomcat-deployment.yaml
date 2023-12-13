@@ -74,7 +74,6 @@ spec:
         runAsUser: 0
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
-      automountServiceAccountToken: false
       volumes:
       - name: config-volume
         configMap:
