@@ -2,26 +2,26 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: cavern-tomcat
-  name: cavern-tomcat
+    run: {{ .Release.Name }}-tomcat
+  name: {{ .Release.Name }}-tomcat
   namespace: {{ .Values.skaha.namespace }}
 spec:
   replicas: {{ default 1 .Values.replicaCount }}
   selector:
     matchLabels:
-      run: cavern-tomcat
+      run: {{ .Release.Name }}-tomcat
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: cavern-tomcat
+        run: {{ .Release.Name }}-tomcat
     spec:
 {{- with .Values.deployment.cavern.filesystem }}
       {{ $cavernTLD := printf "%s/%s" .dataDir .subPath }}
       securityContext:
         fsGroup: {{ .rootOwner.gid }}
       initContainers:
-      - name: init-cavern-fs
+      - name: init-{{ $.Release.Name }}-fs
         image: busybox
         imagePullPolicy: IfNotPresent
         command: ['sh', '-c', 'mkdir -p {{ $cavernTLD }}/home && mkdir -p {{ $cavernTLD }}/projects && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/home && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/projects']
@@ -32,7 +32,7 @@ spec:
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
-        name: cavern-tomcat
+        name: {{ .Release.Name }}-tomcat
         resources:
           requests:
             memory: {{ .Values.deployment.cavern.resources.requests.memory }}
@@ -65,7 +65,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: cavern-config
+          name: {{ .Release.Name }}-config
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.cavern.extraVolumes }}
