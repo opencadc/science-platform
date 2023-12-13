@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: cavern-ingress
+  name: {{ .Release.Name }}-ingress
   namespace: {{ .Values.skaha.namespace }}
   annotations:
     spec.ingressClassName: traefik
@@ -14,6 +14,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: cavern-tomcat-svc
+            name: {{ .Release.Name }}-tomcat-svc
             port:
               number: 8080
