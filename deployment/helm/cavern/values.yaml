@@ -60,6 +60,7 @@ deployment:
         database: "uws"
         schema: "uws"
         maxActive: 2
+        runUID: 999  # Postgres User default in the postgres:13 image
 
     # Optional rename of the application from the default "cavern".
     applicationName: "cavern"
