@@ -67,14 +67,15 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
-import ca.nrc.cadc.auth.X509CertificateChain;
-import ca.nrc.cadc.cred.client.CredClient;
-import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
+import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -84,11 +85,14 @@ import javax.security.auth.Subject;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -266,16 +270,32 @@ public abstract class SessionAction extends SkahaAction {
             log.debug("failed to inject token: " + e.getMessage(), e);
         }
         
-        // inject a delegated proxy certificate if available
+        // inject a delegated proxy certificate, if available
         try {
-            LocalAuthority localAuthority = new LocalAuthority();
-            URI serviceID = localAuthority.getServiceURI(Standards.CRED_PROXY_10.toString());
-            CredUtil.checkCredentials();
-            CredClient credClient = new CredClient(serviceID);
-            X509CertificateChain chain = credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), 14);
-            if (chain != null) {
-                injectFile(chain.certificateString(), homedir + "/" + username + "/.ssl/cadcproxy.pem");
-                log.debug("injected certificate");
+            final LocalAuthority localAuthority = new LocalAuthority();
+            final URI credServiceID = localAuthority.getServiceURI(Standards.CRED_PROXY_10.toString());
+
+            // Should throw a NoSuchElementException if it's missing, but check here anyway.
+            if (credServiceID != null) {
+                final RegistryClient registryClient = new RegistryClient();
+                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10,
+                                                                        AuthMethod.CERT);
+                final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
+                final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
+                    final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    final String userName = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
+                    final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
+                    final HttpGet download = new HttpGet(certificateURL, out);
+                    download.setFollowRedirects(true);
+                    download.run();
+
+                    return out.toString();
+                });
+                log.debug("Proxy cert: " + proxyCert);
+                // inject the proxy cert
+                log.debug("Running docker exec to insert cert");
+
+                injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
             }
         } catch (NoSuchElementException noSuchElementException) {
             log.debug("Not using proxy certificates.  Skipping certificate injection...");
