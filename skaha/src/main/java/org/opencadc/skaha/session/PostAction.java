@@ -68,21 +68,26 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
+import ca.nrc.cadc.ac.Role;
+import ca.nrc.cadc.ac.client.GMSClient;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -97,6 +102,7 @@ import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.opencadc.gms.GroupURI;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
@@ -574,6 +580,7 @@ public class PostAction extends SessionAction {
                 ingressPath = System.getProperty("user.home") + "/config/ingress-contributed.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
+                validateHeadlessMembership();
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
@@ -763,6 +770,24 @@ public class PostAction extends SessionAction {
         injectProxyCert(subject, userID, posixID);
     }
 
+    private void validateHeadlessMembership() throws Exception {
+        LocalAuthority localAuthority = new LocalAuthority();
+        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
+
+        GMSClient gmsClient = new GMSClient(gmsSearchURI);
+        List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
+
+        if (skahaHeadlessGroup == null) {
+            log.warn("skaha.headlessgroup not defined in system properties");
+        } else {
+            final Group headlessGroup = new Group(new GroupURI(URI.create(skahaHeadlessGroup)));
+            if (!memberships.contains(headlessGroup)) {
+                throw new AccessControlException("Not authorized to create a headless session");
+            }
+        }
+
+    }
+    
     private String getPosixId() {
         Subject s = AuthenticationUtil.getCurrentSubject();
         Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);

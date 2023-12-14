@@ -15,6 +15,8 @@ spec:
           value: "images-rc.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
+        - name: skaha.headlessgroup
+          value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
         - name: skaha.sessionexpiry
