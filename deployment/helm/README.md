@@ -28,7 +28,7 @@ helm repo update
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
-helm install -n skaha-system --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
+helm install -n skaha-system --dependency-update --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
 helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
 helm install -n skaha-system --dependency-update --values my-storage-ui-local-values-file.yaml storage-ui science-platform/storageui
 ```
