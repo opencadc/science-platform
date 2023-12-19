@@ -9,6 +9,7 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
+  - [Storae User Interface install](#user-storage-ui-installation)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
@@ -27,8 +28,9 @@ helm repo update
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
-helm install -n skaha-system --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
+helm install -n skaha-system --dependency-update --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
 helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
+helm install -n skaha-system --dependency-update --values my-storage-ui-local-values-file.yaml storage-ui science-platform/storageui
 ```
 
 More details below.
@@ -498,7 +500,7 @@ postgresql:
   install: true  # To run your own database, set this to false and override auth settings.
 ```
 
-### User Storage UI installation (Not yet available)
+### User Storage UI installation
 
 Please read the [minimum configuration](./storage-ui/README.md).  A quick look is:
 
@@ -526,15 +528,24 @@ deployment:
       # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
       scope: "openid profile offline_access"
 
+    # ID (URI) of the GMS Service.
+    gmsID: ivo://skao.int/gms
+
     # Dictionary of all VOSpace APIs (Services) available that will be visible on the UI.
     # Format is:
-    # backend:
-    #   defaultService: cavern
-    #   services:
-    #     cavern:
-    #       resourceID: "ivo://ska.int/cavern"
-    #       nodeURIPrefix: "vos://int.ska~cavern"
-    #       userHomeDir: "/home"
+    backend:
+      defaultService: cavern
+      services:
+        cavern:
+          resourceID: "ivo://ska.int/cavern"
+          nodeURIPrefix: "vos://int.ska~cavern"
+          userHomeDir: "/home"
+          # Some VOSpace services support these features.  Cavern does not, but it needs to be explicitly declared here.
+          features:
+            batchDownload: false
+            batchUpload: false
+            externalLinks: false
+            paging: false
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:

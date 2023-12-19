@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: storage-ui-tomcat
+  name: storage-ui-tomcat
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: storage-ui-tomcat
+  template:
+    metadata:
+      labels:
+        run: storage-ui-tomcat
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - image: {{ .Values.deployment.storageUI.image }}
+        imagePullPolicy: {{ .Values.deployment.storageUI.imagePullPolicy }}
+        name: storage-ui-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.storageUI.resources.requests.memory }}
+            cpu: {{ .Values.deployment.storageUI.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.storageUI.resources.limits.memory }}
+            cpu: {{ .Values.deployment.storageUI.resources.limits.cpu }}
+        ports: 
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.storageUI.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts: 
+        - mountPath: "/config"
+          name: config-volume
+        {{- with .Values.deployment.storageUI.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.deployment.storageUI.extraEnv }}
+        env:
+        {{- with .Values.deployment.storageUI.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: storage-ui-config
+      {{- with .Values.deployment.storageUI.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

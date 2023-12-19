@@ -28,7 +28,7 @@ deployment:
     registryHosts: "images.canfar.net"
 
     # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users" 
+    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
 
