@@ -12,7 +12,7 @@ handle_error() {
 get_resource_options() {
      
     if [ -e "${HOME}/.token/.skaha" ]; then
-      resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" http://(HOST)/skaha/${SKAHA_API_VERSION}/context`
+      resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
     else
        resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
     fi   
@@ -84,7 +84,7 @@ prompt_user() {
         if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
             echo "Launching (NAME)..."
             if [ -e "${HOME}/.token/.skaha" ]; then
-              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
                app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
 
@@ -96,7 +96,7 @@ prompt_user() {
             get_ram || handle_error "Error obtaining the amount of ram to allocate."
             echo "Launching (NAME)..."
             if [ -e "${HOME}/.token/.skaha" ]; then
-              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
               app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             fi   
@@ -118,7 +118,7 @@ get_status() {
     local n=0
     sleep 1
     if [ -e "${HOME}/.token/.skaha" ]; then
-        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}"http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}"https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     else
         curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     fi
@@ -130,7 +130,7 @@ get_status() {
         fi
         sleep 1
         if [ -e "${HOME}/.token/.skaha" ]; then
-           curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" http://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+           curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
         else
            curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
         fi   
