@@ -1,17 +1,12 @@
 #!/bin/bash
 
 HOST=$1
-TOKEN=$2
 
 mkdir -p ${HOME}
 cd ${HOME}
 
 
 mkdir -p ${HOME}/.token
-echo $TOKEN > ${HOME}/.token/Bearer
-
-echo "TOKEN is ${TOKEN}"
-echo "HOST is ${HOST}"
 
 echo "[skaha] Starting skaha desktop container"
 /skaha-system/build-menu.sh ${HOST}

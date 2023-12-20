@@ -600,11 +600,9 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
-                                         Integer.toString(posixPrincipal.getUidNumber()));
-        if (StringUtil.hasText(supplementalGroups)) {
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
+        if (StringUtil.hasText(supplementalGroups))
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -616,7 +614,6 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, xAuthTokenSkaha);
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, secretName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
@@ -739,7 +736,6 @@ public class PostAction extends SessionAction {
         }
 
         String gpuScheduling = getGPUScheduling(0);
-        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         String launchString = new String(launchBytes, StandardCharsets.UTF_8);
         launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
@@ -757,11 +753,11 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
-        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        if (StringUtil.hasText(supplementalGroups))
+            launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-        launchString = setConfigValue(launchString, USER_TOKEN, xAuthTokenSkaha);
         launchString = setConfigValue(launchString, POSIX_MAPPING_SECRET, secretName);
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
