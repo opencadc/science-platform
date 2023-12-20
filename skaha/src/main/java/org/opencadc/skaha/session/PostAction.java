@@ -80,16 +80,15 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
+import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.PosixHelper;
 
 import javax.security.auth.Subject;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -99,6 +98,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 /**
  * @author majorb
@@ -302,7 +303,7 @@ public class PostAction extends SessionAction {
 
     void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
             throws IOException, InterruptedException {
-        SessionAction.execute(command, standardOut, standardErr);
+        execute(command, standardOut, standardErr);
     }
 
     /**
@@ -547,6 +548,10 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
+        String secretName = createPosixMappingSecret(sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
+                tokenTool.generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         Subject subject = AuthenticationUtil.getCurrentSubject();
 
@@ -611,14 +616,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-
-        try {
-            jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, token(subject).getCredentials());
-        } catch (Exception ex) {
-            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
-        }
-
-        final String secretName = createPosixMappingSecret(sessionID);
+        jobLaunchString = setConfigValue(jobLaunchString, USER_TOKEN, xAuthTokenSkaha);
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, secretName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
@@ -707,6 +705,10 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
+        final String secretName = createPosixMappingSecret(sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
+                tokenTool.generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
@@ -759,13 +761,7 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-
-        try {
-            launchString = setConfigValue(launchString, USER_TOKEN, token(subject).getCredentials());
-        } catch (Exception ex) {
-            log.debug("failed to add token into job container yaml: " + ex.getMessage(), ex);
-        }
-        final String secretName = createPosixMappingSecret(sessionID);
+        launchString = setConfigValue(launchString, USER_TOKEN, xAuthTokenSkaha);
         launchString = setConfigValue(launchString, POSIX_MAPPING_SECRET, secretName);
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
@@ -886,7 +882,8 @@ public class PostAction extends SessionAction {
     }
 
     private String createPosixMappingSecret(final String sessionID) throws Exception {
-        final String posixMappingSecretName = "posix-mapping-" + sessionID;
+        if (skahaCallbackFlow) return PosixHelper.getPosixMapperSecretName(callbackSessionId);
+        final String posixMappingSecretName = PosixHelper.getPosixMapperSecretName(sessionID);
         final Path holdingDir =
                 Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), posixMappingSecretName);
         final File uidMappingFile = new File(holdingDir.toString(), "uidmap.txt");
@@ -935,6 +932,7 @@ public class PostAction extends SessionAction {
     }
 
     private String getSupplementalGroupsList() throws Exception {
+        if (skahaCallbackFlow) return callbackSupplementalGroups;
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
             return buildGroupUriList(groupCredentials)

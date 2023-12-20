@@ -1,0 +1,13 @@
+deployment:
+  hostname: posix-mapper-tomcat-svc.skaha-system.svc.cluster.local
+  posixMapper:
+    image: abhishek1009/posix-mapper:latest
+    imagePullPolicy: Always
+    resourceID: ivo://opencadc.org/posix-mapper
+    oidcURI: https://ska-iam.stfc.ac.uk/
+    gmsID: ivo://skao.int/gms
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "1500m"
+    registryURL: http://reg.skaha-system.svc.cluster.local/reg
