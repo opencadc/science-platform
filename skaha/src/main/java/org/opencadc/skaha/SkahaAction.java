@@ -75,6 +75,7 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -87,11 +88,14 @@ import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
+import org.opencadc.permissions.TokenTool;
+import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.utils.CollectionUtils;
+import org.opencadc.skaha.utils.PosixHelper;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -100,6 +104,7 @@ import java.security.AccessControlException;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
+import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
 
 
 public abstract class SkahaAction extends RestAction {
@@ -113,6 +118,7 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_CONTRIB = "contributed";
     public static final String SESSION_TYPE_HEADLESS = "headless";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
+    public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
     public static List<String> SESSION_TYPES = Arrays.asList(
             SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
             SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
@@ -127,6 +133,14 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaUsersGroup;
     protected int maxUserSessions;
     protected final PosixMapperConfiguration posixMapperConfiguration;
+
+
+    protected boolean skahaCallbackFlow = false;
+    protected TokenTool tokenTool = null;
+    protected String callbackSessionId = null;
+    protected String callbackSupplementalGroups = null;
+    protected String xAuthTokenSkaha = null;
+
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -177,10 +191,56 @@ public abstract class SkahaAction extends RestAction {
     }
 
     protected void initRequest() throws Exception {
-
+        if (skahaUsersGroup == null) {
+            throw new IllegalStateException("skaha.usersgroup not defined in system properties");
+        }
+        URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
+        tokenTool = initiateTokenTool();
+        if (isSkahaCallBackFlow(currentSubject))
+            initiateSkahaCallbackFLow(currentSubject, skahaUsersUri);
+        else initiateGeneralFLow(currentSubject, skahaUsersUri);
+    }
 
+    private boolean isSkahaCallBackFlow(Subject currentSubject) {
+        AuthMethod authMethod = AuthenticationUtil.getAuthMethodFromCredentials(currentSubject);
+        log.debug("authMethod is " + authMethod);
+        log.debug("x-auth-token-skaha is " + syncInput.getHeader(X_AUTH_TOKEN_SKAHA));
+        return authMethod == AuthMethod.ANON && isNotEmpty(syncInput.getHeader(X_AUTH_TOKEN_SKAHA));
+    }
+
+    private TokenTool initiateTokenTool() {
+        File privateKey = new File("/certs/skaha-private.pem");
+        File publicKey = new File("/certs/skaha-public.pem");
+        if (!publicKey.exists() || !privateKey.exists())
+            throw new RuntimeException("System is not configured properly to use");
+        return new TokenTool(publicKey, privateKey);
+    }
+
+    private void initiateSkahaCallbackFLow(Subject currentSubject, URI skahaUsersUri) {
+        skahaCallbackFlow = true;
+        xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
+        log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
+        GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
+        try {
+            callbackSessionId = tokenTool.validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
+            String secretName = PosixHelper.getPosixMapperSecretName(callbackSessionId);
+            String workloadNamespaceName = K8SUtil.getWorkloadNamespace();
+            String uidMapping = PosixHelper.uidMapping(secretName, workloadNamespaceName);
+            posixPrincipal = PosixHelper.buildPosixPrincipal(uidMapping);
+            currentSubject.getPrincipals().add(posixPrincipal);
+            String[] gidMappings = PosixHelper.gidMappings(secretName, workloadNamespaceName);
+            callbackSupplementalGroups = PosixHelper.supplementalGroups(gidMappings);
+            currentSubject.getPublicCredentials().add(PosixHelper.buildGroup(gidMappings, skahaUsersGroupUri.getServiceID()));
+        } catch (Exception ex) {
+            log.error("Unable to retrieve information for for callback flow", ex);
+            throw new RuntimeException("Unable to retrieve information for callback flow");
+        }
+    }
+
+    private void initiateGeneralFLow(Subject currentSubject, URI skahaUsersUri) throws IOException, InterruptedException, ResourceNotFoundException {
+        GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
@@ -206,21 +266,17 @@ public abstract class SkahaAction extends RestAction {
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
-        if (skahaUsersGroup == null) {
-            throw new IllegalStateException("skaha.usersgroup not defined in system properties");
-        }
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
 
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
-        GroupURI skahaUsersGroupUri = new GroupURI(URI.create(skahaUsersGroup));
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");
         }
         log.debug("user is a member of skaha user group ");
-        List<Group> groups = CollectionUtils.isNotEmpty(skahaUsersGroupUriSet) ?
+        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
                 skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
                 : new ArrayList<>();
 

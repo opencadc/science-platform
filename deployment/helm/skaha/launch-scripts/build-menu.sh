@@ -1,7 +1,7 @@
 #!/bin/bash -x
 
 HOST=$1
-TOKEN=$(cat ${HOME}/.token/Bearer)
+TOKEN=$(cat ${HOME}/.token/.skaha)
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
@@ -202,9 +202,9 @@ create_merged_applications_menu
 if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
   echo "certificate is used in build menu"
   apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
-elif [ -e "${HOME}/.token/Bearer" ]; then
+elif [ -e "${HOME}/.token/.skaha" ]; then
   echo "token is used in build menu"
-  apps=$(curl -s -k --header "Authorization: Bearer ${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+  apps=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
 else
   echo "[skaha] No credentials to call back to Skaha with."
   exit 1

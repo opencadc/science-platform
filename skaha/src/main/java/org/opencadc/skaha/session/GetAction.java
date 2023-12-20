@@ -86,6 +86,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -257,7 +258,7 @@ public class GetAction extends SessionAction {
                                 "REQCPUCORES:.spec.containers[].resources.requests.cpu," +
                                 "REQRAM:.spec.containers[].resources.requests.memory " +
                                 "--field-selector status.phase=Running --sort-by=.spec.nodeName";
-        String cpuCores = execute(getCPUCoresCmd.split(" "));
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.split(" "));
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -314,7 +315,7 @@ public class GetAction extends SessionAction {
     
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
         String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
-        String rawResources = execute(getAvailableResourcesCmd.split(" "));
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.split(" "));
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");

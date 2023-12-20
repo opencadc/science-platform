@@ -86,7 +86,6 @@ spec:
         command: ["/skaha-system/start-jupyterlab.sh"]
         args:
         - ${skaha.sessionid}
-        - ${user.token}
         imagePullPolicy: Always
         resources:
           requests:

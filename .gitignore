@@ -9,3 +9,5 @@
 *tgz*
 *_key
 *.crt
+deployment/helm/skaha/token-tool-secret/skaha-private.pem
+deployment/helm/skaha/token-tool-secret/skaha-public.pem

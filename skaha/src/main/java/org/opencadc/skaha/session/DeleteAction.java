@@ -75,6 +75,7 @@ import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 /**
  *
@@ -105,7 +106,7 @@ public class DeleteAction extends SessionAction {
                         "TYPE:.metadata.labels.canfar-net-sessionType," +
                         "USERID:.metadata.labels.canfar-net-userid"};
                         
-                String session = execute(getSessionCMD);
+                String session = CommandExecutioner.execute(getSessionCMD);
                 if (StringUtil.hasText(session)) {
                     final String[] lines = session.split("\n");
                     // sessionID was added to desktop-app. This resulted in the
@@ -176,7 +177,7 @@ public class DeleteAction extends SessionAction {
         try {
             String[] cmd = new String[] {
                 "kubectl", "delete", "--namespace", k8sNamespace, type, name};
-            execute(cmd);
+            CommandExecutioner.execute(cmd);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());
