@@ -15,13 +15,17 @@ spec:
           value: "images-rc.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
+        - name: skaha.headlessgroup
+          # TODO: change back to the correct headless group when ready
+          # value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
         - name: skaha.sessionexpiry
           value: "345600"
         - name: skaha.defaultquotagb
           value: "10"
-        image: images-rc.canfar.net/skaha-system/skaha:0.12.3
+        image: images-rc.canfar.net/skaha-system/skaha:0.12.4
         resources:
           requests:
             memory: "4Gi"
