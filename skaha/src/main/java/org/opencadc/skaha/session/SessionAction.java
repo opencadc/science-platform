@@ -86,6 +86,9 @@ import javax.security.auth.Subject;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -95,36 +98,36 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 public abstract class SessionAction extends SkahaAction {
 
     private static final Logger log = Logger.getLogger(SessionAction.class);
-    
+
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
-    
+
     protected static final String SESSION_LIST_VIEW_ALL = "all";
     protected static final String SESSION_VIEW_EVENTS = "events";
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
-    
+
     protected static final String NONE = "<none>";
-    
+
     protected String requestType;
     protected String sessionID;
     protected String appID;
-    
+
     public SessionAction() {
         super();
     }
 
     protected void initRequest() throws Exception {
         super.initRequest();
-        
+
         String path = syncInput.getPath();
         log.debug("request path: " + path);
         requestType = REQUEST_TYPE_SESSION;
-        
+
         if (path == null) {
             return;
         }
-        
+
         String[] parts = path.split("/");
         if (parts.length > 0) {
             sessionID = parts[0];
@@ -149,11 +152,12 @@ public abstract class SessionAction extends SkahaAction {
         // vnc_light.html accepts title and resize
         //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
         //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
-        
+
         // vnc.html does not...
-        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
+        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
+               + "&path=session/desktop/" + sessionID + "/";
     }
-    
+
     public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
         String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
         if (altSocketUrl) {
@@ -161,11 +165,12 @@ public abstract class SessionAction extends SkahaAction {
         }
         return url;
     }
-    
+
     public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
-        return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token=" + sessionID;
+        return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token="
+               + sessionID;
     }
-    
+
     public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
@@ -177,7 +182,7 @@ public abstract class SessionAction extends SkahaAction {
                 .next();
     }
 
-    
+
     protected void injectCredentials() {
         final String username = posixPrincipal.username;
         int posixId = getUID();
@@ -197,6 +202,7 @@ public abstract class SessionAction extends SkahaAction {
         } catch (Exception exception) {
             log.debug("failed to inject token: " + exception.getMessage(), exception);
         }
+    }
 
     private void injectProxyCertificate(String username) {
         // inject a delegated proxy certificate if available
@@ -212,7 +218,8 @@ public abstract class SessionAction extends SkahaAction {
                 final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
                 final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
                     final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    final String userName = subject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
+                    final String userName =
+                            currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
                     final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
                     final HttpGet download = new HttpGet(certificateURL, out);
                     download.setFollowRedirects(true);
@@ -250,7 +257,7 @@ public abstract class SessionAction extends SkahaAction {
         }
 
     }
-    
+
     protected void injectFile(String data, String path) throws IOException, InterruptedException {
         final int uid = posixPrincipal.getUidNumber();
         // stage file
@@ -263,16 +270,16 @@ public abstract class SessionAction extends SkahaAction {
         writer.write(data + "\n");
         writer.flush();
         writer.close();
-        
+
         // update file permissions
         String[] chown = new String[] {"chown", uid + ":" + uid, tmpFileName};
         execute(chown);
 
         // inject file
-        String[] inject = new String[] {"mv",  "-f", tmpFileName, path};
+        String[] inject = new String[] {"mv", "-f", tmpFileName, path};
         execute(inject);
     }
-    
+
     protected String stageFile(String data) throws IOException {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
@@ -285,7 +292,7 @@ public abstract class SessionAction extends SkahaAction {
         writer.close();
         return tmpFileName;
     }
-    
+
     public String getPodID(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getPodCMD = new ArrayList<>();
@@ -303,10 +310,10 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("podID: " + podID);
         if (!StringUtil.hasLength(podID)) {
             throw new ResourceNotFoundException("session " + sessionID + " not found.");
-        } 
+        }
         return podID;
     }
-    
+
     public String getEvents(String forUserID, String sessionID) throws Exception {
 
         String podID = getPodID(forUserID, sessionID);
@@ -333,12 +340,12 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         return "";
-        
+
         //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
-        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp 
-        
+        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp
+
     }
-    
+
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getLogsCmd = new ArrayList<>();
@@ -352,7 +359,7 @@ public abstract class SessionAction extends SkahaAction {
         getLogsCmd.add("-1");
         execute(getLogsCmd.toArray(new String[0]), out);
     }
-    
+
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
         List<Session> sessions = getSessions(posixPrincipal.username, sessionID);
         if (!sessions.isEmpty()) {
@@ -363,11 +370,12 @@ public abstract class SessionAction extends SkahaAction {
                     return session;
                 }
             }
-        } 
+        }
 
-        throw new ResourceNotFoundException("desktop app with session " + sessionID + " and app ID " + appID + " was not found");
+        throw new ResourceNotFoundException(
+                "desktop app with session " + sessionID + " and app ID " + appID + " was not found");
     }
-    
+
     public Session getSession(String forUserID, String sessionID) throws Exception {
         List<Session> sessions = getSessions(forUserID, sessionID);
         if (!sessions.isEmpty()) {
@@ -377,11 +385,11 @@ public abstract class SessionAction extends SkahaAction {
                     return session;
                 }
             }
-        } 
+        }
 
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
-    
+
     public List<Session> getAllSessions(String forUserID) throws Exception {
         return getSessions(forUserID, null);
     }
@@ -391,7 +399,7 @@ public abstract class SessionAction extends SkahaAction {
         List<String> sessionsCMD = getSessionsCMD(k8sNamespace, forUserID, sessionID);
         String sessionList = execute(sessionsCMD.toArray(new String[0]));
         log.debug("Session list: " + sessionList);
-        
+
         List<Session> sessions = new ArrayList<>();
         if (StringUtil.hasLength(sessionList)) {
             Map<String, String> jobExpiryTimes = null;
@@ -405,7 +413,7 @@ public abstract class SessionAction extends SkahaAction {
             for (String line : lines) {
                 Session session = constructSession(line);
                 if (forUserID != null) {
-                    // get expiry time 
+                    // get expiry time
                     String uid = getUID(line);
                     String startTimeStr = session.getStartTime();
                     if (startTimeStr.equalsIgnoreCase(NONE)) {
@@ -427,7 +435,7 @@ public abstract class SessionAction extends SkahaAction {
                         // no job in 'Running' state
                         session.setCPUCoresInUse(NONE);
                         session.setRAMInUse(NONE);
-                        
+
                     } else {
                         // at least one job is in 'Running' state
                         String[] resourceUsage = resourceUsages.get(fullName);
@@ -439,11 +447,11 @@ public abstract class SessionAction extends SkahaAction {
                             session.setCPUCoresInUse(toCoreUnit(resourceUsage[0]));
                             session.setRAMInUse(toCommonUnit(resourceUsage[1]));
                         }
-                        
+
                         // if this session usages GPU, get the GPU usage
                         if (StringUtil.hasText(session.getRequestedGPUCores()) &&
-                                !NONE.equals(session.getRequestedGPUCores()) &&
-                                Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
+                            !NONE.equals(session.getRequestedGPUCores()) &&
+                            Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
                             List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
                             String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
                             List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
@@ -459,26 +467,26 @@ public abstract class SessionAction extends SkahaAction {
                 sessions.add(session);
             }
         }
-        
+
         return sessions;
     }
-    
+
     protected String toCoreUnit(String cores) {
         String ret = NONE;
         if (StringUtil.hasLength(cores)) {
             if ("m".equals(cores.substring(cores.length() - 1))) {
                 // in "m" (millicore) unit, covert to cores
                 int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
-                ret = ((Double) (milliCores/Math.pow(10, 3))).toString();
+                ret = ((Double) (milliCores / Math.pow(10, 3))).toString();
             } else {
                 // use value as is, can be '<none>' or some value
                 ret = cores;
             }
-        } 
-        
+        }
+
         return ret;
     }
-    
+
     protected String toCommonUnit(String inK8sUnit) {
         String ret = NONE;
         if (StringUtil.hasLength(inK8sUnit)) {
@@ -489,11 +497,11 @@ public abstract class SessionAction extends SkahaAction {
                 // use value as is, can be '<none>' or some value
                 ret = inK8sUnit;
             }
-        } 
-        
+        }
+
         return ret;
     }
-    
+
     private Map<String, String[]> getResourceUsages(String k8sNamespace, String forUserID) throws Exception {
         Map<String, String[]> resourceUsages = new HashMap<>();
         List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID);
@@ -516,7 +524,7 @@ public abstract class SessionAction extends SkahaAction {
 
         return resourceUsages;
     }
-    
+
     private List<String> getGPUUsage(String usageData) {
         List<String> usage = new ArrayList<>();
         if (StringUtil.hasLength(usageData)) {
@@ -538,7 +546,7 @@ public abstract class SessionAction extends SkahaAction {
                 }
             }
         }
-        
+
         // no GPU
         if (usage.isEmpty()) {
             usage.add(NONE);
@@ -547,7 +555,7 @@ public abstract class SessionAction extends SkahaAction {
 
         return usage;
     }
-    
+
     private String formatGPUMemoryUsage(String memoryData) {
         String[] data = memoryData.split("/");
         String data0 = data[0].trim();
@@ -561,9 +569,9 @@ public abstract class SessionAction extends SkahaAction {
         }
         return data0 + " / " + data1;
     }
-    
-    protected Map<String,String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
-        Map<String,String> jobExpiryTimes = new HashMap<>();
+
+    protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
+        Map<String, String> jobExpiryTimes = new HashMap<>();
         List<String> jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
         String jobExpiryTimeMap = execute(jobExpiryTimeCMD.toArray(new String[0]));
         log.debug("Expiry times: " + jobExpiryTimeMap);
@@ -574,30 +582,30 @@ public abstract class SessionAction extends SkahaAction {
                 jobExpiryTimes.put(expiryTime[0], expiryTime[1]);
             }
         }
-        
+
         return jobExpiryTimes;
     }
-    
+
     private String getFullName(String line) {
         String name = "";
         String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
         if (parts.length > 8) {
             name = parts[parts.length - 2];
         }
-        
+
         return name;
     }
-    
+
     private String getUID(String line) {
         String uid = "";
         String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
         if (parts.length > 8) {
             uid = parts[parts.length - 1];
         }
-        
+
         return uid;
     }
-    
+
     private List<String> getSessionsCMD(String k8sNamespace, String forUserID, String sessionID) {
         List<String> sessionsCMD = new ArrayList<String>();
         sessionsCMD.add("kubectl");
@@ -616,30 +624,30 @@ public abstract class SessionAction extends SkahaAction {
         }
         sessionsCMD.add("--no-headers=true");
         sessionsCMD.add("-o");
-        
+
         String customColumns = "custom-columns=" +
-            "SESSIONID:.metadata.labels.canfar-net-sessionID," + 
-            "USERID:.metadata.labels.canfar-net-userid," +
-            "IMAGE:.spec.containers[0].image," +
-            "TYPE:.metadata.labels.canfar-net-sessionType," +
-            "STATUS:.status.phase," +
-            "NAME:.metadata.labels.canfar-net-sessionName," +
-            "STARTED:.status.startTime," +
-            "DELETION:.metadata.deletionTimestamp," +
-            "APPID:.metadata.labels.canfar-net-appID";
+                               "SESSIONID:.metadata.labels.canfar-net-sessionID," +
+                               "USERID:.metadata.labels.canfar-net-userid," +
+                               "IMAGE:.spec.containers[0].image," +
+                               "TYPE:.metadata.labels.canfar-net-sessionType," +
+                               "STATUS:.status.phase," +
+                               "NAME:.metadata.labels.canfar-net-sessionName," +
+                               "STARTED:.status.startTime," +
+                               "DELETION:.metadata.deletionTimestamp," +
+                               "APPID:.metadata.labels.canfar-net-appID";
         if (forUserID != null) {
-            customColumns = customColumns + 
-            ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
-            "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
-            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia\\.com/gpu," +
-            "FULLNAME:.metadata.name," +
-            "UID:.metadata.ownerReferences[].uid"; 
+            customColumns = customColumns +
+                            ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
+                            "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
+                            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia\\.com/gpu," +
+                            "FULLNAME:.metadata.name," +
+                            "UID:.metadata.ownerReferences[].uid";
         }
-        
+
         sessionsCMD.add(customColumns);
         return sessionsCMD;
     }
-    
+
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
         List<String> getSessionJobCMD = new ArrayList<String>();
         getSessionJobCMD.add("kubectl");
@@ -651,15 +659,15 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("canfar-net-userid=" + forUserID);
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
-        
+
         String customColumns = "custom-columns=" +
-            "UID:.metadata.uid," +
-            "EXPIRY:.spec.activeDeadlineSeconds";
-        
+                               "UID:.metadata.uid," +
+                               "EXPIRY:.spec.activeDeadlineSeconds";
+
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
     }
-    
+
     private List<String> getSessionResourceUsageCMD(String k8sNamespace, String forUserID) {
         List<String> getSessionJobCMD = new ArrayList<String>();
         getSessionJobCMD.add("kubectl");
@@ -673,26 +681,27 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("--use-protocol-buffers=true");
         return getSessionJobCMD;
     }
-    
+
     private List<String> getSessionGPUUsageCMD(String k8sNamespace, String podName) {
         List<String> getSessionGPUCMD = new ArrayList<String>();
         getSessionGPUCMD.add("kubectl");
         getSessionGPUCMD.add("--namespace");
         getSessionGPUCMD.add(k8sNamespace);
-        getSessionGPUCMD.add("exec");   
-        getSessionGPUCMD.add("-it");    
-        getSessionGPUCMD.add(podName);  
-        getSessionGPUCMD.add("--");     
+        getSessionGPUCMD.add("exec");
+        getSessionGPUCMD.add("-it");
+        getSessionGPUCMD.add(podName);
+        getSessionGPUCMD.add("--");
         getSessionGPUCMD.add("nvidia-smi");
-        return getSessionGPUCMD;        
+        return getSessionGPUCMD;
     }
-    
-    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
+
+    protected String getAppJobName(String sessionID, String userID, String appID) throws
+                                                                                  IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
         return execute(getAppJobNameCMD.toArray(new String[0]));
     }
-    
+
     private List<String> getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
         String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
         labels = labels + ",canfar-net-userid=" + userID;
@@ -713,10 +722,10 @@ public abstract class SessionAction extends SkahaAction {
         getAppJobNameCMD.add(labels);
         getAppJobNameCMD.add("--no-headers=true");
         getAppJobNameCMD.add("-o");
-        
+
         String customColumns = "custom-columns=" +
-            "NAME:.metadata.name";
-        
+                               "NAME:.metadata.name";
+
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
     }
@@ -738,14 +747,14 @@ public abstract class SessionAction extends SkahaAction {
         }
         String host = K8SUtil.getHostName();
         String connectURL = "not-applicable";
-        
+
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
             connectURL = SessionAction.getVNCURL(host, id);
         }
         if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
             if (image.endsWith(":1.4")) {
-                // support alt web socket path for 1.4 carta 
-                connectURL = SessionAction.getCartaURL(host, id, true); 
+                // support alt web socket path for 1.4 carta
+                connectURL = SessionAction.getCartaURL(host, id, true);
             } else {
                 connectURL = SessionAction.getCartaURL(host, id, false);
             }
@@ -771,5 +780,5 @@ public abstract class SessionAction extends SkahaAction {
 
         return session;
     }
-    
+
 }
