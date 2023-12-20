@@ -2,9 +2,8 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: skaha-tomcat-svc.skaha-system.svc.cluster.local
+  hostname: example.org # change this
   skaha:
-    image: abhishek1009/skaha:0.0.1
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
@@ -20,7 +19,6 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    registryURL: http://reg.skaha-system.svc.cluster.local/reg
     # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
 
     # Optionally set the DEBUG port.
