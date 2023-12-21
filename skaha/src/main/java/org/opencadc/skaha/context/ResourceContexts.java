@@ -83,20 +83,20 @@ public class ResourceContexts {
     
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
     
-    private Integer defaultRequestCores;
-    private Integer defaultLimitCores;
-    private Integer defaultCores;
-    private Integer defaultCoresHeadless;
-    private List<Integer> availableCores = new ArrayList<Integer>();
+    private final Integer defaultRequestCores;
+    private final Integer defaultLimitCores;
+    private final Integer defaultCores;
+    private final Integer defaultCoresHeadless;
+    private final List<Integer> availableCores = new ArrayList<>();
     
     // units in GB
-    private Integer defaultRequestRAM;
-    private Integer defaultLimitRAM;
-    private Integer defaultRAM;
-    private Integer defaultRAMHeadless;
-    private List<Integer> availableRAM = new ArrayList<Integer>();
+    private final Integer defaultRequestRAM;
+    private final Integer defaultLimitRAM;
+    private final Integer defaultRAM;
+    private final Integer defaultRAMHeadless;
+    private final List<Integer> availableRAM = new ArrayList<>();
     
-    private List<Integer> availableGPUs = new ArrayList<Integer>();
+    private final List<Integer> availableGPUs = new ArrayList<>();
 
     public ResourceContexts() {
         try {
@@ -144,8 +144,8 @@ public class ResourceContexts {
         return defaultCores;
     }
 
-    public List<Integer> getAvailableCores() {
-        return availableCores;
+    public boolean isCoreCountAvailable(final Integer coreCount) {
+        return this.availableCores.contains(coreCount);
     }
 
     public Integer getDefaultRequestRAM() {

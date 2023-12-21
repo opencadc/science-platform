@@ -74,8 +74,6 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         volumeMounts:
-        - mountPath: "/certs"
-          name: token-tool-secret
         - mountPath: "/config"
           name: config-volume
         - mountPath: "/add-user-config"
@@ -92,9 +90,6 @@ spec:
       priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
       serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}
       volumes:
-      - name: token-tool-secret
-        configMap:
-          name: token-tool-secret
       - name: config-volume
         configMap:
           name: skaha-config

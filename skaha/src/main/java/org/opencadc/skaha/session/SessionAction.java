@@ -215,23 +215,26 @@ public abstract class SessionAction extends SkahaAction {
                 final RegistryClient registryClient = new RegistryClient();
                 final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10,
                                                                         AuthMethod.CERT);
-                final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
-                    final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    final String userName =
-                            currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
-                    final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
-                    final HttpGet download = new HttpGet(certificateURL, out);
-                    download.setFollowRedirects(true);
-                    download.run();
 
-                    return out.toString();
-                });
-                log.debug("Proxy cert: " + proxyCert);
-                // inject the proxy cert
-                log.debug("Running docker exec to insert cert");
+                if (credServiceURL != null) {
+                    final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
+                    final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
+                        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        final String userName =
+                                currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
+                        final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
+                        final HttpGet download = new HttpGet(certificateURL, out);
+                        download.setFollowRedirects(true);
+                        download.run();
 
-                injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
+                        return out.toString();
+                    });
+                    log.debug("Proxy cert: " + proxyCert);
+                    // inject the proxy cert
+                    log.debug("Running docker exec to insert cert");
+
+                    injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
+                }
             }
         } catch (NoSuchElementException noSuchElementException) {
             log.debug("Not using proxy certificates.  Skipping certificate injection...");
@@ -264,7 +267,7 @@ public abstract class SessionAction extends SkahaAction {
         String tmpFileName = "/tmp/" + UUID.randomUUID();
         File file = new File(tmpFileName);
         if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permssion on file " + tmpFileName);
+            log.debug("Failed to set execution permission on file " + tmpFileName);
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(data + "\n");
