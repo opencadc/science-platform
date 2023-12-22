@@ -81,6 +81,7 @@ import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
+import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -91,16 +92,20 @@ import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.PosixHelper;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessControlException;
+import java.security.KeyPair;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -136,7 +141,6 @@ public abstract class SkahaAction extends RestAction {
 
 
     protected boolean skahaCallbackFlow = false;
-    protected TokenTool tokenTool = null;
     protected String callbackSessionId = null;
     protected String callbackSupplementalGroups = null;
     protected String xAuthTokenSkaha = null;
@@ -197,10 +201,11 @@ public abstract class SkahaAction extends RestAction {
         URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
-        tokenTool = initiateTokenTool();
-        if (isSkahaCallBackFlow(currentSubject))
-            initiateSkahaCallbackFLow(currentSubject, skahaUsersUri);
-        else initiateGeneralFLow(currentSubject, skahaUsersUri);
+        if (isSkahaCallBackFlow(currentSubject)) {
+            initiateSkahaCallbackFlow(currentSubject, skahaUsersUri);
+        } else {
+            initiateGeneralFlow(currentSubject, skahaUsersUri);
+        }
     }
 
     private boolean isSkahaCallBackFlow(Subject currentSubject) {
@@ -210,21 +215,54 @@ public abstract class SkahaAction extends RestAction {
         return authMethod == AuthMethod.ANON && isNotEmpty(syncInput.getHeader(X_AUTH_TOKEN_SKAHA));
     }
 
-    private TokenTool initiateTokenTool() {
-        File privateKey = new File("/certs/skaha-private.pem");
-        File publicKey = new File("/certs/skaha-public.pem");
-        if (!publicKey.exists() || !privateKey.exists())
-            throw new RuntimeException("System is not configured properly to use");
-        return new TokenTool(publicKey, privateKey);
+    protected TokenTool getTokenTool() throws Exception {
+        final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
+        return new TokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
     }
 
-    private void initiateSkahaCallbackFLow(Subject currentSubject, URI skahaUsersUri) {
+    EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
+        // Check the current secret
+        final JSONObject secretData = CommandExecutioner.getSecretData(K8SUtil.getPreAuthorizedTokenSecretName(),
+                                                                       K8SUtil.getWorkloadNamespace());
+        final String publicKeyPropertyName = "public";
+        final String privateKeyPropertyName = "private";
+
+        if (secretData.isEmpty()) {
+            final KeyPair keyPair = RsaSignatureGenerator.getKeyPair(2048);
+            final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
+            final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
+
+            // create new secret
+            final String[] createCmd = new String[] {
+                    "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
+                    K8SUtil.getPreAuthorizedTokenSecretName(),
+                    String.format("--from-literal=%s=", publicKeyPropertyName)
+                    + CommonUtils.encodeBase64(encodedPublicKey),
+                    String.format("--from-literal=%s=", privateKeyPropertyName)
+                    + CommonUtils.encodeBase64(encodedPrivateKey)
+            };
+
+            final String createResult = CommandExecutioner.execute(createCmd);
+            log.debug("create secret result: " + createResult);
+
+            return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);
+        } else {
+            final Base64.Decoder base64Decoder = Base64.getDecoder();
+            // Decode twice since Kubernetes does a separate Base64 encoding.
+            return new EncodedKeyPair(base64Decoder.decode(base64Decoder.decode(
+                    secretData.getString(publicKeyPropertyName))),
+                                      base64Decoder.decode(base64Decoder.decode(
+                                              secretData.getString(privateKeyPropertyName))));
+        }
+    }
+
+    private void initiateSkahaCallbackFlow(Subject currentSubject, URI skahaUsersUri) {
         skahaCallbackFlow = true;
         xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         try {
-            callbackSessionId = tokenTool.validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
+            callbackSessionId = getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
             String secretName = PosixHelper.getPosixMapperSecretName(callbackSessionId);
             String workloadNamespaceName = K8SUtil.getWorkloadNamespace();
             String uidMapping = PosixHelper.uidMapping(secretName, workloadNamespaceName);
@@ -232,14 +270,16 @@ public abstract class SkahaAction extends RestAction {
             currentSubject.getPrincipals().add(posixPrincipal);
             String[] gidMappings = PosixHelper.gidMappings(secretName, workloadNamespaceName);
             callbackSupplementalGroups = PosixHelper.supplementalGroups(gidMappings);
-            currentSubject.getPublicCredentials().add(PosixHelper.buildGroup(gidMappings, skahaUsersGroupUri.getServiceID()));
+            currentSubject.getPublicCredentials().add(PosixHelper.buildGroup(gidMappings,
+                                                                             skahaUsersGroupUri.getServiceID()));
         } catch (Exception ex) {
             log.error("Unable to retrieve information for for callback flow", ex);
             throw new RuntimeException("Unable to retrieve information for callback flow");
         }
     }
 
-    private void initiateGeneralFLow(Subject currentSubject, URI skahaUsersUri) throws IOException, InterruptedException, ResourceNotFoundException {
+    private void initiateGeneralFlow(Subject currentSubject, URI skahaUsersUri)
+            throws IOException, InterruptedException, ResourceNotFoundException {
         GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
@@ -485,6 +525,16 @@ public abstract class SkahaAction extends RestAction {
             } else {
                 return new PosixMapperClient(resourceID);
             }
+        }
+    }
+
+    protected static class EncodedKeyPair {
+        final byte[] encodedPublicKey;
+        final byte[] encodedPrivateKey;
+
+        public EncodedKeyPair(byte[] encodedPublicKey, byte[] encodedPrivateKey) {
+            this.encodedPublicKey = encodedPublicKey;
+            this.encodedPrivateKey = encodedPrivateKey;
         }
     }
 }

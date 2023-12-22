@@ -144,7 +144,6 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
-    private static final String USER_TOKEN = "user.token";
     private static final String POSIX_MAPPING_SECRET = "POSIX_MAPPING_SECRET";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
@@ -320,8 +319,8 @@ public class PostAction extends SessionAction {
         if (coresParam != null) {
             try {
                 cores = Integer.valueOf(coresParam);
-                ResourceContexts rc = new ResourceContexts();
-                if (!rc.getAvailableCores().contains(cores)) {
+                final ResourceContexts rc = new ResourceContexts();
+                if (!rc.isCoreCountAvailable(cores)) {
                     throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
                 }
             } catch (Exception e) {
@@ -550,10 +549,9 @@ public class PostAction extends SessionAction {
         log.debug("supplementalGroups are " + supplementalGroups);
         String secretName = createPosixMappingSecret(sessionID);
         xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
-                tokenTool.generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+                getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Subject subject = AuthenticationUtil.getCurrentSubject();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -601,8 +599,9 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
-        if (StringUtil.hasText(supplementalGroups))
+        if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -704,8 +703,7 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         final String secretName = createPosixMappingSecret(sessionID);
         xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
-                tokenTool.generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
-
+                getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
@@ -878,7 +876,10 @@ public class PostAction extends SessionAction {
     }
 
     private String createPosixMappingSecret(final String sessionID) throws Exception {
-        if (skahaCallbackFlow) return PosixHelper.getPosixMapperSecretName(callbackSessionId);
+        if (skahaCallbackFlow) {
+            return PosixHelper.getPosixMapperSecretName(callbackSessionId);
+        }
+
         final String posixMappingSecretName = PosixHelper.getPosixMapperSecretName(sessionID);
         final Path holdingDir =
                 Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), posixMappingSecretName);

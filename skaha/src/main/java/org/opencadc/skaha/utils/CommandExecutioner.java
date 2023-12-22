@@ -1,6 +1,8 @@
 package org.opencadc.skaha.utils;
 
+import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -80,6 +82,21 @@ public class CommandExecutioner {
         }
     }
 
+    public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
+        // Check the current secret
+        final String[] getSecretCommand = new String[] {
+                "kubectl", "--namespace", secretNamespace, "get", "--ignore-not-found", "secret",
+                secretName, "-o", "jsonpath=\"{.data}\""
+        };
+
+        final String data = CommandExecutioner.execute(getSecretCommand);
+
+        // The data from the output begins with a double-quote and ends with one, so strip them.
+        return StringUtil.hasText(data) ? new JSONObject(data.replaceFirst("\"", "")
+                                                             .substring(0, data.lastIndexOf("\"")))
+                                        : new JSONObject();
+    }
+
     protected static String readStream(InputStream in) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int nRead;
@@ -90,17 +107,22 @@ public class CommandExecutioner {
         return buffer.toString(StandardCharsets.UTF_8);
     }
 
-    public static String createDirectoryIfNotExist(String... paths) throws IOException {
+    public static String createDirectoryIfNotExist(String... paths) {
         Path path = Paths.get("/", paths);
         File directory = new File(path.toString());
-        if (!(directory.exists())) directory.mkdir();
+        if (!(directory.exists())) {
+            directory.mkdir();
+        }
         return path.toString();
     }
 
-    public static String createOrOverrideFile(String directoryPath, String fileName, String content) throws IOException {
+    public static String createOrOverrideFile(String directoryPath, String fileName, String content)
+            throws IOException {
         Path path = Paths.get(directoryPath, fileName);
         File file = new File(path.toString());
-        if (!(file.exists())) file.createNewFile();
+        if (!(file.exists())) {
+            file.createNewFile();
+        }
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(content + "\n");
         writer.flush();

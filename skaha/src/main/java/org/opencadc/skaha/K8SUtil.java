@@ -134,4 +134,8 @@ public class K8SUtil {
     public static String getDefaultQuota() {
         return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
     }
+
+    public static String getPreAuthorizedTokenSecretName() {
+        return "pre-auth-token-skaha";
+    }
 }
