@@ -102,8 +102,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.AccessControlException;
 import java.security.KeyPair;
 import java.util.*;
@@ -136,6 +134,8 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaTld;
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
+    protected String skahaHeadlessGroup;
+    protected String skahaAdminsGroup;
     protected int maxUserSessions;
     protected final PosixMapperConfiguration posixMapperConfiguration;
 
@@ -158,6 +158,8 @@ public abstract class SkahaAction extends RestAction {
             harborHosts = Arrays.asList(harborHostList.split(" "));
         }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
+        skahaHeadlessGroup = System.getenv("skaha.headlessgroup");
+        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
         String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
@@ -174,6 +176,8 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
+        log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
+        log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
 
