@@ -1,4 +1,8 @@
-# CHANGELOG for Skaha User Session API (0.3.0)
+# CHANGELOG for Skaha User Session API (0.3.6)
+
+## 2024.01.12 (0.3.6)
+- Desktop sessions have trusted API access to the Skaha service
+- Better support for Access Tokens
 
 ## 2023.11.14 (0.3.0)
 - Desktop sessions are still not complete, but have improved.
