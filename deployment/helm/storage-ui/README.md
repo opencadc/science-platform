@@ -84,13 +84,14 @@ deployment:
 ### Run with configured values
 
 ```bash
+helm repo add science-platform-client https://images.opencadc.org/chartrepo/client
 helm repo update
 
-helm install -n skaha-system --values my-storage-ui-local-values-file.yaml storageui science-platform/storageui
+helm install -n skaha-system --values my-storage-ui-local-values-file.yaml storageui science-platform-client/storageui
 
 Release "storageui" has been installed. Happy Helming!
 NAME: storageui
-LAST DEPLOYED: Thu Nov 1 7:21:10 2023
+LAST DEPLOYED: Thu Jan 12 17:01:07 2024
 NAMESPACE: skaha-system
 STATUS: deployed
 REVISION: 1
@@ -103,4 +104,4 @@ A&A is handle by caching the Token Set server side and issuing a cookie to the b
 
 ## Endpoints
 
-The system will be available at the `/storage-ui` endpoint, (i.e. https://example.com/storage-ui).  Authenticating to the system is optional.
+The system will be available at the `/storage` endpoint, (i.e. https://example.com/storage/list).  Authenticating to the system is optional.

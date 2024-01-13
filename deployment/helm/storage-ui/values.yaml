@@ -44,6 +44,11 @@ deployment:
     #       resourceID: "ivo://cadc.nrc.ca/arc"
     #       nodeURIPrefix: "vos://cadc.nrc.ca~arc"
     #       userHomeDir: "/home"
+    #       features:
+    #         batchDownload: false
+    #         batchUpload: false
+    #         externalLinks: false
+    #         paging: false
 
     # ID (URI) of the GMS Service.
     gmsID: ivo://skao.int/gms
