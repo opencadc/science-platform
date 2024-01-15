@@ -34,10 +34,10 @@ deployment:
       clientSecret: <myclientsecret>
 
       # Where the OIdP should send the User after successful authentication.  This is also known as the redirect_uri in OpenID.  This URI NEEDS
-      redirectURI: https://example.com/storage-ui/oidc-callback
+      redirectURI: https://example.com/storage/oidc-callback
 
       # Where to redirect to after the redirectURI callback has completed.  This will almost always be the URL to the /storage-ui main page (https://example.com/storage-ui).
-      callbackURI: https://example.com/storage-ui/
+      callbackURI: https://example.com/storage/list
 
       # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
       scope: "openid profile offline_access"
