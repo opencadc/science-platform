@@ -50,6 +50,10 @@ spec:
           value: "1"
         - name: SHELL
           value: "/bin/bash"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           allowPrivilegeEscalation: false
         image: "${software.imageid}"
