@@ -47,6 +47,8 @@ spec:
           value: "/arc/home/${skaha.userid}"
         - name: PWD
           value: "/arc/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           allowPrivilegeEscalation: false
         workingDir: "/arc/home/${skaha.userid}"
