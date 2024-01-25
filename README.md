@@ -12,8 +12,7 @@
 
 ## CANFAR Science Portal Documentation
 
-User documentation for the CANFAR Science Portal and Platform can be found here:  [Science Portal Documentation](https://github.com/opencadc/science-containers/blob/main/doc)
-Additional documentation for new users can be found here: [New User Documentation](https://canfar-scienceportal.readthedocs.io/en/latest/)
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Official CANFAR Science Platform Documentation](https://www.opencadc.org/science-containers/)
 
 ## Acknowledgements
 This project has been funded in part by:
