@@ -56,6 +56,10 @@ spec:
           value: "${skaha.hostname}"
         - name: skaha_username
           value: "${skaha.userid}"
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         securityContext:
           runAsUser: ${skaha.posixid} 
           runAsGroup: ${skaha.posixid}

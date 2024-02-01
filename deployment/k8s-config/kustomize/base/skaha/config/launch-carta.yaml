@@ -42,6 +42,12 @@ spec:
           value: "${skaha.userid}"
         - name: skaha_sessionid
           value: "${skaha.sessionid}"
+        - name: HOME
+          value: "/arc/home/${skaha.userid}"
+        - name: PWD
+          value: "/arc/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           allowPrivilegeEscalation: false
         image: ${software.imageid}

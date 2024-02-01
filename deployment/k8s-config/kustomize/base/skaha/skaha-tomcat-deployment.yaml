@@ -40,9 +40,13 @@ spec:
           value: "images.canfar.net"
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
+        - name: skaha.headlessgroup
+          # TODO: change back to the correct headless group when ready
+          # value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.12.3
+        image: images.canfar.net/skaha-system/skaha:0.12.4
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat

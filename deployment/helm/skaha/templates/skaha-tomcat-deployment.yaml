@@ -50,6 +50,10 @@ spec:
           value: "{{ .Values.deployment.skaha.registryHosts }}"
         - name: skaha.usersgroup
           value: "{{ .Values.deployment.skaha.usersGroup }}"
+        - name: skaha.headlessgroup
+          # TODO: change back to the correct headless group when ready
+          # value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.adminsgroup
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
         - name: skaha.posixmapper.resourceid
