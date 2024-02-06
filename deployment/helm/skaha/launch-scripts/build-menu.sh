@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 HOST=$1
 TOKEN=$(cat ${HOME}/.token/.skaha)
@@ -199,10 +199,7 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
-  echo "certificate is used in build menu"
-  apps=$(curl -s -k -E ~/.ssl/cadcproxy.pem https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
-elif [ -e "${HOME}/.token/.skaha" ]; then
+if [ -e "${HOME}/.token/.skaha" ]; then
   echo "token is used in build menu"
   apps=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
 else

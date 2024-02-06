@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 HOST=(HOST)
 TOKEN_FILE="${HOME}/.token/.skaha"
 TOKEN=$(cat ${TOKEN_FILE})
@@ -11,9 +11,7 @@ handle_error() {
 }
 
 get_resource_options() {
-    if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then 
-      resources=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/context`     
-    elif [ -e "${TOKEN_FILE}" ]; then
+    if [ -e "${TOKEN_FILE}" ]; then
       resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
     else
       handle_error "[skaha] No credentials to call back to Skaha with."
@@ -86,9 +84,7 @@ prompt_user() {
         if [[ -z "${yn}" || ${yn} == "n" || ${yn} == "N" ]]; then
             echo "Launching (NAME)..."
 
-            if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then 
-              app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
-            elif [ -e "${TOKEN_FILE}" ]; then
+            if [ -e "${TOKEN_FILE}" ]; then
               app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
               handle_error "[skaha] No credentials to call back to Skaha with."
@@ -100,9 +96,7 @@ prompt_user() {
             get_ram || handle_error "Error obtaining the amount of ram to allocate."
             echo "Launching (NAME)..."
 
-            if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
-              app_id=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
-            elif [ -e "${TOKEN_FILE}" ]; then
+            if [ -e "${TOKEN_FILE}" ]; then
               app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
             else
               handle_error "[skaha] No credentials to call back to Skaha with."
@@ -124,9 +118,7 @@ get_status() {
     status=""
     local n=0
     sleep 1
-    if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
-        curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
-    elif [ -e "${TOKEN_FILE}" ]; then
+    if [ -e "${TOKEN_FILE}" ]; then
         curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
     else
         handle_error "[skaha] No credentials to call back to Skaha with."
@@ -140,9 +132,7 @@ get_status() {
         fi
         sleep 1
 
-        if [ -e "${HOME}/.ssl/cadcproxy.pem" ]; then
-          curl_out=`curl -s -L -k -E ${HOME}/.ssl/cadcproxy.pem https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1` 
-        elif [ -e "${HOME}/.token/.skaha" ]; then
+        if [ -e "${HOME}/.token/.skaha" ]; then
           curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
         else
           handle_error "[skaha] No credentials to call back to Skaha with."
