@@ -66,7 +66,7 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/skaha-carta ${SKAHA_TLD} ${SKAHA_TLD}/projects
+        - /skaha-system/skaha-carta.sh ${SKAHA_TLD} ${SKAHA_TLD}/projects
         imagePullPolicy: Always
         resources:
           requests:
@@ -91,6 +91,8 @@ spec:
         - mountPath: "/etc/group"
           name: etc-group
           subPath: group
+        - mountPath: "/skaha-system"
+          name: start-carta
         - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
@@ -106,6 +108,10 @@ spec:
       - name: init-users-groups
         configMap:
           name: init-users-groups-config
+          defaultMode: 0777
+      - name: start-carta
+        configMap:
+          name: launch-scripts
           defaultMode: 0777
       - name: etc-group
         emptyDir: {}

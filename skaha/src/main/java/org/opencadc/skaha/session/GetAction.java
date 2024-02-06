@@ -186,7 +186,7 @@ public class GetAction extends SessionAction {
             String withRAM = "0G";
             Map<String, Map<String, Double>> nodeResourcesMap = getNodeResources(k8sNamespace);
             Map<String, String[]> aResourceMap = getAvailableResources(k8sNamespace);
-            List<String> nodeNames = new ArrayList<>(nodeResourcesMap.keySet());
+            List<String> nodeNames = new ArrayList<>(aResourceMap.keySet());
             for (String nodeName : nodeNames) {
                 String[] aResources = aResourceMap.get(nodeName);
                 if (aResources != null) {
@@ -203,8 +203,12 @@ public class GetAction extends SessionAction {
                     }
 
                     Map<String, Double> resourcesMap = nodeResourcesMap.get(nodeName);
-                    requestedCPUCores = requestedCPUCores + resourcesMap.get(REQ_CPU_CORES_KEY);
-                    requestedRAM = requestedRAM + resourcesMap.get(REQ_RAM_KEY);
+                    // There may not be anything running.
+                    if (resourcesMap != null) {
+                        requestedCPUCores += resourcesMap.get(REQ_CPU_CORES_KEY);
+                        requestedRAM += resourcesMap.get(REQ_RAM_KEY);
+                    }
+
                     coresAvailable = coresAvailable + aCPUCores;
                     ramAvailable = ramAvailable + aRAM;
                 }
