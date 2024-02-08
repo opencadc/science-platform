@@ -80,7 +80,7 @@ rules:
   resources: ["ingresses"]
   verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
 # Traefik IngressRoute and Middleware
-- apiGroups: ["traefik.containo.us"]
+- apiGroups: ["traefik.io"]
   resources: ["ingressroutes", "ingressroutetcps", "middlewares"]
   verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
 # Allow users to protect their apps against unavailability with poddisruptionbudget (https://github.com/kubernetes/kubernetes/issues/50767)

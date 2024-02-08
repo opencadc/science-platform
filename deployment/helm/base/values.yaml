@@ -13,12 +13,17 @@ secrets:
 # Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
 traefik:
   install: false
-  # experimental:
-  #   plugins:
-  #     enabled: true
-  # additionalArguments:
-  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
-  #   - "--experimental.plugins.htransformation.version=v0.2.7"
+  logs:
+    general:
+      # -- By default, the logs use a text format (common), but you can
+      # also ask for the json format in the format option
+      # format: json
+      # By default, the level is set to ERROR.
+      # -- Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+      level: ERROR
+    access:
+      # -- To enable access logs
+      enabled: false
   # tlsStore:
   #   default:
   #     defaultCertificate:
@@ -30,10 +35,3 @@ traefik:
   #       clientAuthType: VerifyClientCertIfGiven
   #       secretNames:
   #         - cacert-secret
-  # websecure:
-  #   middlewares: 
-  #     - default-traefik-passtlsclientcert@kubernetescrd
-  #     - default-traefik-header-transform@kubernetescrd
-  #   tls:
-  #     options:
-  #       - default-traefik-client-cert-option@kubernetescrd
