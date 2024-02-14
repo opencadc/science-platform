@@ -118,13 +118,16 @@ public abstract class SkahaAction extends RestAction {
     protected String userID;
     protected boolean adminUser = false;
     protected boolean headlessUser = false;
+    protected boolean priorityHeadlessUser = false;
     protected String server;
     protected String homedir;
     protected String scratchdir;
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected String skahaHeadlessGroup;
+    protected String skahaPriorityHeadlessGroup;
     protected String skahaAdminsGroup;
+    protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
 
     public SkahaAction() {
@@ -139,7 +142,9 @@ public abstract class SkahaAction extends RestAction {
         }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
         skahaHeadlessGroup = System.getenv("skaha.headlessgroup");
+        skahaPriorityHeadlessGroup = System.getenv("skaha.headlessprioritygroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
+        skahaHeadlessPriortyClass = System.getenv("skaha.headlesspriortyclass");
         String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
@@ -153,7 +158,9 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
+        log.debug("skaha.priorityheadlessgroup=" + skahaPriorityHeadlessGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        log.debug("skaha.skahaheadlesspriorityclass=" + skahaHeadlessPriortyClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
     }
 
@@ -191,11 +198,27 @@ public abstract class SkahaAction extends RestAction {
         GMSClient gmsClient = new GMSClient(gmsSearchURI);
         List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
 
-        final Group skahaUsersGroupObj;
+        Group skahaUsersGroupObj = null;
+        Group skahaHeadlessGroupObj = null;
+        Group skahaPriorityHeadlessGroupObj = null;
         try {
             skahaUsersGroupObj = new Group(new GroupURI(URI.create(skahaUsersGroup)));
+            if (skahaHeadlessGroup != null) {
+                skahaHeadlessGroupObj = new Group(new GroupURI(URI.create(skahaHeadlessGroup)));
+            }
+            if (skahaPriorityHeadlessGroup != null) {
+                skahaPriorityHeadlessGroupObj = new Group(new GroupURI(URI.create(skahaPriorityHeadlessGroup)));
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+        
+        if (skahaHeadlessGroupObj != null && memberships.contains(skahaHeadlessGroupObj)) {
+            headlessUser = true;
+        }
+        
+        if (skahaPriorityHeadlessGroupObj != null && memberships.contains(skahaPriorityHeadlessGroupObj)) {
+            priorityHeadlessUser = true;
         }
 
         if (!memberships.contains(skahaUsersGroupObj)) {
