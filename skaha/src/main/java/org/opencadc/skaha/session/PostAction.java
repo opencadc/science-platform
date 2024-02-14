@@ -145,6 +145,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
+    public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
 
@@ -590,6 +591,7 @@ public class PostAction extends SessionAction {
         }
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
+        String headlessPriority = getHeadlessPriority();
         String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         String gpuScheduling = getGPUScheduling(gpus);
 
@@ -607,6 +609,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_HOSTNAME, name.toLowerCase());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
+        jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_PRIORITY, headlessPriority);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
@@ -771,21 +774,11 @@ public class PostAction extends SessionAction {
     }
 
     private void validateHeadlessMembership() throws Exception {
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI("ivo://ivoa.net/std/GMS#search-0.1");
-
-        GMSClient gmsClient = new GMSClient(gmsSearchURI);
-        List<Group> memberships = gmsClient.getMemberships(Role.MEMBER);
-
         if (skahaHeadlessGroup == null) {
             log.warn("skaha.headlessgroup not defined in system properties");
-        } else {
-            final Group headlessGroup = new Group(new GroupURI(URI.create(skahaHeadlessGroup)));
-            if (!memberships.contains(headlessGroup)) {
-                throw new AccessControlException("Not authorized to create a headless session");
-            }
+        } else if (!headlessUser) {
+            throw new AccessControlException("Not authorized to create a headless session");
         }
-
     }
     
     private String getPosixId() {
@@ -977,6 +970,17 @@ public class PostAction extends SessionAction {
             return sb.toString();
         }
         return sb.toString();
+    }
+    
+    private String getHeadlessPriority() {
+        if (skahaPriorityHeadlessGroup == null) {
+            return "";
+        }
+        if (priorityHeadlessUser) {
+            return "priorityClassName: uber-user-preempt-medium";
+        } else {
+            return "";
+        }
     }
 
 }
