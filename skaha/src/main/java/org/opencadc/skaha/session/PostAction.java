@@ -976,8 +976,12 @@ public class PostAction extends SessionAction {
         if (skahaPriorityHeadlessGroup == null) {
             return "";
         }
+        if (skahaHeadlessPriortyClass == null) {
+            log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
+            return "";
+        }
         if (priorityHeadlessUser) {
-            return "priorityClassName: uber-user-preempt-medium";
+            return "priorityClassName: " + skahaHeadlessPriortyClass;
         } else {
             return "";
         }

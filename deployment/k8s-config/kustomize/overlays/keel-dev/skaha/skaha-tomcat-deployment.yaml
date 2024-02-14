@@ -16,11 +16,13 @@ spec:
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.headlessgroup
-          value: "ivo://cadc.nrc.ca/gms?skaha-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
         - name: skaha.headlessprioritygroup
           value: "ivo://cadc.nrc.ca/gms?skaha-priority-headless-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
+        - name: skaha.headlesspriortyclass
+          value: uber-user-preempt-medium
         - name: skaha.sessionexpiry
           value: "345600"
         - name: skaha.defaultquotagb

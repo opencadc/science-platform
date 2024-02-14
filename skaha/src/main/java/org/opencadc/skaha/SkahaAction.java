@@ -127,6 +127,7 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaHeadlessGroup;
     protected String skahaPriorityHeadlessGroup;
     protected String skahaAdminsGroup;
+    protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
 
     public SkahaAction() {
@@ -143,6 +144,7 @@ public abstract class SkahaAction extends RestAction {
         skahaHeadlessGroup = System.getenv("skaha.headlessgroup");
         skahaPriorityHeadlessGroup = System.getenv("skaha.headlessprioritygroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
+        skahaHeadlessPriortyClass = System.getenv("skaha.headlesspriortyclass");
         String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
@@ -158,6 +160,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
         log.debug("skaha.priorityheadlessgroup=" + skahaPriorityHeadlessGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        log.debug("skaha.skahaheadlesspriorityclass=" + skahaHeadlessPriortyClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
     }
 
