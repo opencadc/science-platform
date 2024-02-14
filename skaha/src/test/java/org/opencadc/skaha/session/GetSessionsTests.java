@@ -172,9 +172,12 @@ public class GetSessionsTests {
     }
     
     static class TestGetAction extends GetAction {
-        
+
         @Override
         public List<Session> getAllSessions(String forUserID) throws Exception {
+            // A bit of a hack to emulate the state.
+            this.skahaTld = "/cavern-vospace";
+
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {

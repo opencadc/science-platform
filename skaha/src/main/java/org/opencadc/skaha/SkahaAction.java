@@ -104,6 +104,8 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.security.KeyPair;
 import java.util.*;
@@ -332,6 +334,10 @@ public abstract class SkahaAction extends RestAction {
 
     protected String getUsername() {
         return posixPrincipal.username;
+    }
+
+    protected Path getUserHomeDirectory() {
+        return Paths.get(String.format("%s/%s", this.homedir, getUsername()));
     }
 
     protected int getUID() {

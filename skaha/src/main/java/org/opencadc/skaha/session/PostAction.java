@@ -272,7 +272,7 @@ public class PostAction extends SessionAction {
     }
 
     void ensureUserBase() throws Exception {
-        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, getUsername()));
+        final Path homeDir = getUserHomeDirectory();
 
         if (Files.notExists(homeDir)) {
             log.debug("Allocating new user home to " + homeDir);
@@ -283,9 +283,10 @@ public class PostAction extends SessionAction {
 
     void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
+        final Path userHomePath = getUserHomeDirectory();
         final String[] allocateUserCommand = new String[] {
                 PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
-                getDefaultQuota()
+                getDefaultQuota(), userHomePath.toAbsolutePath().toString()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));

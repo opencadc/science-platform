@@ -166,9 +166,9 @@ public abstract class SessionAction extends SkahaAction {
         return url;
     }
 
-    public static String getNotebookURL(String host, String sessionID, String userid) throws MalformedURLException {
-        return "https://" + host + "/session/notebook/" + sessionID + "/lab/tree/arc/home/" + userid + "?token="
-               + sessionID;
+    public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
+        return String.format("https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s", host, sessionID,
+                             skahaTLD.replaceAll("/", ""), userid, sessionID);
     }
 
     public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
@@ -763,7 +763,7 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid);
+            connectURL = SessionAction.getNotebookURL(host, id, userid, this.skahaTld);
         }
         if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
             connectURL = SessionAction.getContributedURL(host, id);

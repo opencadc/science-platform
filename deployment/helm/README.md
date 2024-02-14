@@ -245,9 +245,6 @@ deployment:
         memory: "1Gi"
         cpu: "500m"
 
-    # Directory to hold the user's home folders in the shared storage.
-    homeDir: "/arc/home"
-
     maxUserSessions: "3"
     sessionExpiry: "345600"
     defaultQuotaGB: "10"
