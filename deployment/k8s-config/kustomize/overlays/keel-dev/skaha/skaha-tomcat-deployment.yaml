@@ -27,7 +27,7 @@ spec:
           value: "345600"
         - name: skaha.defaultquotagb
           value: "10"
-        image: images-rc.canfar.net/skaha-system/skaha:0.12.4
+        image: images-rc.canfar.net/skaha-system/skaha:0.12.5
         resources:
           requests:
             memory: "4Gi"

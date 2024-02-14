@@ -48,7 +48,7 @@ spec:
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
         - name: skaha.headlesspriortyclass
           value: uber-user-preempt-medium
-        image: images.canfar.net/skaha-system/skaha:0.12.4
+        image: images.canfar.net/skaha-system/skaha:0.12.5
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat
