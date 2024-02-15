@@ -132,6 +132,8 @@ public abstract class SkahaAction extends RestAction {
 
     protected PosixPrincipal posixPrincipal;
     protected boolean adminUser = false;
+    protected boolean headlessUser = false;
+    protected boolean priorityHeadlessUser = false;
     protected String server;
     protected String homedir;
     protected String scratchdir;
@@ -139,7 +141,9 @@ public abstract class SkahaAction extends RestAction {
     public List<String> harborHosts = new ArrayList<>();
     protected String skahaUsersGroup;
     protected String skahaHeadlessGroup;
+    protected String skahaPriorityHeadlessGroup;
     protected String skahaAdminsGroup;
+    protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
     protected final PosixMapperConfiguration posixMapperConfiguration;
 
@@ -163,7 +167,9 @@ public abstract class SkahaAction extends RestAction {
         }
         skahaUsersGroup = System.getenv("skaha.usersgroup");
         skahaHeadlessGroup = System.getenv("skaha.headlessgroup");
+        skahaPriorityHeadlessGroup = System.getenv("skaha.headlessprioritygroup");
         skahaAdminsGroup = System.getenv("skaha.adminsgroup");
+        skahaHeadlessPriortyClass = System.getenv("skaha.headlesspriortyclass");
         String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
         if (maxUsersSessionsString == null) {
             log.warn("no max user sessions value configured.");
@@ -181,7 +187,9 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.harborHosts=" + harborHostList);
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
+        log.debug("skaha.priorityheadlessgroup=" + skahaPriorityHeadlessGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
+        log.debug("skaha.skahaheadlesspriorityclass=" + skahaHeadlessPriortyClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
 
@@ -206,6 +214,7 @@ public abstract class SkahaAction extends RestAction {
         if (skahaUsersGroup == null) {
             throw new IllegalStateException("skaha.usersgroup not defined in system properties");
         }
+
         URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
@@ -319,14 +328,45 @@ public abstract class SkahaAction extends RestAction {
 
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
+
+        final GroupURI skahaHeadlessGroupURI = StringUtil.hasText(this.skahaHeadlessGroup)
+                                               ? new GroupURI(URI.create(this.skahaHeadlessGroup))
+                                               : null;
+
+        if (skahaHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaHeadlessGroupURI)) {
+            headlessUser = true;
+        }
+
+        final GroupURI skahaPriorityHeadlessGroupURI = StringUtil.hasText(this.skahaPriorityHeadlessGroup)
+                                                       ? new GroupURI(URI.create(this.skahaPriorityHeadlessGroup))
+                                                       : null;
+
+        if (skahaPriorityHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaPriorityHeadlessGroupURI)) {
+            priorityHeadlessUser = true;
+        }
+
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");
         }
+
         log.debug("user is a member of skaha user group ");
-        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet) ?
-                skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
-                : new ArrayList<>();
+        if (skahaAdminsGroup == null) {
+            log.warn("skaha.adminsgroup not defined in system properties");
+        } else {
+            try {
+                final GroupURI adminGroupURI = new GroupURI(URI.create(skahaAdminsGroup));
+                if (skahaUsersGroupUriSet.contains(adminGroupURI)) {
+                    adminUser = true;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        List<Group> groups = isNotEmpty(skahaUsersGroupUriSet)
+                             ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
+                             : Collections.emptyList();
 
         // adding all groups to the Subject
         currentSubject.getPublicCredentials().add(groups);
