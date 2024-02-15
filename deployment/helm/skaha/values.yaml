@@ -17,7 +17,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.14.8
+    image: images.opencadc.org/platform/skaha:0.14.9
     imagePullPolicy: Always
     skahaTld: "/arc"
     maxUserSessions: "3"
@@ -31,6 +31,9 @@ deployment:
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
     adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
+
+    # Group for users to preempt headless jobs.
+    headlessGroup: "ivo://cadc.nrc.ca/gms?skaha-priority-headless-users"
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://example.org/posix-mapper"
