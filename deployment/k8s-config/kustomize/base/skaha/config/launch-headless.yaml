@@ -33,6 +33,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+      ${headless.priority}
       containers:
       - name: "${skaha.jobname}"
         # image and start of the 'env' label comes from the image bundle

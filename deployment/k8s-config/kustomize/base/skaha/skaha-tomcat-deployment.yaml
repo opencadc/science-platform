@@ -41,12 +41,14 @@ spec:
         - name: skaha.usersgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-users"
         - name: skaha.headlessgroup
-          # TODO: change back to the correct headless group when ready
-          # value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
-          value: "ivo://cadc.nrc.ca/gms?skaha-users"
+          value: "ivo://cadc.nrc.ca/gms?skaha-headless-users"
+        - name: skaha.headlessprioritygroup
+          value: "ivo://cadc.nrc.ca/gms?skaha-priority-headless-users"
         - name: skaha.adminsgroup
           value: "ivo://cadc.nrc.ca/gms?skaha-admins"
-        image: images.canfar.net/skaha-system/skaha:0.12.4
+        - name: skaha.headlesspriortyclass
+          value: uber-user-preempt-medium
+        image: images.canfar.net/skaha-system/skaha:0.12.5
         imagePullPolicy: Always
         #imagePullPolicy: IfNotPresent
         name: skaha-tomcat

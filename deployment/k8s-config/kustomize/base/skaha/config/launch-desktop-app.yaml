@@ -31,7 +31,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
-      priorityClassName: uber-user-significant
+      priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
       - name: "${software.containername}"
