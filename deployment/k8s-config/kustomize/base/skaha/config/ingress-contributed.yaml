@@ -1,4 +1,4 @@
-apiVersion: traefik.io/v1alpha1
+apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: skaha-contributed-middleware-${skaha.sessionid}
@@ -9,7 +9,7 @@ spec:
 
 ---
 
-apiVersion: traefik.io/v1alpha1
+apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: skaha-contributed-ingress-${skaha.sessionid}
