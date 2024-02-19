@@ -397,7 +397,8 @@ public abstract class SkahaAction extends RestAction {
         URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
         log.debug("using ac oauth endpoint: " + oauthURL);
 
-        if (oauthURL == null) {
+        // There is no ID Token for the special Skaha BackFlow (API Token).
+        if (oauthURL == null || isSkahaCallBackFlow(AuthenticationUtil.getCurrentSubject())) {
             return null;
         }
 
