@@ -116,7 +116,7 @@ build_menu () {
   project=$1
   directory="xfce-$1.directory"
   cat ${STARTUP_DIR}/xfce-applications-menu-item.template >> ${ASTROSOFTWARE_MENU}
-  sed -i -e "s#(NAME)#${project}#g" ${ASTROSOFTWARE_MENU}
+  sed -i -e "s#(PROJECT)#${project}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(DIRECTORY)#${directory}#g" ${ASTROSOFTWARE_MENU}
   sed -i -e "s#(CATEGORY)#${project}#g" ${ASTROSOFTWARE_MENU}
   rm -f ${MERGED_DIR}/*-e
