@@ -92,6 +92,8 @@ import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.session.Session;
+import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.PosixHelper;
@@ -281,6 +283,8 @@ public abstract class SkahaAction extends RestAction {
         try {
             callbackSessionId = getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
             String secretName = PosixHelper.getPosixMapperSecretName(callbackSessionId);
+            final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
+
             String workloadNamespaceName = K8SUtil.getWorkloadNamespace();
             String uidMapping = PosixHelper.uidMapping(secretName, workloadNamespaceName);
             posixPrincipal = PosixHelper.buildPosixPrincipal(uidMapping);

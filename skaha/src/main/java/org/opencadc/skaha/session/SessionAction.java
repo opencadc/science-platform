@@ -322,7 +322,7 @@ public abstract class SessionAction extends SkahaAction {
         String podID = getPodID(forUserID, sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getEventsCmd = new ArrayList<String>();
+        List<String> getEventsCmd = new ArrayList<>();
         getEventsCmd.add("kubectl");
         getEventsCmd.add("--namespace");
         getEventsCmd.add(k8sNamespace);
@@ -343,10 +343,6 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         return "";
-
-        //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
-        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp
-
     }
 
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
@@ -610,7 +606,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private List<String> getSessionsCMD(String k8sNamespace, String forUserID, String sessionID) {
-        List<String> sessionsCMD = new ArrayList<String>();
+        List<String> sessionsCMD = new ArrayList<>();
         sessionsCMD.add("kubectl");
         sessionsCMD.add("get");
         sessionsCMD.add("--namespace");
