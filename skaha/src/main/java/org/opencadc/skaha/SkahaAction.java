@@ -301,7 +301,7 @@ public abstract class SkahaAction extends RestAction {
         xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         try {
-            callbackSessionId = getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
+            callbackSessionId = SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
 
             final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
             this.posixPrincipal = session.getPosixPrincipal();
