@@ -47,7 +47,7 @@ spec:
         - mountPath: "/posix-mapping"
           name: posix-mapping
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"

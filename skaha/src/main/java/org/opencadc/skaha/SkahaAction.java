@@ -74,6 +74,7 @@ import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
+import ca.nrc.cadc.io.ResourceIterator;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
@@ -86,15 +87,17 @@ import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.session.Session;
+import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
-import org.opencadc.skaha.utils.PosixHelper;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
@@ -102,13 +105,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.security.KeyPair;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
@@ -117,6 +119,9 @@ import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
 public abstract class SkahaAction extends RestAction {
 
     private static final Logger log = Logger.getLogger(SkahaAction.class);
+
+    protected static final String POSIX_DELIMITER = ";";
+
     private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
 
     public static final String SESSION_TYPE_CARTA = "carta";
@@ -225,6 +230,24 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
+    protected String getGroupEntries() throws Exception {
+        final StringBuilder groupEntryBuilder = new StringBuilder();
+        try (final ResourceIterator<PosixGroup> posixGroupIterator =
+                     posixMapperConfiguration.getPosixMapperClient().getGroupMap()) {
+            posixGroupIterator.forEachRemaining(pg -> groupEntryBuilder.append(
+                    String.format("%s:x:%d:\n",
+                                  pg.getGroupURI().getURI().getQuery(),
+                                  pg.getGID())));
+        }
+
+        final String userEntriesString = groupEntryBuilder.toString();
+        if (userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER) > 0) {
+            return groupEntryBuilder.substring(0, userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER));
+        } else {
+            return groupEntryBuilder.toString();
+        }
+    }
+
     private boolean isSkahaCallBackFlow(Subject currentSubject) {
         AuthMethod authMethod = AuthenticationUtil.getAuthMethodFromCredentials(currentSubject);
         log.debug("authMethod is " + authMethod);
@@ -232,12 +255,12 @@ public abstract class SkahaAction extends RestAction {
         return authMethod == AuthMethod.ANON && isNotEmpty(syncInput.getHeader(X_AUTH_TOKEN_SKAHA));
     }
 
-    protected TokenTool getTokenTool() throws Exception {
+    protected static TokenTool getTokenTool() throws Exception {
         final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
         return new TokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
     }
 
-    EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
+    private static EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
         // Check the current secret
         final JSONObject secretData = CommandExecutioner.getSecretData(K8SUtil.getPreAuthorizedTokenSecretName(),
                                                                        K8SUtil.getWorkloadNamespace());
@@ -277,21 +300,23 @@ public abstract class SkahaAction extends RestAction {
         skahaCallbackFlow = true;
         xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
-        GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         try {
             callbackSessionId = getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
-            String secretName = PosixHelper.getPosixMapperSecretName(callbackSessionId);
-            String workloadNamespaceName = K8SUtil.getWorkloadNamespace();
-            String uidMapping = PosixHelper.uidMapping(secretName, workloadNamespaceName);
-            posixPrincipal = PosixHelper.buildPosixPrincipal(uidMapping);
+
+            final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
+            this.posixPrincipal = session.getPosixPrincipal();
             currentSubject.getPrincipals().add(posixPrincipal);
-            String[] gidMappings = PosixHelper.gidMappings(secretName, workloadNamespaceName);
-            callbackSupplementalGroups = PosixHelper.supplementalGroups(gidMappings);
-            currentSubject.getPublicCredentials().add(PosixHelper.buildGroup(gidMappings,
-                                                                             skahaUsersGroupUri.getServiceID()));
+
+            this.callbackSupplementalGroups = Arrays.stream(session.getSupplementalGroups())
+                                                    .map(i -> Integer.toString(i))
+                                                    .collect(Collectors.joining(","));
         } catch (Exception ex) {
             log.error("Unable to retrieve information for for callback flow", ex);
-            throw new RuntimeException("Unable to retrieve information for callback flow");
+            if (ex instanceof IllegalStateException) {
+                throw new RuntimeException(ex.getMessage());
+            } else {
+                throw new RuntimeException("Unable to retrieve information for callback flow");
+            }
         }
     }
 
@@ -397,7 +422,8 @@ public abstract class SkahaAction extends RestAction {
         URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
         log.debug("using ac oauth endpoint: " + oauthURL);
 
-        if (oauthURL == null) {
+        // There is no ID Token for the special Skaha BackFlow (API Token).
+        if (oauthURL == null || isSkahaCallBackFlow(AuthenticationUtil.getCurrentSubject())) {
             return null;
         }
 

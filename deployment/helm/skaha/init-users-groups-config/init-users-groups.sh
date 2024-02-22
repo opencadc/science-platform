@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Two arguments expected: 
 # 1. the URL to the user (UID) mapping service

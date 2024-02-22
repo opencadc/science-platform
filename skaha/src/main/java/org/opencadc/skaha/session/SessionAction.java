@@ -89,8 +89,6 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
@@ -322,7 +320,7 @@ public abstract class SessionAction extends SkahaAction {
         String podID = getPodID(forUserID, sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getEventsCmd = new ArrayList<String>();
+        List<String> getEventsCmd = new ArrayList<>();
         getEventsCmd.add("kubectl");
         getEventsCmd.add("--namespace");
         getEventsCmd.add(k8sNamespace);
@@ -343,10 +341,6 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
         return "";
-
-        //kw get event --field-selector involvedObject.name=k-pop-aydanmckay-vg11vvhm-kl2n7vxw-t5d25 --no-headers=true
-        //-o custom-columns=MESSAGE:.message,TYPE:.type,REASON:.reason,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp
-
     }
 
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
@@ -364,7 +358,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
-        List<Session> sessions = getSessions(posixPrincipal.username, sessionID);
+        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID, skahaTld);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
@@ -380,13 +374,10 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
-        List<Session> sessions = getSessions(forUserID, sessionID);
-        if (!sessions.isEmpty()) {
-            for (Session session : sessions) {
-                // exclude 'desktop-app'
-                if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
-                    return session;
-                }
+        for (final Session session : SessionDAO.getSessions(forUserID, sessionID, skahaTld)) {
+            // exclude 'desktop-app'
+            if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
+                return session;
             }
         }
 
@@ -394,84 +385,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public List<Session> getAllSessions(String forUserID) throws Exception {
-        return getSessions(forUserID, null);
-    }
-
-    private List<Session> getSessions(String forUserID, String sessionID) throws Exception {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> sessionsCMD = getSessionsCMD(k8sNamespace, forUserID, sessionID);
-        String sessionList = execute(sessionsCMD.toArray(new String[0]));
-        log.debug("Session list: " + sessionList);
-
-        List<Session> sessions = new ArrayList<>();
-        if (StringUtil.hasLength(sessionList)) {
-            Map<String, String> jobExpiryTimes = null;
-            Map<String, String[]> resourceUsages = null;
-            if (forUserID != null) {
-                jobExpiryTimes = getJobExpiryTimes(k8sNamespace, forUserID);
-                resourceUsages = getResourceUsages(k8sNamespace, forUserID);
-            }
-
-            String[] lines = sessionList.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                if (forUserID != null) {
-                    // get expiry time
-                    String uid = getUID(line);
-                    String startTimeStr = session.getStartTime();
-                    if (startTimeStr.equalsIgnoreCase(NONE)) {
-                        session.setExpiryTime(startTimeStr);
-                    } else {
-                        Instant instant = Instant.parse(startTimeStr);
-                        String jobExpiryTimesStr = jobExpiryTimes.get(uid);
-                        if (jobExpiryTimesStr == null) {
-                            session.setExpiryTime(NONE);
-                        } else {
-                            instant = instant.plus(Integer.parseInt(jobExpiryTimesStr), ChronoUnit.SECONDS);
-                            session.setExpiryTime(instant.toString());
-                        }
-                    }
-
-                    // get RAM and CPU usage
-                    String fullName = getFullName(line);
-                    if (resourceUsages.isEmpty()) {
-                        // no job in 'Running' state
-                        session.setCPUCoresInUse(NONE);
-                        session.setRAMInUse(NONE);
-
-                    } else {
-                        // at least one job is in 'Running' state
-                        String[] resourceUsage = resourceUsages.get(fullName);
-                        if (resourceUsage == null) {
-                            // job not in 'Running' state
-                            session.setCPUCoresInUse(NONE);
-                            session.setRAMInUse(NONE);
-                        } else {
-                            session.setCPUCoresInUse(toCoreUnit(resourceUsage[0]));
-                            session.setRAMInUse(toCommonUnit(resourceUsage[1]));
-                        }
-
-                        // if this session usages GPU, get the GPU usage
-                        if (StringUtil.hasText(session.getRequestedGPUCores()) &&
-                            !NONE.equals(session.getRequestedGPUCores()) &&
-                            Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
-                            List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
-                            String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
-                            List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
-                            session.setGPURAMInUse(gpuUsage.get(0));
-                            session.setGPUUtilization(gpuUsage.get(1));
-                        } else {
-                            session.setGPURAMInUse(NONE);
-                            session.setGPUUtilization(NONE);
-                        }
-                    }
-                }
-
-                sessions.add(session);
-            }
-        }
-
-        return sessions;
+        return SessionDAO.getSessions(forUserID, null, skahaTld);
     }
 
     protected String toCoreUnit(String cores) {
@@ -505,74 +419,6 @@ public abstract class SessionAction extends SkahaAction {
         return ret;
     }
 
-    private Map<String, String[]> getResourceUsages(String k8sNamespace, String forUserID) throws Exception {
-        Map<String, String[]> resourceUsages = new HashMap<>();
-        List<String> sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID);
-        try {
-            String sessionResourceUsageMap = execute(sessionResourceUsageCMD.toArray(new String[0]));
-            log.debug("Resource used: " + sessionResourceUsageMap);
-            if (StringUtil.hasLength(sessionResourceUsageMap)) {
-                String[] lines = sessionResourceUsageMap.split("\n");
-                for (String line : lines) {
-                    String[] resourceUsage = line.trim().replaceAll("\\s+", " ").split(" ");
-                    String fullName = resourceUsage[0];
-                    String[] resources = {resourceUsage[1], resourceUsage[2]};
-                    resourceUsages.put(fullName, resources);
-                }
-            }
-        } catch (IOException ex) {
-            // error or no session using any resources, return empty resourceUsages
-            log.debug("failed to query for metrics", ex);
-        }
-
-        return resourceUsages;
-    }
-
-    private List<String> getGPUUsage(String usageData) {
-        List<String> usage = new ArrayList<>();
-        if (StringUtil.hasLength(usageData)) {
-            String[] lines = usageData.split("\n");
-            for (String line : lines) {
-                if (line.contains("%")) {
-                    String[] segments = line.trim().split("\\|");
-                    if (segments.length > 3) {
-                        if (segments[3].contains("%")) {
-                            String util = segments[3].trim().split(" ")[0];
-                            if (util.contains("%")) {
-                                String mem = formatGPUMemoryUsage(segments[2].trim());
-                                usage.add(mem);
-                                usage.add(util);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // no GPU
-        if (usage.isEmpty()) {
-            usage.add(NONE);
-            usage.add(NONE);
-        }
-
-        return usage;
-    }
-
-    private String formatGPUMemoryUsage(String memoryData) {
-        String[] data = memoryData.split("/");
-        String data0 = data[0].trim();
-        if (data0.substring(data0.length() - 1).equalsIgnoreCase("B")) {
-            data0 = toCommonUnit(data0.substring(0, data0.length() - 1));
-        }
-
-        String data1 = data[1].trim();
-        if (data1.substring(data1.length() - 1).equalsIgnoreCase("B")) {
-            data1 = toCommonUnit(data1.substring(0, data1.length() - 1));
-        }
-        return data0 + " / " + data1;
-    }
-
     protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
         Map<String, String> jobExpiryTimes = new HashMap<>();
         List<String> jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
@@ -587,68 +433,6 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         return jobExpiryTimes;
-    }
-
-    private String getFullName(String line) {
-        String name = "";
-        String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
-        if (parts.length > 8) {
-            name = parts[parts.length - 2];
-        }
-
-        return name;
-    }
-
-    private String getUID(String line) {
-        String uid = "";
-        String[] parts = line.trim().replaceAll("\\s+", " ").split(" ");
-        if (parts.length > 8) {
-            uid = parts[parts.length - 1];
-        }
-
-        return uid;
-    }
-
-    private List<String> getSessionsCMD(String k8sNamespace, String forUserID, String sessionID) {
-        List<String> sessionsCMD = new ArrayList<String>();
-        sessionsCMD.add("kubectl");
-        sessionsCMD.add("get");
-        sessionsCMD.add("--namespace");
-        sessionsCMD.add(k8sNamespace);
-        sessionsCMD.add("pod");
-        if (forUserID != null) {
-            sessionsCMD.add("-l");
-            String labels = "canfar-net-userid=" + forUserID;
-            if (sessionID != null) {
-                labels = labels + ",canfar-net-sessionID=" + sessionID;
-            }
-
-            sessionsCMD.add(labels);
-        }
-        sessionsCMD.add("--no-headers=true");
-        sessionsCMD.add("-o");
-
-        String customColumns = "custom-columns=" +
-                               "SESSIONID:.metadata.labels.canfar-net-sessionID," +
-                               "USERID:.metadata.labels.canfar-net-userid," +
-                               "IMAGE:.spec.containers[0].image," +
-                               "TYPE:.metadata.labels.canfar-net-sessionType," +
-                               "STATUS:.status.phase," +
-                               "NAME:.metadata.labels.canfar-net-sessionName," +
-                               "STARTED:.status.startTime," +
-                               "DELETION:.metadata.deletionTimestamp," +
-                               "APPID:.metadata.labels.canfar-net-appID";
-        if (forUserID != null) {
-            customColumns = customColumns +
-                            ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
-                            "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
-                            "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia\\.com/gpu," +
-                            "FULLNAME:.metadata.name," +
-                            "UID:.metadata.ownerReferences[].uid";
-        }
-
-        sessionsCMD.add(customColumns);
-        return sessionsCMD;
     }
 
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
@@ -669,33 +453,6 @@ public abstract class SessionAction extends SkahaAction {
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
-    }
-
-    private List<String> getSessionResourceUsageCMD(String k8sNamespace, String forUserID) {
-        List<String> getSessionJobCMD = new ArrayList<String>();
-        getSessionJobCMD.add("kubectl");
-        getSessionJobCMD.add("--namespace");
-        getSessionJobCMD.add(k8sNamespace);
-        getSessionJobCMD.add("top");
-        getSessionJobCMD.add("pod");
-        getSessionJobCMD.add("-l");
-        getSessionJobCMD.add("canfar-net-userid=" + forUserID);
-        getSessionJobCMD.add("--no-headers=true");
-        getSessionJobCMD.add("--use-protocol-buffers=true");
-        return getSessionJobCMD;
-    }
-
-    private List<String> getSessionGPUUsageCMD(String k8sNamespace, String podName) {
-        List<String> getSessionGPUCMD = new ArrayList<String>();
-        getSessionGPUCMD.add("kubectl");
-        getSessionGPUCMD.add("--namespace");
-        getSessionGPUCMD.add(k8sNamespace);
-        getSessionGPUCMD.add("exec");
-        getSessionGPUCMD.add("-it");
-        getSessionGPUCMD.add(podName);
-        getSessionGPUCMD.add("--");
-        getSessionGPUCMD.add("nvidia-smi");
-        return getSessionGPUCMD;
     }
 
     protected String getAppJobName(String sessionID, String userID, String appID) throws
@@ -731,57 +488,6 @@ public abstract class SessionAction extends SkahaAction {
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
-    }
-
-    protected Session constructSession(String k8sOutput) throws IOException {
-        log.debug("line: " + k8sOutput);
-        String[] parts = k8sOutput.trim().replaceAll("\\s+", " ").split(" ");
-        String id = parts[0];
-        String userid = parts[1];
-        String image = parts[2];
-        String type = parts[3];
-        String status = parts[4];
-        String name = parts[5];
-        String startTime = parts[6];
-        String deletionTimestamp = parts[7];
-        String appID = parts[8];
-        if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
-            status = Session.STATUS_TERMINATING;
-        }
-        String host = K8SUtil.getHostName();
-        String connectURL = "not-applicable";
-
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
-        }
-        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            if (image.endsWith(":1.4")) {
-                // support alt web socket path for 1.4 carta
-                connectURL = SessionAction.getCartaURL(host, id, true);
-            } else {
-                connectURL = SessionAction.getCartaURL(host, id, false);
-            }
-        }
-        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid, this.skahaTld);
-        }
-        if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
-            connectURL = SessionAction.getContributedURL(host, id);
-        }
-
-        Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        session.setAppId(appID);
-
-        if (parts.length > 9) {
-            String requestedRAM = parts[9];
-            String requestedCPUCores = parts[10];
-            String requestedGPUCores = parts[11];
-            session.setRequestedRAM(toCommonUnit(requestedRAM));
-            session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
-            session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));
-        }
-
-        return session;
     }
 
 }
