@@ -82,6 +82,7 @@ import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.utils.PosixHelper;
@@ -116,8 +117,6 @@ public class PostAction extends SessionAction {
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
-
-    private static final String POSIX_DELIMITER = ";";
 
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
@@ -166,7 +165,8 @@ public class PostAction extends SessionAction {
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
-            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
+            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION)
+                                                         && sessionID == null)) {
                 throw new IllegalArgumentException("Missing parameter 'image'");
             }
         }
@@ -181,7 +181,7 @@ public class PostAction extends SessionAction {
                 }
 
                 Integer ram = getRamParam();
-                if (ram == null ) {
+                if (ram == null) {
                     ram = rc.getDefaultRAM(validatedType);
                 }
 
@@ -202,7 +202,7 @@ public class PostAction extends SessionAction {
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
-                sessionID = new RandomStringGenerator(8).getID();
+                this.sessionID = new RandomStringGenerator(8).getID();
 
                 int gpus = 0;
                 if (gpusParam != null) {
@@ -217,7 +217,7 @@ public class PostAction extends SessionAction {
                 }
 
                 ensureUserBase();
-                createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -297,8 +297,8 @@ public class PostAction extends SessionAction {
 
             if (StringUtil.hasText(errorOutput)) {
                 throw new IOException("Unable to create user home."
-                        + "\nError message from server: " + errorOutput
-                        + "\nOutput from command: " + commandOutput);
+                                      + "\nError message from server: " + errorOutput
+                                      + "\nOutput from command: " + commandOutput);
             } else {
                 log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
@@ -314,7 +314,8 @@ public class PostAction extends SessionAction {
 
     /**
      * Override to test injected quota value without processing an entire Request.
-     * @return  String quota number in GB, or null if not configured.
+     *
+     * @return String quota number in GB, or null if not configured.
      */
     String getDefaultQuota() {
         return K8SUtil.getDefaultQuota();
@@ -451,10 +452,10 @@ public class PostAction extends SessionAction {
         getRenewJobNamesCmd.add("-o");
 
         String customColumns = "custom-columns=" +
-                "NAME:.metadata.name," +
-                "UID:.metadata.uid," +
-                "STATUS:.status.active," +
-                "START:.status.startTime";
+                               "NAME:.metadata.name," +
+                               "UID:.metadata.uid," +
+                               "STATUS:.status.active," +
+                               "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
         return getRenewJobNamesCmd;
@@ -528,10 +529,10 @@ public class PostAction extends SessionAction {
         for (Session session : sessions) {
             log.debug("checking session: " + session);
             if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
-                    !TYPE_DESKTOP_APP.equals(session.getType())) {
+                !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                        status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
@@ -543,8 +544,8 @@ public class PostAction extends SessionAction {
         }
     }
 
-    public void createSession(String sessionID, String type, String image, String name,
-                              Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs)
+    public void createSession(String type, String image, String name, Integer cores, Integer ram, Integer gpus,
+                              String cmd, String args, List<String> envs)
             throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
@@ -555,8 +556,7 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
         String secretName = createPosixMappingSecret(sessionID);
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
-                getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -594,7 +594,6 @@ public class PostAction extends SessionAction {
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
 
-
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessPriority = getHeadlessPriority();
@@ -607,7 +606,8 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
+                                         Integer.toString(posixPrincipal.getUidNumber()));
         if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
@@ -627,8 +627,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
-        String[] launchCmd = new String[] {
-                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+        String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
@@ -640,8 +639,7 @@ public class PostAction extends SessionAction {
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = new String[] {
-                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
         }
@@ -652,19 +650,23 @@ public class PostAction extends SessionAction {
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
             ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = new String[] {
-                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
+    }
+
+    private String generateToken(String sessionID) throws Exception {
+        return SkahaAction.getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
     }
 
     /**
      * Attach a desktop application.
      * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
      * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
-     * @param image         Container image name.
-     * @throws Exception    For any unexpected errors.
+     *
+     * @param image Container image name.
+     * @throws Exception For any unexpected errors.
      */
     public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
                                  Integer limitRAM) throws Exception {
@@ -676,10 +678,10 @@ public class PostAction extends SessionAction {
                 "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
                 "--no-headers=true",
                 "-o", "custom-columns=" +
-                "IPADDR:.status.podIP," +
-                "DT:.metadata.deletionTimestamp," +
-                "TYPE:.metadata.labels.canfar-net-sessionType," +
-                "NAME:.metadata.name"};
+                      "IPADDR:.status.podIP," +
+                      "DT:.metadata.deletionTimestamp," +
+                      "TYPE:.metadata.labels.canfar-net-sessionType," +
+                      "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -694,7 +696,7 @@ public class PostAction extends SessionAction {
                 }
             }
             if (parts.length > 1 && parts[1].trim().equals(NONE) &&
-                    SESSION_TYPE_DESKTOP.equals(parts[2])) {
+                SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
@@ -711,9 +713,8 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
-        final String secretName = createPosixMappingSecret(sessionID);
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha :
-                getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+        final String secretName = PosixHelper.getPosixMapperSecretName(sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
@@ -761,8 +762,9 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
         launchString = setConfigValue(launchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
-        if (StringUtil.hasText(supplementalGroups))
+        if (StringUtil.hasText(supplementalGroups)) {
             launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
@@ -920,7 +922,7 @@ public class PostAction extends SessionAction {
                 posixMappingSecretName,
                 "--from-file=" + uidMappingFile.getAbsolutePath(),
                 "--from-file=" + gidMappingFile.getAbsolutePath()
-                };
+        };
 
         final String createResult = execute(createCmd);
         log.debug("create secret result: " + createResult);
@@ -932,22 +934,21 @@ public class PostAction extends SessionAction {
         final StringBuilder userEntryBuilder = new StringBuilder();
         try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
                      posixMapperConfiguration.getPosixMapperClient().getUserMap()) {
-            posixPrincipalIterator.forEachRemaining(pp -> userEntryBuilder.append(
-                    String.format("%s:x:%d:%d:::\n", pp.username,
-                                  pp.getUidNumber(),
-                                  pp.getUidNumber())));
+            posixPrincipalIterator.forEachRemaining(pp -> userEntryBuilder.append(PosixHelper.uidMapping(pp)));
         }
 
         final String userEntriesString = userEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
-            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
+        if (userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER) > 0) {
+            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER));
         } else {
             return userEntryBuilder.toString();
         }
     }
 
     private String getSupplementalGroupsList() throws Exception {
-        if (skahaCallbackFlow) return callbackSupplementalGroups;
+        if (skahaCallbackFlow) {
+            return callbackSupplementalGroups;
+        }
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
             return buildGroupUriList(groupCredentials)
@@ -959,29 +960,11 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private String getGroupEntries() throws Exception {
-        final StringBuilder groupEntryBuilder = new StringBuilder();
-        try (final ResourceIterator<PosixGroup> posixGroupIterator =
-                     posixMapperConfiguration.getPosixMapperClient().getGroupMap()) {
-            posixGroupIterator.forEachRemaining(pg -> groupEntryBuilder.append(
-                    String.format("%s:x:%d:\n",
-                                  pg.getGroupURI().getURI().getQuery(),
-                                  pg.getGID())));
-        }
-
-        final String userEntriesString = groupEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER) > 0) {
-            return groupEntryBuilder.substring(0, userEntriesString.lastIndexOf(PostAction.POSIX_DELIMITER));
-        } else {
-            return groupEntryBuilder.toString();
-        }
-    }
-
     private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
         return toGIDs(groupCredentials.iterator().next().stream()
-                .map(Group::getID)
-                .collect(Collectors.toList())
-        );
+                                      .map(Group::getID)
+                                      .collect(Collectors.toList())
+                     );
     }
 
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
@@ -1058,7 +1041,7 @@ public class PostAction extends SessionAction {
         }
         return sb.toString();
     }
-    
+
     private String getHeadlessPriority() {
         if (skahaPriorityHeadlessGroup == null) {
             return "";
@@ -1073,5 +1056,4 @@ public class PostAction extends SessionAction {
             return "";
         }
     }
-
 }

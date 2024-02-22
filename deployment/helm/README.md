@@ -252,8 +252,15 @@ deployment:
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
 
-    # The group name to verify users against for permission to use the Science Platform.
+    # The group name to verify users against for permission to use the Science Platform.  Group must exist in the group provider.
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+
+    # Group for users to preempt headless jobs.  Group must exist in the group provider.
+    headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+
+    # Array of groups allowed to set the logging level.  Group must exist in the group provider.
+    loggingGroups:
+      - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"

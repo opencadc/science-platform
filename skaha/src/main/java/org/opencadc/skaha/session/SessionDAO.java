@@ -10,9 +10,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -21,7 +23,10 @@ public class SessionDAO {
 
     private static final String NONE = "<none>";
 
-    public static List<String> getSessionsCMD(final String k8sNamespace, String forUserID, String sessionID) {
+    // Ordered dictionary of columns requested from Kubernetes
+
+    static List<String> getSessionsCMD(final String k8sNamespace, final String forUserID,
+                                       final String sessionID) {
         final List<String> sessionsCMD = new ArrayList<>();
         sessionsCMD.add("kubectl");
         sessionsCMD.add("get");
@@ -39,24 +44,12 @@ public class SessionDAO {
         sessionsCMD.add("--no-headers=true");
         sessionsCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-                "SESSIONID:.metadata.labels.canfar-net-sessionID," +
-                "USERID:.metadata.labels.canfar-net-userid," +
-                "IMAGE:.spec.containers[0].image," +
-                "TYPE:.metadata.labels.canfar-net-sessionType," +
-                "STATUS:.status.phase," +
-                "NAME:.metadata.labels.canfar-net-sessionName," +
-                "STARTED:.status.startTime," +
-                "DELETION:.metadata.deletionTimestamp," +
-                "APPID:.metadata.labels.canfar-net-appID";
-        if (forUserID != null) {
-            customColumns = customColumns +
-                    ",REQUESTEDRAM:.spec.containers[0].resources.requests.memory," +
-                    "REQUESTEDCPU:.spec.containers[0].resources.requests.cpu," +
-                    "REQUESTEDGPU:.spec.containers[0].resources.requests.nvidia\\.com/gpu," +
-                    "FULLNAME:.metadata.name," +
-                    "UID:.metadata.ownerReferences[].uid";
-        }
+        final String customColumns = "custom-columns="
+                                     + Arrays.stream(CustomColumns.values())
+                                             .filter(customColumn -> !customColumn.forUserOnly || forUserID != null)
+                                             .map(customColumn -> String.format("%s:%s", customColumn.name(),
+                                                                                customColumn.columnDefinition))
+                                             .collect(Collectors.joining(","));
 
         sessionsCMD.add(customColumns);
         return sessionsCMD;
@@ -91,7 +84,7 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    private static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
+    protected static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
             throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> sessionsCMD = SessionDAO.getSessionsCMD(k8sNamespace, forUserID, sessionID);
@@ -148,8 +141,8 @@ public class SessionDAO {
 
                         // if this session usages GPU, get the GPU usage
                         if (StringUtil.hasText(session.getRequestedGPUCores()) &&
-                                !NONE.equals(session.getRequestedGPUCores()) &&
-                                Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
+                            !NONE.equals(session.getRequestedGPUCores()) &&
+                            Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
                             List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
                             String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
                             List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
@@ -291,6 +284,7 @@ public class SessionDAO {
 
         return resourceUsages;
     }
+
     private static List<String> getSessionResourceUsageCMD(String k8sNamespace, String forUserID) {
         final List<String> getSessionJobCMD = new ArrayList<>();
         getSessionJobCMD.add("kubectl");
@@ -331,8 +325,8 @@ public class SessionDAO {
         getSessionJobCMD.add("-o");
 
         String customColumns = "custom-columns="
-                + "UID:.metadata.uid,"
-                + "EXPIRY:.spec.activeDeadlineSeconds";
+                               + "UID:.metadata.uid,"
+                               + "EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -354,53 +348,119 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    private static Session constructSession(String k8sOutput, final String topLevelDirectory) throws IOException {
+    static Session constructSession(String k8sOutput, final String topLevelDirectory) throws IOException {
         LOGGER.debug("line: " + k8sOutput);
-        String[] parts = k8sOutput.trim().replaceAll("\\s+", " ").split(" ");
-        String id = parts[0];
-        String userid = parts[1];
-        String image = parts[2];
-        String type = parts[3];
-        String status = parts[4];
-        String name = parts[5];
-        String startTime = parts[6];
-        String deletionTimestamp = parts[7];
-        String appID = parts[8];
-        if (deletionTimestamp != null && !NONE.equals(deletionTimestamp)) {
-            status = Session.STATUS_TERMINATING;
-        }
-        String host = K8SUtil.getHostName();
-        String connectURL = "not-applicable";
+        final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
+
+        // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
+        // are in a space-delimited array.
+        final String[] parts = k8sOutput.trim().split(" {3,}");
+
+        String id = parts[allColumns.indexOf(CustomColumns.SESSION_ID)];
+        String userid = parts[allColumns.indexOf(CustomColumns.USERID)];
+        String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
+        String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
+        String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
+        final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
+                              ? Session.STATUS_TERMINATING
+                              : parts[allColumns.indexOf(CustomColumns.STATUS)];
+        final String host = K8SUtil.getHostName();
+        final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
             connectURL = SessionAction.getVNCURL(host, id);
-        }
-        if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+        } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
             if (image.endsWith(":1.4")) {
                 // support alt web socket path for 1.4 carta
                 connectURL = SessionAction.getCartaURL(host, id, true);
             } else {
                 connectURL = SessionAction.getCartaURL(host, id, false);
             }
-        }
-        if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+        } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionAction.getNotebookURL(host, id, userid, topLevelDirectory);
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
             connectURL = SessionAction.getContributedURL(host, id);
+        } else {
+            connectURL = "not-applicable";
         }
 
-        Session session = new Session(id, userid, image, type, status, name, startTime, connectURL);
-        session.setAppId(appID);
+        final Session session = new Session(id,
+                                            userid,
+                                            parts[allColumns.indexOf(CustomColumns.RUN_AS_UID)],
+                                            parts[allColumns.indexOf(CustomColumns.RUN_AS_GID)],
+                                            SessionDAO.fromStringArray(parts[allColumns.indexOf(
+                                                    CustomColumns.SUPPLEMENTAL_GROUPS)]),
+                                            image,
+                                            type,
+                                            status,
+                                            parts[allColumns.indexOf(CustomColumns.NAME)],
+                                            parts[allColumns.indexOf(CustomColumns.STARTED)],
+                                            connectURL,
+                                            parts[allColumns.indexOf(CustomColumns.APP_ID)]);
 
-        if (parts.length > 9) {
-            String requestedRAM = parts[9];
-            String requestedCPUCores = parts[10];
-            String requestedGPUCores = parts[11];
-            session.setRequestedRAM(toCommonUnit(requestedRAM));
-            session.setRequestedCPUCores(toCoreUnit(requestedCPUCores));
-            session.setRequestedGPUCores(toCoreUnit(requestedGPUCores));
+        // Check if all columns were requested (set by forUserId)
+        final int requestedRamIndex = allColumns.indexOf(CustomColumns.REQUESTED_RAM);
+        if (parts.length > requestedRamIndex) {
+            session.setRequestedRAM(toCommonUnit(parts[requestedRamIndex]));
+        }
+
+        final int requestedCPUIndex = allColumns.indexOf(CustomColumns.REQUESTED_CPU);
+        if (parts.length > requestedCPUIndex) {
+            session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
+        }
+
+        final int requestedGPUIndex = allColumns.indexOf(CustomColumns.REQUESTED_GPU);
+        if (parts.length > requestedGPUIndex) {
+            session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
         }
 
         return session;
+    }
+
+    /**
+     * Example input is [4444 5555 6666].  Convert to an actual integer array.
+     *
+     * @param inputArray Kubernetes output of an array of integers.
+     * @return integer array, never null.
+     */
+    private static Integer[] fromStringArray(final String inputArray) {
+        if (inputArray.equals(SessionDAO.NONE)) {
+            return new Integer[0];
+        } else {
+            final Object[] parsedArray =
+                    Arrays.stream(inputArray.replace("[", "").replace("]", "")
+                                          .trim().split(" "))
+                          .filter(StringUtil::hasText)
+                          .map(Integer::parseInt).toArray();
+            return Arrays.copyOf(parsedArray, parsedArray.length, Integer[].class);
+        }
+    }
+
+    private enum CustomColumns {
+        SESSION_ID(".metadata.labels.canfar-net-sessionID", false),
+        USERID(".metadata.labels.canfar-net-userid", false),
+        RUN_AS_UID(".spec.securityContext.runAsUser", false),
+        RUN_AS_GID(".spec.securityContext.runAsGroup", false),
+        SUPPLEMENTAL_GROUPS(".spec.securityContext.supplementalGroups", false),
+        IMAGE(".spec.containers[0].image", false),
+        TYPE(".metadata.labels.canfar-net-sessionType", false),
+        STATUS(".status.phase", false),
+        NAME(".metadata.labels.canfar-net-sessionName", false),
+        STARTED(".status.startTime", false),
+        DELETION(".metadata.deletionTimestamp", false),
+        APP_ID(".metadata.labels.canfar-net-appID", false),
+        REQUESTED_RAM(".spec.containers[0].resources.requests.memory", true),
+        REQUESTED_CPU(".spec.containers[0].resources.requests.cpu", true),
+        REQUESTED_GPU(".spec.containers[0].resources.requests.nvidia\\.com/gpu", true),
+        FULL_NAME(".metadata.name", true),
+        UID(".metadata.ownerReferences[].uid", true);
+
+        final String columnDefinition;
+        final boolean forUserOnly;
+
+        CustomColumns(String columnDefinition, boolean forUserOnly) {
+            this.columnDefinition = columnDefinition;
+            this.forUserOnly = forUserOnly;
+        }
     }
 }

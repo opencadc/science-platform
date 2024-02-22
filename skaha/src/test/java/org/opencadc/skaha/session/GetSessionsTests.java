@@ -72,6 +72,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,13 +93,16 @@ public class GetSessionsTests {
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
-    
+
+
     private static final String K8S_LIST =
-        "pud05npw   majorb  imageID carta      Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n" +
-        "e37lmx4m   majorb  imageID desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n" +
-        "gspc0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
-        "abcd0n8m   majorb  imageID notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
-        "defg0n8m   majorb  imageID notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n";
+        "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n" +
+        "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n" +
+        "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
+        "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
+        "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n" +
+        "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n" +
+        "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
     public GetSessionsTests() {
     }
@@ -117,6 +121,9 @@ public class GetSessionsTests {
             Assert.assertEquals("session count", sessions1.size(), sessions2.size());
             for (Session s : sessions1) {
                 Assert.assertTrue(s.getId(), sessions2.contains(s));
+
+                // All start times should be parsable.
+                Instant.parse(s.getStartTime());
             }
             
         } catch (Throwable t) {
@@ -141,17 +148,12 @@ public class GetSessionsTests {
     }
     
     @Test
-    public void testFilterStatus() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, null, "Running");
-            for (Session s : filtered) {
-                Assert.assertEquals(s.getId(), "Running", s.getStatus());
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+    public void testFilterStatus() throws Exception {
+        GetAction get = new TestGetAction();
+        List<Session> sessions = get.getAllSessions(null);
+        List<Session> filtered = get.filter(sessions, null, "Running");
+        for (Session s : filtered) {
+            Assert.assertEquals(s.getId(), "Running", s.getStatus());
         }
     }
     
@@ -181,7 +183,7 @@ public class GetSessionsTests {
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = constructSession(line);
+                Session session = SessionDAO.constructSession(line, this.skahaTld);
                 sessions.add(session);
             }
             return sessions;

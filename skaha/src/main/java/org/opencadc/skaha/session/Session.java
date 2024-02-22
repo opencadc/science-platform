@@ -66,7 +66,11 @@
  */
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.auth.PosixPrincipal;
 import org.apache.log4j.Logger;
+
+import java.lang.reflect.Array;
+import java.util.Arrays;
 
 /**
  * @author majorb
@@ -81,16 +85,19 @@ public class Session {
     public static final String STATUS_TERMINATING = "Terminating";
     public static final String STATUS_SUCCEEDED = "Succeeded";
     
-    private String id;
-    private String userid;
-    private String appid;
-    private String image;
-    private String type;
-    private String status;
-    private String name;
-    private String startTime;
+    private final String id;
+    private final String userid;
+    private final String runAsUID;
+    private final String runAsGID;
+    private final Integer[] supplementalGroups;
+    private final String appid;
+    private final String image;
+    private final String type;
+    private final String status;
+    private final String name;
+    private final String startTime;
     private String expiryTime;            // in seconds
-    private String connectURL;
+    private final String connectURL;
     private String requestedRAM;
     private String requestedCPUCores;
     private String requestedGPUCores;
@@ -99,18 +106,29 @@ public class Session {
     private String cpuCoresInUse;
     private String gpuUtilization;
 
-    public Session(String id, String userid, String image, String type, String status, String name, String startTime, String connectURL) {
+    public Session(String id, String userid, String runAsUID, String runAsGID, Integer[] supplementalGroups,
+                   String image, String type, String status, String name, String startTime, String connectURL,
+                   String appID) {
         if (id == null) {
-            throw new IllegalArgumentException("id is requried");
+            throw new IllegalArgumentException("id is required");
         }
         this.id = id;
         this.userid = userid;
+        this.runAsUID = runAsUID;
+        this.runAsGID = runAsGID;
         this.image = image;
         this.type = type;
         this.status = status;
         this.name = name;
         this.startTime = startTime;
         this.connectURL = connectURL;
+        this.appid = appID;
+
+        if (supplementalGroups != null) {
+            this.supplementalGroups = Arrays.copyOf(supplementalGroups, supplementalGroups.length);
+        } else {
+            this.supplementalGroups = new Integer[0];
+        }
     }
     
     public String getId() {
@@ -212,9 +230,23 @@ public class Session {
     public String getAppId() {
         return appid;
     }
-    
-    public void setAppId(String appId) {
-        this.appid = appId;
+
+    /**
+     * See the array of Supplemental Group IDs.  To ensure the integrity of this Session's Supplemental groups, this
+     * method will return a copy.
+     * @return  Integer array, never null.
+     */
+    public Integer[] getSupplementalGroups() {
+        return Arrays.copyOf(this.supplementalGroups, this.supplementalGroups.length);
+    }
+
+
+    public PosixPrincipal getPosixPrincipal() {
+        final PosixPrincipal posixPrincipal = new PosixPrincipal(Integer.parseInt(this.runAsUID));
+        posixPrincipal.username = this.userid;
+        posixPrincipal.defaultGroup = Integer.parseInt(this.runAsGID);
+
+        return posixPrincipal;
     }
     
     @Override

@@ -36,7 +36,11 @@ spec:
       initContainers:
       - name: init-users-groups
         image: ${software.imageid}
+        # image: curlimages/curl:8.6.0
         command: ["/init-users-groups/init-users-groups.sh"]
+        # args:
+        # - ${POSIX_UID_MAPPER_URL}
+        # - ${POSIX_GID_MAPPER_URL}
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -47,7 +51,7 @@ spec:
         - mountPath: "/posix-mapping"
           name: posix-mapping
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
