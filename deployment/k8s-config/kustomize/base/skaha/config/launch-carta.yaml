@@ -53,7 +53,7 @@ spec:
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
-        - /carta/skaha-carta /arc /arc/projects
+        - /skaha-system/skaha-carta.sh /arc /arc/projects
         imagePullPolicy: Always
         resources:
           requests:
@@ -72,6 +72,8 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
+        - mountPath: "/skaha-system"
+          name: start-desktop
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -95,6 +97,10 @@ spec:
           readOnly: false          
       - name: scratch-dir
         emptyDir: {}
+      - name: start-desktop
+        configMap:
+          name: start-desktop
+          defaultMode: 0777
       - name: sssd-dir
         hostPath:
           path: /var/lib/ubernetes
