@@ -35,9 +35,9 @@ deployment:
     # Group for users to preempt headless jobs.
     headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
-    # Array of groups allowed to set the logging level.
-    loggingGroups:
-      - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
+    # loggingGroups:
+    #   - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://example.org/posix-mapper"
