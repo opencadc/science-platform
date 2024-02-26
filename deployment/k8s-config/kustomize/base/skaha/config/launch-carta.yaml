@@ -73,7 +73,7 @@ spec:
           name: frontend-port
         volumeMounts:
         - mountPath: "/skaha-system"
-          name: start-desktop
+          name: start-carta
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -97,7 +97,7 @@ spec:
           readOnly: false          
       - name: scratch-dir
         emptyDir: {}
-      - name: start-desktop
+      - name: start-carta
         configMap:
           name: start-desktop
           defaultMode: 0777
