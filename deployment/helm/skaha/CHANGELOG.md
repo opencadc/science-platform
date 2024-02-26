@@ -1,4 +1,10 @@
-# CHANGELOG for Skaha User Session API (0.3.6)
+# CHANGELOG for Skaha User Session API (Chart 0.4.0)
+
+## 2024.02.26
+- Fix multiple users in Desktop session Applications
+- Add `loggingGroup` access to permit log level modification
+- Externalize the CARTA startup script to better diagnose issues
+- Bug fixes around user home directory allocations
 
 ## 2024.01.12 (0.3.6)
 - Desktop sessions have trusted API access to the Skaha service

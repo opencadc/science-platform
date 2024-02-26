@@ -255,10 +255,13 @@ deployment:
     # The group name to verify users against for permission to use the Science Platform.  Group must exist in the group provider.
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
-    # Group for users to preempt headless jobs.  Group must exist in the group provider.
+    # Set to an administrative group.  Used to determine if the current user can bypass Harbor image validation.
+    adminsGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+
+    # Group for users to preempt headless jobs.  Group must exist in the group provider. (Optional)
     headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
-    # Array of groups allowed to set the logging level.  Group must exist in the group provider.
+    # Array of groups allowed to set the logging level.  Group must exist in the group provider. (Optional)
     loggingGroups:
       - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
 
