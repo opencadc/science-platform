@@ -1,0 +1,7 @@
+        <Menu>
+            <Name>(PROJECT)</Name>
+            <Directory>(DIRECTORY)</Directory>
+            <Include>
+                <Category>(CATEGORY)</Category>
+            </Include>
+        </Menu>

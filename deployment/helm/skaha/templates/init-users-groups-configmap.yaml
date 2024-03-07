@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: init-users-groups-config
+  namespace: {{ .Values.skahaWorkload.namespace }}
+data:
+  {{- (.Files.Glob "init-users-groups-config/*").AsConfig | nindent 2 }}

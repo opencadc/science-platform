@@ -1,0 +1,122 @@
+kubernetesClusterDomain: cluster.local
+
+# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+replicaCount: 1
+
+# It's best to keep these set as such, unless you're willing to change these in several places.
+skaha:
+  namespace: skaha-system
+
+# Skaha web service deployment
+deployment:
+  hostname: example.org
+  cavern:
+    image: images.opencadc.org/platform/cavern:0.6.4
+    imagePullPolicy: Always
+
+    # How cavern identifies itself.
+    resourceID: "ivo://example.org/cavern"
+
+    # Set the Registry URL pointing to the desired registry (https:// URL)
+    registryURL: https://spsrc27.iaa.csic.es/reg
+
+    # The Resource ID of the Service that contains the Posix Mapping information
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
+
+    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
+    oidcURI: https://ska-iam.stfc.ac.uk/
+
+    # ID (URI) of the GMS Service.
+    gmsID: ivo://skao.int/gms
+
+    # filesystem:
+      # persistent data directory in container
+      # dataDir: "/data"
+
+      # RELATIVE path to the node/file content that could be mounted in other containers
+      # This will be used in a `dataDir`/`subPath` manner to remove shared data from the root folder.
+      # subPath: "cavern"
+
+      # The adminUsername is required to be set whomever has admin access over the
+      # filesystem.dataDir above.
+      # rootOwner:
+        # adminUsername: "root"
+        # username: "root"
+        # uid: 1000
+        # gid: 1000
+
+      # (optional) base directory exposed for sshfs mounts
+      # sshfs:
+      #   serverBase: {server}[:{port}]:{path}
+
+    # The IdentityManager class handling authentication.  This should generally be left alone
+    identityManagerClass: org.opencadc.auth.StandardIdentityManager
+
+    # For the UWS database.
+    uws:
+      db:
+        username: "uwsuser"
+        password: "uwspwd"
+        database: "uws"
+        schema: "uws"
+        maxActive: 2
+        runUID: 999  # Postgres User default in the postgres:13 image
+
+    # Optional rename of the application from the default "cavern".
+    applicationName: "cavern"
+
+    # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
+    # Don't forget to update your registry entries!
+    endpoint: "/cavern"
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # cavern-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+
+# Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
+# service:
+#   cavern:
+#     extraPorts:
+  #   - port: 5555
+  #     protocol: TCP
+  #     name: java-debug
+
+# Set these appropriately to match your Persistent Volume Claim labels.
+storage:
+  service:
+    spec:
+      # YAML for service mounted storage.
+      # Example is the persistentVolumeClaim below.  Do not uncomment this
+      # or Helm will use it as the default, even if a different spec
+      # is specified.
+      # persistentVolumeClaim:
+      #   claimName: skaha-pvc

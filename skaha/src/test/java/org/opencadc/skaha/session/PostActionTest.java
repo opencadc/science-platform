@@ -73,10 +73,8 @@ import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.UUID;
 
 
 public class PostActionTest {
@@ -88,8 +86,13 @@ public class PostActionTest {
     public void allocateUserError() throws Exception {
         final PostAction testSubject = new PostAction() {
             @Override
-            String getUserID() {
+            protected String getUsername() {
                 return "TESTUSER";
+            }
+
+            @Override
+            protected int getUID() {
+                return 997;
             }
 
             @Override
@@ -120,14 +123,20 @@ public class PostActionTest {
     public void allocateUser() throws Exception {
         final PostAction testSubject = new PostAction() {
             @Override
-            String getUserID() {
+            protected String getUsername() {
                 return "TESTUSER";
+            }
+
+            @Override
+            protected int getUID() {
+                return 997;
             }
 
             @Override
             String getDefaultQuota() {
                 return "14";
             }
+
 
             @Override
             void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)

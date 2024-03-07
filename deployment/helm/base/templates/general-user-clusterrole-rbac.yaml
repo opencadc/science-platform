@@ -1,0 +1,95 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: general-user-clusterrole
+  labels:
+  {{- include "base.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+  # basic actions for pods
+- apiGroups:
+  - ""
+  resources: 
+  - pods
+  verbs: 
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+  - deletecollection
+- apiGroups:
+  - ""
+  resources: 
+  - pods/log
+  verbs: 
+  - get
+- apiGroups:
+  - ""
+  resources: 
+  - pods/exec
+  verbs: 
+  - create
+- apiGroups:
+  - metrics.k8s.io
+  resources: 
+  - pods
+  verbs: 
+  - get
+  - list
+  - watch
+# get events in namespace
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+# services
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# secrets, configmaps, PVCs
+- apiGroups: [""]
+  resources: ["secrets", "configmaps", "persistentvolumeclaims"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# read-only endpoints access (for e.g. kubectl describe ingress)
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch"]
+# deployments, statefulsets
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# jobs
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# ingress rules
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# Traefik IngressRoute and Middleware
+- apiGroups: ["traefik.containo.us", "traefik.io"]
+  resources: ["ingressroutes", "ingressroutetcps", "middlewares"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# Allow users to protect their apps against unavailability with poddisruptionbudget (https://github.com/kubernetes/kubernetes/issues/50767)
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+# autoscaling - HPA
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "deletecollection"]
+
+  # Error from server (Forbidden): error when creating "/tmp/a57952b3-beb9-4e4e-a20b-38d42cc48276": jobs.batch is forbidden: User "system:serviceaccount:skaha-system:skaha" cannot create resource "jobs" in API group "batch" in the namespace "skaha-workload": RBAC: clusterrole.rbac.authorization.k8s.io "skaha-nodes-namespaces-clusterrole" not found

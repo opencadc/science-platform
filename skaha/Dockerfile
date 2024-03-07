@@ -4,7 +4,7 @@ FROM images.opencadc.org/library/cadc-tomcat:1
 RUN dnf -y install which
 
 # PAM LDAP access
-RUN dnf -y install sssd-client acl 
+RUN dnf -y install acl
 
 # install docker
 RUN dnf -y install docker
@@ -23,11 +23,6 @@ RUN set -x && \
     \
     # Basic check it works.
     kubectl version --client
-
-# Install kubectl
-#RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.22.13/bin/linux/amd64/kubectl && \
-#  chmod +x /usr/bin/kubectl && \
-#  kubectl version --client
 
 COPY build/libs/skaha.war /usr/share/tomcat/webapps/
 

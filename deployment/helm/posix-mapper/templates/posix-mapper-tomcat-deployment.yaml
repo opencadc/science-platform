@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: posix-mapper-tomcat
+  name: posix-mapper-tomcat
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: posix-mapper-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: posix-mapper-tomcat
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - image: {{ .Values.deployment.posixMapper.image }}
+        imagePullPolicy: {{ .Values.deployment.posixMapper.imagePullPolicy }}
+        name: posix-mapper-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.posixMapper.resources.requests.memory }}
+            cpu: {{ .Values.deployment.posixMapper.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.posixMapper.resources.limits.memory }}
+            cpu: {{ .Values.deployment.posixMapper.resources.limits.cpu }}
+        {{- with .Values.deployment.posixMapper.extraEnv }}
+        env:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.posixMapper.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts: 
+        - mountPath: "/config"
+          name: config-volume
+        {{- with .Values.deployment.posixMapper.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: posix-mapper-config
+      {{- with .Values.deployment.posixMapper.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

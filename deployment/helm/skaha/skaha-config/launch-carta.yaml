@@ -1,0 +1,123 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      ${skaha.schedulegpu}
+      imagePullSecrets:
+      - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      - name: init-users-groups
+        image: ${software.imageid}
+        command: ["/init-users-groups/init-users-groups.sh"]
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/init-users-groups"
+          name: init-users-groups
+        - mountPath: "/posix-mapping"
+          name: posix-mapping
+        securityContext:
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        securityContext:
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
+        image: ${software.imageid}
+        command: ["/bin/sh", "-c"]
+        args:
+        - /skaha-system/skaha-carta.sh ${SKAHA_TLD} ${SKAHA_TLD}/projects
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "5Gi"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            ephemeral-storage: "5Gi"
+        ports:
+        - containerPort: 5901
+          protocol: TCP
+          name: websocket-port
+        - containerPort: 6901
+          protocol: TCP
+          name: frontend-port
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-carta
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc  
+      - name: scratch-dir
+        emptyDir: {}
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: start-carta
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+      - name: posix-mapping
+        secret:
+          defaultMode: 420
+          secretName: ${POSIX_MAPPING_SECRET}

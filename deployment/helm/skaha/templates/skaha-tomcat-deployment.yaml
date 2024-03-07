@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: skaha-tomcat
+  name: skaha-tomcat
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: skaha-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: skaha-tomcat
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      initContainers:
+      - name: init-skaha-service
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'mkdir -p ${SKAHA_TLD}/home && mkdir -p ${SKAHA_TLD}/projects']  # Expected to have /arc mounted
+        volumeMounts:
+        - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
+          name: cavern-volume
+          subPath: cavern
+        env:
+        - name: SKAHA_TLD
+          value: "{{ .Values.deployment.skaha.skahaTld }}"
+      containers:
+      - env: 
+        - name: skaha.hostname
+          value: "{{ .Values.deployment.hostname }}"
+        - name: SKAHA_TLD
+          value: "{{ .Values.deployment.skaha.skahaTld }}"  
+        - name: skaha.homedir
+          value: "{{ .Values.deployment.skaha.skahaTld }}/home"
+        - name: skaha.namespace
+          value: "{{ .Values.skahaWorkload.namespace }}"
+        - name: skaha.maxusersessions
+          value: "{{ .Values.deployment.skaha.maxUserSessions }}"
+        - name: skaha.sessionexpiry
+          value: "{{ .Values.deployment.skaha.sessionExpiry }}"
+        - name: skaha.defaultquotagb
+          value: "{{ .Values.deployment.skaha.defaultQuotaGB }}"
+        - name: skaha.harborhosts
+          value: "{{ .Values.deployment.skaha.registryHosts }}"
+        - name: skaha.usersgroup
+          value: "{{ .Values.deployment.skaha.usersGroup }}"
+        - name: skaha.headlessgroup
+          value: "{{ .Values.deployment.skaha.headlessGroup }}"
+        - name: skaha.adminsgroup
+          value: "{{ .Values.deployment.skaha.adminsGroup }}"
+        - name: skaha.posixmapper.resourceid
+          value: "{{ .Values.deployment.skaha.posixMapperResourceID }}"
+        {{- with .Values.deployment.skaha.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        image: {{ .Values.deployment.skaha.image }}
+        imagePullPolicy: {{ .Values.deployment.skaha.imagePullPolicy }}
+        name: skaha-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.skaha.resources.requests.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.skaha.resources.limits.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.limits.cpu }}
+        ports: 
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.skaha.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: "/add-user-config"
+          name: add-user-config
+        - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
+          name: cavern-volume
+          # This subpath needs to match the subpath in Cavern's deployment.  If that one is configurable, so must this one be!
+          subPath: cavern
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        securityContext:
+          runAsUser: 0
+      priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
+      serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config
+      - name: add-user-config
+        configMap:
+          name: add-user-config
+      - name: cavern-volume
+        {{- toYaml .Values.storage.service.spec | nindent 8 }}
+      {{- with .Values.deployment.skaha.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

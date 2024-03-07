@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-uws-postgres
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-uws-postgres
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-uws-postgres
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.deployment.cavern.uws.db.runUID }}
+      containers:
+        - name: postgres
+          image: postgres:13
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432  # Exposes container port
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-uws-postgres-config
+          volumeMounts:
+            - mountPath: /docker-entrypoint-initdb.d
+              name: postgresinit
+            {{- if .Values.deployment.cavern.uws.db.storage }}
+            - mountPath: /var/lib/postgresql/data
+              name: postgresdb
+            {{- end }}
+      volumes:
+        {{- if .Values.deployment.cavern.uws.db.storage }}
+        - name: postgresdb
+          {{- toYaml .Values.deployment.cavern.uws.db.storage.spec | nindent 10 }}
+        {{- end }}
+        - name: postgresinit
+          configMap:
+            name: {{ .Release.Name }}-uws-postgres-init

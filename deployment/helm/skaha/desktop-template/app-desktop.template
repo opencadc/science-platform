@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=(VERSION)
+Name=(SHORTNAME)
+Comment=(NAME)
+Keywords=(NAME)
+Exec=(EXECUTABLE)/(NAME).sh
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/(SHORTNAME).svg
+Type=Application
+Categories=(CATEGORY);

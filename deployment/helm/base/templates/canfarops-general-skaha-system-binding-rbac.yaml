@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: canfarops-general-skaha-system-binding
+  labels:
+  {{- include "base.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: general-user-clusterrole
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: canfarops
+  namespace: '{{ .Release.Namespace }}'

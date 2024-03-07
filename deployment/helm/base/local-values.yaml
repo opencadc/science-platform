@@ -1,0 +1,37 @@
+# Good template for a local (laptop) installation.
+
+# Put in certificate values here!
+secrets:
+  default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
+  # For server domains with self-signed certificates, add the Base64 encoded file content here.
+    # tls.crt: <base64 encoded server cert>
+    # tls.key: <base64 encoded server key>
+
+
+# Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
+traefik:
+  install: true
+  # experimental:
+  #   plugins:
+  #     enabled: true
+  # additionalArguments:
+  #   - "--experimental.plugins.htransformation.modulename=github.com/tomMoulard/htransformation"
+  #   - "--experimental.plugins.htransformation.version=v0.2.7"
+  tlsStore:
+    default:
+      defaultCertificate:
+  #       # See default-certificate secret(s) above
+        secretName: default-certificate
+  # tlsOptions:
+  #   traefik-client-cert-option:
+  #     clientAuth:
+  #       clientAuthType: VerifyClientCertIfGiven
+  #       secretNames:
+  #         - cacert-secret
+  # websecure:
+  #   middlewares: 
+  #     - default-traefik-passtlsclientcert@kubernetescrd
+  #     - default-traefik-header-transform@kubernetescrd
+  #   tls:
+  #     options:
+  #       - default-traefik-client-cert-option@kubernetescrd

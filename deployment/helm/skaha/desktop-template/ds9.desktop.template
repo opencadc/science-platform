@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=8.4.1
+Name=ds9
+Comment=An image display and visualization tool for astronomical data. ds9 starts up directly, bypassing the xterm.
+Keywords=ds9
+Exec=(SCRIPT)
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/ds9.svg
+Type=Application
+Categories=X-Xfce-Toplevel;

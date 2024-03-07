@@ -86,6 +86,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -185,7 +186,7 @@ public class GetAction extends SessionAction {
             String withRAM = "0G";
             Map<String, Map<String, Double>> nodeResourcesMap = getNodeResources(k8sNamespace);
             Map<String, String[]> aResourceMap = getAvailableResources(k8sNamespace);
-            List<String> nodeNames = new ArrayList<>(nodeResourcesMap.keySet());
+            List<String> nodeNames = new ArrayList<>(aResourceMap.keySet());
             for (String nodeName : nodeNames) {
                 String[] aResources = aResourceMap.get(nodeName);
                 if (aResources != null) {
@@ -202,8 +203,12 @@ public class GetAction extends SessionAction {
                     }
 
                     Map<String, Double> resourcesMap = nodeResourcesMap.get(nodeName);
-                    requestedCPUCores = requestedCPUCores + resourcesMap.get(REQ_CPU_CORES_KEY);
-                    requestedRAM = requestedRAM + resourcesMap.get(REQ_RAM_KEY);
+                    // There may not be anything running.
+                    if (resourcesMap != null) {
+                        requestedCPUCores += resourcesMap.get(REQ_CPU_CORES_KEY);
+                        requestedRAM += resourcesMap.get(REQ_RAM_KEY);
+                    }
+
                     coresAvailable = coresAvailable + aCPUCores;
                     ramAvailable = ramAvailable + aRAM;
                 }
@@ -257,7 +262,7 @@ public class GetAction extends SessionAction {
                                 "REQCPUCORES:.spec.containers[].resources.requests.cpu," +
                                 "REQRAM:.spec.containers[].resources.requests.memory " +
                                 "--field-selector status.phase=Running --sort-by=.spec.nodeName";
-        String cpuCores = execute(getCPUCoresCmd.split(" "));
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.split(" "));
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -314,7 +319,7 @@ public class GetAction extends SessionAction {
     
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
         String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
-        String rawResources = execute(getAvailableResourcesCmd.split(" "));
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.split(" "));
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");
@@ -393,20 +398,20 @@ public class GetAction extends SessionAction {
     }
     
     public String getSingleDesktopApp(String sessionID, String appID) throws Exception {
-        Session session = this.getDesktopApp(userID, sessionID, appID);
+        Session session = this.getDesktopApp(sessionID, appID);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
     }
     
     public String getSingleSession(String sessionID) throws Exception {
-        Session session = this.getSession(userID, sessionID);
+        Session session = this.getSession(getUsername(), sessionID);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
     }
 
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
-        final String forUser = allUsers ? null : userID;
+        final String forUser = allUsers ? null : getUsername();
         final List<Session> sessions = getAllSessions(forUser);
 
         log.debug("typeFilter=" + typeFilter);
@@ -442,7 +447,7 @@ public class GetAction extends SessionAction {
     }
 
     public String getEventLogs(String sessionID) throws Exception {
-        String events = getEvents(userID, sessionID);
+        String events = getEvents(getUsername(), sessionID);
         if (!StringUtil.hasLength(events)) {
             events = NONE;
         }
@@ -450,6 +455,6 @@ public class GetAction extends SessionAction {
     }
 
     public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
-        streamPodLogs(userID, sessionID, out);
+        streamPodLogs(getUsername(), sessionID, out);
     }
 }

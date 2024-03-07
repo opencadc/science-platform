@@ -1,0 +1,31 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-desktop-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/session/desktop/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-desktop-ingress-${skaha.sessionid}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/desktop/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-desktop-svc-${skaha.sessionid}
+      port: 6901
+      scheme: http
+    middlewares:
+      - name: skaha-desktop-middleware-${skaha.sessionid}

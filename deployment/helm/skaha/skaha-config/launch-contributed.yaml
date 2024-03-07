@@ -1,0 +1,85 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      ${skaha.schedulegpu}
+      imagePullSecrets:
+      - name: ${software.imagesecret}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
+        image: ${software.imageid}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "5Gi"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
+            ephemeral-storage: "5Gi"
+        ports:
+        - containerPort: 5000
+          protocol: TCP
+          name: main-port
+        volumeMounts:
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}

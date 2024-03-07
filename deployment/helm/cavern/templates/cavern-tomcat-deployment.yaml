@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: {{ .Release.Name }}-tomcat
+  name: {{ .Release.Name }}-tomcat
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: {{ .Release.Name }}-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: {{ .Release.Name }}-tomcat
+    spec:
+{{- with .Values.deployment.cavern.filesystem }}
+      {{ $cavernTLD := printf "%s/%s" .dataDir .subPath }}
+      securityContext:
+        fsGroup: {{ .rootOwner.gid }}
+        runAsUser: 0
+      initContainers:
+      - name: init-{{ $.Release.Name }}-fs
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'mkdir -p {{ $cavernTLD }}/home && mkdir -p {{ $cavernTLD }}/projects && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/home && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/projects']
+        volumeMounts:
+        - mountPath: "{{ .dataDir }}"
+          name: cavern-volume
+{{- end }}
+      containers:
+      - image: {{ .Values.deployment.cavern.image }}
+        imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
+        name: {{ .Release.Name }}-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.cavern.resources.requests.memory }}
+            cpu: {{ .Values.deployment.cavern.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.cavern.resources.limits.memory }}
+            cpu: {{ .Values.deployment.cavern.resources.limits.cpu }}
+        {{- with .Values.deployment.cavern.extraEnv }}
+        env:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.cavern.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
+          name: cavern-volume
+        {{- with .Values.deployment.cavern.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      priorityClassName: uber-user-preempt-high
+      serviceAccountName: skaha
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ .Release.Name }}-config
+      - name: cavern-volume
+        {{- toYaml .Values.storage.service.spec | nindent 8 }}
+      {{- with .Values.deployment.cavern.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

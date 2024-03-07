@@ -1,0 +1,50 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-carta-http-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/session/carta/http/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-carta-ws-middleware-${skaha.sessionid}
+spec:
+  replacePathRegex:
+    regex: ^/session/carta/ws/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-carta-ingress-${skaha.sessionid}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/carta/http/${skaha.sessionid}`)
+    services:
+    - kind: Service
+      name: skaha-carta-svc-${skaha.sessionid}
+      port: 6901
+      scheme: http
+    middlewares:
+      - name: skaha-carta-http-middleware-${skaha.sessionid}
+  - kind: Rule
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/carta/ws/${skaha.sessionid}`)
+    services:
+    - kind: Service
+      name: skaha-carta-svc-${skaha.sessionid}
+      port: 5901
+      scheme: http
+    middlewares:
+      - name: skaha-carta-ws-middleware-${skaha.sessionid}

@@ -1,0 +1,19 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-notebook-ingress-${skaha.sessionid}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.hostname}`) && PathPrefix(`/session/notebook/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-notebook-svc-${skaha.sessionid}
+      port: 8888
+      scheme: http

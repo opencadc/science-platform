@@ -1,0 +1,13 @@
+/**/dependencies
+/**/.idea
+/**/.gradle 
+/**/build
+/**/bin
+.vscode
+
+# Local build stuff
+*tgz*
+*_key
+*.crt
+deployment/helm/skaha/token-tool-secret/skaha-private.pem
+deployment/helm/skaha/token-tool-secret/skaha-public.pem

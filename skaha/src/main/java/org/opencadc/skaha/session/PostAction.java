@@ -1,84 +1,96 @@
 /*
-************************************************************************
-*******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
-**************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
-*
-*  (c) 2020.                            (c) 2020.
-*  Government of Canada                 Gouvernement du Canada
-*  National Research Council            Conseil national de recherches
-*  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
-*  All rights reserved                  Tous droits réservés
-*
-*  NRC disclaims any warranties,        Le CNRC dénie toute garantie
-*  expressed, implied, or               énoncée, implicite ou légale,
-*  statutory, of any kind with          de quelque nature que ce
-*  respect to the software,             soit, concernant le logiciel,
-*  including without limitation         y compris sans restriction
-*  any warranty of merchantability      toute garantie de valeur
-*  or fitness for a particular          marchande ou de pertinence
-*  purpose. NRC shall not be            pour un usage particulier.
-*  liable in any event for any          Le CNRC ne pourra en aucun cas
-*  damages, whether direct or           être tenu responsable de tout
-*  indirect, special or general,        dommage, direct ou indirect,
-*  consequential or incidental,         particulier ou général,
-*  arising from the use of the          accessoire ou fortuit, résultant
-*  software.  Neither the name          de l'utilisation du logiciel. Ni
-*  of the National Research             le nom du Conseil National de
-*  Council of Canada nor the            Recherches du Canada ni les noms
-*  names of its contributors may        de ses  participants ne peuvent
-*  be used to endorse or promote        être utilisés pour approuver ou
-*  products derived from this           promouvoir les produits dérivés
-*  software without specific prior      de ce logiciel sans autorisation
-*  written permission.                  préalable et particulière
-*                                       par écrit.
-*
-*  This file is part of the             Ce fichier fait partie du projet
-*  OpenCADC project.                    OpenCADC.
-*
-*  OpenCADC is free software:           OpenCADC est un logiciel libre ;
-*  you can redistribute it and/or       vous pouvez le redistribuer ou le
-*  modify it under the terms of         modifier suivant les termes de
-*  the GNU Affero General Public        la “GNU Affero General Public
-*  License as published by the          License” telle que publiée
-*  Free Software Foundation,            par la Free Software Foundation
-*  either version 3 of the              : soit la version 3 de cette
-*  License, or (at your option)         licence, soit (à votre gré)
-*  any later version.                   toute version ultérieure.
-*
-*  OpenCADC is distributed in the       OpenCADC est distribué
-*  hope that it will be useful,         dans l’espoir qu’il vous
-*  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
-*  without even the implied             GARANTIE : sans même la garantie
-*  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
-*  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
-*  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
-*  General Public License for           Générale Publique GNU Affero
-*  more details.                        pour plus de détails.
-*
-*  You should have received             Vous devriez avoir reçu une
-*  a copy of the GNU Affero             copie de la Licence Générale
-*  General Public License along         Publique GNU Affero avec
-*  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
-*  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
-*                                       <http://www.gnu.org/licenses/>.
-*
-************************************************************************
-*/
+ ************************************************************************
+ *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
+ **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
+ *
+ *  (c) 2020.                            (c) 2020.
+ *  Government of Canada                 Gouvernement du Canada
+ *  National Research Council            Conseil national de recherches
+ *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+ *  All rights reserved                  Tous droits réservés
+ *
+ *  NRC disclaims any warranties,        Le CNRC dénie toute garantie
+ *  expressed, implied, or               énoncée, implicite ou légale,
+ *  statutory, of any kind with          de quelque nature que ce
+ *  respect to the software,             soit, concernant le logiciel,
+ *  including without limitation         y compris sans restriction
+ *  any warranty of merchantability      toute garantie de valeur
+ *  or fitness for a particular          marchande ou de pertinence
+ *  purpose. NRC shall not be            pour un usage particulier.
+ *  liable in any event for any          Le CNRC ne pourra en aucun cas
+ *  damages, whether direct or           être tenu responsable de tout
+ *  indirect, special or general,        dommage, direct ou indirect,
+ *  consequential or incidental,         particulier ou général,
+ *  arising from the use of the          accessoire ou fortuit, résultant
+ *  software.  Neither the name          de l'utilisation du logiciel. Ni
+ *  of the National Research             le nom du Conseil National de
+ *  Council of Canada nor the            Recherches du Canada ni les noms
+ *  names of its contributors may        de ses  participants ne peuvent
+ *  be used to endorse or promote        être utilisés pour approuver ou
+ *  products derived from this           promouvoir les produits dérivés
+ *  software without specific prior      de ce logiciel sans autorisation
+ *  written permission.                  préalable et particulière
+ *                                       par écrit.
+ *
+ *  This file is part of the             Ce fichier fait partie du projet
+ *  OpenCADC project.                    OpenCADC.
+ *
+ *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
+ *  you can redistribute it and/or       vous pouvez le redistribuer ou le
+ *  modify it under the terms of         modifier suivant les termes de
+ *  the GNU Affero General Public        la “GNU Affero General Public
+ *  License as published by the          License” telle que publiée
+ *  Free Software Foundation,            par la Free Software Foundation
+ *  either version 3 of the              : soit la version 3 de cette
+ *  License, or (at your option)         licence, soit (à votre gré)
+ *  any later version.                   toute version ultérieure.
+ *
+ *  OpenCADC is distributed in the       OpenCADC est distribué
+ *  hope that it will be useful,         dans l’espoir qu’il vous
+ *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
+ *  without even the implied             GARANTIE : sans même la garantie
+ *  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
+ *  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
+ *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
+ *  General Public License for           Générale Publique GNU Affero
+ *  more details.                        pour plus de détails.
+ *
+ *  You should have received             Vous devriez avoir reçu une
+ *  a copy of the GNU Affero             copie de la Licence Générale
+ *  General Public License along         Publique GNU Affero avec
+ *  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
+ *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
+ *                                       <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************
+ */
 
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.ac.Role;
-import ca.nrc.cadc.ac.client.GMSClient;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.io.ResourceIterator;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.permissions.WriteGrant;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.PosixHelper;
 
+import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -90,22 +102,10 @@ import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
-import javax.security.auth.Subject;
-
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 /**
  * @author majorb
@@ -148,7 +148,9 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-
+    private static final String DEFAULT_HARBOR_SECRET = "notused";
+    private static final String POSIX_MAPPING_SECRET = "POSIX_MAPPING_SECRET";
+    private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
         super();
@@ -158,15 +160,16 @@ public class PostAction extends SessionAction {
     public void doAction() throws Exception {
 
         super.initRequest();
-        
-        String validatedType = null;
+
+        final String validatedType;
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
-            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
+            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION)
+                                                         && sessionID == null)) {
                 throw new IllegalArgumentException("Missing parameter 'image'");
             }
-        } 
+        }
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
@@ -176,12 +179,12 @@ public class PostAction extends SessionAction {
                 if (cores == null) {
                     cores = rc.getDefaultCores(validatedType);
                 }
-                
+
                 Integer ram = getRamParam();
-                if (ram == null ) {
+                if (ram == null) {
                     ram = rc.getDefaultRAM(validatedType);
                 }
-                
+
                 String name = syncInput.getParameter("name");
                 String gpusParam = syncInput.getParameter("gpus");
                 String cmd = syncInput.getParameter("cmd");
@@ -195,13 +198,13 @@ public class PostAction extends SessionAction {
 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkExistingSessions(userID, validatedType);
+                checkExistingSessions(posixPrincipal.username, validatedType);
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
-                sessionID = new RandomStringGenerator(8).getID();
+                this.sessionID = new RandomStringGenerator(8).getID();
 
-                Integer gpus = 0;
+                int gpus = 0;
                 if (gpusParam != null) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
@@ -214,7 +217,7 @@ public class PostAction extends SessionAction {
                 }
 
                 ensureUserBase();
-                createSession(sessionID, validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -222,14 +225,15 @@ public class PostAction extends SessionAction {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
                     if (action.equalsIgnoreCase("renew")) {
-                        Map<String, List<String>> jobNameToAttributesMap = getJobsToRenew(userID, sessionID);
+                        Map<String, List<String>> jobNameToAttributesMap = getJobsToRenew(posixPrincipal.username,
+                                                                                          sessionID);
                         if (!jobNameToAttributesMap.isEmpty()) {
                             for (Map.Entry<String, List<String>> entry : jobNameToAttributesMap.entrySet()) {
                                 renew(entry);
                             }
                         } else {
                             throw new IllegalArgumentException(
-                                    "No active job for user " + userID + " with session " + sessionID);
+                                    "No active job for user " + posixPrincipal + " with session " + sessionID);
                         }
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
@@ -265,8 +269,8 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws IOException, InterruptedException {
-        final Path homeDir = Paths.get(String.format("%s/%s", this.homedir, this.userID));
+    void ensureUserBase() throws Exception {
+        final Path homeDir = getUserHomeDirectory();
 
         if (Files.notExists(homeDir)) {
             log.debug("Allocating new user home to " + homeDir);
@@ -275,10 +279,12 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void allocateUser() throws IOException, InterruptedException {
+    void allocateUser() throws Exception {
         log.debug("PostAction.makeUserBase()");
+        final Path userHomePath = getUserHomeDirectory();
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUserID(), getDefaultQuota()
+                PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
+                getDefaultQuota(), userHomePath.toAbsolutePath().toString()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -303,20 +309,13 @@ public class PostAction extends SessionAction {
 
     void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
             throws IOException, InterruptedException {
-        SessionAction.execute(command, standardOut, standardErr);
-    }
-
-    /**
-     * Override to test user ID without processing an entire Request.
-     * @return  String userID, if present.
-     */
-    String getUserID() {
-        return this.userID;
+        execute(command, standardOut, standardErr);
     }
 
     /**
      * Override to test injected quota value without processing an entire Request.
-     * @return  String quota number in GB, or null if not configured.
+     *
+     * @return String quota number in GB, or null if not configured.
      */
     String getDefaultQuota() {
         return K8SUtil.getDefaultQuota();
@@ -328,18 +327,18 @@ public class PostAction extends SessionAction {
         if (coresParam != null) {
             try {
                 cores = Integer.valueOf(coresParam);
-                ResourceContexts rc = new ResourceContexts();
-                if (!rc.getAvailableCores().contains(cores)) {
+                final ResourceContexts rc = new ResourceContexts();
+                if (!rc.isCoreCountAvailable(cores)) {
                     throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
                 }
             } catch (Exception e) {
                 throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
             }
         }
-        
+
         return cores;
     }
-    
+
     private Integer getRamParam() {
         Integer ram = null;
         String ramParam = syncInput.getParameter("ram");
@@ -354,11 +353,11 @@ public class PostAction extends SessionAction {
                 throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
             }
         }
-        
+
         return ram;
     }
-    
-    
+
+
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -390,7 +389,7 @@ public class PostAction extends SessionAction {
         long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, userID);
+        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, posixPrincipal.username);
         String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
         if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
             long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
@@ -412,7 +411,35 @@ public class PostAction extends SessionAction {
     }
 
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        final List<String> getRenewJobNamesCmd = PostAction.getRenewJobNamesCmd(forUserID, sessionID);
+
+        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
+        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
+
+        Map<String, List<String>> renewJobMap = new HashMap<>();
+        if (StringUtil.hasLength(renewJobNamesStr)) {
+            String[] lines = renewJobNamesStr.split("\n");
+            for (String line : lines) {
+                List<String> renewJobAttributes = new ArrayList<>();
+                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
+                String jobName = parts[0];
+                String uid = parts[1];
+                String isActive = parts[2];
+                String startTime = parts[3];
+                // look for the job ID of an active session
+                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
+                    renewJobAttributes.add(uid);
+                    renewJobAttributes.add(startTime);
+                    renewJobMap.put(jobName, renewJobAttributes);
+                }
+            }
+        }
+
+        return renewJobMap;
+    }
+
+    private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
+        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getRenewJobNamesCmd = new ArrayList<>();
         getRenewJobNamesCmd.add("kubectl");
         getRenewJobNamesCmd.add("get");
@@ -431,30 +458,7 @@ public class PostAction extends SessionAction {
                                "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
-
-        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
-        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
-
-        Map<String, List<String>> renewJobMap = new HashMap<String, List<String>>();
-        if (StringUtil.hasLength(renewJobNamesStr)) {
-            String[] lines = renewJobNamesStr.split("\n");
-            for (String line : lines) {
-                List<String> renewJobAttributes = new ArrayList<String>();
-                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                String jobName = parts[0];
-                String uid = parts[1];
-                String isActive = parts[2];
-                String startTime = parts[3];
-                // look for the job ID of an active session
-                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
-                    renewJobAttributes.add(uid);
-                    renewJobAttributes.add(startTime);
-                    renewJobMap.put(jobName, renewJobAttributes);
-                }
-            }
-        }
-
-        return renewJobMap;
+        return getRenewJobNamesCmd;
     }
 
     private void validateName(String name) {
@@ -516,7 +520,7 @@ public class PostAction extends SessionAction {
     }
 
     public void checkExistingSessions(String userid, String type) throws Exception {
-        // multiple 
+        // multiple
         if (SESSION_TYPE_HEADLESS.equals(type)) {
             return;
         }
@@ -535,26 +539,26 @@ public class PostAction extends SessionAction {
         }
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + userID + " has reached the maximum of " +
+            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
                                                maxUserSessions + " active sessions.");
         }
     }
 
-    public void createSession(String sessionID, String type, String image, String name,
-                              Integer cores, Integer ram, Integer gpus, String cmd, String args, List<String> envs)
+    public void createSession(String type, String image, String name, Integer cores, Integer ram, Integer gpus,
+                              String cmd, String args, List<String> envs)
             throws Exception {
 
-        String jobName = K8SUtil.getJobName(sessionID, type, userID);
-        String posixID = getPosixId();
-        log.debug("Posix id: " + posixID);
+        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        String imageSecret = getHarborSecret(image);
+        final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
-        if (imageSecret == null) {
-            imageSecret = "notused";
-        }
 
         String supplementalGroups = getSupplementalGroupsList();
+        log.debug("supplementalGroups are " + supplementalGroups);
+        String secretName = createPosixMappingSecret(sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
+
+        String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -589,6 +593,7 @@ public class PostAction extends SessionAction {
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
+
         byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
         String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
         String headlessPriority = getHeadlessPriority();
@@ -600,9 +605,12 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, userID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, posixID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
+                                         Integer.toString(posixPrincipal.getUidNumber()));
+        if (StringUtil.hasText(supplementalGroups)) {
+            jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
@@ -615,26 +623,23 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, secretName);
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
-        String[] launchCmd = new String[] {
-                "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+        String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
         // insert the user's proxy cert in the home dir
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert(subject, userID, posixID);
+        injectCredentials();
 
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = new String[] {
-                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
         }
@@ -643,22 +648,28 @@ public class PostAction extends SessionAction {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = new String[] {
-                    "kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
+    }
+
+    private String generateToken(String sessionID) throws Exception {
+        return SkahaAction.getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
     }
 
     /**
      * Attach a desktop application.
      * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
      * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
-     * @param image         Container image name.
-     * @throws Exception    For any unexpected errors.
+     *
+     * @param image Container image name.
+     * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
+                                 Integer limitRAM) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -667,10 +678,10 @@ public class PostAction extends SessionAction {
                 "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
                 "--no-headers=true",
                 "-o", "custom-columns=" +
-                    "IPADDR:.status.podIP," +
-                    "DT:.metadata.deletionTimestamp," +
-                    "TYPE:.metadata.labels.canfar-net-sessionType," +
-                    "NAME:.metadata.name"};
+                      "IPADDR:.status.podIP," +
+                      "DT:.metadata.deletionTimestamp," +
+                      "TYPE:.metadata.labels.canfar-net-sessionType," +
+                      "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -698,15 +709,12 @@ public class PostAction extends SessionAction {
 
         String name = getImageName(image);
         log.debug("name: " + name);
-        String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
-        if (imageSecret == null) {
-            imageSecret = "notused";
-        }
+        final String imageSecret = getHarborSecret(image);
         log.debug("image secret: " + imageSecret);
 
-        String posixID = getPosixId();
         String supplementalGroups = getSupplementalGroupsList();
+        final String secretName = PosixHelper.getPosixMapperSecretName(sessionID);
+        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
@@ -719,16 +727,16 @@ public class PostAction extends SessionAction {
         log.debug("Using limits.cores: " + limitCores.toString());
         log.debug("Using requests.ram: " + requestRAM.toString() + "Gi");
         log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
-        
+
         appID = new RandomStringGenerator(3).getID();
-        String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
+        String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
         String jobName = sessionID + "-" + appID + "-" + userJobID.toLowerCase() + "-" + name.toLowerCase();
         String containerName = name.toLowerCase().replaceAll("\\.", "-"); // no dots in k8s names
         // trim job name if necessary
         if (jobName.length() > MAX_JOB_NAME_LENGTH) {
             int pos = MAX_JOB_NAME_LENGTH;
             jobName = jobName.substring(0, pos--);
-            // ensure that the trimmed job name is valid, i.e. starts and ends with 
+            // ensure that the trimmed job name is valid, i.e. starts and ends with
             // an alphanumeric character
             while (!jobName.matches("(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?")) {
                 // invalid job name, continue to trim
@@ -747,17 +755,21 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
         launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, requestCores.toString());
         launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, limitCores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi");
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM.toString() + "Gi");
-        launchString = setConfigValue(launchString, SKAHA_USERID, userID);
+        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM + "Gi");
+        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM + "Gi");
+        launchString = setConfigValue(launchString, SKAHA_USERID, posixPrincipal.username);
         launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
         launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
         launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
-        launchString = setConfigValue(launchString, SKAHA_POSIXID, posixID);
-        launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        launchString = setConfigValue(launchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
+        if (StringUtil.hasText(supplementalGroups)) {
+            launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+        }
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
+        launchString = setConfigValue(launchString, POSIX_MAPPING_SECRET, secretName);
+        launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
 
@@ -769,23 +781,15 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        injectProxyCert(subject, userID, posixID);
+        injectCredentials();
     }
 
-    private void validateHeadlessMembership() throws Exception {
+    private void validateHeadlessMembership() {
         if (skahaHeadlessGroup == null) {
             log.warn("skaha.headlessgroup not defined in system properties");
         } else if (!headlessUser) {
             throw new AccessControlException("Not authorized to create a headless session");
         }
-    }
-    
-    private String getPosixId() {
-        Subject s = AuthenticationUtil.getCurrentSubject();
-        Set<PosixPrincipal> principals = s.getPrincipals(PosixPrincipal.class);
-        int uidNumber = principals.iterator().next().getUidNumber();
-        return Integer.toString(uidNumber);
     }
 
     private String setConfigValue(String doc, String key, String value) {
@@ -795,7 +799,7 @@ public class PostAction extends SessionAction {
     }
 
     private String getHarborSecret(String image) throws Exception {
-        
+
         // get the user's cli secret:
         //  1. get the idToken from /ac/authorize
         //  2. call harbor with idToken to get user info and secret
@@ -810,7 +814,12 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("not a skaha harbor image: " + image);
         }
 
-        String idToken = super.getIdToken();
+        String idToken = getIdToken();
+
+        // Default secret name if no ID Token is found.
+        if (!StringUtil.hasText(idToken)) {
+            return PostAction.DEFAULT_HARBOR_SECRET;
+        }
 
         log.debug("getting secret from harbor");
         URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
@@ -825,11 +834,11 @@ public class PostAction extends SessionAction {
             } else {
                 log.warn("user not found in harbor");
             }
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
         if (get.getThrowable() != null) {
             log.warn("error obtaining harbor secret. response code: " + get.getResponseCode());
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
         String userJson = out.toString();
         log.debug("harbor user info: " + userJson);
@@ -839,7 +848,7 @@ public class PostAction extends SessionAction {
         log.debug("cliSecret: " + cliSecret);
         String harborUsername = obj.getString("username");
 
-        String secretName = "harbor-secret-" + userID.toLowerCase();
+        final String secretName = "harbor-secret-" + posixPrincipal.username.toLowerCase();
 
         // delete any old secret by this name
         String[] deleteCmd = new String[] {
@@ -880,31 +889,92 @@ public class PostAction extends SessionAction {
             }
         } else {
             log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
-            return null;
+            return PostAction.DEFAULT_HARBOR_SECRET;
         }
 
         return secretName;
-
     }
 
+    private String createPosixMappingSecret(final String sessionID) throws Exception {
+        if (skahaCallbackFlow) {
+            return PosixHelper.getPosixMapperSecretName(callbackSessionId);
+        }
 
-    private String getSupplementalGroupsList() {
+        final String posixMappingSecretName = PosixHelper.getPosixMapperSecretName(sessionID);
+        final Path holdingDir =
+                Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), posixMappingSecretName);
+        final File uidMappingFile = new File(holdingDir.toString(), "uidmap.txt");
+        final File gidMappingFile = new File(holdingDir.toString(), "gidmap.txt");
+
+        try (final FileWriter uidMappingWriter = new FileWriter(uidMappingFile)) {
+            uidMappingWriter.write(getUserEntries());
+            uidMappingWriter.flush();
+        }
+
+        try (final FileWriter gidMappingWriter = new FileWriter(gidMappingFile)) {
+            gidMappingWriter.write(getGroupEntries());
+            gidMappingWriter.flush();
+        }
+
+        // create new secret
+        final String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
+                posixMappingSecretName,
+                "--from-file=" + uidMappingFile.getAbsolutePath(),
+                "--from-file=" + gidMappingFile.getAbsolutePath()
+        };
+
+        final String createResult = execute(createCmd);
+        log.debug("create secret result: " + createResult);
+
+        return posixMappingSecretName;
+    }
+
+    private String getUserEntries() throws Exception {
+        final StringBuilder userEntryBuilder = new StringBuilder();
+        try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
+                     posixMapperConfiguration.getPosixMapperClient().getUserMap()) {
+            posixPrincipalIterator.forEachRemaining(pp -> userEntryBuilder.append(PosixHelper.uidMapping(pp)));
+        }
+
+        final String userEntriesString = userEntryBuilder.toString();
+        if (userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER) > 0) {
+            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER));
+        } else {
+            return userEntryBuilder.toString();
+        }
+    }
+
+    private String getSupplementalGroupsList() throws Exception {
+        if (skahaCallbackFlow) {
+            return callbackSupplementalGroups;
+        }
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        if (groupCredentials.size() == 1) {
+            return buildGroupUriList(groupCredentials)
+                    .stream()
+                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
+                    .collect(Collectors.joining(","));
+        } else {
+            return "";
+        }
+    }
+
+    private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
+        return toGIDs(groupCredentials.iterator().next().stream()
+                                      .map(Group::getID)
+                                      .collect(Collectors.toList())
+                     );
+    }
+
+    List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
+        return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIS);
+    }
+
+    private static Set<List<Group>> getCachedGroupsFromSubject() {
         Subject subject = AuthenticationUtil.getCurrentSubject();
         Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        Set<List<Group>> groupCreds = subject.getPublicCredentials(c);
-        if (groupCreds.size() == 1) {
-            List<Group> memberships = groupCreds.iterator().next();
-            log.debug("Adding " + memberships.size() + " supplemental groups");
-            if (memberships.size() > 0) {
-                StringBuilder sb = new StringBuilder();
-                for (Group g : memberships) {
-                    sb.append(g.gid).append(", ");
-                }
-                sb.setLength(sb.length() - 2);
-                return sb.toString();
-            }
-        }
-        return "";
+        return subject.getPublicCredentials(c);
     }
 
     /**
@@ -971,7 +1041,7 @@ public class PostAction extends SessionAction {
         }
         return sb.toString();
     }
-    
+
     private String getHeadlessPriority() {
         if (skahaPriorityHeadlessGroup == null) {
             return "";
@@ -986,5 +1056,4 @@ public class PostAction extends SessionAction {
             return "";
         }
     }
-
 }

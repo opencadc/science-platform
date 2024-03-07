@@ -1,0 +1,20 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: skaha-general-workload-binding
+  namespace: {{ .Values.skahaWorkload.namespace }}
+  labels:
+  {{- include "base.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: general-user-clusterrole
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: canfarops
+  namespace: '{{ .Release.Namespace }}'
+- kind: ServiceAccount
+  name: 'skaha'
+  namespace: {{ .Values.skaha.namespace }}
+  

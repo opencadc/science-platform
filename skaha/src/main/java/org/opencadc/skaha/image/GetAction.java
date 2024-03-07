@@ -66,17 +66,13 @@
  */
 package org.opencadc.skaha.image;
 
-import ca.nrc.cadc.rest.InlineContentHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -98,11 +94,7 @@ public class GetAction extends SkahaAction {
     private static final Logger log = Logger.getLogger(GetAction.class);
     private static final int MAX_PROJECT_NTHREADS = 20;
     private static final int MAX_REPO_NTHREADS = 40;
-    
-    // Consider adding a cache
-    Map<List<Image>, String> cache = Collections.synchronizedMap(
-        new WeakHashMap<List<Image>, String>());
-    
+
     public GetAction() {
         super();
     }
@@ -149,7 +141,7 @@ public class GetAction extends SkahaAction {
         }
 
         // process each project in its own thread
-        List<Image> images = new ArrayList<Image>();
+        List<Image> images = new ArrayList<>();
         ExecutorService taskExecutor = null;
         try {
             if (tasks.size() > MAX_PROJECT_NTHREADS) {
@@ -253,7 +245,7 @@ public class GetAction extends SkahaAction {
             if (!jArtifact.isNull("labels")) {
                 JSONArray labels = jArtifact.getJSONArray("labels");
                 Set<String> types = getTypesFromLabels(labels);
-                if (types.size() > 0 && (typeFilter == null || types.contains(typeFilter))) {
+                if (!types.isEmpty() && (typeFilter == null || types.contains(typeFilter))) {
                     String digest = jArtifact.getString("digest");
                     if (!jArtifact.isNull("tags")) {
                         JSONArray tags = jArtifact.getJSONArray("tags");
@@ -273,10 +265,5 @@ public class GetAction extends SkahaAction {
         }
 
         return images;
-    }
-
-    @Override
-    protected InlineContentHandler getInlineContentHandler() {
-        return null;
     }
 }

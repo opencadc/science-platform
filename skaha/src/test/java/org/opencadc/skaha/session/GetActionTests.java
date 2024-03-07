@@ -127,7 +127,15 @@ public class GetActionTests {
         }
     }
     
-    class TestGetAction extends GetAction {
-        
+    static class TestGetAction extends GetAction {
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected int getUID() {
+            return 32635;
+        }
     }
 }

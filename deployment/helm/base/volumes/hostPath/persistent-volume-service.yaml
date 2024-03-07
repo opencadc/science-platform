@@ -1,0 +1,43 @@
+# This is a sample PersistentVolume that is expected to be present.  It can be anything, so long as it can be bound by a PersistentVolumeClaim
+# when Skaha is installed.  This is done by matching th labels.  The intent is that a Cluster Administrator will have a PersistentVolume setup,
+# and will direct deployers on what label to use to bind to it.
+# This will be used by the User Sessions when starting up to gain access to the shared Storage with the Skaha service.
+# This default will create a hostPath volume with no declared PV.
+#
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-pv
+  labels:
+    storage: skaha-storage
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: hostpath
+  hostPath:
+    path: /var/lib/k8s-pvs/science-platform
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-pvc
+  namespace: skaha-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: hostpath
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      storage: skaha-storage 

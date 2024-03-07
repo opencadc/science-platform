@@ -67,8 +67,6 @@
 
 package org.opencadc.skaha.context;
 
-import ca.nrc.cadc.rest.InlineContentHandler;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -95,10 +93,4 @@ public class GetAction extends SkahaAction {
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(json.getBytes());
     }
-
-    @Override
-    protected InlineContentHandler getInlineContentHandler() {
-        return null;
-    }
-
 }

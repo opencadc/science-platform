@@ -1,0 +1,102 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  activeDeadlineSeconds: 1209600
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      ${skaha.schedulegpu}
+      imagePullSecrets:
+      - name: ${software.imagesecret}
+      hostname: "${software.hostname}"
+      initContainers:
+      - name: init-users-groups
+        image: ${software.imageid}
+        command: ["/init-users-groups/init-users-groups.sh"]
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/init-users-groups"
+          name: init-users-groups
+        - mountPath: "/posix-mapping"
+          name: posix-mapping
+        securityContext:
+          runAsUser: ${skaha.posixid} 
+          runAsGroup: ${skaha.posixid}
+      securityContext:
+        runAsUser: ${skaha.posixid}
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+      ${headless.priority}
+      containers:
+      - name: "${skaha.jobname}"
+        ${headless.image.bundle}
+        securityContext:
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
+        workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "5Gi"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            nvidia.com/gpu: "${software.limits.gpus}"
+            ephemeral-storage: "5Gi"
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+      volumes:
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+      - name: posix-mapping
+        secret:
+          defaultMode: 420
+          secretName: ${POSIX_MAPPING_SECRET}

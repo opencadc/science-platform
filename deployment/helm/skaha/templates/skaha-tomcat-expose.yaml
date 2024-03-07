@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: skaha-tomcat-svc
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    run: skaha-tomcat-svc
+spec:
+  ports: 
+  - port: 8080
+    name: http-connection
+    protocol: TCP
+  - port: 80
+    targetPort: 8080
+    name: http-connection-automatic
+    protocol: TCP  
+  {{ with .Values.service }}
+    {{ with .skaha }}
+      {{ with .extraPorts }}
+  {{- toYaml . | nindent 2 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  selector:
+    run: skaha-tomcat

@@ -75,6 +75,7 @@ import java.security.AccessControlException;
 
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 /**
  *
@@ -105,25 +106,23 @@ public class DeleteAction extends SessionAction {
                         "TYPE:.metadata.labels.canfar-net-sessionType," +
                         "USERID:.metadata.labels.canfar-net-userid"};
                         
-                String session = execute(getSessionCMD);
+                String session = CommandExecutioner.execute(getSessionCMD);
                 if (StringUtil.hasText(session)) {
-                    String[] lines = session.split("\n");
-                    if (lines.length > 0) {
-                        // sessionID was added to desktop-app. This resulted in the 
-                        // above kubectl command returning desktop-app as well. We 
-                        // want to ignore them as we pick the session to be deleted.
-                        for (String line : lines) {
-                            String[] parts = line.split("\\s+");
-                            String type = parts[0];
-                            if (!TYPE_DESKTOP_APP.equals(type)) {
-                                String sessionUserId = parts[1];
-                                if (!userID.equals(sessionUserId)) {
-                                    throw new AccessControlException("forbidden");
-                                }   
-    
-                                deleteSession(userID, type, sessionID);
-                                return;
+                    final String[] lines = session.split("\n");
+                    // sessionID was added to desktop-app. This resulted in the
+                    // above kubectl command returning desktop-app as well. We
+                    // want to ignore them as we pick the session to be deleted.
+                    for (String line : lines) {
+                        String[] parts = line.split("\\s+");
+                        String type = parts[0];
+                        if (!TYPE_DESKTOP_APP.equals(type)) {
+                            String sessionUserId = parts[1];
+                            if (!posixPrincipal.username.equals(sessionUserId)) {
+                                throw new AccessControlException("forbidden");
                             }
+
+                            deleteSession(posixPrincipal.username, type, sessionID);
+                            return;
                         }
                     }
                 }
@@ -134,7 +133,7 @@ public class DeleteAction extends SessionAction {
         }
 
         if (requestType.equals(REQUEST_TYPE_APP)) {
-            deleteSession(userID, TYPE_DESKTOP_APP, sessionID);
+            deleteSession(posixPrincipal.username, TYPE_DESKTOP_APP, sessionID);
         }
     }
     
@@ -178,7 +177,7 @@ public class DeleteAction extends SessionAction {
         try {
             String[] cmd = new String[] {
                 "kubectl", "delete", "--namespace", k8sNamespace, type, name};
-            execute(cmd);
+            CommandExecutioner.execute(cmd);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());

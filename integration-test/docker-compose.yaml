@@ -1,0 +1,127 @@
+version: "3"
+services:
+  skaha:
+    container_name: skaha
+    ports:
+      - "8081:8080"
+    image: abhishek1009/skaha:latest # build the image manually, context can not be applied here
+    # build:
+    #   context: ./dependencies/science-platform/skaha
+    #   dockerfile: Dockerfile
+    environment:
+      - skaha.usersgroup=ivo://cadc.nrc.ca/gms?mini-src-test-group
+      - skaha.homedir=/arc/home
+      - skaha.harborhosts=images.canfar.net
+      - POSIX_DATABASE_URL=jdbc:postgresql://postgres:5432/skaha
+      - POSIX_DATABASE_USERNAME=postgres
+      - POSIX_DATABASE_PASSWORD=postgres
+    volumes:
+      - ./configs/skaha:/config:ro
+    links:
+      - reg
+      - gms
+      - postgres
+    depends_on:
+      - reg
+      - gms
+      - postgres
+    networks:
+      - science-platform
+  reg:
+    container_name: reg
+    image: abhishek1009/reg:latest # build the image manually, context can not be applied here
+    # build:
+    #   context: ./dependencies/reg/reg
+    #   dockerfile: Dockerfile
+    volumes:
+      - ./configs/reg:/config:ro
+    networks:
+      - science-platform
+  gms:
+    container_name: gms
+    build:
+      context: ./dependencies/group-membership-service 
+      dockerfile: Dockerfile
+    environment:
+      - IAM_HOST=http://iam:8080/
+      - GMS_APPLICATION_LOGGING_LEVEL=DEBUG
+      - TOMCAT_CONNECTOR_SCHEME=http
+      - TOMCAT_CONNECTOR_PROXY_NAME=gms
+      - TOMCAT_CONNECTOR_PROXY_PORT=8080
+    links:
+      - iam
+    networks:
+      - science-platform
+    depends_on:
+      - iam
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - science-platform
+  db:
+    container_name: db
+    restart: unless-stopped
+    image: mysql
+    ports:
+      - "3306:3306"
+    # volumes:
+    #   - ./data.sql:/data.sql
+    # command: --init-file /data.sql
+    environment:
+      MYSQL_ROOT_PASSWORD: pwd
+      MYSQL_USER: iam
+      MYSQL_PASSWORD: pwd
+      MYSQL_DATABASE: iam
+    networks:
+      - science-platform
+  iam:
+    ports:
+      - "8080:8080"
+    container_name: iam
+    image: indigoiam/iam-login-service # build the image manually, context can not be applied here
+    # build:
+    #   context: ./dependencies/iam/iam-login-service/docker
+    #   dockerfile: Dockerfile
+    environment:
+      - IAM_HOST=localhost:8080
+      - IAM_BASE_URL=http://localhost:8080
+      - IAM_ISSUER=http://localhost:8080
+      - IAM_DB_ALLOW_PUBLIC_KEY=true
+      - IAM_FORWARD_HEADERS_STRATEGY=native
+      - IAM_DB_HOST=db
+      - IAM_DB_NAME=iam
+      - IAM_DB_USERNAME=root
+      - IAM_DB_PASSWORD=pwd
+      - IAM_KEY_STORE_LOCATION=file:/keystore/keystore.jwks
+      - IAM_X509_CAN_LOGIN=true
+      - IAM_LOG_LEVEL=DEBUG
+      - IAM_JAVA_OPTS=-Dspring.profiles.active=prod,registration,oidc -Djava.security.egd=file:/dev/./urandom
+    volumes:
+      - ./configs/iam:/keystore:ro
+      - ./data.sql:/indigo-iam/WEB-INF/classes/data.sql
+    depends_on:
+      - db
+    networks:
+      - science-platform
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://iam:8080/.well-known/openid-configuration"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+volumes:
+  logs:
+  db_data:
+  postgres:
+networks:
+  science-platform:

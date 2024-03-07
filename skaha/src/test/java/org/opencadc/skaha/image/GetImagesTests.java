@@ -80,6 +80,7 @@ import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
 
+
 /**
  * @author majorb
  *
@@ -197,7 +198,7 @@ public class GetImagesTests {
         
     }
     
-    class TestGetAction extends GetAction {
+    static class TestGetAction extends GetAction {
         
         @Override
         protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
@@ -216,6 +217,16 @@ public class GetImagesTests {
         @Override
         protected String getIdToken() {
             return "";
+        }
+
+        @Override
+        protected String getUsername() {
+            return null;
+        }
+
+        @Override
+        protected int getUID() {
+            return 747;
         }
     }
 }

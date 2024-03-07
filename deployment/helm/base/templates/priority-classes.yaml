@@ -1,0 +1,36 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-important
+value: 3000
+preemptionPolicy: Never
+globalDefault: false
+description: "For important user pods. Non-preempting."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-preempt-high
+value: 2000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "For high-priority user pods. Preempting."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-preempt-medium
+value: 1000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "For medium-priority user pods. Preempting."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: uber-user-significant
+value: 500
+preemptionPolicy: Never
+globalDefault: false
+description: "For slightly prioritizing pods. Non-preempting."

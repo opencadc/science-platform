@@ -1,0 +1,93 @@
+# Sample Local install values file.
+
+# Skaha web service deployment
+deployment:
+  hostname: example.org # change this
+  skaha:
+    imagePullPolicy: IfNotPresent
+    # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
+    registryHosts: "images.canfar.net"
+
+    # Root of shared storage
+    skahaTld: "/arc"
+
+    # The group name to verify users against for permission to use the Science Platform.
+    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
+
+    adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
+
+    # The Resource ID of the Service that contains the Posix Mapping information
+    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "500M"
+        cpu: "500m"
+      limits:
+        memory: "1500M"
+        cpu: "1500m"
+
+    # Uncomment to debug.  Requires options above as well as service port exposure below.
+    # extraPorts:
+    # - containerPort: 5555
+    #   protocol: TCP
+
+    # Optionally mount a custom CA certificate
+    extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # If the base names have changed, then change them here, otherwise leave them.
+    priorityClassName: uber-user-preempt-high
+    serviceAccountName: skaha
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # skaha-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+
+# Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
+# service:
+#   extraPorts:
+  # - port: 5555
+  #   protocol: TCP
+  #   name: java-debug
+
+# Set these labels appropriately to match your Persistent Volume labels.
+# The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
+# The CephFS Volume can be dynamically allocated here for the storage.service.spec:
+# Example:
+# storage:
+#   service:
+#     spec:
+#       cephfs:
+#         mons:
+#           ...
+# Default is a PersistentVolumeClaim to the Local Storage.
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
+  sessions:
+    claim:
+      # storageClassName: ""
+      labels:
+        storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC

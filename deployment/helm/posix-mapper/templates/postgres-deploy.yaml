@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: posix-mapper-postgres
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: posix-mapper-postgres
+  template:
+    metadata:
+      labels:
+        app: posix-mapper-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:13
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432  # Exposes container port
+          envFrom:
+            - configMapRef:
+                name: posix-mapper-postgres-config
+          volumeMounts:
+            - mountPath: /docker-entrypoint-initdb.d
+              name: postgresinit
+            - mountPath: /var/lib/postgresql/data
+              name: postgresdb
+      volumes:
+        - name: postgresdb
+          {{- toYaml .Values.postgresql.storage.spec | nindent 10 }}
+        - name: postgresinit
+          configMap:
+            name: posix-mapper-postgres-init

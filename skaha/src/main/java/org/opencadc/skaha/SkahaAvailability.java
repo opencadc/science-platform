@@ -72,6 +72,7 @@ import org.opencadc.skaha.session.SessionAction;
 
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 import java.io.IOException;
 
@@ -105,7 +106,7 @@ public class SkahaAvailability implements AvailabilityPlugin
             String k8sNamespace = K8SUtil.getWorkloadNamespace();
             String[] getPods = new String[] {
                 "kubectl", "get", "--namespace", k8sNamespace, "pods"};
-            SessionAction.execute(getPods);
+            CommandExecutioner.execute(getPods);
             return STATUS_UP;
         } catch (Exception e) {
             return new Availability(false, "failed to run kubectl: " + e.getMessage());

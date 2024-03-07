@@ -1,0 +1,77 @@
+kubernetesClusterDomain: cluster.local
+
+# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+replicaCount: 1
+
+# It's best to keep these set as such, unless you're willing to change these in several places.
+skaha:
+  namespace: skaha-system
+
+# POSIX Mapper web service deployment
+deployment:
+  hostname: example.host.com    # Change this!
+  posixMapper:
+    image: images.opencadc.org/platform/posix-mapper:0.2.1
+    imagePullPolicy: Always
+    resourceID: ivo://opencadc.org/posix-mapper
+
+    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
+    oidcURI: https://ska-iam.stfc.ac.uk/
+
+    # ID (URI) of the GMS Service.
+    gmsID: ivo://skao.int/gms
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Uncomment to debug.  Requires options above as well as service port exposure below.
+    # extraPorts:
+    # - containerPort: 5555
+    #   protocol: TCP
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+    minUID: 10000
+    minGID: 900000
+    registryURL: https://spsrc27.iaa.csic.es/reg
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: posix-manager-cacert-secret
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # posix-manager-cacert-secret:
+  #   ca.crt: <base64 encoded ca crt>
+
+# These values are preset in the catalina.properties, and this default database only exists beside this service.
+# It's usually safe to leave these as-is, but make sure they match the values in catalina.properties.
+postgresql:
+  auth:
+    username: posixmapper
+    password: posixmapperpwd
+    database: mapping
+    schema: mapping
+  storage:
+    spec:
+      hostPath:
+        path: "/posix-mapper/data"
