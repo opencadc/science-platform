@@ -11,6 +11,9 @@ configMapGenerator:
   - config/start-desktop.sh
   - config/build-menu.sh
   - config/sleep-forever.sh
+- name: start-carta
+  files:
+  - config/skaha-carta.sh
 - name: templates
   files:
   - config/templates/skaha-resolutions.properties

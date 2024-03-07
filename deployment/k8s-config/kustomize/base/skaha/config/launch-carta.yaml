@@ -99,7 +99,7 @@ spec:
         emptyDir: {}
       - name: start-carta
         configMap:
-          name: start-desktop
+          name: start-carta
           defaultMode: 0777
       - name: sssd-dir
         hostPath:
