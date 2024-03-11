@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.4.0)
+# CHANGELOG for Skaha User Session API (Chart 0.4.1)
+
+## 2024.03.11
+- Large development branch merged into `master`.  This is a point release only.
 
 ## 2024.02.26
 - Fix multiple users in Desktop session Applications
