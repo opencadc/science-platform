@@ -57,7 +57,8 @@ deployment:
       db:
         username: "uwsuser"
         password: "uwspwd"
-        database: "uws"
+        database: "uws"  # OR url below.
+        # url: "jdbc:postgresql://<host>:<port>/<database>"
         schema: "uws"
         maxActive: 2
         runUID: 999  # Postgres User default in the postgres:13 image
