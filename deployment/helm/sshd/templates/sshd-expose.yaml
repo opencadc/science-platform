@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sshd-svc
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    run: sshd-svc
+spec:
+  ports: 
+  - port: 2222
+    name: ssh-connection
+    protocol: TCP
+  selector:
+    run: sshd-process

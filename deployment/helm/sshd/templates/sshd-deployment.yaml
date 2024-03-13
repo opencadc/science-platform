@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: sshd-process
+  name: sshd-process
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      run: sshd-process
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: sshd-process
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - image: linuxserver/openssh-server:latest
+        imagePullPolicy: {{ .Values.deployment.sshd.imagePullPolicy }}
+        name: sshd-process
+        resources:
+          requests:
+            memory: {{ .Values.deployment.sshd.resources.requests.memory }}
+            cpu: {{ .Values.deployment.sshd.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.sshd.resources.limits.memory }}
+            cpu: {{ .Values.deployment.sshd.resources.limits.cpu }}
+        {{- with .Values.deployment.sshd.extraEnv }}
+        env:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - containerPort: 2222
+          protocol: TCP
+        volumeMounts: 
+        - mountPath: "{{ .Values.deployment.sshd.dataDir }}"
+          name: cavern-volume
+        {{- with .Values.deployment.sshd.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: cavern-volume
+        {{- toYaml .Values.storage.service.spec | nindent 8 }}
+      {{- with .Values.deployment.sshd.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

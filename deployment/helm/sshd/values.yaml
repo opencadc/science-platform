@@ -1,0 +1,32 @@
+kubernetesClusterDomain: cluster.local
+
+# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+replicaCount: 1
+
+# It's best to keep these set as such, unless you're willing to change these in several places.
+skaha:
+  namespace: skaha-system
+
+# Skaha web service deployment
+deployment:
+  sshd:
+    imagePullPolicy: Always
+    resources:
+      requests:
+        memory: "500Mi"
+        cpu: "250m"
+      limits:
+        memory: "500Mi"
+        cpu: "250m"
+    dataDir: "/data"
+
+# Set these appropriately to match your Persistent Volume Claim labels.
+storage:
+  service:
+    spec:
+      # YAML for service mounted storage.
+      # Example is the persistentVolumeClaim below.  Do not uncomment this
+      # or Helm will use it as the default, even if a different spec
+      # is specified.
+      persistentVolumeClaim:
+        claimName: skaha-pvc
