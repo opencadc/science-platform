@@ -18,6 +18,8 @@ deployment:
       limits:
         memory: "500Mi"
         cpu: "250m"
+
+    # Needs to match the Cavern filesystem.dataDir
     dataDir: "/data"
 
 # Set these appropriately to match your Persistent Volume Claim labels.
