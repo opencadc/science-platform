@@ -13,6 +13,14 @@ secrets:
 # Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
 traefik:
   install: false
+  ports:
+  #   # Uncomment to route SSH requests on an exposed port.  This is 60422 by default, 
+  #   # but pick whatever works for your deployment.
+  #   # The endpoint must be named sshd.
+  #   #
+  #   sshd:
+  #     port: 60422
+  #     expose: true
   logs:
     general:
       # -- By default, the logs use a text format (common), but you can

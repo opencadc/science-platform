@@ -29,7 +29,7 @@ spec:
         volumeMounts:
         - mountPath: "{{ .dataDir }}"
           name: cavern-volume
-{{- end }}
+{{- end }} # End with
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}

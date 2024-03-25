@@ -10,6 +10,7 @@ skaha:
 # Skaha web service deployment
 deployment:
   sshd:
+    image: linuxserver/openssh-server:latest
     imagePullPolicy: Always
     resources:
       requests:
@@ -19,8 +20,11 @@ deployment:
         memory: "500Mi"
         cpu: "250m"
 
-    # Needs to match the Cavern filesystem.dataDir
-    dataDir: "/data"
+
+    filesystem:
+      # RELATIVE path to the node/file content that could be mounted in other containers
+      # Needs to match the Cavern filesystem.subPath
+      subPath: "cavern"
 
 # Set these appropriately to match your Persistent Volume Claim labels.
 storage:

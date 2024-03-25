@@ -29,6 +29,10 @@ deployment:
     # ID (URI) of the GMS Service.
     gmsID: ivo://skao.int/gms
 
+    # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
+    # loggingGroups:
+    #   - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+
     # filesystem:
       # persistent data directory in container
       # dataDir: "/data"

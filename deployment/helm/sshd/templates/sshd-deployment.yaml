@@ -2,26 +2,32 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    run: sshd-process
-  name: sshd-process
+    run: {{ .Release.Name }}-process
+  name: {{ .Release.Name }}-process
   namespace: {{ .Values.skaha.namespace }}
 spec:
   replicas: {{ default 1 .Values.replicaCount }}
   selector:
     matchLabels:
-      run: sshd-process
+      run: {{ .Release.Name }}-process
   template:
     metadata:
       creationTimestamp: null
       labels:
-        run: sshd-process
+        run: {{ .Release.Name }}-process
     spec:
-      imagePullSecrets:
-        - name: regcred
       containers:
-      - image: linuxserver/openssh-server:latest
+      - image: {{ .Values.deployment.sshd.image }}
         imagePullPolicy: {{ .Values.deployment.sshd.imagePullPolicy }}
-        name: sshd-process
+        name: {{ .Release.Name }}-process
+        env:
+        - name: PUID
+          value: "0"
+        - name: PGID
+          value: "0"
+        ports:
+        - containerPort: 2222
+          protocol: TCP
         resources:
           requests:
             memory: {{ .Values.deployment.sshd.resources.requests.memory }}
@@ -37,12 +43,27 @@ spec:
         - containerPort: 2222
           protocol: TCP
         volumeMounts: 
-        - mountPath: "{{ .Values.deployment.sshd.dataDir }}"
+        # - mountPath: "/etc/passwd"
+        #   name: etc-passwd
+        #   subPath: passwd
+        # - mountPath: "/etc/group"
+        #   name: etc-group
+        #   subPath: group
+        - mountPath: "/home"
           name: cavern-volume
+          subPath: "{{ .Values.deployment.sshd.filesystem.subPath }}/home"
         {{- with .Values.deployment.sshd.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.sshd.extraVolumes }}

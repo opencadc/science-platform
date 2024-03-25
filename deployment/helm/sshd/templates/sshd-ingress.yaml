@@ -1,13 +1,13 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRouteTCP
 metadata:
-  name: sshd-ingress-route-tcp
+  name: {{ .Release.Name }}-ingress-route-tcp
   namespace: {{ .Values.skaha.namespace }}
 spec:
-  entryPoints:                  # [1]
+  entryPoints:
     - sshd
-  routes:                       # [2]
-  - match: HostSNI(`*`)         # [3]
-    services:                   # [7]
-    - name: sshd-svc                 # [8]
-      port: 2222                # [9]
+  routes:
+  - match: HostSNI(`*`)
+    services:
+    - name: {{ .Release.Name }}-svc
+      port: 2222
