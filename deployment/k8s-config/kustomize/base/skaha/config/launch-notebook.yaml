@@ -106,6 +106,7 @@ spec:
       volumes:
       - name: dshm
         emptyDir:
+          sizeLimit: 1Gi
           medium: Memory
       - name: start-jupyterlab
         configMap:

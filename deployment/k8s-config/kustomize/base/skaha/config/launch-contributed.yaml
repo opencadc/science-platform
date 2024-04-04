@@ -87,6 +87,7 @@ spec:
       volumes:
       - name: dshm
         emptyDir:
+          sizeLimit: 1Gi
           medium: Memory
       - name: cavern-volume
         cephfs:

@@ -110,6 +110,7 @@ spec:
       volumes:
       - name: dshm
         emptyDir:
+          sizeLimit: 1Gi
           medium: Memory
       - name: templates
         configMap:
