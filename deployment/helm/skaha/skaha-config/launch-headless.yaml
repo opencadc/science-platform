@@ -70,6 +70,8 @@ spec:
             nvidia.com/gpu: "${software.limits.gpus}"
             ephemeral-storage: "5Gi"
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd
@@ -83,6 +85,9 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc

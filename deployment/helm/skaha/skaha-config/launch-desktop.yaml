@@ -89,6 +89,8 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd
@@ -106,6 +108,9 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
       - name: templates
         configMap:
           name: templates

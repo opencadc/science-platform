@@ -73,6 +73,8 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "/arc"
           name: cavern-volume
           subPath: "cavern"
@@ -83,6 +85,9 @@ spec:
           name: sssd-dir
           readOnly: true
       volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
       - name: cavern-volume
         cephfs:
           monitors:

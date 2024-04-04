@@ -71,6 +71,8 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
@@ -78,6 +80,9 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory     
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc

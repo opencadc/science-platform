@@ -85,6 +85,8 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd
@@ -100,6 +102,9 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc  
