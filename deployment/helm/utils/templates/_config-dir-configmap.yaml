@@ -1,0 +1,11 @@
+{{- define "utils.configmap.tpl" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name | printf "%s-config" }}
+data: {}
+{{- end -}}
+
+{{- define "utils.configmap" -}}
+{{- include "utils.util.merge" (append . "utils.configmap.tpl") -}}
+{{- end -}}
