@@ -19,4 +19,4 @@ metadata:
     app: {{ .Release.Name }}-uws-postgres
 data:
   init_schema.sql: |
-      create schema {{ .Values.deployment.cavern.uws.db.schema }};
+      create schema if not exists {{ .Values.deployment.cavern.uws.db.schema }};
