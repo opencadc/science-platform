@@ -1,4 +1,4 @@
-# CHANGELOG for Skaha User Session API (Chart 0.4.1)
+# CHANGELOG for Skaha User Session API (Chart 0.4.2)
 
 ## 2024.03.11
 - Large development branch merged into `master`.  This is a point release only.
