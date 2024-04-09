@@ -84,6 +84,8 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd
@@ -99,6 +101,10 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
+      - name: dshm
+        emptyDir:
+          sizeLimit: 1Gi
+          medium: Memory
       - name: start-desktop-software
         configMap:
           name: launch-scripts
