@@ -11,6 +11,6 @@ configMapGenerator:
   files:
   - config/cadc-registry.properties
   - config/catalina.properties
-  - config/Cavern.properties
+  - config/cavern.properties
 generatorOptions:
  disableNameSuffixHash: true
