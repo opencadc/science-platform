@@ -10,10 +10,10 @@ configMapGenerator:
 - name: arc-config
   files:
   - config/catalina.properties
-  - config/Cavern.properties
+  - config/cavern.properties
   - config/cadc-registry.properties
-  - config/VOSpaceWS.properties
   - config/war-rename.conf
+  - config/RsaSignaturePub.key
 - name: arc-sshd-config
   files:
   - config/sshd_config
