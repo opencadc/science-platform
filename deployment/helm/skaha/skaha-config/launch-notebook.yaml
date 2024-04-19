@@ -59,11 +59,17 @@ spec:
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/"
+        - name: JUPYTER_DATA_DIR
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.local/share/jupyter/"
+        - name: JUPYTER_RUNTIME_DIR
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.local/share/jupyter/runtime/"
         - name: JUPYTER_PATH
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-#        - name: JUPYTERLAB_DIR
-#          value: "${SKAHA_TLD}/home/${skaha.userid}/skaha-lab"
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/"
+        - name: JUPYTERLAB_WORKSPACES_DIR
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/lab/workspaces/"
+        - name: JUPYTERLAB_SETTINGS_DIR
+          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/lab/user-settings/"
         - name: NB_USER
           value: "${skaha.userid}"
         - name: NB_UID
