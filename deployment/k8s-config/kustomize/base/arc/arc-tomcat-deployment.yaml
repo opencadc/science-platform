@@ -24,7 +24,7 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: arc-tomcat
-        image: images.opencadc.org/platform/cavern:0.7.3
+        image: images.opencadc.org/platform/cavern:0.7.4
         imagePullPolicy: Always
         resources:
           requests:
