@@ -10,8 +10,6 @@ skaha:
 # Skaha web service deployment
 deployment:
   sshd:
-    image: linuxserver/openssh-server:latest
-    imagePullPolicy: Always
     resources:
       requests:
         memory: "500Mi"
@@ -20,6 +18,11 @@ deployment:
         memory: "500Mi"
         cpu: "250m"
 
+    # The Resource ID of the Service that contains the Posix Mapping information
+    # posixMapperResourceID: "ivo://example.org/posix-mapper"
+
+    # The URL of the Registry to use
+    # registryURL: https://example.org/reg
 
     filesystem:
       # RELATIVE path to the node/file content that could be mounted in other containers
@@ -34,5 +37,5 @@ storage:
       # Example is the persistentVolumeClaim below.  Do not uncomment this
       # or Helm will use it as the default, even if a different spec
       # is specified.
-      persistentVolumeClaim:
-        claimName: skaha-pvc
+      # persistentVolumeClaim:
+      #   claimName: skaha-pvc

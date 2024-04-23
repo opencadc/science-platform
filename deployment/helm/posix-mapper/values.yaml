@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
-    image: images.opencadc.org/platform/posix-mapper:0.2.1
+    image: images.opencadc.org/platform/posix-mapper:0.2.2
     imagePullPolicy: Always
     resourceID: ivo://opencadc.org/posix-mapper
 
@@ -21,11 +21,13 @@ deployment:
     # ID (URI) of the GMS Service.
     gmsID: ivo://skao.int/gms
 
-    # Provide an array of distinguished names that are permitted to use the POSIX Mapper, if no
-    # bearer token is provided.
+    # Provide an array of Groups URIs that are permitted to access the POSIX Mapper data.  In the
+    # case of Bearer Token authentication, these will be used to authorize a user.  These are
+    # ignored when bare shared-secrets are used to authenticate (service to service call).
+    # Optional, but a good idea.
     #
-    # authorizedDistinguishedNames:
-    #   - "CN=posix-mapper, OU=cadc, O=nrc, L=victoria, ST=british-columbia, C=ca"
+    # authorizedGroups:
+    #   - "ivo://example.org/parent/groupA"
 
     # Optionally set the DEBUG port.
     # extraEnv:
