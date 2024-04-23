@@ -21,17 +21,17 @@ GROUP_FILE="/etc-group/group"
 
 TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
 
-TOKEN_FILE="/config/keys/.api-key"
+TOKEN_FILE="${HOME}/config/keys/.api-key"
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
 if [[ ! -f "${TOKEN_FILE}" ]]; then
     echo "Required file (${TOKEN_FILE}) containing the POSIX Mapper API Key is missing."
     exit 1
-elif [[ -z "${REGISTRY_URL}" ]] ; then
-    echo "Required variable REGISTRY_URL is not set."
-    exit 2
 elif [[ -z "${POSIX_MAPPER_URI}" ]] ; then
     echo "Required variable POSIX_MAPPER_URI is not set."
+    exit 2
+elif [[ -z "${REGISTRY_URL}" && "${POSIX_MAPPER_URI}" != http* ]] ; then
+    echo "Required variable REGISTRY_URL is not set if POSIX_MAPPER_URI is not an absolute URL."
     exit 3
 else
     echo "Using Registry at ${REGISTRY_URL}"
@@ -39,7 +39,16 @@ fi
 
 UID_STANDARD_URI="http://www.opencadc.org/std/posix#user-mapping-0.1"
 GID_STANDARD_URI="http://www.opencadc.org/std/posix#group-mapping-0.1"
-POSIX_MAPPER_CAPABILITIES_URL=`curl -SsL ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
+
+if [[ "${POSIX_MAPPER_URI}" == http* ]] ; then
+    # Remove trailing slashes
+    TRIMMED_POSIX_MAPPER_URL=`echo "${POSIX_MAPPER_URI}" | tr -s \/ | sed 's/\(.*\)\/$/\1/'`
+    POSIX_MAPPER_CAPABILITIES_URL="${TRIMMED_POSIX_MAPPER_URL}/capabilities"
+else
+    POSIX_MAPPER_CAPABILITIES_URL=`curl -SsL ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
+fi
+
+echo "Using POSIX Mapper service at ${POSIX_MAPPER_CAPABILITIES_URL}"
 
 # Dump the contents locally.
 curl -SsL ${POSIX_MAPPER_CAPABILITIES_URL} > ${LOCAL_CAPABILITIES_FILE}

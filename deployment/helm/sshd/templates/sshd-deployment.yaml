@@ -1,3 +1,5 @@
+{{ $image := "linuxserver/openssh-server:latest" }}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,7 +20,7 @@ spec:
     spec:
       initContainers:
       - name: backup-original-passwd-groups
-        image: linuxserver/openssh-server:latest
+        image: {{ .Values.deployment.sshd.image | default $image }}
         command: ["/bin/sh", "-c", "cp /etc/passwd /etc-passwd/passwd-orig && cp /etc/group /etc-group/group-orig"]
         volumeMounts:
         - mountPath: "/etc-passwd"
@@ -29,12 +31,12 @@ spec:
           runAsUser: 0
           runAsGroup: 0
       - name: init-users-groups
-        image: linuxserver/openssh-server:latest
+        image: {{ .Values.deployment.sshd.image | default $image }}
         imagePullPolicy: Always
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
         env:
         - name: POSIX_MAPPER_URI
-          value: {{ .Values.deployment.sshd.posixMapperResourceID }}
+          value: {{ .Values.deployment.sshd.posixMapperResourceID | required "value for .Values.deployment.sshd.posixMapperResourceID is required." "" }}
         - name: REGISTRY_URL
           value: {{ .Values.deployment.sshd.registryURL }}
         volumeMounts:
@@ -51,7 +53,7 @@ spec:
           runAsUser: 0
           runAsGroup: 0
       containers:
-      - image: linuxserver/openssh-server:latest
+      - image: {{ .Values.deployment.sshd.image | default $image }}
         imagePullPolicy: Always
         name: {{ .Release.Name }}-process
         env:

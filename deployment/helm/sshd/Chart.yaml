@@ -1,6 +1,6 @@
 apiVersion: v2
 name: sshd
-description: "A Helm chart to install an SSH server to Cavern"
+description: "A Helm chart to install an OpenSSH server to the underyling storage"
 
 # A chart can be either an 'application' or a 'library' chart.
 #
