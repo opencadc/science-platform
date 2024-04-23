@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: arc-tomcat
-        image: images-rc.canfar.net/skaha-system/cavern:0.4.9
+        image: images.opencadc.org/platform/cavern:0.7.4
       volumes:
       - name: cavern-ceph-volume
         cephfs:
