@@ -26,7 +26,7 @@ deployment:
 
     filesystem:
       # RELATIVE path to the node/file content that could be mounted in other containers
-      # Needs to match the Cavern filesystem.subPath
+      # MUST match the Cavern filesystem.subPath
       subPath: "cavern"
 
 # Set these appropriately to match your Persistent Volume Claim labels.

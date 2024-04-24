@@ -100,7 +100,7 @@ spec:
           subPath: group
         - mountPath: "/home"
           name: cavern-volume
-          subPath: "{{ .Values.deployment.sshd.filesystem.subPath }}/home"
+          subPath: "{{ .Values.deployment.sshd.filesystem.subPath | default "" }}/home"
         {{- with .Values.deployment.sshd.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
