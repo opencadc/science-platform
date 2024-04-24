@@ -54,6 +54,8 @@ spec:
         volumeMounts:
         - mountPath: "/config"
           name: config-volume
+        - mountPath: "/config/.posix-mapper-api-secret"
+          name: posix-mapper-api-secret
         - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
           name: cavern-volume
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
@@ -65,6 +67,10 @@ spec:
       - name: config-volume
         configMap:
           name: {{ .Release.Name }}-config
+      - name: posix-mapper-api-secret
+        secret:
+          defaultMode: 420
+          secretName: posix-mapper-api-secret
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.cavern.extraVolumes }}

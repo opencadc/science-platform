@@ -36,7 +36,7 @@ spec:
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
         env:
         - name: POSIX_MAPPER_URI
-          value: {{ .Values.deployment.sshd.posixMapperResourceID | required "value for .Values.deployment.sshd.posixMapperResourceID is required." "" }}
+          value: {{ .Values.deployment.sshd.posixMapperResourceID | required "value for .Values.deployment.sshd.posixMapperResourceID is required." }}
         - name: REGISTRY_URL
           value: {{ .Values.deployment.sshd.registryURL }}
         volumeMounts:
@@ -84,7 +84,13 @@ spec:
         - mountPath: "/config/keys"
           name: posix-mapper-api-secret
           readOnly: true
-        - mountPath: "/init-users-groups"
+        # Maintain the 'etc-passwd' and 'etc-group' mappings for the init-users-groups script to
+        # periodically run.
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/etc/periodic/15min"
           name: init-users-groups
         - mountPath: "/etc/passwd"
           name: etc-passwd

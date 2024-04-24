@@ -21,7 +21,7 @@ GROUP_FILE="/etc-group/group"
 
 TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
 
-TOKEN_FILE="${HOME}/config/keys/.api-key"
+TOKEN_FILE="/config/keys/.api-key"
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
 if [[ ! -f "${TOKEN_FILE}" ]]; then
