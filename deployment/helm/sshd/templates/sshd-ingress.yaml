@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 spec:
   entryPoints:
-    - sshd
+    - {{ .Values.deployment.sshd.entryPoint | required "Must supply an entryPoint name that matches your Traefik configuration." }}
   routes:
   - match: HostSNI(`*`)
     services:

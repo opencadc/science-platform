@@ -18,6 +18,9 @@ deployment:
         memory: "500Mi"
         cpu: "250m"
 
+    # Name of the Traefik entrypoint to use.
+    # entryPoint: sshd
+
     # The Resource ID of the Service that contains the Posix Mapping information
     # posixMapperResourceID: "ivo://example.org/posix-mapper"
 
