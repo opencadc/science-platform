@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   storageUI:
-    image: images.opencadc.org/client/storage-ui:1.1.1
+    image: images.opencadc.org/client/storage-ui:1.1.5
     imagePullPolicy: Always
 
     # Optionally set the DEBUG port.
@@ -34,6 +34,9 @@ deployment:
       limits:
         memory: "500M"
         cpu: "500m"
+
+    # Groups that can alter logging.  Empty array means nobody can alter it.
+    # loggingGroups: []
 
     # Dictionary of all VOSpace APIs (Services) available that will be visible on the UI.
     # Format is:
