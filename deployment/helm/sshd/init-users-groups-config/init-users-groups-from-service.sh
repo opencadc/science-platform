@@ -19,8 +19,9 @@ ORIGINAL_GROUP_FILE="/etc-group/group-orig"
 PASSWD_FILE="/etc-passwd/passwd"
 GROUP_FILE="/etc-group/group"
 
-TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
+AUTHORIZATION_HEADER="authorization: api-key"
 
+TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
 TOKEN_FILE="/config/keys/.api-key"
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
@@ -79,6 +80,6 @@ else
     cp "${ORIGINAL_GROUP_FILE}" "${GROUP_FILE}"
 
     # Ensure they have home directories set.
-    curl -SsL --header "X-Client-API-Key: ${TOKEN}" "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
-    curl -SsL --header "X-Client-API-Key: ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
+    curl -SsL --header "${AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+    curl -SsL --header "${AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
 fi

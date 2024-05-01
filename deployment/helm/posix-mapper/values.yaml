@@ -29,6 +29,16 @@ deployment:
     # authorizedGroups:
     #   - "ivo://example.org/parent/groupA"
 
+    # Provide an array of Resource IDs (URIs) that are authorized to make anonymous calls with an API Key.
+    # These should match the URIs in the Registry.  Only URIs with the "ivo" scheme are permitted.
+    #
+    # Example:
+    # authorizedResourceIDs:
+    #   - "ivo://example.org/skaha"
+    #
+    # authorizedResourceIDs: []
+    #
+
     # Optionally set the DEBUG port.
     # extraEnv:
     # - name: CATALINA_OPTS
