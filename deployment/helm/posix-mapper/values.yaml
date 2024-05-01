@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
-    image: images.opencadc.org/platform/posix-mapper:0.2.2
+    image: images.opencadc.org/platform/posix-mapper:0.2.1
     imagePullPolicy: Always
     resourceID: ivo://opencadc.org/posix-mapper
 
@@ -21,22 +21,28 @@ deployment:
     # ID (URI) of the GMS Service.
     gmsID: ivo://skao.int/gms
 
+    identityManager: org.opencadc.auth.StandardIdentityManager
+
     # Provide an array of Groups URIs that are permitted to access the POSIX Mapper data.  In the
     # case of Bearer Token authentication, these will be used to authorize a user.  These are
-    # ignored when bare shared-secrets are used to authenticate (service to service call).
-    # Optional, but a good idea.
+    # ignored when API Keys are used.
+    #
     #
     # authorizedGroups:
     #   - "ivo://example.org/parent/groupA"
 
-    # Provide an array of Resource IDs (URIs) that are authorized to make anonymous calls with an API Key.
-    # These should match the URIs in the Registry.  Only URIs with the "ivo" scheme are permitted.
+    # Provide an array of Clients that are authorized to make anonymous calls with an API Key.
+    # Each of the clients will need to include the secret to be able to call the posix-mapper
+    # with the API Key in the header:
+    #
+    # authorization: api-key <value-in-secret>
     #
     # Example:
-    # authorizedResourceIDs:
-    #   - "ivo://example.org/skaha"
+    # authorizedClients:
+    #   - sshd
+    #   - cavern
     #
-    # authorizedResourceIDs: []
+    # authorizedClients: []
     #
 
     # Optionally set the DEBUG port.

@@ -46,8 +46,9 @@ spec:
           name: etc-group
         - mountPath: "/init-users-groups"
           name: init-users-groups
-        - mountPath: "/config/keys"
-          name: posix-mapper-api-secret
+        - mountPath: "/config/keys/posix-mapper-api-key"
+          name: posix-mapper-api-keys
+          subPath: sshd-api-key
           readOnly: true
         securityContext:
           runAsUser: 0
@@ -81,8 +82,9 @@ spec:
         - containerPort: 2222
           protocol: TCP
         volumeMounts: 
-        - mountPath: "/config/keys"
-          name: posix-mapper-api-secret
+        - mountPath: "/config/keys/posix-mapper-api-key"
+          name: posix-mapper-api-keys
+          subPath: sshd-api-key
           readOnly: true
         # Maintain the 'etc-passwd' and 'etc-group' mappings for the init-users-groups script to
         # periodically run.
@@ -110,12 +112,12 @@ spec:
       volumes:
       - name: init-users-groups
         configMap:
-          name: {{ .Release.Name}}-init-users-groups-config
+          name: {{ .Release.Name }}-init-users-groups-config
           defaultMode: 0777
-      - name: posix-mapper-api-secret
+      - name: posix-mapper-api-keys
         secret:
           defaultMode: 420
-          secretName: posix-mapper-api-secret
+          secretName: posix-mapper-api-keys
       - name: etc-group
         emptyDir: {}
       - name: etc-passwd

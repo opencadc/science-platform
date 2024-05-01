@@ -40,19 +40,19 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         volumeMounts:
-        - mountPath: "/config/keys"
-          name: posix-mapper-api-secret
-          readOnly: true
         - mountPath: "/config"
           name: config-volume
+        - mountPath: "/config/keys"
+          name: posix-mapper-api-keys
+          readOnly: true
         {{- with .Values.deployment.posixMapper.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
-      - name: posix-mapper-api-secret
+      - name: posix-mapper-api-keys
         secret:
           defaultMode: 420
-          secretName: posix-mapper-api-secret
+          secretName: posix-mapper-api-keys
       - name: config-volume
         configMap:
           name: posix-mapper-config
