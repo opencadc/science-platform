@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   posixMapper:
-    image: images.opencadc.org/platform/posix-mapper:0.2.1
+    image: images.opencadc.org/platform/posix-mapper:0.2.2
     imagePullPolicy: Always
     resourceID: ivo://opencadc.org/posix-mapper
 

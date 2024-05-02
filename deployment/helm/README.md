@@ -9,7 +9,8 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
-  - [Storae User Interface install](#user-storage-ui-installation)
+  - [Storage User Interface install](#user-storage-ui-install)
+  - [SSH Daemon](#ssh-daemon-install)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
@@ -507,7 +508,7 @@ postgresql:
   install: true  # To run your own database, set this to false and override auth settings.
 ```
 
-### User Storage UI installation
+### User Storage UI install
 
 Please read the [minimum configuration](./storage-ui/README.md).  A quick look is:
 
@@ -571,6 +572,8 @@ deployment:
   # science-portal-cacert-secret:
     # ca.crt: <base64 encoded ca.crt blob>
 ```
+
+### SSHD Daemon install
 
 ## Obtaining a Bearer Token
 

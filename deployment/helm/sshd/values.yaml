@@ -27,10 +27,10 @@ deployment:
     # The URL of the Registry to use
     # registryURL: https://example.org/reg
 
-    filesystem:
+    # filesystem:
       # RELATIVE path to the node/file content that could be mounted in other containers
       # MUST match the Cavern filesystem.subPath
-      subPath: "cavern"
+      # subPath: "cavern"
 
 # Set these appropriately to match your Persistent Volume Claim labels.
 storage:

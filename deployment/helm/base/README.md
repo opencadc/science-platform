@@ -62,6 +62,31 @@ You can create your own secrets to contain your self-signed server certificates 
 the SSL termination.  See the `values.yaml` file for more, and don't forget to `base64` encode
 the values.
 
+## SSH Daemon port exposure (optional)
+
+The optional SSH Daemon will require another port to be exposed, which will be handled in this Base Chart.
+
+```yml
+traefik:
+  install: true
+  ports:
+    # Uncomment to route SSH requests on an exposed port.  This is 64022 by default, 
+    # but pick whatever works for your deployment.
+    # The endpoint must be named sshd in this example, but can be any valid YAML key.
+    #
+    # Remember this name though as it will be used later on in the SSH Daemon install.
+    #
+    sshd:
+      port: 64022
+      expose: true
+```
+
+This will expose a public port (64022) so that once the SSH Daemon Chart is installed, this port will allow users to SSH to it:
+
+```sh
+$ ssh -p 64022 example.org
+```
+
 ## Shared Storage
 
 Shared Storage is handled by the `local` Persistent Volume types.

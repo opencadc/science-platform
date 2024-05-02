@@ -19,14 +19,16 @@ ORIGINAL_GROUP_FILE="/etc-group/group-orig"
 PASSWD_FILE="/etc-passwd/passwd"
 GROUP_FILE="/etc-group/group"
 
-AUTHORIZATION_HEADER="authorization: api-key"
+TOKEN_AUTHORIZATION_HEADER="authorization: api-key"
+
+CADC_PROXY_CERT_FILE="/root/.ssl/cadcproxy.pem"
+TOKEN_FILE="/config/keys/posix-mapper-api-key"
 
 TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
-TOKEN_FILE="/config/keys/posix-mapper-api-key"
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
-if [[ ! -f "${TOKEN_FILE}" ]]; then
-    echo "Required file (${TOKEN_FILE}) containing the POSIX Mapper API Key is missing."
+if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
+    echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."
     ls -alh /config/keys/posix-mapper/
     exit 1
 elif [[ -z "${POSIX_MAPPER_URI}" ]] ; then
@@ -56,8 +58,6 @@ echo "Using POSIX Mapper service at ${POSIX_MAPPER_CAPABILITIES_URL}"
 curl -SsL ${POSIX_MAPPER_CAPABILITIES_URL} > ${LOCAL_CAPABILITIES_FILE}
 echo "Got the latest capabilities at ${LOCAL_CAPABILITIES_FILE}."
 
-TOKEN=`cat ${TOKEN_FILE}`
-
 UID_STANDARD_LINE_NUMBER=`grep -n "${UID_STANDARD_URI}" ${LOCAL_CAPABILITIES_FILE} | cut -f1 -d:`
 GID_STANDARD_LINE_NUMBER=`grep -n "${GID_STANDARD_URI}" ${LOCAL_CAPABILITIES_FILE} | cut -f1 -d:`
 
@@ -80,7 +80,15 @@ else
     cp "${ORIGINAL_PASSWD_FILE}" "${PASSWD_FILE}"
     cp "${ORIGINAL_GROUP_FILE}" "${GROUP_FILE}"
 
+    # For the case of using the CADC client certificate.
+    if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
+        CURL_COMMAND="curl -SsL -E ${CADC_PROXY_CERT_FILE}"
+    else
+        TOKEN=`cat ${TOKEN_FILE}`
+        CURL_COMMAND="curl -SsL --header ${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}"
+    fi
+
     # Ensure they have home directories set.
-    curl -SsL --header "${AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
-    curl -SsL --header "${AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
+    ${CURL_COMMAND} "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+    ${CURL_COMMAND} "${GID_URL}" >> "${GROUP_FILE}"
 fi
