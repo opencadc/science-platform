@@ -92,6 +92,12 @@ deployment:
     #     defaultMode: 420
     #     secretName: skaha-cacert-secret
 
+    # Additional configuration items that will be mounted in the container's /config folder.
+    # This mainly applies to adding extra key files that are specific the CADC.
+    # This is expected to be valid YAML.
+    #
+    # extraConfigData:
+
     # Resources provided to the Skaha service.
     resources:
       requests:
