@@ -16,20 +16,8 @@ spec:
       labels:
         run: {{ .Release.Name }}-tomcat
     spec:
-{{- with .Values.deployment.cavern.filesystem }}
-      {{ $cavernTLD := printf "%s/%s" .dataDir .subPath }}
       securityContext:
-        fsGroup: {{ .rootOwner.gid }}
         runAsUser: 0
-      initContainers:
-      - name: init-{{ $.Release.Name }}-fs
-        image: busybox
-        imagePullPolicy: IfNotPresent
-        command: ['sh', '-c', 'mkdir -p {{ $cavernTLD }}/home && mkdir -p {{ $cavernTLD }}/projects && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/home && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/projects']
-        volumeMounts:
-        - mountPath: "{{ .dataDir }}"
-          name: cavern-volume
-{{- end }} # End with
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
@@ -55,12 +43,12 @@ spec:
         - mountPath: "/config"
           name: config-volume
         {{- if (lookup "v1" "Secret" .Release.Namespace "posix-mapper-api-keys") }}
-        - mountPath: "/config/keys/posix-mapper-api-key"
+        - mountPath: "/config/keys"
           name: posix-mapper-api-keys
-          subPath: cavern-api-key
+          # subPath: cavern-api-key
           readOnly: true
         {{- end }}
-        - mountPath: "{{ .Values.deployment.cavern.filesystem.dataDir }}"
+        - mountPath: {{ .Values.deployment.cavern.filesystem.dataDir | required "The deployment.cavern.filesystem.dataDir not set.  It should be an absolute path." }}
           name: cavern-volume
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
@@ -76,6 +64,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: posix-mapper-api-keys
+          items:
+            - key: cavern-api-key
+              path: cavern-api-key
       {{- end }}
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}

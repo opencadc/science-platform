@@ -5,4 +5,6 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 data:
 {{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
-{{- .Values.deployment.cavern.extraConfigData | toYaml | nindent 2 }}
+{{- with .Values.deployment.cavern.extraConfigData}}
+{{- . | toYaml | nindent 2 }}
+{{- end }}

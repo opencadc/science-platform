@@ -22,14 +22,13 @@ GROUP_FILE="/etc-group/group"
 TOKEN_AUTHORIZATION_HEADER="authorization: api-key"
 
 CADC_PROXY_CERT_FILE="/root/.ssl/cadcproxy.pem"
-TOKEN_FILE="/config/keys/posix-mapper-api-key"
+TOKEN_FILE="/config/keys/sshd-api-key"
 
 TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
 if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
     echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."
-    ls -alh /config/keys/posix-mapper/
     exit 1
 elif [[ -z "${POSIX_MAPPER_URI}" ]] ; then
     echo "Required variable POSIX_MAPPER_URI is not set."
@@ -82,13 +81,11 @@ else
 
     # For the case of using the CADC client certificate.
     if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
-        CURL_COMMAND="curl -SsL -E ${CADC_PROXY_CERT_FILE}"
+        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
     else
         TOKEN=`cat ${TOKEN_FILE}`
-        CURL_COMMAND="curl -SsL --header ${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}"
+        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
     fi
-
-    # Ensure they have home directories set.
-    ${CURL_COMMAND} "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
-    ${CURL_COMMAND} "${GID_URL}" >> "${GROUP_FILE}"
 fi
