@@ -5,6 +5,10 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 data:
 {{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
-{{- with .Values.deployment.cavern.extraConfigData}}
-{{- . | toYaml | nindent 2 }}
+{{- range $configFileName, $configFileValue := .Values.deployment.cavern.extraConfigData }}
+{{- if $configFileName | hasSuffix ".key" }}
+  {{ $configFileName }}: {{ $configFileValue | b64dec | quote }}
+{{- else }}
+  {{ $configFileName }}: {{ $configFileValue }}
+{{- end }}
 {{- end }}
