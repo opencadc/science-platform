@@ -105,6 +105,8 @@ spec:
         {{- with .Values.deployment.sshd.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      priorityClassName: uber-user-preempt-high
+      serviceAccountName: skaha
       volumes:
       - name: init-users-groups
         configMap:
