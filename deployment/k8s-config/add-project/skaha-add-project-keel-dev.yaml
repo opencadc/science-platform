@@ -41,7 +41,7 @@ spec:
           path: /volumes/_nogroup/dcd994bc-c0d4-4557-9fbf-28fc4ef5969e
           user: kanfarnetes_dev
           secretRef:
-            name: cephfs-cephx-key
+            name: cephfs-cephx-admin-key
           readOnly: false
       - name: sssd-dir
         hostPath:
