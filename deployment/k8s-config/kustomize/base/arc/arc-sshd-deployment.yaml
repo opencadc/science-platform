@@ -81,7 +81,7 @@ spec:
           path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
           user: keel_prod
           secretRef:
-            name: cephfs-cephx-key
+            name: cephfs-cephx-user-key
           readOnly: false
       - name: arc-sshd-config-vol
         configMap:
