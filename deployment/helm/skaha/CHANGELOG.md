@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.4.2)
+# CHANGELOG for Skaha User Session API (Chart 0.4.3)
+
+## 2024.05.06
+- Small change to deploy on CADC infrastructure with CephFS quotas
 
 ## 2024.03.11
 - Large development branch merged into `master`.  This is a point release only.
