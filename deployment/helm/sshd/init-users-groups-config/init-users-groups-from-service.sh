@@ -79,13 +79,16 @@ else
     cp "${ORIGINAL_PASSWD_FILE}" "${PASSWD_FILE}"
     cp "${ORIGINAL_GROUP_FILE}" "${GROUP_FILE}"
 
+    # Escape slashes
+    ESCAPED_ROOT_PATH=`echo "${ROOT_PATH}" | sed 's/\//\\\\\//g'`
+
     # For the case of using the CADC client certificate.
     if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
-        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_ROOT_PATH}\/home\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
         curl -SsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
     else
         TOKEN=`cat ${TOKEN_FILE}`
-        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed 's/^\([a-z]*\):\(.*\):::$/\1:\2::\/home\/\1:/' >> "${PASSWD_FILE}"
+        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_ROOT_PATH}\/home\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
         curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
     fi
 fi

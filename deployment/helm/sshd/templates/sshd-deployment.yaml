@@ -36,6 +36,8 @@ spec:
           value: {{ .Values.deployment.sshd.posixMapperResourceID | required "value for .Values.deployment.sshd.posixMapperResourceID is required." }}
         - name: REGISTRY_URL
           value: {{ .Values.deployment.sshd.registryURL }}
+        - name: ROOT_PATH
+          value: {{ .Values.deployment.sshd.rootPath | required "The rootPath property is required to be an absolute path." }}
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -62,6 +64,11 @@ spec:
           value: {{ .Values.deployment.sshd.posixMapperResourceID }}
         - name: REGISTRY_URL
           value: {{ .Values.deployment.sshd.registryURL }}
+        - name: ROOT_PATH
+          value: {{ .Values.deployment.sshd.rootPath }}
+        {{- with .Values.deployment.sshd.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         ports:
         - containerPort: 2222
           protocol: TCP
@@ -72,10 +79,6 @@ spec:
           limits:
             memory: {{ .Values.deployment.sshd.resources.limits.memory }}
             cpu: {{ .Values.deployment.sshd.resources.limits.cpu }}
-        {{- with .Values.deployment.sshd.extraEnv }}
-        env:
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
         ports:
         - containerPort: 2222
           protocol: TCP
@@ -99,9 +102,9 @@ spec:
         - mountPath: "/etc/group"
           name: etc-group
           subPath: group
-        - mountPath: "/home"
+        - mountPath: "{{ .Values.deployment.sshd.rootPath }}"
           name: cavern-volume
-          subPath: {{ .Values.deployment.sshd.filesystem.homePath | default "" }}
+          subPath: {{ .Values.deployment.sshd.rootPath | regexFind "[^/].*$" }}
         {{- with .Values.deployment.sshd.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
