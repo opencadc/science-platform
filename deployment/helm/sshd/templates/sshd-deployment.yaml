@@ -55,6 +55,7 @@ spec:
         {{- end }}
       containers:
       - image: {{ .Values.deployment.sshd.image | default $image }}
+        command: ["/bin/sh", "-c", "/init-sshd/init-sshd.sh"]
         imagePullPolicy: Always
         name: {{ .Release.Name }}-process
         env:
@@ -94,6 +95,8 @@ spec:
           name: etc-passwd
         - mountPath: "/etc-group"
           name: etc-group
+        - mountPath: "/init-sshd"
+          name: init-sshd
         - mountPath: "/etc/periodic/15min"
           name: init-users-groups
         - mountPath: "/etc/passwd"
@@ -111,6 +114,10 @@ spec:
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:
+      - name: init-sshd
+        configMap:
+          name: {{ .Release.Name }}-init-sshd-config
+          defaultMode: 0777
       - name: init-users-groups
         configMap:
           name: {{ .Release.Name }}-init-users-groups-config
