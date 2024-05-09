@@ -108,20 +108,17 @@ spec:
           name: {{ .Release.Name }}-config
           subPath: ssh_host_rsa_key
         - mountPath: "/config/ssh_host_keys/ssh_host_rsa_key.pub"
-          name: {{ .Release.Name }}-config
-          subPath: ssh_host_rsa_key.pub
+          name: ssh-host-rsa-key-pub
         - mountPath: "/config/ssh_host_keys/ssh_host_ecdsa_key"
           name: {{ .Release.Name }}-config
           subPath: ssh_host_ecdsa_key
         - mountPath: "/config/ssh_host_keys/ssh_host_ecdsa_key.pub"
-          name: {{ .Release.Name }}-config
-          subPath: ssh_host_ecdsa_key.pub
+          name: ssh-host-ecdsa-key-pub
         - mountPath: "/config/ssh_host_keys/ssh_host_ed25519_key"
           name: {{ .Release.Name }}-config
           subPath: ssh_host_ed25519_key
         - mountPath: "/config/ssh_host_keys/ssh_host_ed25519_key.pub"
-          name: {{ .Release.Name }}-config
-          subPath: ssh_host_ed25519_key.pub
+          name: ssh-host-ed25519-key-pub
         - mountPath: "/config/ssh_host_keys/sshd_config"
           name: {{ .Release.Name }}-config
           subPath: sshd_config
@@ -147,16 +144,22 @@ spec:
           items:
             - key: sshd-api-key
               path: sshd-api-key
+      {{- end }}
       - name: {{ .Release.Name }}-config
         secret:
           # Decimal equivalent to 0600 octal
           defaultMode: 384
           secretName: {{ .Release.Name }}-config
-      {{- end }}
       - name: etc-group
         emptyDir: {}
       - name: etc-passwd
         emptyDir: {}
+      - name: ssh-host-rsa-key-pub
+        emptyDir: {}
+      - name: ssh-host-ecdsa-key-pub
+        emptyDir: {}
+      - name: ssh-host-ed25519-key-pub
+        emptyDir: {}        
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.sshd.extraVolumes }}

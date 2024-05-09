@@ -14,6 +14,4 @@ by the constant host name issue.
   # set $apiSecret to existing secret data or generate a random one when not exists
   {{- $apiSecret := (get $secretData $secretFieldName) | default (genPrivateKey $keyType | b64enc) }}
   {{ $secretFieldName }}: {{ $apiSecret }}
-  
-  {{ $secretFieldName }}.pub: 
 {{- end -}}
