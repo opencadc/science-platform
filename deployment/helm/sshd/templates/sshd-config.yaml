@@ -1,0 +1,13 @@
+{{ $secretName := printf "%s-config" .Release.Name }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Values.skaha.namespace }}
+type: Opaque
+data:
+{{- range list "rsa" "ecdsa" "ed25519" }}
+  {{- $keyFileName := printf "ssh_host_%s_key" . -}}
+  {{- include "sshd.gen.key" (dict "namespace" $.Release.Namespace "secretName" $secretName "secretFieldName" $keyFileName "keyType" .) -}}
+{{- end }}
+  sshd_config: {{ tpl (.Files.Get "config/sshd_config") . | b64enc }}

@@ -1,0 +1,14 @@
+Port 2222
+PasswordAuthentication no
+AllowTcpForwarding no
+GatewayPorts no
+X11Forwarding no
+PidFile /config/sshd.pid
+Subsystem	sftp	internal-sftp
+
+Match User *
+	ChrootDirectory {{ .Values.deployment.sshd.rootPath }}
+	X11Forwarding no
+	AllowTcpForwarding no
+	PermitTTY no
+	ForceCommand internal-sftp
