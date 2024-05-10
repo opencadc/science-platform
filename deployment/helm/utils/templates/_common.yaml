@@ -11,3 +11,34 @@ This takes an array of three values:
 {{- $tpl := fromYaml (include (index . 2) $top) | default (dict ) -}}
 {{- toYaml (merge $overrides $tpl) -}}
 {{- end -}}
+
+{{- /*
+utils.extraConfig will pull any extra config data from the
+.extraConfigData input YAML object.
+
+The .extraConfigData is expected to contain a valid dict with
+key: data-value pairings.
+
+Any keys that end in ".key" are treated as base64 encoded data
+and decoded.
+
+Example:
+values.yaml:
+...
+system:
+  extraConfigData:
+    myfile.txt: somedata
+    mysecret.key: L03DJSLKJLKSFD=
+...
+
+{{- include "utils.extraConfig" (dict "extraConfigData" .Values.system.extraConfigData) -}}
+*/}}
+{{- define "utils.extraConfig" -}}
+{{- range $configFileName, $configFileValue := .extraConfigData }}
+{{- if $configFileName | hasSuffix ".key" }}
+  {{ $configFileName }}: {{ $configFileValue | b64dec | quote }}
+{{- else }}
+  {{ $configFileName }}: {{ $configFileValue }}
+{{- end }}
+{{- end }}
+{{- end -}}

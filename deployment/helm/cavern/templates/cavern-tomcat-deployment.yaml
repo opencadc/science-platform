@@ -1,3 +1,6 @@
+{{- $storageSpec := .Values.storage.service.spec | required ".storage.service.spec is missing.  This should declare the configuration of the underlying storage." -}}
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,7 +15,6 @@ spec:
       run: {{ .Release.Name }}-tomcat
   template:
     metadata:
-      creationTimestamp: null
       labels:
         run: {{ .Release.Name }}-tomcat
     spec:
@@ -45,7 +47,6 @@ spec:
         {{- if (lookup "v1" "Secret" .Release.Namespace "posix-mapper-api-keys") }}
         - mountPath: "/config/keys"
           name: posix-mapper-api-keys
-          # subPath: cavern-api-key
           readOnly: true
         {{- end }}
         - mountPath: {{ .Values.deployment.cavern.filesystem.dataDir | required "The deployment.cavern.filesystem.dataDir not set.  It should be an absolute path." }}
@@ -69,7 +70,7 @@ spec:
               path: cavern-api-key
       {{- end }}
       - name: cavern-volume
-        {{- toYaml .Values.storage.service.spec | nindent 8 }}
+        {{- toYaml $storageSpec | nindent 8 }}
       {{- with .Values.deployment.cavern.extraVolumes }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

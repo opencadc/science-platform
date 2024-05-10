@@ -18,9 +18,6 @@ war {
 }
 
 copy {
-    from(System.getenv('A') + '/etc/') {
-        include 'RsaSignaturePub.key'
-    }
     into 'src/main/resources'
 }
 
