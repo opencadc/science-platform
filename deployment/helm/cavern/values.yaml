@@ -32,9 +32,9 @@ deployment:
     # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
     # loggingGroups: []
 
-    filesystem:
+    # filesystem:
       # persistent data directory in container
-      dataDir: "/data"
+      # dataDir: "/data"
 
       # RELATIVE path to the node/file content that could be mounted in other containers
       # This will be used in a `dataDir`/`subPath` manner to remove shared data from the root folder.
@@ -42,9 +42,9 @@ deployment:
 
       # The adminUsername is required to be set whomever has admin access over the
       # filesystem.dataDir above.
-      rootOwner:
+      # rootOwner:
         # adminUsername: "root"
-        username: "root"
+        # username: "root"
         # uid: 1000
         # gid: 1000
 

@@ -13,7 +13,7 @@ secrets:
 # Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
 traefik:
   install: false
-  ports:
+  # ports:
     # Uncomment to route SSH requests on an exposed port.  This is 64022 by default, 
     # but pick whatever works for your deployment.
     # The endpoint must be named sshd.
@@ -28,7 +28,7 @@ traefik:
       # format: json
       # By default, the level is set to ERROR.
       # -- Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
-      level: ERROR
+      level: WARN
     access:
       # -- To enable access logs
       enabled: false
