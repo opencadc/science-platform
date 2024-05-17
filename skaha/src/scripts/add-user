@@ -77,13 +77,12 @@ echo " Adding CASA configuration: OK"
 
 echo -n "  Setting user quota to ${QUOTA}G..."
 
-# Ignore the errors from the CephFS xattr in case they're not supported.
-setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR 2> /dev/null
-STAT=${?}
-
-if [[ ! "X${STAT}" == "X0" ]]; then
-  echo "No CephFS extended attribute plugin found.  Skipping..."
-fi
+{ # try
+    # Ignore the errors from the CephFS xattr in case they're not supported.
+    setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR 2> /dev/null
+} || { # catch
+    echo "No CephFS extended attribute plugin found.  Skipping..."
+}
 
 setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
 echo " Setting user quota to ${QUOTA}G: OK"
