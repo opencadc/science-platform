@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.org
   cavern:
-    image: images.opencadc.org/platform/cavern:0.7.6
+    image: images.opencadc.org/platform/cavern:0.7.7
     imagePullPolicy: Always
 
     # How cavern identifies itself.
@@ -31,6 +31,12 @@ deployment:
 
     # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
     # loggingGroups: []
+
+    # Simple Class name of the QuotaPlugin to use.
+    # - For CephFS deployments: CephFSQuotaPlugin
+    # - Default: NoQuotaPlugin
+    #
+    # quotaPlugin: {NoQuotaPlugin | CephFSQuotaPlug}
 
     # filesystem:
       # persistent data directory in container
@@ -107,7 +113,14 @@ deployment:
         memory: "1Gi"
         cpu: "500m"
 
-# secrets:
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the skaha one.
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  # extraHosts: []
+
+secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # cavern-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
