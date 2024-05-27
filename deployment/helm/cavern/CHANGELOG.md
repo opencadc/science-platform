@@ -1,4 +1,10 @@
-# CHANGELOG for Cavern User Storage (Chart 0.3.0)
+# CHANGELOG for Cavern User Storage (Chart 0.3.8)
+
+## 2024.05.27 (0.3.8)
+- Fix for Quota reporting
+- Fix for folder size reporting
+- Added `extraHosts` mapping for manual DNS entries
+- Added `extraConfigData` to add to the Cavern `ConfigMap`.
 
 ## 2024.03.12 (0.3.0)
 - Bug fixes in allocation
