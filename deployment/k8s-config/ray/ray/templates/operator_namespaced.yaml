@@ -1,0 +1,38 @@
+{{- if and (.Values.namespacedOperator) (not .Values.clusterOnly) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ray-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cluster.ray.io/component: operator
+  template:
+    metadata:
+      labels:
+        cluster.ray.io/component: operator
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: ray
+        imagePullPolicy: Always
+        image: {{ .Values.operatorImage }}
+        command: ["ray-operator"]
+        env:
+        - name: RAY_OPERATOR_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AUTOSCALER_MAX_NUM_FAILURES
+          value: "inf"
+        resources:
+          requests:
+            cpu: 1
+            memory: 1Gi
+            ephemeral-storage: 1Gi
+          limits:
+            memory: 2Gi
+            cpu: 1
+{{- end }}
