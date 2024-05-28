@@ -1,6 +1,7 @@
-# CHANGELOG for Cavern User Storage (Chart 0.3.8)
+# CHANGELOG for Cavern User Storage (Chart 0.4.0)
 
-## 2024.05.27 (0.3.8)
+## 2024.05.27 (0.4.0)
+- Enforcing some values to be set by the deployer.
 - Fix for Quota reporting
 - Fix for folder size reporting
 - Added `extraHosts` mapping for manual DNS entries
