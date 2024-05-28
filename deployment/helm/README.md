@@ -418,13 +418,13 @@ Please see the [minimum configuration](./cavern/README.md).  A quick look is:
 deployment:
   hostname: example.org  # Change this!
   cavern:
-    # How cavern identifies itself.
+    # How cavern identifies itself.  Required.
     resourceID: "ivo://example.org/cavern"
 
-    # Set the Registry URL pointing to the desired registry
+    # Set the Registry URL pointing to the desired registry.  Required
     registryURL: "https://registry.example.org/reg"
 
-    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
+    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).  Required.
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     filesystem:
@@ -459,27 +459,43 @@ deployment:
 
     # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
     # Don't forget to update your registry entries!
+    #
     # endpoint: "/cavern"
 
     # Optionally set the DEBUG port.
+    #
+    # Example:
     # extraEnv:
     # - name: CATALINA_OPTS
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
     # - name: JAVA_OPTS
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    #
+    # extraEnv:
 
     # Optionally mount a custom CA certificate
+    # Example:
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"
     #   name: cacert-volume
+    # 
+    # extraVolumeMounts:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # Example:
     # extraVolumes:
     # - name: cacert-volume
     #   secret:
     #     defaultMode: 420
     #     secretName: skaha-cacert-secret
+    #
+    # extraVolumes:
 
+    # Other data to be included in the main ConfigMap of this deployment.
+    # Of note, files that end in .key are special and base64 decoded.
+    # 
+    # extraConfigData:
+    
     # Resources provided to the Skaha service.
     resources:
       requests:
@@ -488,6 +504,18 @@ deployment:
       limits:
         memory: "1Gi"
         cpu: "500m"
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the cavern one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
