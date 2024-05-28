@@ -89,6 +89,12 @@ spec:
         {{- end }}
         securityContext:
           runAsUser: 0
+    {{- range $extraHost := .Values.deployment.extraHosts }}
+      hostAliases:
+        - ip: {{ $extraHost.ip }}
+          hostnames:
+            - {{ $extraHost.hostname }}
+    {{- end }}
       priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
       serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}
       volumes:
