@@ -105,7 +105,7 @@ Create a `my-posix-mapper-local-values-file.yaml` file to override Values from t
 ```yaml
 # POSIX Mapper web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  hostname: example.org
   posixMapper:
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -222,7 +222,7 @@ Create a `my-skaha-local-values-file.yaml` file to override Values from the main
 ```yaml
 # Skaha web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  hostname: example.org
   skaha:
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -374,7 +374,7 @@ Create a `my-science-portal-local-values-file.yaml` file to override Values from
 `my-science-portal-local-values-file.yaml`
 ```yaml
 deployment:
-  hostname: example.com # Change this!
+  hostname: example.org
   sciencePortal:
     # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
     skahaResourceID: ivo://example.org/skaha
@@ -459,7 +459,7 @@ Create a `my-cavern-local-values-file.yaml` file to override Values from the mai
 ```yaml
 # Cavern web service deployment
 deployment:
-  hostname: example.org  # Change this!
+  hostname: example.org
   cavern:
     # How cavern identifies itself.  Required.
     resourceID: "ivo://example.org/cavern"
@@ -594,7 +594,7 @@ Create a `my-storage-ui-local-values-file.yaml` file to override Values from the
 `my-storage-ui-local-values-file.yaml`
 ```yaml
 deployment:
-  hostname: example.com # Change this!
+  hostname: example.org
   storageUI:
     # OIDC (IAM) server configuration.  These are required
     oidc:
