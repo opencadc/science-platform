@@ -17,7 +17,7 @@
 ## Dependencies
 
 - An existing Kubernetes cluster.
-- An IVOA Registry (See the [Current SKAO Registry](https://spsrc27.iaa.csic.es/reg))
+- An [Service Registry deployment](https://github.com/opencadc/reg/tree/master/reg)
 
 ## Quick Start
 
