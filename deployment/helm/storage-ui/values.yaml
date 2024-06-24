@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   storageUI:
-    image: images.opencadc.org/client/storage-ui:1.1.7
+    image: images.opencadc.org/client/storage-ui:1.1.8
     imagePullPolicy: Always
 
     # Optionally set the DEBUG port.
