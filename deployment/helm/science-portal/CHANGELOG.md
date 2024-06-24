@@ -1,5 +1,8 @@
 # CHANGELOG for Science Portal UI (Chart 0.2.2)
 
+## 2024.06.24 (0.2.7)
+- Fix to use tokens for APIs on a different host.
+
 ## 2023.12.11 (0.2.2)
 - OpenID Connect login support
 
