@@ -75,18 +75,14 @@ rm casa-config.tar
 chown -R $USERID:$USERID $HOMEDIR/.casa
 echo " Adding CASA configuration: OK"
 
-echo -n "  Setting user quota to ${QUOTA}G..."
-
-# Ignore the errors from the CephFS xattr in case they're not supported.
-setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR 2> /dev/null
-STAT=${?}
-
-if [[ ! "X${STAT}" == "X0" ]]; then
-  echo "No CephFS extended attribute plugin found.  Skipping..."
-fi
-
+echo "  Setting user quota to ${QUOTA}G..."
 setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $HOMEDIR
-echo " Setting user quota to ${QUOTA}G: OK"
+echo "  Setting user quota to ${QUOTA}G: Done"
+
+echo "  Setting CephFS quota to ${QUOTA}G..."
+# Ignore the errors from the CephFS xattr in case they're not supported.
+eval $(setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $HOMEDIR)
+echo "  Setting CephFS quota to ${QUOTA}G: Done"
 
 TS=$(date)
 echo "$TS $SELF DONE"

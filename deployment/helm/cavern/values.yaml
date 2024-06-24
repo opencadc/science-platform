@@ -11,26 +11,34 @@ skaha:
 deployment:
   hostname: example.org
   cavern:
-    image: images.opencadc.org/platform/cavern:0.7.6
+    image: images.opencadc.org/platform/cavern:0.7.9
     imagePullPolicy: Always
 
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
 
     # Set the Registry URL pointing to the desired registry (https:// URL)
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # registryURL: https://example.org/reg
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperResourceID: "ivo://example.org/posix-mapper"
+    # posixMapperResourceID: "ivo://example.org/posix-mapper"
 
-    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
-    oidcURI: https://ska-iam.stfc.ac.uk/
+    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.  Required.
+    # oidcURI: https://ska-iam.stfc.ac.uk/
 
-    # ID (URI) of the GMS Service.
-    gmsID: ivo://skao.int/gms
+    # ID (URI) of the GMS Service.  Required
+    # gmsID: ivo://skao.int/gms
 
     # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
     # loggingGroups: []
+
+    # Simple Class name of the QuotaPlugin to use.  This is used to request quota and folder size information
+    # from the underlying storage system.  Optional, defaults to NoQuotaPlugin.
+    #
+    # - For CephFS deployments: CephFSQuotaPlugin
+    # - Default: NoQuotaPlugin
+    #
+    # quotaPlugin: {NoQuotaPlugin | CephFSQuotaPlug}
 
     # filesystem:
       # persistent data directory in container
@@ -52,7 +60,7 @@ deployment:
       # sshfs:
       #   serverBase: {server}[:{port}]:{path}
 
-    # The IdentityManager class handling authentication.  This should generally be left alone
+    # The IdentityManager class handling authentication.  This should generally be left alone.
     identityManagerClass: org.opencadc.auth.StandardIdentityManager
 
     # For the UWS database.
@@ -107,7 +115,14 @@ deployment:
         memory: "1Gi"
         cpu: "500m"
 
-# secrets:
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the skaha one.
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  # extraHosts: []
+
+secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # cavern-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>

@@ -18,12 +18,13 @@
 ## Dependencies
 
 - An existing Kubernetes cluster.
-- An IVOA Registry (See the [Current SKAO Registry](https://spsrc27.iaa.csic.es/reg))
+- An [Service Registry deployment](https://github.com/opencadc/reg/tree/master/reg)
 
 ## Quick Start
 
 ```bash
 helm repo add science-platform https://images.opencadc.org/chartrepo/platform
+helm repo add science-platform-client https://images.opencadc.org/chartrepo/client
 helm repo update
 
 helm install --values my-base-local-values-file.yaml base science-platform/base
@@ -31,7 +32,7 @@ helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml pos
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
 helm install -n skaha-system --dependency-update --values my-scienceportal-local-values-file.yaml scienceportal science-platform/scienceportal
 helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern science-platform/cavern
-helm install -n skaha-system --dependency-update --values my-storage-ui-local-values-file.yaml storage-ui science-platform/storageui
+helm install -n skaha-system --dependency-update --values my-storage-ui-local-values-file.yaml storage-ui science-platform-client/storageui
 ```
 
 More details below.
@@ -105,7 +106,7 @@ Create a `my-posix-mapper-local-values-file.yaml` file to override Values from t
 ```yaml
 # POSIX Mapper web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  hostname: example.org
   posixMapper:
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -135,7 +136,7 @@ deployment:
     minGID: 900000
 
     # The URL of the IVOA Registry
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    registryURL: https://example.org/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -216,10 +217,13 @@ ivo://example.org/posix-mapper = https://example.host.com/posix-mapper/capabilit
 ...
 ```
 
+Create a `my-skaha-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](skaha/values.yaml).
+
+`my-skaha-local-values-file.yaml`
 ```yaml
-# POSIX Mapper web service deployment
+# Skaha web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  hostname: example.org
   skaha:
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -237,15 +241,6 @@ deployment:
     # omitted.
     # skahaTld: "/arc"
 
-    # Resources provided to the Skaha service.
-    resources:
-      requests:
-        memory: "1Gi"
-        cpu: "500m"
-      limits:
-        memory: "1Gi"
-        cpu: "500m"
-
     maxUserSessions: "3"
     sessionExpiry: "345600"
     defaultQuotaGB: "10"
@@ -254,28 +249,29 @@ deployment:
     registryHosts: "images.canfar.net"
 
     # The group name to verify users against for permission to use the Science Platform.  Group must exist in the group provider.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # usersGroup: "ivo://example.org/gms?groups/users"
 
     # Set to an administrative group.  Used to determine if the current user can bypass Harbor image validation.
-    adminsGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # adminsGroup: "ivo://example.org/gms?groups/admins"
 
     # Group for users to preempt headless jobs.  Group must exist in the group provider. (Optional)
-    headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # headlessGroup: "ivo://example.org/gms?groups/headless-users"
 
     # Array of groups allowed to set the logging level.  Group must exist in the group provider. (Optional)
-    loggingGroups:
-      - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # loggingGroups:
+    #   - "ivo://example.org/gms?groups/logging-users"
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
+    # posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     # URI or URL of the OIDC (IAM) server
-    # oidcURI: https://ska-iam.stfc.ac.uk/
+    # oidcURI: https://iam.example.org/
 
     # ID (URI) of the GMS Service.
-    # gmsID: ivo://skao.int/gms
+    # gmsID: ivo://example.org/gms
 
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # The registry of canned URLs
+    registryURL: https://example.org/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -288,6 +284,32 @@ deployment:
     #   secret:
     #     defaultMode: 420
     #     secretName: posix-manager-cacert-secret
+
+    # Other data to be included in the main ConfigMap of this deployment.
+    # Of note, files that end in .key are special and base64 decoded.
+    # 
+    # extraConfigData:
+    
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the skaha one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
 
 # Set these labels appropriately to match your Persistent Volume labels.
 # The storage.service.spec can be anything that supports ACLs, such as CephFS or Local.
@@ -310,11 +332,6 @@ secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
 #   posix-manager-cacert-secret:
 #     ca.crt: <base64 encoded ca crt>
-
-# An omission equals true, so set this explicitly to false as we already installed it.
-posixmapper:
-    install: false
-    # Supports all of the posix-mapper/values.yaml options here.
 ```
 
 It is recommended to install into the `skaha-system` namespace, but not required.
@@ -338,13 +355,11 @@ curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" https://example.host.com
 
 # xxxxxx is the returned session ID.
 curl -SsL --header "authorization: Bearer ${SKA_TOKEN}" -d "ram=1" -d "cores=1" -d "image=images.canfar.net/canucs/canucs:1.2.5" -d "name=myjupyternotebook" "https://example.host.com/skaha/v0/session"
-
-xxxxxx
 ```
 
 ### Science Portal User Interface install
 
-The Skaha service will manage User Sessions.  It relies on the Skaha service being deployed, and available to be found
+The Science Portal service will manage User Sessions.  It relies on the Skaha service being deployed, and available to be found
 via the IVOA Registry:
 
 `/reg/resource-caps`
@@ -355,31 +370,35 @@ ivo://example.org/skaha = https://example.host.com/skaha/capabilities
 ...
 ```
 
-Please read the [minimum configuration](./science-portal/README.md).  A quick look is:
+Create a `my-science-portal-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](science-portal/values.yaml).
 
+`my-science-portal-local-values-file.yaml`
 ```yaml
 deployment:
-  hostname: example.com # Change this!
+  hostname: example.org
   sciencePortal:
+    # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
+    skahaResourceID: ivo://example.org/skaha
+
     # OIDC (IAM) server configuration.  These are required
-    oidc:
+    # oidc:
       # Location of the OpenID Provider (OIdP), and where users will login
-      uri: https://ska-iam.stfc.ac.uk/
+    #   uri: https://iam.example.org/
 
       # The Client ID as listed on the OIdP.  Create one at the uri above.
-      clientID: my-client-id
+    #   clientID: my-client-id
 
       # The Client Secret, which should be generated by the OIdP.
-      clientSecret:  my-client-secret
+    #   clientSecret: my-client-secret
 
       # Where the OIdP should send the User after successful authentication.  This is also known as the redirect_uri in OpenID.
-      redirectURI: https://example.com/science-portal/oidc-callback
+    #   redirectURI: https://example.com/science-portal/oidc-callback
 
       # Where to redirect to after the redirectURI callback has completed.  This will almost always be the URL to the /science-portal main page (https://example.com/science-portal).
-      callbackURI: https://example.com/science-portal/
+    #   callbackURI: https://example.com/science-portal/
 
       # The standard OpenID scopes for token requests.  This is required, and if using the SKAO IAM, can be left as-is.
-      scope: "openid profile offline_access"
+    #   scope: "openid profile offline_access"
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -393,12 +412,36 @@ deployment:
     #     defaultMode: 420
     #     secretName: science-portal-cacert-secret
 
-    # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
-    skahaResourceID: ivo://example.org/skaha
+    # The theme name for styling.
+    # src: The SRCNet theme
+    # canfar: The CANFAR theme for internal CADC deployment
+    # themeName: {src | canfar}
 
-    # The logo in the top left.  No link associated, just the image.  This can be relative, or absolute.
-    # Default is the SRCNet Logo.
-    # logoURL: /science-portal/images/SRCNetLogo.png
+    # Other data to be included in the main ConfigMap of this deployment.
+    # Of note, files that end in .key are special and base64 decoded.
+    # 
+    # extraConfigData:
+    
+    # Resources provided to the Science Portal service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the sciencePortal one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
@@ -411,28 +454,29 @@ deployment:
 The Cavern API provides access to the User Storage which is shared between Skaha and all of the User Sessions.  A [Bearer token](#obtaining-a-bearer-token) is required when trying to read
 private access, or any writing.
 
-Please see the [minimum configuration](./cavern/README.md).  A quick look is:
+Create a `my-cavern-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](cavern/values.yaml).
 
+`my-cavern-local-values-file.yaml`
 ```yaml
-# Skaha web service deployment
+# Cavern web service deployment
 deployment:
-  hostname: example.org  # Change this!
+  hostname: example.org
   cavern:
-    # How cavern identifies itself.
+    # How cavern identifies itself.  Required.
     resourceID: "ivo://example.org/cavern"
 
-    # Set the Registry URL pointing to the desired registry
-    registryURL: "https://registry.example.org/reg"
+    # Set the Registry URL pointing to the desired registry.  Required
+    registryURL: "https://example.org/reg"
 
-    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).
+    # How to find the POSIX Mapper API.  URI (ivo://) or URL (https://).  Required.
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     filesystem:
       # persistent data directory in container
-      dataDir: "/data"
+      dataDir: # e.g. "/data"
 
       # RELATIVE path to the node/file content that could be mounted in other containers
-      subPath: "cavern"
+      subPath: # e.g. "cavern"
 
       # See https://github.com/opencadc/vos/tree/master/cavern for documentation.  For deployments using OpenID Connect,
       # the rootOwner MUST be an object with the following properties set.
@@ -459,28 +503,52 @@ deployment:
 
     # The endpoint to serve this from.  Defaults to /cavern.  If the applicationName is changed, then this should match.
     # Don't forget to update your registry entries!
+    #
     # endpoint: "/cavern"
 
+    # Simple Class name of the QuotaPlugin to use.  This is used to request quota and folder size information
+    # from the underlying storage system.  Optional, defaults to NoQuotaPlugin.
+    #
+    # - For CephFS deployments: CephFSQuotaPlugin
+    # - Default: NoQuotaPlugin
+    #
+    # quotaPlugin: {NoQuotaPlugin | CephFSQuotaPlug}
+
     # Optionally set the DEBUG port.
+    #
+    # Example:
     # extraEnv:
     # - name: CATALINA_OPTS
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
     # - name: JAVA_OPTS
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    #
+    # extraEnv:
 
     # Optionally mount a custom CA certificate
+    # Example:
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"
     #   name: cacert-volume
+    # 
+    # extraVolumeMounts:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # Example:
     # extraVolumes:
     # - name: cacert-volume
     #   secret:
     #     defaultMode: 420
-    #     secretName: skaha-cacert-secret
+    #     secretName: cavern-cacert-secret
+    #
+    # extraVolumes:
 
-    # Resources provided to the Skaha service.
+    # Other data to be included in the main ConfigMap of this deployment.
+    # Of note, files that end in .key are special and base64 decoded.
+    # 
+    # extraConfigData:
+    
+    # Resources provided to the Cavern service.
     resources:
       requests:
         memory: "1Gi"
@@ -488,6 +556,18 @@ deployment:
       limits:
         memory: "1Gi"
         cpu: "500m"
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the cavern one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
@@ -510,16 +590,17 @@ postgresql:
 
 ### User Storage UI install
 
-Please read the [minimum configuration](./storage-ui/README.md).  A quick look is:
+Create a `my-storage-ui-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](storage-ui/values.yaml).
 
+`my-storage-ui-local-values-file.yaml`
 ```yaml
 deployment:
-  hostname: example.com # Change this!
+  hostname: example.org
   storageUI:
     # OIDC (IAM) server configuration.  These are required
     oidc:
       # Location of the OpenID Provider (OIdP), and where users will login
-      uri: https://ska-iam.stfc.ac.uk/
+      uri: https://iam.example.org/
 
       # The Client ID as listed on the OIdP.  Create one at the uri above.
       clientID: my-client-id
@@ -537,7 +618,7 @@ deployment:
       scope: "openid profile offline_access"
 
     # ID (URI) of the GMS Service.
-    gmsID: ivo://skao.int/gms
+    gmsID: ivo://example.org/gms
 
     # Dictionary of all VOSpace APIs (Services) available that will be visible on the UI.
     # Format is:
@@ -545,8 +626,8 @@ deployment:
       defaultService: cavern
       services:
         cavern:
-          resourceID: "ivo://ska.int/cavern"
-          nodeURIPrefix: "vos://int.ska~cavern"
+          resourceID: "ivo://example.org/cavern"
+          nodeURIPrefix: "vos://example.org~cavern"
           userHomeDir: "/home"
           # Some VOSpace services support these features.  Cavern does not, but it needs to be explicitly declared here.
           features:
@@ -565,11 +646,37 @@ deployment:
     # - name: cacert-volume
     #   secret:
     #     defaultMode: 420
-    #     secretName: science-portal-cacert-secret
+    #     secretName: storage-ui-cacert-secret
+
+    # Other data to be included in the main ConfigMap of this deployment.
+    # Of note, files that end in .key are special and base64 decoded.
+    # 
+    # extraConfigData:
+    
+    # Resources provided to the StorageUI service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the storageUI one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-  # science-portal-cacert-secret:
+  # storage-ui-cacert-secret:
     # ca.crt: <base64 encoded ca.crt blob>
 ```
 
