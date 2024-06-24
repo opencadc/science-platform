@@ -2,32 +2,6 @@
 
 See the [Deployment Guide](../README.md) for a better idea of a full system.
 
-## Preparation
-
-### Key authorization (`authorized_keys`)
-
-To faciliate password-less logins, please upload a Public Key to your Home directory in the `.ssh/authorized_key` file.  The easiest way to do that
-is to create a local `authorized_keys` file, or you may use your existing one if it contains your Public Key already.  If you're creating a new one, simply put the contents
-of your Public Key into the `authorized_keys` file:
-
-```sh
-$ cat ~/.ssh/id_rsa.pub > /cavern/home/jenkinsd/.ssh/authorized_keys
-```
-
-Then create a folder in the called `.ssh` in your `/home/<username>` folder.  It's quickest to use the Storage UI to do that.  Assuming your storage is called `cavern` and your username is `exampleuser`:
-
-```sh
-$ open https://example.org/storage/cavern/list/home/exampleuser
-```
-
-Once authenticated, ensure the `.ssh` folder exists with the `+ Add` -> `Folder` pulldown.
-
-Then navigate into that folder, and uplaod the newly created `authorized_keys` file:
-
-```sh
-$ open https://example.org/storage/cavern/list/home/exampleuser/.ssh
-```
-
 ### Traefik endpoint
 
 Ensure that a Traefik endpoint is setup to expose the desired port.  Examples will use the `64022` port.  In the `base`
