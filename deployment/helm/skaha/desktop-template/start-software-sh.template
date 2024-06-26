@@ -12,7 +12,7 @@ handle_error() {
 
 get_resource_options() {
     if [ -e "${TOKEN_FILE}" ]; then
-      resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/context`
+      resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/context`
     else
       handle_error "[skaha] No credentials to call back to Skaha with."
     fi   
@@ -85,7 +85,7 @@ prompt_user() {
             echo "Launching (NAME)..."
 
             if [ -e "${TOKEN_FILE}" ]; then
-              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
             else
               handle_error "[skaha] No credentials to call back to Skaha with."
             fi 
@@ -97,7 +97,7 @@ prompt_user() {
             echo "Launching (NAME)..."
 
             if [ -e "${TOKEN_FILE}" ]; then
-              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
             else
               handle_error "[skaha] No credentials to call back to Skaha with."
             fi   
@@ -119,7 +119,7 @@ get_status() {
     local n=0
     sleep 1
     if [ -e "${TOKEN_FILE}" ]; then
-        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`
     else
         handle_error "[skaha] No credentials to call back to Skaha with."
     fi
@@ -133,7 +133,7 @@ get_status() {
         sleep 1
 
         if [ -e "${HOME}/.token/.skaha" ]; then
-          curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/${SKAHA_API_VERSION}/session/${VNC_PW}/app/$1`
+          curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`
         else
           handle_error "[skaha] No credentials to call back to Skaha with."
         fi   
