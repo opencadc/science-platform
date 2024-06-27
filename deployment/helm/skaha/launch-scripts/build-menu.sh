@@ -180,26 +180,36 @@ build_menu_item () {
   image_id=$1
   name=$2
   category=$3
+  tmp_folder="/tmp"
   name_version_array=($(echo $name | tr ":" "\n"))
   short_name=${name_version_array[0]}
   version=${name_version_array[1]}
   executable="${EXECUTABLE_DIR}/${name}.sh"
+  tmp_executable="${tmp_folder}/${name}.sh"
   start_executable="${EXECUTABLE_DIR}/start-${name}.sh"
+  tmp_start_executable="${tmp_folder}/start-${name}.sh"
   desktop="${DESKTOP_DIR}/${name}.desktop"
-  cp ${STARTUP_DIR}/software-sh.template $executable
-  cp ${STARTUP_DIR}/start-software-sh.template ${start_executable}
-  cp ${STARTUP_DIR}/software-category.template $desktop
-  sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
-  sed -i -e "s#(TOKEN)#${TOKEN}#g" $start_executable
-  sed -i -e "s#(HOST)#${HOST}#g" $start_executable
-  sed -i -e "s#(SKAHA_API_VERSION)#${SKAHA_API_VERSION}#g" $start_executable
-  sed -i -e "s#(NAME)#${name}#g" $executable
-  sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${start_executable}
-  sed -i -e "s#(NAME)#${name}#g" ${start_executable}
-  sed -i -e "s#(NAME)#${name}#g" $desktop
-  sed -i -e "s#(VERSION)#${version}#g" $desktop
-  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
-  sed -i -e "s#(CATEGORY)#${category}#g" $desktop
+  tmp_desktop="${tmp_folder}/${name}.desktop"
+  cp ${STARTUP_DIR}/software-sh.template $tmp_executable
+  cp ${STARTUP_DIR}/start-software-sh.template ${tmp_start_executable}
+  cp ${STARTUP_DIR}/software-category.template $tmp_desktop
+  sed -i -e "s#(IMAGE_ID)#${image_id}#g" $tmp_executable
+  sed -i -e "s#(TOKEN)#${TOKEN}#g" $tmp_start_executable
+  sed -i -e "s#(HOST)#${HOST}#g" $tmp_start_executable
+  sed -i -e "s#(SKAHA_API_VERSION)#${SKAHA_API_VERSION}#g" $tmp_start_executable
+  sed -i -e "s#(NAME)#${name}#g" $tmp_executable
+  sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${tmp_start_executable}
+  sed -i -e "s#(NAME)#${name}#g" ${tmp_start_executable}
+  sed -i -e "s#(NAME)#${name}#g" $tmp_desktop
+  sed -i -e "s#(VERSION)#${version}#g" $tmp_desktop
+  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $tmp_desktop
+  sed -i -e "s#(CATEGORY)#${category}#g" $tmp_desktop
+  cp $tmp_executable $executable
+  cp $tmp_start_executable ${start_executable}
+  cp $tmp_desktop $desktop
+  rm -f $tmp_executable
+  rm -f $tmp_start_executable
+  rm -f $tmp_desktop
   if [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]]; then
     if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
       # pick the latest version
