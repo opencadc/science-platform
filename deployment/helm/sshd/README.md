@@ -1,0 +1,79 @@
+# Helm Chart for the Science Platform SSHD service
+
+See the [Deployment Guide](../README.md) for a better idea of a full system.
+
+### Traefik endpoint
+
+Ensure that a Traefik endpoint is setup to expose the desired port.  Examples will use the `64022` port.  In the `base`
+install, add a `ports` section if it's not there already, and create an entrypoint with the name that will match
+the `deployment.sshd.entryPoint` value in your Helm values file.
+
+`base/values.yaml`:
+```yaml
+...
+traefik:
+  ports:
+    sshd:
+      port: 64022
+      expose: true
+...
+```
+
+Then re-install the `base` Chart.
+
+## Install from Helm repository
+
+Create a Helm values file.
+
+`my-sshd-values.yaml`:
+```yaml
+deployment:
+  sshd:
+    registryURL: https://example.org/reg
+    posixMapperResourceID: ivo://example.org/posix-mapper
+    entryPoint: sshd  # Match this to the entrypoint (port exposed) deployed in the Base install!
+
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
+```
+
+Assuming your installation namespace is `skaha-system` (it should be the same as the other installations):
+```sh
+$ helm repo update
+$ helm -n skaha-system upgrade --install --values my-sshd-values.yaml sshd science-platform/sshd
+```
+
+### Install From Git source
+
+Installation depends on a working Kubernetes cluster version 1.23 or greater.
+
+The base install also installs the Traefik proxy, which is needed by the Ingress when the Science Platform services are installed.
+
+```sh
+$ git clone https://github.com/opencadc/science-platform.git
+$ cd science-platform/deployment/helm
+$ helm install -n skaha-system --dependency-update --values my-values-local.yaml <name> ./sshd
+```
+
+Where `<name>` is the name of this installation.  Example:
+```sh
+$ helm install -n skaha-system --dependency-update --values my-values-local.yaml my-sshd ./sshd
+```
+This will install the SSH Daemon service and any necessary Ingress.
+```
+NAME: sshd
+LAST DEPLOYED: <Timestamp e.g. The May 02 13:10:22 2024>
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+```
+
+## Verification
+
+From a terminal:
+```sh
+$ ssh -p 64022 example.org
+```

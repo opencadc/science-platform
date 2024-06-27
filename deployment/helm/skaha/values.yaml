@@ -90,6 +90,12 @@ deployment:
     #     defaultMode: 420
     #     secretName: skaha-cacert-secret
 
+    # Additional configuration items that will be mounted in the container's /config folder.
+    # This mainly applies to adding extra key files that are specific the CADC.
+    # This is expected to be valid YAML.
+    #
+    # extraConfigData:
+
   # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
   # deployment object, not the skaha one.
   # extraHosts:

@@ -9,7 +9,8 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
-  - [Storae User Interface install](#user-storage-ui-installation)
+  - [Storage User Interface install](#user-storage-ui-install)
+  - [SSH Daemon](#ssh-daemon-install)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
@@ -587,7 +588,7 @@ postgresql:
   install: true  # To run your own database, set this to false and override auth settings.
 ```
 
-### User Storage UI installation
+### User Storage UI install
 
 Create a `my-storage-ui-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](storage-ui/values.yaml).
 
@@ -678,6 +679,8 @@ deployment:
   # storage-ui-cacert-secret:
     # ca.crt: <base64 encoded ca.crt blob>
 ```
+
+### SSHD Daemon install
 
 ## Obtaining a Bearer Token
 
