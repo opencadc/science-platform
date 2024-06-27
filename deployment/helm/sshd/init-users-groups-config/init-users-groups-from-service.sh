@@ -27,6 +27,8 @@ TOKEN_FILE="/config/keys/sshd-api-key"
 TMP_FILE_NAME=`hexdump -n 8 -v -e '/1 "%02X"' -e '/8 "\n"' /dev/urandom`
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
+update-ca-certificates
+
 if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
     echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."
     exit 1
