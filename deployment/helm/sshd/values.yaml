@@ -31,6 +31,31 @@ deployment:
     # path that users will mount using sshfs.
     # rootPath: "/cavern"
 
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: sshd-cacert-secret
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the sshd one.
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  # extraHosts: []
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+  # sshd-cacert-secret:
+  #   ca.crt: <base64 encoded CA crt>
+
+
 # Set these appropriately to match your Persistent Volume Claim labels.
 storage:
   service:
