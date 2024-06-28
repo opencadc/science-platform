@@ -97,6 +97,10 @@ deployment:
   #     hostname: myhost.example.org
   # extraHosts: []
 
+    # Uncomment to mount CVMFS in the skaha deployments.
+    # Deployments assume CVMFS is configured on the cluster nodes and available at the path /cvmfs.
+    # cvmfsEnabled: true
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
