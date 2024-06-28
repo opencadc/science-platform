@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         - name: "${software.imagesecret}"
       securityContext:
-        runAsUser: ${skaha.posixid} 
+        runAsUser: ${skaha.posixid}
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
@@ -47,7 +47,7 @@ spec:
         - mountPath: "/posix-mapping"
           name: posix-mapping
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
@@ -122,6 +122,7 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        {{- include "skaha.cvmfsVolumeMount" . | indent 8 }}
       volumes:
       - name: start-jupyterlab
         configMap:
@@ -134,6 +135,7 @@ spec:
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc
+      {{- include "skaha.cvmfsVolume" . | indent 6 }}
       - name: scratch-dir
         emptyDir: {}
       - name: etc-group

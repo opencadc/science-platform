@@ -47,7 +47,7 @@ spec:
         - mountPath: "/posix-mapping"
           name: posix-mapping
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
@@ -61,7 +61,7 @@ spec:
         - name: PWD
           value: "${SKAHA_TLD}/home/${skaha.userid}"
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
@@ -99,10 +99,11 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        {{- include "skaha.cvmfsVolumeMount" . | indent 8 }}
       volumes:
       - name: cavern-volume
         persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc  
+          claimName: skaha-workload-cavern-pvc
       - name: scratch-dir
         emptyDir: {}
       - name: init-users-groups
@@ -113,6 +114,7 @@ spec:
         configMap:
           name: launch-scripts
           defaultMode: 0777
+      {{- include "skaha.cvmfsVolume" . | indent 6 }}
       - name: etc-group
         emptyDir: {}
       - name: etc-passwd

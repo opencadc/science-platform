@@ -42,7 +42,7 @@ spec:
         - mountPath: "/posix-mapping"
           name: posix-mapping
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
       securityContext:
         runAsUser: ${skaha.posixid}
@@ -82,6 +82,7 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        {{- include "skaha.cvmfsVolumeMount" . | indent 8 }}
       volumes:
       - name: cavern-volume
         persistentVolumeClaim:
@@ -90,6 +91,7 @@ spec:
         configMap:
           name: init-users-groups-config
           defaultMode: 0777
+      {{- include "skaha.cvmfsVolume" . | indent 6 }}
       - name: scratch-dir
         emptyDir: {}
       - name: etc-group

@@ -60,3 +60,27 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+CVMFS Volume
+*/}}
+{{- define "skaha.cvmfsVolume" -}}
+{{- if .Values.deployment.skaha.cvmfsEnabled }}
+- name: cvmfs
+  hostPath:
+    path: /cvmfs
+    type: Directory
+{{- end }}
+{{- end }}
+
+{{/*
+CVMFS VolumeMount
+*/}}
+{{- define "skaha.cvmfsVolumeMount" -}}
+{{- if .Values.deployment.skaha.cvmfsEnabled }}
+- name: cvmfs
+  mountPath: /cvmfs
+  readOnly: true
+  mountPropagation: HostToContainer
+{{- end }}
+{{- end }}

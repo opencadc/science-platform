@@ -5,5 +5,14 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 data:
 {{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
-  {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}
-{{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
+{{ $currentScope := .}}
+{{- range $path, $_ := (.Files.Glob "skaha-config/*") }}
+{{- with $currentScope}}
+{{ $path }}: |
+{{- if (hasSuffix ".yaml" $path) }}
+  {{- tpl (.Files.Get $path) . | nindent 2 }}
+{{- else }}
+  {{- .Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
