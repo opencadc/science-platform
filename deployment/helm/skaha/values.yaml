@@ -90,6 +90,10 @@ deployment:
     #     defaultMode: 420
     #     secretName: skaha-cacert-secret
 
+    # Uncomment to mount CVMFS in the skaha deployments.
+    # Deployments assume CVMFS is configured on the cluster nodes and accessible as a hostpath at /cvmfs.
+    # cvmfsEnabled: true
+
   # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
   # deployment object, not the skaha one.
   # extraHosts:
@@ -97,9 +101,6 @@ deployment:
   #     hostname: myhost.example.org
   # extraHosts: []
 
-    # Uncomment to mount CVMFS in the skaha deployments.
-    # Deployments assume CVMFS is configured on the cluster nodes and available at the path /cvmfs.
-    # cvmfsEnabled: true
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
