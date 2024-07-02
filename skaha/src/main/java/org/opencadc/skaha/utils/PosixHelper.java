@@ -127,9 +127,9 @@ public class PosixHelper {
                               pg.getGID())));
         }
 
-        final String userEntriesString = groupEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(PosixHelper.POSIX_DELIMITER) > 0) {
-            return groupEntryBuilder.substring(0, userEntriesString.lastIndexOf(PosixHelper.POSIX_DELIMITER));
+        final String groupEntriesString = groupEntryBuilder.toString();
+        if (groupEntriesString.lastIndexOf(PosixHelper.POSIX_DELIMITER) > 0) {
+            return groupEntryBuilder.substring(0, groupEntriesString.lastIndexOf(PosixHelper.POSIX_DELIMITER));
         } else {
             return groupEntryBuilder.toString();
         }
