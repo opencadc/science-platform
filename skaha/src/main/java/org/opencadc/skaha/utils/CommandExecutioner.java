@@ -21,6 +21,26 @@ public class CommandExecutioner {
         return execute(command, true);
     }
 
+    public static String executeInShell(String[] command, boolean allowError) throws IOException, InterruptedException {
+        final ProcessBuilder processBuilder = new ProcessBuilder("/bin/sh", "-c", String.join(" ", command));
+        final Process p = processBuilder.start();
+        final String stdout = readStream(p.getInputStream());
+        final String stderr = readStream(p.getErrorStream());
+        log.debug("stdout: " + stdout);
+        log.debug("stderr: " + stderr);
+        int status = p.waitFor();
+        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
+        if (status != 0) {
+            if (allowError) {
+                return stderr;
+            } else {
+                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
+                throw new IOException(message);
+            }
+        }
+        return stdout.trim();
+    }
+
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         String stdout = readStream(p.getInputStream());

@@ -69,8 +69,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.PosixPrincipal;
-import ca.nrc.cadc.io.ResourceIterator;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
@@ -85,12 +83,9 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.utils.PosixHelper;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -104,6 +99,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.opencadc.skaha.utils.PosixHelper;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -123,7 +119,6 @@ public class PostAction extends SessionAction {
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
     public static final String SKAHA_USERID = "skaha.userid";
-    public static final String SKAHA_USER_QUOTA_GB = "skaha.userquotagb";
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
@@ -165,8 +160,7 @@ public class PostAction extends SessionAction {
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
-            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION)
-                                                         && sessionID == null)) {
+            if (requestType.equals(REQUEST_TYPE_APP) || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
                 throw new IllegalArgumentException("Missing parameter 'image'");
             }
         }
@@ -371,8 +365,7 @@ public class PostAction extends SessionAction {
             renewExpiryTimeCmd.add(entry.getKey());
             renewExpiryTimeCmd.add("--type=json");
             renewExpiryTimeCmd.add("-p");
-            renewExpiryTimeCmd.add(
-                    "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
+            renewExpiryTimeCmd.add("[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
             execute(renewExpiryTimeCmd.toArray(new String[0]));
         }
     }
@@ -555,7 +548,8 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-        String secretName = createPosixMappingSecret(sessionID);
+        PosixHelper.ensurePosixMappingSecret(posixMapperConfiguration.getPosixMapperClient());
+
         xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
@@ -623,7 +617,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, secretName);
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, PosixHelper.POSIX_MAPPINGS_SECRET_NAME);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
@@ -713,7 +707,6 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
-        final String secretName = PosixHelper.getPosixMapperSecretName(sessionID);
         xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
@@ -768,7 +761,6 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
-        launchString = setConfigValue(launchString, POSIX_MAPPING_SECRET, secretName);
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
@@ -893,56 +885,6 @@ public class PostAction extends SessionAction {
         }
 
         return secretName;
-    }
-
-    private String createPosixMappingSecret(final String sessionID) throws Exception {
-        if (skahaCallbackFlow) {
-            return PosixHelper.getPosixMapperSecretName(callbackSessionId);
-        }
-
-        final String posixMappingSecretName = PosixHelper.getPosixMapperSecretName(sessionID);
-        final Path holdingDir =
-                Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), posixMappingSecretName);
-        final File uidMappingFile = new File(holdingDir.toString(), "uidmap.txt");
-        final File gidMappingFile = new File(holdingDir.toString(), "gidmap.txt");
-
-        try (final FileWriter uidMappingWriter = new FileWriter(uidMappingFile)) {
-            uidMappingWriter.write(getUserEntries());
-            uidMappingWriter.flush();
-        }
-
-        try (final FileWriter gidMappingWriter = new FileWriter(gidMappingFile)) {
-            gidMappingWriter.write(getGroupEntries());
-            gidMappingWriter.flush();
-        }
-
-        // create new secret
-        final String[] createCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
-                posixMappingSecretName,
-                "--from-file=" + uidMappingFile.getAbsolutePath(),
-                "--from-file=" + gidMappingFile.getAbsolutePath()
-        };
-
-        final String createResult = execute(createCmd);
-        log.debug("create secret result: " + createResult);
-
-        return posixMappingSecretName;
-    }
-
-    private String getUserEntries() throws Exception {
-        final StringBuilder userEntryBuilder = new StringBuilder();
-        try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
-                     posixMapperConfiguration.getPosixMapperClient().getUserMap()) {
-            posixPrincipalIterator.forEachRemaining(pp -> userEntryBuilder.append(PosixHelper.uidMapping(pp)));
-        }
-
-        final String userEntriesString = userEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER) > 0) {
-            return userEntryBuilder.substring(0, userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER));
-        } else {
-            return userEntryBuilder.toString();
-        }
     }
 
     private String getSupplementalGroupsList() throws Exception {
