@@ -23,7 +23,12 @@ public class PosixHelper {
 
     static final String POSIX_DELIMITER = ";";
     static final String POSIX_MAPPING_SECRET_LAST_MOD_KEY = "lastModified";
-    static final long FIFTEEN_MINUTES_MS = 15L * 60L * 1000L;
+
+    // TODO: Make this configurable, if this solution proves successful.
+    // TODO: jenkinsd 2024.06.02
+    //
+    static final long ONE_MINUTE_MS = 60L * 1000L;
+
     public static final String POSIX_MAPPINGS_SECRET_NAME = "posix-mappings";
 
     /**
@@ -51,7 +56,7 @@ public class PosixHelper {
             final Date lastModDate = DateUtil.getDateFormat(DateUtil.ISO8601_DATE_FORMAT_LOCAL, DateUtil.UTC).parse(lastModDateString);
             final long currentAgeInMilliseconds = PosixHelper.currentDateUTC().getTime() - lastModDate.getTime();
             LOGGER.debug("current age of " + PosixHelper.POSIX_MAPPINGS_SECRET_NAME + " is " + currentAgeInMilliseconds + " milliseconds");
-            return currentAgeInMilliseconds >= PosixHelper.FIFTEEN_MINUTES_MS;
+            return currentAgeInMilliseconds >= PosixHelper.ONE_MINUTE_MS;
         } else {
             return true;
         }
