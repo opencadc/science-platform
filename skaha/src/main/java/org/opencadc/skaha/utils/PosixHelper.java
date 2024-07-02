@@ -1,7 +1,5 @@
 package org.opencadc.skaha.utils;
 
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
-
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.io.ResourceIterator;
@@ -58,6 +56,7 @@ public class PosixHelper {
             LOGGER.debug("current age of " + PosixHelper.POSIX_MAPPINGS_SECRET_NAME + " is " + currentAgeInMilliseconds + " milliseconds");
             return currentAgeInMilliseconds >= PosixHelper.ONE_MINUTE_MS;
         } else {
+            LOGGER.debug("secret " + PosixHelper.POSIX_MAPPINGS_SECRET_NAME + " not found");
             return true;
         }
     }
@@ -101,7 +100,7 @@ public class PosixHelper {
             final String createResult = CommandExecutioner.executeInShell(createSecretCommand, false);
             LOGGER.debug("create secret result: " + createResult);
         } else {
-
+            LOGGER.debug("secret " + PosixHelper.POSIX_MAPPINGS_SECRET_NAME + " does not require an update");
         }
     }
 
