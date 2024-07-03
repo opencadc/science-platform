@@ -577,6 +577,14 @@ public abstract class SkahaAction extends RestAction {
             }
         }
 
+        public URI getResourceID() {
+            return this.resourceID;
+        }
+
+        public URL getBaseURL() {
+            return this.baseURL;
+        }
+
         public PosixMapperClient getPosixMapperClient() {
             if (resourceID == null) {
                 return new PosixMapperClient(baseURL);

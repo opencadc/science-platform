@@ -71,6 +71,8 @@ import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.reg.client.LocalAuthority;
+import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import org.apache.log4j.Logger;
@@ -99,7 +101,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.opencadc.skaha.utils.PosixHelper;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -145,6 +146,8 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String POSIX_MAPPING_SECRET = "POSIX_MAPPING_SECRET";
+    private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
+    private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
@@ -548,7 +551,7 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-        PosixHelper.ensurePosixMappingSecret(posixMapperConfiguration.getPosixMapperClient());
+//        PosixHelper.ensurePosixMappingSecret(posixMapperConfiguration.getPosixMapperClient());
 
         xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
@@ -617,16 +620,24 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, PosixHelper.POSIX_MAPPINGS_SECRET_NAME);
+        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
+                                                                            ? posixMapperConfiguration.getResourceID().toString()
+                                                                            : posixMapperConfiguration.getBaseURL().toExternalForm());
+
+        // This property is mandatory in the Skaha configuration's cadc-registry.properties.
+        jobLaunchString = setConfigValue(jobLaunchString, REGISTRY_URL,
+                                         new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
+//        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, PosixHelper.POSIX_MAPPINGS_SECRET_NAME);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
+
+        // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
+        injectCredentials();
+
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
-
-        // insert the user's proxy cert in the home dir
-        injectCredentials();
 
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
