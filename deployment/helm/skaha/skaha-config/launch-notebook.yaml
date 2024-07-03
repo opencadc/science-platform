@@ -34,8 +34,19 @@ spec:
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
-      - name: init-users-groups
+      - name: backup-original-passwd-groups
         image: ${software.imageid}
+        command: ["/bin/sh", "-c", "cp /etc/passwd /etc-passwd/passwd-orig && cp /etc/group /etc-group/group-orig"]
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        securityContext:
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+      - name: init-users-groups
+        image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
         volumeMounts:
         - mountPath: "/etc-passwd"
@@ -44,6 +55,9 @@ spec:
           name: etc-group
         - mountPath: "/init-users-groups"
           name: init-users-groups
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
@@ -52,8 +66,8 @@ spec:
         - name: REGISTRY_URL
           value: ${REGISTRY_URL}
         securityContext:
-          runAsUser: 0
-          runAsGroup: 0
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
       containers:
       - name: "${skaha.jobname}"
         env:

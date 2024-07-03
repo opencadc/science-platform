@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+
+# Depends on the images.opencadc.org/library/cadc-tomcat:1 image!
 
 # Two variables are expected:
 # REGISTRY_URL
@@ -13,23 +15,27 @@
 PASSWD_FILE="/etc-passwd/passwd"
 GROUP_FILE="/etc-group/group"
 
-TOKEN_AUTHORIZATION_HEADER="authorization: api-key"
-
+TOKEN_AUTHORIZATION_HEADER="authorization: bearer"
+CONFDIR=/config
 CADC_PROXY_CERT_FILE="${HOME}/.ssl/cadcproxy.pem"
-TOKEN_FILE="/config/keys/skaha-posix-mapping-api-key"
+TOKEN_FILE="${HOME}/.token/.skaha"
 
 TMP_FILE_NAME=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 32 | head -n 1`
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
-update-ca-certificates
+if [[ -e $CONFDIR/cacerts ]]; then
+    echo "Configure CA bundle with extra certificates: $CONFDIR/cacerts"
+    cp $CONFDIR/cacerts/* /etc/pki/ca-trust/source/anchors/
+    update-ca-trust
+fi
 
-if [ ! -f "${TOKEN_FILE}" ] && [ ! -f "${CADC_PROXY_CERT_FILE}" ]; then
+if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
     echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."
     exit 1
-elif [ -z "${POSIX_MAPPER_URI}" ] ; then
+elif [[ -z "${POSIX_MAPPER_URI}" ]] ; then
     echo "Required variable POSIX_MAPPER_URI is not set."
     exit 2
-elif [ -z "${REGISTRY_URL}" ] && [ "${POSIX_MAPPER_URI}" != http* ] ; then
+elif [[ -z "${REGISTRY_URL}" && "${POSIX_MAPPER_URI}" != http* ]] ; then
     echo "Required variable REGISTRY_URL is not set if POSIX_MAPPER_URI is not an absolute URL."
     exit 3
 else
@@ -39,7 +45,7 @@ fi
 UID_STANDARD_URI="http://www.opencadc.org/std/posix#user-mapping-0.1"
 GID_STANDARD_URI="http://www.opencadc.org/std/posix#group-mapping-0.1"
 
-if [ "${POSIX_MAPPER_URI}" == http* ] ; then
+if [[ "${POSIX_MAPPER_URI}" == http* ]] ; then
     # Remove trailing slashes
     TRIMMED_POSIX_MAPPER_URL=`echo "${POSIX_MAPPER_URI}" | tr -s \/ | sed 's/\(.*\)\/$/\1/'`
     POSIX_MAPPER_CAPABILITIES_URL="${TRIMMED_POSIX_MAPPER_URL}/capabilities"
@@ -65,10 +71,10 @@ echo "Will obtain UID information from ${UID_URL}"
 GID_URL=`tail -n +${GID_STANDARD_LINE_NUMBER} ${LOCAL_CAPABILITIES_FILE} | grep accessURL -m 1 | awk -F \> '{print $2}' | awk -F \< '{print $1}'`
 echo "Will obtain GID information from ${GID_URL}"
 
-if [ -z "${UID_URL}" ] || [ "X${UID_URL}" == "X" ] ; then
+if [[ -z "${UID_URL}" || "X${UID_URL}" == "X" ]] ; then
     echo "No URL found for POSIX Mapper UID."
     exit 4
-elif [ -z "${GID_URL}" ] || [ "X${GID_URL}" == "X" ] ; then
+elif [[ -z "${GID_URL}" || "X${GID_URL}" == "X" ]] ; then
     echo "No URL found for POSIX Mapper GID."
     exit 5
 else
@@ -76,7 +82,7 @@ else
     ESCAPED_HOME=`echo "${HOME}" | sed 's/\//\\\\\//g'`
 
     # For the case of using the CADC client certificate.
-    if [ -f "${CADC_PROXY_CERT_FILE}" ] ; then
+    if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
         curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
         curl -SsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
     else
