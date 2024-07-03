@@ -772,6 +772,13 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
+        launchString = setConfigValue(launchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
+            ? posixMapperConfiguration.getResourceID().toString()
+            : posixMapperConfiguration.getBaseURL().toExternalForm());
+
+        // This property is mandatory in the Skaha configuration's cadc-registry.properties.
+        launchString = setConfigValue(launchString, REGISTRY_URL,
+                                         new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
         String launchFile = super.stageFile(launchString);
