@@ -5,5 +5,5 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 data:
 {{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
-  {{ tpl (.Files.Glob "skaha-config/*").AsConfig . | indent 2 -}}
+  {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}
 {{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
