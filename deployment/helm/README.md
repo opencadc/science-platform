@@ -216,6 +216,21 @@ ivo://example.org/posix-mapper = https://example.host.com/posix-mapper/capabilit
 ...
 ```
 
+#### (Optional) Mount CVMFS in Skaha deployments
+
+To mount CVMFS in the skaha deployments, uncomment this variable in the skaha values file:
+
+```{yaml}
+deployment:
+  skaha:
+    cvmfsEnabled: true
+```
+
+Skaha assumes CVMFS is configured on the nodes of the cluster and accessible as a hostpath at /cvmfs. For information about installing a CVMFS client, see the [CVMFS documentation](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html).
+
+Note that in production scenarios, it is recommended to set up a [local proxy server](https://cvmfs.readthedocs.io/en/stable/cpt-squid.html) that the CVMFS clients connect to.
+
+
 Create a `my-skaha-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](skaha/values.yaml).
 
 `my-skaha-local-values-file.yaml`
