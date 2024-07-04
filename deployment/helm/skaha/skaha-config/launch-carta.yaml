@@ -58,6 +58,9 @@ spec:
         - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
@@ -68,6 +71,14 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+{{- with .Values.deployment.extraHosts }}
+      hostAliases:
+{{- range $extraHost := . }}
+        - ip: {{ $extraHost.ip }}
+          hostnames:
+            - {{ $extraHost.hostname }}
+{{- end }}            
+{{- end }}
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -136,4 +147,6 @@ spec:
         emptyDir: {}
       - name: etc-passwd
         emptyDir: {}
- 
+      {{- with .Values.deployment.skaha.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

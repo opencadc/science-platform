@@ -23,11 +23,10 @@ TOKEN_FILE="${HOME}/.token/.skaha"
 TMP_FILE_NAME=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 32 | head -n 1`
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
-if [[ -e $CONFDIR/cacerts ]]; then
-    echo "Configure CA bundle with extra certificates: $CONFDIR/cacerts"
-    cp $CONFDIR/cacerts/* /etc/pki/ca-trust/source/anchors/
-    update-ca-trust
-fi
+CURL="curl -SsL"
+
+whoami
+sudo update-ca-trust
 
 if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
     echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."
@@ -50,13 +49,13 @@ if [[ "${POSIX_MAPPER_URI}" == http* ]] ; then
     TRIMMED_POSIX_MAPPER_URL=`echo "${POSIX_MAPPER_URI}" | tr -s \/ | sed 's/\(.*\)\/$/\1/'`
     POSIX_MAPPER_CAPABILITIES_URL="${TRIMMED_POSIX_MAPPER_URL}/capabilities"
 else
-    POSIX_MAPPER_CAPABILITIES_URL=`curl -SsL ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
+    POSIX_MAPPER_CAPABILITIES_URL=`${CURL} ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
 fi
 
 echo "Using POSIX Mapper service at ${POSIX_MAPPER_CAPABILITIES_URL}"
 
 # Dump the contents locally.
-curl -SsL ${POSIX_MAPPER_CAPABILITIES_URL} > ${LOCAL_CAPABILITIES_FILE}
+${CURL} ${POSIX_MAPPER_CAPABILITIES_URL} > ${LOCAL_CAPABILITIES_FILE}
 echo "Got the latest capabilities at ${LOCAL_CAPABILITIES_FILE}."
 
 UID_STANDARD_LINE_NUMBER=`grep -n "${UID_STANDARD_URI}" ${LOCAL_CAPABILITIES_FILE} | cut -f1 -d:`
@@ -83,11 +82,11 @@ else
 
     # For the case of using the CADC client certificate.
     if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
-        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
-        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
+        ${CURL} -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
+        ${CURL} -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
     else
         TOKEN=`cat ${TOKEN_FILE}`
-        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
-        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
+        ${CURL} --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed "s/^\([a-z]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
+        ${CURL} --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
     fi
 fi

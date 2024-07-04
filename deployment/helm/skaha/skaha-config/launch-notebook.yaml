@@ -42,9 +42,6 @@ spec:
           name: etc-passwd
         - mountPath: "/etc-group"
           name: etc-group
-        securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
       - name: init-users-groups
         image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
@@ -58,6 +55,17 @@ spec:
         - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- range $mount := . }}
+        {{ if eq $mount.mountPath "/config/cacerts" }}
+        - mountPath: "/etc/pki/ca-trust/source/anchors/"
+          name: {{ $mount.name }}
+          readOnly: {{ $mount.readOnly }}
+        {{ else }}
+        {{- toYaml . | nindent 8 }}
+        {{ end }}
+        {{- end }}
+        {{- end }}
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
@@ -65,9 +73,17 @@ spec:
           value: ${POSIX_MAPPER_URI}
         - name: REGISTRY_URL
           value: ${REGISTRY_URL}
+{{- with .Values.deployment.extraHosts }}
+      hostAliases:
+{{- range $extraHost := . }}
+        - ip: {{ $extraHost.ip }}
+          hostnames:
+            - {{ $extraHost.hostname }}
+{{- end }}            
+{{- end }}
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
+          runAsUser: 8675309
+          runAsGroup: 8675309
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -116,12 +132,12 @@ spec:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
-            ephemeral-storage: "5Gi"
+            ephemeral-storage: "20Gi"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             nvidia.com/gpu: "${software.limits.gpus}"
-            ephemeral-storage: "5Gi"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 8888
           protocol: TCP
@@ -159,3 +175,6 @@ spec:
         emptyDir: {}
       - name: etc-passwd
         emptyDir: {}
+      {{- with .Values.deployment.skaha.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
