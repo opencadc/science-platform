@@ -80,8 +80,9 @@ spec:
         - name: PWD
           value: "${SKAHA_TLD}/home/${skaha.userid}"
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:

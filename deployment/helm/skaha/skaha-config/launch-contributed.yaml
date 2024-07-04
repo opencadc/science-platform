@@ -118,6 +118,10 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        securityContext:
+          runAsUser: ${skaha.posixid}
+          runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
       volumes:
       - name: cavern-volume
         persistentVolumeClaim:
