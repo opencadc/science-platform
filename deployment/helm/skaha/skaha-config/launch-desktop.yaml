@@ -93,13 +93,13 @@ spec:
         imagePullPolicy: Always
         resources:
           requests:
-            memory: "250Mi"
-            cpu: "100m"
+            memory: "1Gi"
+            cpu: "250m"
             ephemeral-storage: "2Gi"
           limits:
-            memory: "500Mi"
-            cpu: "250m"
-            ephemeral-storage: "5Gi"
+            memory: "4Gi"
+            cpu: "1"
+            ephemeral-storage: "10Gi"
         ports:
         - containerPort: 5901
           protocol: TCP
