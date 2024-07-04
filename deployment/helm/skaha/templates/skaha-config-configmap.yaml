@@ -6,8 +6,9 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
 data:
 {{ tpl ($.Files.Glob "config/*").AsConfig . | indent 2 }}
-{{ range $path, $_ :=  $.Files.Glob "skaha-config/*" }}
+{{ range $path, $_ :=  $.Files.Glob "skaha-config/*.yaml" }}
   {{ base $path }}: |
-  {{- tpl ($.Files.Get $path) $currContext | nindent 4 }}
+  {{- tpl ($.Files.Get $path) $currContext | toYaml | nindent 4 }}
 {{ end }}
+{{ ($.Files.Glob "skaha-config/*.properties").AsConfig | indent 2 }}
 {{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
