@@ -57,7 +57,7 @@ spec:
           subPath: "cavern"
         {{- with .Values.deployment.skaha.extraVolumeMounts }}
         {{- range $mount := . }}
-        {{ if eq $mount.mountPath "/config/cacerts" }}
+        {{- if eq $mount.mountPath "/config/cacerts" }}
         - mountPath: "/etc/pki/ca-trust/source/anchors/"
           name: {{ $mount.name }}
           {{ if $mount.readOnly }}
