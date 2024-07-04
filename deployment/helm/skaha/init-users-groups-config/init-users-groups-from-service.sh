@@ -16,7 +16,6 @@ PASSWD_FILE="/etc-passwd/passwd"
 GROUP_FILE="/etc-group/group"
 
 TOKEN_AUTHORIZATION_HEADER="authorization: bearer"
-CONFDIR=/config
 CADC_PROXY_CERT_FILE="${HOME}/.ssl/cadcproxy.pem"
 TOKEN_FILE="${HOME}/.token/.skaha"
 
@@ -27,6 +26,9 @@ CURL="curl -SsL"
 
 whoami
 sudo update-ca-trust
+
+/bin/ls -alh ${HOME}/.ssl
+/bin/ls -alh ${HOME}/.token
 
 if [[ ! -f "${TOKEN_FILE}" && ! -f "${CADC_PROXY_CERT_FILE}" ]]; then
     echo "One of the required files (${TOKEN_FILE}, ${CADC_PROXY_CERT_FILE}) containing the POSIX Mapper API Key or client certificates is missing."

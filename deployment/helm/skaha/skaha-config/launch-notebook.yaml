@@ -60,7 +60,9 @@ spec:
         {{ if eq $mount.mountPath "/config/cacerts" }}
         - mountPath: "/etc/pki/ca-trust/source/anchors/"
           name: {{ $mount.name }}
+          {{ if $mount.readOnly }}
           readOnly: {{ $mount.readOnly }}
+          {{ end }}
         {{ else }}
         {{- toYaml . | nindent 8 }}
         {{ end }}
@@ -73,6 +75,9 @@ spec:
           value: ${POSIX_MAPPER_URI}
         - name: REGISTRY_URL
           value: ${REGISTRY_URL}
+        securityContext:
+          runAsUser: 8675309
+          runAsGroup: ${skaha.posixid}
 {{- with .Values.deployment.extraHosts }}
       hostAliases:
 {{- range $extraHost := . }}
@@ -81,9 +86,6 @@ spec:
             - {{ $extraHost.hostname }}
 {{- end }}            
 {{- end }}
-        securityContext:
-          runAsUser: 8675309
-          runAsGroup: 8675309
       containers:
       - name: "${skaha.jobname}"
         env:
