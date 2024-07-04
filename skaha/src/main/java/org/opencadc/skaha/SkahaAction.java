@@ -120,8 +120,6 @@ public abstract class SkahaAction extends RestAction {
 
     private static final Logger log = Logger.getLogger(SkahaAction.class);
 
-    protected static final String POSIX_DELIMITER = ";";
-
     private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
 
     public static final String SESSION_TYPE_CARTA = "carta";
@@ -227,24 +225,6 @@ public abstract class SkahaAction extends RestAction {
             initiateSkahaCallbackFlow(currentSubject, skahaUsersUri);
         } else {
             initiateGeneralFlow(currentSubject, skahaUsersUri);
-        }
-    }
-
-    protected String getGroupEntries() throws Exception {
-        final StringBuilder groupEntryBuilder = new StringBuilder();
-        try (final ResourceIterator<PosixGroup> posixGroupIterator =
-                     posixMapperConfiguration.getPosixMapperClient().getGroupMap()) {
-            posixGroupIterator.forEachRemaining(pg -> groupEntryBuilder.append(
-                    String.format("%s:x:%d:\n",
-                                  pg.getGroupURI().getURI().getQuery(),
-                                  pg.getGID())));
-        }
-
-        final String userEntriesString = groupEntryBuilder.toString();
-        if (userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER) > 0) {
-            return groupEntryBuilder.substring(0, userEntriesString.lastIndexOf(SkahaAction.POSIX_DELIMITER));
-        } else {
-            return groupEntryBuilder.toString();
         }
     }
 
@@ -595,6 +575,14 @@ public abstract class SkahaAction extends RestAction {
                 throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
                                                 + configuredPosixMapperID + ").");
             }
+        }
+
+        public URI getResourceID() {
+            return this.resourceID;
+        }
+
+        public URL getBaseURL() {
+            return this.baseURL;
         }
 
         public PosixMapperClient getPosixMapperClient() {
