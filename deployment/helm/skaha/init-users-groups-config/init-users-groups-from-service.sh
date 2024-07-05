@@ -24,9 +24,6 @@ LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
 
 CURL="curl -SsL"
 
-whoami
-sudo update-ca-trust
-
 /bin/ls -alh ${HOME}/.ssl
 /bin/ls -alh ${HOME}/.token
 
