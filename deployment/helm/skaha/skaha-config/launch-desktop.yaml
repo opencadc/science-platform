@@ -98,8 +98,9 @@ spec:
         - name: SKAHA_API_VERSION
           value: "v0"  
         securityContext:
-          runAsUser: ${skaha.posixid} 
+          runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          allowPrivilegeEscalation: false
         image: ${software.imageid}
         imagePullPolicy: Always
         resources:
