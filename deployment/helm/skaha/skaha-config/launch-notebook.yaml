@@ -75,6 +75,14 @@ spec:
           value: ${POSIX_MAPPER_URI}
         - name: REGISTRY_URL
           value: ${REGISTRY_URL}
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- range $mount := . }}
+        {{- if eq $mount.mountPath "/config/cacerts" }}
+        - name: USE_INSECURE
+          value: "1"
+        {{ end }}
+        {{- end }}
+        {{- end }}
         securityContext:
           # nobody user
           runAsUser: ${skaha.posixid}
