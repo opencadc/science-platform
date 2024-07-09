@@ -131,23 +131,37 @@ public class CommandExecutioner {
         Path path = Paths.get("/", paths);
         File directory = new File(path.toString());
         if (!(directory.exists())) {
-            directory.mkdir();
+            directory.mkdirs();
         }
         return path.toString();
     }
 
-    public static String createOrOverrideFile(String directoryPath, String fileName, String content)
-            throws IOException {
+    public static String createOrOverrideFile(String directoryPath, String fileName) throws IOException {
         Path path = Paths.get(directoryPath, fileName);
         File file = new File(path.toString());
         if (!(file.exists())) {
             file.createNewFile();
         }
+
+        return path.toString();
+    }
+
+    public static String createOrOverrideFile(String directoryPath, String fileName, String content) throws IOException {
+        File file = new File(CommandExecutioner.createOrOverrideFile(directoryPath, fileName));
+        if (!(file.exists())) {
+            file.createNewFile();
+        }
+
         BufferedWriter writer = new BufferedWriter(new FileWriter(file));
         writer.write(content + "\n");
         writer.flush();
         writer.close();
-        return path.toString();
+
+        return file.getAbsolutePath();
+    }
+
+    public static void changeOwnership(String path, int posixID) throws IOException, InterruptedException {
+        CommandExecutioner.changeOwnership(path, posixID, posixID);
     }
 
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {

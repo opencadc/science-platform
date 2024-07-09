@@ -90,6 +90,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.*;
+import org.opencadc.skaha.utils.PosixHelper;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -180,12 +181,16 @@ public abstract class SessionAction extends SkahaAction {
                 .next();
     }
 
-
-    protected void injectCredentials() {
+    void injectCredentials() {
         final String username = posixPrincipal.username;
         int posixId = getUID();
         injectToken(username, posixId, xAuthTokenSkaha);
         injectProxyCertificate(username);
+    }
+
+    void injectPOSIXDetails() throws Exception {
+        final String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, posixPrincipal.username);
+        PosixHelper.writePOSIXEntries(userHomeDirectory, posixPrincipal, posixMapperConfiguration.getPosixMapperClient());
     }
 
     private void injectToken(String username, int posixId, String token) {
@@ -229,7 +234,7 @@ public abstract class SessionAction extends SkahaAction {
                     });
                     log.debug("Proxy cert: " + proxyCert);
                     // inject the proxy cert
-                    log.debug("Running docker exec to insert cert");
+                    log.debug("Inserting certificate");
 
                     injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
                 }
