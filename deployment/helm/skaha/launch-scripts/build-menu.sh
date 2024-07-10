@@ -2,6 +2,7 @@
 
 HOST=$1
 TOKEN=$(cat ${HOME}/.token/.skaha)
+ICON_DIR="/headless/.icons"
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
 EXECUTABLE_DIR="$HOME/.local/skaha/bin"
@@ -13,27 +14,55 @@ START_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-top.menu"
 END_ASTROSOFTWARE_MENU="${STARTUP_DIR}/astrosoftware-bottom.menu"
 MERGED_DIR="/etc/xdg/menus/applications-merged"
 ASTROSOFTWARE_MENU="${MERGED_DIR}/astrosoftware.menu"
-ds9_version="ds9:"
-ds9_terminal_version="ds9-terminal:"
-terminal_version="terminal:"
-topcat_version="topcat:"
-topcat_terminal_version="topcat-terminal:"
+declare -A app_version
 
-init_dir () {
-  if [[ -d "$1" ]]; then
-    # empty the directory
-    rm -f $1/*
-  else
-    mkdir -p "$1"
-  fi
+
+# generate a list of candidate icon names
+generate_candidates () {
+  current_dir=${PWD}
+  cd ${ICON_DIR}
+  png_files=`ls *.png`
+  svg_files=`ls *.svg`
+  non_candidates=()
+  for file in ${png_files}
+  do
+    non_candidates+=(`echo ${file} | cut -f1 -d"."`)
+  done
+  echo "[skaha] non icon candidates: ${non_candidates[@]}"
+
+  candidates=()
+  for file in ${svg_files[@]}
+  do
+    candidate=(`echo ${file} | cut -f1 -d"."`)
+    if [[ ! "${non_candidates[@]}" =~ ${candidate} ]]; then
+      candidates+=(${candidate})
+    fi
+  done
+  echo "[skaha] icon candidates: ${candidates[@]}"
+  cd ${current_dir}
 }
 
-init () {
+init_app_version () {
+  generate_candidates
+  for app_name in ${candidates[@]}
+  do
+    app_version[${app_name}]="${app_name}:"
+  done
+}
+
+init_skaha_dir () {
+  if [[ -d "${SKAHA_DIR}" ]]; then
+    # remove the directory
+    rm -rf ${SKAHA_DIR}
+  fi
+
   dirs="${EXECUTABLE_DIR} ${DESKTOP_DIR} ${DIRECTORIES_DIR}"
   for dir in ${dirs}; do
-    init_dir ${dir}
+    mkdir -p ${dir}
   done
+}
 
+init_applications_dir () {
   # XFCE is hardcoded to use ~/.local/share/applications
   if [[ -d ${XFCE_DESKTOP_DIR} ]]; then
     # directory already exists, delete it
@@ -46,6 +75,12 @@ init () {
     mkdir -p ${XFCE_DESKTOP_DIR_PARENT}
     ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
   fi
+}
+
+init () {
+  init_app_version
+  init_skaha_dir
+  init_applications_dir
 
   # sleep-forever.sh is used on desktop-app start up, refer to start-software-sh.template
   cp /skaha-system/sleep-forever.sh ${EXECUTABLE_DIR}/.
@@ -127,69 +162,60 @@ build_menu () {
 }
 
 update_desktop () {
-  script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/$1.desktop.template /tmp/$1.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/$1.desktop
-  cp /tmp/$1.desktop /headless/Desktop/$1.desktop
-  rm /tmp/$1.desktop
-}
-
-update_terminal_desktop () {
-  script_name="${EXECUTABLE_DIR}/$2.sh"
-  cp ${STARTUP_DIR}/terminal.desktop.template /tmp/terminal.desktop
-  sed -i -e "s#(SCRIPT)#${script_name}#g" /tmp/terminal.desktop
-  cp /tmp/terminal.desktop $1
-  rm /tmp/terminal.desktop
+  dest=$1
+  short_name=$2
+  name=$3
+  tmp_file=/tmp/${short_name}.desktop
+  cp ${STARTUP_DIR}/app-desktop.template ${tmp_file}
+  sed -i -e "s#(VERSION)#${version}#g" ${tmp_file}
+  sed -i -e "s#(SHORTNAME)#${short_name}#g" ${tmp_file}
+  sed -i -e "s#(NAME)#${name}#g" ${tmp_file}
+  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" ${tmp_file}
+  sed -i -e "s#(CATEGORY)#${category}#g" ${tmp_file}
+  cp ${tmp_file} ${dest}
+  rm ${tmp_file}
 }
 
 build_menu_item () {
   image_id=$1
   name=$2
   category=$3
+  tmp_folder="/tmp"
+  name_version_array=($(echo $name | tr ":" "\n"))
+  short_name=${name_version_array[0]}
+  version=${name_version_array[1]}
   executable="${EXECUTABLE_DIR}/${name}.sh"
+  tmp_executable="${tmp_folder}/${name}.sh"
   start_executable="${EXECUTABLE_DIR}/start-${name}.sh"
+  tmp_start_executable="${tmp_folder}/start-${name}.sh"
   desktop="${DESKTOP_DIR}/${name}.desktop"
-  cp ${STARTUP_DIR}/software-sh.template $executable
-  cp ${STARTUP_DIR}/start-software-sh.template ${start_executable}
-  sed -i -e "s#(HOST)#$HOST#g" $start_executable
-  sed -i -e "s#(TOKEN)#$TOKEN#g" $start_executable 
-  cp ${STARTUP_DIR}/software-category.template $desktop
-  sed -i -e "s#(IMAGE_ID)#${image_id}#g" $executable
-  sed -i -e "s#(NAME)#${name}#g" $executable
-  sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${start_executable}
-  sed -i -e "s#(NAME)#${name}#g" ${start_executable}
-  sed -i -e "s#(NAME)#${name}#g" $desktop
-  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $desktop
-  sed -i -e "s#(CATEGORY)#${category}#g" $desktop
-  if [[ ${image_id} == *"/skaha/ds9"* ]]; then
-    name_version_array=($(echo $name | tr ":" "\n"))
-    short_name=${name_version_array[0]}
-    # ds9 desktop accessed via ds9 icon on desktop
-    if [[ ${name} == *"${ds9_version}"* && "${name}" > "${ds9_version}" ]]; then
-      ds9_version=${name}
-      update_desktop ${short_name} ${name}
-    elif [[ ${name} == *"${ds9_terminal_version}"* && "${name}" > "${ds9_terminal_version}" ]]; then
-      ds9_terminal_version=${name}
-      update_desktop ${short_name} ${name}
-    fi
-  fi
-  if [[ ${image_id} == *"/skaha/terminal:"* ]] && [[ "${name}" > "${terminal_version}" ]]; then
-    terminal_version=${name}
-    # terminal.desktop accessed via "Applications->terminal"
-    update_terminal_desktop /usr/share/applications/terminal.desktop ${name}
-    # terminal.desktop accessed via terminal icon on desktop
-    update_terminal_desktop /headless/Desktop/terminal.desktop ${name}
-  fi
-  if [[ ${image_id} == *"/skaha/topcat"* ]]; then
-    name_version_array=($(echo $name | tr ":" "\n"))
-    short_name=${name_version_array[0]}
-    # topcat desktop accessed via topcat icon on desktop
-    if [[ ${name} == *"${topcat_version}"* && "${name}" > "${topcat_version}" ]]; then
-      topcat_version=${name}
-      update_desktop ${short_name} ${name}
-    elif [[ ${name} == *"${topcat_terminal_version}"* && "${name}" > "${topcat_terminal_version}" ]]; then
-      topcat_terminal_version=${name}
-      update_desktop ${short_name} ${name}
+  tmp_desktop="${tmp_folder}/${name}.desktop"
+  cp ${STARTUP_DIR}/software-sh.template $tmp_executable
+  cp ${STARTUP_DIR}/start-software-sh.template ${tmp_start_executable}
+  cp ${STARTUP_DIR}/software-category.template $tmp_desktop
+  sed -i -e "s#(IMAGE_ID)#${image_id}#g" $tmp_executable
+  sed -i -e "s#(TOKEN)#${TOKEN}#g" $tmp_start_executable
+  sed -i -e "s#(HOST)#${HOST}#g" $tmp_start_executable
+  sed -i -e "s#(SKAHA_API_VERSION)#${SKAHA_API_VERSION}#g" $tmp_start_executable
+  sed -i -e "s#(NAME)#${name}#g" $tmp_executable
+  sed -i -e "s#(IMAGE_ID)#${image_id}#g" ${tmp_start_executable}
+  sed -i -e "s#(NAME)#${name}#g" ${tmp_start_executable}
+  sed -i -e "s#(NAME)#${name}#g" $tmp_desktop
+  sed -i -e "s#(VERSION)#${version}#g" $tmp_desktop
+  sed -i -e "s#(EXECUTABLE)#${EXECUTABLE_DIR}#g" $tmp_desktop
+  sed -i -e "s#(CATEGORY)#${category}#g" $tmp_desktop
+  cp $tmp_executable $executable
+  cp $tmp_start_executable ${start_executable}
+  cp $tmp_desktop $desktop
+  rm -f $tmp_executable
+  rm -f $tmp_start_executable
+  rm -f $tmp_desktop
+  if [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]]; then
+    if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
+      # pick the latest version
+      app_version[${short_name}]="${name}"
+      # accessed via icon on desktop
+      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
     fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
@@ -201,34 +227,31 @@ init
 create_merged_applications_menu
 if [ -e "${HOME}/.token/.skaha" ]; then
   echo "token is used in build menu"
-  apps=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app | grep '"id"')
+  curl_out=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
 else
   echo "[skaha] No credentials to call back to Skaha with."
   exit 1
 fi
-if [[ ${apps} == *"id"* ]]; then
-  project_array=()
-  while IFS= read -r line
-  do
-    parts_array=($(echo $line | tr "\"" "\n"))
-    if [[ ${#parts_array[@]} -ge 4 && ${parts_array[0]} == "id" ]]; then
-      image_id=${parts_array[2]}
-      echo "[skaha] image_id: ${image_id}"
-      image_array=($(echo ${image_id} | tr "/" "\n"))
-      if [[ ${#image_array[@]} -ge 3 ]]; then
-        project=${image_array[1]}
-        name=${image_array[2]}
-	if [[ ! " ${project_array[*]} " =~ " ${project} " ]]; then
-          project_array=(${project_array[@]} ${project})
-          build_menu ${project} ${name}
-        fi
-          build_menu_item ${image_id} ${name} ${project}
-      fi
-    fi
-  done  < <(printf '%s\n' "$apps")
-else
+if [[ $(echo ${curl_out} | jq '[.[] | .id | length] | add') == 0 ]]; then
   echo "[skaha] no desktop-app"
+  echo "${curl_out}"
   exit 1
+else
+  image_id_list=$(echo ${curl_out} | jq -r '.[] | .id')
+  for image_id in ${image_id_list}
+  do
+    echo "[skaha] image_id: ${image_id}"
+    image_array=($(echo ${image_id} | tr "/" "\n"))
+    if [[ ${#image_array[@]} -ge 3 ]]; then
+      project=${image_array[1]}
+      name=${image_array[2]}
+      if [[ ! " ${project_array[*]} " =~ " ${project} " ]]; then
+        project_array=(${project_array[@]} ${project})
+        build_menu ${project} ${name}
+      fi
+      build_menu_item ${image_id} ${name} ${project}
+    fi
+  done
 fi
 complete_merged_applications_menu
 echo "[skaha] Finish building menu."
