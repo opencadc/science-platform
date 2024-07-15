@@ -7,8 +7,11 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
+    kueue.x-k8s.io/queue-name: skaha-workload-queue-headless
   name: "${skaha.jobname}"
 spec:
+  parallelism: 1
+  completions: 1
   activeDeadlineSeconds: 1209600
   ttlSecondsAfterFinished: 3600
   backoffLimit: 0
