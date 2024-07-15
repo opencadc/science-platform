@@ -1,0 +1,10 @@
+{{ range $queue, $config := .Values.localQueues }}
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: {{ $config.namespace }}
+  name: {{ $queue }}
+spec:
+  clusterQueue: {{ $config.clusterQueue }}
+---
+{{ end }}

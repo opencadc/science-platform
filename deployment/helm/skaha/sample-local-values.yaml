@@ -2,11 +2,13 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: example.org # change this
+  hostname: canfar.e4r.internal
   skaha:
+    image: images.opencadc.org/platform/skaha:0.16.1
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
+    maxUserSessions: "5"
 
     # Root of shared storage
     skahaTld: "/arc"
@@ -19,7 +21,7 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
+    registryURL: http://reg.skaha-system.svc.cluster.local/reg
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -44,8 +46,8 @@ deployment:
 
     # Optionally mount a custom CA certificate
     extraVolumeMounts:
-    # - mountPath: "/config/cacerts"
-    #   name: cacert-volume
+     - mountPath: "/config/cacerts"
+       name: cacert-volume
 
     # If the base names have changed, then change them here, otherwise leave them.
     priorityClassName: uber-user-preempt-high
@@ -53,10 +55,10 @@ deployment:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
     extraVolumes:
-    # - name: cacert-volume
-    #   secret:
-    #     defaultMode: 420
-    #     secretName: skaha-cacert-secret
+     - name: cacert-volume
+       secret:
+         defaultMode: 420
+         secretName: science-portal-cacert-secret
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
@@ -91,3 +93,61 @@ storage:
       # storageClassName: ""
       labels:
         storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
+
+# Kueue setups
+resourceFlavors:
+  skaha-interactive:
+    nodeLabels:
+      node-role.kubernetes.io/interactive-worker: "true"
+  skaha-headless:
+    nodeLabels:
+      node-role.kubernetes.io/headless-worker: "true"
+
+localQueues:
+  skaha-workload-queue-interactive:
+    namespace: skaha-workload
+    clusterQueue: skaha-cluster-queue-interactive
+  skaha-workload-queue-headless:
+    namespace: skaha-workload
+    clusterQueue: skaha-cluster-queue-headless
+
+clusterQueues:
+  skaha-cluster-queue-interactive:
+    cohort: "skaha-queue"
+    resourceGroups:
+    - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+      flavors:
+      - name: skaha-interactive
+        resources:
+        - name: cpu
+          nominalQuota: 30
+        - name: memory
+          nominalQuota: 30Gi
+        - name: ephemeral-storage
+          nominalQuota: 300Gi
+      - name: skaha-headless
+        resources:
+        - name: cpu
+          nominalQuota: 0
+          borrowingLimit: 2
+        - name: memory
+          nominalQuota: 0Gi
+          borrowingLimit: 2Gi
+        - name: ephemeral-storage
+          nominalQuota: 0Gi
+  skaha-cluster-queue-headless:
+    cohort: "skaha-queue"
+    resourceGroups:
+    - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+      flavors:
+      - name: skaha-headless
+        resources:
+        - name: cpu
+          nominalQuota: 4
+          lendingLimit: 2
+        - name: memory
+          nominalQuota: 4Gi
+          lendingLimit: 2Gi
+        - name: ephemeral-storage
+          nominalQuota: 50Gi
+
