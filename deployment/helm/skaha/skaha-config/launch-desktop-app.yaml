@@ -86,7 +86,7 @@ spec:
         - name: SHELL
           value: "/bin/bash"
         - name: PWD
-          value: "/${SKAHA_TLD}/home/${skaha.userid}"
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         securityContext:
