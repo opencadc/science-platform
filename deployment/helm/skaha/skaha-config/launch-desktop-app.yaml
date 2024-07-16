@@ -75,6 +75,8 @@ spec:
         - ${skaha.userid}
         - ${software.containerparam}
         env:
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
         - name: DISPLAY
@@ -83,6 +85,10 @@ spec:
           value: "1"
         - name: SHELL
           value: "/bin/bash"
+        - name: PWD
+          value: "/${SKAHA_TLD}/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
