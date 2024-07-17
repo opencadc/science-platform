@@ -17,6 +17,7 @@ GROUP_FILE="/etc-group/group"
 
 TOKEN_AUTHORIZATION_HEADER="authorization: bearer"
 CONFDIR=/config
+HOME_PARENT_DIR="$(dirname ${HOME})"
 CADC_PROXY_CERT_FILE="${HOME}/.ssl/cadcproxy.pem"
 TOKEN_FILE="${HOME}/.token/.skaha"
 
@@ -79,7 +80,7 @@ elif [[ -z "${GID_URL}" || "X${GID_URL}" == "X" ]] ; then
     exit 5
 else
     # Escape slashes
-    ESCAPED_HOME=`echo "${HOME}" | sed 's/\//\\\\\//g'`
+    ESCAPED_HOME=`echo "${HOME_PARENT_DIR}" | sed 's/\//\\\\\//g'`
 
     # For the case of using the CADC client certificate.
     if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
