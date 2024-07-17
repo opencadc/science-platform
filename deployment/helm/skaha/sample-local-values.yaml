@@ -95,59 +95,60 @@ storage:
         storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
 
 # Kueue setups
-resourceFlavors:
-  skaha-interactive:
-    nodeLabels:
-      node-role.kubernetes.io/interactive-worker: "true"
-  skaha-headless:
-    nodeLabels:
-      node-role.kubernetes.io/headless-worker: "true"
+kueue:
+  resourceFlavors:
+    skaha-interactive:
+      nodeLabels:
+        node-role.kubernetes.io/interactive-worker: "true"
+    skaha-headless:
+      nodeLabels:
+        node-role.kubernetes.io/headless-worker: "true"
 
-localQueues:
-  skaha-workload-queue-interactive:
-    namespace: skaha-workload
-    clusterQueue: skaha-cluster-queue-interactive
-  skaha-workload-queue-headless:
-    namespace: skaha-workload
-    clusterQueue: skaha-cluster-queue-headless
+  localQueues:
+    skaha-workload-queue-interactive:
+      namespace: skaha-workload
+      clusterQueue: skaha-cluster-queue-interactive
+    skaha-workload-queue-headless:
+      namespace: skaha-workload
+      clusterQueue: skaha-cluster-queue-headless
 
-clusterQueues:
-  skaha-cluster-queue-interactive:
-    cohort: "skaha-queue"
-    resourceGroups:
-    - coveredResources: ["cpu", "memory", "ephemeral-storage"]
-      flavors:
-      - name: skaha-interactive
-        resources:
-        - name: cpu
-          nominalQuota: 30
-        - name: memory
-          nominalQuota: 30Gi
-        - name: ephemeral-storage
-          nominalQuota: 300Gi
-      - name: skaha-headless
-        resources:
-        - name: cpu
-          nominalQuota: 0
-          borrowingLimit: 2
-        - name: memory
-          nominalQuota: 0Gi
-          borrowingLimit: 2Gi
-        - name: ephemeral-storage
-          nominalQuota: 0Gi
-  skaha-cluster-queue-headless:
-    cohort: "skaha-queue"
-    resourceGroups:
-    - coveredResources: ["cpu", "memory", "ephemeral-storage"]
-      flavors:
-      - name: skaha-headless
-        resources:
-        - name: cpu
-          nominalQuota: 4
-          lendingLimit: 2
-        - name: memory
-          nominalQuota: 4Gi
-          lendingLimit: 2Gi
-        - name: ephemeral-storage
-          nominalQuota: 50Gi
+  clusterQueues:
+    skaha-cluster-queue-interactive:
+      cohort: "skaha-queue"
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+        flavors:
+        - name: skaha-interactive
+          resources:
+          - name: cpu
+            nominalQuota: 30
+          - name: memory
+            nominalQuota: 30Gi
+          - name: ephemeral-storage
+            nominalQuota: 300Gi
+        - name: skaha-headless
+          resources:
+          - name: cpu
+            nominalQuota: 0
+            borrowingLimit: 2
+          - name: memory
+            nominalQuota: 0Gi
+            borrowingLimit: 2Gi
+          - name: ephemeral-storage
+            nominalQuota: 0Gi
+    skaha-cluster-queue-headless:
+      cohort: "skaha-queue"
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+        flavors:
+        - name: skaha-headless
+          resources:
+          - name: cpu
+            nominalQuota: 4
+            lendingLimit: 2
+          - name: memory
+            nominalQuota: 4Gi
+            lendingLimit: 2Gi
+          - name: ephemeral-storage
+            nominalQuota: 50Gi
 

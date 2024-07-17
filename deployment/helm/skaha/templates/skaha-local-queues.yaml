@@ -1,4 +1,4 @@
-{{ range $queue, $config := .Values.localQueues }}
+{{ range $queue, $config := .Values.kueue.localQueues }}
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
 metadata:
