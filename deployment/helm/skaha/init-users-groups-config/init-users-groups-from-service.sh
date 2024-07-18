@@ -18,7 +18,7 @@ GROUP_FILE="/etc-group/group"
 TOKEN_AUTHORIZATION_HEADER="authorization: bearer"
 CONFDIR=/config
 CADC_PROXY_CERT_FILE="${HOME}/.ssl/cadcproxy.pem"
-TOKEN_FILE="${HOME}/.token/.skaha"
+TOKEN_FILE="${HOME}/.token/.access"
 
 TMP_FILE_NAME=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 32 | head -n 1`
 LOCAL_CAPABILITIES_FILE="/tmp/${TMP_FILE_NAME}-capabilities.xml"
