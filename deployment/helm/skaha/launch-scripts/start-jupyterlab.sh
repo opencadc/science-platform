@@ -9,6 +9,9 @@ cd ${HOME}
 mkdir -p ${HOME}/.token
 
 jupyter lab \
+	--NotebookApp.base_url=session/notebook/"$1" \
+	--NotebookApp.notebook_dir=/ \
+	--NotebookApp.allow_origin="*" \
 	--ServerApp.ip=0.0.0.0 \
 	--ServerApp.port=8888 \
 	--no-browser \

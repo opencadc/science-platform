@@ -90,6 +90,7 @@ secrets:
 # These values are preset in the catalina.properties, and this default database only exists beside this service.
 # It's usually safe to leave these as-is, but make sure they match the values in catalina.properties.
 postgresql:
+  maxActive: 8
   auth:
     username: posixmapper
     password: posixmapperpwd
