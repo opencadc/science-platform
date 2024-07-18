@@ -71,6 +71,7 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
@@ -173,36 +174,64 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
 
-    protected AuthorizationToken token(final Subject subject) {
-        return subject
-                .getPublicCredentials(AuthorizationToken.class)
-                .iterator()
-                .next();
+    private AuthorizationToken accessToken() {
+        return AuthenticationUtil.getCurrentSubject()
+                                 .getPublicCredentials(AuthorizationToken.class)
+                                 .stream()
+                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
+                                 .findFirst()
+                                 .orElse(null);
     }
-
 
     protected void injectCredentials() {
-        final String username = posixPrincipal.username;
-        int posixId = getUID();
-        injectToken(username, posixId, xAuthTokenSkaha);
-        injectProxyCertificate(username);
+        if (!injectAccessToken() && !injectProxyCertificate()) {
+            throw new NotAuthenticatedException("Can't inject user credentials (none available)");
+        }
+        injectAPIToken();
     }
 
-    private void injectToken(String username, int posixId, String token) {
+    private void injectAPIToken() {
         // inject a token if available
+        final int posixId = getUID();
         try {
-            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, username);
+            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
             CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
             String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
             CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
-            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", token);
+            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", this.xAuthTokenSkaha);
             CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
         } catch (Exception exception) {
             log.debug("failed to inject token: " + exception.getMessage(), exception);
         }
     }
 
-    private void injectProxyCertificate(String username) {
+    private boolean injectAccessToken() {
+        log.debug("injectAccessToken()");
+        final AuthorizationToken accessToken = accessToken();
+        if (accessToken != null) {
+            final int posixId = getUID();
+            try {
+                String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
+                CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
+                String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
+                CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
+                String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".access", accessToken.getCredentials());
+                CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
+                log.debug("injectAccessToken(): OK");
+                return true;
+            } catch (Exception exception) {
+                log.debug("failed to inject access token: " + exception.getMessage(), exception);
+            }
+        }
+
+        log.debug("No Access Token found.  Relying on proxy certificate.");
+        log.debug("injectAccessToken(): UNSUCCESSFUL");
+        return false;
+    }
+
+    private boolean injectProxyCertificate() {
+        log.debug("injectProxyCertificate()");
+
         // inject a delegated proxy certificate if available
         try {
             final LocalAuthority localAuthority = new LocalAuthority();
@@ -231,7 +260,9 @@ public abstract class SessionAction extends SkahaAction {
                     // inject the proxy cert
                     log.debug("Running docker exec to insert cert");
 
-                    injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
+                    injectFile(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
+                    log.debug("injectProxyCertificate(): OK");
+                    return true;
                 }
             }
         } catch (NoSuchElementException noSuchElementException) {
@@ -239,6 +270,9 @@ public abstract class SessionAction extends SkahaAction {
         } catch (Exception e) {
             log.warn("failed to inject cert: " + e.getMessage(), e);
         }
+
+        log.debug("injectProxyCertificate(): UNSUCCESSFUL");
+        return false;
     }
 
     protected String getImageName(String image) {
