@@ -40,6 +40,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       - name: init-users-groups
         image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
@@ -63,11 +64,13 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       securityContext:
         runAsUser: ${skaha.posixid}
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
       ${headless.priority}
       containers:
       - name: "${skaha.jobname}"
@@ -89,6 +92,7 @@ spec:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
+          runAsNonRoot: true
         workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
         imagePullPolicy: Always
         resources:

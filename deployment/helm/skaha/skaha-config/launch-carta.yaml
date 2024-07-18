@@ -31,6 +31,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
@@ -68,6 +69,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -87,6 +89,7 @@ spec:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
+          runAsNonRoot: true
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
