@@ -35,7 +35,7 @@ spec:
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
-      {{ template "skaha.job.initContainers" }}
+      {{ template "skaha.job.initContainers" . }}
       containers:
       - name: "${skaha.jobname}"
         command: ["/skaha-system/start-desktop.sh"]
