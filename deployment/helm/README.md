@@ -226,7 +226,9 @@ deployment:
     cvmfsEnabled: true
 ```
 
-Skaha assumes CVMFS is configured on the nodes of the cluster and accessible as a hostpath at /cvmfs. For information about installing a CVMFS client, see the [CVMFS documentation](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html).
+Skaha assumes a CVMFS client is installed and configured on the nodes of the cluster beforehand and made accessible at /cvmfs.
+The Skaha pods will mount the /cvmfs directory as a hostpath.
+For information about installing a CVMFS client, see the [CVMFS documentation](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html).
 
 Create a `my-skaha-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](skaha/values.yaml).
 

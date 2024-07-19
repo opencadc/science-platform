@@ -91,7 +91,8 @@ deployment:
     #     secretName: skaha-cacert-secret
 
     # Uncomment to mount CVMFS in the skaha deployments.
-    # Skaha assumes CVMFS is configured on the nodes of the cluster and accessible as a hostpath at /cvmfs.
+    # Skaha assumes a CVMFS client is installed and configured on the nodes of the cluster beforehand and made accessible at /cvmfs.
+    # The Skaha pods will mount the /cvmfs directory as a hostpath.
     # cvmfsEnabled: true
 
   # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
