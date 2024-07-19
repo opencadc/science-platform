@@ -1,6 +1,6 @@
 # CHANGELOG for Skaha User Session API (Chart 0.4.3)
 
-## 20224.06.28
+## 2024.06.28
 - Add option to mount CVMFS in skaha deployments
 
 ## 2024.05.06
