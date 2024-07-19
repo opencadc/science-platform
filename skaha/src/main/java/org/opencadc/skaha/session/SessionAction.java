@@ -184,13 +184,13 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     protected void injectCredentials() {
-        if (!injectAccessToken() && !injectProxyCertificate()) {
-            throw new NotAuthenticatedException("Can't inject user credentials (none available)");
+        if (!injectAccessToken() && !injectProxyCertificate() && !injectAPIToken()) {
+            throw new NotAuthenticatedException("Unable to inject user credentials (none available)");
         }
-        injectAPIToken();
     }
 
-    private void injectAPIToken() {
+    private boolean injectAPIToken() {
+        log.debug("injectAPIToken()");
         // inject a token if available
         final int posixId = getUID();
         try {
@@ -200,9 +200,15 @@ public abstract class SessionAction extends SkahaAction {
             CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
             String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", this.xAuthTokenSkaha);
             CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
+            log.debug("injectAPIToken(): OK");
+            return true;
         } catch (Exception exception) {
             log.debug("failed to inject token: " + exception.getMessage(), exception);
         }
+
+        log.debug("No API Token found");
+        log.debug("injectAPIToken(): UNSUCCESSFUL");
+        return false;
     }
 
     private boolean injectAccessToken() {
@@ -224,7 +230,7 @@ public abstract class SessionAction extends SkahaAction {
             }
         }
 
-        log.debug("No Access Token found.  Relying on proxy certificate.");
+        log.debug("No Access Token found");
         log.debug("injectAccessToken(): UNSUCCESSFUL");
         return false;
     }
@@ -266,7 +272,7 @@ public abstract class SessionAction extends SkahaAction {
                 }
             }
         } catch (NoSuchElementException noSuchElementException) {
-            log.debug("Not using proxy certificates.  Skipping certificate injection...");
+            log.debug("Not using proxy certificates");
         } catch (Exception e) {
             log.warn("failed to inject cert: " + e.getMessage(), e);
         }
