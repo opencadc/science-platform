@@ -12,6 +12,9 @@ deployment:
 
     # Root of shared storage
     skahaTld: "/arc"
+    
+    # Change this to enable the GPU 
+    gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
