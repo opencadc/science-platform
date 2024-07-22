@@ -49,7 +49,7 @@ spec:
         - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
           subPath: cadc_CA_2029.crt
           name: sssd-cert-config-vol
-        - mountPath: "/cavern"
+        - mountPath: "/arc"
           name: arc-ceph-volume
           subPath: cavern
         - mountPath: /etc/ssh/sshd_config
