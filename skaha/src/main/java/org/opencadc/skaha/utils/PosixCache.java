@@ -11,8 +11,15 @@ import redis.clients.jedis.AbstractTransaction;
 import redis.clients.jedis.JedisPooled;
 
 
+/**
+ * A simple Redis Cache for POSIX information.  This will update the underlying Redis Set in a transaction to ensure single access.
+ * BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to properly reset it.
+ */
 public class PosixCache {
     private static final Logger LOGGER = Logger.getLogger(PosixCache.class);
+
+    // Default path to the no-login shell.  This could be risky, but most distributions should support it.
+    private static final String NO_LOGIN_SHELL = "/sbin/nologin";
 
     private static final String UID_MAP_KEY = "users:posix";
     private static final String GID_MAP_FIELD = "groups:posix";
@@ -36,17 +43,18 @@ public class PosixCache {
     /**
      * Obtain the POSIX entry for the provided POSIX Principal in POSIX form.
      * Example output:
-     * "username1:x:1000:1000"
+     * "username1:x:1000:1000::/rootdir/home/username:/sbin/nologin"
      *
      * @param posixPrincipalEntry The POSIX Principal wrapper to transform.
      * @return String POSIX entry, never null;
      */
     private static String uidMapping(final PosixPrincipalEntry posixPrincipalEntry) {
-        return String.format("%s:x:%d:%d::%s:",
+        return String.format("%s:x:%d:%d::%s:%s",
                              posixPrincipalEntry.posixPrincipal.username,
                              posixPrincipalEntry.posixPrincipal.getUidNumber(),
                              posixPrincipalEntry.posixPrincipal.getUidNumber(),
-                             posixPrincipalEntry.homeFolder);
+                             posixPrincipalEntry.homeFolder,
+                             PosixCache.NO_LOGIN_SHELL);
     }
 
     private static String gidMapping(final PosixGroup posixGroup) {
