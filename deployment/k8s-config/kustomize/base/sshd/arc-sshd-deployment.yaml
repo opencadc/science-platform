@@ -64,9 +64,9 @@ spec:
         - mountPath: /etc/ssh/ssh_host_rsa_key
           name: ssh-host-rsa-key
           subPath: ssh_host_rsa_key
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-          readOnly: true
+        # - mountPath: /var/lib/sss/pipes
+        #   name: sssd-dir
+        #   readOnly: true
       securityContext:
         runAsUser: 0
       priorityClassName: uber-user-preempt-high
@@ -79,7 +79,7 @@ spec:
           - 10.30.202.3:6789
           - 10.30.203.3:6789
           path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
-          user: keel_prod
+          user: keel-prod-user
           secretRef:
             name: cephfs-cephx-user-key
           readOnly: false
@@ -98,7 +98,7 @@ spec:
         secret:
           secretName: arc-sshd-priv3-secret
           defaultMode: 256
-      - name: sssd-dir
-        hostPath:
-          path: /var/lib/ubernetes
-          type: Directory
+      # - name: sssd-dir
+      #   hostPath:
+      #     path: /var/lib/ubernetes
+      #     type: Directory

@@ -1,0 +1,5 @@
+bases:
+- ../../../base/sshd
+namespace: skaha-system
+patchesStrategicMerge:
+- arc-sshd-deployment.yaml
