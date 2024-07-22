@@ -7,6 +7,13 @@ configMapGenerator:
 - name: arc-sshd-config
   files:
   - config/sshd_config
+- name: sssd-config
+  files:
+  - config/sssd.conf
+- name: sssd-cert-config
+  files:
+  - config/certs/ca.crt
+  - config/certs/cadc_CA_2029.crt
 secretGenerator:
 - name: arc-sshd-priv1-secret
   files:
@@ -17,12 +24,5 @@ secretGenerator:
 - name: arc-sshd-priv3-secret
   files:
   - sshd-certs/ssh_host_rsa_key
-- name: sssd-config
-  files:
-  - config/sssd.conf
-- name: sssd-cert-config
-  files:
-  - config/certs/ca.crt
-  - config/certs/cadc_CA_2029.crt
 generatorOptions:
  disableNameSuffixHash: true
