@@ -43,6 +43,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       - name: init-users-groups
         image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
@@ -66,19 +67,35 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       securityContext:
         runAsUser: ${skaha.posixid}
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
       ${headless.priority}
       containers:
       - name: "${skaha.jobname}"
+        # image and start of the 'env' label comes from the image bundle
         ${headless.image.bundle}
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
+          runAsNonRoot: true
         workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
         imagePullPolicy: Always
         resources:

@@ -34,6 +34,7 @@ spec:
         runAsGroup: ${skaha.posixid}
         fsGroup: ${skaha.posixid}
         supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
@@ -48,6 +49,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       - name: init-users-groups
         image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
@@ -71,6 +73,7 @@ spec:
         securityContext:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
+          runAsNonRoot: true
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -125,6 +128,7 @@ spec:
           runAsUser: ${skaha.posixid}
           runAsGroup: ${skaha.posixid}
           allowPrivilegeEscalation: false
+          runAsNonRoot: true
       volumes:
       - name: cavern-volume
         persistentVolumeClaim:
