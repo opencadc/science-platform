@@ -40,6 +40,15 @@ spec:
         - containerPort: 64022
           protocol: TCP
         volumeMounts:
+        - mountPath: /etc/sssd/sssd.conf
+          subPath: sssd.conf
+          name: sssd-config-vol
+        - mountPath: /etc/openldap/certs/ca.crt
+          subPath: ca.crt
+          name: sssd-cert-config-vol
+        - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
+          subPath: cadc_CA_2029.crt
+          name: sssd-cert-config-vol
         - mountPath: "/cavern"
           name: arc-ceph-volume
           subPath: cavern
@@ -98,6 +107,15 @@ spec:
         secret:
           secretName: arc-sshd-priv3-secret
           defaultMode: 256
+      - name: sssd-config-vol
+        configMap:
+          name: sssd-config
+          # defaultMode of 256 sets the permissions of the file
+          # to 0400 - needed by sssd
+          defaultMode: 256
+      - name: sssd-cert-config-vol
+        configMap:
+          name: sssd-cert-config
       # - name: sssd-dir
       #   hostPath:
       #     path: /var/lib/ubernetes
