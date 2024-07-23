@@ -24,11 +24,8 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: arc-sshd
-        image: images.canfar.net/skaha-system/sshd:0.1
+        image: images.canfar.net/skaha-system/sshd:0.2
         imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
-        #command: ["/bin/sh"]
-        #args: ["-c", "while true; do sleep 10;done"] 
         resources:
           requests:
             memory: "4Gi"
@@ -43,12 +40,6 @@ spec:
         - mountPath: /etc/sssd/sssd.conf
           subPath: sssd.conf
           name: sssd-config-vol
-        - mountPath: /etc/openldap/certs/ca.crt
-          subPath: ca.crt
-          name: sssd-cert-config-vol
-        - mountPath: /etc/openldap/certs/cadc_CA_2029.crt
-          subPath: cadc_CA_2029.crt
-          name: sssd-cert-config-vol
         - mountPath: "/arc"
           name: arc-ceph-volume
           subPath: cavern
@@ -73,9 +64,6 @@ spec:
         - mountPath: /etc/ssh/ssh_host_rsa_key
           name: ssh-host-rsa-key
           subPath: ssh_host_rsa_key
-        # - mountPath: /var/lib/sss/pipes
-        #   name: sssd-dir
-        #   readOnly: true
       securityContext:
         runAsUser: 0
       priorityClassName: uber-user-preempt-high
@@ -113,10 +101,3 @@ spec:
           # defaultMode of 256 sets the permissions of the file
           # to 0400 - needed by sssd
           defaultMode: 256
-      - name: sssd-cert-config-vol
-        configMap:
-          name: sssd-cert-config
-      # - name: sssd-dir
-      #   hostPath:
-      #     path: /var/lib/ubernetes
-      #     type: Directory
