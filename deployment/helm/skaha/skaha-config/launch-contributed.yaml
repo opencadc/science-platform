@@ -105,7 +105,7 @@ spec:
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
-            "${software.limits.gpus}"
+            ${software.limits.gpus}
             ephemeral-storage: "200Gi"
         ports:
         - containerPort: 5000
