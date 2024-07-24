@@ -17,16 +17,6 @@ The init containers for the launch scripts.
             drop:
               - ALL
       - name: init-users-groups
-      - name: init-users-groups
-        image: redis:7-alpine
-        command: ["/init-users-groups/init-users-groups.sh"]
-        securityContext:
-          privileged: false
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-      - name: init-users-groups
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
@@ -39,6 +29,12 @@ The init containers for the launch scripts.
           name: etc-group
         - mountPath: "/init-users-groups"
           name: init-users-groups
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
 {{- with .Values.deployment.extraHosts }}
       hostAliases:
 {{- range $extraHost := . }}
