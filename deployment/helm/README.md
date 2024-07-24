@@ -149,6 +149,18 @@ deployment:
     #     defaultMode: 420
     #     secretName: posix-manager-cacert-secret
 
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the posixMapper one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
+
 # Declare the storage for the skaha service to use.
 storage:
   service:
