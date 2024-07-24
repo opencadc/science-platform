@@ -1,0 +1,13 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ .Release.Name }}-ingress-route-tcp
+  namespace: {{ .Values.skaha.namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.deployment.sshd.entryPoint | required "Must supply an entryPoint name that matches your Traefik configuration." }}
+  routes:
+  - match: HostSNI(`*`)
+    services:
+    - name: {{ .Release.Name }}-svc
+      port: 2222
