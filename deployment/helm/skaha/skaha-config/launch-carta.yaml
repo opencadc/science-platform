@@ -44,8 +44,11 @@ spec:
         - mountPath: "/etc-group"
           name: etc-group
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
       - name: init-users-groups
         image: images.opencadc.org/library/cadc-tomcat:1
         command: ["/init-users-groups/init-users-groups-from-service.sh"]
@@ -67,9 +70,11 @@ spec:
         - name: REGISTRY_URL
           value: ${REGISTRY_URL}
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
-          runAsNonRoot: true
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
       containers:
       - name: "${skaha.jobname}"
         env:
@@ -86,10 +91,11 @@ spec:
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
+          privileged: false
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         image: ${software.imageid}
         command: ["/bin/sh", "-c"]
         args:
