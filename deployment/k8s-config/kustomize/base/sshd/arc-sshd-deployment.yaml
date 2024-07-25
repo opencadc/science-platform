@@ -24,7 +24,7 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: arc-sshd
-        image: images.canfar.net/skaha-system/sshd:0.2
+        image: images.canfar.net/skaha-system/sshd:0.2.0
         imagePullPolicy: Always
         resources:
           requests:
