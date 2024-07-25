@@ -135,7 +135,7 @@ Subsystem	sftp	internal-sftp
 
 # Example of overriding settings on a per-user basis
 Match User * 
-ChrootDirectory /cavern
+ChrootDirectory /arc
 X11Forwarding no
 AllowTcpForwarding no
 PermitTTY no

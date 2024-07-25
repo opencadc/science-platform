@@ -3,7 +3,6 @@ bases:
 namespace: skaha-system
 patchesStrategicMerge:
 - arc-tomcat-deployment.yaml
-- arc-sshd-deployment.yaml
 - arc-ingress.yaml
 configMapGenerator:
 - name: arc-config
