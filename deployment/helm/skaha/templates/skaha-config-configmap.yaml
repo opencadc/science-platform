@@ -17,6 +17,8 @@ The init containers for the launch scripts.
             drop:
               - ALL
       - name: init-users-groups
+        image: redis:7-alpine
+        command: ["/init-users-groups/init-users-groups.sh"]
         env:
         - name: HOME
           value: "${SKAHA_TLD}/home/${skaha.userid}"
