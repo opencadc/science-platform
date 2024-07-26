@@ -9,6 +9,15 @@ metadata:
     canfar-net-userid: "${skaha.userid}"
   name: "${skaha.jobname}"
 spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: skaha.opencadc.org/node-type
+            operator: NotIn
+            values:
+            - service-node
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:

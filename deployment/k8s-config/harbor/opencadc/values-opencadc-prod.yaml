@@ -1,8 +1,6 @@
+logLevel: warn
 
-logLevel: debug
-
-
-adminPassword: "changeme"
+#adminPassword: "changeme"
 
 externalURL: https://images.opencadc.org
 
@@ -20,12 +18,13 @@ ingress:
       ingress.kubernetes.io/ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
       traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.tls.certresolver: "cadc_cloudflare"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
       nginx.ingress.kubernetes.io/ssl-redirect: null
       nginx.ingress.kubernetes.io/proxy-body-size: null
     extraTls:
     - hosts:
         - images.opencadc.org
-      secretName: images-net-cert-secret
 
   notary:
     hostname: notary.opencadc.org
@@ -34,12 +33,13 @@ ingress:
       ingress.kubernetes.io/ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
       traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.tls.certresolver: "cadc_cloudflare"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
       nginx.ingress.kubernetes.io/ssl-redirect: null
       nginx.ingress.kubernetes.io/proxy-body-size: null
     extraTls:
     - hosts:
         - notary.opencadc.org
-      secretName: notary-net-cert-secret
 
 
 ## Notary Parameters
@@ -48,22 +48,34 @@ notary:
   enabled: true
 
   server:
+    image:
+      registry: docker.io
+      repository: bitnami/harbor-notary-server-archived
+      tag: 2.7.1-debian-11-r6
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
-  signer:
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-          - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
 
+  signer:
+    image:
+      registry: docker.io
+      repository: bitnami/harbor-notary-signer-archived
+      tag: 2.7.1-debian-11-r6
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
 
 portal:
   affinity:
@@ -71,8 +83,10 @@ portal:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 core:
   affinity:
@@ -80,8 +94,10 @@ core:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 jobservice:
   affinity:
@@ -89,8 +105,10 @@ jobservice:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 registry:
   affinity:
@@ -98,17 +116,25 @@ registry:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 chartmuseum:
+  image:
+    registry: docker.io
+    repository: bitnami/chartmuseum-archived
+    tag: 0.15.0-debian-11-r79
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 trivy:
   affinity:
@@ -116,11 +142,10 @@ trivy:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
-
-
-
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 persistence:
@@ -173,8 +198,10 @@ postgresql:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
     volumes:
       - name: postgresql-extended-config
         configMap:
@@ -213,8 +240,10 @@ redis:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
     persistence:
       enabled: true
       storageClass: ""
@@ -225,4 +254,3 @@ redis:
       enabled: true
       storageClass: "csi-cinder-sc-delete"
       subPath: harbor-redis
-
