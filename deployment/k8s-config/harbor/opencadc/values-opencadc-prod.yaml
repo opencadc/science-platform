@@ -4,9 +4,14 @@ logLevel: warn
 
 externalURL: https://images.opencadc.org
 
+containerSecurityContext:
+  runAsGroup: 1001
+  runAsNonRoot: true
+
+podSecurityContext:
+  fsGroup: 1001
+
 exposureType: ingress
-
-
 
 #***************************************************
 ingress:
@@ -41,9 +46,7 @@ ingress:
     - hosts:
         - notary.opencadc.org
 
-
-## Notary Parameters
-## 
+#***************************************************
 notary:
   enabled: true
 
@@ -77,6 +80,7 @@ notary:
               values:
               - service-node
 
+#***************************************************
 portal:
   affinity:
     nodeAffinity:
@@ -88,6 +92,7 @@ portal:
             values:
             - service-node
 
+#***************************************************
 core:
   affinity:
     nodeAffinity:
@@ -99,6 +104,7 @@ core:
             values:
             - service-node
 
+#***************************************************
 jobservice:
   affinity:
     nodeAffinity:
@@ -110,6 +116,7 @@ jobservice:
             values:
             - service-node
 
+#***************************************************
 registry:
   affinity:
     nodeAffinity:
@@ -121,6 +128,7 @@ registry:
             values:
             - service-node
 
+#***************************************************
 chartmuseum:
   image:
     registry: docker.io
@@ -136,6 +144,7 @@ chartmuseum:
             values:
             - service-node
 
+#***************************************************
 trivy:
   affinity:
     nodeAffinity:
