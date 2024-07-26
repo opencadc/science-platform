@@ -2,7 +2,7 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: canfar.e4r.internal
+  hostname: example.org # Change this
   skaha:
     image: images.opencadc.org/platform/skaha:0.16.1
     imagePullPolicy: IfNotPresent
@@ -100,13 +100,8 @@ storage:
 # Kueue setups
 kueue:
   resourceFlavors:
-    skaha-interactive:
-      nodeLabels:
-        node-role.kubernetes.io/interactive-worker: "true"
-    skaha-headless:
-      nodeLabels:
-        node-role.kubernetes.io/headless-worker: "true"
-
+  - name: skaha
+    
   localQueues:
     skaha-workload-queue-interactive:
       namespace: skaha-workload
@@ -121,37 +116,29 @@ kueue:
       resourceGroups:
       - coveredResources: ["cpu", "memory", "ephemeral-storage"]
         flavors:
-        - name: skaha-interactive
+        - name: skaha
           resources:
           - name: cpu
-            nominalQuota: 30
+            nominalQuota: 30 # Change this according to the available resources
+            borrowingLimit: 10 # Change this according to the resource requirements
           - name: memory
-            nominalQuota: 30Gi
+            nominalQuota: 30Gi # Change this according to the available resources
+            borrowingLimit: 10Gi # Change this according to the available resources 
           - name: ephemeral-storage
             nominalQuota: 300Gi
-        - name: skaha-headless
-          resources:
-          - name: cpu
-            nominalQuota: 0
-            borrowingLimit: 2
-          - name: memory
-            nominalQuota: 0Gi
-            borrowingLimit: 2Gi
-          - name: ephemeral-storage
-            nominalQuota: 0Gi
     skaha-cluster-queue-headless:
       cohort: "skaha-queue"
       resourceGroups:
       - coveredResources: ["cpu", "memory", "ephemeral-storage"]
         flavors:
-        - name: skaha-headless
+        - name: skaha
           resources:
           - name: cpu
-            nominalQuota: 4
-            lendingLimit: 2
+            nominalQuota: 4 # Change this according to the available resources
+            borrowingLimit: 0 # Change this according to the resource requirements
           - name: memory
-            nominalQuota: 4Gi
-            lendingLimit: 2Gi
+            nominalQuota: 4Gi # Change this according to the available resources
+            borrowingLimit: 0Gi # Change this according to the resource requirements
           - name: ephemeral-storage
             nominalQuota: 50Gi
 
