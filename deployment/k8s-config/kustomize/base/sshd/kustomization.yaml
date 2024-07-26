@@ -1,0 +1,24 @@
+namespace: skaha-system
+resources:
+- arc-sshd-deployment.yaml
+- arc-sshd-expose.yaml
+- arc-sshd-ingress.yaml
+configMapGenerator:
+- name: arc-sshd-config
+  files:
+  - config/sshd_config
+- name: sssd-config
+  files:
+  - config/sssd.conf
+secretGenerator:
+- name: arc-sshd-priv1-secret
+  files:
+  - sshd-certs/ssh_host_ecdsa_key
+- name: arc-sshd-priv2-secret
+  files:
+  - sshd-certs/ssh_host_ed25519_key
+- name: arc-sshd-priv3-secret
+  files:
+  - sshd-certs/ssh_host_rsa_key
+generatorOptions:
+ disableNameSuffixHash: true
