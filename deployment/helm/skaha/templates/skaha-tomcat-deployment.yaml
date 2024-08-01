@@ -102,6 +102,7 @@ spec:
           hostnames:
             - {{ $extraHost.hostname }}
 {{- end }}
+{{- end }}
       priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
       serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}
       volumes:
