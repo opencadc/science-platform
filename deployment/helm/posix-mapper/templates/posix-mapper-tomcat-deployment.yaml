@@ -45,12 +45,14 @@ spec:
         {{- with .Values.deployment.posixMapper.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-    {{- range $extraHost := .Values.deployment.extraHosts }}
+{{- with .Values.deployment.extraHosts }}
       hostAliases:
+{{- range $extraHost := . }}
         - ip: {{ $extraHost.ip }}
           hostnames:
             - {{ $extraHost.hostname }}
-    {{- end }}
+{{- end }}
+{{- end }}
       volumes:
       - name: config-volume
         configMap:

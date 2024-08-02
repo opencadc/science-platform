@@ -65,12 +65,14 @@ spec:
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-    {{- range $extraHost := .Values.deployment.extraHosts }}
+{{- with .Values.deployment.extraHosts }}
       hostAliases:
+{{- range $extraHost := . }}
         - ip: {{ $extraHost.ip }}
           hostnames:
             - {{ $extraHost.hostname }}
-    {{- end }}
+{{- end }}
+{{- end }}
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:
