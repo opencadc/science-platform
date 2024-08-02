@@ -64,39 +64,41 @@
  *
  ************************************************************************
  */
+
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
-
+import ca.nrc.cadc.util.StringUtil;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
 /**
  * @author majorb
- *
  */
 public class ResourceContexts {
-    
+
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
-    
+
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
     private final Integer defaultCores;
     private final Integer defaultCoresHeadless;
     private final List<Integer> availableCores = new ArrayList<>();
-    
+
     // units in GB
     private final Integer defaultRequestRAM;
     private final Integer defaultLimitRAM;
     private final Integer defaultRAM;
     private final Integer defaultRAMHeadless;
     private final List<Integer> availableRAM = new ArrayList<>();
-    
-    private final List<Integer> availableGPUs = new ArrayList<>();
+    private final GPUConfigurations gpuConfigurations;
 
     public ResourceContexts() {
         try {
@@ -112,16 +114,14 @@ public class ResourceContexts {
             defaultRAMHeadless = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-headless"));
             String cOptions = mvp.getFirstPropertyValue("cores-options");
             String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
-            String gOptions = mvp.getFirstPropertyValue("gpus-options");
-            
+
+            gpuConfigurations = new GPUConfigurations(mvp);
+
             for (String c : cOptions.split(" ")) {
                 availableCores.add(Integer.valueOf(c));
             }
             for (String r : rOptions.split(" ")) {
                 availableRAM.add(Integer.valueOf(r));
-            }
-            for (String g : gOptions.split(" ")) {
-                availableGPUs.add(Integer.valueOf(g));
             }
         } catch (Exception e) {
             log.error(e);
@@ -166,9 +166,65 @@ public class ResourceContexts {
     public List<Integer> getAvailableRAM() {
         return availableRAM;
     }
-    
-    public List<Integer> getAvailableGPUs() {
-        return availableGPUs;
+
+    /**
+     * Check if the requested GPU count, version, and type are valid.
+     *
+     * @param count The number of GPUs to request.
+     * @throws IllegalArgumentException when not valid.
+     * @see GPUConfigurations#verifyGPUConfiguration(int, String)
+     */
+    public void verifyGPUConfiguration(final int count, final String type) {
+        log.info("ResourceContexts.isValidGPUConfiguration(" + count + ", " + type + ")");
+        this.gpuConfigurations.verifyGPUConfiguration(count, type);
     }
-    
+
+    private static final class GPUConfigurations {
+        private static final String GPU_CONFIGURATION_KEY = "gpu-count";
+        private static final String GPU_CONFIGURATION_KEY_TYPE_DELIMITER = ":";
+        private final Map<String, int[]> configurations;
+
+        /**
+         * Constructor.  Build a type-count map from the configuration.
+         *
+         * @param multiValuedProperties The MultiValuedProperties created from a configuration file.
+         *                              Pertinent keys are expected to be in format <code>gpu-count:[amd | nvidia]</code> with a value of space delimited
+         *                              integers.
+         */
+        public GPUConfigurations(final MultiValuedProperties multiValuedProperties) {
+            final Map<String, int[]> configurationsFromFile = new HashMap<>();
+            multiValuedProperties.keySet()
+                                 .stream()
+                                 .filter(key -> key.startsWith(GPUConfigurations.GPU_CONFIGURATION_KEY))
+                                 .filter(key -> StringUtil.hasText(multiValuedProperties.getFirstPropertyValue(key)))
+                                 .forEach(key -> {
+                                     final int[] value =
+                                         Arrays.stream(multiValuedProperties.getFirstPropertyValue(key).split(" "))
+                                               .mapToInt(Integer::parseInt)
+                                               .toArray();
+                                     final String type = key.split(GPUConfigurations.GPU_CONFIGURATION_KEY_TYPE_DELIMITER)[1].toLowerCase().trim();
+                                     configurationsFromFile.put(type, value);
+                                 });
+            this.configurations = Collections.unmodifiableMap(configurationsFromFile);
+        }
+
+        private void verifyGPUConfiguration(final int count, final String type) {
+            log.info("GPUConfigurations.isValidGPUConfiguration()");
+            if (!StringUtil.hasText(type) || count < 1) {
+                throw new IllegalArgumentException("GPU type (gpu-type) and GPU Count (gpus) are required fields.");
+            }
+
+            if (StringUtil.hasText(type)) {
+                final String gpuType = type.toLowerCase().trim();
+                if (!this.configurations.containsKey(gpuType)) {
+                    throw new IllegalArgumentException("Unsupported GPU type '" + type + "'");
+                } else {
+                    final int[] counts = this.configurations.get(gpuType);
+                    if (counts == null || counts.length == 0) {
+                        throw new IllegalArgumentException("No configured count values for GPU type '" + type + "'");
+                    }
+                }
+            }
+        }
+    }
 }
