@@ -67,11 +67,11 @@ spec:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
-            ephemeral-storage: "${software.requests.ephemeralStorage}"
+            ephemeral-storage: "20Gi"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
-            ephemeral-storage: "${software.limits.ephemeralStorage}"
+            ephemeral-storage: "200Gi"
         ports:
         - containerPort: 5901
           protocol: TCP
