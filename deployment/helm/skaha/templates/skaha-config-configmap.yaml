@@ -1,9 +1,80 @@
+{{/*
+The init containers for the launch scripts.
+*/}}
+{{- define "skaha.job.initContainers" -}}
+      - name: backup-original-passwd-groups
+        image: ${software.imageid}
+        command: ["/bin/sh", "-c", "cp /etc/passwd /etc-passwd/passwd-orig && cp /etc/group /etc-group/group-orig"]
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+      - name: init-users-groups
+        image: images.opencadc.org/library/cadc-tomcat:1
+        command: ["/init-users-groups/init-users-groups-from-service.sh"]
+        volumeMounts:
+        - mountPath: "/etc-passwd"
+          name: etc-passwd
+        - mountPath: "/etc-group"
+          name: etc-group
+        - mountPath: "/init-users-groups"
+          name: init-users-groups
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
+        env:
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: POSIX_MAPPER_URI
+          value: ${POSIX_MAPPER_URI}
+        - name: REGISTRY_URL
+          value: ${REGISTRY_URL}
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+{{- with .Values.deployment.extraHosts }}
+      hostAliases:
+{{- range $extraHost := . }}
+        - ip: {{ $extraHost.ip }}
+          hostnames:
+            - {{ $extraHost.hostname }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+The affinity for Jobs.
+*/}}
+{{- define "skaha.job.nodeSelector" -}}
+  selector:
+    matchExpressions:
+    - key: skaha.opencadc.org/node-type
+      operator: NotIn
+      values:
+      - service-node
+{{- end }}
+
+{{ $currContext := . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: skaha-config
   namespace: {{ .Values.skaha.namespace }}
 data:
-{{ tpl (.Files.Glob "config/*").AsConfig . | indent 2 }}
-  {{- (.Files.Glob "skaha-config/*").AsConfig | nindent 2 }}
+{{ tpl ($.Files.Glob "config/*").AsConfig . | indent 2 }}
+{{ range $path, $_ :=  $.Files.Glob "skaha-config/*.yaml" }}
+  {{ base $path }}: |
+  {{- tpl ($.Files.Get $path) $currContext | nindent 4 }}
+{{ end }}
+{{ ($.Files.Glob "skaha-config/*.properties").AsConfig | indent 2 }}
 {{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
