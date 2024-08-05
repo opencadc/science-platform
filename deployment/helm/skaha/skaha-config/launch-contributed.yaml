@@ -12,6 +12,15 @@ metadata:
 spec:
   parallelism: 1
   completions: 1
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: skaha.opencadc.org/node-type
+            operator: NotIn
+            values:
+            - service-node
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
