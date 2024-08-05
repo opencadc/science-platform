@@ -4,12 +4,9 @@
 deployment:
   hostname: example.org # Change this
   skaha:
-    image: images.opencadc.org/platform/skaha:0.16.1
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
-    maxUserSessions: "5"
-
     # Root of shared storage
     skahaTld: "/arc"
     
@@ -24,7 +21,7 @@ deployment:
 
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    registryURL: http://reg.skaha-system.svc.cluster.local/reg
+    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -49,8 +46,8 @@ deployment:
 
     # Optionally mount a custom CA certificate
     extraVolumeMounts:
-     - mountPath: "/config/cacerts"
-       name: cacert-volume
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
 
     # If the base names have changed, then change them here, otherwise leave them.
     priorityClassName: uber-user-preempt-high
@@ -58,10 +55,10 @@ deployment:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
     extraVolumes:
-     - name: cacert-volume
-       secret:
-         defaultMode: 420
-         secretName: science-portal-cacert-secret
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: skaha-cacert-secret
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
@@ -119,13 +116,13 @@ kueue:
         - name: skaha
           resources:
           - name: cpu
-            nominalQuota: 30 # Change this according to the available resources
-            borrowingLimit: 10 # Change this according to the resource requirements
+            nominalQuota: 6 # Change this according to the available resources
+            borrowingLimit: 2 # Change this according to the resource requirements
           - name: memory
-            nominalQuota: 30Gi # Change this according to the available resources
-            borrowingLimit: 10Gi # Change this according to the available resources 
+            nominalQuota: 6Gi # Change this according to the available resources
+            borrowingLimit: 2Gi # Change this according to the available resources 
           - name: ephemeral-storage
-            nominalQuota: 300Gi
+            nominalQuota: 50Gi
     skaha-cluster-queue-headless:
       cohort: "skaha-queue"
       resourceGroups:
