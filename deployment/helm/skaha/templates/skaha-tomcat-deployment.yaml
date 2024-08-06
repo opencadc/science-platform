@@ -87,6 +87,8 @@ spec:
           name: config-volume
         - mountPath: "/add-user-config"
           name: add-user-config
+        - mountPath: "/session-volumes"
+          name: session-extra-volume-config
         - mountPath: "{{ .Values.deployment.skaha.skahaTld }}"
           name: cavern-volume
           # This subpath needs to match the subpath in Cavern's deployment.  If that one is configurable, so must this one be!
@@ -114,6 +116,9 @@ spec:
       - name: add-user-config
         configMap:
           name: add-user-config
+       - name: session-extra-volume-config
+        configMap:
+          name: session-extra-volume-config
       - name: cavern-volume
         {{- toYaml .Values.storage.service.spec | nindent 8 }}
       {{- with .Values.deployment.skaha.extraVolumes }}

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: session-extra-volume-config
+  namespace: {{ .Values.skaha.namespace }}
+data:
+  session-extra-volume-config.yaml: |
+    sessions:
+      extraVolumes:
+      {{- range .Values.sessions.extraVolumes }}
+      - name: {{ .name }}
+        volume:
+          type: {{ .volume.type }}
+          {{- if eq .volume.type "PVC" }}
+          claimName: {{ .volume.claimName }}
+          {{- else if eq .volume.type "HOST_PATH" }}
+          hostPath: {{ .volume.hostPath }}
+          hostPathType: {{ .volume.hostPathType }}
+          {{- else if eq .volume.type "CMP" }}
+          cmpName: {{ .volume.cmpName }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        volumeMount:
+          mountPath: {{ .volumeMount.mountPath }}
+          {{- if eq .volume.type "HOST_PATH" }}
+          readOnly: {{ .volumeMount.readOnly | quote }}
+          mountPropagation: {{ .volumeMount.mountPropagation | quote }}
+          {{- end }}
+          {{- if eq .volume.type "CMP" }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+      {{- end }}

@@ -139,3 +139,28 @@ kueue:
           - name: ephemeral-storage
             nominalQuota: 50Gi
 
+sessions:
+  extraVolumes:
+  - name: cavern-volume
+    volume:
+      type: PVC
+      claimName: skaha-workload-cavern-pvc
+    volumeMount:
+      mountPath: "/arc"
+      subPath: "cavern"
+  - name: cvmfs-volume
+    volume:
+      type: HOST_PATH
+      hostPath: "/cvmfs"
+      hostPathType: Directory
+    volumeMount:
+      mountPath: "/cvmfs"
+      readOnly: true
+      mountPropagation: HostToContainer
+  - name: config-map-volume
+    volume:
+      type: CMP
+      cmpName: launch-scripts
+      defaultMode: "0777"
+    volumeMount:
+      mountPath: "/cmp"
