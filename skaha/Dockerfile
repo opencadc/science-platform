@@ -1,10 +1,6 @@
 FROM images.opencadc.org/library/cadc-tomcat:1
 
-# add often used tools
-RUN dnf -y install which
-
-# PAM LDAP access
-RUN dnf -y install acl
+ARG KUBECTL_VERSION="v1.25.16"
 
 # install docker
 RUN dnf -y install docker
@@ -13,7 +9,7 @@ RUN dnf -y install docker
 RUN dnf -y install attr
 
 # install kubernetes client
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.22.13/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+ADD https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 
 RUN set -x && \
     chmod +x /usr/local/bin/kubectl && \
