@@ -36,11 +36,11 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
       containers:
-      - env: 
+      - env:
         - name: skaha.hostname
           value: "{{ .Values.deployment.hostname }}"
         - name: SKAHA_TLD
-          value: "{{ .Values.deployment.skaha.skahaTld }}"  
+          value: "{{ .Values.deployment.skaha.skahaTld }}"
         - name: skaha.homedir
           value: "{{ .Values.deployment.skaha.skahaTld }}/home"
         - name: skaha.namespace
@@ -74,7 +74,7 @@ spec:
           limits:
             memory: {{ .Values.deployment.skaha.resources.limits.memory }}
             cpu: {{ .Values.deployment.skaha.resources.limits.cpu }}
-        ports: 
+        ports:
         - containerPort: 8080
           protocol: TCP
         {{- with .Values.deployment.skaha.extraPorts }}

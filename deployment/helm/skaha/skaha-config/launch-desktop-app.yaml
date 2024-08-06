@@ -141,6 +141,7 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        {{- include "skaha.cvmfsVolumeMount" . | indent 8 }}
       volumes:
       - name: start-desktop-software
         configMap:
@@ -152,7 +153,8 @@ spec:
           defaultMode: 0777
       - name: cavern-volume
         persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc  
+          claimName: skaha-workload-cavern-pvc
+      {{- include "skaha.cvmfsVolume" . | indent 6 }}
       - name: scratch-dir
         emptyDir: {}
       - name: etc-group

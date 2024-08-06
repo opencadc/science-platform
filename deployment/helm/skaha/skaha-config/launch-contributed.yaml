@@ -134,6 +134,7 @@ spec:
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        {{- include "skaha.cvmfsVolumeMount" . | indent 8 }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
@@ -144,6 +145,7 @@ spec:
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc
+      {{- include "skaha.cvmfsVolume" . | indent 6 }}
       - name: init-users-groups
         configMap:
           name: init-users-groups-config
