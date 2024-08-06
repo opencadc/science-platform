@@ -84,11 +84,8 @@ import com.google.gson.reflect.TypeToken;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
-import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
@@ -114,9 +111,6 @@ import org.opencadc.skaha.session.SessionAction;
 public class DesktopAppLifecycleTest {
 
     private static final Logger log = Logger.getLogger(DesktopAppLifecycleTest.class);
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-    public static final String TERMINAL_IMAGE = "images-rc.canfar.net/skaha/terminal:1.1.2";
-
     private static final long DEFAULT_TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 25 * 1000;
 
     static {
@@ -130,7 +124,7 @@ public class DesktopAppLifecycleTest {
     public DesktopAppLifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL sessionServiceURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10,
+            final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getServiceID(), Standards.PROC_SESSIONS_10,
                                                                   AuthMethod.TOKEN);
             sessionURL = new URL(sessionServiceURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);

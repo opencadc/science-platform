@@ -73,14 +73,10 @@ import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.HttpPost;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
+import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.junit.Assert;
-import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.session.Session;
-import org.opencadc.skaha.session.SessionAction;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
@@ -94,9 +90,32 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
+import org.junit.Assert;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.session.Session;
+import org.opencadc.skaha.session.SessionAction;
 
 public class SessionUtil {
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
+    private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
+    private static final URI DEFAULT_SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
+    private static final String ENV_SKAHA_SERVICE_ID_KEY = "SKAHA_SERVICE_ID";
+
+    /**
+     * Obtain the current Service ID of the API being tested.
+     *
+     * @return URI, never null.
+     */
+    static URI getServiceID() {
+        final String configuredServiceID = System.getenv(SessionUtil.ENV_SKAHA_SERVICE_ID_KEY);
+        if (StringUtil.hasText(configuredServiceID)) {
+            LOGGER.info("Using configured Service: " + configuredServiceID);
+            return URI.create(configuredServiceID);
+        } else {
+            LOGGER.info("Using default CADC service: " + SessionUtil.DEFAULT_SKAHA_SERVICE_ID);
+            return SessionUtil.DEFAULT_SKAHA_SERVICE_ID;
+        }
+    }
 
     /**
      * Start a session and return the ID.
@@ -186,8 +205,7 @@ public class SessionUtil {
         return active;
     }
 
-    protected static List<Session> getSessionsOfType(final URL sessionURL, final String type, String... omitStatuses)
-            throws Exception {
+    protected static List<Session> getSessionsOfType(final URL sessionURL, final String type, String... omitStatuses) throws Exception {
         return SessionUtil.getSessions(sessionURL, omitStatuses).stream()
                           .filter(session -> session.getType().equals(type))
                           .collect(Collectors.toList());
@@ -221,7 +239,7 @@ public class SessionUtil {
 
     protected static List<Image> getImagesOfType(final String type) throws Exception {
         final RegistryClient registryClient = new RegistryClient();
-        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.SKAHA_SERVICE_ID,
+        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.getServiceID(),
                                                                  Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         final URL imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
 

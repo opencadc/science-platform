@@ -88,6 +88,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import java.util.concurrent.TimeoutException;
 import javax.security.auth.Subject;
 
 import org.apache.log4j.Level;
@@ -105,10 +106,6 @@ public class SessionLifecycleTest {
     
     private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
     private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-//    public static final String PROC_SESSION_STDID = "vos://cadc.nrc.ca~vospace/CADC/std/Proc#sessions-1.0";
-//    public static final String DESKTOP_IMAGE_SUFFIX = "/skaha/desktop:1.0.2";
-//    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
     public static final String PROD_IMAGE_HOST = "images.canfar.net";
     public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
 
@@ -139,7 +136,7 @@ public class SessionLifecycleTest {
             
             RegistryClient regClient = new RegistryClient();
             final URL sessionServiceURL =
-                    regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+                    regClient.getServiceURL(SessionUtil.getServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
             sessionURL = new URL(sessionServiceURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);
 
@@ -171,11 +168,19 @@ public class SessionLifecycleTest {
             // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been
             // addressed, just wait for a bit.
             long millisecondCount = 0L;
-            final int pollIntervalInSeconds = 5;
-            while (getSessions().size() != 1
-                   && millisecondCount < SessionLifecycleTest.DEFAULT_TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
+            final long pollIntervalInSeconds = 2;
+            int size = getSessions().size();
+            while (size != 1) {
+                log.info("Waiting " + pollIntervalInSeconds + " seconds...");
                 TimeUnit.SECONDS.sleep(pollIntervalInSeconds);
                 millisecondCount += pollIntervalInSeconds * 1000;
+                log.info("Waited for " + (millisecondCount / 1000) + " seconds...");
+
+                if (millisecondCount >= SessionLifecycleTest.DEFAULT_TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
+                    throw new TimeoutException("Session list exceeded time out.  Currently see " + size + " sessions.");
+                } else {
+                    size = getSessions().size();
+                }
             }
 
             // verify desktop session

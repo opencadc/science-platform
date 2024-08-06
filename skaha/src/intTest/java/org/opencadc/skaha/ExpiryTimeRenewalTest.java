@@ -79,7 +79,6 @@ import ca.nrc.cadc.util.Log4jInit;
 
 import java.io.File;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
@@ -106,7 +105,6 @@ public class ExpiryTimeRenewalTest {
 
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
     private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
     public static final String PROD_IMAGE_HOST = "images.canfar.net";
     public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
@@ -136,7 +134,7 @@ public class ExpiryTimeRenewalTest {
 
         RegistryClient regClient = new RegistryClient();
         final URL sessionServiceURL =
-                regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+                regClient.getServiceURL(SessionUtil.getServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         sessionURL = new URL(sessionServiceURL.toString() + "/session");
         log.info("sessions URL: " + sessionURL);
 
@@ -322,6 +320,7 @@ public class ExpiryTimeRenewalTest {
                         Instant startTime = Instant.parse(s.getStartTime());
                         Instant expiryTime = Instant.parse(s.getExpiryTime());
                         desktopTimeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
+                        log.info("Desktop time to live is " + desktopTimeToLive + "ms");
                     }
                 }
             }
@@ -372,6 +371,7 @@ public class ExpiryTimeRenewalTest {
                         Instant startTime = Instant.parse(session.getStartTime());
                         Instant expiryTime = Instant.parse(session.getExpiryTime());
                         desktopTimeToLiveAfterRenewal = startTime.until(expiryTime, ChronoUnit.SECONDS);
+                        log.info("Desktop time to live after renewal is " + desktopTimeToLiveAfterRenewal + "ms");
                     } else if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                         Instant startTime = Instant.parse(session.getStartTime());
                         Instant expiryTime = Instant.parse(session.getExpiryTime());

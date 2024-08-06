@@ -82,7 +82,6 @@ import com.google.gson.reflect.TypeToken;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.Type;
-import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
@@ -103,8 +102,7 @@ import org.opencadc.skaha.image.Image;
 public class ImagesTest {
     
     private static final Logger log = Logger.getLogger(ImagesTest.class);
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-    
+
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
@@ -116,7 +114,7 @@ public class ImagesTest {
         try {
             RegistryClient regClient = new RegistryClient();
             final URL imageServiceURL =
-                    regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+                    regClient.getServiceURL(SessionUtil.getServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
             imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
             log.info("sessions URL: " + imageURL);
 
