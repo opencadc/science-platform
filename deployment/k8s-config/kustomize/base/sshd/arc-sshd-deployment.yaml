@@ -24,11 +24,8 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: arc-sshd
-        image: images.canfar.net/skaha-system/sshd:0.1
+        image: images.canfar.net/skaha-system/sshd:0.2.0
         imagePullPolicy: Always
-        #imagePullPolicy: IfNotPresent
-        #command: ["/bin/sh"]
-        #args: ["-c", "while true; do sleep 10;done"] 
         resources:
           requests:
             memory: "4Gi"
@@ -36,11 +33,16 @@ spec:
           limits:
             memory: "8Gi"
             cpu: "4"
+        securityContext:
+          allowPrivilegeEscalation: false
         ports:
         - containerPort: 64022
           protocol: TCP
         volumeMounts:
-        - mountPath: "/cavern"
+        - mountPath: /etc/sssd/sssd.conf
+          subPath: sssd.conf
+          name: sssd-config-vol
+        - mountPath: "/arc"
           name: arc-ceph-volume
           subPath: cavern
         - mountPath: /etc/ssh/sshd_config
@@ -64,11 +66,10 @@ spec:
         - mountPath: /etc/ssh/ssh_host_rsa_key
           name: ssh-host-rsa-key
           subPath: ssh_host_rsa_key
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-          readOnly: true
       securityContext:
         runAsUser: 0
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:
@@ -79,7 +80,7 @@ spec:
           - 10.30.202.3:6789
           - 10.30.203.3:6789
           path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
-          user: keel_prod
+          user: keel-prod-user
           secretRef:
             name: cephfs-cephx-user-key
           readOnly: false
@@ -98,7 +99,9 @@ spec:
         secret:
           secretName: arc-sshd-priv3-secret
           defaultMode: 256
-      - name: sssd-dir
-        hostPath:
-          path: /var/lib/ubernetes
-          type: Directory
+      - name: sssd-config-vol
+        configMap:
+          name: sssd-config
+          # defaultMode of 256 sets the permissions of the file
+          # to 0400 - needed by sssd
+          defaultMode: 256

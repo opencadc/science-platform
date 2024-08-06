@@ -18,6 +18,9 @@ spec:
     spec:
       imagePullSecrets:
         - name: regcred
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: init-skaha-service
         image: busybox
@@ -30,6 +33,8 @@ spec:
         env:
         - name: SKAHA_TLD
           value: "{{ .Values.deployment.skaha.skahaTld }}"
+        securityContext:
+          allowPrivilegeEscalation: false
       containers:
       - env: 
         - name: skaha.hostname
@@ -91,13 +96,14 @@ spec:
         {{- end }}
         securityContext:
           runAsUser: 0
+          allowPrivilegeEscalation: false
 {{- with .Values.deployment.extraHosts }}
       hostAliases:
 {{- range $extraHost := . }}
         - ip: {{ $extraHost.ip }}
           hostnames:
             - {{ $extraHost.hostname }}
-{{- end }}            
+{{- end }}
 {{- end }}
       priorityClassName: {{ .Values.deployment.skaha.priorityClassName }}
       serviceAccountName: {{ .Values.deployment.skaha.serviceAccountName }}

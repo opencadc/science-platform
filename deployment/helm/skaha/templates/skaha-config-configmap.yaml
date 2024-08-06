@@ -47,6 +47,18 @@ The init containers for the launch scripts.
 {{- end }}
 {{- end }}
 
+{{/*
+The affinity for Jobs.
+*/}}
+{{- define "skaha.job.nodeSelector" -}}
+  selector:
+    matchExpressions:
+    - key: skaha.opencadc.org/node-type
+      operator: NotIn
+      values:
+      - service-node
+{{- end }}
+
 {{ $currContext := . }}
 apiVersion: v1
 kind: ConfigMap

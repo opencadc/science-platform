@@ -21,6 +21,8 @@ spec:
       securityContext:
         fsGroup: {{ .rootOwner.gid }}
         runAsUser: 0
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: init-{{ $.Release.Name }}-fs
         image: busybox
@@ -29,6 +31,8 @@ spec:
         volumeMounts:
         - mountPath: "{{ .dataDir }}"
           name: cavern-volume
+        securityContext:
+          allowPrivilegeEscalation: false
 {{- end }}
       containers:
       - image: {{ .Values.deployment.cavern.image }}
@@ -41,6 +45,8 @@ spec:
           limits:
             memory: {{ .Values.deployment.cavern.resources.limits.memory }}
             cpu: {{ .Values.deployment.cavern.resources.limits.cpu }}
+        securityContext:
+          allowPrivilegeEscalation: false
         {{- with .Values.deployment.cavern.extraEnv }}
         env:
         {{- toYaml . | nindent 8 }}
@@ -59,12 +65,14 @@ spec:
         {{- with .Values.deployment.cavern.extraVolumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-    {{- range $extraHost := .Values.deployment.extraHosts }}
+{{- with .Values.deployment.extraHosts }}
       hostAliases:
+{{- range $extraHost := . }}
         - ip: {{ $extraHost.ip }}
           hostnames:
             - {{ $extraHost.hostname }}
-    {{- end }}
+{{- end }}
+{{- end }}
       priorityClassName: uber-user-preempt-high
       serviceAccountName: skaha
       volumes:

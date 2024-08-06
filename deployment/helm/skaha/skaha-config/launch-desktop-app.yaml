@@ -9,6 +9,7 @@ metadata:
     canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
 spec:
+  {{ template "skaha.job.nodeSelector" . }}
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
@@ -58,10 +59,11 @@ spec:
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         securityContext:
-          runAsUser: ${skaha.posixid}
-          runAsGroup: ${skaha.posixid}
+          privileged: false
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         image: "${software.imageid}"
         workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
         imagePullPolicy: Always

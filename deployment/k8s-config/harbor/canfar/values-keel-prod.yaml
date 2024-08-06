@@ -1,5 +1,4 @@
-
-logLevel: debug
+logLevel: warn
 
 externalURL: https://images.canfar.net
 
@@ -46,24 +45,36 @@ ingress:
 #***************************************************
 notary:
   server: 
+    image:
+      registry: docker.io
+      repository: bitnami/harbor-notary-server-archived
+      tag: 2.7.1-debian-11-r6
     priorityClassName: uber-user-preempt-high
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
 
-  signer: 
+  signer:
+    image:
+      registry: docker.io
+      repository: bitnami/harbor-notary-signer-archived
+      tag: 2.7.1-debian-11-r6
     priorityClassName: uber-user-preempt-high
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
 
 #***************************************************
 portal:
@@ -73,19 +84,27 @@ portal:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 chartmuseum:
+  image:
+    registry: docker.io
+    repository: bitnami/chartmuseum-archived
+    tag: 0.15.0-debian-11-r79
   priorityClassName: uber-user-preempt-high
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 jobservice:
@@ -95,8 +114,10 @@ jobservice:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 registry:
@@ -106,8 +127,10 @@ registry:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 trivy:
@@ -117,8 +140,10 @@ trivy:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 persistence:
@@ -163,10 +188,10 @@ core:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: nvidia.com/gpu.count
-            operator: DoesNotExist
-
-
+          - key: skaha.opencadc.org/node-type
+            operator: In
+            values:
+            - service-node
 
 #***************************************************
 postgresql:
@@ -178,14 +203,23 @@ postgresql:
     subPath: harbor-postgresql
 
   primary:
+    resources:
+      limits:
+        memory: 1Gi
+        cpu: 1
+      requests:
+        memory: 1Gi
+        cpu: 1
     priorityClassName: uber-user-preempt-high
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
     volumes:
       - name: postgresql-extended-config
         configMap:
@@ -222,8 +256,10 @@ redis:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: nvidia.com/gpu.count
-              operator: DoesNotExist
+            - key: skaha.opencadc.org/node-type
+              operator: In
+              values:
+              - service-node
     persistence:
       enabled: true
       storageClass: ""

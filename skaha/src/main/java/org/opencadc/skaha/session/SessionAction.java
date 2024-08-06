@@ -71,6 +71,7 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -84,7 +85,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -120,17 +120,13 @@ public abstract class SessionAction extends SkahaAction {
         super();
     }
 
-    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
-        // vnc_light.html accepts title and resize
-        //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
-        //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
-
+    public static String getVNCURL(String host, String sessionID) {
         // vnc.html does not...
         return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-            + "&path=session/desktop/" + sessionID + "/";
+               + "&path=session/desktop/" + sessionID + "/";
     }
 
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
         String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
         if (altSocketUrl) {
             url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
@@ -143,8 +139,17 @@ public abstract class SessionAction extends SkahaAction {
                              skahaTLD.replaceAll("/", ""), userid, sessionID);
     }
 
-    public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
+    public static String getContributedURL(String host, String sessionID) {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
+    }
+
+    private static String accessToken() throws IllegalStateException {
+        return AuthenticationUtil.getCurrentSubject()
+                                 .getPublicCredentials(AuthorizationToken.class).stream()
+                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
+                                 .findFirst()
+                                 .map(AuthorizationToken::getCredentials)
+                                 .orElseThrow(IllegalStateException::new);
     }
 
     protected void initRequest() throws Exception {
@@ -179,7 +184,28 @@ public abstract class SessionAction extends SkahaAction {
 
     protected void injectCredentials() {
         injectAPIToken();
+        injectAccessToken();
         injectProxyCertificate();
+    }
+
+    private void injectAccessToken() {
+        log.debug("injectAccessToken()");
+        // inject a token if available
+        final int posixId = getUID();
+        try {
+            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
+            CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
+            String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
+            CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
+            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".access", SessionAction.accessToken());
+            CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
+            log.debug("injectAccessToken(): OK");
+        } catch (Exception exception) {
+            log.debug("failed to inject token: " + exception.getMessage(), exception);
+        }
+
+        log.debug("No API Token found");
+        log.debug("injectAPIToken(): UNSUCCESSFUL");
     }
 
     private void injectAPIToken() {
@@ -450,8 +476,8 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("-o");
 
         String customColumns = "custom-columns=" +
-            "UID:.metadata.uid," +
-            "EXPIRY:.spec.activeDeadlineSeconds";
+                               "UID:.metadata.uid," +
+                               "EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -486,7 +512,7 @@ public abstract class SessionAction extends SkahaAction {
         getAppJobNameCMD.add("-o");
 
         String customColumns = "custom-columns=" +
-            "NAME:.metadata.name";
+                               "NAME:.metadata.name";
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
