@@ -173,36 +173,64 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
 
-    protected AuthorizationToken token(final Subject subject) {
-        return subject
-                .getPublicCredentials(AuthorizationToken.class)
-                .iterator()
-                .next();
+    private static String accessToken() throws IllegalStateException {
+        return AuthenticationUtil.getCurrentSubject()
+                                 .getPublicCredentials(AuthorizationToken.class).stream()
+                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
+                                 .findFirst()
+                                 .map(AuthorizationToken::getCredentials)
+                                 .orElseThrow(IllegalStateException::new);
     }
-
 
     protected void injectCredentials() {
-        final String username = posixPrincipal.username;
-        int posixId = getUID();
-        injectToken(username, posixId, xAuthTokenSkaha);
-        injectProxyCertificate(username);
+        injectAPIToken();
+        injectAccessToken();
+        injectProxyCertificate();
     }
 
-    private void injectToken(String username, int posixId, String token) {
+    private void injectAccessToken() {
+        log.debug("injectAccessToken()");
         // inject a token if available
+        final int posixId = getUID();
         try {
-            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, username);
+            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
             CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
             String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
             CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
-            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", token);
+            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".access", SessionAction.accessToken());
             CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
+            log.debug("injectAccessToken(): OK");
         } catch (Exception exception) {
             log.debug("failed to inject token: " + exception.getMessage(), exception);
         }
+
+        log.debug("No API Token found");
+        log.debug("injectAPIToken(): UNSUCCESSFUL");
     }
 
-    private void injectProxyCertificate(String username) {
+    private void injectAPIToken() {
+        log.debug("injectAPIToken()");
+        // inject a token if available
+        final int posixId = getUID();
+        try {
+            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
+            CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
+            String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
+            CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
+            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", this.xAuthTokenSkaha);
+            CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
+            log.debug("injectAPIToken(): OK");
+        } catch (Exception exception) {
+            log.debug("failed to inject token: " + exception.getMessage(), exception);
+        }
+
+        log.debug("No API Token found");
+        log.debug("injectAPIToken(): UNSUCCESSFUL");
+    }
+
+    private void injectProxyCertificate() {
+        log.debug("injectProxyCertificate()");
+
         // inject a delegated proxy certificate if available
         try {
             final LocalAuthority localAuthority = new LocalAuthority();
@@ -211,15 +239,13 @@ public abstract class SessionAction extends SkahaAction {
             // Should throw a NoSuchElementException if it's missing, but check here anyway.
             if (credServiceID != null) {
                 final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10,
-                                                                        AuthMethod.CERT);
+                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
 
                 if (credServiceURL != null) {
                     final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
                     final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
                         final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        final String userName =
-                                currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
+                        final String userName = currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
                         final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
                         final HttpGet download = new HttpGet(certificateURL, out);
                         download.setFollowRedirects(true);
@@ -231,14 +257,17 @@ public abstract class SessionAction extends SkahaAction {
                     // inject the proxy cert
                     log.debug("Running docker exec to insert cert");
 
-                    injectFile(proxyCert, Path.of(homedir, username, ".ssl", "cadcproxy.pem").toString());
+                    injectFile(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
+                    log.debug("injectProxyCertificate(): OK");
                 }
             }
         } catch (NoSuchElementException noSuchElementException) {
-            log.debug("Not using proxy certificates.  Skipping certificate injection...");
+            log.debug("Not using proxy certificates");
         } catch (Exception e) {
             log.warn("failed to inject cert: " + e.getMessage(), e);
         }
+
+        log.debug("injectProxyCertificate(): UNSUCCESSFUL");
     }
 
     protected String getImageName(String image) {
