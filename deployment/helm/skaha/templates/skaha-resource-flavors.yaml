@@ -1,3 +1,4 @@
+ {{- if .Values.kueue }}
 {{ range $flavor, $config := .Values.kueue.resourceFlavors }}
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ResourceFlavor
@@ -10,3 +11,4 @@ spec:
 {{- end}}
 ---
 {{ end }}
+{{- end}}

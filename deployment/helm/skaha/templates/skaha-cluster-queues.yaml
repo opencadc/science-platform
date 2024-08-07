@@ -1,3 +1,4 @@
+ {{- if .Values.kueue }}
 {{ range $queue, $config := .Values.kueue.clusterQueues }}
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
@@ -32,3 +33,4 @@ spec:
   {{- end }}
 ---
 {{ end }}
+{{- end }}
