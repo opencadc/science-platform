@@ -46,12 +46,14 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- end }}
-    {{- range $extraHost := .Values.deployment.extraHosts }}
+{{- with .Values.deployment.extraHosts }}
       hostAliases:
+{{- range $extraHost := . }}
         - ip: {{ $extraHost.ip }}
           hostnames:
             - {{ $extraHost.hostname }}
-    {{- end }}
+{{- end }}
+{{- end }}
       volumes:
       - name: config-volume
         configMap:
