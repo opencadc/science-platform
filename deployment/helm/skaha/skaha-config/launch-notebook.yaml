@@ -122,20 +122,4 @@ spec:
             drop:
               - ALL
       volumes:
-      - name: start-jupyterlab
-        configMap:
-          name: launch-scripts
-          defaultMode: 0777
-      - name: init-users-groups
-        configMap:
-          name: init-users-groups-config
-          defaultMode: 0777
-      - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc
-      - name: scratch-dir
-        emptyDir: {}
-      - name: etc-group
-        emptyDir: {}
-      - name: etc-passwd
-        emptyDir: {}
+      {{ template "skaha.job.jupyterVolumes" . }}
