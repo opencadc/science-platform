@@ -89,17 +89,4 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
-      - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc
-      - name: init-users-groups
-        configMap:
-          name: init-users-groups-config
-          defaultMode: 0777
-      - name: scratch-dir
-        emptyDir: {}
-      - name: etc-group
-        emptyDir: {}
-      - name: etc-passwd
-        emptyDir: {}
-
+      {{ template "skaha.session.headlessVolumes" . }}

@@ -97,4 +97,4 @@ spec:
             drop:
               - ALL
       volumes:
-      {{ template "skaha.job.contributedVolumes" . }}
+      {{ template "skaha.session.contributedVolumes" . }}

@@ -1,0 +1,116 @@
+{{- define "skaha.session.jupyterVolumes" -}}
+      - name: start-jupyterlab
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.cartaVolumes" -}}
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc  
+      - name: scratch-dir
+        emptyDir: {}
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: start-carta
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.contributedVolumes" -}}
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.desktopVolumes" -}}
+      - name: templates
+        configMap:
+          name: templates
+          defaultMode: 0777
+      - name: start-desktop
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.desktopAppVolumes" -}}
+      - name: start-desktop-software
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.headlessVolumes"}}
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
+
+{{- end }}

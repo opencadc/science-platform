@@ -98,4 +98,4 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
-      {{ template "skaha.job.cartaVolumes" . }}
+      {{ template "skaha.session.cartaVolumes" . }}
