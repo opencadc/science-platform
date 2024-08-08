@@ -159,7 +159,7 @@ sessions:
       mountPropagation: HostToContainer
   - name: config-map-volume
     volume:
-      type: CMP
+      type: CONFIG_MAP
       cmpName: launch-scripts
       defaultMode: "0777"
     volumeMount:
