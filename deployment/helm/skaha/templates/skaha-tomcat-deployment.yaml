@@ -40,7 +40,9 @@ spec:
         - name: skaha.hostname
           value: "{{ .Values.deployment.hostname }}"
         - name: SKAHA_TLD
-          value: "{{ .Values.deployment.skaha.skahaTld }}"  
+          value: "{{ .Values.deployment.skaha.skahaTld }}"
+        - name: GPU_ENABLED
+          value: "{{ .Values.deployment.skaha.gpuEnabled }}"
         - name: skaha.homedir
           value: "{{ .Values.deployment.skaha.skahaTld }}/home"
         - name: skaha.namespace

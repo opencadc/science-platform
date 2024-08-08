@@ -2,14 +2,16 @@
 
 # Skaha web service deployment
 deployment:
-  hostname: example.org # change this
+  hostname: example.org # Change this
   skaha:
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
-
     # Root of shared storage
     skahaTld: "/arc"
+    
+    # Change this to enable the GPU 
+    gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
     usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
@@ -91,3 +93,49 @@ storage:
       # storageClassName: ""
       labels:
         storage: local-storage  # Match this label up with whatever was installed in the base install, or the desired PVC
+
+# Kueue setups
+kueue:
+  resourceFlavors:
+  - name: skaha
+    
+  localQueues:
+    skaha-workload-queue-interactive:
+      namespace: skaha-workload
+      clusterQueue: skaha-cluster-queue-interactive
+    skaha-workload-queue-headless:
+      namespace: skaha-workload
+      clusterQueue: skaha-cluster-queue-headless
+
+  clusterQueues:
+    skaha-cluster-queue-interactive:
+      cohort: "skaha-queue"
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+        flavors:
+        - name: skaha
+          resources:
+          - name: cpu
+            nominalQuota: 6 # Change this according to the available resources
+            borrowingLimit: 2 # Change this according to the resource requirements
+          - name: memory
+            nominalQuota: 6Gi # Change this according to the available resources
+            borrowingLimit: 2Gi # Change this according to the available resources 
+          - name: ephemeral-storage
+            nominalQuota: 50Gi
+    skaha-cluster-queue-headless:
+      cohort: "skaha-queue"
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "ephemeral-storage"]
+        flavors:
+        - name: skaha
+          resources:
+          - name: cpu
+            nominalQuota: 4 # Change this according to the available resources
+            borrowingLimit: 0 # Change this according to the resource requirements
+          - name: memory
+            nominalQuota: 4Gi # Change this according to the available resources
+            borrowingLimit: 0Gi # Change this according to the resource requirements
+          - name: ephemeral-storage
+            nominalQuota: 50Gi
+
