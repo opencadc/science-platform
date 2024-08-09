@@ -1,71 +1,73 @@
 /*
-************************************************************************
-*******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
-**************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
-*
-*  (c) 2020.                            (c) 2020.
-*  Government of Canada                 Gouvernement du Canada
-*  National Research Council            Conseil national de recherches
-*  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
-*  All rights reserved                  Tous droits réservés
-*
-*  NRC disclaims any warranties,        Le CNRC dénie toute garantie
-*  expressed, implied, or               énoncée, implicite ou légale,
-*  statutory, of any kind with          de quelque nature que ce
-*  respect to the software,             soit, concernant le logiciel,
-*  including without limitation         y compris sans restriction
-*  any warranty of merchantability      toute garantie de valeur
-*  or fitness for a particular          marchande ou de pertinence
-*  purpose. NRC shall not be            pour un usage particulier.
-*  liable in any event for any          Le CNRC ne pourra en aucun cas
-*  damages, whether direct or           être tenu responsable de tout
-*  indirect, special or general,        dommage, direct ou indirect,
-*  consequential or incidental,         particulier ou général,
-*  arising from the use of the          accessoire ou fortuit, résultant
-*  software.  Neither the name          de l'utilisation du logiciel. Ni
-*  of the National Research             le nom du Conseil National de
-*  Council of Canada nor the            Recherches du Canada ni les noms
-*  names of its contributors may        de ses  participants ne peuvent
-*  be used to endorse or promote        être utilisés pour approuver ou
-*  products derived from this           promouvoir les produits dérivés
-*  software without specific prior      de ce logiciel sans autorisation
-*  written permission.                  préalable et particulière
-*                                       par écrit.
-*
-*  This file is part of the             Ce fichier fait partie du projet
-*  OpenCADC project.                    OpenCADC.
-*
-*  OpenCADC is free software:           OpenCADC est un logiciel libre ;
-*  you can redistribute it and/or       vous pouvez le redistribuer ou le
-*  modify it under the terms of         modifier suivant les termes de
-*  the GNU Affero General Public        la “GNU Affero General Public
-*  License as published by the          License” telle que publiée
-*  Free Software Foundation,            par la Free Software Foundation
-*  either version 3 of the              : soit la version 3 de cette
-*  License, or (at your option)         licence, soit (à votre gré)
-*  any later version.                   toute version ultérieure.
-*
-*  OpenCADC is distributed in the       OpenCADC est distribué
-*  hope that it will be useful,         dans l’espoir qu’il vous
-*  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
-*  without even the implied             GARANTIE : sans même la garantie
-*  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
-*  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
-*  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
-*  General Public License for           Générale Publique GNU Affero
-*  more details.                        pour plus de détails.
-*
-*  You should have received             Vous devriez avoir reçu une
-*  a copy of the GNU Affero             copie de la Licence Générale
-*  General Public License along         Publique GNU Affero avec
-*  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
-*  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
-*                                       <http://www.gnu.org/licenses/>.
-*
-************************************************************************
-*/
+ ************************************************************************
+ *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
+ **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
+ *
+ *  (c) 2020.                            (c) 2020.
+ *  Government of Canada                 Gouvernement du Canada
+ *  National Research Council            Conseil national de recherches
+ *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+ *  All rights reserved                  Tous droits réservés
+ *
+ *  NRC disclaims any warranties,        Le CNRC dénie toute garantie
+ *  expressed, implied, or               énoncée, implicite ou légale,
+ *  statutory, of any kind with          de quelque nature que ce
+ *  respect to the software,             soit, concernant le logiciel,
+ *  including without limitation         y compris sans restriction
+ *  any warranty of merchantability      toute garantie de valeur
+ *  or fitness for a particular          marchande ou de pertinence
+ *  purpose. NRC shall not be            pour un usage particulier.
+ *  liable in any event for any          Le CNRC ne pourra en aucun cas
+ *  damages, whether direct or           être tenu responsable de tout
+ *  indirect, special or general,        dommage, direct ou indirect,
+ *  consequential or incidental,         particulier ou général,
+ *  arising from the use of the          accessoire ou fortuit, résultant
+ *  software.  Neither the name          de l'utilisation du logiciel. Ni
+ *  of the National Research             le nom du Conseil National de
+ *  Council of Canada nor the            Recherches du Canada ni les noms
+ *  names of its contributors may        de ses  participants ne peuvent
+ *  be used to endorse or promote        être utilisés pour approuver ou
+ *  products derived from this           promouvoir les produits dérivés
+ *  software without specific prior      de ce logiciel sans autorisation
+ *  written permission.                  préalable et particulière
+ *                                       par écrit.
+ *
+ *  This file is part of the             Ce fichier fait partie du projet
+ *  OpenCADC project.                    OpenCADC.
+ *
+ *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
+ *  you can redistribute it and/or       vous pouvez le redistribuer ou le
+ *  modify it under the terms of         modifier suivant les termes de
+ *  the GNU Affero General Public        la “GNU Affero General Public
+ *  License as published by the          License” telle que publiée
+ *  Free Software Foundation,            par la Free Software Foundation
+ *  either version 3 of the              : soit la version 3 de cette
+ *  License, or (at your option)         licence, soit (à votre gré)
+ *  any later version.                   toute version ultérieure.
+ *
+ *  OpenCADC is distributed in the       OpenCADC est distribué
+ *  hope that it will be useful,         dans l’espoir qu’il vous
+ *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
+ *  without even the implied             GARANTIE : sans même la garantie
+ *  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
+ *  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
+ *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
+ *  General Public License for           Générale Publique GNU Affero
+ *  more details.                        pour plus de détails.
+ *
+ *  You should have received             Vous devriez avoir reçu une
+ *  a copy of the GNU Affero             copie de la Licence Générale
+ *  General Public License along         Publique GNU Affero avec
+ *  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
+ *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
+ *                                       <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************
+ */
 
 package org.opencadc.skaha.session;
+
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
@@ -77,42 +79,101 @@ import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
 
-import javax.security.auth.Subject;
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.security.PrivilegedExceptionAction;
-import java.util.*;
-
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
-
 public abstract class SessionAction extends SkahaAction {
-
-    private static final Logger log = Logger.getLogger(SessionAction.class);
 
     protected static final String REQUEST_TYPE_SESSION = "session";
     protected static final String REQUEST_TYPE_APP = "app";
-
     protected static final String SESSION_LIST_VIEW_ALL = "all";
     protected static final String SESSION_VIEW_EVENTS = "events";
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
-
     protected static final String NONE = "<none>";
-
+    private static final Logger log = Logger.getLogger(SessionAction.class);
     protected String requestType;
     protected String sessionID;
     protected String appID;
 
     public SessionAction() {
         super();
+    }
+
+    public static String getVNCURL(String host, String sessionID) {
+        // vnc.html does not...
+        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
+    }
+
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
+        String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
+        if (altSocketUrl) {
+            url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
+        }
+        return url;
+    }
+
+    public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
+        return String.format("https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s", host, sessionID,
+                             skahaTLD.replaceAll("/", ""), userid, sessionID);
+    }
+
+    public static String getContributedURL(String host, String sessionID) {
+        return "https://" + host + "/session/contrib/" + sessionID + "/";
+    }
+
+    private static String accessToken() throws IllegalStateException {
+        return AuthenticationUtil.getCurrentSubject()
+                                 .getPublicCredentials(AuthorizationToken.class).stream()
+                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
+                                 .findFirst()
+                                 .map(AuthorizationToken::getCredentials)
+                                 .orElseThrow(IllegalStateException::new);
+    }
+
+    static String stageFile(String data) throws IOException {
+        final File file = File.createTempFile("skaha-tmp-file-", UUID.randomUUID().toString());
+
+        if (!file.setExecutable(true, true)) {
+            log.debug("Failed to set execution permission on file " + file.getAbsolutePath());
+        }
+
+        try (final BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            writer.write(data + "\n");
+            writer.flush();
+        }
+
+        return file.getAbsolutePath();
+    }
+
+    static List<String> getJobCommand(String k8sNamespace) {
+        final List<String> getSessionJobCMD = new ArrayList<>();
+        getSessionJobCMD.add("kubectl");
+        getSessionJobCMD.add("get");
+        getSessionJobCMD.add("--namespace");
+        getSessionJobCMD.add(k8sNamespace);
+        getSessionJobCMD.add("job");
+        getSessionJobCMD.add("-l");
+        return getSessionJobCMD;
     }
 
     protected void initRequest() throws Exception {
@@ -143,43 +204,6 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("sessionID: " + sessionID);
         log.debug("appID: " + appID);
         log.debug("userID: " + posixPrincipal);
-    }
-
-
-    public static String getVNCURL(String host, String sessionID) throws MalformedURLException {
-        // vnc_light.html accepts title and resize
-        //return "https://" + host + "/desktop/" + ipAddress + "/" + sessionID + "/connect?" +
-        //    "title=skaha&resize=true&path=desktop/" + ipAddress + "/" + sessionID + "/websockify&password=" + sessionID;
-
-        // vnc.html does not...
-        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-               + "&path=session/desktop/" + sessionID + "/";
-    }
-
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) throws MalformedURLException {
-        String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
-        if (altSocketUrl) {
-            url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
-        }
-        return url;
-    }
-
-    public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
-        return String.format("https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s", host, sessionID,
-                             skahaTLD.replaceAll("/", ""), userid, sessionID);
-    }
-
-    public static String getContributedURL(String host, String sessionID) throws MalformedURLException {
-        return "https://" + host + "/session/contrib/" + sessionID + "/";
-    }
-
-    private static String accessToken() throws IllegalStateException {
-        return AuthenticationUtil.getCurrentSubject()
-                                 .getPublicCredentials(AuthorizationToken.class).stream()
-                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
-                                 .findFirst()
-                                 .map(AuthorizationToken::getCredentials)
-                                 .orElseThrow(IllegalStateException::new);
     }
 
     protected void injectCredentials() {
@@ -291,36 +315,14 @@ public abstract class SessionAction extends SkahaAction {
     protected void injectFile(String data, String path) throws IOException, InterruptedException {
         final int uid = posixPrincipal.getUidNumber();
         // stage file
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
+        String tmpFileName = SessionAction.stageFile(data);
 
         // update file permissions
-        String[] chown = new String[] {"chown", uid + ":" + uid, tmpFileName};
-        execute(chown);
+        CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
 
         // inject file
         String[] inject = new String[] {"mv", "-f", tmpFileName, path};
         execute(inject);
-    }
-
-    protected String stageFile(String data) throws IOException {
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permssion on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
-        return tmpFileName;
     }
 
     public String getPodID(String forUserID, String sessionID) throws Exception {
@@ -399,7 +401,7 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         throw new ResourceNotFoundException(
-                "desktop app with session " + sessionID + " and app ID " + appID + " was not found");
+            "desktop app with session " + sessionID + " and app ID " + appID + " was not found");
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
@@ -465,27 +467,18 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        List<String> getSessionJobCMD = new ArrayList<String>();
-        getSessionJobCMD.add("kubectl");
-        getSessionJobCMD.add("get");
-        getSessionJobCMD.add("--namespace");
-        getSessionJobCMD.add(k8sNamespace);
-        getSessionJobCMD.add("job");
-        getSessionJobCMD.add("-l");
+        List<String> getSessionJobCMD = SessionAction.getJobCommand(k8sNamespace);
         getSessionJobCMD.add("canfar-net-userid=" + forUserID);
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-                               "UID:.metadata.uid," +
-                               "EXPIRY:.spec.activeDeadlineSeconds";
+        String customColumns = "custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
     }
 
-    protected String getAppJobName(String sessionID, String userID, String appID) throws
-                                                                                  IOException, InterruptedException {
+    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
         return execute(getAppJobNameCMD.toArray(new String[0]));
@@ -501,19 +494,12 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        List<String> getAppJobNameCMD = new ArrayList<String>();
-        getAppJobNameCMD.add("kubectl");
-        getAppJobNameCMD.add("get");
-        getAppJobNameCMD.add("--namespace");
-        getAppJobNameCMD.add(k8sNamespace);
-        getAppJobNameCMD.add("job");
-        getAppJobNameCMD.add("-l");
+        List<String> getAppJobNameCMD = SessionAction.getJobCommand(k8sNamespace);
         getAppJobNameCMD.add(labels);
         getAppJobNameCMD.add("--no-headers=true");
         getAppJobNameCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name";
+        String customColumns = "custom-columns=NAME:.metadata.name";
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;

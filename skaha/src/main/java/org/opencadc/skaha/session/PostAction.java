@@ -206,22 +206,16 @@ public class PostAction extends SessionAction {
 
     private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getRenewJobNamesCmd = new ArrayList<>();
-        getRenewJobNamesCmd.add("kubectl");
-        getRenewJobNamesCmd.add("get");
-        getRenewJobNamesCmd.add("--namespace");
-        getRenewJobNamesCmd.add(k8sNamespace);
-        getRenewJobNamesCmd.add("job");
-        getRenewJobNamesCmd.add("-l");
+        final List<String> getRenewJobNamesCmd = SessionAction.getJobCommand(k8sNamespace);
         getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
         getRenewJobNamesCmd.add("--no-headers=true");
         getRenewJobNamesCmd.add("-o");
 
         String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name," +
-                               "UID:.metadata.uid," +
-                               "STATUS:.status.active," +
-                               "START:.status.startTime";
+            "NAME:.metadata.name," +
+            "UID:.metadata.uid," +
+            "STATUS:.status.active," +
+            "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
         return getRenewJobNamesCmd;
@@ -364,8 +358,8 @@ public class PostAction extends SessionAction {
 
             if (StringUtil.hasText(errorOutput)) {
                 throw new IOException("Unable to create user home."
-                                      + "\nError message from server: " + errorOutput
-                                      + "\nOutput from command: " + commandOutput);
+                                          + "\nError message from server: " + errorOutput
+                                          + "\nOutput from command: " + commandOutput);
             } else {
                 log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
@@ -537,7 +531,7 @@ public class PostAction extends SessionAction {
                 !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                    status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
@@ -545,12 +539,11 @@ public class PostAction extends SessionAction {
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
             throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
-                                               maxUserSessions + " active sessions.");
+                                                   maxUserSessions + " active sessions.");
         }
     }
 
-    public void createSession(String type, String image, String name, Integer cores, Integer ram, Integer gpus,
-                              String cmd, String args, List<String> envs)
+    public void createSession(String type, String image, String name, Integer cores, Integer ram, int gpus, String cmd, String args, List<String> envs)
         throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
@@ -627,17 +620,17 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, gpus.toString());
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, Integer.toString(gpus));
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-                                                                            ? posixMapperConfiguration.getResourceID().toString()
-                                                                            : posixMapperConfiguration.getBaseURL().toExternalForm());
+            ? posixMapperConfiguration.getResourceID().toString()
+            : posixMapperConfiguration.getBaseURL().toExternalForm());
 
         // This property is mandatory in the Skaha configuration's cadc-registry.properties.
         jobLaunchString = setConfigValue(jobLaunchString, REGISTRY_URL,
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
-        String jsonLaunchFile = super.stageFile(jobLaunchString);
+        String jsonLaunchFile = SessionAction.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
         injectCredentials();
@@ -650,7 +643,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
-            jsonLaunchFile = super.stageFile(serviceString);
+            jsonLaunchFile = SessionAction.stageFile(serviceString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
@@ -661,7 +654,7 @@ public class PostAction extends SessionAction {
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
             ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-            jsonLaunchFile = super.stageFile(ingressString);
+            jsonLaunchFile = SessionAction.stageFile(ingressString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
@@ -680,8 +673,7 @@ public class PostAction extends SessionAction {
      * @param image Container image name.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
-                                 Integer limitRAM) throws Exception {
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -690,10 +682,10 @@ public class PostAction extends SessionAction {
             "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
             "--no-headers=true",
             "-o", "custom-columns=" +
-                  "IPADDR:.status.podIP," +
-                  "DT:.metadata.deletionTimestamp," +
-                  "TYPE:.metadata.labels.canfar-net-sessionType," +
-                  "NAME:.metadata.name"};
+            "IPADDR:.status.podIP," +
+            "DT:.metadata.deletionTimestamp," +
+            "TYPE:.metadata.labels.canfar-net-sessionType," +
+            "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -780,15 +772,15 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
         launchString = setConfigValue(launchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-                                                                      ? posixMapperConfiguration.getResourceID().toString()
-                                                                      : posixMapperConfiguration.getBaseURL().toExternalForm());
+            ? posixMapperConfiguration.getResourceID().toString()
+            : posixMapperConfiguration.getBaseURL().toExternalForm());
 
         // This property is mandatory in the Skaha configuration's cadc-registry.properties.
         launchString = setConfigValue(launchString, REGISTRY_URL,
                                       new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
-        String launchFile = super.stageFile(launchString);
+        String launchFile = SessionAction.stageFile(launchString);
 
         String[] launchCmd = new String[] {
             "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile
