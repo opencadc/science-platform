@@ -1,4 +1,19 @@
 {{- define "skaha.session.commonVolumeMounts" -}}
+        {{- if .Values.sessions.extraVolumes }}
+        {{- range .Values.sessions.extraVolumes }}
+        - name: {{ .name }}
+          mountPath: {{ .volumeMount.mountPath }}
+          {{- if .volumeMount.subPath }}
+          subPath: {{ .volumeMount.subPath }}
+          {{- end }}
+          {{- if .volumeMount.readOnly }}
+          readOnly: {{ .volumeMount.readOnly }}
+          {{- end }}
+          {{- if .volumeMount.mountPropagation }}
+          mountPropagation: {{ .volumeMount.mountPropagation }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd

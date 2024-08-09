@@ -139,28 +139,36 @@ kueue:
           - name: ephemeral-storage
             nominalQuota: 50Gi
 
-sessions:
-  extraVolumes:
-  - name: cavern-volume
-    volume:
-      type: PVC
-      claimName: skaha-workload-cavern-pvc
-    volumeMount:
-      mountPath: "/arc"
-      subPath: "cavern"
-  - name: cvmfs-volume
-    volume:
-      type: HOST_PATH
-      hostPath: "/cvmfs"
-      hostPathType: Directory
-    volumeMount:
-      mountPath: "/cvmfs"
-      readOnly: true
-      mountPropagation: HostToContainer
-  - name: config-map-volume
-    volume:
-      type: CONFIG_MAP
-      cmpName: launch-scripts
-      defaultMode: "0777"
-    volumeMount:
-      mountPath: "/cmp"
+# this will be extra volume configs, create this config accordingly, type parameter in volume section is constant
+# sessions:
+#   extraVolumes:
+#   - name: sample-pvc-volume
+#     volume:
+#       type: PVC           # PVC is for Persistant volume claim
+#       name: pvc-name
+#     volumeMount:
+#       mountPath: "/pvc-volume-mount"
+#       subPath: "pvc"
+#   - name: sample-hostpath-volume
+#     volume:
+#       type: HOST_PATH     # HOST_PATH is for host path
+#       hostPath: "/host-path"
+#       hostPathType: Directory
+#     volumeMount:
+#       mountPath: "/host-path"
+#       readOnly: true
+#       mountPropagation: HostToContainer
+#   - name: config-map-volume
+#     volume:
+#       type: CONFIG_MAP    # CONFIG_MAP is for config map
+#       name: sample-config-map
+#       defaultMode: "0777"
+#     volumeMount:
+#       mountPath: "/cmp"
+#   - name: secret-volume
+#     volume:
+#       type: SECRET        # SECRET is for secrets
+#       name: sample-secret
+#       defaultMode: "0777"
+#     volumeMount:
+#       mountPath: "/scrt"

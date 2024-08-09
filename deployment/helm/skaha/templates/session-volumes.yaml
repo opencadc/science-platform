@@ -1,4 +1,29 @@
 {{- define "skaha.session.commonVolumes" -}}
+      {{- if .Values.sessions.extraVolumes }}
+      {{- range .Values.sessions.extraVolumes }}
+      - name: {{ .name }}
+        {{- if eq .volume.type "PVC" }}
+        persistentVolumeClaim:
+          claimName: {{ .volume.name }}
+        {{- else if eq .volume.type "HOST_PATH" }}
+        hostPath:
+          path: {{ .volume.hostPath }}
+          type: {{ .volume.hostPathType }}
+        {{- else if eq .volume.type "CONFIG_MAP" }}
+        configMap:
+          name: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- else if eq .volume.type "SECRET" }}
+        secret:
+          secretName: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
       - name: cavern-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc
