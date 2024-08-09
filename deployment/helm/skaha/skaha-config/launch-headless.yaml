@@ -89,4 +89,4 @@ spec:
           name: scratch-dir
           subPath: "${skaha.sessionid}"
       volumes:
-      {{ template "skaha.session.headlessVolumes" . }}
+      {{ template "skaha.session.commonVolumes" . }}

@@ -122,4 +122,5 @@ spec:
             drop:
               - ALL
       volumes:
-      {{ template "skaha.session.jupyterVolumes" . }}
+      {{ template "skaha.session.commonVolumes" . }}
+      {{ template "skaha.session.notebookVolumes" . }}
