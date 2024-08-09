@@ -83,20 +83,8 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "/skaha-system"
-          name: start-carta
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        {{ template "skaha.session.cartaVolumeMounts" . }}
       volumes:
       {{ template "skaha.session.commonVolumes" . }}
       {{ template "skaha.session.cartaVolumes" . }}

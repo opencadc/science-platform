@@ -78,18 +78,7 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

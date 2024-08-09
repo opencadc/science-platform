@@ -85,22 +85,8 @@ spec:
           protocol: TCP
           name: novnc-port
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "/desktopstartup"
-          name: templates
-        - mountPath: "/skaha-system"
-          name: start-desktop
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        {{ template "skaha.session.desktopVolumeMounts" . }}
       volumes:
       {{ template "skaha.session.commonVolumes" . }}
       {{ template "skaha.session.desktopVolumes" . }}

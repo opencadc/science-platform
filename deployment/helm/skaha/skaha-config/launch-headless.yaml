@@ -76,17 +76,6 @@ spec:
             ${software.limits.gpus}
             ephemeral-storage: "200Gi"
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
       volumes:
       {{ template "skaha.session.commonVolumes" . }}

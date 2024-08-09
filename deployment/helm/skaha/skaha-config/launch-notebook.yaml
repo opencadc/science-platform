@@ -101,20 +101,8 @@ spec:
           protocol: TCP
           name: notebook-port
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "/skaha-system"
-          name: start-jupyterlab
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        {{ template "skaha.session.notebookVolumeMounts" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

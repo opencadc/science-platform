@@ -83,20 +83,8 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
-        - mountPath: "/skaha-system"
-          name: start-desktop-software
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        {{ template  "skaha.session.desktopAppVolumeMounts" . }}
       volumes:
       {{ template "skaha.session.commonVolumes" . }}
       {{ template "skaha.session.desktopAppVolumes" . }}
