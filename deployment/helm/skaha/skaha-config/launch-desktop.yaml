@@ -43,20 +43,7 @@ spec:
         args:
         - ${skaha.hostname}
         env:
-        - name: HOME
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: VNC_PW
-          value: "${skaha.sessionid}"
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: skaha_sessionid
-          value: "${skaha.sessionid}"
-        - name: MOZ_FORCE_DISABLE_E10S
-          value: "1"
-        - name: SKAHA_API_VERSION
-          value: "v0"  
+        {{ template "skaha.job.environment.desktop" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

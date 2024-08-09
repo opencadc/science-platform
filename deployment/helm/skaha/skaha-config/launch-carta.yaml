@@ -40,18 +40,7 @@ spec:
       containers:
       - name: "${skaha.jobname}"
         env:
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: skaha_sessionid
-          value: "${skaha.sessionid}"
-        - name: HOME
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
+        {{ template "skaha.job.environment.carta" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

@@ -107,6 +107,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.CommandExecutioner;
 
 /**
  * @author majorb
@@ -139,6 +140,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
+    public static final String SOFTWARE_GPU_NVIDIA_CUDA_MAJOR_VERSION = "software.gpu.cuda.majorVersion";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final Logger log = Logger.getLogger(PostAction.class);
@@ -621,6 +623,14 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, Integer.toString(gpus));
+
+        try {
+            final int majorNVIDIACUDAVersion = CommandExecutioner.getMajorNvidiaCudaGPUVersion();
+            jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_GPU_NVIDIA_CUDA_MAJOR_VERSION, Integer.toString(majorNVIDIACUDAVersion));
+        } catch (IllegalStateException noMajorVersionException) {
+            jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_GPU_NVIDIA_CUDA_MAJOR_VERSION, "N/A");
+        }
+
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
             ? posixMapperConfiguration.getResourceID().toString()
             : posixMapperConfiguration.getBaseURL().toExternalForm());
