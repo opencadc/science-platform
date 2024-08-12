@@ -7,8 +7,11 @@ metadata:
     canfar-net-sessionName: "${skaha.sessionname}"
     canfar-net-sessionType: "${skaha.sessiontype}"
     canfar-net-userid: "${skaha.userid}"
+    kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
   name: "${skaha.jobname}"
 spec:
+  parallelism: 1
+  completions: 1
   {{ template "skaha.job.nodeSelector" . }}
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
@@ -54,7 +57,7 @@ spec:
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
-            nvidia.com/gpu: "${software.limits.gpus}"
+            ${software.limits.gpus}
             ephemeral-storage: "200Gi"
         ports:
         - containerPort: 8888

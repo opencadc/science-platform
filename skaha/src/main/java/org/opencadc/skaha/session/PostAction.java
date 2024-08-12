@@ -622,7 +622,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, Integer.toString(gpus));
+        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, getGPUResourceLimit(gpus));
 
         try {
             final int majorNVIDIACUDAVersion = CommandExecutioner.getMajorNvidiaCudaGPUVersion();
@@ -985,7 +985,18 @@ public class PostAction extends SessionAction {
         return sb.toString();
     }
 
+    private String getGPUResourceLimit(Integer gpus) {
+        if (!gpuEnabled) {
+            return "";
+        }
+        return "nvidia.com/gpu: ".concat(gpus.toString());
+    }
+
     private String getGPUScheduling(Integer gpus) {
+        if (!gpuEnabled) {
+            return "";
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append("affinity:\n");
         sb.append("          nodeAffinity:\n");
