@@ -131,3 +131,16 @@ The affinity for Jobs.
       values:
       - service-node
 {{- end }}
+
+{{/*
+Common security context settings for User Session Jobs
+*/}}
+{{- define "skaha.job.securityContext" -}}
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+{{- end }}
