@@ -9,7 +9,7 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
-  - [Storae User Interface install](#user-storage-ui-installation)
+  - [Storage User Interface install](#user-storage-ui-installation)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
