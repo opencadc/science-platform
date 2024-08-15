@@ -63,7 +63,7 @@ Create the name of the service account to use
 
 
 {{/*
-JOB CONFIGURATION DEFINITIONS
+USER SESSION TEMPLATE DEFINITIONS
 */}}
 
 {{/*
@@ -143,7 +143,6 @@ Common environment variables for User Sessions.
         - name: "NVIDIA_CUDA_MAJOR_VERSION"
           value: "${software.gpu.cuda.majorVersion}"
 {{- end }}
-
 
 {{/*
 Obtain the environment variable array for Jupyter Notebooks.
