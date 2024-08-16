@@ -272,4 +272,16 @@ Obtain the environment variable array for Contributed sessions.
           value: "${software.requests.cores}"
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
+
+{{/*
+Common security context settings for User Session Jobs
+*/}}
+{{- define "skaha.job.securityContext" -}}
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
 {{- end }}
