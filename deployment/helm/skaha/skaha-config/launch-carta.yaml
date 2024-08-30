@@ -79,8 +79,22 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
+        - mountPath: "/skaha-system"
+          name: start-carta
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
         {{ template "skaha.session.commonVolumeMounts" . }}
-        {{ template "skaha.session.cartaVolumeMounts" . }}
       volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-carta
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
       {{ template "skaha.session.commonVolumes" . }}
-      {{ template "skaha.session.cartaVolumes" . }}

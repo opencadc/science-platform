@@ -72,6 +72,16 @@ spec:
             ${software.limits.gpus}
             ephemeral-storage: "200Gi"
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
         {{ template "skaha.session.commonVolumeMounts" . }}
       volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
       {{ template "skaha.session.commonVolumes" . }}

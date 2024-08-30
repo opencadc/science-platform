@@ -79,8 +79,22 @@ spec:
         - containerPort: 6000
           protocol: TCP
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-desktop-software
         {{ template "skaha.session.commonVolumeMounts" . }}
-        {{ template  "skaha.session.desktopAppVolumeMounts" . }}
       volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-desktop-software
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
       {{ template "skaha.session.commonVolumes" . }}
-      {{ template "skaha.session.desktopAppVolumes" . }}

@@ -97,8 +97,15 @@ spec:
           protocol: TCP
           name: notebook-port
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-jupyterlab
         {{ template "skaha.session.commonVolumeMounts" . }}
-        {{ template "skaha.session.notebookVolumeMounts" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
@@ -106,5 +113,12 @@ spec:
             drop:
               - ALL
       volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-jupyterlab
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
       {{ template "skaha.session.commonVolumes" . }}
-      {{ template "skaha.session.notebookVolumes" . }}

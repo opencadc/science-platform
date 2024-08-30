@@ -14,12 +14,6 @@
           {{- end }}
         {{- end }}
         {{- end }}
-        - mountPath: "/etc/passwd"
-          name: etc-passwd
-          subPath: passwd
-        - mountPath: "/etc/group"
-          name: etc-group
-          subPath: group
         - mountPath: "${SKAHA_TLD}"
           name: cavern-volume
           subPath: "cavern"
@@ -28,25 +22,4 @@
           subPath: "${skaha.sessionid}"
 {{- end }}
 
-{{- define "skaha.session.cartaVolumeMounts" -}}
-        - mountPath: "/skaha-system"
-          name: start-carta
-{{- end }}
 
-
-{{- define "skaha.session.desktopAppVolumeMounts" -}}
-        - mountPath: "/skaha-system"
-          name: start-desktop-software
-{{- end }}
-
-{{- define "skaha.session.desktopVolumeMounts" -}}
-        - mountPath: "/desktopstartup"
-          name: templates
-        - mountPath: "/skaha-system"
-          name: start-desktop
-{{- end }}
-
-{{- define "skaha.session.notebookVolumeMounts" -}}
-        - mountPath: "/skaha-system"
-          name: start-jupyterlab
-{{- end }}

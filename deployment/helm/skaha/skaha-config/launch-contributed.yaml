@@ -74,6 +74,12 @@ spec:
           protocol: TCP
           name: main-port
         volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
         {{ template "skaha.session.commonVolumeMounts" . }}
         securityContext:
           privileged: false
@@ -82,4 +88,8 @@ spec:
             drop:
               - ALL
       volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
       {{ template "skaha.session.commonVolumes" . }}
