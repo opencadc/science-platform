@@ -144,6 +144,9 @@ Common environment variables for User Sessions.
           value: "${software.gpu.cuda.majorVersion}"
 {{- end }}
 
+{{/*
+Common security settings for User Sessions.
+*/}}
 {{- define "skaha.job.securityContext" -}}
         runAsUser: ${skaha.posixid} 
         runAsGroup: ${skaha.posixid}
