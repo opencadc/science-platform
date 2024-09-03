@@ -63,7 +63,7 @@ Create the name of the service account to use
 
 
 {{/*
-JOB CONFIGURATION DEFINITIONS
+USER SESSION TEMPLATE DEFINITIONS
 */}}
 
 {{/*
@@ -144,133 +144,12 @@ Common environment variables for User Sessions.
           value: "${software.gpu.cuda.majorVersion}"
 {{- end }}
 
-
-{{/*
-Obtain the environment variable array for Jupyter Notebooks.
-Usage:
-  {{ template "skaha.job.environment.notebook" }}
-*/}}
-{{- define "skaha.job.environment.notebook" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: JUPYTER_TOKEN
-          value: "${skaha.sessionid}"
-        - name: JUPYTER_CONFIG_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/"
-        - name: JUPYTER_DATA_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.local/share/jupyter/"
-        - name: JUPYTER_RUNTIME_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.local/share/jupyter/runtime/"
-        - name: JUPYTER_PATH
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/"
-        - name: JUPYTERLAB_WORKSPACES_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/lab/workspaces/"
-        - name: JUPYTERLAB_SETTINGS_DIR
-          value: "${SKAHA_TLD}/home/${skaha.userid}/.jupyter/lab/user-settings/"
-        - name: NB_USER
-          value: "${skaha.userid}"
-        - name: NB_UID
-          value: "${skaha.posixid}"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: XDG_CACHE_HOME
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: JULIA_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: OPENBLAS_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: MKL_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
-{{- end }}
-
-{{/*
-Obtain the environment variable array for CARTA sessions.
-Usage:
-  {{ template "skaha.job.environment.carta" }}
-*/}}
-{{- define "skaha.job.environment.carta" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
-{{- end }}
-
-{{/*
-Obtain the environment variable array for Desktop sessions.
-*/}}
-{{- define "skaha.job.environment.desktop" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: VNC_PW
-          value: "${skaha.sessionid}"
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: MOZ_FORCE_DISABLE_E10S
-          value: "1"
-        - name: SKAHA_API_VERSION
-          value: "v0"
-{{- end }}
-
-{{/*
-Obtain the environment variable array for Desktop Applications launched from within a Desktop session.
-*/}}
-{{- define "skaha.job.environment.desktopApp" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: DISPLAY
-          value: "${software.targetip}"
-        - name: GDK_SYNCHRONIZE
-          value: "1"
-        - name: SHELL
-          value: "/bin/bash"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
-{{- end }}
-
-{{/*
-Obtain the environment variable array for Headless sessions.
-*/}}
-{{- define "skaha.job.environment.headless" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
-{{- end }}
-
-{{/*
-Obtain the environment variable array for Contributed sessions.
-*/}}
-{{- define "skaha.job.environment.contributed" -}}
-        {{ template "skaha.job.environment.common" . }}
-        - name: skaha_hostname
-          value: "${skaha.hostname}"
-        - name: skaha_username
-          value: "${skaha.userid}"
-        - name: PWD
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: JULIA_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: OPENBLAS_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: MKL_NUM_THREADS
-          value: "${software.requests.cores}"
-        - name: OMP_NUM_THREADS
-          value: "${software.requests.cores}"
+{{- define "skaha.job.securityContext" -}}
+        runAsUser: ${skaha.posixid} 
+        runAsGroup: ${skaha.posixid}
+        fsGroup: ${skaha.posixid}
+        supplementalGroups: [${skaha.supgroups}]
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
 {{- end }}

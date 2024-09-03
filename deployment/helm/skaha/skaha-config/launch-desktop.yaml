@@ -31,11 +31,7 @@ spec:
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
-        runAsUser: ${skaha.posixid}
-        runAsGroup: ${skaha.posixid}
-        fsGroup: ${skaha.posixid}
-        supplementalGroups: [${skaha.supgroups}]
-        runAsNonRoot: true
+        {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
@@ -46,7 +42,17 @@ spec:
         args:
         - ${skaha.hostname}
         env:
-        {{ template "skaha.job.environment.desktop" . }}
+        {{ template "skaha.job.environment.common" . }}
+        - name: VNC_PW
+          value: "${skaha.sessionid}"
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: MOZ_FORCE_DISABLE_E10S
+          value: "1"
+        - name: SKAHA_API_VERSION
+          value: "v0"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

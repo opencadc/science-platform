@@ -35,17 +35,21 @@ spec:
       initContainers:
       {{ template "skaha.job.initContainers" . }}
       securityContext:
-        runAsUser: ${skaha.posixid}
-        runAsGroup: ${skaha.posixid}
-        fsGroup: ${skaha.posixid}
-        supplementalGroups: [${skaha.supgroups}]
-        runAsNonRoot: true
+        {{ template "skaha.job.securityContext" . }}
       ${headless.priority}
       containers:
       - name: "${skaha.jobname}"
         # image and start of the 'env' label comes from the image bundle
         ${headless.image.bundle}
-        {{ template "skaha.job.environment.headless" . }}
+        {{ template "skaha.job.environment.common" . }}
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

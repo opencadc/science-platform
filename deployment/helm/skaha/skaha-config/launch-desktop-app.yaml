@@ -31,11 +31,7 @@ spec:
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
-        runAsUser: ${skaha.posixid}
-        runAsGroup: ${skaha.posixid}
-        fsGroup: ${skaha.posixid}
-        supplementalGroups: [${skaha.supgroups}]
-        runAsNonRoot: true
+        {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
@@ -47,7 +43,17 @@ spec:
         - ${skaha.userid}
         - ${software.containerparam}
         env:
-        {{ template "skaha.job.environment.desktopApp" . }}
+        {{ template "skaha.job.environment.common" . }}
+        - name: DISPLAY
+          value: "${software.targetip}"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

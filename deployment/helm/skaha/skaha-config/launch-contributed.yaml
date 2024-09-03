@@ -31,11 +31,7 @@ spec:
       imagePullSecrets:
       - name: ${software.imagesecret}
       securityContext:
-        runAsUser: ${skaha.posixid}
-        runAsGroup: ${skaha.posixid}
-        fsGroup: ${skaha.posixid}
-        supplementalGroups: [${skaha.supgroups}]
-        runAsNonRoot: true
+        {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       initContainers:
@@ -43,7 +39,21 @@ spec:
       containers:
       - name: "${skaha.jobname}"
         env:
-        {{ template "skaha.job.environment.contributed" . }}
+        {{ template "skaha.job.environment.common" . }}
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: PWD
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: MKL_NUM_THREADS
+          value: "${software.requests.cores}"
+        - name: OMP_NUM_THREADS
+          value: "${software.requests.cores}"
         image: ${software.imageid}
         imagePullPolicy: Always
         resources:
