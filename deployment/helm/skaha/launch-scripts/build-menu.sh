@@ -1,7 +1,10 @@
 #!/bin/bash
 
 HOST=$1
-TOKEN=$(cat ${HOME}/.token/.skaha)
+
+# Callback token
+TOKEN="${DESKTOP_SESSION_APP_TOKEN}"
+
 ICON_DIR="/headless/.icons"
 STARTUP_DIR="/desktopstartup"
 SKAHA_DIR="$HOME/.local/skaha"
@@ -225,12 +228,12 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-if [ -e "${HOME}/.token/.skaha" ]; then
+if [ -z "${TOKEN}" ]; then
+  handle_error "[skaha] No credentials to call back to Skaha with."
+  exit 1
+else
   echo "token is used in build menu"
   curl_out=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
-else
-  echo "[skaha] No credentials to call back to Skaha with."
-  exit 1
 fi
 if [[ $(echo ${curl_out} | jq '[.[] | .id | length] | add') == 0 ]]; then
   echo "[skaha] no desktop-app"

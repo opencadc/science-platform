@@ -183,9 +183,9 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     protected void injectCredentials() {
-        injectAPIToken();
-        injectAccessToken();
-        injectProxyCertificate();
+        if (!injectProxyCertificate()) {
+            injectAccessToken();
+        }
     }
 
     private void injectAccessToken() {
@@ -208,27 +208,7 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("injectAPIToken(): UNSUCCESSFUL");
     }
 
-    private void injectAPIToken() {
-        log.debug("injectAPIToken()");
-        // inject a token if available
-        final int posixId = getUID();
-        try {
-            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
-            CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
-            String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
-            CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
-            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", this.xAuthTokenSkaha);
-            CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
-            log.debug("injectAPIToken(): OK");
-        } catch (Exception exception) {
-            log.debug("failed to inject token: " + exception.getMessage(), exception);
-        }
-
-        log.debug("No API Token found");
-        log.debug("injectAPIToken(): UNSUCCESSFUL");
-    }
-
-    private void injectProxyCertificate() {
+    private boolean injectProxyCertificate() {
         log.debug("injectProxyCertificate()");
 
         // inject a delegated proxy certificate if available
@@ -259,6 +239,8 @@ public abstract class SessionAction extends SkahaAction {
 
                     injectFile(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
                     log.debug("injectProxyCertificate(): OK");
+
+                    return true;
                 }
             }
         } catch (NoSuchElementException noSuchElementException) {
@@ -268,6 +250,7 @@ public abstract class SessionAction extends SkahaAction {
         }
 
         log.debug("injectProxyCertificate(): UNSUCCESSFUL");
+        return false;
     }
 
     protected String getImageName(String image) {
