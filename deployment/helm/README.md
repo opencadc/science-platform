@@ -9,7 +9,7 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
-  - [Storae User Interface install](#user-storage-ui-installation)
+  - [Storage User Interface install](#user-storage-ui-installation)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
@@ -251,6 +251,9 @@ deployment:
     # Optional.  Rename the main root folder to something else.  For existing installs, this can be
     # omitted.
     # skahaTld: "/arc"
+
+    # Set to true if your cluster supports GPU processing
+    gpuEnabled: false
 
     maxUserSessions: "3"
     sessionExpiry: "345600"
