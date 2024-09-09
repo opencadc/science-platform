@@ -252,6 +252,9 @@ deployment:
     # omitted.
     # skahaTld: "/arc"
 
+    # Set to true if your cluster supports GPU processing
+    gpuEnabled: false
+
     maxUserSessions: "3"
     sessionExpiry: "345600"
     defaultQuotaGB: "10"
