@@ -11,7 +11,7 @@ deployment:
     # Root of shared storage
     skahaTld: "/cavern"
     
-    # Change this to enable a GPU, if one is present on a Node
+    # When set to 'true' this flag will enable GPU node scheduling.
     gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
