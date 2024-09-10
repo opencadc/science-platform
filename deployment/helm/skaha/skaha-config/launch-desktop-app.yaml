@@ -65,7 +65,7 @@ spec:
               - ALL
         image: "${software.imageid}"
         workingDir: "${SKAHA_TLD}/home/${skaha.userid}"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"

@@ -69,13 +69,32 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
+import ca.nrc.cadc.auth.SSLUtil;
+import ca.nrc.cadc.auth.SSOCookieCredential;
+import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.net.HttpDelete;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.HttpPost;
+import ca.nrc.cadc.net.NetUtil;
+import ca.nrc.cadc.net.NetrcFile;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
+import ca.nrc.cadc.util.FileUtil;
+import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.net.PasswordAuthentication;
+import java.nio.file.Files;
+import java.util.MissingResourceException;
+import java.util.concurrent.TimeoutException;
+import javax.security.auth.Subject;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.session.Session;
@@ -97,6 +116,81 @@ import java.util.stream.Collectors;
 
 public class SessionUtil {
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
+    private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
+    private static final long ONE_SECOND = 1000L;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 45L * SessionUtil.ONE_SECOND;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS = 40L * SessionUtil.ONE_SECOND;
+
+    static URI getSkahaServiceID() {
+        final String configuredServiceID = System.getenv("SKAHA_SERVICE_ID");
+        return StringUtil.hasText(configuredServiceID) ? URI.create(configuredServiceID) : SessionUtil.SKAHA_SERVICE_ID;
+    }
+
+    /**
+     * Read in the current user's credentials from the local path.
+     * @param sessionURL    The current URL to use to deduce a domain.
+     * @return  Subject instance, never null.
+     */
+    static Subject getCurrentUser(final URL sessionURL, final boolean allowAnonymous) throws Exception {
+        final Subject subject = new Subject();
+
+        try {
+            final AuthorizationToken bearerToken = SessionUtil.getBearerToken(sessionURL);
+            subject.getPublicCredentials().add(bearerToken);
+            subject.getPublicCredentials().add(AuthMethod.TOKEN);
+            return subject;
+        } catch (MissingResourceException noTokenFile) {
+            LOGGER.warn("No bearer token (skaha-test.token) found in path.");
+        }
+
+        try {
+            final X509CertificateChain proxyCertificate = SessionUtil.getProxyCertificate();
+            subject.getPublicCredentials().add(proxyCertificate);
+            subject.getPublicCredentials().add(AuthMethod.CERT);
+            return subject;
+        } catch (MissingResourceException noProxyCertificate) {
+            LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
+        }
+
+        final RegistryClient registryClient = new RegistryClient();
+        URL newLoginURL = registryClient.getServiceURL(URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_10, AuthMethod.ANON);
+        final URL loginURL = newLoginURL == null
+                             ? registryClient.getServiceURL(URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_01, AuthMethod.ANON)
+                             : newLoginURL;
+        final NetrcFile netrcFile = new NetrcFile();
+        final PasswordAuthentication passwordAuthentication = netrcFile.getCredentials(loginURL.getHost(), true);
+        final Map<String, Object> loginPayload = new HashMap<>();
+        loginPayload.put("username", passwordAuthentication.getUserName());
+        loginPayload.put("password", String.valueOf(passwordAuthentication.getPassword()));
+
+        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        final HttpPost httpPost = new HttpPost(loginURL, loginPayload, outputStream);
+        httpPost.run();
+
+        final String cookieValue = outputStream.toString();
+        LOGGER.info("Using cookie value: " + cookieValue);
+        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
+        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "cadc-ccda.hia-iha.nrc-cnrc.gc.ca"));
+        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
+        subject.getPublicCredentials().add(AuthMethod.COOKIE);
+
+        if (AuthenticationUtil.getAuthMethod(subject) == AuthMethod.ANON && !allowAnonymous) {
+            throw new NotAuthenticatedException("No credentials supplied and anonymous not allowed.");
+        }
+
+        return subject;
+    }
+
+    private static AuthorizationToken getBearerToken(final URL sessionURL) throws Exception {
+        final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token", SessionUtil.class);
+        final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
+        return new AuthorizationToken("Bearer", bearerToken.replaceAll("\n", ""), List.of(NetUtil.getDomainName(sessionURL)));
+    }
+
+    private static X509CertificateChain getProxyCertificate() throws Exception {
+        final File proxyCertificateFile = FileUtil.getFileFromResource("skaha-test.pem", SessionUtil.class);
+        return SSLUtil.readPemCertificateAndKey(proxyCertificateFile);
+    }
 
     /**
      * Start a session and return the ID.
@@ -174,6 +268,15 @@ public class SessionUtil {
         }
     }
 
+    static void deleteSession(URL sessionURL, String sessionID) throws Exception {
+        LOGGER.info("Deleting session " + sessionID);
+        HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + sessionID), true);
+        delete.run();
+
+        SessionUtil.waitForSessionToTerminate(sessionURL, sessionID);
+        Assert.assertNull("delete session error", delete.getThrowable());
+    }
+
     protected static List<Session> getSessions(final URL sessionURL, String... omitStatuses) throws Exception {
         final List<Session> sessions = SessionUtil.getAllSessions(sessionURL);
         final List<Session> active = new ArrayList<>();
@@ -184,6 +287,51 @@ public class SessionUtil {
         }
 
         return active;
+    }
+
+    private static Session getSessionWithoutWait(final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
+        return SessionUtil.getAllSessions(sessionURL).stream()
+                   .filter(session -> session.getId().equals(sessionID) && session.getStatus().equals(expectedState))
+                   .findFirst()
+                   .orElse(null);
+    }
+
+    static void waitForSessionToTerminate(final URL sessionURL, final String sessionID) throws Exception {
+        Session requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, Session.STATUS_TERMINATING);
+        long currentWaitTime = 0L;
+        while (requestedSession != null) {
+            LOGGER.info("Waiting for Session " + sessionID + " to terminate.");
+            Thread.sleep(SessionUtil.ONE_SECOND);
+            currentWaitTime += SessionUtil.ONE_SECOND;
+
+            if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS) {
+                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + Session.STATUS_TERMINATING);
+            }
+
+            requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, Session.STATUS_TERMINATING);
+        }
+
+        LOGGER.info("Session " + sessionID + " terminated.");
+    }
+
+    static Session waitForSession(final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
+        Session requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, expectedState);
+        long currentWaitTime = 0L;
+        while (requestedSession == null) {
+            LOGGER.info("Waiting for Session " + sessionID + " to reach " + expectedState);
+            Thread.sleep(SessionUtil.ONE_SECOND);
+            currentWaitTime += SessionUtil.ONE_SECOND;
+
+            if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
+                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + expectedState);
+            }
+
+            requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, expectedState);
+        }
+
+        LOGGER.info("Session " + sessionID + " reached " + expectedState);
+
+        return requestedSession;
     }
 
     protected static List<Session> getSessionsOfType(final URL sessionURL, final String type, String... omitStatuses)

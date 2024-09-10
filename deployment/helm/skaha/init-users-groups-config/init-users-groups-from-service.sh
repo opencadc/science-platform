@@ -51,7 +51,7 @@ if [[ "${POSIX_MAPPER_URI}" == http* ]] ; then
     TRIMMED_POSIX_MAPPER_URL=`echo "${POSIX_MAPPER_URI}" | tr -s \/ | sed 's/\(.*\)\/$/\1/'`
     POSIX_MAPPER_CAPABILITIES_URL="${TRIMMED_POSIX_MAPPER_URL}/capabilities"
 else
-    POSIX_MAPPER_CAPABILITIES_URL=`curl -SsL ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
+    POSIX_MAPPER_CAPABILITIES_URL=`curl -kSsL ${REGISTRY_URL}/resource-caps | grep ${POSIX_MAPPER_URI} | awk -F = '{print $2}' | xargs`
 fi
 
 echo "Using POSIX Mapper service at ${POSIX_MAPPER_CAPABILITIES_URL}"
@@ -84,11 +84,11 @@ else
 
     # For the case of using the CADC client certificate.
     if [[ -f "${CADC_PROXY_CERT_FILE}" ]] ; then
-        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-zA-Z0-9_\@\.\-]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
-        curl -SsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
+        curl -kSsL -E ${CADC_PROXY_CERT_FILE} "${UID_URL}" | sed "s/^\([a-zA-Z0-9_\@\.\-]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
+        curl -kSsL -E ${CADC_PROXY_CERT_FILE} "${GID_URL}" >> "${GROUP_FILE}"
     else
         TOKEN=`cat ${TOKEN_FILE}`
-        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed "s/^\([a-zA-Z0-9_\@\.\-]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
-        curl -SsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
+        curl -kSsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${UID_URL}" | sed "s/^\([a-zA-Z0-9_\@\.\-]*\):\(.*\):::$/\1:\2::${ESCAPED_HOME}\/\1:\/sbin\/nologin/" >> "${PASSWD_FILE}"
+        curl -kSsL --header "${TOKEN_AUTHORIZATION_HEADER} ${TOKEN}" "${GID_URL}" >> "${GROUP_FILE}"
     fi
 fi
