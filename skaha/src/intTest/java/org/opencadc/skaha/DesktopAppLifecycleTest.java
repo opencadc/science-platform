@@ -68,39 +68,20 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthorizationToken;
-import ca.nrc.cadc.net.HttpDelete;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.HttpPost;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
-import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Type;
-import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
-import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import javax.security.auth.Subject;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
@@ -114,34 +95,22 @@ import org.opencadc.skaha.session.SessionAction;
 public class DesktopAppLifecycleTest {
 
     private static final Logger log = Logger.getLogger(DesktopAppLifecycleTest.class);
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-    public static final String TERMINAL_IMAGE = "images-rc.canfar.net/skaha/terminal:1.1.2";
-
-    private static final long DEFAULT_TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 25 * 1000;
 
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
 
     protected final URL sessionURL;
-    protected URL desktopAppURL;
     protected final Subject userSubject;
 
     public DesktopAppLifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL sessionServiceURL = regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10,
-                                                                  AuthMethod.TOKEN);
+            final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
             sessionURL = new URL(sessionServiceURL.toString() + "/session");
             log.info("sessions URL: " + sessionURL);
 
-            final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token",
-                                                                      ImagesTest.class);
-            final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-            userSubject = new Subject();
-            userSubject.getPublicCredentials().add(
-                    new AuthorizationToken("Bearer", bearerToken.replaceAll("\n", ""),
-                                           List.of(NetUtil.getDomainName(sessionURL))));
+            this.userSubject = SessionUtil.getCurrentUser(sessionURL, false);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
             log.error("init exception", e);
@@ -151,220 +120,76 @@ public class DesktopAppLifecycleTest {
 
     @Test
     public void testCreateDeleteDesktopApp() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
             initialize();
 
             // create desktop session
-            final Session session = SessionUtil.createSession(
-                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(), sessionURL);
-            desktopAppURL = new URL(sessionURL.toString() + "/" + session.getId() + "/app");
+            final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
+                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
+
+            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
+
+            final URL desktopAppURL = new URL(this.sessionURL.toString() + "/" + desktopSession.getId() + "/app");
             log.info("desktop-app URL: " + desktopAppURL);
 
-            // until issue 4 (https://github.com/opencadc/skaha/issues/4) has been
-            // addressed, just wait for a bit.
-            long millisecondCount = 0L;
-            final int pollIntervalInSeconds = 3;
-            while (SessionUtil.getSessionsOfType(sessionURL, SessionAction.SESSION_TYPE_DESKTOP,
-                                                 Session.STATUS_TERMINATING, Session.STATUS_SUCCEEDED).size() != 1
-                   && millisecondCount < DesktopAppLifecycleTest.DEFAULT_TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
-                TimeUnit.SECONDS.sleep(pollIntervalInSeconds);
-                millisecondCount += pollIntervalInSeconds * 1000;
-            }
-
-            // verify desktop session
-            verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#1", session.getName());
-
             // create a terminal desktop-app
-            final Session appSession =
-                    SessionUtil.createDesktopAppSession(
-                            SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), desktopAppURL);
+            String desktopAppID = SessionUtil.createDesktopAppSession(SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(),
+                                                                      desktopAppURL);
 
-            TimeUnit.SECONDS.sleep(10);
+            Session appSession = SessionUtil.waitForDesktopApplicationSession(desktopAppURL, desktopAppID, Session.STATUS_RUNNING);
 
-            // verify desktop session and desktop-app
-            int sessionCount = 0;
-            int appCount = 0;
-            String desktopSessionID = null;
-            String desktopAppID = null;
-            for (Session s : getSessions()) {
-                Assert.assertNotNull("session type", s.getType());
-                Assert.assertNotNull("session has no status", s.getStatus());
-                if (s.getStatus().equals("Running") && s.getType().equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-                    sessionCount++;
-                    desktopSessionID = s.getId();
-                    Assert.assertEquals("session name", session.getName(), s.getName());
-                } else if (Arrays.asList("Succeeded", "Running").contains(s.getStatus())
-                           && s.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                    appCount++;
-                    desktopAppID = s.getAppId();
-                    Assert.assertNotNull("app id", s.getAppId());
-                } else {
-                    throw new AssertionError("invalid session type: " + s.getType());
-                }
-
-                Assert.assertNotNull("session id", s.getId());
-                Assert.assertNotNull("connect URL", s.getConnectURL());
-                Assert.assertNotNull("up since", s.getStartTime());
-            }
-            Assert.assertEquals("one session", 1, sessionCount);
-            Assert.assertEquals("one desktop-app", 1, appCount);
-            Assert.assertNotNull("no desktop session", desktopSessionID);
             Assert.assertNotNull("no desktop app", desktopAppID);
             Assert.assertEquals("Wrong app session ID", appSession.getAppId(), desktopAppID);
 
             // get desktop-app
-            List<Session> desktopApps = getAllDesktopApp();
+            List<Session> desktopApps = SessionUtil.getAllDesktopApplicationSessions(desktopAppURL);
             Assert.assertFalse("no desktop-app", desktopApps.isEmpty());
             Assert.assertEquals("more than one desktop-app", 1, desktopApps.size());
 
             // delete desktop-app
-            deleteDesktopApp(desktopAppURL, desktopAppID);
-            TimeUnit.SECONDS.sleep(10);
-            desktopApps = getAllDesktopApp();
+            SessionUtil.deleteDesktopApplicationSession(desktopAppURL, desktopAppID);
+            desktopApps = SessionUtil.getAllDesktopApplicationSessions(desktopAppURL);
             Assert.assertTrue("should have no active desktop-app", desktopApps.isEmpty());
 
             // create desktop-app specifying resources
-            String cores = "1";
-            String ram = "4";
-            desktopAppID = createDesktopApp(SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(),
-                                            cores, ram);
-            TimeUnit.SECONDS.sleep(10);
-            desktopApps = getAllDesktopApp();
-            Assert.assertFalse("no desktop-app", desktopApps.isEmpty());
-            Assert.assertEquals("more than one desktop-app", 1, desktopApps.size());
-            Session desktopApp = desktopApps.get(0);
-            Assert.assertEquals("wrong number of cores", cores, desktopApp.getRequestedCPUCores());
-            Assert.assertEquals("wrong amount of ram", ram + "G", desktopApp.getRequestedRAM());
+            int cores = 1;
+            int ram = 4;
+            desktopAppID = SessionUtil.createDesktopAppSession(SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(),
+                                                               desktopAppURL, cores, ram);
+            appSession = SessionUtil.waitForDesktopApplicationSession(desktopAppURL, desktopAppID, Session.STATUS_RUNNING);
+
+            Assert.assertEquals("wrong number of cores", cores, Integer.parseInt(appSession.getRequestedCPUCores()));
+            Assert.assertEquals("wrong amount of ram", ram + "G", appSession.getRequestedRAM());
 
             // delete desktop-app
-            deleteDesktopApp(desktopAppURL, desktopAppID);
-            TimeUnit.SECONDS.sleep(10);
-            desktopApps = getAllDesktopApp();
+            SessionUtil.deleteDesktopApplicationSession(desktopAppURL, desktopAppID);
+
+            desktopApps = SessionUtil.getAllDesktopApplicationSessions(desktopAppURL);
             Assert.assertTrue("should have no active desktop-app", desktopApps.isEmpty());
 
-            // verify remaining desktop session
-            verifyOneSession(SessionAction.SESSION_TYPE_DESKTOP, "#2", session.getName());
-
             // delete desktop session
-            deleteSession(sessionURL, desktopSessionID);
-
-            TimeUnit.SECONDS.sleep(10);
-
-            // verify that there is no session left
-            sessionCount = 0;
-            for (Session s : getSessions()) {
-                Assert.assertNotNull("session ID", s.getId());
-                if (s.getId().equals(desktopSessionID)) {
-                    sessionCount++;
-                }
-            }
-            Assert.assertEquals("zero sessions #2", 0, sessionCount);
+            SessionUtil.deleteSession(sessionURL, desktopSessionID);
 
             return null;
         });
     }
 
     private void initialize() throws Exception {
-        List<Session> sessions = getSessions();
-        boolean wait = false;
+        List<Session> sessions = SessionUtil.getSessions(this.sessionURL);
         for (Session session : sessions) {
             if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                 // delete desktop-app
-                wait = true;
                 String sessionID = session.getId();
-                desktopAppURL = new URL(sessionURL.toString() + "/" + sessionID + "/app");
-                deleteDesktopApp(desktopAppURL, session.getAppId());
+                final URL desktopAppURL = new URL(sessionURL.toString() + "/" + sessionID + "/app");
+                SessionUtil.deleteDesktopApplicationSession(desktopAppURL, session.getAppId());
             } else {
                 // delete session
-                wait = true;
-                deleteSession(sessionURL, session.getId());
+                SessionUtil.deleteSession(sessionURL, session.getId());
             }
         }
-
-        if (wait) {
-            TimeUnit.SECONDS.sleep(10);
-        }
-
-        sessions = getSessions();
+        sessions = SessionUtil.getSessions(this.sessionURL);
         Assert.assertEquals("zero sessions #1", 0, sessions.size());
-    }
-
-    private String createDesktopApp(Map<String, Object> params) throws Exception {
-        final HttpPost post = new HttpPost(desktopAppURL, params, false);
-        post.prepare();
-
-        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(post.getInputStream()))) {
-            return reader.readLine();
-        }
-    }
-
-    private String createDesktopApp(String image) throws Exception {
-        return createDesktopApp(image, "1", "1");
-    }
-
-    private String createDesktopApp(String image, String cores, String ram) throws Exception {
-        Map<String, Object> params = new HashMap<>();
-        params.put("cores", cores);
-        params.put("ram", ram);
-        params.put("image", image);
-        params.put("cmd", "sleep");
-        params.put("args", "260");
-        return createDesktopApp(params);
-    }
-
-    private void verifyOneSession(String expectedSessionType, String sessionNumber, String expectedSessionName)
-            throws Exception {
-        int count = 0;
-        List<Session> sessions = getSessions();
-        for (Session session : sessions) {
-            Assert.assertNotNull("no session type", session.getType());
-            if (session.getType().equals(expectedSessionType)) {
-                Assert.assertNotNull("no session ID", session.getId());
-                if (session.getStatus().equals("Running")) {
-                    count++;
-                    Assert.assertEquals("session name", expectedSessionName, session.getName());
-                    Assert.assertNotNull("connect URL", session.getConnectURL());
-                    Assert.assertNotNull("up since", session.getStartTime());
-                }
-            }
-
-        }
-        Assert.assertEquals("one session " + sessionNumber, 1, count);
-    }
-
-    private void deleteSession(URL sessionURL, String sessionID) throws Exception {
-        HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + sessionID), true);
-        delete.prepare();
-    }
-
-    private void deleteDesktopApp(URL desktopAppURL, String appID) throws Exception {
-        HttpDelete delete = new HttpDelete(new URL(desktopAppURL.toString() + "/" + appID), true);
-        delete.prepare();
-    }
-
-    private List<Session> getAllDesktopApp() {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(desktopAppURL, out);
-        get.run();
-        Assert.assertNull("get desktop app error", get.getThrowable());
-        Assert.assertEquals("content-type", "application/json", get.getContentType());
-        String json = out.toString();
-        Type listType = new TypeToken<List<Session>>() {}.getType();
-        Gson gson = new Gson();
-        List<Session> sessions = gson.fromJson(json, listType);
-        List<Session> active = new ArrayList<>();
-        for (Session s : sessions) {
-            if (!s.getStatus().equals(Session.STATUS_TERMINATING)) {
-                active.add(s);
-            }
-        }
-
-        return active;
-
-    }
-
-    private List<Session> getSessions() throws Exception {
-        return SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING);
     }
 }
