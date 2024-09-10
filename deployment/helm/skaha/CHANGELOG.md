@@ -1,11 +1,14 @@
 # CHANGELOG for Skaha User Session API (Chart 0.5.0)
 
-## 2024.08.16
+## 2024.09.10
 - Enforce configuration by deployers by removing some default values
 - Sessions now contain their own stanza (`sessions:`)
   - `deployment.skaha.maxUserSessions` is now `deployment.skaha.sessions.maxCount`
   - `deployment.skaha.sessionExpiry` is now `deployment.skaha.sessions.expirySeconds`
   - Added `deployment.skaha.sessions.minEphemeralStorage` and `deployment.skaha.sessions.maxEphemeralStorage`
+
+## 2024.09.04
+- Fix for Desktop Applications not starting due to API token being overwritten
 
 ## 2024.05.06
 - Small change to deploy on CADC infrastructure with CephFS quotas

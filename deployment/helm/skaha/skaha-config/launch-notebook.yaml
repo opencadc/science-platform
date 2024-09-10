@@ -81,7 +81,7 @@ spec:
         command: ["/skaha-system/start-jupyterlab.sh"]
         args:
         - ${skaha.sessionid}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"

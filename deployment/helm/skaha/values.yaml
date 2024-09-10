@@ -17,7 +17,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.19.0
+    image: images.opencadc.org/platform/skaha:0.20.0
     imagePullPolicy: Always
   
     # Set the top-level-directory name that gets mounted at the root.

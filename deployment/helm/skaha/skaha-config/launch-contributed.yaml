@@ -58,7 +58,7 @@ spec:
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         image: ${software.imageid}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"

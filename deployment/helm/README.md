@@ -9,7 +9,7 @@
   - [Skaha install](#skaha-install)
   - [Science Portal install](#science-portal-user-interface-install)
   - [Cavern install](#cavern-user-storage-api-install)
-  - [Storae User Interface install](#user-storage-ui-installation)
+  - [Storage User Interface install](#user-storage-ui-installation)
 - [Obtaining a bearer token](#obtaining-a-bearer-token)
 - [Flow](#flow)
 - [Structure](#structure)
@@ -250,6 +250,9 @@ deployment:
 
     # Set the top-level-directory name that gets mounted at the root.
     # skahaTld: "/cavern"
+
+    # Set to true if your cluster supports GPU processing
+    gpuEnabled: false
 
     defaultQuotaGB: "10"
 
