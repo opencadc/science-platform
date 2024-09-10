@@ -228,13 +228,7 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-if [ -z "${TOKEN}" ]; then
-  handle_error "[skaha] No credentials to call back to Skaha with."
-  exit 1
-else
-  echo "token is used in build menu"
-  curl_out=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
-fi
+curl_out=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
 if [[ $(echo ${curl_out} | jq '[.[] | .id | length] | add') == 0 ]]; then
   echo "[skaha] no desktop-app"
   echo "${curl_out}"
