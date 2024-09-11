@@ -145,7 +145,7 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
-    private static final String POSIX_MAPPING_SECRET = "POSIX_MAPPING_SECRET";
+    private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
@@ -551,9 +551,6 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-//        PosixHelper.ensurePosixMappingSecret(posixMapperConfiguration.getPosixMapperClient());
-
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -603,8 +600,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
-                                         Integer.toString(posixPrincipal.getUidNumber()));
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
         if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
@@ -627,8 +623,11 @@ public class PostAction extends SessionAction {
         // This property is mandatory in the Skaha configuration's cadc-registry.properties.
         jobLaunchString = setConfigValue(jobLaunchString, REGISTRY_URL,
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
-//        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPING_SECRET, PosixHelper.POSIX_MAPPINGS_SECRET_NAME);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
+
+        if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+            jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
+        }
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
@@ -661,8 +660,8 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private String generateToken(String sessionID) throws Exception {
-        return SkahaAction.getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+    private String generateToken() throws Exception {
+        return SkahaAction.getTokenTool().generateToken(URI.create(this.skahaUsersGroup), WriteGrant.class, this.sessionID);
     }
 
     /**
@@ -718,8 +717,6 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
-
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
 

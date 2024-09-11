@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.4.3)
+# CHANGELOG for Skaha User Session API (Chart 0.4.23)
+
+## 2024.09.04
+- Fix for Desktop Applications not starting due to API token being overwritten
 
 ## 2024.05.06
 - Small change to deploy on CADC infrastructure with CephFS quotas

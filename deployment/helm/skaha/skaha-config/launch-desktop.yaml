@@ -56,6 +56,8 @@ spec:
           value: "1"
         - name: SKAHA_API_VERSION
           value: "v0"  
+        - name: DESKTOP_SESSION_APP_TOKEN
+          value: "${software.desktop.app.token}"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
@@ -63,7 +65,7 @@ spec:
             drop:
               - ALL
         image: ${software.imageid}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "1Gi"
