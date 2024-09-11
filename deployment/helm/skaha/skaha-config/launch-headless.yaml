@@ -84,4 +84,8 @@ spec:
         emptyDir: { }
       - name: etc-passwd
         emptyDir: { }
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
       {{ template "skaha.session.commonVolumes" . }}

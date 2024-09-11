@@ -29,8 +29,4 @@
           claimName: skaha-workload-cavern-pvc
       - name: scratch-dir
         emptyDir: {}
-      - name: init-users-groups
-        configMap:
-          name: init-users-groups-config
-          defaultMode: 0777
 {{- end }}
