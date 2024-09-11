@@ -248,44 +248,54 @@ deployment:
     # - containerPort: 5555
     #   protocol: TCP
 
-    # Optional.  Rename the main root folder to something else.  For existing installs, this can be
-    # omitted.
-    # skahaTld: "/arc"
+    # Set the top-level-directory name that gets mounted at the root.
+    # skahaTld: "/cavern"
 
     # Set to true if your cluster supports GPU processing
     gpuEnabled: false
 
-    maxUserSessions: "3"
-    sessionExpiry: "345600"
     defaultQuotaGB: "10"
 
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
 
-    # The group name to verify users against for permission to use the Science Platform.  Group must exist in the group provider.
-    # usersGroup: "ivo://example.org/gms?groups/users"
+    # The IVOA GMS Group URI to verify users against for permission to use the Science Platform.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    usersGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Set to an administrative group.  Used to determine if the current user can bypass Harbor image validation.
-    # adminsGroup: "ivo://example.org/gms?groups/admins"
+    # The IVOA GMS Group URI to verify images without contacting Harbor.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    adminsGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Group for users to preempt headless jobs.  Group must exist in the group provider. (Optional)
-    # headlessGroup: "ivo://example.org/gms?groups/headless-users"
+    # Group for users to preempt headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    headlessGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Array of groups allowed to set the logging level.  Group must exist in the group provider. (Optional)
-    # loggingGroups:
-    #   - "ivo://example.org/gms?groups/logging-users"
+    # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
+    # See https://github.com/opencadc/core/tree/main/cadc-log for Logging control
+    loggingGroups:
+      - "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # The Resource ID of the Service that contains the Posix Mapping information
-    # posixMapperResourceID: "ivo://example.org/posix-mapper"
+    # The Resource ID (URI) of the Service that contains the Posix Mapping information
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
 
-    # URI or URL of the OIDC (IAM) server
-    # oidcURI: https://iam.example.org/
+    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
+    oidcURI: https://iam.example.org/
 
-    # ID (URI) of the GMS Service.
-    # gmsID: ivo://example.org/gms
+    # The Resource ID (URI) of the GMS Service.
+    gmsID: ivo://example.org/gms
 
-    # The registry of canned URLs
+    # The absolute URL of the IVOA Registry where services are registered
     registryURL: https://example.org/reg
+
+    # Settings for User Sessions.  Sensible defaults supplied, but can be overridden.
+    # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+    sessions:
+      expirySeconds: "345600"   # Duration, in seconds, until they expire and are shut down.
+      maxCount: "3"  # Max number of sessions per user.
+      minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
+      maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -297,7 +307,7 @@ deployment:
     # - name: cacert-volume
     #   secret:
     #     defaultMode: 420
-    #     secretName: posix-manager-cacert-secret
+    #     secretName: skaha-cacert-secret
 
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
@@ -305,6 +315,7 @@ deployment:
     # extraConfigData:
     
     # Resources provided to the Skaha service.
+    # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
     resources:
       requests:
         memory: "1Gi"
@@ -344,7 +355,7 @@ storage:
 
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
-#   posix-manager-cacert-secret:
+#   skaha-cacert-secret:
 #     ca.crt: <base64 encoded ca crt>
 ```
 
