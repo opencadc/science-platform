@@ -32,6 +32,7 @@ dependencies {
     providedCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 
     implementation 'com.google.code.gson:gson:2.8.9'
+    implementation 'io.kubernetes:client-java:21.0.1'
     implementation 'org.opencadc:cadc-access-control:[1.1.23,)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'

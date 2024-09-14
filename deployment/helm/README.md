@@ -251,9 +251,6 @@ deployment:
     # Set the top-level-directory name that gets mounted at the root.
     # skahaTld: "/cavern"
 
-    # Set to true if your cluster supports GPU processing
-    gpuEnabled: false
-
     defaultQuotaGB: "10"
 
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
@@ -296,6 +293,14 @@ deployment:
       maxCount: "3"  # Max number of sessions per user.
       minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
       maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
+
+      # When set to 'true' this flag will enable GPU node scheduling.  Don't forget to declare any related GPU configurations, if appropriate, in the nodeAffinity below!
+      # gpuEnabled: false
+
+      # Set the YAML that will go into the "affinity.nodeAffinity" stanza for Pod Spec in User Sessions.  This can be used to enable GPU scheduling, for example, 
+      # or to control how and where User Session Pods are scheduled.  This can be potentially dangerous unless you know what you are doing.
+      # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity
+      # nodeAffinity: {}
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:

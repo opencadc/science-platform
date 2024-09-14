@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.5.0)
+# CHANGELOG for Skaha User Session API (Chart 0.5.2)
+
+## 2024.09.13
+- Allow setting nodeAffinity values for proper scheduling.
 
 ## 2024.09.10
 - Enforce configuration by deployers by removing some default values

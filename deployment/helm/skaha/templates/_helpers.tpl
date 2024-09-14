@@ -123,13 +123,12 @@ The init containers for the launch scripts.
 {{/*
 The affinity for Jobs.
 */}}
-{{- define "skaha.job.nodeSelector" -}}
-  selector:
-    matchExpressions:
-    - key: skaha.opencadc.org/node-type
-      operator: NotIn
-      values:
-      - service-node
+{{- define "skaha.job.nodeAffinity" -}}
+{{- with .Values.deployment.skaha.sessions.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
 {{- end }}
 
 {{/*

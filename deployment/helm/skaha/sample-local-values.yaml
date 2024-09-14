@@ -10,9 +10,6 @@ deployment:
 
     # Root of shared storage
     skahaTld: "/cavern"
-    
-    # When set to 'true' this flag will enable GPU node scheduling.
-    gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
     usersGroup: "ivo://example.org/gms?/example/users-group-name"
@@ -34,6 +31,18 @@ deployment:
       maxCount: "2"  # Users may have 2 interactive sessions at once
       minEphemeralStorage: "10Gi" # Initial request for ephemeral storage (scratch disk space)
       maxEphemeralStorage: "100Gi" # Max expansion for ephemeral storage (scratch disk space)
+
+      # When set to 'true' this flag will enable GPU node scheduling.
+      gpuEnabled: true
+
+      # Example nodeAffinity to restrict how User Sessions are scheduled.
+      nodeAffinity:
+        # Only allow executions of User Sessions on specific Nodes.
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: high-compute-batch-nodes
+              operator: Exists
 
     # Resources provided to the Skaha service.
     resources:
