@@ -121,7 +121,7 @@ The init containers for the launch scripts.
 {{- end }}
 
 {{/*
-The affinity for Jobs.
+The affinity for Jobs.  This will import the YAML as defined by the user in the deployment.skaha.sessions.nodeAffinity stanza.
 */}}
 {{- define "skaha.job.nodeAffinity" -}}
 {{- with .Values.deployment.skaha.sessions.nodeAffinity }}
