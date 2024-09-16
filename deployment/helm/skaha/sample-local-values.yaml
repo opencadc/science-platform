@@ -7,28 +7,33 @@ deployment:
     imagePullPolicy: IfNotPresent
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
+
     # Root of shared storage
-    skahaTld: "/arc"
+    skahaTld: "/cavern"
     
-    # Change this to enable the GPU 
+    # When set to 'true' this flag will enable GPU node scheduling.
     gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
-    # usersGroup: "ivo://cadc.nrc.ca/gms?skaha-users"
+    usersGroup: "ivo://example.org/gms?/example/users-group-name"
 
-    adminsGroup: "ivo://cadc.nrc.ca/gms?skaha-admins"
+    adminsGroup: "ivo://example.org/gms?/example/admin-group-name"
+
+    # Groups that can change the logging output level.
+    # See log setting information at https://github.com/opencadc/core/tree/main/cadc-log#cadc-log
+    loggingGroups:
+      - "ivo://example.org/gms?/example/logging-group-1"
+      - "ivo://example.org/gms?/example/logging-group-2"
 
     # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperResourceID: "ivo://opencadc.org/posix-mapper"
-    # posixMapperResourceID: "ivo://cadc.nrc.ca/gms"
+    posixMapperResourceID: "ivo://example.org/posix-mapper"
 
-    # Optionally set the DEBUG port.
-    # extraEnv:
-    # - name: CATALINA_OPTS
-    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
-    # - name: JAVA_OPTS
-    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # Session settings.
+    sessions:
+      expirySeconds: "345600" # Four days
+      maxCount: "2"  # Users may have 2 interactive sessions at once
+      minEphemeralStorage: "10Gi" # Initial request for ephemeral storage (scratch disk space)
+      maxEphemeralStorage: "100Gi" # Max expansion for ephemeral storage (scratch disk space)
 
     # Resources provided to the Skaha service.
     resources:
@@ -38,6 +43,13 @@ deployment:
       limits:
         memory: "1500M"
         cpu: "1500m"
+
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
 
     # Uncomment to debug.  Requires options above as well as service port exposure below.
     # extraPorts:

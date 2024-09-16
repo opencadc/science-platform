@@ -86,12 +86,12 @@ spec:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
-            ephemeral-storage: "20Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             ${software.limits.gpus}
-            ephemeral-storage: "200Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
         ports:
         - containerPort: 8888
           protocol: TCP
