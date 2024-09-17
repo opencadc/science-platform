@@ -106,16 +106,18 @@ public class SessionJobBuilder {
             final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
             final V1JobSpec podTemplate = launchJob.getSpec();
             if (podTemplate != null) {
+                // spec.template.spec
                 final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
-
                 if (podTemplateSpec != null) {
                     final V1Affinity affinity = podTemplateSpec.getAffinity();
 
+                    // spec.template.spec.affinity
                     if (affinity == null) {
                         podTemplateSpec.setAffinity(gpuAffinity);
                     } else {
                         final V1NodeAffinity nodeAffinity = affinity.getNodeAffinity();
 
+                        // spec.template.spec.affinity.nodeAffinity
                         if (nodeAffinity == null) {
                             affinity.setNodeAffinity(gpuAffinity.getNodeAffinity());
                         } else {
@@ -140,6 +142,7 @@ public class SessionJobBuilder {
                                     nodeAffinity.setPreferredDuringSchedulingIgnoredDuringExecution(mergedPreferredSchedulingTerms);
                                 }
 
+                                // spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
                                 final V1NodeSelector requiredNodeSelector = nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
                                 final V1NodeSelector gpuRequiredNodeSelector = gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
 

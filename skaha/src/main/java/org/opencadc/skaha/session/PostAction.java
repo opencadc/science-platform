@@ -127,7 +127,6 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
-    public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -968,37 +967,6 @@ public class PostAction extends SessionAction {
             }
         }
 
-        return sb.toString();
-    }
-
-    private String getGPUResourceLimit(Integer gpus) {
-        if (!gpuEnabled) {
-            return "";
-        }
-        return "nvidia.com/gpu: ".concat(gpus.toString());
-    }
-
-    private String getGPUScheduling(Integer gpus) {
-        if (!gpuEnabled) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("affinity:\n");
-        sb.append("          nodeAffinity:\n");
-        sb.append("            requiredDuringSchedulingIgnoredDuringExecution:\n");
-        sb.append("              nodeSelectorTerms:\n");
-        sb.append("              - matchExpressions:\n");
-        if (gpus == null || gpus == 0) {
-            sb.append("                - key: nvidia.com/gpu.count\n");
-            sb.append("                  operator: DoesNotExist\n");
-        } else {
-            sb.append("                - key: nvidia.com/gpu.count\n");
-            sb.append("                  operator: Gt\n");
-            sb.append("                  values:\n");
-            sb.append("                  - \"0\"\n");
-            return sb.toString();
-        }
         return sb.toString();
     }
 
