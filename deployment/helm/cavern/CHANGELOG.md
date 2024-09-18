@@ -1,4 +1,7 @@
-# CHANGELOG for Cavern User Storage (Chart 0.4.5)
+# CHANGELOG for Cavern User Storage (Chart 0.4.6)
+
+## 2024.09.18 (0.4.6)
+- Bug fix for setting quotas
 
 ## 2024.09.13 (0.4.5)
 - Bug fix for database initialization
