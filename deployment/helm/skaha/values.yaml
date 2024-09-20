@@ -48,6 +48,9 @@ deployment:
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
     # headlessPriorityGroup: "ivo://example.org/gms?skaha-priority-headless-users"
 
+    # Class name to set for priority headless jobs.
+    # headlessPriorityClass: uber-user-preempt-high
+
     # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
     # See https://github.com/opencadc/core/tree/main/cadc-log for Logging control

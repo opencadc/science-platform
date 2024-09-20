@@ -63,6 +63,10 @@ spec:
         - name: skaha.headlessprioritygroup
           value: "{{ . }}"
         {{- end }}
+        {{- with .Values.deployment.skaha.headlessPriorityClass }}
+        - name: skaha.headlesspriortyclass
+          value: "{{ . }}"
+        {{- end }}
         - name: skaha.adminsgroup
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
         - name: skaha.posixmapper.resourceid

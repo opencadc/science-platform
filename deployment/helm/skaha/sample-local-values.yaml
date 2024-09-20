@@ -23,6 +23,8 @@ deployment:
 
     headlessPriorityGroup: "ivo://example.org/gms?example/vip-group-users"
 
+    headlessPriorityClass: "uber-user-preempt-high"
+
     # Groups that can change the logging output level.
     # See log setting information at https://github.com/opencadc/core/tree/main/cadc-log#cadc-log
     loggingGroups:
