@@ -17,7 +17,7 @@ spec:
               args:
               - |
                 apk add --no-cache jq redis && \
-                sh /config/image-caching.sh
+                sh /config/cache-images.sh
               env:
                 - name: HARBOR_HOST
                   value: "{{ .Values.deployment.skaha.registryHosts }}"
