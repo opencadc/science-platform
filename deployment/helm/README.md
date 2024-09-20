@@ -267,9 +267,13 @@ deployment:
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
     adminsGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Group for users to preempt headless jobs.
+    # Group URI for users to preempt headless jobs.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
     headlessGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+
+    # Group URI for users to ensure priority for their headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    headlessPriorityGroup: "ivo://example.org/gms?skaha-priority-headless-users"
 
     # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
