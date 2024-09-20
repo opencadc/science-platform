@@ -170,3 +170,12 @@ storage:
       # Example is the persistentVolumeClaim below.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# For the token caching
+redis:
+  architecture: 'standalone'
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false

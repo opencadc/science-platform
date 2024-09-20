@@ -69,21 +69,17 @@ package org.opencadc.skaha.image;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.opencadc.skaha.SkahaAction;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
  * @author majorb
@@ -104,19 +100,29 @@ public class GetAction extends SkahaAction {
         super.initRequest();
         
         String type = syncInput.getParameter("type");
-        if (type != null && !SESSION_TYPES.contains(type)) {
-            throw new IllegalArgumentException("unknown type: " + type);
-        }
-        
-        String idToken = super.getIdToken();
-        List<Image> images = getImages(idToken, type);
+
+        // todo delete this method also
+//        String idToken = super.getIdToken();
+//        List<Image> images = getImages(idToken, type);
+        List<Image> images = getImages(type);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(images);
         
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(json.getBytes());
     }
-        
+
+    protected List<Image> getImages(String type) throws Exception {
+        List<Image> images = redis.lrange("public", Image.class);
+        if (null == type) return images;
+        if (!SESSION_TYPES.contains(type))
+            throw new IllegalArgumentException("unknown type: " + type);
+        return images.stream()
+                .filter(image -> null != image.getTypes() && image.getTypes().contains(type))
+                .collect(Collectors.toList());
+    }
+
+    // todo delete this method
     protected List<Image> getImages(String idToken, String typeFilter) throws Exception {
         List<Callable<List<Image>>> tasks = new ArrayList<Callable<List<Image>>>();
         for (String harborHost : super.harborHosts) {
