@@ -19,9 +19,9 @@ deployment:
 
     adminsGroup: "ivo://example.org/gms?example/admin-group-name"
 
-    headlessGroup: "ivo://example.org/gms?example/admin-group-name"
+    headlessGroup: "ivo://example.org/gms?example/headless-group-name"
 
-    headlessPriorityGroup: "ivo://example.org/gms?example/vip-group-users"
+    headlessPriorityGroup: "ivo://example.org/gms?example/headless-priority-group-name"
 
     headlessPriorityClass: "uber-user-preempt-high"
 
