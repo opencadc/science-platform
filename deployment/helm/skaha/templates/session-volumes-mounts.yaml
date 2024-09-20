@@ -1,6 +1,6 @@
 {{- define "skaha.session.commonVolumeMounts" -}}
-        {{- if .Values.sessions.extraVolumes }}
-        {{- range .Values.sessions.extraVolumes }}
+        {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+        {{- range . }}
         - name: {{ .name }}
           mountPath: {{ .volumeMount.mountPath }}
           {{- if .volumeMount.subPath }}

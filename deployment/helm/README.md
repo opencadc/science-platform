@@ -304,7 +304,19 @@ deployment:
       minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
       maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
 
-    # Optionally mount a custom CA certificate
+      # Mount CVMFS from the Node's mounted path into all User Sessions.
+      extraVolumes:
+      - name: cvmfs-mount
+        volume:
+          type: HOST_PATH     # HOST_PATH is for host path
+          hostPath: "/cvmfs"  # Path on the Node to look for a source folder
+          hostPathType: Directory
+        volumeMount:
+          mountPath: "/cvmfs"   # Path to mount on the User Sesssion Pod.
+          readOnly: false
+          mountPropagation: HostToContainer
+
+    # Optionally mount a custom CA certificate as an extra mount in Skaha (*not* user sessions)
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"
     #   name: cacert-volume
