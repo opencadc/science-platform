@@ -261,21 +261,28 @@ deployment:
 
     # The IVOA GMS Group URI to verify users against for permission to use the Science Platform.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    usersGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+    usersGroup: "ivo://example.org/gms?skaha-platform-users"
 
     # The IVOA GMS Group URI to verify images without contacting Harbor.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    adminsGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+    adminsGroup: "ivo://example.org/gms?skaha-admin-users"
 
-    # Group for users to preempt headless jobs.
+    # The IVOA GMS Group URI to verify users against for permission to run headless jobs.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    headlessGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+    headlessGroup: "ivo://example.org/gms?skaha-headless-users"
+
+    # The IVOA GMS Group URI to verify users against that have priority for their headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    headlessPriorityGroup: "ivo://example.org/gms?skaha-priority-headless-users"
+
+    # Class name to set for priority headless jobs.
+    headlessPriorityClass: "uber-user-vip"
 
     # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
     # See https://github.com/opencadc/core/tree/main/cadc-log for Logging control
     loggingGroups:
-      - "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+      - "ivo://example.org/gms?skaha-logging-admin-users"
 
     # The Resource ID (URI) of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://example.org/posix-mapper"

@@ -34,30 +34,37 @@ deployment:
 
     # The IVOA GMS Group URI to verify users against for permission to use the Science Platform.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    # usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # usersGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
     # The IVOA GMS Group URI to verify images without contacting Harbor.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    # adminsGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # adminsGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Group for users to preempt headless jobs.
+    # Group URI for users to preempt headless jobs.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
-    # headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # headlessGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
+
+    # Group URI for users to ensure priority for their headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    # headlessPriorityGroup: "ivo://example.org/gms?skaha-priority-headless-users"
+
+    # Class name to set for priority headless jobs.
+    # headlessPriorityClass: uber-user-preempt-high
 
     # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
     # See https://github.com/opencadc/core/tree/main/cadc-log for Logging control
     # loggingGroups:
-    #   - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    #   - "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
     # The Resource ID (URI) of the Service that contains the Posix Mapping information
     # posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
-    # oidcURI: https://ska-iam.stfc.ac.uk/
+    # oidcURI: https://iam.example.org/
 
     # The Resource ID (URI) of the GMS Service.
-    # gmsID: ivo://skao.int/gms
+    # gmsID: ivo://example.org/gms
 
     # The absolute URL of the IVOA Registry where services are registered
     # registryURL: https://spsrc27.iaa.csic.es/reg

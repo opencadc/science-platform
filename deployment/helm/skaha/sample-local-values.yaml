@@ -15,9 +15,15 @@ deployment:
     gpuEnabled: false 
 
     # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://example.org/gms?/example/users-group-name"
+    usersGroup: "ivo://example.org/gms?example/users-group-name"
 
-    adminsGroup: "ivo://example.org/gms?/example/admin-group-name"
+    adminsGroup: "ivo://example.org/gms?example/admin-group-name"
+
+    headlessGroup: "ivo://example.org/gms?example/headless-group-name"
+
+    headlessPriorityGroup: "ivo://example.org/gms?example/headless-priority-group-name"
+
+    headlessPriorityClass: "uber-user-preempt-high"
 
     # Groups that can change the logging output level.
     # See log setting information at https://github.com/opencadc/core/tree/main/cadc-log#cadc-log
