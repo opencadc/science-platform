@@ -1,6 +1,6 @@
-# CHANGELOG for Skaha User Session API (Chart 0.5.2)
+# CHANGELOG for Skaha User Session API (Chart 0.5.1)
 
-## 2024.09.19 (0.5.2)
+## 2024.09.19 (0.5.1)
 - Fix to add `headlessPriorityGroup` configuration
 
 ## 2024.09.10
