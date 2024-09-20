@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.5.1)
+# CHANGELOG for Skaha User Session API (Chart 0.6.0)
+
+## 2024.09.20 (0.6.0)
+- Feature to allow mounting volumes into user sessions.
 
 ## 2024.09.19 (0.5.1)
 - Fix to add `headlessPriorityGroup` and `headlessPriorityClass` configurations

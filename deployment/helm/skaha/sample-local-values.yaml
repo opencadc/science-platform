@@ -40,6 +40,16 @@ deployment:
       maxCount: "2"  # Users may have 2 interactive sessions at once
       minEphemeralStorage: "10Gi" # Initial request for ephemeral storage (scratch disk space)
       maxEphemeralStorage: "100Gi" # Max expansion for ephemeral storage (scratch disk space)
+      extraVolumes:
+      - name: cvmfs-mount
+        volume:
+          type: HOST_PATH     # HOST_PATH is for host path
+          hostPath: "/cvmfs"  # Path on the Node to look for a source folder
+          hostPathType: Directory
+        volumeMount:
+          mountPath: "/cvmfs"   # Path to mount on the User Sesssion Pod.
+          readOnly: false
+          mountPropagation: HostToContainer
 
     # Resources provided to the Skaha service.
     resources:
@@ -156,37 +166,3 @@ kueue:
             borrowingLimit: 0Gi # Change this according to the resource requirements
           - name: ephemeral-storage
             nominalQuota: 50Gi
-
-# this will be extra volume configs, create this config accordingly, type parameter in volume section is constant
-# sessions:
-#   extraVolumes:
-#   - name: sample-pvc-volume
-#     volume:
-#       type: PVC           # PVC is for Persistant volume claim
-#       name: pvc-name
-#     volumeMount:
-#       mountPath: "/pvc-volume-mount"
-#       subPath: "pvc"
-#   - name: sample-hostpath-volume
-#     volume:
-#       type: HOST_PATH     # HOST_PATH is for host path
-#       hostPath: "/host-path"
-#       hostPathType: Directory
-#     volumeMount:
-#       mountPath: "/host-path"
-#       readOnly: true
-#       mountPropagation: HostToContainer
-#   - name: config-map-volume
-#     volume:
-#       type: CONFIG_MAP    # CONFIG_MAP is for config map
-#       name: sample-config-map
-#       defaultMode: "0777"
-#     volumeMount:
-#       mountPath: "/cmp"
-#   - name: secret-volume
-#     volume:
-#       type: SECRET        # SECRET is for secrets
-#       name: sample-secret
-#       defaultMode: "0777"
-#     volumeMount:
-#       mountPath: "/scrt"

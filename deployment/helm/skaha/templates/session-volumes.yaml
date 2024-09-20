@@ -1,6 +1,12 @@
+{{/**
+TODO: This is likely more complicated than it needs to be, and is technical debt for now.  Deployers
+TODO: could simply declare the appropriate YAML that Kubernetes expects that can simply be inserted here, 
+TODO: rather than mapping it to a separate model and injecting specific values.
+TODO: jenkinsd 2024.09.20
+*/}}
 {{- define "skaha.session.commonVolumes" -}}
-      {{- if .Values.sessions.extraVolumes }}
-      {{- range .Values.sessions.extraVolumes }}
+      {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+      {{- range . }}
       - name: {{ .name }}
         {{- if eq .volume.type "PVC" }}
         persistentVolumeClaim:
