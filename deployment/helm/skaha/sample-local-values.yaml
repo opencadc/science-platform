@@ -37,6 +37,16 @@ deployment:
       maxCount: "2"  # Users may have 2 interactive sessions at once
       minEphemeralStorage: "10Gi" # Initial request for ephemeral storage (scratch disk space)
       maxEphemeralStorage: "100Gi" # Max expansion for ephemeral storage (scratch disk space)
+      extraVolumes:
+      - name: cvmfs-mount
+        volume:
+          type: HOST_PATH     # HOST_PATH is for host path
+          hostPath: "/cvmfs"  # Path on the Node to look for a source folder
+          hostPathType: Directory
+        volumeMount:
+          mountPath: "/cvmfs"   # Path to mount on the User Sesssion Pod.
+          readOnly: false
+          mountPropagation: HostToContainer
 
       # When set to 'true' this flag will enable GPU node scheduling.
       gpuEnabled: true
@@ -166,4 +176,3 @@ kueue:
             borrowingLimit: 0Gi # Change this according to the resource requirements
           - name: ephemeral-storage
             nominalQuota: 50Gi
-

@@ -73,6 +73,38 @@ deployment:
       maxCount: "3"  # Max number of sessions per user.
       minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
       maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
+      # Declare extra volume mounts in User Sessions.  The "type: parameter in volume section is constant.
+      # extraVolumes:
+      # - name: example-pvc-name
+      #   volume:
+      #     type: PVC           # PVC is for Persistant volume claim
+      #     name: pvc-name
+      #   volumeMount:
+      #     mountPath: "/pvc-volume-mount"
+      #     subPath: "pvc"
+      # - name: example-hostpath-name
+      #   volume:
+      #     type: HOST_PATH     # HOST_PATH is for host path
+      #     hostPath: "/host-path"
+      #     hostPathType: Directory
+      #   volumeMount:
+      #     mountPath: "/host-path"
+      #     readOnly: true
+      #     mountPropagation: HostToContainer
+      # - name: config-map-volume
+      #   volume:
+      #     type: CONFIG_MAP    # CONFIG_MAP is for config map
+      #     name: example-config-map-name
+      #     defaultMode: "0777"
+      #   volumeMount:
+      #     mountPath: "/cmp"
+      # - name: secret-volume
+      #   volume:
+      #     type: SECRET        # SECRET is for secrets
+      #     name: example-secret-name
+      #     defaultMode: "0777"
+      #   volumeMount:
+      #     mountPath: "/scrt"
 
       # When set to 'true' this flag will enable GPU node scheduling.  Don't forget to declare any related GPU configurations, if appropriate, in the nodeAffinity below!
       # gpuEnabled: false

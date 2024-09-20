@@ -309,7 +309,19 @@ deployment:
       # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity
       # nodeAffinity: {}
 
-    # Optionally mount a custom CA certificate
+      # Mount CVMFS from the Node's mounted path into all User Sessions.
+      extraVolumes:
+      - name: cvmfs-mount
+        volume:
+          type: HOST_PATH     # HOST_PATH is for host path
+          hostPath: "/cvmfs"  # Path on the Node to look for a source folder
+          hostPathType: Directory
+        volumeMount:
+          mountPath: "/cvmfs"   # Path to mount on the User Sesssion Pod.
+          readOnly: false
+          mountPropagation: HostToContainer
+
+    # Optionally mount a custom CA certificate as an extra mount in Skaha (*not* user sessions)
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"
     #   name: cacert-volume
