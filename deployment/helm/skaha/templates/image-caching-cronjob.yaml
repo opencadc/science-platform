@@ -11,14 +11,20 @@ spec:
         spec:
           containers:
             - name: image-caching-cronjob
-              image: busybox:1.28
+              image: alpine:3.20.3
               imagePullPolicy: IfNotPresent
-              command:
-                - /bin/sh
-                - image-caching.sh
+              command: ["/bin/sh", "-c"]
+              args:
+              - |
+                apk add --no-cache jq redis && \
+                sh /config/image-caching.sh
               env:
                 - name: HARBOR_HOST
                   value: "{{ .Values.deployment.skaha.registryHosts }}"
+                - name: REDIS_HOST
+                  value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+                - name: REDIS_PORT
+                  value: "6379"
               volumeMounts:
                 - name: config-volume
                   mountPath: /config

@@ -51,11 +51,11 @@ for harborHost in "${harborHosts[@]}"; do
                 labels=$(echo $artifact | jq -c [.labels[].name])
 
                 refined_artifact=$(echo $artifact | jq -c --argjson labels "$labels" --arg id "$image_id" '{id: $id, types: $labels, digest: .digest, tags: .tags}')
-                echo $refined_artifact | redis-cli -x lpush temp
+                echo $refined_artifact | redis-cli -h $REDIS_HOST -p $REDIS_PORT -x lpush temp
             done
         done
     done
-done && redis-cli rename temp public
+done && redis-cli -h $REDIS_HOST -p $REDIS_PORT rename temp public
 
 
 
