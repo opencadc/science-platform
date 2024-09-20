@@ -93,31 +93,22 @@ spec:
           name: templates
         - mountPath: "/skaha-system"
           name: start-desktop
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
       volumes:
-      - name: templates
-        configMap:
-          name: templates
-          defaultMode: 0777
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
       - name: start-desktop
         configMap:
           name: launch-scripts
           defaultMode: 0777
-      - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc
-      - name: scratch-dir
-        emptyDir: {}
+      - name: templates
+        configMap:
+          name: templates
+          defaultMode: 0777
       - name: init-users-groups
         configMap:
           name: init-users-groups-config
           defaultMode: 0777
-      - name: etc-group
-        emptyDir: {}
-      - name: etc-passwd
-        emptyDir: {}
+      {{ template "skaha.session.commonVolumes" . }}
