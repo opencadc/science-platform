@@ -59,6 +59,14 @@ spec:
           value: "{{ .Values.deployment.skaha.usersGroup }}"
         - name: skaha.headlessgroup
           value: "{{ .Values.deployment.skaha.headlessGroup }}"
+        {{- with .Values.deployment.skaha.headlessPriorityGroup }}
+        - name: skaha.headlessprioritygroup
+          value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.deployment.skaha.headlessPriorityClass }}
+        - name: skaha.headlesspriortyclass
+          value: "{{ . }}"
+        {{- end }}
         - name: skaha.adminsgroup
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
         - name: skaha.posixmapper.resourceid

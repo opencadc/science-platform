@@ -1,7 +1,10 @@
 # CHANGELOG for Skaha User Session API (Chart 0.6.0)
 
-## 2024.09.13 (0.6.0)
+## 2024.09.20 (0.6.0)
 - Allow setting nodeAffinity values for proper scheduling.
+
+## 2024.09.19 (0.5.1)
+- Fix to add `headlessPriorityGroup` and `headlessPriorityClass` configurations
 
 ## 2024.09.10
 - Enforce configuration by deployers by removing some default values
