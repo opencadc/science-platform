@@ -1,6 +1,5 @@
-#! /bin/bash
+harborHosts=$(echo $HARBOR_HOST | tr ' ' '\n')
 
-harborHosts=($HARBOR_HOST)
 URL="https://$harborHost/api/v2.0/projects?page_size=100"
 PROJECT_URL="https:/$harborHost/api/v2.0/projects"
 
@@ -13,7 +12,7 @@ fi
 # Fetch the data from the given URL
 redis-cli -h $REDIS_HOST -p $REDIS_PORT del temp
 
-for harborHost in "${harborHosts[@]}"; do
+echo "$harborHosts" | while read -r harborHost; do
     URL="https://$harborHost/api/v2.0/projects?page_size=100"
     PROJECT_URL="https://$harborHost/api/v2.0/projects"
 
@@ -61,6 +60,3 @@ for harborHost in "${harborHosts[@]}"; do
         done
     done
 done && redis-cli -h $REDIS_HOST -p $REDIS_PORT rename temp public
-
-
-

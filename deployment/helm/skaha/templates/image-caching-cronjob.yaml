@@ -16,7 +16,7 @@ spec:
               command: ["/bin/sh", "-c"]
               args:
               - |
-                apk add --no-cache jq redis && \
+                apk add --no-cache jq redis curl && \
                 sh /config/cache-images.sh
               env:
                 - name: HARBOR_HOST
