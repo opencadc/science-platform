@@ -455,6 +455,20 @@ public abstract class SkahaAction extends RestAction {
     }
 
     public Image getImage(String imageID) throws Exception {
+        log.debug("get image: " + imageID);
+        List<Image> images = redis.lrange("public", Image.class);
+        if (images == null) {
+            log.debug("no images in cache");
+            return null;
+        }
+        return images.stream()
+             .filter(image -> image.getId().equals(imageID))
+             .findFirst()
+             .orElse(null);
+    }
+
+    @Deprecated
+    public Image getImageOld(String imageID) throws Exception {
         String idToken = getIdToken();
 
         log.debug("get image: " + imageID);

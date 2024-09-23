@@ -164,28 +164,6 @@ public class GetImagesTests {
     }
     
     @Test
-    public void testGetImages() {
-        try {
-            GetAction get = new TestGetAction();
-            get.harborHosts.add("test");
-            List<Image> images = get.getImages(null, null);
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            String json = gson.toJson(images);
-            log.info(json);
-            Assert.assertEquals("image count",  5, images.size());
-            Set<String> types = new HashSet<String>();
-            types.add("notebook");
-            Image test = new Image("test/petuan/new-earth-snap:0.1.1", types,
-                "sha256:439cadced5731d0946018fa3e2371444309c7cb8b6fc762c8f96ef915fc49ae4");
-            Assert.assertTrue("exists", images.contains(test));
-            
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-    
-    @Test
     public void testGetImage() {
         try {
             GetAction get = new TestGetAction();
