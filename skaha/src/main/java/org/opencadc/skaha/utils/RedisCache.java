@@ -12,8 +12,8 @@ public class RedisCache {
     private final Jedis jedis;
     private final Gson gson = new Gson();
 
-    public RedisCache(String host, int port) {
-        jedis = new Jedis(host, port);
+    public RedisCache(String host, String port) {
+        jedis = new Jedis(host, Integer.parseInt(port));
     }
 
     public String put(String key, String value) {

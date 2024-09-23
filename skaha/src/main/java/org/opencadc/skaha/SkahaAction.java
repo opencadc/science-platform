@@ -153,7 +153,7 @@ public abstract class SkahaAction extends RestAction {
 
     protected RedisCache redis;
     private final String redisHost;
-    private final int redisPort;
+    private final String redisPort;
 
     protected boolean skahaCallbackFlow = false;
     protected String callbackSupplementalGroups = null;
@@ -188,7 +188,7 @@ public abstract class SkahaAction extends RestAction {
         final String configuredPosixMapperResourceID = System.getenv(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY);
 
         redisHost = System.getenv("REDIS_HOST");
-        redisPort = Integer.parseInt(System.getenv("REDIS_PORT"));
+        redisPort = System.getenv("REDIS_PORT");
 
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
@@ -468,7 +468,7 @@ public abstract class SkahaAction extends RestAction {
     }
 
     @Deprecated
-    public Image getImageOld(String imageID) throws Exception {
+    public Image getImageDeprecated(String imageID) throws Exception {
         String idToken = getIdToken();
 
         log.debug("get image: " + imageID);
