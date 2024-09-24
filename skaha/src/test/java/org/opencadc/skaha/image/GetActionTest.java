@@ -66,16 +66,90 @@
  */
 package org.opencadc.skaha.image;
 
-import org.apache.log4j.Logger;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
+import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.utils.RedisCache;
+
+import java.util.List;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.when;
+import static org.opencadc.skaha.utils.TestUtils.set;
+import static org.opencadc.skaha.utils.TestUtils.setEnv;
 
 
 /**
  * @author majorb
  *
  */
+@RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
-    
-    private static final Logger log = Logger.getLogger(GetActionTest.class);
+
+    @InjectMocks
+    GetAction getAction;
+
+    RedisCache redis;
+
+    private static final String redisHost = "localhost";
+    private static final String redisPort = "6129";
+
+    @Before
+    public void setUp() {
+        setEnv("REDIS_HOST", redisHost);
+        setEnv("REDIS_PORT", redisPort);
+        redis = Mockito.mock(RedisCache.class);
+        getAction = new GetAction();
+        set(getAction, SkahaAction.class, "redis", redis);
+    }
+
+    @Test
+    public void testGetImagesWithNullType() throws Exception {
+        List<Image> expectedImages = List.of(
+                new Image("image1", Set.of("type1", "type2"), "digest1"),
+                new Image("image2", Set.of("type2", "type3"), "digest2")
+        );
+
+        when(redis.getAll("public", Image.class))
+                .thenReturn(expectedImages);
+
+        List<Image> result = getAction.getImages(null);
+
+        assertEquals(expectedImages, result);
+    }
+
+    @Test
+    public void testGetImagesWithUnknownImageType() throws Exception {
+        String type = "type3";
+
+        Exception exception = assertThrows(RuntimeException.class, () -> getAction.getImages(type));
+
+        assertEquals("unknown type: type3", exception.getMessage());
+    }
+
+    @Test
+    public void testGetImagesWithImageType() throws Exception {
+        // Arrange
+        String notebook = "notebook";
+        Image notebookImage = new Image("image2", Set.of(notebook), "digest2");
+        List<Image> expectedImages = List.of(
+                new Image("image1", Set.of("type1", "type2"), "digest1"),
+                notebookImage
+        );
+
+        when(redis.getAll("public", Image.class))
+                .thenReturn(expectedImages);
+
+        List<Image> result = getAction.getImages(notebook);
+
+        assertEquals(List.of(notebookImage), result);
+    }
 
 
 }

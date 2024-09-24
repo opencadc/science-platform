@@ -456,7 +456,7 @@ public abstract class SkahaAction extends RestAction {
 
     public Image getImage(String imageID) throws Exception {
         log.debug("get image: " + imageID);
-        List<Image> images = redis.lrange("public", Image.class);
+        List<Image> images = redis.getAll("public", Image.class);
         if (images == null) {
             log.debug("no images in cache");
             return null;

@@ -2,6 +2,7 @@ package org.opencadc.skaha.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import org.apache.log4j.Logger;
 import redis.clients.jedis.Jedis;
 
 import java.util.List;
@@ -9,8 +10,13 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class RedisCache {
+    private static final Logger log = Logger.getLogger(RedisCache.class);
     private final Jedis jedis;
     private final Gson gson = new Gson();
+
+    public RedisCache() {
+        jedis = null;
+    }
 
     public RedisCache(String host, String port) {
         jedis = new Jedis(host, Integer.parseInt(port));
@@ -21,7 +27,7 @@ public class RedisCache {
         try {
             return jedis.set(key, value);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e);
             throw e;
         }
     }
@@ -37,7 +43,7 @@ public class RedisCache {
         try {
             return jedis.get(key);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e);
             throw e;
         }
     }
@@ -47,25 +53,25 @@ public class RedisCache {
         if (valueInString == null) return null;
         try {
             return gson.fromJson(valueInString, className);
-        } catch (JsonSyntaxException ex) {
-            ex.printStackTrace();
+        } catch (JsonSyntaxException e) {
+            log.error(e);
             throw new ClassCastException("Unable to cast value to " + className.getCanonicalName());
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw ex;
+        } catch (Exception e) {
+            log.error(e);
+            throw e;
         }
     }
 
-    public List<String> lrange(String key, long start, long stop) {
+    public List<String> getAll(String key, long start, long stop) {
         return jedis.lrange(key, start, stop);
     }
 
-    public List<String> lrange(String key) {
-        return lrange(key, 0, -1);
+    public List<String> getAll(String key) {
+        return getAll(key, 0, -1);
     }
 
-    public <T> List<T> lrange(String key, Class<T> className) {
-        List<String> list = lrange(key);
+    public <T> List<T> getAll(String key, Class<T> className) {
+        List<String> list = getAll(key);
         if (list.isEmpty()) return List.of();
         return list
                 .stream()
@@ -78,7 +84,7 @@ public class RedisCache {
         try {
             return gson.fromJson(item, className);
         } catch (JsonSyntaxException e) {
-            e.printStackTrace();
+            log.error(e);
             return null;
         }
     }

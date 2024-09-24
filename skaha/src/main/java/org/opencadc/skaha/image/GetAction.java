@@ -80,8 +80,9 @@ import java.util.stream.Collectors;
  *
  */
 public class GetAction extends SkahaAction {
-    
+
     private static final Logger log = Logger.getLogger(GetAction.class);
+    public static final String PUBLIC_IMAGES = "public";
 
     public GetAction() {
         super();
@@ -91,9 +92,8 @@ public class GetAction extends SkahaAction {
     public void doAction() throws Exception {
         super.initRequest();
 
-        // TODO add logs
         String type = syncInput.getParameter("type");
-
+        log.debug("requested image type is " + type);
         List<Image> images = getImages(type);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(images);
@@ -103,10 +103,12 @@ public class GetAction extends SkahaAction {
     }
 
     protected List<Image> getImages(String type) throws Exception {
-        List<Image> images = redis.lrange("public", Image.class);
-        if (null == type) return images;
-        if (!SESSION_TYPES.contains(type))
+        if (null != type && !SESSION_TYPES.contains(type)) {
+            log.error("unknown image type: " + type);
             throw new IllegalArgumentException("unknown type: " + type);
+        }
+        List<Image> images = redis.getAll(PUBLIC_IMAGES, Image.class);
+        if (null == type) return images;
         return images.stream()
                 .filter(image -> null != image.getTypes() && image.getTypes().contains(type))
                 .collect(Collectors.toList());
