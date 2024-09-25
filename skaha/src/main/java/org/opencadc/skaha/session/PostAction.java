@@ -101,6 +101,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.PosixCache;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -634,6 +636,9 @@ public class PostAction extends SessionAction {
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
         injectCredentials();
 
+        // inject the entries from the POSIX Mapper
+        injectPOSIXDetails();
+
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
@@ -658,6 +663,11 @@ public class PostAction extends SessionAction {
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
+    }
+
+    private void injectPOSIXDetails() throws Exception {
+        final PosixCache posixCache = new PosixCache(this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+        posixCache.writePOSIXEntries();
     }
 
     private String generateToken() throws Exception {

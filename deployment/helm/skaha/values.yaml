@@ -17,7 +17,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.20.0
+    image: images.opencadc.org/platform/skaha:0.21.0
     imagePullPolicy: Always
   
     # Set the top-level-directory name that gets mounted at the root.
@@ -170,3 +170,12 @@ storage:
       # Example is the persistentVolumeClaim below.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# For the writing the POSIX Users and Groups to be shared with Job files
+redis:
+  architecture: 'standalone'
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false

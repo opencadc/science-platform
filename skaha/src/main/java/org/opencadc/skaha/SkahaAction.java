@@ -147,6 +147,7 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaAdminsGroup;
     protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
+    protected String skahaPosixCacheURL;
     protected final PosixMapperConfiguration posixMapperConfiguration;
    
 
@@ -180,6 +181,9 @@ public abstract class SkahaAction extends RestAction {
         } else {
             maxUserSessions = Integer.parseInt(maxUsersSessionsString);
         }
+
+        // Check the catalina.properties for this setting.
+        skahaPosixCacheURL = System.getProperty(SkahaAction.class.getPackageName() + ".posixCache.url");
 
         final String configuredPosixMapperResourceID = System.getenv(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY);
 
