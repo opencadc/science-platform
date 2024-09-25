@@ -58,17 +58,17 @@ spec:
         - name: OMP_NUM_THREADS
           value: "${software.requests.cores}"
         image: ${software.imageid}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
-            ephemeral-storage: "20Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
             ${software.limits.gpus}
-            ephemeral-storage: "200Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
         ports:
         - containerPort: 5000
           protocol: TCP
@@ -80,12 +80,7 @@ spec:
         - mountPath: "/etc/group"
           name: etc-group
           subPath: group
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
@@ -93,16 +88,12 @@ spec:
             drop:
               - ALL
       volumes:
-      - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
       - name: init-users-groups
         configMap:
           name: init-users-groups-config
           defaultMode: 0777
-      - name: scratch-dir
-        emptyDir: {}
-      - name: etc-group
-        emptyDir: {}
-      - name: etc-passwd
-        emptyDir: {}
+      {{ template "skaha.session.commonVolumes" . }}

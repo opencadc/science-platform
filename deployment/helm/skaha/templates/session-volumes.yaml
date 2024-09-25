@@ -1,0 +1,38 @@
+{{/**
+TODO: This is likely more complicated than it needs to be, and is technical debt for now.  Deployers
+TODO: could simply declare the appropriate YAML that Kubernetes expects that can simply be inserted here, 
+TODO: rather than mapping it to a separate model and injecting specific values.
+TODO: jenkinsd 2024.09.20
+*/}}
+{{- define "skaha.session.commonVolumes" -}}
+      {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+      {{- range . }}
+      - name: {{ .name }}
+        {{- if eq .volume.type "PVC" }}
+        persistentVolumeClaim:
+          claimName: {{ .volume.name }}
+        {{- else if eq .volume.type "HOST_PATH" }}
+        hostPath:
+          path: {{ .volume.hostPath }}
+          type: {{ .volume.hostPathType }}
+        {{- else if eq .volume.type "CONFIG_MAP" }}
+        configMap:
+          name: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- else if eq .volume.type "SECRET" }}
+        secret:
+          secretName: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}
+{{- end }}

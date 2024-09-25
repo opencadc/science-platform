@@ -48,9 +48,9 @@ spec:
         - name: skaha.namespace
           value: "{{ .Values.skahaWorkload.namespace }}"
         - name: skaha.maxusersessions
-          value: "{{ .Values.deployment.skaha.maxUserSessions }}"
+          value: "{{ .Values.deployment.skaha.sessions.maxCount }}"
         - name: skaha.sessionexpiry
-          value: "{{ .Values.deployment.skaha.sessionExpiry }}"
+          value: "{{ .Values.deployment.skaha.sessions.expirySeconds }}"
         - name: SKAHA_POSIX_CACHE_URL
           value: "{{ .Values.deployment.skaha.posixCacheURL }}"
         - name: skaha.defaultquotagb
@@ -61,6 +61,14 @@ spec:
           value: "{{ .Values.deployment.skaha.usersGroup }}"
         - name: skaha.headlessgroup
           value: "{{ .Values.deployment.skaha.headlessGroup }}"
+        {{- with .Values.deployment.skaha.headlessPriorityGroup }}
+        - name: skaha.headlessprioritygroup
+          value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.deployment.skaha.headlessPriorityClass }}
+        - name: skaha.headlesspriortyclass
+          value: "{{ . }}"
+        {{- end }}
         - name: skaha.adminsgroup
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
         - name: skaha.posixmapper.resourceid

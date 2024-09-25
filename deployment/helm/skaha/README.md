@@ -4,8 +4,7 @@ See the [Deployment Guide](../README.md) for a better idea of a full system.
 
 ## Install
 
-The `values-local.yaml` and `values-k8s.yaml` provide different configuration for your deployment.  This `README` will focus on the
-`values-local.yaml` as of 2023.08.22 to assume a local install on Docker Desktop.
+The `sample-local-values.yaml` provides a sample configuration for your deployment.
 
 It is assumed that the `base` install has already been performed.  See https://github.com/opencadc/science-platform/tree/SP-3544/deployment/helm/base.
 

@@ -71,7 +71,6 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -143,15 +142,6 @@ public abstract class SessionAction extends SkahaAction {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
     }
 
-    private static String accessToken() throws IllegalStateException {
-        return AuthenticationUtil.getCurrentSubject()
-                                 .getPublicCredentials(AuthorizationToken.class).stream()
-                                 .filter(authorizationToken -> authorizationToken.getType().equalsIgnoreCase("bearer"))
-                                 .findFirst()
-                                 .map(AuthorizationToken::getCredentials)
-                                 .orElseThrow(IllegalStateException::new);
-    }
-
     protected void initRequest() throws Exception {
         super.initRequest();
 
@@ -183,49 +173,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     protected void injectCredentials() {
-        injectAPIToken();
-        injectAccessToken();
         injectProxyCertificate();
-    }
-
-    private void injectAccessToken() {
-        log.debug("injectAccessToken()");
-        // inject a token if available
-        final int posixId = getUID();
-        try {
-            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
-            CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
-            String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
-            CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
-            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".access", SessionAction.accessToken());
-            CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
-            log.debug("injectAccessToken(): OK");
-        } catch (Exception exception) {
-            log.debug("failed to inject token: " + exception.getMessage(), exception);
-        }
-
-        log.debug("No API Token found");
-        log.debug("injectAPIToken(): UNSUCCESSFUL");
-    }
-
-    private void injectAPIToken() {
-        log.debug("injectAPIToken()");
-        // inject a token if available
-        final int posixId = getUID();
-        try {
-            String userHomeDirectory = CommandExecutioner.createDirectoryIfNotExist(homedir, this.posixPrincipal.username);
-            CommandExecutioner.changeOwnership(userHomeDirectory, posixId, posixId);
-            String tokenDirectory = CommandExecutioner.createDirectoryIfNotExist(userHomeDirectory, ".token");
-            CommandExecutioner.changeOwnership(tokenDirectory, posixId, posixId);
-            String tokenFilePath = CommandExecutioner.createOrOverrideFile(tokenDirectory, ".skaha", this.xAuthTokenSkaha);
-            CommandExecutioner.changeOwnership(tokenFilePath, posixId, posixId);
-            log.debug("injectAPIToken(): OK");
-        } catch (Exception exception) {
-            log.debug("failed to inject token: " + exception.getMessage(), exception);
-        }
-
-        log.debug("No API Token found");
-        log.debug("injectAPIToken(): UNSUCCESSFUL");
     }
 
     private void injectProxyCertificate() {
@@ -263,11 +211,11 @@ public abstract class SessionAction extends SkahaAction {
             }
         } catch (NoSuchElementException noSuchElementException) {
             log.debug("Not using proxy certificates");
+            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
         } catch (Exception e) {
             log.warn("failed to inject cert: " + e.getMessage(), e);
+            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
         }
-
-        log.debug("injectProxyCertificate(): UNSUCCESSFUL");
     }
 
     protected String getImageName(String image) {

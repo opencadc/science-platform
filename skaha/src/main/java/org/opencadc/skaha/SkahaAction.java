@@ -74,7 +74,6 @@ import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.io.ResourceIterator;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
@@ -87,7 +86,6 @@ import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
@@ -155,9 +153,7 @@ public abstract class SkahaAction extends RestAction {
 
 
     protected boolean skahaCallbackFlow = false;
-    protected String callbackSessionId = null;
     protected String callbackSupplementalGroups = null;
-    protected String xAuthTokenSkaha = null;
 
 
     public SkahaAction() {
@@ -286,10 +282,10 @@ public abstract class SkahaAction extends RestAction {
 
     private void initiateSkahaCallbackFlow(Subject currentSubject, URI skahaUsersUri) {
         skahaCallbackFlow = true;
-        xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
+        final String xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         try {
-            callbackSessionId = SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
+            final String callbackSessionId = SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
 
             final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
             this.posixPrincipal = session.getPosixPrincipal();
