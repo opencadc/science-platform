@@ -9,9 +9,9 @@ if ! redis-cli -h $REDIS_HOST -p $REDIS_PORT ping > /dev/null 2>&1; then
     exit 1
 fi
 
-# Fetch the data from the given URL
-redis-cli -h $REDIS_HOST -p $REDIS_PORT del temp
+temp_key=$(date +%s)
 
+# Fetch the data from the given URL
 echo "$harborHosts" | while read -r harborHost; do
     URL="https://$harborHost/api/v2.0/projects?page_size=100"
     PROJECT_URL="https://$harborHost/api/v2.0/projects"
@@ -55,8 +55,8 @@ echo "$harborHosts" | while read -r harborHost; do
                 labels=$(echo $artifact | jq -c [.labels[].name])
 
                 refined_artifact=$(echo $artifact | jq -c --argjson labels "$labels" --arg id "$image_id" '{id: $id, types: $labels, digest: .digest, tags: .tags}')
-                echo $refined_artifact | redis-cli -h $REDIS_HOST -p $REDIS_PORT -x lpush temp
+                echo $refined_artifact | redis-cli -h $REDIS_HOST -p $REDIS_PORT -x lpush "$temp_key"
             done
         done
     done
-done && redis-cli -h $REDIS_HOST -p $REDIS_PORT rename temp public
+done && redis-cli -h $REDIS_HOST -p $REDIS_PORT rename "$temp_key" public
