@@ -4,14 +4,14 @@
 nameOverride: ""
 fullnameOverride: ""
 # Enable each function, like kustomize https://github.com/kubernetes-sigs/kueue/blob/main/config/default/kustomization.yaml
-enablePrometheus: true
+enablePrometheus: false
 # Enable x509 automated certificate management using cert-manager (cert-manager.io)
 enableCertManager: false
 # Customize controllerManager
 controllerManager:
-  featureGates:
-  - name: VisibilityOnDemand
-    enabled: true
+  # featureGates:
+  # - name: VisibilityOnDemand
+  #   enabled: true
   #  - name: PartialAdmission
   #    enabled: true
   kubeRbacProxy:
