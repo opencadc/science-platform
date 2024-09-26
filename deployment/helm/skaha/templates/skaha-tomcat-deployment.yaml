@@ -16,8 +16,6 @@ spec:
       labels:
         run: skaha-tomcat
     spec:
-      imagePullSecrets:
-        - name: regcred
       securityContext:
         seccompProfile:
           type: RuntimeDefault
