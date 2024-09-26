@@ -78,7 +78,13 @@ public class Image {
     private String id;
     private Set<String> types;
     private String digest;
-    
+
+    /**
+     * The following constructor is used by the ObjectMapper class for creating instances using reflection
+     */
+    public Image() {
+    }
+
     public Image(String id, Set<String> types, String digest) {
         if (id == null) {
             throw new IllegalArgumentException("id requried");

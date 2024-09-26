@@ -68,11 +68,7 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.auth.NotAuthenticatedException;
-import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
@@ -402,7 +398,7 @@ public abstract class SkahaAction extends RestAction {
             log.debug("no images in cache");
             return null;
         }
-        return images.stream()
+        return images.parallelStream()
              .filter(image -> image.getId().equals(imageID))
              .findFirst()
              .orElse(null);

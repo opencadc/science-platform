@@ -109,7 +109,7 @@ public class GetAction extends SkahaAction {
         }
         List<Image> images = redis.getAll(PUBLIC_IMAGES, Image.class);
         if (null == type) return images;
-        return images.stream()
+        return images.parallelStream()
                 .filter(image -> null != image.getTypes() && image.getTypes().contains(type))
                 .collect(Collectors.toList());
     }
