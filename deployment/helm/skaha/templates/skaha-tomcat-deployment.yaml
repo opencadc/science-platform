@@ -51,8 +51,6 @@ spec:
           value: "{{ .Values.deployment.skaha.sessions.maxCount }}"
         - name: skaha.sessionexpiry
           value: "{{ .Values.deployment.skaha.sessions.expirySeconds }}"
-        - name: SKAHA_POSIX_CACHE_URL
-          value: "{{ .Values.deployment.skaha.posixCacheURL }}"
         - name: skaha.defaultquotagb
           value: "{{ .Values.deployment.skaha.defaultQuotaGB }}"
         - name: skaha.harborhosts
