@@ -19,6 +19,10 @@ deployment:
   skaha:
     image: images.opencadc.org/platform/skaha:0.21.0
     imagePullPolicy: Always
+
+    # Cron string for the image caching cron job schedule. Defaults to every hour.
+    imageCache:
+      refreshSchedule: "0 */1 * * *"
   
     # Set the top-level-directory name that gets mounted at the root.
     # skahaTld: "/cavern"
@@ -157,6 +161,8 @@ deployment:
   #     hostname: myhost.example.org
   # extraHosts: []
 
+
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
@@ -171,7 +177,7 @@ storage:
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
 
-# For the writing the POSIX Users and Groups to be shared with Job files
+#  For caching images from the Image Repository
 redis:
   architecture: 'standalone'
   auth:
@@ -179,4 +185,3 @@ redis:
   master:
     persistence:
       enabled: false
- 

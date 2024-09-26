@@ -4,7 +4,7 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
   name: image-caching-cronjob
 spec:
-  schedule: "0 */1 * * *"
+  schedule: {{.Values.deployment.skaha.imageCache.refreshSchedule}}
   jobTemplate:
     spec:
       template:

@@ -43,7 +43,7 @@ echo "$harborHosts" | while read -r harborHost; do
                     continue
                 fi
 
-                image_id="$harborHost/$name:$tag"
+                image_id="$harborHost/$project_name/$name:$tag"
                 labelArray=$(echo $artifact | jq -r .labels)
 
                 # check if labels are empty
