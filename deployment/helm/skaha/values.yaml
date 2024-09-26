@@ -177,7 +177,7 @@ storage:
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
 
-#  For caching images from the Image Repository
+# For caching images from the Image Repository and for the writing the POSIX Users and Groups to be shared with Job files
 redis:
   architecture: 'standalone'
   auth:
