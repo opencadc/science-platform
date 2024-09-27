@@ -86,7 +86,6 @@ import org.opencadc.skaha.session.SessionAction;
  * @author majorb
  */
 public class SessionLifecycleTest {
-
     public static final String PROD_IMAGE_HOST = "images.canfar.net";
     public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
     private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);

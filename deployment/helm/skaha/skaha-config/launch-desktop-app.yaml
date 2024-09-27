@@ -43,10 +43,7 @@ spec:
         - ${skaha.userid}
         - ${software.containerparam}
         env:
-        - name: skaha_sessionid
-          value: "${skaha.sessionid}"
-        - name: HOME
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        {{ template "skaha.job.environment.common" . }}
         - name: DISPLAY
           value: "${software.targetip}"
         - name: GDK_SYNCHRONIZE

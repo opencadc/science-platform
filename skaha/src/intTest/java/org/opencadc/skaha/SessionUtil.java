@@ -114,6 +114,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 public class SessionUtil {
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
@@ -346,7 +347,7 @@ public class SessionUtil {
         return active;
     }
 
-    private static Session getDesktopApplicationSessionWithoutWait(final URL desktopApplicationURL, final String desktopApplicationSessionID,
+   private static Session getDesktopApplicationSessionWithoutWait(final URL desktopApplicationURL, final String desktopApplicationSessionID,
                                                                    final String expectedState) {
         return SessionUtil.getAllDesktopApplicationSessions(desktopApplicationURL).stream()
                           .filter(session -> session.getAppId().equals(desktopApplicationSessionID) && session.getStatus().equals(expectedState))
@@ -464,7 +465,7 @@ public class SessionUtil {
 
     protected static List<Image> getImagesOfType(final String type) throws Exception {
         final RegistryClient registryClient = new RegistryClient();
-        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.SKAHA_SERVICE_ID,
+        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.getServiceID(),
                                                                  Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         final URL imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
 

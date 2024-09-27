@@ -68,19 +68,12 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Type;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;

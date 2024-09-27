@@ -21,26 +21,6 @@ public class CommandExecutioner {
         return execute(command, true);
     }
 
-    public static String executeInShell(String[] command, boolean allowError) throws IOException, InterruptedException {
-        final ProcessBuilder processBuilder = new ProcessBuilder("/bin/sh", "-c", String.join(" ", command));
-        final Process p = processBuilder.start();
-        final String stdout = readStream(p.getInputStream());
-        final String stderr = readStream(p.getErrorStream());
-        log.debug("stdout: " + stdout);
-        log.debug("stderr: " + stderr);
-        int status = p.waitFor();
-        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
-        if (status != 0) {
-            if (allowError) {
-                return stderr;
-            } else {
-                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-                throw new IOException(message);
-            }
-        }
-        return stdout.trim();
-    }
-
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         String stdout = readStream(p.getInputStream());
@@ -117,7 +97,7 @@ public class CommandExecutioner {
                                         : new JSONObject();
     }
 
-    protected static String readStream(InputStream in) throws IOException {
+    private static String readStream(InputStream in) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int nRead;
         byte[] data = new byte[1024];
@@ -136,8 +116,7 @@ public class CommandExecutioner {
         return path.toString();
     }
 
-    public static String createOrOverrideFile(String directoryPath, String fileName, String content)
-            throws IOException {
+    public static String createOrOverrideFile(String directoryPath, String fileName, String content) throws IOException {
         Path path = Paths.get(directoryPath, fileName);
         File file = new File(path.toString());
         if (!(file.exists())) {
@@ -153,5 +132,30 @@ public class CommandExecutioner {
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {
         String[] chown = new String[]{"chown", posixId + ":" + groupId, path};
         execute(chown);
+    }
+
+    /**
+     * Query the Nodes for the Major version of the NVIDIA CUDA driver.  This is used to report back to the user, so that they may tune their processing
+     * appropriately.
+     * @return  Integer number.  Never null.
+     * @throws IOException  If the command errors during execution.
+     */
+    public static int getMajorNvidiaCudaGPUVersion() throws IOException, InterruptedException {
+        final String[] command = new String[] {
+            "kubectl",
+            "get",
+            "node",
+            "-l feature.node.kubernetes.io/pci-10de.present=true",
+            "-o jsonpath='{.items[0].metadata.labels.nvidia\\.com/cuda\\.driver-version\\.major}'"
+        };
+
+        final String output = CommandExecutioner.execute(command);
+
+        try {
+            return Integer.parseInt(output);
+        } catch (NumberFormatException numberFormatException) {
+            // Not a number, meaning no GPU attached, or no major version declared, or not allowed to see it.
+            throw new IllegalStateException("Cannot query GPU Major version: " + output);
+        }
     }
 }

@@ -128,7 +128,19 @@ The affinity for Jobs.
 {{- end }}
 
 {{/*
-Common security context settings for User Session Jobs
+Common environment variables for User Sessions.
+*/}}
+{{- define "skaha.job.environment.common" -}}
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: "NVIDIA_CUDA_MAJOR_VERSION"
+          value: "${software.gpu.cuda.majorVersion}"
+{{- end }}
+
+{{/*
+Common security settings for User Sessions.
 */}}
 {{- define "skaha.job.securityContext" -}}
         runAsUser: ${skaha.posixid} 

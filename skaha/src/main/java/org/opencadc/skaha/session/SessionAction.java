@@ -71,6 +71,7 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -100,7 +101,6 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
 
-
 public abstract class SessionAction extends SkahaAction {
 
     protected static final String REQUEST_TYPE_SESSION = "session";
@@ -121,8 +121,7 @@ public abstract class SessionAction extends SkahaAction {
 
     public static String getVNCURL(String host, String sessionID) {
         // vnc.html does not...
-        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-               + "&path=session/desktop/" + sessionID + "/";
+        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID + "&path=session/desktop/" + sessionID + "/";
     }
 
     public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
@@ -140,6 +139,32 @@ public abstract class SessionAction extends SkahaAction {
 
     public static String getContributedURL(String host, String sessionID) {
         return "https://" + host + "/session/contrib/" + sessionID + "/";
+    }
+
+    static String stageFile(String data) throws IOException {
+        final File file = File.createTempFile("skaha-tmp-file-", UUID.randomUUID().toString());
+
+        if (!file.setExecutable(true, true)) {
+            log.debug("Failed to set execution permission on file " + file.getAbsolutePath());
+        }
+
+        try (final BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            writer.write(data + "\n");
+            writer.flush();
+        }
+
+        return file.getAbsolutePath();
+    }
+
+    static List<String> getJobCommand(String k8sNamespace) {
+        final List<String> getSessionJobCMD = new ArrayList<>();
+        getSessionJobCMD.add("kubectl");
+        getSessionJobCMD.add("get");
+        getSessionJobCMD.add("--namespace");
+        getSessionJobCMD.add(k8sNamespace);
+        getSessionJobCMD.add("job");
+        getSessionJobCMD.add("-l");
+        return getSessionJobCMD;
     }
 
     protected void initRequest() throws Exception {
@@ -239,15 +264,7 @@ public abstract class SessionAction extends SkahaAction {
     protected void injectFile(String data, String path) throws IOException, InterruptedException {
         final int uid = posixPrincipal.getUidNumber();
         // stage file
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
+        String tmpFileName = SessionAction.stageFile(data);
 
         // update file permissions
         CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
@@ -255,19 +272,6 @@ public abstract class SessionAction extends SkahaAction {
         // inject file
         String[] inject = new String[] {"mv", "-f", tmpFileName, path};
         execute(inject);
-    }
-
-    protected String stageFile(String data) throws IOException {
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permssion on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
-        return tmpFileName;
     }
 
     public String getPodID(String forUserID, String sessionID) throws Exception {
@@ -412,27 +416,18 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        List<String> getSessionJobCMD = new ArrayList<String>();
-        getSessionJobCMD.add("kubectl");
-        getSessionJobCMD.add("get");
-        getSessionJobCMD.add("--namespace");
-        getSessionJobCMD.add(k8sNamespace);
-        getSessionJobCMD.add("job");
-        getSessionJobCMD.add("-l");
+        List<String> getSessionJobCMD = SessionAction.getJobCommand(k8sNamespace);
         getSessionJobCMD.add("canfar-net-userid=" + forUserID);
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-                               "UID:.metadata.uid," +
-                               "EXPIRY:.spec.activeDeadlineSeconds";
+        String customColumns = "custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
     }
 
-    protected String getAppJobName(String sessionID, String userID, String appID) throws
-                                                                                  IOException, InterruptedException {
+    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
         return execute(getAppJobNameCMD.toArray(new String[0]));
@@ -448,19 +443,12 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        List<String> getAppJobNameCMD = new ArrayList<String>();
-        getAppJobNameCMD.add("kubectl");
-        getAppJobNameCMD.add("get");
-        getAppJobNameCMD.add("--namespace");
-        getAppJobNameCMD.add(k8sNamespace);
-        getAppJobNameCMD.add("job");
-        getAppJobNameCMD.add("-l");
+        List<String> getAppJobNameCMD = SessionAction.getJobCommand(k8sNamespace);
         getAppJobNameCMD.add(labels);
         getAppJobNameCMD.add("--no-headers=true");
         getAppJobNameCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name";
+        String customColumns = "custom-columns=NAME:.metadata.name";
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
