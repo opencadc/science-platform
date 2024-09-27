@@ -1,29 +1,32 @@
 #!/bin/sh
 
-# Two arguments expected: 
-# 1. the URL to the user (UID) mapping service
-# 2. the URL to the group (GID) mapping service
+# It is expected that /etc-passwd and /etc-group exist and contain the original passwd files
+# named passwd-orig and group-orig respectively.
 
-cp /etc/passwd /etc-passwd/passwd
-cp /etc/group /etc-group/group
+# REDIS_URL expected to be in the environment.
+# env:
+#   - name: REDIS_URL
+#     value: http://example.org:6359
+#
 
-UID_MAP_FILE="/posix-mapping/uidmap.txt"
-GID_MAP_FILE="/posix-mapping/gidmap.txt"
 SAVEIFS=$IFS
 IFS='\n'
 
-if [[ ! -f "${UID_MAP_FILE}" ]]; then
-    echo "Required file ${UID_MAP_FILE} is missing."
+if [[ -z "${REDIS_URL}" ]]; then
+    echo "Required argument REDIS_URL is missing."
     exit 1
 fi
 
-if [[ ! -f "${GID_MAP_FILE}" ]]; then
-    echo "Required file ${GID_MAP_FILE} is missing."
-    exit 1
-fi
+TARGET_PASSWD_FILE="/etc-passwd/passwd"
+TARGET_GROUP_FILE="/etc-group/group"
 
-cat "${UID_MAP_FILE}" >> /etc-passwd/passwd
-cat "${GID_MAP_FILE}" >> /etc-group/group
+# Create (or overwrite) the files
+cat /etc-passwd/passwd-orig > "${TARGET_PASSWD_FILE}"
+cat /etc-group/group-orig > "${TARGET_GROUP_FILE}"
+
+# Append Science Platform users
+redis-cli -u ${REDIS_URL} --raw smembers "users:posix" >> "${TARGET_PASSWD_FILE}"
+redis-cli -u ${REDIS_URL} --raw smembers "groups:posix" >> "${TARGET_GROUP_FILE}"
 
 # restore $IFS
 IFS=$SAVEIFS

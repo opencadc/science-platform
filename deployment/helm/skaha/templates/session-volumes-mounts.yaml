@@ -1,0 +1,25 @@
+{{- define "skaha.session.commonVolumeMounts" -}}
+        {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+        {{- range . }}
+        - name: {{ .name }}
+          mountPath: {{ .volumeMount.mountPath }}
+          {{- if .volumeMount.subPath }}
+          subPath: {{ .volumeMount.subPath }}
+          {{- end }}
+          {{- if .volumeMount.readOnly }}
+          readOnly: {{ .volumeMount.readOnly }}
+          {{- end }}
+          {{- if .volumeMount.mountPropagation }}
+          mountPropagation: {{ .volumeMount.mountPropagation }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+        - mountPath: "${SKAHA_TLD}"
+          name: cavern-volume
+          subPath: "cavern"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+{{- end }}
+
+

@@ -58,16 +58,16 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - /skaha-system/skaha-carta.sh ${SKAHA_TLD} ${SKAHA_TLD}/projects
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "${software.requests.ram}"
             cpu: "${software.requests.cores}"
-            ephemeral-storage: "20Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
           limits:
             memory: "${software.limits.ram}"
             cpu: "${software.limits.cores}"
-            ephemeral-storage: "200Gi"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
         ports:
         - containerPort: 5901
           protocol: TCP
@@ -76,36 +76,26 @@ spec:
           protocol: TCP
           name: frontend-port
         volumeMounts:
+        - mountPath: "/skaha-system"
+          name: start-carta
         - mountPath: "/etc/passwd"
           name: etc-passwd
           subPath: passwd
         - mountPath: "/etc/group"
           name: etc-group
           subPath: group
-        - mountPath: "/skaha-system"
-          name: start-carta
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        - mountPath: "/scratch"
-          name: scratch-dir
-          subPath: "${skaha.sessionid}"
+        {{ template "skaha.session.commonVolumeMounts" . }}
       volumes:
-      - name: cavern-volume
-        persistentVolumeClaim:
-          claimName: skaha-workload-cavern-pvc  
-      - name: scratch-dir
-        emptyDir: {}
-      - name: init-users-groups
-        configMap:
-          name: init-users-groups-config
-          defaultMode: 0777
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
       - name: start-carta
         configMap:
           name: launch-scripts
           defaultMode: 0777
-      - name: etc-group
-        emptyDir: {}
-      - name: etc-passwd
-        emptyDir: {}
- 
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

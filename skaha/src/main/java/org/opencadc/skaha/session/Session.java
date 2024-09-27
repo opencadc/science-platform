@@ -84,7 +84,8 @@ public class Session {
     
     public static final String STATUS_TERMINATING = "Terminating";
     public static final String STATUS_SUCCEEDED = "Succeeded";
-    
+    public static final String STATUS_RUNNING = "Running";
+
     private final String id;
     private final String userid;
     private final String runAsUID;

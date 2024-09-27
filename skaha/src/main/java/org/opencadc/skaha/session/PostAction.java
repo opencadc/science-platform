@@ -108,6 +108,7 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.PosixCache;
 
 /**
  * @author majorb
@@ -149,6 +150,7 @@ public class PostAction extends SessionAction {
     private static final int MAX_JOB_NAME_LENGTH = 57;
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DEFAULT_HARBOR_SECRET = "notused";
+    private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
@@ -214,10 +216,10 @@ public class PostAction extends SessionAction {
         getRenewJobNamesCmd.add("-o");
 
         String customColumns = "custom-columns=" +
-            "NAME:.metadata.name," +
-            "UID:.metadata.uid," +
-            "STATUS:.status.active," +
-            "START:.status.startTime";
+                               "NAME:.metadata.name," +
+                               "UID:.metadata.uid," +
+                               "STATUS:.status.active," +
+                               "START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
         return getRenewJobNamesCmd;
@@ -360,8 +362,8 @@ public class PostAction extends SessionAction {
 
             if (StringUtil.hasText(errorOutput)) {
                 throw new IOException("Unable to create user home."
-                                          + "\nError message from server: " + errorOutput
-                                          + "\nOutput from command: " + commandOutput);
+                                      + "\nError message from server: " + errorOutput
+                                      + "\nOutput from command: " + commandOutput);
             } else {
                 log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
@@ -533,7 +535,7 @@ public class PostAction extends SessionAction {
                 !TYPE_DESKTOP_APP.equals(session.getType())) {
                 String status = session.getStatus();
                 if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                    status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
@@ -541,7 +543,7 @@ public class PostAction extends SessionAction {
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
             throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
-                                                   maxUserSessions + " active sessions.");
+                                               maxUserSessions + " active sessions.");
         }
     }
 
@@ -555,8 +557,6 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
 
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
@@ -606,8 +606,7 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID,
-                                         Integer.toString(posixPrincipal.getUidNumber()));
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
         if (StringUtil.hasText(supplementalGroups)) {
             jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
@@ -632,18 +631,25 @@ public class PostAction extends SessionAction {
         }
 
         jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-            ? posixMapperConfiguration.getResourceID().toString()
-            : posixMapperConfiguration.getBaseURL().toExternalForm());
+                                                                            ? posixMapperConfiguration.getResourceID().toString()
+                                                                            : posixMapperConfiguration.getBaseURL().toExternalForm());
 
         // This property is mandatory in the Skaha configuration's cadc-registry.properties.
         jobLaunchString = setConfigValue(jobLaunchString, REGISTRY_URL,
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
+        if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+            jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
+        }
+
         String jsonLaunchFile = SessionAction.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
         injectCredentials();
+
+        // inject the entries from the POSIX Mapper
+        injectPOSIXDetails();
 
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
@@ -671,8 +677,13 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private String generateToken(String sessionID) throws Exception {
-        return SkahaAction.getTokenTool().generateToken(URI.create(skahaUsersGroup), WriteGrant.class, sessionID);
+    private void injectPOSIXDetails() throws Exception {
+        final PosixCache posixCache = new PosixCache(this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+        posixCache.writePOSIXEntries();
+    }
+
+    private String generateToken() throws Exception {
+        return SkahaAction.getTokenTool().generateToken(URI.create(this.skahaUsersGroup), WriteGrant.class, this.sessionID);
     }
 
     /**
@@ -692,10 +703,10 @@ public class PostAction extends SessionAction {
             "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
             "--no-headers=true",
             "-o", "custom-columns=" +
-            "IPADDR:.status.podIP," +
-            "DT:.metadata.deletionTimestamp," +
-            "TYPE:.metadata.labels.canfar-net-sessionType," +
-            "NAME:.metadata.name"};
+                  "IPADDR:.status.podIP," +
+                  "DT:.metadata.deletionTimestamp," +
+                  "TYPE:.metadata.labels.canfar-net-sessionType," +
+                  "NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -727,8 +738,6 @@ public class PostAction extends SessionAction {
         log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
-        xAuthTokenSkaha = skahaCallbackFlow ? xAuthTokenSkaha : generateToken(sessionID);
-
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
 
@@ -782,8 +791,8 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
         launchString = setConfigValue(launchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-            ? posixMapperConfiguration.getResourceID().toString()
-            : posixMapperConfiguration.getBaseURL().toExternalForm());
+                                                                      ? posixMapperConfiguration.getResourceID().toString()
+                                                                      : posixMapperConfiguration.getBaseURL().toExternalForm());
 
         // This property is mandatory in the Skaha configuration's cadc-registry.properties.
         launchString = setConfigValue(launchString, REGISTRY_URL,
