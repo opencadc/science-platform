@@ -175,3 +175,12 @@ storage:
       # Example is the persistentVolumeClaim below.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# For the writing the POSIX Users and Groups to be shared with Job files
+redis:
+  architecture: 'standalone'
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false

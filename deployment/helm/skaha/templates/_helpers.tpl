@@ -85,8 +85,13 @@ The init containers for the launch scripts.
             drop:
               - ALL
       - name: init-users-groups
-        image: images.opencadc.org/library/cadc-tomcat:1
-        command: ["/init-users-groups/init-users-groups-from-service.sh"]
+        image: redis:7-alpine
+        command: ["/init-users-groups/init-users-groups.sh"]
+        env:
+        - name: HOME
+          value: "${SKAHA_TLD}/home/${skaha.userid}"
+        - name: REDIS_URL
+          value: "redis://{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:6379"
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
@@ -94,16 +99,6 @@ The init containers for the launch scripts.
           name: etc-group
         - mountPath: "/init-users-groups"
           name: init-users-groups
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
-        env:
-        - name: HOME
-          value: "${SKAHA_TLD}/home/${skaha.userid}"
-        - name: POSIX_MAPPER_URI
-          value: ${POSIX_MAPPER_URI}
-        - name: REGISTRY_URL
-          value: ${REGISTRY_URL}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
