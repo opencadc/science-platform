@@ -55,7 +55,7 @@ echo "$harborHosts" | while read -r harborHost; do
                 labels=$(echo $artifact | jq -c [.labels[].name])
 
                 refined_artifact=$(echo $artifact | jq -c --argjson labels "$labels" --arg id "$image_id" '{id: $id, types: $labels, digest: .digest}')
-                echo $refined_artifact | redis-cli -h $REDIS_HOST -p $REDIS_PORT -x lpush "$temp_key"
+                echo $refined_artifact | redis-cli -h $REDIS_HOST -p $REDIS_PORT -x rpush "$temp_key"
             done
         done
     done
