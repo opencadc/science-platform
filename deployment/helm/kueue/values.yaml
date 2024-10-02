@@ -9,7 +9,9 @@ enablePrometheus: false
 enableCertManager: false
 # Customize controllerManager
 controllerManager:
-  #featureGates:
+  # featureGates:
+  # - name: VisibilityOnDemand
+  #   enabled: true
   #  - name: PartialAdmission
   #    enabled: true
   kubeRbacProxy:

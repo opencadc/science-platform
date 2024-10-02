@@ -68,23 +68,15 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.auth.NotAuthenticatedException;
-import ca.nrc.cadc.auth.PosixPrincipal;
-import ca.nrc.cadc.cred.client.CredUtil;
-import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
@@ -96,11 +88,10 @@ import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
+import org.opencadc.skaha.utils.RedisCache;
 
 import javax.security.auth.Subject;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -149,8 +140,11 @@ public abstract class SkahaAction extends RestAction {
     protected int maxUserSessions;
     protected String skahaPosixCacheURL;
     protected final PosixMapperConfiguration posixMapperConfiguration;
-   
 
+
+    protected RedisCache redis;
+    private final String redisHost;
+    private final String redisPort;
 
     protected boolean skahaCallbackFlow = false;
     protected String callbackSupplementalGroups = null;
@@ -186,6 +180,9 @@ public abstract class SkahaAction extends RestAction {
         skahaPosixCacheURL = System.getProperty(SkahaAction.class.getPackageName() + ".posixCache.url");
 
         final String configuredPosixMapperResourceID = System.getenv(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY);
+
+        redisHost = System.getenv("REDIS_HOST");
+        redisPort = System.getenv("REDIS_PORT");
 
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
@@ -225,6 +222,7 @@ public abstract class SkahaAction extends RestAction {
         URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
+        redis = new RedisCache(redisHost, redisPort);
         if (isSkahaCallBackFlow(currentSubject)) {
             initiateSkahaCallbackFlow(currentSubject, skahaUsersUri);
         } else {
@@ -393,171 +391,17 @@ public abstract class SkahaAction extends RestAction {
         return posixPrincipal.getUidNumber();
     }
 
-    /**
-     * Obtain an ID Token.  This is only available with a subset of Identity Managers, and so will return null if
-     * not supported.
-     * @return  String ID Token, or null if none.
-     * @throws Exception    Access Control and/or Malformed URL Exceptions
-     */
-    protected String getIdToken() throws Exception {
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI serviceURI = localAuthority.getServiceURI(Standards.SECURITY_METHOD_OAUTH.toString());
-        RegistryClient regClient = new RegistryClient();
-        URL oauthURL = regClient.getServiceURL(serviceURI, Standards.SECURITY_METHOD_OAUTH, AuthMethod.TOKEN);
-        log.debug("using ac oauth endpoint: " + oauthURL);
-
-        // There is no ID Token for the special Skaha BackFlow (API Token).
-        if (oauthURL == null || isSkahaCallBackFlow(AuthenticationUtil.getCurrentSubject())) {
-            return null;
-        }
-
-        log.debug("checking public credentials for idToken");
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        if (subject != null) {
-            Set<IDToken> idTokens = subject.getPublicCredentials(IDToken.class);
-            if (!idTokens.isEmpty()) {
-                log.debug("returning idToken from public credentials");
-                return idTokens.iterator().next().idToken;
-            }
-        }
-        log.debug("verifying delegated credentials");
-        if (!CredUtil.checkCredentials()) {
-            throw new IllegalStateException("cannot access delegated credentials");
-        }
-
-        log.debug("getting idToken from ac");
-        URL acURL = new URL(oauthURL + "?response_type=id_token&client_id=arbutus-harbor&scope=cli");
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(acURL, out);
-        get.run();
-        if (get.getThrowable() != null) {
-            log.warn("error obtaining idToken", get.getThrowable());
-            return null;
-        }
-        String idToken = out.toString();
-        log.debug("idToken: " + idToken);
-        if (idToken == null || idToken.trim().isEmpty()) {
-            log.warn("null id token returned");
-            return null;
-        }
-        // adding to public credentials
-        IDToken tokenClass = new IDToken();
-        tokenClass.idToken = idToken;
-        if (subject != null) {
-            subject.getPublicCredentials().add(tokenClass);
-        }
-
-        return idToken;
-    }
-
     public Image getImage(String imageID) throws Exception {
-        String idToken = getIdToken();
-
         log.debug("get image: " + imageID);
-        int firstSlash = imageID.indexOf("/");
-        int secondSlash = imageID.indexOf("/", firstSlash + 1);
-        int colon = imageID.lastIndexOf(":");
-        String harborHost = imageID.substring(0, firstSlash);
-        String project = imageID.substring(firstSlash + 1, secondSlash);
-        String repo = imageID.substring(secondSlash + 1, colon);
-        String version = imageID.substring(colon + 1);
-        log.debug("host: " + harborHost);
-        log.debug("project: " + project);
-        log.debug("repo: " + repo);
-        log.debug("version: " + version);
-
-        String artifacts = callHarbor(idToken, harborHost, project, repo);
-
-        JSONArray jArtifacts = new JSONArray(artifacts);
-
-        for (int a = 0; a < jArtifacts.length(); a++) {
-            JSONObject jArtifact = jArtifacts.getJSONObject(a);
-
-            if (!jArtifact.isNull("tags")) {
-                JSONArray tags = jArtifact.getJSONArray("tags");
-                for (int j = 0; j < tags.length(); j++) {
-                    JSONObject jTag = tags.getJSONObject(j);
-                    String tag = jTag.getString("name");
-                    if (version.equals(tag)) {
-                        if (!jArtifact.isNull("labels")) {
-                            String digest = jArtifact.getString("digest");
-                            JSONArray labels = jArtifact.getJSONArray("labels");
-                            Set<String> types = getTypesFromLabels(labels);
-                            if (!types.isEmpty()) {
-                                return new Image(imageID, types, digest);
-                            }
-                        }
-                    }
-                }
-            }
-
+        List<Image> images = redis.getAll("public", Image.class);
+        if (images == null) {
+            log.debug("no images in cache");
+            return null;
         }
-
-
-        return null;
-    }
-
-    protected String callHarbor(String idToken, String harborHost, String project, String repo) throws Exception {
-
-        final URL harborURL;
-        final String message;
-        if (project == null) {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects?page_size=100");
-            message = "projects";
-        } else if (repo == null) {
-            harborURL = new URL(
-                    "https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories?page_size=-1");
-            message = "repositories";
-        } else {
-            harborURL = new URL("https://" + harborHost + "/api/v2.0/projects/" + project + "/repositories/"
-                                + repo + "/artifacts?detail=true&with_label=true&page_size=-1");
-            message = "artifacts";
-        }
-
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(harborURL, out);
-        if (StringUtil.hasText(idToken)) {
-            get.setRequestProperty("Authorization", "Bearer " + idToken);
-        }
-        log.debug("calling " + harborURL + " for " + message);
-        try {
-            get.run();
-        } catch (Exception e) {
-            log.debug("error listing harbor " + message + ": " + e.getMessage(), e);
-            log.debug("response code: " + get.getResponseCode());
-            throw e;
-        }
-
-        if (get.getThrowable() != null) {
-            log.warn("error listing harbor " + message, get.getThrowable());
-            throw new RuntimeException(get.getThrowable());
-        }
-
-        String output = out.toString();
-        log.debug(message + " output: " + output);
-        return output;
-
-    }
-
-    protected Set<String> getTypesFromLabels(JSONArray labels) {
-        Set<String> types = new HashSet<>();
-        for (int i = 0; i < labels.length(); i++) {
-            JSONObject label = labels.getJSONObject(i);
-            String name = label.getString("name");
-            log.debug("label: " + name);
-            if (name != null && SESSION_TYPES.contains(name)) {
-                types.add(name);
-            }
-        }
-        return types;
-    }
-
-    /**
-     * Temporary holder of tokens until cadc-util auth package with Token
-     * support released.
-     */
-    static class IDToken {
-        public String idToken;
+        return images.parallelStream()
+             .filter(image -> image.getId().equals(imageID))
+             .findFirst()
+             .orElse(null);
     }
 
     /**

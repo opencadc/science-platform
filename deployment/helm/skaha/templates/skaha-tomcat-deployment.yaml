@@ -16,8 +16,6 @@ spec:
       labels:
         run: skaha-tomcat
     spec:
-      imagePullSecrets:
-        - name: regcred
       securityContext:
         seccompProfile:
           type: RuntimeDefault
@@ -71,6 +69,10 @@ spec:
           value: "{{ .Values.deployment.skaha.adminsGroup }}"
         - name: skaha.posixmapper.resourceid
           value: "{{ .Values.deployment.skaha.posixMapperResourceID }}"
+        - name: REDIS_HOST
+          value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+        - name: REDIS_PORT
+          value: "6379"
         {{- with .Values.deployment.skaha.extraEnv }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

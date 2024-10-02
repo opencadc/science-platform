@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  namespace: {{ .Values.skaha.namespace }}
+  name: image-caching-cronjob
+spec:
+  schedule: {{.Values.deployment.skaha.imageCache.refreshSchedule}}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: image-caching-cronjob
+              image: alpine:3.20.3
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+              - |
+                apk add --no-cache jq redis curl && \
+                sh /config/cache-images.sh
+              env:
+                - name: HARBOR_HOST
+                  value: "{{ .Values.deployment.skaha.registryHosts }}"
+                - name: REDIS_HOST
+                  value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+                - name: REDIS_PORT
+                  value: "6379"
+              volumeMounts:
+                - name: config-volume
+                  mountPath: /config
+          restartPolicy: OnFailure
+          volumes:
+          - name: config-volume
+            configMap:
+              name: skaha-config
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: {{ .Values.skaha.namespace }}
+  name: image-caching-job
+spec:
+  template:
+    spec:
+      containers:
+        - name: image-caching-job
+          image: alpine:3.20.3
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+          - |
+            apk add --no-cache jq redis curl && \
+            sh /config/cache-images.sh
+          env:
+            - name: HARBOR_HOST
+              value: "{{ .Values.deployment.skaha.registryHosts }}"
+            - name: REDIS_HOST
+              value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+            - name: REDIS_PORT
+              value: "6379"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+      restartPolicy: OnFailure
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config
