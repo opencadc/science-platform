@@ -1,4 +1,7 @@
-# CHANGELOG for Cavern User Storage (Chart 0.4.6)
+# CHANGELOG for Cavern User Storage (Chart 0.4.7)
+
+## 2024.10.03 (0.4.7)
+- Small bug fix to properly ask the OIDC Discovery document for the userinfo endpoint.
 
 ## 2024.09.18 (0.4.6)
 - Bug fix for setting quotas
