@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.7.1)
+# CHANGELOG for Skaha User Session API (Chart 0.7.2)
+
+## 2024.10.04 (0.7.2)
+- Fix to inject user client certificates properly
 
 ## 2024.10.03 (0.7.1)
 - Small fix to ensure userinfo endpoint is obtained from the Identity Provider for applications using the StandardIdentityManager

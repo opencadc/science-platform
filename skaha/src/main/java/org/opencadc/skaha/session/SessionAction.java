@@ -71,19 +71,21 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.cred.CertUtil;
+import ca.nrc.cadc.cred.client.CredClient;
+import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -110,7 +112,10 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
     protected static final String NONE = "<none>";
+
     private static final Logger log = Logger.getLogger(SessionAction.class);
+    private static final double ONE_WEEK_DAYS = 7.0D;
+
     protected String requestType;
     protected String sessionID;
     protected String appID;
@@ -122,7 +127,7 @@ public abstract class SessionAction extends SkahaAction {
     public static String getVNCURL(String host, String sessionID) {
         // vnc.html does not...
         return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-               + "&path=session/desktop/" + sessionID + "/";
+            + "&path=session/desktop/" + sessionID + "/";
     }
 
     public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
@@ -190,22 +195,15 @@ public abstract class SessionAction extends SkahaAction {
                 final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
 
                 if (credServiceURL != null) {
-                    final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                    final String proxyCert = Subject.doAs(currentSubject, (PrivilegedExceptionAction<String>) () -> {
-                        final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        final String userName = currentSubject.getPrincipals(HttpPrincipal.class).iterator().next().getName();
-                        final URL certificateURL = new URL(credServiceURL.toExternalForm() + "/userid/" + userName);
-                        final HttpGet download = new HttpGet(certificateURL, out);
-                        download.setFollowRedirects(true);
-                        download.run();
+                    final CredClient credClient = new CredClient(credServiceID);
+                    final X509CertificateChain proxyCert = Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>) ()
+                        -> credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), SessionAction.ONE_WEEK_DAYS));
 
-                        return out.toString();
-                    });
                     log.debug("Proxy cert: " + proxyCert);
                     // inject the proxy cert
                     log.debug("Running docker exec to insert cert");
 
-                    injectFile(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
+                    writeClientCertificate(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
                     log.debug("injectProxyCertificate(): OK");
                 }
             }
@@ -216,6 +214,26 @@ public abstract class SessionAction extends SkahaAction {
             log.warn("failed to inject cert: " + e.getMessage(), e);
             log.debug("injectProxyCertificate(): UNSUCCESSFUL");
         }
+    }
+
+    private void writeClientCertificate(X509CertificateChain clientCertificateChain, String path) throws IOException, InterruptedException {
+        final int uid = posixPrincipal.getUidNumber();
+        // stage file
+
+        final String tmpFileName = "/tmp/" + UUID.randomUUID();
+        File file = new File(tmpFileName);
+        if (!file.setExecutable(true, true)) {
+            log.debug("Failed to set execution permission on file " + tmpFileName);
+        }
+        final Writer writer = new BufferedWriter(new FileWriter(file));
+        CertUtil.writePEMCertificateAndKey(clientCertificateChain, writer);
+
+        // update file permissions
+        CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
+
+        // inject file
+        String[] inject = new String[] {"mv", "-f", tmpFileName, path};
+        execute(inject);
     }
 
     protected String getImageName(String image) {
@@ -234,27 +252,6 @@ public abstract class SessionAction extends SkahaAction {
             return "unknown";
         }
 
-    }
-
-    protected void injectFile(String data, String path) throws IOException, InterruptedException {
-        final int uid = posixPrincipal.getUidNumber();
-        // stage file
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
-
-        // update file permissions
-        CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
-
-        // inject file
-        String[] inject = new String[] {"mv", "-f", tmpFileName, path};
-        execute(inject);
     }
 
     protected String stageFile(String data) throws IOException {
@@ -424,8 +421,8 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("-o");
 
         String customColumns = "custom-columns=" +
-                               "UID:.metadata.uid," +
-                               "EXPIRY:.spec.activeDeadlineSeconds";
+            "UID:.metadata.uid," +
+            "EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -460,7 +457,7 @@ public abstract class SessionAction extends SkahaAction {
         getAppJobNameCMD.add("-o");
 
         String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name";
+            "NAME:.metadata.name";
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
