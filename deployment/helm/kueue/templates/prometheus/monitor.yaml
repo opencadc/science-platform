@@ -4,6 +4,7 @@ kind: ServiceMonitor
 metadata:
   name: {{ include "kueue.fullname" . }}-controller-manager-metrics-monitor
   labels:
+    prometheus: "prometheus"
     {{- with .Values.prometheus.serviceMonitorSelectorLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
