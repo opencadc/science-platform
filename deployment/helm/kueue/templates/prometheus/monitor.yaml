@@ -4,6 +4,7 @@ kind: ServiceMonitor
 metadata:
   name: {{ include "kueue.fullname" . }}-controller-manager-metrics-monitor
   labels:
+    prometheus: "prometheus"
   {{- include "kueue.labels" . | nindent 4 }}
   namespace: '{{ .Release.Namespace }}'
 spec:
@@ -16,5 +17,5 @@ spec:
       insecureSkipVerify: true
   selector:
     matchLabels:
-    {{- include "kueue.labels" . | nindent 6 }}
+    {{- include "kueue.selectorLabels" . | nindent 6 }}
 {{- end }}
