@@ -4,11 +4,14 @@ metadata:
   namespace: {{ .Values.skaha.namespace }}
   name: image-caching-cronjob
 spec:
-  schedule: {{.Values.deployment.skaha.imageCache.refreshSchedule}}
+  schedule: {{ .Values.deployment.skaha.imageCache.refreshSchedule | toString | quote }}
   jobTemplate:
     spec:
       template:
         spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: image-caching-cronjob
               image: alpine:3.20.3
@@ -28,6 +31,9 @@ spec:
               volumeMounts:
                 - name: config-volume
                   mountPath: /config
+              securityContext:
+                privileged: false
+                allowPrivilegeEscalation: false
           restartPolicy: OnFailure
           volumes:
           - name: config-volume
@@ -42,6 +48,9 @@ metadata:
 spec:
   template:
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: image-caching-job
           image: alpine:3.20.3
@@ -61,6 +70,9 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /config
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
       restartPolicy: OnFailure
       volumes:
       - name: config-volume

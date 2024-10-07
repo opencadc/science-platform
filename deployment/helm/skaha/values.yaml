@@ -162,7 +162,6 @@ deployment:
   # extraHosts: []
 
 
-
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
@@ -185,3 +184,6 @@ redis:
   master:
     persistence:
       enabled: false
+  # serviceAccount:
+  #   create: false
+  #   name: "" # Use default service account as this requires no special permissions
