@@ -26,6 +26,11 @@ _See [`helm repo`](https://helm.sh/docs/helm/helm_repo/) for command documentati
 helm install [RELEASE_NAME] prometheus-community/kube-prometheus-stack
 ```
 
+## Install for Science Platform
+```console
+helm install --create-namespace --namespace monitoring --values ./values.yaml <name> .
+```
+
 _See [configuration](#configuration) below._
 
 _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
