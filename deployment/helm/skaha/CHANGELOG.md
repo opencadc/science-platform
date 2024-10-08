@@ -1,4 +1,4 @@
-# CHANGELOG for Skaha User Session API (Chart 0.7.5)
+# CHANGELOG for Skaha User Session API (Chart 0.7.6)
 
 ## 2024.10.07 (0.7.3)
 - Fix for security context in image caching job
