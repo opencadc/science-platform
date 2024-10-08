@@ -10,17 +10,17 @@ spec:
       template:
         spec:
           securityContext:
+            runAsUser: 999  # redis user
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
           containers:
             - name: image-caching-cronjob
-              image: alpine:3.20.3
+              image: images.opencadc.org/platform/skaha-image-cache:7-alpine
               imagePullPolicy: IfNotPresent
               command: ["/bin/sh", "-c"]
               args:
               - |
-                apk add --no-cache jq redis curl && \
                 sh /config/cache-images.sh
               env:
                 - name: HARBOR_HOST
@@ -33,8 +33,10 @@ spec:
                 - name: config-volume
                   mountPath: /config
               securityContext:
-                privileged: false
                 allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
           restartPolicy: OnFailure
           volumes:
           - name: config-volume
@@ -50,17 +52,17 @@ spec:
   template:
     spec:
       securityContext:
+        runAsUser: 999  # redis user
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: image-caching-job
-          image: alpine:3.20.3
+          image: images.opencadc.org/platform/skaha-image-cache:7-alpine
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
           - |
-            apk add --no-cache jq redis curl && \
             sh /config/cache-images.sh
           env:
             - name: HARBOR_HOST
@@ -73,7 +75,9 @@ spec:
             - name: config-volume
               mountPath: /config
           securityContext:
-            privileged: false
+            capabilities:
+              drop:
+                - ALL
             allowPrivilegeEscalation: false
       restartPolicy: OnFailure
       volumes:
