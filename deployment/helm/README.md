@@ -539,6 +539,7 @@ deployment:
 
     # Further UWS settings for the Tomcat Pool setup.
     uws:
+      install: true
       schema: uws
       maxActive: 2
 

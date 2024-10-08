@@ -1,41 +1,50 @@
+{{ $releaseName := .Release.Name }}
+{{- with required "UWS Database configuration is required." .Values.deployment.cavern.uws.db }}
+{{- if .install }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-uws-postgres
-  namespace: {{ .Values.skaha.namespace }}
+  name: {{ $releaseName }}-uws-postgres
+  namespace: {{ $.Values.skaha.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-uws-postgres
+      app: {{ $releaseName }}-uws-postgres
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-uws-postgres
+        app: {{ $releaseName }}-uws-postgres
     spec:
       securityContext:
-        runAsUser: {{ .Values.deployment.cavern.uws.db.runUID }}
+        runAsUser: {{ .runUID | required ".runUID is required for PostgreSQL" }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
-          image: postgres:13
+          image: postgres:15
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432  # Exposes container port
           envFrom:
             - configMapRef:
-                name: {{ .Release.Name }}-uws-postgres-config
+                name: {{ $releaseName }}-uws-postgres-config
           volumeMounts:
             - mountPath: /docker-entrypoint-initdb.d
               name: postgresinit
-            {{- if .Values.deployment.cavern.uws.db.storage }}
+            {{- if .storage }}
             - mountPath: /var/lib/postgresql/data
               name: postgresdb
             {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
       volumes:
-        {{- if .Values.deployment.cavern.uws.db.storage }}
+        {{- if .storage }}
         - name: postgresdb
-          {{- toYaml .Values.deployment.cavern.uws.db.storage.spec | nindent 10 }}
+          {{- toYaml .storage.spec | nindent 10 }}
         {{- end }}
         - name: postgresinit
           configMap:
-            name: {{ .Release.Name }}-uws-postgres-init
+            name: {{ $releaseName }}-uws-postgres-init
+{{- end }}
+{{- end }}
