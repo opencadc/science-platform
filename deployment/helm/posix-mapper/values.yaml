@@ -1,25 +1,30 @@
 kubernetesClusterDomain: cluster.local
 
-# Tell Kubernetes to spin up multiple instances.  Defaults to 1.
+# -- Replica count for the service, default is 1
 replicaCount: 1
 
-# It's best to keep these set as such, unless you're willing to change these in several places.
+
 skaha:
+  # -- The namespace for the service, **Note:** This namespace is common between the Skaha and POSIX Mapper services. Do not change.
   namespace: skaha-system
 
 # POSIX Mapper web service deployment
 deployment:
-  hostname: example.host.com    # Change this!
+  # -- Hostname for the service, **Note:** Change this to your domain.
+  hostname: example.host.com
   posixMapper:
+    # -- The image for the service
     image: images.opencadc.org/platform/posix-mapper:0.2.1
+    # -- The image pull policy for the service
     imagePullPolicy: Always
-    resourceID: ivo://opencadc.org/posix-mapper
+    # -- IVOA Resource ID for the service
+    resourceID: ivo://example.org/posix-mapper
 
-    # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
-    oidcURI: https://ska-iam.stfc.ac.uk/
+    # -- URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
+    oidcURI: iam.example.org
 
-    # ID (URI) of the GMS Service.
-    gmsID: ivo://skao.int/gms
+    # -- ID (URI) of the GMS Service.
+    gmsID: ivo://example.org/gms
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -33,18 +38,25 @@ deployment:
     # - containerPort: 5555
     #   protocol: TCP
 
-    # Resources provided to the Skaha service.
+    # -- Resources provided to the Skaha service.
     resources:
       requests:
+        # -- Memory Requested
         memory: "1Gi"
+        # -- CPU Requested
         cpu: "500m"
       limits:
+        # -- Memory Limit
         memory: "1Gi"
+        # -- CPU Limit
         cpu: "500m"
 
+    # -- Minimum UID, **should be high so as not to conflict with Image UIDs**.
     minUID: 10000
+    # -- Minimum GID, **should be high so as not to conflict with Image GIDs**.
     minGID: 900000
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # -- Registry URL
+    registryURL: https://example.org/reg
 
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
@@ -76,6 +88,7 @@ secrets:
 
 # These values are preset in the catalina.properties, and this default database only exists beside this service.
 # It's usually safe to leave these as-is, but make sure they match the values in catalina.properties.
+# -- The database connection information for the service
 postgresql:
   maxActive: 8
   auth:

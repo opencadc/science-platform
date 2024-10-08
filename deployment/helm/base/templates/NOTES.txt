@@ -1,0 +1,74 @@
+
+.  ______    ___       ____    ______
+  / ____/   /   |     / __ \  / ____/
+ / /       / /| |    / / / / / /     
+/ /___    / ___ |   / /_/ / / /___   
+\____/   /_/  |_|  /_____/  \____/                                
+Canadian Astronomy Data Centre
+
+### Installation Info
+
+  - Kubernetes Namespace: {{ .Release.Namespace }}
+  - Helm Release Name   : {{ .Release.Name }}
+  - Helm Chart Name     : {{ .Chart.Name }}
+  - Helm Chart Version  : {{ .Chart.Version }}
+  - Application Version : {{ .Chart.AppVersion }}
+
+### Followup Links
+
+    - [CANFAR Science Platform]()
+    - [CANFAR Helm Charts]()
+    - [Social Chat]()
+    - [Issue Tracker]()
+
+{{- if not .Values.traefik.install }}
+### Production Checklist
+
+    - To learn more about the release, try:
+      
+      helm status {{ .Release.Name }}
+      helm get all {{ .Release.Name }}
+
+    - Verify the required skaha namespaces are created:
+
+      kubectl get namespaces
+
+      You should see the following namespaces:
+
+      NAME            STATUS   AGE
+      {{ .Values.skaha.namespace }}   Active   1m
+      {{ .Values.skahaWorkload.namespace }} Active   1m
+{{ end }}
+
+{{- if .Values.traefik.install }}
+### Developer Checklist
+
+    - Developer Storage: Please make sure you have the following folders exist on your local machine: {{ .Values.developer.storage.path }}
+
+    - Verify the Dev Traefik Ingress Controller is running:
+
+      kubectl get pods -n default
+
+      You should see the following pods:
+
+      NAME                                    READY   STATUS    RESTARTS   AGE
+      traefik-ingress-controller-<hash>       1/1     Running   0          1m
+
+    - Verify various skaha resources are created:
+      
+        # Verify the skaha namespaces are created
+        kubectl get namespaces
+        
+        # Verify the default-certificate for skaha services is created
+        kubectl get secrets
+
+        # Verify the skaha persistent volume claims are created
+        kubectl get pvc -A
+
+    - Access traefik dashboard:
+
+      kubectl port-forward $(kubectl get pods --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+
+      Open your browser and navigate to http://localhost:9000
+
+{{- end }}

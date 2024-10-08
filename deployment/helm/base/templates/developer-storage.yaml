@@ -3,7 +3,9 @@
 # and will direct deployers on what label to use to bind to it.
 # This will be used by the User Sessions when starting up to gain access to the shared Storage with the Skaha service.
 # This default will create a hostPath volume with no declared PV.
-#
+
+{{- if .Values.developer.storage.path}}
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -21,7 +23,7 @@ spec:
   persistentVolumeReclaimPolicy: Delete
   storageClassName: hostpath
   hostPath:
-    path: /var/lib/k8s-pvs/science-platform
+    path: {{ .Values.developer.storage.path }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -41,3 +43,42 @@ spec:
   selector:
     matchLabels:
       storage: skaha-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-workload-pv
+  labels:
+    storage: skaha-workload-storage
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: hostpath
+  hostPath:
+    path: {{ .Values.developer.storage.path }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: skaha-workload-cavern-pvc
+  namespace: skaha-workload
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: hostpath
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      storage: skaha-workload-storage
+{{- end }}

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: registry
+# -- Chart Version
+version: 0.1.0
+kubeVersion: ">=1.23.0"
+description: "A Helm chart to install the IVOA Registry"
+type: application
+keywords:
+  - registry
+  - ivoa
+  - helm
+  - cadc
+maintainers:
+  - name: "CADC"
+    url: "https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/"
+deprecated: false
+#-- Version of the application being deployed, also used as the default image tag
+appVersion: "1.16.0"

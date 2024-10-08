@@ -1,0 +1,53 @@
+# Pre-Commit Configuration File: https://pre-commit.com
+---
+repos:
+  # Commitizen Configuration
+  # This configuration will add commitizen to your pre-commit hooks and will run it on commit-msg stage
+  # of the git commit process.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.29.1
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Prevent giant files from being committed.
+      - id: check-added-large-files
+      # Check for files with names that would conflict on a case-insensitive filesystem like MacOS HFS+ or Windows FAT.
+      - id: check-case-conflict
+      # Checks that non-binary executables have a proper shebang.
+      - id: check-executables-have-shebangs
+        exclude: deployment/k8s-config/*
+      # Attempts to load all json files to verify syntax.
+      - id: check-json
+      # Check for files that contain merge conflict strings.
+      - id: check-merge-conflict
+      # Checks for symlinks which do not point to anything.
+      - id: check-symlinks
+      # Attempts to load all TOML files to verify syntax.
+      - id: check-toml
+      # Attempts to load all yaml files to verify syntax.
+      - id: check-yaml
+        # Exclude the deployment directory from yaml checks.
+        # Helm Templating Language (HTL) is not valid yaml.
+        exclude: ^deployment/
+      # Attempts to load all xml files to verify syntax.
+      - id: check-xml
+      # Check for debugger imports and py37+ breakpoint() calls in python source.
+      - id: debug-statements
+      # Makes sure files end in a newline and only a newline.
+      - id: end-of-file-fixer
+      # Trims trailing whitespace.
+      - id: trailing-whitespace
+      # Checks for private key files.
+      - id: detect-private-key
+  - repo: https://github.com/norwoodj/helm-docs
+    rev:  "v1.14.2"
+    hooks:
+      - id: helm-docs
+        args:
+          # Make the tool search for charts only under the `charts` directory
+          - --chart-search-root=deployment/helm/
+          - --chart-to-generate=deployment/helm/posix-mapper,deployment/helm/base,deployment/helm/registry
+

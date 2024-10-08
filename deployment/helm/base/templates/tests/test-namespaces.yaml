@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "base.fullname" . }}-test-namespaces
+  annotations:
+    "helm.sh/hook": test
+
+spec:
+  template:
+    metadata:
+      namespace: {{ .Values.skaha.namespace }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: kubectl
+          image: bitnami/kubectl:latest # Use the latest version of kubectl
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Check that the Skaha system namespace exists
+              if kubectl get namespace {{ .Values.skaha.namespace }}; then
+                echo "Skaha system namespace exists"
+              else
+                echo "Skaha system namespace does not exist"
+                exit 1
+              fi
+
+              # Check that the Skaha Workload namespace exists
+              if kubectl get namespace {{ .Values.skahaWorkload.namespace }}; then
+                echo "Skaha Workload namespace exists"
+              else
+                echo "Skaha Workload namespace does not exist"
+                exit 1
+              fi

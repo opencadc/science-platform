@@ -1,0 +1,18 @@
+#
+# This file maps resource identifiers to the base locations of UI pages and applications.
+#
+
+## CADC applications
+
+# Deliberately fine grained at the moment, so better design can be done later
+ivo://cadc.nrc.ca/passchg = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/resetPassword.html
+ivo://cadc.nrc.ca/passreset = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/resetPassword.html
+ivo://cadc.nrc.ca/acctrequest = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html
+ivo://cadc.nrc.ca/acctupdate = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/update.html
+
+# Most likely correct granularity of one that's per application
+ivo://cadc.nrc.ca/groups = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/groups/
+ivo://cadc.nrc.ca/search = https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/search
+
+## CANFAR applications
+ivo://cadc.nrc.ca/canfar-dashboard = https://{{ .Values.deployment.hostname }}.cadc.dao.nrc.ca/

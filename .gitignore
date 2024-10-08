@@ -1,6 +1,6 @@
 /**/dependencies
 /**/.idea
-/**/.gradle 
+/**/.gradle
 /**/build
 /**/bin
 .vscode
@@ -11,3 +11,6 @@
 *.crt
 deployment/helm/skaha/token-tool-secret/skaha-private.pem
 deployment/helm/skaha/token-tool-secret/skaha-public.pem
+
+# Developer Override Files
+deployment/helm/base/dev.overrides.yaml

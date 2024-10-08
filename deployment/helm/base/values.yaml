@@ -1,37 +1,46 @@
-kubernetesClusterDomain: cluster.local
-skaha:
-  namespace: skaha-system
-skahaWorkload:
-  namespace: skaha-workload
-  
-secrets:
-  # default-certificate:  # Match the default-certificate name in traefik.tlsStore.default.defaultCertificate.secretName
-  # For server domains with self-signed certificates, add the Base64 encoded file content here.
-    # tls.crt: <base64 encoded server cert>
-    # tls.key: <base64 encoded server key>
+# kubernetesClusterDomain: This key defines the DNS domain name used within the Kubernetes cluster.
+# cluster.local: This is the default domain name for Kubernetes clusters.
+# It is used for internal DNS resolution within the cluster, allowing services to communicate with each other using DNS names
+# like service.namespace.svc.cluster.local.
 
-# Don't install Traefik by default.  Set to true to add it in.  Omitting it defaults to true, so beware.
+# -- DNS domain name used within the Kubernetes cluster to allow service communication, e.g. service.namespace.svc.cluster.local
+kubernetesClusterDomain: cluster.local
+
+skaha:
+  # -- The namespace for the Skaha system components
+  namespace: skaha-system
+
+skahaWorkload:
+  # -- The namespace for the Skaha Workload components, e.g. User JupyterHub
+  namespace: skaha-workload
+
+developer:
+  storage:
+    # -- **Dev Only:** The path to local storage for skaha, this path needs to exist on the host.
+    path: null
+
+secrets:
+  # -- **Dev Only:** The secret for Traefik Ingress SSL Termination, dont use in production!!!
+  default-certificate:
+    # -- **Dev Only:** Base64 encoded server certificate
+    tls.crt: null
+    # -- **Dev Only:** Base64 encoded server key
+    tls.key: null
+
+# Don't install Traefik by default. Set to true to add it in.
 traefik:
+  # -- **Dev Only:** Whether to install Traefik (default: false)
   install: false
   logs:
     general:
-      # -- By default, the logs use a text format (common), but you can
-      # also ask for the json format in the format option
-      # format: json
-      # By default, the level is set to ERROR.
-      # -- Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+      # -- **Dev Only:** The format of the logs, e.g. common, json, or logfmt
+      format: common
+      # -- **Dev Only:** Logging level: DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
       level: ERROR
     access:
-      # -- To enable access logs
+      # -- **Dev Only:** To enable access logs
       enabled: false
-  # tlsStore:
-  #   default:
-  #     defaultCertificate:
-  #       # See default-certificate secret(s) above
-  #       secretName: default-certificate
-  # tlsOptions:
-  #   traefik-client-cert-option:
-  #     clientAuth:
-  #       clientAuthType: VerifyClientCertIfGiven
-  #       secretNames:
-  #         - cacert-secret
+  # -- **Dev Only:** See dev.overrides.yaml for more options
+  tlsStore: {}
+  # -- **Dev Only:** See dev.overrides.yaml for more options
+  tlsOptions: {}

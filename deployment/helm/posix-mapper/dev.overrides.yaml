@@ -1,0 +1,86 @@
+# POSIX Mapper web service deployment
+deployment:
+  hostname: "nrc-023947.cadc.dao.nrc.ca"
+  posixMapper:
+    # Optionally set the DEBUG port.
+    # extraEnv:
+    # - name: CATALINA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+    # - name: JAVA_OPTS
+    #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
+
+    # Uncomment to debug.  Requires options above as well as service port exposure below.
+    # extraPorts:
+    # - containerPort: 5555
+    #   protocol: TCP
+
+    # Resources provided to the Skaha service.
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+    # Used to set the minimum UID.  Useful to avoid conflicts.
+    minUID: 10000
+
+    # Used to set the minimum GID.  Keep this much higher than the minUID so that default Groups can be set for new users.
+    minGID: 900000
+
+    # The URL of the IVOA Registry
+    registryURL: https://nrc-023947.cadc.dao.nrc.ca/reg
+
+    # Optionally mount a custom CA certificate
+    # extraVolumeMounts:
+    # - mountPath: "/config/cacerts"
+    #   name: cacert-volume
+
+    # Create the CA certificate volume to be mounted in extraVolumeMounts
+    # extraVolumes:
+    # - name: cacert-volume
+    #   secret:
+    #     defaultMode: 420
+    #     secretName: posix-manager-cacert-secret
+
+  # Specify extra hostnames that will be added to the Pod's /etc/hosts file.  Note that this is in the
+  # deployment object, not the posixMapper one.
+  #
+  # These entries get added as hostAliases entries to the Deployment.
+  #
+  # Example:
+  # extraHosts:
+  #   - ip: 127.3.34.5
+  #     hostname: myhost.example.org
+  #
+  # extraHosts: []
+
+# Declare the storage for the skaha service to use.
+storage:
+  service:
+    spec:
+      persistentVolumeClaim:
+        claimName: skaha-pvc # Match this label up with whatever was installed in the base install, or the desired PVC, or create dynamically provisioned storage.
+
+secrets:
+  # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
+#   posix-manager-cacert-secret:
+#     ca.crt: <base64 encoded ca crt>
+
+# These values are preset in the catalina.properties, and this default database only exists beside this service.
+# It's usually safe to leave these as-is.
+# postgresql:
+#   auth:
+#     username: posixmapper
+#     password: posixmapperpwd
+#     database: mapping
+#     schema: mapping
+#   storage:
+#     spec:
+#       hostPath:
+#         path: "/posixmapper/data"
+
+# An omission equals true, so set this explicitly to false as we already installed it.
+base:
+  install: false

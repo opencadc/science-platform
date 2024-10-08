@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    run: {{ .Release.Name }}-deployment
+spec:
+  replicas: {{ default 1 .Values.replicaCount}}
+  selector:
+    matchLabels:
+      run: {{ .Release.Name }}-deployment
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: {{ .Release.Name }}-deployment
+    spec:
+      containers:
+        - name: {{ .Release.Name }}-container
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "128m"
+            limits:
+              memory: "128Mi"
+              cpu: "256m"
+          ports:
+          - containerPort: 80
+            protocol: TCP
+          volumeMounts:
+          - name: {{ .Release.Name }}-volume
+            mountPath: /usr/share/nginx/html/reg
+            
+      volumes:
+      - name: {{ .Release.Name }}-volume
+        configMap:
+          name: {{ .Release.Name }}-configmap
+          

@@ -48,4 +48,4 @@ spec:
       storage: 10Gi
   selector:
     matchLabels:
-      storage: skaha-storage 
+      storage: skaha-storage

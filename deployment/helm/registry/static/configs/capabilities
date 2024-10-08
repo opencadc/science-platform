@@ -1,0 +1,22 @@
+#
+# This file maps resource identifiers to the location of capability
+# information.
+#
+ivo://cadc.nrc.ca/posix-mapper = https://{{ .Values.deployment.hostname }}/posix-mapper/capabilities
+ivo://cadc.nrc.ca/skaha = https://{{ .Values.deployment.hostname }}/skaha/capabilities
+ivo://cadc.nrc.ca/gms = https://ws-cadc.canfar.net/ac/capabilities
+
+ivo://kawfee.ca/gms = https://iam.kawfee.ca/gms/capabilities
+ivo://{{ .Values.deployment.hostname }}/gms = https://{{ .Values.deployment.hostname }}/gms/capabilities
+ivo://skao.int/gms = https://ska-gms.stfc.ac.uk/gms/capabilities
+
+# AC Support
+ivo://cadc.nrc.ca/cred = https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/capabilities
+
+ivo://cadc.nrc.ca/vault = https://rc-ws-cadc.canfar.net/vault/capabilities
+
+# Cavern storage APIs
+ivo://cadc.nrc.ca/arc = https://{{ .Values.deployment.hostname }}/arc/capabilities
+ivo://cadc.nrc.ca/cavern = https://{{ .Values.deployment.hostname }}/cavern/capabilities
+ivo://kawfee.ca/cavern = https://{{ .Values.deployment.hostname }}/cavern/capabilities
+ivo://opencadc.org/cavern = https://{{ .Values.deployment.hostname }}/cavern/capabilities

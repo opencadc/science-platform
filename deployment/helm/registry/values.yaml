@@ -1,0 +1,32 @@
+# Default values for registry.
+
+# -- [ReplicaSet Count](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)
+replicaCount: 1
+
+skaha:
+  # -- Namespace to deploy the application to, must exist before deployment.
+  namespace: "skaha-system"
+
+deployment:
+  # -- Hostname for the ingress resource used for deployment. In a producion environment this should be a FQDN. In development it can be a local hostname.
+  hostname: "localhost"
+
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+image:
+  # -- Container image repository
+  repository: nginx
+  # -- Container image pull policy
+  pullPolicy: IfNotPresent
+  # -- Container image tag, defaults to the Chart.AppVersion
+  tag: "latest"
+
+# -- Secrets for pulling a private image, [more info](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/)
+imagePullSecrets: []
+# -- Override the default chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# -- [Pod Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+podAnnotations: {}
+# -- [Pod Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+podLabels: {}

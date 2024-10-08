@@ -1,0 +1,36 @@
+name: Standardized Checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  commit-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Check Commit Message Format
+      uses: opensource-nepal/commitlint@v1.3.0
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Helm
+      uses: Azure/setup-helm@v4.2.0
+      with:
+        version: v3.7.0
+    - name: Lint Helm Charts
+      run: |
+        helm lint deployment/helm/*
+
+  

@@ -1,27 +1,75 @@
+# The chart API version
 apiVersion: v2
+
+# The name of the chart
 name: base
-description: "A Helm chart to install base components of the CANFAR Science Platform"
-# A chart can be either an 'application' or a 'library' chart.
-#
-# Application charts are a collection of templates that can be packaged into versioned archives
-# to be deployed.
-#
-# Library charts provide useful utilities or functions for the chart developer. They're included as
-# a dependency of application charts to inject those utilities and functions into the rendering
-# pipeline. Library charts do not define any templates and therefore cannot be deployed.
-type: application
+
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 version: 0.3.3
-# This is the version number of the application being deployed. This version number should be
-# incremented each time you make changes to the application. Versions are not expected to
-# follow Semantic Versioning. They should reflect the version the application is using.
-# It is recommended to use it with quotes.
+
+# A SemVer range of compatible Kubernetes versions for this chart. (optional)
+kubeVersion: ">=1.26"
+
+# A single-sentence description of this project (optional)
+description: "A Helm chart to install base components of the CANFAR Science Platform"
+
+# A chart can be either an 'application' or a 'library' chart.
+#  Application charts are a collection of templates that can be packaged into versioned archives to be deployed.
+#
+#  Library charts provide useful utilities or functions for the chart developer. They're included as
+#  a dependency of application charts to inject those utilities and functions into the rendering
+#  pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# List of keywords for the chart.
+keywords:
+  - CANFAR
+  - Science Platform
+  - base
+
+# A URL to the source code for this chart.
+home: "https://github.com/opencadc/science-platform"
+
+# Alist of URLs to the source code for this chart.
+sources:
+  - https://github.com/opencadc/science-platform/tree/main/deployment/helm/base
+
+# A list of the chart requirements (optional)
+dependencies:
+  - name: traefik # The name of the chart
+    version: "24.0.0" # The version of the chart
+    repository: "https://traefik.github.io/charts" # The repository URL
+    condition: traefik.install # A yaml path that resolves to a boolean, used for enabling/disabling the chart
+    tags: # Tags for grouping charts for enabling/disabling purposes
+      - traefik
+    # ImportValues holds the mapping of source values to parent key to be imported.
+    # Each item can be a string or pair of child/parent sublist items.
+    # import-values:
+    #  - traefik.tlsStore.default.defaultCertificate.secretName=default-certificate
+    # Optional alias to be used for the chart.
+    # Useful when you have to add the same chart multiple times
+    alias: traefik
+
+maintainers:
+  - name: Candian Astronomy Data Centre
+    # Email address to reach the maintainer
+    # email:
+    url: https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/
+
+# The icon URL
+# icon: https://example.com/icon.png
+
+# This is the version number of the application being deployed.
+# This version number should be incremented each time you make changes to the application.
+# Versions are expected to follow Semantic Versioning (https://semver.org/).
+# Quotes recommended.
 appVersion: "0.1.4"
 
-dependencies:
-  - name: traefik
-    version: "24.0.0"
-    repository: "https://traefik.github.io/charts"
-    condition: traefik.install
+# Whether this chart is deprecated (optional, boolean)
+deprecated: false
+
+# Annotations (optional), a list of key-value pairs
+annotations:
+  base: "This is the base chart for the CANFAR Science Platform"

@@ -1,31 +1,66 @@
 # Deployment Guide
 
-- [Dependencies](#dependencies)
-- [Helm](#helm-repository)
-- [Quick Start](#quick-start)
-  - [Base install](#base-install)
-  - [Persistent Volumes](#persistent-volumes-and-persistent-volume-claims)
+- [Deployment Guide](#deployment-guide)
+  - [Dependencies](#dependencies)
+  - [Quick Start](#quick-start)
+    - [Helm Chart Repositories](#helm-chart-repositories)
+    - [Source Code Repository](#source-code-repository)
+    - [Quick Install](#quick-install)
+  - [Base Helm Chart](#base-helm-chart)
+    - [Development Environment](#development-environment)
+  - [Required Persistent Volumes](#required-persistent-volumes)
+  - [Required Persistent Volume Claim](#required-persistent-volume-claim)
+  - [IVOA Registry](#ivoa-registry)
   - [POSIX Mapper install](#posix-mapper-install)
-  - [Skaha install](#skaha-install)
-  - [Science Portal install](#science-portal-user-interface-install)
-  - [Cavern install](#cavern-user-storage-api-install)
-  - [Storage User Interface install](#user-storage-ui-installation)
-- [Obtaining a bearer token](#obtaining-a-bearer-token)
-- [Flow](#flow)
-- [Structure](#structure)
+    - [Skaha install](#skaha-install)
+    - [Science Portal User Interface install](#science-portal-user-interface-install)
+    - [Cavern (User Storage API) install](#cavern-user-storage-api-install)
+    - [User Storage UI installation](#user-storage-ui-installation)
+  - [Obtaining a Bearer Token](#obtaining-a-bearer-token)
+  - [Flow](#flow)
+  - [Structure](#structure)
 
 ## Dependencies
 
-- An existing Kubernetes cluster.
-- An [Service Registry deployment](https://github.com/opencadc/reg/tree/master/reg)
+- A Kubernetes Cluster v1.26+
+- [Helm v3.0+](https://helm.sh/docs/intro/install/)
+- OpenID Connect (OIDC) Provider for Authentication, (e.g. Indigo IAM, Keycloak, etc.)
+- GMS Service for Group Management
+
+> [!IMPORTANT]
+> Production deployments are also expected to have the following services and deployments in place:
+> 
+> - A [Traefik Ingress Controller](https://traefik.io/traefik/) for the `base` service to build on with proper SSL termination.
+> - An externally accessible [IVOA Registry Service](https://github.com/opencadc/reg/tree/master/reg) that can be found by the Skaha service.
+> - Persistent Volumes and Persistent Volume Claims for the Skaha Workload and Skaha System Namespaces that are shared between the services and configured by the cluster administrator.
+
+For development environments, e.g. Minikube, Kubernetes in Docker Desktop or CI/CD some of these services and deployments can either be omitted or are replaced with specific development services.
+See the service specific documentation for more information on how to deploy the services in a development environment.
 
 ## Quick Start
+
+### Helm Chart Repositories
+
+The official Helm Charts to deploy CANFAR Science Platform services are provided by the OpenCADC Helm Chart Repository.  To install the Helm Charts, run the following commands:
 
 ```bash
 helm repo add science-platform https://images.opencadc.org/chartrepo/platform
 helm repo add science-platform-client https://images.opencadc.org/chartrepo/client
 helm repo update
+```
 
+### Source Code Repository
+
+Alternatively, the helm charts can be found in the [OpenCADC Science Platform Repository](https://github.com/opencadc/science-platform).
+
+```bash
+git clone https://github.com/opencadc/science-platform.git
+cd science-platform/deployment/helm
+```
+
+### Quick Install
+
+```bash
 helm install --values my-base-local-values-file.yaml base science-platform/base
 helm install -n skaha-system --values my-posix-mapper-local-values-file.yaml posixmapper science-platform/posixmapper
 helm install -n skaha-system --values my-skaha-local-values-file.yaml skaha science-platform/skaha
@@ -34,70 +69,102 @@ helm install -n skaha-system --values my-cavern-local-values-file.yaml cavern sc
 helm install -n skaha-system --dependency-update --values my-storage-ui-local-values-file.yaml storage-ui science-platform-client/storageui
 ```
 
-More details below.
+Here the `*-local-values-file.yaml` files are the environment specific overrides for the Helm Charts.  These files are used to override the default values in the Helm Charts.
+The `--values` flag is used to specify the file to use for the overrides.
 
-### Helm repository
+## Base Helm Chart
 
-Add the Helm repository:
+The [Base](base) install will provisions `ServiceAccount`, `Role`, `Namespace`, and `Role Based Access` objects in the Kubernetes Cluster needed for the Skaha services.
+
+>[!CAUTION]
+>In a production environment, an ingress controller with proper SSL termination is required outside the scope of the `base` chart installation.
+
+To install the `base` service, run the following command:
+
 ```bash
-helm repo add science-platform https://images.opencadc.org/chartrepo/platform
-helm repo update
+helm install base science-platform/base
 ```
 
-### Base install
+### Development Environment
 
-The [Base](base) install will create ServiceAccount, Role, Namespace, and RBAC objects needed to place the Skaha service.
+In a development environment, the `base` installation needs to be augmented to additionally install and provision,
 
-Create a `my-base-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](base/values.yaml).  Mainly the
-Traefik Default Server certificate (optional if needed):
+- A `traefik` Ingress Controller
+- Persistent Volumes and Persistent Volume Claims for the Skaha Workload and Skaha System Namespaces
+- Setup a TLS certificate for the `traefik` Ingress Controller
 
-`my-base-local-values-file.yaml`
+The `dev.override.yaml` file is a YAML file that contains the necessary overrides for the `base` service  to achieve the above requirements.
+
+- `traefik`is enabled via the `traefike.install=true` flag.
+- To enabled `tls` for the `traefik` Ingress Controller, we need to provide a `default-certificate` in the `secrets` section with base64 encoded server certificate and key.
+
 ```yaml
 secrets:
-    default-certificate:
-        tls.crt: <base64 encoded server certificate>
-        tls.key: <base64 encoded server key>
+  default-certificate:
+      tls.crt: <base64 encoded server certificate>
+      tls.key: <base64 encoded server key>
 ```
+
+>[!TIP]
+>To base64 encode a file and copy it to the clipboard, run the following command:
+>```bash
+> # On MacOS
+> base64 -i /path/to/tls.crt | pbcopy
+> # On Linux
+> base64 -i /path/to/tls.crt | xclip -selection clipboard
+>```
+
+- In development environments, the persistant volumes are provisioned using `hostPath` storage class. The `developer.storage.path` key is used to specify this path on the host machine where the volumes will be mounted.
+
+>[!CAUTION]
+>The `developer.storage.path` should be created and have the necessary permissions before installing the `base` service in a development environment.
 
 ```bash
-helm install --values my-base-local-values-file.yaml base science-platform/base
-
-NAME: base
-LAST DEPLOYED: Thu Sep 28 07:28:45 2023
-NAMESPACE: default
-STATUS: deployed
-REVISION: 1
+cd science-platform/deployment/helm/base
+helm install --values dev.override.yaml base base/
 ```
 
-### Persistent Volumes and Persistent Volume Claims
+## Required Persistent Volumes
 
-**Note** 
-The `base` MUST be installed first as it creates the necessary Namespaces for the Persistent Volume Claims!
+>[!NOTE]
+>In production, `base` helm chart **MUST** be installed first as it creates the necessary namespaces(`skaha-system` and `skaha-workload`) required for the Persistent Volume Claims.
 
-**Important**
-There are two (2) Persistent Volume Claims that are used in the system, due to the fact that there are two (2) Namespaces (`skaha-system` and `skaha-workload`).  These PVCs, while
-having potentially different configurations, **SHOULD** point to the same storage.  For example, if two `hostPath` PVCs are created, the `hostPath.path` **MUST** point to the same
-folder in order to have shared content between the Services (`skaha`, `cavern`) and the User Sessions (Notebooks, CARTA, etc.).
+>[!IMPORTANT]
+>There are two (2) Persistent Volume Claims that are used in the system, due to the fact that there are two (2) Namespaces (`skaha-system` and `skaha-workload`).  These PVCs, while having potentially different configurations, **SHOULD** point to the same storage.  For example, if two `hostPath` PVCs are created, the `hostPath.path` **MUST** point to the same folder in order to have shared content between the Services (`skaha`, `cavern`) and the User Sessions (Notebooks, CARTA, etc.).
+> It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
 
-It is expected that the deployer, or an Administrator, will create the necessary Persistent Volumes (if needed), and the required Persistent Volume Claims at
-this point.  There are sample [Local Storage](https://kubernetes.io/docs/concepts/storage/volumes/#local) Persistent Volume examples in the `base/volumes` folder.
+>[!NOTE]
+>In development environment, the `base` service will create the necessary Persistent Volume Claims using `hostPath` storage class. The `developer.storage.path` key is used to specify this path on the host machine where the volumes will be mounted.
 
+## Required Persistent Volume Claim
 
-#### Required Persistent Volume Claim
+>[!NOTE]
+>In production, it is expected that there is a Persistent Volume Claim with the name of the Skaha Workload namespace hyphenated with `cavern-pvc`.  This will provide the backing storage to the User Sessions.  Using the default values, this means, `skaha-workload-cavern-pvc` will exist as a Persistent Volume Claim in the `skaha-workload` namespace.
 
-It is expected that there is a Persistent Volume Claim with the name of the Skaha Workload namespace hyphenated with `cavern-pvc`.  This will provide the
-backing storage to the User Sessions.  Using the default values, this means:
+>[!NOTE]
+>In development environment, the `base` service will create the necessary Persistent Volume Claims using `hostPath` storage class. The `developer.storage.path` key is used to specify this path on the host machine where the volumes will be mounted.
 
-`skaha-workload-cavern-pvc`
+## IVOA Registry
 
-will exist as a Persistent Volume Claim in the `skaha-workload` namespace.
+The IVOA Registry is used to find the services that are required for the Skaha service to function.
 
+>[!IMPORTANT]
+>In a production environment, it is expected that the IVOA Registry is hosted and availaible through an external source that can be found by the Skaha service.
 
-### POSIX Mapper install
+>[!CAUTION]
+> For development environments only, the `registry` helm chart can be used to deploy a local IVOA Registry.
+
+```bash
+cd science-platform/deployment/helm/registry
+helm install registry .
+```
+
+## POSIX Mapper install
 
 The [POSIX Mapper Service](posix-mapper) is required to provide a UID to Username mapping, and a GID to Group Name mapping so that any Terminal access properly showed System Users in User Sessions.  It will generate UIDs when a user is requested, or a GID when a Group is requested, and then keep track of them.
 
-This service is required to be installed _before_ the Skaha service.
+>[!NOTE]
+>POSIX Mapper is required to be installed **before** the Skaha service.
 
 Create a `my-posix-mapper-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](posix-mapper/values.yaml).
 
@@ -330,9 +397,9 @@ deployment:
 
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
-    # 
+    #
     # extraConfigData:
-    
+
     # Resources provided to the Skaha service.
     # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
     resources:
@@ -463,9 +530,9 @@ deployment:
 
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
-    # 
+    #
     # extraConfigData:
-    
+
     # Resources provided to the Science Portal service.
     resources:
       requests:
@@ -526,16 +593,16 @@ deployment:
       # the rootOwner MUST be an object with the following properties set.
       rootOwner:
         # The adminUsername is required to be set whomever has admin access over the filesystem.dataDir above.
-        adminUsername: 
+        adminUsername:
 
         # The username of the root owner.
-        username: 
+        username:
 
         # The UID of the root owner.
-        uid: 
+        uid:
 
         # The GID of the root owner.
-        gid: 
+        gid:
 
     # Further UWS settings for the Tomcat Pool setup.
     uws:
@@ -574,7 +641,7 @@ deployment:
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"
     #   name: cacert-volume
-    # 
+    #
     # extraVolumeMounts:
 
     # Create the CA certificate volume to be mounted in extraVolumeMounts
@@ -589,9 +656,9 @@ deployment:
 
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
-    # 
+    #
     # extraConfigData:
-    
+
     # Resources provided to the Cavern service.
     resources:
       requests:
@@ -694,9 +761,9 @@ deployment:
 
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
-    # 
+    #
     # extraConfigData:
-    
+
     # Resources provided to the StorageUI service.
     resources:
       requests:

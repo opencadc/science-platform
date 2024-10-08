@@ -17,4 +17,3 @@ subjects:
 - kind: ServiceAccount
   name: 'skaha'
   namespace: {{ .Values.skaha.namespace }}
-  

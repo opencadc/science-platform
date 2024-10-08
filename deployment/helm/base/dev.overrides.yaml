@@ -1,0 +1,41 @@
+# Developer Environment Overrides
+# This file is for local development environment overrides.  It is not used in the CI/CD pipeline``.
+
+secrets:
+  # -- The default-certificate secret for Traefik, must match traefik.tlsStore.default.defaultCertificate.secretName
+  default-certificate:
+    # -- **Dev Only:** Base64 encoded server certificate
+    tls.crt: <base64-encoded-certificate>
+    # -- **Dev Only:** Base64 encoded server key
+    tls.key: <base64-encoded-key>
+
+developer:
+  storage:
+    # -- **Dev Only:** The path to local storage for skaha, this path needs to exist on the host
+    path: <path-to-local-storage>
+
+# Developer Environment Overrides for Traefik Ingress Controller
+traefik:
+  # -- **Dev Only:** Whether to install Traefik (default: false)
+  install: true
+  ingressRoute:
+    dashboard:
+      enabled: true
+  experimental:
+    plugins:
+      # -- **Dev Only:** Enable plugins for Traefik, e.g. traefik-forward-auth
+      enabled: true
+  logs:
+    general:
+      # -- **Dev Only:** The format of the logs, e.g. common or json
+      format: common
+      # -- **Dev Only:** Log level: DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+      level: DEBUG
+    access:
+      # -- **Dev Only:** To enable access logs
+      enabled: true
+  tlsStore:
+    default:
+      defaultCertificate:
+        # -- **Dev Only:** Hardcoded secret name for the default certificate
+        secretName: default-certificate

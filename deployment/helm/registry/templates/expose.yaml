@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-service
+  namespace: {{ .Values.skaha.namespace }}
+  labels:
+    run: {{ .Release.Name }}-service
+spec:
+  ports:
+    - port: 80
+      name: {{ .Release.Name }}-http
+      protocol: TCP
+  selector:
+    # Needs to match the labels in the deployment
+    run: {{ .Release.Name }}-deployment
