@@ -10,6 +10,7 @@ spec:
       template:
         spec:
           securityContext:
+            runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
           containers:
@@ -49,6 +50,7 @@ spec:
   template:
     spec:
       securityContext:
+        runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
