@@ -11,6 +11,7 @@ spec:
         spec:
           securityContext:
             runAsUser: 999  # redis user
+            runAsGroup: 1000  # redis user group
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
@@ -53,6 +54,7 @@ spec:
     spec:
       securityContext:
         runAsUser: 999  # redis user
+        runAsGroup: 1000  # redis user group
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
