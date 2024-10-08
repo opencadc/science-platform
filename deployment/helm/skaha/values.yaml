@@ -184,6 +184,13 @@ redis:
   master:
     persistence:
       enabled: false
-  # serviceAccount:
-  #   create: false
-  #   name: "" # Use default service account as this requires no special permissions
+    containerSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
