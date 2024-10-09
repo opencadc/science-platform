@@ -4,7 +4,7 @@
 nameOverride: ""
 fullnameOverride: ""
 # Enable each function, like kustomize https://github.com/kubernetes-sigs/kueue/blob/main/config/default/kustomization.yaml
-enablePrometheus: false
+enablePrometheus: true
 # this label will be used by the prometheus to find the service monitors
 prometheus:
   serviceMonitorSelectorLabels:
@@ -66,7 +66,7 @@ managerConfig:
       healthProbeBindAddress: :8081
     metrics:
       bindAddress: :8080
-      # enableClusterQueueResources: true
+      enableClusterQueueResources: true
     webhook:
       port: 9443
     leaderElection:
