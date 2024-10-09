@@ -4,7 +4,7 @@ kind: ServiceMonitor
 metadata:
   name: {{ include "kueue.fullname" . }}-controller-manager-metrics-monitor
   labels:
-    prometheus: "prometheus"
+    release: kube-prometheus-stack
   {{- include "kueue.labels" . | nindent 4 }}
   namespace: '{{ .Release.Namespace }}'
 spec:
