@@ -270,7 +270,7 @@ alertmanager:
 
   ## Deploy alertmanager
   ##
-  enabled: true
+  enabled: false
 
   ## Annotations for Alertmanager
   ##
@@ -288,8 +288,8 @@ alertmanager:
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
   ##
   serviceAccount:
-    create: true
-    name: "prometheus-k8s"
+    create: false
+    name: ""
     annotations: {}
     automountServiceAccountToken: true
 

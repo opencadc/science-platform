@@ -5,6 +5,10 @@ nameOverride: ""
 fullnameOverride: ""
 # Enable each function, like kustomize https://github.com/kubernetes-sigs/kueue/blob/main/config/default/kustomization.yaml
 enablePrometheus: true
+# this label will be used by the prometheus to find the service monitors
+prometheus:
+  serviceMonitorSelectorLabels:
+    release: prometheus
 # Enable x509 automated certificate management using cert-manager (cert-manager.io)
 enableCertManager: false
 # Customize controllerManager
