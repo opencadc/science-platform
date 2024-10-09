@@ -289,7 +289,7 @@ alertmanager:
   ##
   serviceAccount:
     create: true
-    name: ""
+    name: "prometheus-k8s"
     annotations: {}
     automountServiceAccountToken: true
 
@@ -2046,6 +2046,8 @@ kube-state-metrics:
   rbac:
     create: true
   releaseLabel: true
+  extraArgs:
+    - --metric-labels-allowlist=pods=[*]
   prometheus:
     monitor:
       enabled: true
@@ -3632,9 +3634,6 @@ prometheus:
     ## ServiceMonitors to be selected for target discovery.
     ## If {}, select all ServiceMonitors
     ##
-    serviceMonitorSelector: 
-      matchLabels:
-        prometheus: "prometheus"
     ## Example which selects ServiceMonitors with label "prometheus" set to "somelabel"
     # serviceMonitorSelector:
     #   matchLabels:
