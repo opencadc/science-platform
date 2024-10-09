@@ -1,7 +1,16 @@
-# CHANGELOG for Skaha User Session API (Chart 0.6.0)
+# CHANGELOG for Skaha User Session API (Chart 0.7.6)
+
+## 2024.10.07 (0.7.3)
+- Fix for security context in image caching job
+
+## 2024.10.04 (0.7.2)
+- Fix to inject user client certificates properly
+
+## 2024.10.03 (0.7.1)
+- Small fix to ensure userinfo endpoint is obtained from the Identity Provider for applications using the StandardIdentityManager
 
 ## 2024.09.20 (0.6.0)
-- Feature to allow mounting volumes into user sessions.
+- Feature to allow mounting volumes into user sessions
 
 ## 2024.09.19 (0.5.1)
 - Fix to add `headlessPriorityGroup` and `headlessPriorityClass` configurations

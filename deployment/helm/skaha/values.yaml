@@ -17,12 +17,12 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.21.0
+    image: images.opencadc.org/platform/skaha:0.21.2
     imagePullPolicy: Always
 
-    # Cron string for the image caching cron job schedule. Defaults to every hour.
+    # Cron string for the image caching cron job schedule. Defaults to every minute.
     imageCache:
-      refreshSchedule: "0 */1 * * *"
+      refreshSchedule: "*/1 * * * *"
   
     # Set the top-level-directory name that gets mounted at the root.
     # skahaTld: "/cavern"
@@ -162,7 +162,6 @@ deployment:
   # extraHosts: []
 
 
-
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
@@ -185,3 +184,13 @@ redis:
   master:
     persistence:
       enabled: false
+    containerSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
