@@ -97,6 +97,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.PosixCache;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
@@ -141,11 +142,12 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-    private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+
+    public static final String DEFAULT_SOFTWARE_IMAGESECRET_VALUE = "notused";
 
     public PostAction() {
         super();
@@ -618,6 +620,8 @@ public class PostAction extends SessionAction {
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
 
+        jobLaunchString = setConfigValue(jobLaunchString, PostAction.SOFTWARE_IMAGESECRET, createRegistryImageSecret(image));
+
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
@@ -663,6 +667,31 @@ public class PostAction extends SessionAction {
 
     private String generateToken() throws Exception {
         return SkahaAction.getTokenTool().generateToken(URI.create(this.skahaUsersGroup), WriteGrant.class, this.sessionID);
+    }
+
+    /**
+     * Create a registry secret and return its name.
+     * @param imageID The image ID to create a secret for.
+     * @return  String secret name, never null.
+     */
+    private String createRegistryImageSecret(final String imageID) {
+        final String registryAuth = getRegistryAuth();
+        final String username = this.posixPrincipal.username;
+        final String secretName = "harbor-secret-" + username.toLowerCase();
+        CommandExecutioner.ensureRegistrySecret(getRegistryHost(imageID), username,
+                                                StringUtil.hasText(registryAuth) ? registryAuth : PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE,
+                                                secretName);
+
+        return secretName;
+    }
+
+    private String getRegistryHost(final String imageID) {
+        final String registryHost = this.harborHosts.stream().filter(imageID::startsWith).findFirst().orElse(null);
+        if (registryHost == null) {
+            throw new IllegalArgumentException("not a skaha harbor image: " + imageID);
+        }
+
+        return registryHost;
     }
 
     /**

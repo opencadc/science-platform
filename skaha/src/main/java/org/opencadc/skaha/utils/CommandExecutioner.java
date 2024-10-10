@@ -81,7 +81,7 @@ public class CommandExecutioner {
         }
     }
 
-    protected static void ensureRegistrySecret(final String registryHost, final String registryUsername, final String secret, final String secretName) {
+    public static void ensureRegistrySecret(final String registryHost, final String registryUsername, final String secret, final String secretName) {
         // create new secret
         String[] createCmd = new String[] {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",

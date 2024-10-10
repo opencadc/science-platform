@@ -398,7 +398,7 @@ public abstract class SkahaAction extends RestAction {
         return posixPrincipal.getUidNumber();
     }
 
-    public Image getImage(String imageID) throws Exception {
+    public Image getImage(String imageID) {
         log.debug("get image: " + imageID);
         List<Image> images = redis.getAll("public", Image.class);
         if (images == null) {
