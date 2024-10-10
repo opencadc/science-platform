@@ -196,8 +196,9 @@ public abstract class SessionAction extends SkahaAction {
 
                 if (credServiceURL != null) {
                     final CredClient credClient = new CredClient(credServiceID);
+                    final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
                     final X509CertificateChain proxyCert = Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>) ()
-                        -> credClient.getProxyCertificate(AuthenticationUtil.getCurrentSubject(), SessionAction.ONE_WEEK_DAYS));
+                        -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
 
                     log.debug("Proxy cert: " + proxyCert);
                     // inject the proxy cert
