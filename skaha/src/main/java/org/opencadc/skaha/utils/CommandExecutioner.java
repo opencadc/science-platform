@@ -10,35 +10,14 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
+import org.opencadc.skaha.K8SUtil;
 
 public class CommandExecutioner {
     private static final Logger log = Logger.getLogger(CommandExecutioner.class);
 
     public static String execute(String[] command) throws IOException, InterruptedException {
         return execute(command, true);
-    }
-
-    public static String executeInShell(String[] command, boolean allowError) throws IOException, InterruptedException {
-        final ProcessBuilder processBuilder = new ProcessBuilder("/bin/sh", "-c", String.join(" ", command));
-        final Process p = processBuilder.start();
-        final String stdout = readStream(p.getInputStream());
-        final String stderr = readStream(p.getErrorStream());
-        log.debug("stdout: " + stdout);
-        log.debug("stderr: " + stderr);
-        int status = p.waitFor();
-        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
-        if (status != 0) {
-            if (allowError) {
-                return stderr;
-            } else {
-                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-                throw new IOException(message);
-            }
-        }
-        return stdout.trim();
     }
 
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
@@ -102,6 +81,17 @@ public class CommandExecutioner {
         }
     }
 
+    protected static void ensureRegistrySecret(final String registryHost, final String registryUsername, final String secret, final String secretName) {
+        // create new secret
+        String[] createCmd = new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+            secretName,
+            "--docker-server=" + registryHost,
+            "--docker-username=" + registryUsername,
+            "--docker-password=" + secret
+        };
+    }
+
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
         // Check the current secret
         final String[] getSecretCommand = new String[] {
@@ -125,29 +115,6 @@ public class CommandExecutioner {
             buffer.write(data, 0, nRead);
         }
         return buffer.toString(StandardCharsets.UTF_8);
-    }
-
-    public static String createDirectoryIfNotExist(String... paths) {
-        Path path = Paths.get("/", paths);
-        File directory = new File(path.toString());
-        if (!(directory.exists())) {
-            directory.mkdir();
-        }
-        return path.toString();
-    }
-
-    public static String createOrOverrideFile(String directoryPath, String fileName, String content)
-            throws IOException {
-        Path path = Paths.get(directoryPath, fileName);
-        File file = new File(path.toString());
-        if (!(file.exists())) {
-            file.createNewFile();
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(content + "\n");
-        writer.flush();
-        writer.close();
-        return path.toString();
     }
 
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {

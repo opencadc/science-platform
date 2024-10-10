@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.7.6)
+# CHANGELOG for Skaha User Session API (Chart 0.8.0)
+
+## 2024.10.10 (0.8.0)
+- Add `x-cadc-registry-secret` request header support to set Harbor CLI secret (or other Image Registry secret)
 
 ## 2024.10.07 (0.7.3)
 - Fix for security context in image caching job

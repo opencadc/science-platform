@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2020.                            (c) 2020.
+ *  (c) 2024.                            (c) 2024.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,15 +69,12 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -91,7 +88,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,7 +97,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.PosixCache;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
