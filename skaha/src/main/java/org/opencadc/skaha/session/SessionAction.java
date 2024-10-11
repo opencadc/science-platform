@@ -67,8 +67,6 @@
 
 package org.opencadc.skaha.session;
 
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
-
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
@@ -234,7 +232,7 @@ public abstract class SessionAction extends SkahaAction {
 
         // inject file
         String[] inject = new String[] {"mv", "-f", tmpFileName, path};
-        execute(inject);
+        CommandExecutioner.execute(inject);
     }
 
     protected String getImageName(String image) {
@@ -281,7 +279,7 @@ public abstract class SessionAction extends SkahaAction {
         getPodCMD.add("--no-headers=true");
         getPodCMD.add("-o");
         getPodCMD.add("custom-columns=NAME:.metadata.name");
-        String podID = execute(getPodCMD.toArray(new String[0]));
+        String podID = CommandExecutioner.execute(getPodCMD.toArray(new String[0]));
         log.debug("podID: " + podID);
         if (!StringUtil.hasLength(podID)) {
             throw new ResourceNotFoundException("session " + sessionID + " not found.");
@@ -306,7 +304,7 @@ public abstract class SessionAction extends SkahaAction {
         getEventsCmd.add("-o");
         String customColumns = "TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp";
         getEventsCmd.add("custom-columns=" + customColumns);
-        String events = execute(getEventsCmd.toArray(new String[0]));
+        String events = CommandExecutioner.execute(getEventsCmd.toArray(new String[0]));
         log.debug("events: " + events);
         if (events != null) {
             String[] lines = events.split("\n");
@@ -328,7 +326,7 @@ public abstract class SessionAction extends SkahaAction {
         getLogsCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
         getLogsCmd.add("--tail");
         getLogsCmd.add("-1");
-        execute(getLogsCmd.toArray(new String[0]), out);
+        CommandExecutioner.execute(getLogsCmd.toArray(new String[0]), out);
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
@@ -396,7 +394,7 @@ public abstract class SessionAction extends SkahaAction {
     protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
         Map<String, String> jobExpiryTimes = new HashMap<>();
         List<String> jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
-        String jobExpiryTimeMap = execute(jobExpiryTimeCMD.toArray(new String[0]));
+        String jobExpiryTimeMap = CommandExecutioner.execute(jobExpiryTimeCMD.toArray(new String[0]));
         log.debug("Expiry times: " + jobExpiryTimeMap);
         if (StringUtil.hasLength(jobExpiryTimeMap)) {
             String[] lines = jobExpiryTimeMap.split("\n");
@@ -410,7 +408,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        List<String> getSessionJobCMD = new ArrayList<String>();
+        List<String> getSessionJobCMD = new ArrayList<>();
         getSessionJobCMD.add("kubectl");
         getSessionJobCMD.add("get");
         getSessionJobCMD.add("--namespace");
@@ -421,9 +419,8 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-            "UID:.metadata.uid," +
-            "EXPIRY:.spec.activeDeadlineSeconds";
+        String customColumns;
+        customColumns = "custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -433,7 +430,7 @@ public abstract class SessionAction extends SkahaAction {
                                                                                   IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
-        return execute(getAppJobNameCMD.toArray(new String[0]));
+        return CommandExecutioner.execute(getAppJobNameCMD.toArray(new String[0]));
     }
 
     private List<String> getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
@@ -446,7 +443,7 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        List<String> getAppJobNameCMD = new ArrayList<String>();
+        List<String> getAppJobNameCMD = new ArrayList<>();
         getAppJobNameCMD.add("kubectl");
         getAppJobNameCMD.add("get");
         getAppJobNameCMD.add("--namespace");
@@ -457,8 +454,7 @@ public abstract class SessionAction extends SkahaAction {
         getAppJobNameCMD.add("--no-headers=true");
         getAppJobNameCMD.add("-o");
 
-        String customColumns = "custom-columns=" +
-            "NAME:.metadata.name";
+        String customColumns = "custom-columns=NAME:.metadata.name";
 
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;

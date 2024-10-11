@@ -430,12 +430,6 @@ public class SessionUtil {
         }
     }
 
-    protected static List<Session> getSessionsOfType(final URL sessionURL, final String type, String... omitStatuses) throws Exception {
-        return SessionUtil.getSessions(sessionURL, omitStatuses).stream()
-                          .filter(session -> session.getType().equals(type))
-                          .collect(Collectors.toList());
-    }
-
     private static List<Session> getAllSessions(final URL sessionURL) throws Exception {
         final HttpGet get = new HttpGet(sessionURL, true);
         get.prepare();

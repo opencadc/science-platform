@@ -106,6 +106,7 @@ import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
@@ -274,8 +275,13 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
-    protected String getRegistryAuth() {
-        return this.syncInput.getHeader(SkahaAction.X_REGISTRY_AUTH_HEADER);
+    protected ImageRegistryAuth getRegistryAuth(final String registryHost) {
+        final String registryAuthValue = this.syncInput.getHeader(SkahaAction.X_REGISTRY_AUTH_HEADER);
+        if (!StringUtil.hasText(registryAuthValue)) {
+            throw new IllegalArgumentException("No authentication provided for unknown or private image.  Use "
+                                                   + SkahaAction.X_REGISTRY_AUTH_HEADER + " request header with base64Encode(username:secret).");
+        }
+        return ImageRegistryAuth.fromEncoded(registryAuthValue, registryHost);
     }
 
     private boolean isSkahaCallBackFlow(Subject currentSubject) {
@@ -398,7 +404,7 @@ public abstract class SkahaAction extends RestAction {
         return posixPrincipal.getUidNumber();
     }
 
-    public Image getImage(String imageID) {
+    public Image getPublicImage(String imageID) {
         log.debug("get image: " + imageID);
         List<Image> images = redis.getAll("public", Image.class);
         if (images == null) {

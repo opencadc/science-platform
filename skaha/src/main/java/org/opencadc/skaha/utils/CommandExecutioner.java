@@ -12,6 +12,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
 
 public class CommandExecutioner {
     private static final Logger log = Logger.getLogger(CommandExecutioner.class);
@@ -81,15 +82,52 @@ public class CommandExecutioner {
         }
     }
 
-    public static void ensureRegistrySecret(final String registryHost, final String registryUsername, final String secret, final String secretName) {
-        // create new secret
-        String[] createCmd = new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
-            secretName,
-            "--docker-server=" + registryHost,
-            "--docker-username=" + registryUsername,
-            "--docker-password=" + secret
-        };
+    public static void ensureRegistrySecret(final ImageRegistryAuth registryAuth, final String secretName)
+        throws Exception {
+        // delete any old secret by this name
+        final String[] deleteCmd = new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+        log.debug("delete secret command: " + Arrays.toString(deleteCmd));
+        try {
+            String deleteResult = CommandExecutioner.execute(deleteCmd);
+            log.debug("delete secret result: " + deleteResult);
+        } catch (IOException notFound) {
+            log.debug("no secret to delete", notFound);
+        }
+
+        // harbor invalidates secrets with the Unicode replacement characters 'fffd'.
+        if (registryAuth.isSecretValid()) {
+            // create new secret
+            final String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+                secretName,
+                "--docker-server=" + registryAuth.getHost(),
+                "--docker-username=" + registryAuth.getUsername(),
+                "--docker-password=" + new String(registryAuth.getSecret())
+            };
+            log.debug("create secret command: " + Arrays.toString(createCmd));
+
+            try {
+                String createResult = CommandExecutioner.execute(createCmd);
+                log.debug("create secret result: " + createResult);
+            } catch (IOException e) {
+                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
+                    // This can happen with concurrent posts by same user.
+                    // Considered making secrets unique with the session id,
+                    // but that would lead to a large number of secrets and there
+                    // is no k8s option to have them cleaned up automatically.
+                    // Should look at supporting multiple job creations on a post,
+                    // specifically for the headless use case.  That way only one
+                    // secret per post.
+                    log.warn("secret creation failed, moving on: " + e);
+                } else {
+                    log.error(e.getMessage(), e);
+                    throw new IOException("error creating image pull secret");
+                }
+            }
+        } else {
+            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
+            /* @TODO: Should throw IllegalStateException here, but for future work. */
+        }
     }
 
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
