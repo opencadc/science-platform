@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.7.6)
+# CHANGELOG for Skaha User Session API (Chart 0.7.8)
+
+## 2024.10.10 (0.7.8)
+- Fix for client certificate injection
 
 ## 2024.10.07 (0.7.3)
 - Fix for security context in image caching job
