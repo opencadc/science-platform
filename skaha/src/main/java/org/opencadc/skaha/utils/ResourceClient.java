@@ -20,7 +20,6 @@ public class ResourceClient {
 
     private <T> T deserialize(Class<T> className, String item) throws JsonProcessingException {
         try {
-            System.out.println(item);
             return mapper.readValue(item, className);
         } catch (JsonProcessingException e) {
             log.error(e);
@@ -29,15 +28,13 @@ public class ResourceClient {
     }
 
     public Resource getResourceByGroup(String clusterqueue) throws Exception {
-        String[] getClusterQueue = new String[]{
-                "kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.status.flavorsUsage}"};
+        String[] getClusterQueue = new String[]{"kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.status.flavorsUsage}"};
         return getResourcesFromResourceFlavors(getClusterQueue);
 
     }
 
     public Resource getResourceLimitClusterQueue(String clusterqueue) throws Exception {
-        String[] getClusterQueueResourceLimits = new String[]{
-                "kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.spec.resourceGroups[*].flavors}"};
+        String[] getClusterQueueResourceLimits = new String[]{"kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.spec.resourceGroups[*].flavors}"};
         return getResourcesFromResourceFlavors(getClusterQueueResourceLimits);
 
     }
@@ -47,8 +44,7 @@ public class ResourceClient {
         String rawClusterQueueResources = CommandExecutioner.execute(command);
         if (rawClusterQueueResources.isEmpty()) throw new Exception("unable to find clusterqueue");
         List<LinkedHashMap<String, Object>> flavors = (List<LinkedHashMap<String, Object>>) deserialize(List.class, rawClusterQueueResources);
-        return flavors.stream().map(this::getResourcesFromResourceFlavors)
-                .reduce(new Resource(), (Resource::add));
+        return flavors.stream().map(this::getResourcesFromResourceFlavors).reduce(new Resource(), (Resource::add));
     }
 
     @SuppressWarnings("unchecked")
@@ -56,8 +52,11 @@ public class ResourceClient {
         Resource resource = new Resource();
         List<LinkedHashMap<String, Object>> flavorResources = (List<LinkedHashMap<String, Object>>) flavor.get("resources");
         flavorResources.forEach(flavorResource -> {
-            String resourceType = (String) flavorResource.get("name");
-            String resourceSize = (String) flavorResource.get("nominalQuota");
+            String resourceType = flavorResource.get("name").toString();
+            String resourceSize = flavorResource.get("nominalQuota") == null ?
+                    flavorResource.get("total").toString() :
+                    flavorResource.get("nominalQuota").toString();
+
             switch (resourceType) {
                 case "cpu":
                     resource.setCpu(convertResourceSize(resourceSize));
@@ -72,15 +71,12 @@ public class ResourceClient {
 
     @SuppressWarnings("unchecked")
     public Resource getResourcesByUser(String uid) throws IOException, InterruptedException {
-        String[] getPods = new String[]{
-                "kubectl", "get", "pods", "-l", "canfar-net-userid=" + uid, "--field-selector=status.phase=Running", "-o", "jsonpath={range .items[*]}{.spec.containers[*].resources.limits}{\",\"}{end}"};
+        String[] getPods = new String[]{"kubectl", "get", "pods", "-l", "canfar-net-userid=" + uid, "--field-selector=status.phase=Running", "-o", "jsonpath={range .items[*]}{.spec.containers[*].resources.limits}{\",\"}{end}"};
 
         String rawPodInfo = CommandExecutioner.execute(getPods);
         String podInfo = rawPodInfo.isEmpty() ? rawPodInfo : rawPodInfo.substring(0, rawPodInfo.length() - 1);
         List<LinkedHashMap<String, Object>> deserialize = (List<LinkedHashMap<String, Object>>) deserialize(List.class, "[" + podInfo + "]");
-        return deserialize.stream()
-                .map(this::buildResourceFromMap)
-                .reduce(new Resource(), (Resource::add));
+        return deserialize.stream().map(this::buildResourceFromMap).reduce(new Resource(), (Resource::add));
     }
 
     private Resource buildResourceFromMap(Map<String, Object> resource) {
@@ -91,7 +87,7 @@ public class ResourceClient {
     }
 
     public float convertResourceSize(String resourceSize) {
-        if(Character.isDigit(resourceSize.charAt(resourceSize.length() -1))) {
+        if (Character.isDigit(resourceSize.charAt(resourceSize.length() - 1))) {
             return Float.parseFloat(resourceSize);
         }
 
@@ -131,6 +127,7 @@ public class ResourceClient {
         ResourceClient rs = new ResourceClient();
         System.out.println(rs.getResourcesByUser("anuja").cpu());
         System.out.println(rs.getResourceLimitClusterQueue("test").cpu());
+        System.out.println(rs.getResourceByGroup("test").memory());
     }
 }
 
