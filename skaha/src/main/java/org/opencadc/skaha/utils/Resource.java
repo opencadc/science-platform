@@ -39,7 +39,6 @@ public class Resource {
     }
 
     public Resource add(Resource another) {
-        System.out.println(another.cpu + "thsi is cpu");
         this.cpu += another.cpu;
         this.memory += another.memory;
         this.ephemeralStorage = another.ephemeralStorage;
