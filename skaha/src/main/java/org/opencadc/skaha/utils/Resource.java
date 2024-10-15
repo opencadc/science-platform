@@ -44,4 +44,13 @@ public class Resource {
         this.ephemeralStorage = another.ephemeralStorage;
         return this;
     }
+
+    @Override
+    public String toString() {
+        return "Resource{" +
+                "cpu=" + cpu +
+                ", ephemeralStorage=" + ephemeralStorage +
+                ", memory=" + memory +
+                '}';
+    }
 }
