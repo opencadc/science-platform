@@ -489,6 +489,8 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image is required");
         }
 
+        // This will also vet the currently requested image's host (authority) against
+        // the list of configured ones.
         final String imageRegistryHost = getRegistryHost(imageID);
         log.debug("Image is located at " + imageRegistryHost);
 
@@ -496,13 +498,19 @@ public class PostAction extends SessionAction {
         final String validatedType;
 
         // Private images are also missing from this list.
+        // TODO: We currently rely on the image's host name to match a configured one
+        // TODO: to ensure a supported image from a configured source.  This is impossible
+        // TODO: with Private images as they cannot be obtained first.  This means that any
+        // TODO: image that is missing from the Public Cache can either be invalid or Private,
+        // TODO: and since we can't verify one way or the other, let them through.
         if (image == null) {
-            log.debug("Image " + imageID + " missing from cache...");
-            if (SessionAction.SESSION_TYPE_HEADLESS.equals(type)) {
-                log.debug("Assuming headless for private (or missing) image " + imageID);
-                validatedType = SessionAction.SESSION_TYPE_HEADLESS;
-            } else {
+            log.warn("Image " + imageID + " missing from cache...");
+            final ImageRegistryAuth imageRegistryAuth = getRegistryAuth(imageRegistryHost);
+            if (imageRegistryAuth == null) {
                 throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
+            } else {
+                log.warn("Assuming image " + imageID + " is private as credentials were supplied.");
+                validatedType = type;
             }
         } else if (image.getTypes().contains(type)) {
             validatedType = type;
