@@ -498,7 +498,6 @@ public class PostAction extends SessionAction {
         // Private images are also missing from this list.
         if (image == null) {
             log.debug("Image " + imageID + " missing from cache...");
-            // Absence of type is assumed to be headless
             if (SessionAction.SESSION_TYPE_HEADLESS.equals(type)) {
                 log.debug("Assuming headless for private (or missing) image " + imageID);
                 validatedType = SessionAction.SESSION_TYPE_HEADLESS;

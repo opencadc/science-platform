@@ -125,7 +125,7 @@ get_status() {
     if [ -z "${TOKEN}" ]; then
         handle_error "[skaha] No credentials to call back to Skaha with."
     else
-        curl_out=`curl -s -L -k "${CURL_APP_SESSION_HEADERS}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`
+        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`
     fi
 
     while [[ ${curl_out} != *"status"* ]]; do
@@ -137,7 +137,7 @@ get_status() {
         sleep 1
 
         # No need to check for the Token again as it passed above.
-        curl_out=`curl -s -L -k "${CURL_APP_SESSION_HEADERS}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`             
+        curl_out=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app/$1`             
     done
 }
 
