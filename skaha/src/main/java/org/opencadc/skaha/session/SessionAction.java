@@ -329,13 +329,14 @@ public abstract class SessionAction extends SkahaAction {
         CommandExecutioner.execute(getLogsCmd.toArray(new String[0]), out);
     }
 
+    @SuppressWarnings("checkstyle:OperatorWrap")
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
         List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID, skahaTld);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
-                if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType()) &&
-                    (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
+                if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())
+                    && (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
                     return session;
                 }
             }

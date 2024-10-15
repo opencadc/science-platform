@@ -94,39 +94,33 @@ public class CommandExecutioner {
             log.debug("no secret to delete", notFound);
         }
 
-        // harbor invalidates secrets with the Unicode replacement characters 'fffd'.
-        if (registryAuth.isSecretValid()) {
-            // create new secret
-            final String[] createCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
-                secretName,
-                "--docker-server=" + registryAuth.getHost(),
-                "--docker-username=" + registryAuth.getUsername(),
-                "--docker-password=" + new String(registryAuth.getSecret())
-            };
-            log.debug("create secret command: " + Arrays.toString(createCmd));
+        // create new secret
+        final String[] createCmd = new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+            secretName,
+            "--docker-server=" + registryAuth.getHost(),
+            "--docker-username=" + registryAuth.getUsername(),
+            "--docker-password=" + new String(registryAuth.getSecret())
+        };
+        log.debug("create secret command: " + Arrays.toString(createCmd));
 
-            try {
-                String createResult = CommandExecutioner.execute(createCmd);
-                log.debug("create secret result: " + createResult);
-            } catch (IOException e) {
-                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
-                    // This can happen with concurrent posts by same user.
-                    // Considered making secrets unique with the session id,
-                    // but that would lead to a large number of secrets and there
-                    // is no k8s option to have them cleaned up automatically.
-                    // Should look at supporting multiple job creations on a post,
-                    // specifically for the headless use case.  That way only one
-                    // secret per post.
-                    log.warn("secret creation failed, moving on: " + e);
-                } else {
-                    log.error(e.getMessage(), e);
-                    throw new IOException("error creating image pull secret");
-                }
+        try {
+            String createResult = CommandExecutioner.execute(createCmd);
+            log.debug("create secret result: " + createResult);
+        } catch (IOException e) {
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
+                // This can happen with concurrent posts by same user.
+                // Considered making secrets unique with the session id,
+                // but that would lead to a large number of secrets and there
+                // is no k8s option to have them cleaned up automatically.
+                // Should look at supporting multiple job creations on a post,
+                // specifically for the headless use case.  That way only one
+                // secret per post.
+                log.warn("secret creation failed, moving on: " + e);
+            } else {
+                log.error(e.getMessage(), e);
+                throw new IOException("error creating image pull secret");
             }
-        } else {
-            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
-            /* @TODO: Should throw IllegalStateException here, but for future work. */
         }
     }
 

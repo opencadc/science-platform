@@ -65,8 +65,4 @@ public class ImageRegistryAuth {
     public byte[] getSecret() {
         return secret;
     }
-
-    public boolean isSecretValid() {
-        return !new String(this.secret).startsWith("\ufffd");
-    }
 }
