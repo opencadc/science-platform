@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class ResourceClient {
     private static final Logger log = Logger.getLogger(ResourceClient.class);
@@ -19,25 +18,37 @@ public class ResourceClient {
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     }
 
-    private <T> T deserialize(Class<T> className, String item) {
+    private <T> T deserialize(Class<T> className, String item) throws JsonProcessingException {
         try {
+            System.out.println(item);
             return mapper.readValue(item, className);
         } catch (JsonProcessingException e) {
             log.error(e);
-            return null;
+            throw e;
         }
     }
 
-    @SuppressWarnings("unchecked")
     public Resource getResourceByGroup(String clusterqueue) throws Exception {
         String[] getClusterQueue = new String[]{
                 "kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.status.flavorsUsage}"};
-        String rawClusterQueueInfo = CommandExecutioner.execute(getClusterQueue);
-        if (rawClusterQueueInfo.isEmpty()) throw new Exception("unable to find clusterqueue");
-        List<LinkedHashMap<String, Object>> flavors = (List<LinkedHashMap<String, Object>>) deserialize(List.class, rawClusterQueueInfo);
+        return getResourcesFromResourceFlavors(getClusterQueue);
+
+    }
+
+    public Resource getResourceLimitClusterQueue(String clusterqueue) throws Exception {
+        String[] getClusterQueueResourceLimits = new String[]{
+                "kubectl", "get", "clusterqueues", clusterqueue, "-o", "jsonpath={.spec.resourceGroups[*].flavors}"};
+        return getResourcesFromResourceFlavors(getClusterQueueResourceLimits);
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private Resource getResourcesFromResourceFlavors(String[] command) throws Exception {
+        String rawClusterQueueResources = CommandExecutioner.execute(command);
+        if (rawClusterQueueResources.isEmpty()) throw new Exception("unable to find clusterqueue");
+        List<LinkedHashMap<String, Object>> flavors = (List<LinkedHashMap<String, Object>>) deserialize(List.class, rawClusterQueueResources);
         return flavors.stream().map(this::getResourcesFromResourceFlavors)
                 .reduce(new Resource(), (Resource::add));
-
     }
 
     @SuppressWarnings("unchecked")
@@ -49,11 +60,11 @@ public class ResourceClient {
             String resourceSize = (String) flavorResource.get("nominalQuota");
             switch (resourceType) {
                 case "cpu":
-                    resource.setCpu(convertResourceSizeToMb(resourceSize));
+                    resource.setCpu(convertResourceSize(resourceSize));
                 case "memory":
-                    resource.setMemory(convertResourceSizeToMb(resourceSize));
+                    resource.setMemory(convertResourceSize(resourceSize));
                 case "ephemeralStorage":
-                    resource.setEphemeralStorage(convertResourceSizeToMb(resourceSize));
+                    resource.setEphemeralStorage(convertResourceSize(resourceSize));
             }
         });
         return resource;
@@ -76,15 +87,19 @@ public class ResourceClient {
         String cpu = (String) resource.get("cpu");
         String memory = (String) resource.get("memory");
         String ephemeralStorage = (String) resource.get("ephemeral-storage");
-        return new Resource(convertResourceSizeToMb(cpu), convertResourceSizeToMb(ephemeralStorage), convertResourceSizeToMb(memory));
+        return new Resource(convertResourceSize(cpu), convertResourceSize(ephemeralStorage), convertResourceSize(memory));
     }
 
-    // TODO: Verify whether cpu will have unit or not.
-    public float convertResourceSizeToMb(String size) {
-        String regex = "(\\d+)([KMGm]i?|B)";
+    public float convertResourceSize(String resourceSize) {
+        if(Character.isDigit(resourceSize.charAt(resourceSize.length() -1))) {
+            return Float.parseFloat(resourceSize);
+        }
+
+        String regex = "(\\d+)([KMG]i?|B)";
 
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
-        java.util.regex.Matcher matcher = pattern.matcher(size);
+        java.util.regex.Matcher matcher = pattern.matcher(resourceSize);
+
         if (matcher.matches()) {
             float value = Float.parseFloat(matcher.group(1));
             String unit = matcher.group(2);
@@ -96,7 +111,6 @@ public class ResourceClient {
                 case "Mi":
                 case "MiB":
                 case "M":
-                case "m":
                     return value;
                 case "Gi":
                 case "GiB":
@@ -109,13 +123,14 @@ public class ResourceClient {
                     throw new IllegalArgumentException("Unsupported memory unit: " + unit);
             }
         } else {
-            throw new IllegalArgumentException("Invalid memory format: " + size);
+            throw new IllegalArgumentException("Invalid memory format: " + resourceSize);
         }
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws Exception {
         ResourceClient rs = new ResourceClient();
         System.out.println(rs.getResourcesByUser("anuja").cpu());
+        System.out.println(rs.getResourceLimitClusterQueue("test").cpu());
     }
 }
 
