@@ -1,28 +1,11 @@
 FROM images.opencadc.org/library/cadc-tomcat:1
 
-# add often used tools
-RUN dnf -y install which
+RUN dnf -y install dnf-plugins-core \
+    && dnf -y config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo \
+    && dnf -y install acl attr containerd.io docker-ce docker-ce-cli kubernetes-client which \
+    && dnf -y clean all
 
-# PAM LDAP access
-RUN dnf -y install acl
-
-# install docker
-RUN dnf -y install docker
-
-# needed to get/set quota when adding users.
-RUN dnf -y install attr
-
-# install kubernetes client
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.22.13/bin/linux/amd64/kubectl /usr/local/bin/kubectl
-
-RUN set -x && \
-    chmod +x /usr/local/bin/kubectl && \
-    \
-    # Create non-root user (with a randomly chosen UID/GUI).
-    adduser -d /config -u 2342 kubectl && \
-    \
-    # Basic check it works.
-    kubectl version --client
+RUN kubectl version --client
 
 COPY build/libs/skaha.war /usr/share/tomcat/webapps/
 

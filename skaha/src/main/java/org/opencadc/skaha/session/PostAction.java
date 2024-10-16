@@ -101,6 +101,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.PosixCache;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -546,9 +548,6 @@ public class PostAction extends SessionAction {
 
         String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        final String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
-
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
@@ -608,7 +607,6 @@ public class PostAction extends SessionAction {
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_HOSTNAME, name.toLowerCase());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGESECRET, imageSecret);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
         jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_PRIORITY, headlessPriority);
         jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
@@ -634,6 +632,9 @@ public class PostAction extends SessionAction {
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
         injectCredentials();
 
+        // inject the entries from the POSIX Mapper
+        injectPOSIXDetails();
+
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
@@ -658,6 +659,11 @@ public class PostAction extends SessionAction {
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
+    }
+
+    private void injectPOSIXDetails() throws Exception {
+        final PosixCache posixCache = new PosixCache(this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+        posixCache.writePOSIXEntries();
     }
 
     private String generateToken() throws Exception {
@@ -713,8 +719,6 @@ public class PostAction extends SessionAction {
 
         String name = getImageName(image);
         log.debug("name: " + name);
-        final String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
 
         String supplementalGroups = getSupplementalGroupsList();
         String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
@@ -768,7 +772,6 @@ public class PostAction extends SessionAction {
         }
         launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
         launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
-        launchString = setConfigValue(launchString, SOFTWARE_IMAGESECRET, imageSecret);
         launchString = setConfigValue(launchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
             ? posixMapperConfiguration.getResourceID().toString()
             : posixMapperConfiguration.getBaseURL().toExternalForm());
@@ -803,103 +806,6 @@ public class PostAction extends SessionAction {
         String regKey = key.replace(".", "\\.");
         String regex = "\\$[{]" + regKey + "[}]";
         return doc.replaceAll(regex, value);
-    }
-
-    private String getHarborSecret(String image) throws Exception {
-
-        // get the user's cli secret:
-        //  1. get the idToken from /ac/authorize
-        //  2. call harbor with idToken to get user info and secret
-
-        String harborHost = null;
-        for (String next : harborHosts) {
-            if (image.startsWith(next)) {
-                harborHost = next;
-            }
-        }
-        if (harborHost == null) {
-            throw new IllegalArgumentException("not a skaha harbor image: " + image);
-        }
-
-        String idToken = getIdToken();
-
-        // Default secret name if no ID Token is found.
-        if (!StringUtil.hasText(idToken)) {
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-
-        log.debug("getting secret from harbor");
-        URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(harborURL, out);
-        get.setRequestProperty("Authorization", "Bearer " + idToken);
-        get.run();
-        log.debug("harbor response code: " + get.getResponseCode());
-        if (get.getResponseCode() == 404) {
-            if (get.getThrowable() != null) {
-                log.warn("user not found in harbor", get.getThrowable());
-            } else {
-                log.warn("user not found in harbor");
-            }
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-        if (get.getThrowable() != null) {
-            log.warn("error obtaining harbor secret. response code: " + get.getResponseCode());
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-        String userJson = out.toString();
-        log.debug("harbor user info: " + userJson);
-        JSONTokener tokener = new JSONTokener(userJson);
-        JSONObject obj = new JSONObject(tokener);
-        String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
-        log.debug("cliSecret: " + cliSecret);
-        String harborUsername = obj.getString("username");
-
-        final String secretName = "harbor-secret-" + posixPrincipal.username.toLowerCase();
-
-        // delete any old secret by this name
-        String[] deleteCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
-        try {
-            String deleteResult = execute(deleteCmd);
-            log.debug("delete secret result: " + deleteResult);
-        } catch (IOException notFound) {
-            log.debug("no secret to delete", notFound);
-        }
-
-        // harbor invalidates secrets with the unicode replacement characters 'fffd'.
-        if (cliSecret != null && !cliSecret.startsWith("\ufffd")) {
-            // create new secret
-            String[] createCmd = new String[] {
-                    "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
-                    secretName,
-                    "--docker-server=" + harborHost,
-                    "--docker-username=" + harborUsername,
-                    "--docker-password=" + cliSecret};
-            try {
-                String createResult = execute(createCmd);
-                log.debug("create secret result: " + createResult);
-            } catch (IOException e) {
-                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
-                    // This can happen with concurrent posts by same user.
-                    // Considered making secrets unique with the session id,
-                    // but that would lead to a large number of secrets and there
-                    // is no k8s option to have them cleaned up automatically.
-                    // Should look at supporting multiple job creations on a post,
-                    // specifically for the headless use case.  That way only one
-                    // secret per post.
-                    log.debug("secret creation failed, moving on: " + e);
-                } else {
-                    log.error(e.getMessage(), e);
-                    throw new IOException("error creating image pull secret");
-                }
-            }
-        } else {
-            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-
-        return secretName;
     }
 
     private String getSupplementalGroupsList() throws Exception {

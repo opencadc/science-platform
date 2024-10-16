@@ -17,38 +17,101 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.19.1
+    image: images.opencadc.org/platform/skaha:0.21.3
     imagePullPolicy: Always
-    skahaTld: "/arc"
-    maxUserSessions: "3"
-    sessionExpiry: "345600"
+
+    # Cron string for the image caching cron job schedule. Defaults to every minute.
+    imageCache:
+      refreshSchedule: "*/1 * * * *"
+  
+    # Set the top-level-directory name that gets mounted at the root.
+    # skahaTld: "/cavern"
+
+    # When set to 'true' this flag will enable GPU node scheduling.
+    # gpuEnabled: false 
+
+    # Used when allocating first-time users into the system.
     defaultQuotaGB: "10"
 
     # Space delimited list of allowed Image Registry hosts.  These hosts should match the hosts in the User Session images.
     registryHosts: "images.canfar.net"
 
-    # The group name to verify users against for permission to use the Science Platform.
-    usersGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # The IVOA GMS Group URI to verify users against for permission to use the Science Platform.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    # usersGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    adminsGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # The IVOA GMS Group URI to verify images without contacting Harbor.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    # adminsGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Group for users to preempt headless jobs.
-    headlessGroup: "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    # Group URI for users to preempt headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    # headlessGroup: "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # Array of groups allowed to set the logging level.  If none set, then nobody can change the log level.
+    # Group URI for users to ensure priority for their headless jobs.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
+    # headlessPriorityGroup: "ivo://example.org/gms?skaha-priority-headless-users"
+
+    # Class name to set for priority headless jobs.
+    # headlessPriorityClass: uber-user-preempt-high
+
+    # Array of GMS Group URIs allowed to set the logging level.  If none set, then nobody can change the log level.
+    # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2 for GMS Group URIs
+    # See https://github.com/opencadc/core/tree/main/cadc-log for Logging control
     # loggingGroups:
-    #   - "ivo://skao.int/gms?prototyping-groups/mini-src/platform-users"
+    #   - "ivo://example.org/gms?prototyping-groups/mini-src/platform-users"
 
-    # The Resource ID of the Service that contains the Posix Mapping information
-    posixMapperResourceID: "ivo://example.org/posix-mapper"
+    # The Resource ID (URI) of the Service that contains the Posix Mapping information
+    # posixMapperResourceID: "ivo://example.org/posix-mapper"
 
     # URI or URL of the OIDC (IAM) server.  Used to validate incoming tokens.
-    oidcURI: https://ska-iam.stfc.ac.uk/
+    # oidcURI: https://iam.example.org/
 
-    # ID (URI) of the GMS Service.
-    gmsID: ivo://skao.int/gms
+    # The Resource ID (URI) of the GMS Service.
+    # gmsID: ivo://example.org/gms
 
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # The absolute URL of the IVOA Registry where services are registered
+    # registryURL: https://spsrc27.iaa.csic.es/reg
+
+    # Settings for User Sessions.  Sensible defaults supplied, but can be overridden.
+    # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+    sessions:
+      expirySeconds: "345600"   # Duration, in seconds, until they expire and are shut down.
+      maxCount: "3"  # Max number of sessions per user.
+      minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
+      maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
+      # Declare extra volume mounts in User Sessions.  The "type: parameter in volume section is constant.
+      # extraVolumes:
+      # - name: example-pvc-name
+      #   volume:
+      #     type: PVC           # PVC is for Persistant volume claim
+      #     name: pvc-name
+      #   volumeMount:
+      #     mountPath: "/pvc-volume-mount"
+      #     subPath: "pvc"
+      # - name: example-hostpath-name
+      #   volume:
+      #     type: HOST_PATH     # HOST_PATH is for host path
+      #     hostPath: "/host-path"
+      #     hostPathType: Directory
+      #   volumeMount:
+      #     mountPath: "/host-path"
+      #     readOnly: true
+      #     mountPropagation: HostToContainer
+      # - name: config-map-volume
+      #   volume:
+      #     type: CONFIG_MAP    # CONFIG_MAP is for config map
+      #     name: example-config-map-name
+      #     defaultMode: "0777"
+      #   volumeMount:
+      #     mountPath: "/cmp"
+      # - name: secret-volume
+      #   volume:
+      #     type: SECRET        # SECRET is for secrets
+      #     name: example-secret-name
+      #     defaultMode: "0777"
+      #   volumeMount:
+      #     mountPath: "/scrt"
 
     # Optionally set the DEBUG port.
     # extraEnv:
@@ -58,6 +121,7 @@ deployment:
     #   value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5555"
 
     # Resources provided to the Skaha service.
+    # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
     resources:
       requests:
         memory: "1Gi"
@@ -97,26 +161,36 @@ deployment:
   #     hostname: myhost.example.org
   # extraHosts: []
 
+
 secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
   # skaha-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
-
-# Exposed extra ports.  Uncomment the java-debug port to expose and debug issues.
-# service:
-#   skaha:
-#     extraPorts:
-  #   - port: 5555
-  #     protocol: TCP
-  #     name: java-debug
 
 # Set these appropriately to match your Persistent Volume labels.
 storage:
   service:
     spec:
       # YAML for service mounted storage.
-      # Example is the persistentVolumeClaim below.  Do not uncomment this
-      # or Helm will use it as the default, even if a different spec
-      # is specified.
+      # Example is the persistentVolumeClaim below.
       # persistentVolumeClaim:
       #   claimName: skaha-pvc
+
+# For caching images from the Image Repository and for the writing the POSIX Users and Groups to be shared with Job files
+redis:
+  architecture: 'standalone'
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    containerSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]

@@ -1,0 +1,88 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  namespace: {{ .Values.skaha.namespace }}
+  name: image-caching-cronjob
+spec:
+  schedule: {{ .Values.deployment.skaha.imageCache.refreshSchedule | toString | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            runAsUser: 999  # redis user
+            runAsGroup: 1000  # redis user group
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: image-caching-cronjob
+              image: images.opencadc.org/platform/skaha-image-cache:7-alpine
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+              - |
+                sh /config/cache-images.sh
+              env:
+                - name: HARBOR_HOST
+                  value: "{{ .Values.deployment.skaha.registryHosts }}"
+                - name: REDIS_HOST
+                  value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+                - name: REDIS_PORT
+                  value: "6379"
+              volumeMounts:
+                - name: config-volume
+                  mountPath: /config
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+          restartPolicy: OnFailure
+          volumes:
+          - name: config-volume
+            configMap:
+              name: skaha-config
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: {{ .Values.skaha.namespace }}
+  name: image-caching-job
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 999  # redis user
+        runAsGroup: 1000  # redis user group
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: image-caching-job
+          image: images.opencadc.org/platform/skaha-image-cache:7-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+          - |
+            sh /config/cache-images.sh
+          env:
+            - name: HARBOR_HOST
+              value: "{{ .Values.deployment.skaha.registryHosts }}"
+            - name: REDIS_HOST
+              value: "{{ .Release.Name }}-redis-master.{{ .Values.skaha.namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+            - name: REDIS_PORT
+              value: "6379"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+      restartPolicy: OnFailure
+      volumes:
+      - name: config-volume
+        configMap:
+          name: skaha-config

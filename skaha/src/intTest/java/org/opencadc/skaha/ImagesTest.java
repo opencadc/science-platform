@@ -68,28 +68,18 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
-import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.lang.reflect.Type;
-import java.net.URI;
 import java.net.URL;
-import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
-
 import javax.security.auth.Subject;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
@@ -98,60 +88,32 @@ import org.opencadc.skaha.image.Image;
 
 /**
  * @author yeunga
- *
  */
 public class ImagesTest {
-    
+
     private static final Logger log = Logger.getLogger(ImagesTest.class);
-    public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
-    
+
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
     }
-    
+
     protected final URL imageURL;
     protected final Subject userSubject;
-    
+
     public ImagesTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL imageServiceURL =
-                    regClient.getServiceURL(SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+            final URL imageServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
             imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
             log.info("sessions URL: " + imageURL);
 
-            final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token",
-                                                                ImagesTest.class);
-            final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-            userSubject = new Subject();
-            userSubject.getPublicCredentials().add(
-                    new AuthorizationToken("Bearer", bearerToken.replaceAll("\n", ""),
-                                           List.of(NetUtil.getDomainName(imageURL))));
-            log.debug("userSubject: " + userSubject);
+            this.userSubject = SessionUtil.getCurrentUser(imageURL, false);
         } catch (Exception e) {
             log.error("init exception", e);
             throw new RuntimeException("init exception", e);
         }
     }
-    
-    @Test
-    public void testGetImageList() {
-        try {
-            
-            Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
-                // should have at least one image
-                List<Image> images = ImagesTest.getImages(imageURL);
-                Assert.assertFalse("one or more images", images.isEmpty());
-                return null;
-            });
-            
-        } catch (Exception t) {
-            log.error("unexpected throwable", t);
-            Assert.fail("unexpected throwable: " + t);
-        }
-    }
-    
     protected static List<Image> getImages(final URL imageURL) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         HttpGet get = new HttpGet(imageURL, out);
@@ -160,8 +122,25 @@ public class ImagesTest {
         Assert.assertEquals("response code", 200, get.getResponseCode());
         Assert.assertEquals("content-type", "application/json", get.getContentType());
         String json = out.toString();
-        Type listType = new TypeToken<List<Image>>(){}.getType();
+        Type listType = new TypeToken<List<Image>>() {
+        }.getType();
         Gson gson = new Gson();
         return gson.fromJson(json, listType);
+    }
+
+    @Test
+    public void testGetImageList() {
+        try {
+            Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+                // should have at least one image
+                List<Image> images = ImagesTest.getImages(imageURL);
+                Assert.assertFalse("one or more images", images.isEmpty());
+                return null;
+            });
+
+        } catch (Exception t) {
+            log.error("unexpected throwable", t);
+            Assert.fail("unexpected throwable: " + t);
+        }
     }
 }

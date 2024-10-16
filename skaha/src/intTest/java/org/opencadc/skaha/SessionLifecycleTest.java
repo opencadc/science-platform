@@ -68,16 +68,12 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.net.HttpPost;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-import java.io.ByteArrayOutputStream;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -119,7 +115,7 @@ public class SessionLifecycleTest {
         }
 
         RegistryClient regClient = new RegistryClient();
-        final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.COOKIE);
+        final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         sessionURL = new URL(sessionServiceURL.toString() + "/session");
         log.info("sessions URL: " + sessionURL);
 
@@ -134,19 +130,18 @@ public class SessionLifecycleTest {
             // ensure that there is no active session
             initialize();
 
-
             // create desktop session
-            final String desktopSessionID = createSession("inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                          SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
+            final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
+                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
 
-            final Session desktopSession = SessionUtil.waitForSession(sessionURL, desktopSessionID, Session.STATUS_RUNNING);
-            verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
+            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 
             // create carta session
-            final String cartaSessionID = createSession("inttest" + SessionAction.SESSION_TYPE_CARTA,
-                                                        SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId());
+            final String cartaSessionID = SessionUtil.createSession(sessionURL, "inttest" + SessionAction.SESSION_TYPE_CARTA,
+                                                                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId());
             Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID, Session.STATUS_RUNNING);
-            verifySession(desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
+            SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
 
             Assert.assertNotNull("CARTA session not running.", cartaSession);
             Assert.assertEquals("CARTA session name is wrong", "inttest" + SessionAction.SESSION_TYPE_CARTA, cartaSession.getName());
@@ -189,31 +184,6 @@ public class SessionLifecycleTest {
             }
         }
         Assert.assertEquals("zero sessions #1", 0, count);
-    }
-
-    private String createSession(final String name, String image) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("name", name);
-        params.put("image", image);
-        params.put("cores", 1);
-        params.put("ram", 1);
-        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        HttpPost post = new HttpPost(sessionURL, params, outputStream);
-        post.setFollowRedirects(false);
-        post.run();
-        Assert.assertNull("create session error", post.getThrowable());
-
-        return outputStream.toString().trim();
-    }
-
-    private void verifySession(final Session session, final String expectedSessionType, final String expectedName) {
-        Assert.assertNotNull("no session type", session.getType());
-        if (session.getType().equals(expectedSessionType)) {
-            Assert.assertNotNull("no session ID", session.getId());
-            Assert.assertEquals("wrong session name", expectedName, session.getName());
-            Assert.assertNotNull("missing connect URL", session.getConnectURL());
-            Assert.assertNotNull("missing up since", session.getStartTime());
-        }
     }
 
     private List<Session> getSessions() throws Exception {
