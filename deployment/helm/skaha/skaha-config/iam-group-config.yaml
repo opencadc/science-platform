@@ -1,6 +1,6 @@
-{{- if .Values.kueue.localQueues }}
-{{- range $queueName, $queue := .Values.kueue.localQueues }}
-{{- range $type := $queue.type }}
-{{ $queue.group }}:{{ $type }}: {{ $queueName }}
-{{- end }}
+{{- range $queueName, $queueData := .Values.kueue.localQueues }}
+  {{- $group := $queueData.group }}
+  {{- range $queueType := $queueData.type }}
+{{ $queueName }}:{{ $queueType }} : {{ $group }}
+  {{- end }}
 {{- end }}
