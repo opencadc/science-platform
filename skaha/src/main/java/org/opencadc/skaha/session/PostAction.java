@@ -85,12 +85,7 @@ import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -143,6 +138,7 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+    private static final String SKAHA_LOCAL_QUEUE = "SKAHA_LOCAL_QUEUE";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
 
@@ -644,6 +640,8 @@ public class PostAction extends SessionAction {
         }
 
         String jobLaunchString = sessionJobBuilder.build();
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, "skaha-workload-queue-interactive");
+
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
