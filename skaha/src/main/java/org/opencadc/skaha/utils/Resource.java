@@ -41,10 +41,22 @@ public class Resource {
     public Resource add(Resource another) {
         this.cpu += another.cpu;
         this.memory += another.memory;
-        this.ephemeralStorage = another.ephemeralStorage;
+        this.ephemeralStorage += another.ephemeralStorage;
         return this;
     }
 
+    public Resource reduce(Resource another) {
+        this.cpu -= another.cpu;
+        this.memory -= another.memory;
+        this.ephemeralStorage -= another.ephemeralStorage;
+        return this;
+    }
+
+    public boolean isAvailable(Resource another) {
+        return this.cpu >= another.cpu
+                && this.memory >= another.memory
+                && this.ephemeralStorage >= another.ephemeralStorage;
+    }
     @Override
     public String toString() {
         return "Resource{" +
