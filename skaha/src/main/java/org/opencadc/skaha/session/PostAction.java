@@ -151,6 +151,7 @@ public class PostAction extends SessionAction {
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+    private static final String SKAHA_LOCAL_QUEUE = "SKAHA_LOCAL_QUEUE";
 
     public PostAction() {
         super();
@@ -627,6 +628,8 @@ public class PostAction extends SessionAction {
             jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
 
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, "skaha-workload-queue-interactive");
+
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
@@ -780,6 +783,8 @@ public class PostAction extends SessionAction {
         launchString = setConfigValue(launchString, REGISTRY_URL,
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
+
+        launchString = setConfigValue(launchString, SKAHA_LOCAL_QUEUE, "skaha-workload-queue-interactive");
 
         String launchFile = super.stageFile(launchString);
 
