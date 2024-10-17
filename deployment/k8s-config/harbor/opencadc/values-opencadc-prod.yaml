@@ -64,6 +64,16 @@ notary:
               operator: In
               values:
               - service-node
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsGroup: 1001
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
 
   signer:
     image:
@@ -79,6 +89,16 @@ notary:
               operator: In
               values:
               - service-node
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsGroup: 1001
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
 
 #***************************************************
 portal:
@@ -91,6 +111,16 @@ portal:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 core:
@@ -103,6 +133,16 @@ core:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 jobservice:
@@ -115,6 +155,16 @@ jobservice:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 registry:
@@ -127,6 +177,16 @@ registry:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 chartmuseum:
@@ -143,6 +203,16 @@ chartmuseum:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 trivy:
@@ -155,6 +225,16 @@ trivy:
             operator: In
             values:
             - service-node
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: true
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
 
 #***************************************************
 persistence:
@@ -201,6 +281,16 @@ postgresql:
     subPath: harbor-postgresql
 
   primary:
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
     priorityClassName: uber-user-preempt-high
     affinity:
       nodeAffinity:
@@ -243,6 +333,16 @@ redis:
   enabled: true
 
   master:
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
     priorityClassName: uber-user-preempt-high
     affinity:
       nodeAffinity:
