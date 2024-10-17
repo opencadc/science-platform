@@ -28,6 +28,8 @@ spec:
       enableServiceLinks: false
       restartPolicy: OnFailure
       ${skaha.schedulegpu}
+      imagePullSecrets:
+        - name: ${software.imagesecret}
       securityContext:
         {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium
