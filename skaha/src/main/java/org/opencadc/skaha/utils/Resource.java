@@ -57,6 +57,7 @@ public class Resource {
                 && this.memory >= another.memory
                 && this.ephemeralStorage >= another.ephemeralStorage;
     }
+
     @Override
     public String toString() {
         return "Resource{" +
