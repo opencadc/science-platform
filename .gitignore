@@ -4,6 +4,7 @@
 /**/build
 /**/bin
 .vscode
+out
 
 # Local build stuff
 *tgz*
