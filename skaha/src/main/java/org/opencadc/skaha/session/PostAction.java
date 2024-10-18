@@ -557,6 +557,7 @@ public class PostAction extends SessionAction {
         final String jobLaunchPath;
         final String servicePath;
         final String ingressPath;
+        String localQueue = "skaha-workload-queue-interactive";;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
@@ -583,6 +584,7 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
+                localQueue = "skaha-workload-queue-headless";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -628,7 +630,7 @@ public class PostAction extends SessionAction {
             jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
 
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, "skaha-workload-queue-interactive");
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, localQueue);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
