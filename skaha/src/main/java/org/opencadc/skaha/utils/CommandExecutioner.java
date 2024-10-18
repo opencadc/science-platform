@@ -10,35 +10,15 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
 
 public class CommandExecutioner {
     private static final Logger log = Logger.getLogger(CommandExecutioner.class);
 
     public static String execute(String[] command) throws IOException, InterruptedException {
         return execute(command, true);
-    }
-
-    public static String executeInShell(String[] command, boolean allowError) throws IOException, InterruptedException {
-        final ProcessBuilder processBuilder = new ProcessBuilder("/bin/sh", "-c", String.join(" ", command));
-        final Process p = processBuilder.start();
-        final String stdout = readStream(p.getInputStream());
-        final String stderr = readStream(p.getErrorStream());
-        log.debug("stdout: " + stdout);
-        log.debug("stderr: " + stderr);
-        int status = p.waitFor();
-        log.debug("Status=" + status + " for command: " + Arrays.toString(command));
-        if (status != 0) {
-            if (allowError) {
-                return stderr;
-            } else {
-                String message = "Error executing command: " + Arrays.toString(command) + " Error: " + stderr;
-                throw new IOException(message);
-            }
-        }
-        return stdout.trim();
     }
 
     public static String execute(String[] command, boolean allowError) throws IOException, InterruptedException {
@@ -102,6 +82,48 @@ public class CommandExecutioner {
         }
     }
 
+    public static void ensureRegistrySecret(final ImageRegistryAuth registryAuth, final String secretName)
+        throws Exception {
+        // delete any old secret by this name
+        final String[] deleteCmd = new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+        log.debug("delete secret command: " + Arrays.toString(deleteCmd));
+        try {
+            String deleteResult = CommandExecutioner.execute(deleteCmd);
+            log.debug("delete secret result: " + deleteResult);
+        } catch (IOException notFound) {
+            log.debug("no secret to delete", notFound);
+        }
+
+        // create new secret
+        final String[] createCmd = new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+            secretName,
+            "--docker-server=" + registryAuth.getHost(),
+            "--docker-username=" + registryAuth.getUsername(),
+            "--docker-password=" + new String(registryAuth.getSecret())
+        };
+        log.debug("create secret command: " + Arrays.toString(createCmd));
+
+        try {
+            String createResult = CommandExecutioner.execute(createCmd);
+            log.debug("create secret result: " + createResult);
+        } catch (IOException e) {
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
+                // This can happen with concurrent posts by same user.
+                // Considered making secrets unique with the session id,
+                // but that would lead to a large number of secrets and there
+                // is no k8s option to have them cleaned up automatically.
+                // Should look at supporting multiple job creations on a post,
+                // specifically for the headless use case.  That way only one
+                // secret per post.
+                log.warn("secret creation failed, moving on: " + e);
+            } else {
+                log.error(e.getMessage(), e);
+                throw new IOException("error creating image pull secret");
+            }
+        }
+    }
+
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
         // Check the current secret
         final String[] getSecretCommand = new String[] {
@@ -125,29 +147,6 @@ public class CommandExecutioner {
             buffer.write(data, 0, nRead);
         }
         return buffer.toString(StandardCharsets.UTF_8);
-    }
-
-    public static String createDirectoryIfNotExist(String... paths) {
-        Path path = Paths.get("/", paths);
-        File directory = new File(path.toString());
-        if (!(directory.exists())) {
-            directory.mkdir();
-        }
-        return path.toString();
-    }
-
-    public static String createOrOverrideFile(String directoryPath, String fileName, String content)
-            throws IOException {
-        Path path = Paths.get(directoryPath, fileName);
-        File file = new File(path.toString());
-        if (!(file.exists())) {
-            file.createNewFile();
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(content + "\n");
-        writer.flush();
-        writer.close();
-        return path.toString();
     }
 
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {
