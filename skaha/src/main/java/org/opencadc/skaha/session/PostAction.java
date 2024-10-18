@@ -69,15 +69,12 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -85,13 +82,14 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.skaha.utils.QueueUtil;
 
 import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,8 +99,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.PosixCache;
 
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
@@ -557,7 +553,6 @@ public class PostAction extends SessionAction {
         final String jobLaunchPath;
         final String servicePath;
         final String ingressPath;
-        String localQueue = "skaha-workload-queue-interactive";;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
@@ -584,7 +579,6 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
-                localQueue = "skaha-workload-queue-headless";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -629,6 +623,16 @@ public class PostAction extends SessionAction {
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
+
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+        List<String> groupNames = groups.stream()
+                .map(group -> group.getID().getName())
+                .collect(Collectors.toList());
+        String localQueue = QueueUtil.getLocalQueue(groupNames, type);
 
         jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, localQueue);
 
@@ -786,7 +790,16 @@ public class PostAction extends SessionAction {
                                          new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
         launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
 
-        launchString = setConfigValue(launchString, SKAHA_LOCAL_QUEUE, "skaha-workload-queue-interactive");
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+        List<String> groupNames = groups.stream()
+                .map(group -> group.getID().getName())
+                .collect(Collectors.toList());
+        String localQueue = QueueUtil.getLocalQueue(groupNames, "desktop-app");
+        launchString = setConfigValue(launchString, SKAHA_LOCAL_QUEUE, localQueue);
 
         String launchFile = super.stageFile(launchString);
 

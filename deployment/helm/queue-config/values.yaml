@@ -8,9 +8,13 @@ kueue:
     skaha-workload-queue-interactive:
       namespace: skaha-workload
       clusterQueue: skaha-cluster-queue-interactive
+      group: "prototyping-groups/mini-src/platform-users"
+      jobType: carta,notebook,desktop,contributed,desktop-app
     skaha-workload-queue-headless:
       namespace: skaha-workload
       clusterQueue: skaha-cluster-queue-headless
+      group: "prototyping-groups/mini-src/platform-users"
+      jobType: headless
 
   clusterQueues:
     skaha-cluster-queue-interactive:
