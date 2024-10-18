@@ -22,19 +22,27 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 
+/**
+ * Class to interface with Kubernetes.
+ */
 public class SessionJobBuilder {
     private static final Logger log = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
-
-    private Path jobFilePath;
     private final Map<String, String> parameters = new HashMap<>();
+    private Path jobFilePath;
     private boolean gpuEnabled;
     private Integer gpuCount;
 
+
+    private SessionJobBuilder() {
+
+    }
+
     /**
      * Create a new builder from the provided path.
+     *
      * @param jobFilePath The Path of the template file.
-     * @return  SessionJobBuilder instance.  Never null.
+     * @return SessionJobBuilder instance.  Never null.
      */
     static SessionJobBuilder fromPath(final Path jobFilePath) {
         final SessionJobBuilder sessionJobBuilder = new SessionJobBuilder();
@@ -43,10 +51,35 @@ public class SessionJobBuilder {
         return sessionJobBuilder;
     }
 
+    private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
+        if (gpuRequiredNodeSelectorTerms.size() != 1) {
+            throw new IllegalStateException("GPU Node Selector cannot exceed one selector.");
+        }
+
+        final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.get(0);
+        final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions = gpuNodeSelectorTerm.getMatchExpressions();
+
+        if (gpuNodeSelectorMatchExpressions == null) {
+            throw new IllegalStateException("Preset GPU Node Selector match expressions are missing.");
+        } else if (gpuNodeSelectorMatchExpressions.size() != 1) {
+            throw new IllegalStateException("Preset GPU Node Selector match expressions must be exactly one (found "
+                                                + gpuNodeSelectorMatchExpressions.size() + ")");
+        }
+
+        return gpuNodeSelectorMatchExpressions.get(0);
+    }
+
+    static String setConfigValue(String doc, String key, String value) {
+        String regKey = key.replace(".", "\\.");
+        String regex = "\\$[{]" + regKey + "[}]";
+        return doc.replaceAll(regex, value);
+    }
+
     /**
      * Pass parameters to be replaced in the job file.
-     * @param parameters    Map of parameter String key to String values to replace.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param parameters Map of parameter String key to String values to replace.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withParameters(final Map<String, String> parameters) {
         this.parameters.putAll(parameters);
@@ -55,8 +88,9 @@ public class SessionJobBuilder {
 
     /**
      * Enable GPU scheduling.
-     * @param enableGPU     True if GPU scheduling enabled, False otherwise.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param enableGPU True if GPU scheduling enabled, False otherwise.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withGPUEnabled(final boolean enableGPU) {
         this.gpuEnabled = enableGPU;
@@ -65,8 +99,9 @@ public class SessionJobBuilder {
 
     /**
      * Request some number of GPUs.
-     * @param gpuCount  The count of GPUs to request.
-     * @return  This SessionJobBuilder instance, never null
+     *
+     * @param gpuCount The count of GPUs to request.
+     * @return This SessionJobBuilder instance, never null
      */
     SessionJobBuilder withGPUCount(final int gpuCount) {
         this.gpuCount = gpuCount;
@@ -76,9 +111,10 @@ public class SessionJobBuilder {
 
     /**
      * Build a single parameter into this builder's parameter map.
-     * @param key       The key to find.
-     * @param value     The value to replace with.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param key   The key to find.
+     * @param value The value to replace with.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withParameter(final String key, final String value) {
         this.parameters.put(key, value);
@@ -87,8 +123,9 @@ public class SessionJobBuilder {
 
     /**
      * Construct the Job YAML output of this builder.
-     * @return  String of YAML, never null.
-     * @throws IOException  If the provided Path cannot be read.
+     *
+     * @return String of YAML, never null.
+     * @throws IOException If the provided Path cannot be read.
      */
     String build() throws IOException {
         final byte[] jobFileBytes = Files.readAllBytes(jobFilePath);
@@ -181,30 +218,6 @@ public class SessionJobBuilder {
         }
 
         return jobFileString;
-    }
-
-    private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
-        if (gpuRequiredNodeSelectorTerms.size() != 1) {
-            throw new IllegalStateException("GPU Node Selector cannot exceed one selector.");
-        }
-
-        final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.get(0);
-        final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions = gpuNodeSelectorTerm.getMatchExpressions();
-
-        if (gpuNodeSelectorMatchExpressions == null) {
-            throw new IllegalStateException("Preset GPU Node Selector match expressions are missing.");
-        } else if (gpuNodeSelectorMatchExpressions.size() != 1) {
-            throw new IllegalStateException("Preset GPU Node Selector match expressions must be exactly one (found "
-                                                + gpuNodeSelectorMatchExpressions.size() + ")");
-        }
-
-        return gpuNodeSelectorMatchExpressions.get(0);
-    }
-
-    static String setConfigValue(String doc, String key, String value) {
-        String regKey = key.replace(".", "\\.");
-        String regex = "\\$[{]" + regKey + "[}]";
-        return doc.replaceAll(regex, value);
     }
 
     private V1Affinity getGPUSchedulingAffinity() {

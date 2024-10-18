@@ -12,3 +12,4 @@ data:
 {{ end }}
 {{ ($.Files.Glob "skaha-config/*.properties").AsConfig | indent 2 }}
 {{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
+{{- (.Files.Glob "image-cache/*").AsConfig | nindent 2 }}

@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.org
   cavern:
-    image: images.opencadc.org/platform/cavern:0.7.13
+    image: images.opencadc.org/platform/cavern:0.7.14
     imagePullPolicy: Always
 
     # How cavern identifies itself.
@@ -63,16 +63,17 @@ deployment:
     # The IdentityManager class handling authentication.  This should generally be left alone.
     identityManagerClass: org.opencadc.auth.StandardIdentityManager
 
-    # For the UWS database.
+    # For the UWS PostgreSQL database.
     uws:
       db:
+        install: true # Whether to deploy a local PostgreSQL database.  Set to false to use your own.
+        runUID: 999  # Postgres User default in the postgres:15 image if install: true
+        # url: "jdbc:postgresql://<host>:<port>/<database>" # if install: false, then set this to where it should point to
+        database: "uws"  # if install: true, otherwise it's ignored
         username: "uwsuser"
         password: "uwspwd"
-        database: "uws"  # OR url below.
-        # url: "jdbc:postgresql://<host>:<port>/<database>"
         schema: "uws"
         maxActive: 2
-        runUID: 999  # Postgres User default in the postgres:13 image
 
     # Optional rename of the application from the default "cavern".
     applicationName: "cavern"

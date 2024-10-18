@@ -27,8 +27,6 @@ spec:
       enableServiceLinks: false
       restartPolicy: OnFailure
       {{ template "skaha.job.nodeAffinity" . }}
-      imagePullSecrets:
-      - name: ${software.imagesecret}
       securityContext:
         {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium

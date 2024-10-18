@@ -28,8 +28,6 @@ spec:
       enableServiceLinks: false
       restartPolicy: Never
       {{ template "skaha.job.nodeAffinity" . }}
-      imagePullSecrets:
-      - name: ${software.imagesecret}
       hostname: "${software.hostname}"
       initContainers:
       {{ template "skaha.job.initContainers" . }}

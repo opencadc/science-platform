@@ -67,31 +67,17 @@
 
 package org.opencadc.skaha.session;
 
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
+
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.reg.client.LocalAuthority;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.opencadc.auth.PosixGroup;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
-
-import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,21 +85,28 @@ import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
+import javax.security.auth.Subject;
+import org.apache.log4j.Logger;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.permissions.WriteGrant;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.utils.PosixCache;
 
 /**
  * @author majorb
  */
 public class PostAction extends SessionAction {
-
-    private static final Logger log = Logger.getLogger(PostAction.class);
-
-    // k8s rejects label size > 63. Since k8s appends a maximum of six characters
-    // to a job name to form a pod name, we limit the job name length to 57 characters.
-    private static final int MAX_JOB_NAME_LENGTH = 57;
 
     // variables replaced in kubernetes yaml config files for
     // launching desktop sessions and launching software
@@ -134,22 +127,48 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
     public static final String SOFTWARE_IMAGEID = "software.imageid";
-    public static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
     public static final String SOFTWARE_REQUESTS_CORES = "software.requests.cores";
     public static final String SOFTWARE_REQUESTS_RAM = "software.requests.ram";
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
+    private static final Logger log = Logger.getLogger(PostAction.class);
+    // k8s rejects label size > 63. Since k8s appends a maximum of six characters
+    // to a job name to form a pod name, we limit the job name length to 57 characters.
+    private static final int MAX_JOB_NAME_LENGTH = 57;
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
-    private static final String DEFAULT_HARBOR_SECRET = "notused";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
-    private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
     public PostAction() {
         super();
+    }
+
+    private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
+        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        List<String> getRenewJobNamesCmd = new ArrayList<>();
+        getRenewJobNamesCmd.add("kubectl");
+        getRenewJobNamesCmd.add("get");
+        getRenewJobNamesCmd.add("--namespace");
+        getRenewJobNamesCmd.add(k8sNamespace);
+        getRenewJobNamesCmd.add("job");
+        getRenewJobNamesCmd.add("-l");
+        getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
+        getRenewJobNamesCmd.add("--no-headers=true");
+        getRenewJobNamesCmd.add("-o");
+
+        String customColumns = "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime";
+
+        getRenewJobNamesCmd.add(customColumns);
+        return getRenewJobNamesCmd;
+    }
+
+    private static Set<List<Group>> getCachedGroupsFromSubject() {
+        Subject subject = AuthenticationUtil.getCurrentSubject();
+        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
+        return subject.getPublicCredentials(c);
     }
 
     @Override
@@ -181,10 +200,6 @@ public class PostAction extends SessionAction {
                 }
 
                 String name = syncInput.getParameter("name");
-                String gpusParam = syncInput.getParameter("gpus");
-                String cmd = syncInput.getParameter("cmd");
-                String args = syncInput.getParameter("args");
-                List<String> envs = syncInput.getParameters("env");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
@@ -200,6 +215,7 @@ public class PostAction extends SessionAction {
                 this.sessionID = new RandomStringGenerator(8).getID();
 
                 int gpus = 0;
+                final String gpusParam = syncInput.getParameter("gpus");
                 if (gpusParam != null) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
@@ -212,6 +228,10 @@ public class PostAction extends SessionAction {
                 }
 
                 ensureUserBase();
+
+                final String cmd = syncInput.getParameter("cmd");
+                final String args = syncInput.getParameter("args");
+                final List<String> envs = syncInput.getParameters("env");
                 createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
@@ -228,7 +248,7 @@ public class PostAction extends SessionAction {
                             }
                         } else {
                             throw new IllegalArgumentException(
-                                    "No active job for user " + posixPrincipal + " with session " + sessionID);
+                                "No active job for user " + posixPrincipal + " with session " + sessionID);
                         }
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
@@ -237,7 +257,6 @@ public class PostAction extends SessionAction {
                     throw new UnsupportedOperationException("Cannot modify an existing session");
                 }
             }
-            return;
         } else if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
                 // create an app
@@ -278,8 +297,8 @@ public class PostAction extends SessionAction {
         log.debug("PostAction.makeUserBase()");
         final Path userHomePath = getUserHomeDirectory();
         final String[] allocateUserCommand = new String[] {
-                PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
-                getDefaultQuota(), userHomePath.toAbsolutePath().toString()
+            PostAction.CREATE_USER_BASE_COMMAND, getUsername(), Integer.toString(getUID()),
+            getDefaultQuota(), userHomePath.toAbsolutePath().toString()
         };
 
         log.debug("Executing " + Arrays.toString(allocateUserCommand));
@@ -292,8 +311,8 @@ public class PostAction extends SessionAction {
 
             if (StringUtil.hasText(errorOutput)) {
                 throw new IOException("Unable to create user home."
-                                      + "\nError message from server: " + errorOutput
-                                      + "\nOutput from command: " + commandOutput);
+                                          + "\nError message from server: " + errorOutput
+                                          + "\nOutput from command: " + commandOutput);
             } else {
                 log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
             }
@@ -303,7 +322,7 @@ public class PostAction extends SessionAction {
     }
 
     void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-            throws IOException, InterruptedException {
+        throws IOException, InterruptedException {
         execute(command, standardOut, standardErr);
     }
 
@@ -352,7 +371,6 @@ public class PostAction extends SessionAction {
         return ram;
     }
 
-
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -370,7 +388,6 @@ public class PostAction extends SessionAction {
             execute(renewExpiryTimeCmd.toArray(new String[0]));
         }
     }
-
 
     private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
         String uid = jobAttributes.get(0);
@@ -430,29 +447,6 @@ public class PostAction extends SessionAction {
         }
 
         return renewJobMap;
-    }
-
-    private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
-        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getRenewJobNamesCmd = new ArrayList<>();
-        getRenewJobNamesCmd.add("kubectl");
-        getRenewJobNamesCmd.add("get");
-        getRenewJobNamesCmd.add("--namespace");
-        getRenewJobNamesCmd.add(k8sNamespace);
-        getRenewJobNamesCmd.add("job");
-        getRenewJobNamesCmd.add("-l");
-        getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
-        getRenewJobNamesCmd.add("--no-headers=true");
-        getRenewJobNamesCmd.add("-o");
-
-        String customColumns = "custom-columns=" +
-                               "NAME:.metadata.name," +
-                               "UID:.metadata.uid," +
-                               "STATUS:.status.active," +
-                               "START:.status.startTime";
-
-        getRenewJobNamesCmd.add(customColumns);
-        return getRenewJobNamesCmd;
     }
 
     private void validateName(String name) {
@@ -522,35 +516,28 @@ public class PostAction extends SessionAction {
         int count = 0;
         for (Session session : sessions) {
             log.debug("checking session: " + session);
-            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
-                !TYPE_DESKTOP_APP.equals(session.getType())) {
-                String status = session.getStatus();
-                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                      status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) && !TYPE_DESKTOP_APP.equals(session.getType())) {
+                final String status = session.getStatus();
+                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
+                    || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
         }
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
-                                               maxUserSessions + " active sessions.");
+            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " + maxUserSessions + " active sessions.");
         }
     }
 
     public void createSession(String type, String image, String name, Integer cores, Integer ram, Integer gpus,
                               String cmd, String args, List<String> envs)
-            throws Exception {
+        throws Exception {
 
         String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        final String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
-
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -602,7 +589,6 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SKAHA_SESSIONTYPE, type)
                                                                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                                                                .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
-                                                               .withParameter(PostAction.SOFTWARE_IMAGESECRET, imageSecret)
                                                                .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                                                                .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
                                                                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, cores.toString())
@@ -613,10 +599,7 @@ public class PostAction extends SessionAction {
                                                                               this.posixMapperConfiguration.getBaseURL() == null
                                                                                   ? this.posixMapperConfiguration.getResourceID().toString()
                                                                                   : this.posixMapperConfiguration.getBaseURL().toExternalForm())
-                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
-                                                               .withParameter(PostAction.REGISTRY_URL,
-                                                                              new LocalAuthority().getServiceURI(RegistryClient.class.getName()
-                                                                                                                     + ".baseURL").toString());
+                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
         if (StringUtil.hasText(supplementalGroups)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
@@ -632,6 +615,10 @@ public class PostAction extends SessionAction {
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
         injectCredentials();
 
+        // inject the entries from the POSIX Mapper
+        injectPOSIXDetails();
+
+        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
@@ -658,6 +645,11 @@ public class PostAction extends SessionAction {
         }
     }
 
+    private void injectPOSIXDetails() throws Exception {
+        final PosixCache posixCache = new PosixCache(this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+        posixCache.writePOSIXEntries();
+    }
+
     private String generateToken() throws Exception {
         return SkahaAction.getTokenTool().generateToken(URI.create(this.skahaUsersGroup), WriteGrant.class, this.sessionID);
     }
@@ -677,13 +669,10 @@ public class PostAction extends SessionAction {
 
         // Get the IP address based on the session
         String[] getIPCommand = new String[] {
-                "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
-                "--no-headers=true",
-                "-o", "custom-columns=" +
-                      "IPADDR:.status.podIP," +
-                      "DT:.metadata.deletionTimestamp," +
-                      "TYPE:.metadata.labels.canfar-net-sessionType," +
-                      "NAME:.metadata.name"};
+            "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
+            "--no-headers=true",
+            "-o",
+            "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name"};
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
@@ -697,8 +686,7 @@ public class PostAction extends SessionAction {
                     log.debug("part: " + part);
                 }
             }
-            if (parts.length > 1 && parts[1].trim().equals(NONE) &&
-                SESSION_TYPE_DESKTOP.equals(parts[2])) {
+            if (parts.length > 1 && parts[1].trim().equals(NONE) && SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
@@ -711,11 +699,6 @@ public class PostAction extends SessionAction {
 
         String name = getImageName(image);
         log.debug("name: " + name);
-        final String imageSecret = getHarborSecret(image);
-        log.debug("image secret: " + imageSecret);
-
-        String supplementalGroups = getSupplementalGroupsList();
-        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
 
         // incoming params ignored for the time being.  set to the 'name' so
         // that it becomes the xterm title
@@ -742,6 +725,7 @@ public class PostAction extends SessionAction {
             }
         }
 
+        final String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                                                                .withGPUEnabled(this.gpuEnabled)
                                                                .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
@@ -753,7 +737,6 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                                                                .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                                                                .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
-                                                               .withParameter(PostAction.SOFTWARE_IMAGESECRET, imageSecret)
                                                                .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                                                                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
@@ -766,19 +749,15 @@ public class PostAction extends SessionAction {
                                                                               this.posixMapperConfiguration.getBaseURL() == null
                                                                                   ? this.posixMapperConfiguration.getResourceID().toString()
                                                                                   : this.posixMapperConfiguration.getBaseURL().toExternalForm())
-                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
-                                                               .withParameter(PostAction.REGISTRY_URL,
-                                                                              new LocalAuthority().getServiceURI(RegistryClient.class.getName()
-                                                                                                                     + ".baseURL").toString());
-
+                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+        final String supplementalGroups = getSupplementalGroupsList();
         if (StringUtil.hasText(supplementalGroups)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
-
         String[] launchCmd = new String[] {
-                "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile
+            "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile
         };
 
         String createResult = execute(launchCmd);
@@ -796,103 +775,6 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private String getHarborSecret(String image) throws Exception {
-
-        // get the user's cli secret:
-        //  1. get the idToken from /ac/authorize
-        //  2. call harbor with idToken to get user info and secret
-
-        String harborHost = null;
-        for (String next : harborHosts) {
-            if (image.startsWith(next)) {
-                harborHost = next;
-            }
-        }
-        if (harborHost == null) {
-            throw new IllegalArgumentException("not a skaha harbor image: " + image);
-        }
-
-        String idToken = getIdToken();
-
-        // Default secret name if no ID Token is found.
-        if (!StringUtil.hasText(idToken)) {
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-
-        log.debug("getting secret from harbor");
-        URL harborURL = new URL("https://" + harborHost + "/api/v2.0/users/current");
-        OutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(harborURL, out);
-        get.setRequestProperty("Authorization", "Bearer " + idToken);
-        get.run();
-        log.debug("harbor response code: " + get.getResponseCode());
-        if (get.getResponseCode() == 404) {
-            if (get.getThrowable() != null) {
-                log.warn("user not found in harbor", get.getThrowable());
-            } else {
-                log.warn("user not found in harbor");
-            }
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-        if (get.getThrowable() != null) {
-            log.warn("error obtaining harbor secret. response code: " + get.getResponseCode());
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-        String userJson = out.toString();
-        log.debug("harbor user info: " + userJson);
-        JSONTokener tokener = new JSONTokener(userJson);
-        JSONObject obj = new JSONObject(tokener);
-        String cliSecret = obj.getJSONObject("oidc_user_meta").getString("secret");
-        log.debug("cliSecret: " + cliSecret);
-        String harborUsername = obj.getString("username");
-
-        final String secretName = "harbor-secret-" + posixPrincipal.username.toLowerCase();
-
-        // delete any old secret by this name
-        String[] deleteCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
-        try {
-            String deleteResult = execute(deleteCmd);
-            log.debug("delete secret result: " + deleteResult);
-        } catch (IOException notFound) {
-            log.debug("no secret to delete", notFound);
-        }
-
-        // harbor invalidates secrets with the unicode replacement characters 'fffd'.
-        if (cliSecret != null && !cliSecret.startsWith("\ufffd")) {
-            // create new secret
-            String[] createCmd = new String[] {
-                    "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
-                    secretName,
-                    "--docker-server=" + harborHost,
-                    "--docker-username=" + harborUsername,
-                    "--docker-password=" + cliSecret};
-            try {
-                String createResult = execute(createCmd);
-                log.debug("create secret result: " + createResult);
-            } catch (IOException e) {
-                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("already exists")) {
-                    // This can happen with concurrent posts by same user.
-                    // Considered making secrets unique with the session id,
-                    // but that would lead to a large number of secrets and there
-                    // is no k8s option to have them cleaned up automatically.
-                    // Should look at supporting multiple job creations on a post,
-                    // specifically for the headless use case.  That way only one
-                    // secret per post.
-                    log.debug("secret creation failed, moving on: " + e);
-                } else {
-                    log.error(e.getMessage(), e);
-                    throw new IOException("error creating image pull secret");
-                }
-            }
-        } else {
-            log.warn("image repository 'CLI Secret' is invalid and needs resetting.");
-            return PostAction.DEFAULT_HARBOR_SECRET;
-        }
-
-        return secretName;
-    }
-
     private String getSupplementalGroupsList() throws Exception {
         if (skahaCallbackFlow) {
             return callbackSupplementalGroups;
@@ -900,9 +782,9 @@ public class PostAction extends SessionAction {
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         if (groupCredentials.size() == 1) {
             return buildGroupUriList(groupCredentials)
-                    .stream()
-                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
-                    .collect(Collectors.joining(","));
+                .stream()
+                .map(posixGroup -> Integer.toString(posixGroup.getGID()))
+                .collect(Collectors.joining(","));
         } else {
             return "";
         }
@@ -919,15 +801,9 @@ public class PostAction extends SessionAction {
         return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIS);
     }
 
-    private static Set<List<Group>> getCachedGroupsFromSubject() {
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        return subject.getPublicCredentials(c);
-    }
-
     /**
      * Create the image, command, args, and env sections of the job launch yaml.  Example:
-     * <p>
+     * <p/>
      * image: "${software.imageid}"
      * command: ["/skaha-system/start-desktop-software.sh"]
      * args: [arg1, arg2]
