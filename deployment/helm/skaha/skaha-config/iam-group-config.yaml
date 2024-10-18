@@ -1,6 +1,0 @@
-{{- range $queueName, $queueData := .Values.kueue.localQueues }}
-  {{- $group := $queueData.group }}
-  {{- range $queueType := $queueData.type }}
-{{ $queueName }}:{{ $queueType }} : {{ $group }}
-  {{- end }}
-{{- end }}
