@@ -67,6 +67,7 @@
 
 package org.opencadc.skaha.session;
 
+import static org.opencadc.skaha.session.SessionJobBuilder.setConfigValue;
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.ac.Group;
@@ -74,6 +75,20 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import org.apache.log4j.Logger;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.permissions.WriteGrant;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.skaha.utils.QueueUtil;
+
+import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -87,19 +102,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import javax.security.auth.Subject;
-import org.apache.log4j.Logger;
-import org.opencadc.auth.PosixGroup;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.registry.ImageRegistryAuth;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.PosixCache;
-
 /**
  * @author majorb
  */
@@ -564,7 +566,6 @@ public class PostAction extends SessionAction {
         final String jobLaunchPath;
         final String servicePath;
         final String ingressPath;
-        String localQueue = "skaha-workload-queue-interactive";;
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
@@ -591,7 +592,6 @@ public class PostAction extends SessionAction {
                 jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
-                localQueue = "skaha-workload-queue-headless";
                 break;
             default:
                 throw new IllegalStateException("Bug: unknown session type: " + type);
@@ -632,8 +632,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
-                .withParameter(SKAHA_LOCAL_QUEUE, localQueue);
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
         sessionJobBuilder = sessionJobBuilder.withParameter(
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -642,7 +641,18 @@ public class PostAction extends SessionAction {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
 
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+        List<String> groupNames = groups.stream()
+                .map(group -> group.getID().getName())
+                .collect(Collectors.toList());
+        String localQueue = QueueUtil.getLocalQueue(groupNames, type);
+
         String jobLaunchString = sessionJobBuilder.build();
+        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_LOCAL_QUEUE, localQueue);
 
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
@@ -661,7 +671,7 @@ public class PostAction extends SessionAction {
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
-            serviceString = SessionJobBuilder.setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
+            serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
@@ -671,8 +681,8 @@ public class PostAction extends SessionAction {
         if (ingressPath != null) {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
+            ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
@@ -828,6 +838,7 @@ public class PostAction extends SessionAction {
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
+
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
 
         String createResult = execute(launchCmd);

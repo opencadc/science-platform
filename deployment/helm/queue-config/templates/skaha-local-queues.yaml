@@ -5,6 +5,9 @@ kind: LocalQueue
 metadata:
   namespace: {{ $config.namespace }}
   name: {{ $queue }}
+  annotations:
+    group: {{ $config.group }}
+    jobType: {{ $config.jobType }}
 spec:
   clusterQueue: {{ $config.clusterQueue }}
 ---
