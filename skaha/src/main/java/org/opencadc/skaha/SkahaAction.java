@@ -234,10 +234,8 @@ public abstract class SkahaAction extends RestAction {
             final String[] createCmd = new String[] {
                 "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
                 K8SUtil.getPreAuthorizedTokenSecretName(),
-                String.format("--from-literal=%s=", publicKeyPropertyName)
-                    + CommonUtils.encodeBase64(encodedPublicKey),
-                String.format("--from-literal=%s=", privateKeyPropertyName)
-                    + CommonUtils.encodeBase64(encodedPrivateKey)
+                String.format("--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
+                String.format("--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
             };
 
             final String createResult = CommandExecutioner.execute(createCmd);
@@ -317,7 +315,6 @@ public abstract class SkahaAction extends RestAction {
 
     private void initiateGeneralFlow(Subject currentSubject, URI skahaUsersUri)
         throws IOException, InterruptedException, ResourceNotFoundException {
-        GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
@@ -343,6 +340,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
+
         LocalAuthority localAuthority = new LocalAuthority();
         URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
 
@@ -365,6 +363,7 @@ public abstract class SkahaAction extends RestAction {
             priorityHeadlessUser = true;
         }
 
+        final GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");

@@ -890,7 +890,7 @@ public class PostAction extends SessionAction {
 
     /**
      * Create the image, command, args, and env sections of the job launch yaml.  Example:
-     * <p>
+     * <p />
      * image: "${software.imageid}"
      * command: ["/skaha-system/start-desktop-software.sh"]
      * args: [arg1, arg2]
