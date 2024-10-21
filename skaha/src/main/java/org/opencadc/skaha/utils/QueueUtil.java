@@ -18,6 +18,7 @@ public class QueueUtil {
             String localQueue = getLocalQueueByGroupAndJobType(groupName, jobType);
             if (localQueue != null) localQueues.add(localQueue);
         }
+        log.debug("primary group size for the user is : " + localQueues.size());
         if (localQueues.size() > 1) throw new RuntimeException("More than one LocalQueue for an user is Unsupported");
         if (localQueues.isEmpty()) throw new RuntimeException("No LocalQueue available");
         return localQueues.get(0);
@@ -26,15 +27,22 @@ public class QueueUtil {
     public static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
         String[] cmd = {"kubectl", "get", "localQueue", "-A", "-o",
                 "jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}"};
-        String allLocalQueuesOutput = CommandExecutioner.execute(cmd);
-        if (allLocalQueuesOutput.isEmpty()) return null;
-        String[] allLocalQueues = allLocalQueuesOutput.split("\n");
-        List<String> localQueues = Arrays.stream(allLocalQueues)
-                .map(localQueue -> findLocalQueueByJobType(jobType, localQueue))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        if (localQueues.size() > 1) throw new RuntimeException("More than one LocalQueue for a group is Unsupported");
-        return localQueues.get(0);
+        try {
+            String allLocalQueuesOutput = CommandExecutioner.execute(cmd, false);
+            log.debug("all local queues for the group " + groupName + " is : " + allLocalQueuesOutput);
+            if (allLocalQueuesOutput.isEmpty()) return null;
+            String[] allLocalQueues = allLocalQueuesOutput.split("\n");
+            List<String> localQueues = Arrays.stream(allLocalQueues)
+                    .map(localQueue -> findLocalQueueByJobType(jobType, localQueue))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            if (localQueues.size() > 1)
+                throw new RuntimeException("More than one LocalQueue for a group is Unsupported");
+            return localQueues.get(0);
+        } catch (IOException | InterruptedException ex) {
+            log.error(ex);
+            throw ex;
+        }
     }
 
     private static String findLocalQueueByJobType(String jobType, String localQueue) {
