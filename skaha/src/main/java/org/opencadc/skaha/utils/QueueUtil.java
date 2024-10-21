@@ -24,7 +24,7 @@ public class QueueUtil {
         return localQueues.get(0);
     }
 
-    public static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
+    private static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
         String[] cmd = {"kubectl", "get", "localQueue", "-A", "-o",
                 "jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}"};
         try {
