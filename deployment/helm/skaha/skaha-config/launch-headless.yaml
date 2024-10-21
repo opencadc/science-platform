@@ -29,6 +29,8 @@ spec:
       enableServiceLinks: false
       restartPolicy: Never
       ${skaha.schedulegpu}
+      imagePullSecrets:
+        - name: ${software.imagesecret}
       hostname: "${software.hostname}"
       initContainers:
       {{ template "skaha.job.initContainers" . }}

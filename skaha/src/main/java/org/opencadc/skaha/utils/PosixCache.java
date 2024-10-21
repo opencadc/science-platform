@@ -32,6 +32,7 @@ public class PosixCache {
      * Construct a new Cache.  This will initialize the Redis Pool (JediPooled) with the given URL and client to the POSIX Mapper API.
      *
      * @param cacheURL          The Redis URL.
+     * @param rootHomeFolder    Root of entire system (i.e. containing home and project folders)
      * @param posixMapperClient The Client to the POSIX Mapper API.
      */
     public PosixCache(final String cacheURL, final String rootHomeFolder, final PosixMapperClient posixMapperClient) {
