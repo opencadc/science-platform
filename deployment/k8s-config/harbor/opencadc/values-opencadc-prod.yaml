@@ -177,16 +177,28 @@ registry:
             operator: In
             values:
             - service-node
-  containerSecurityContext:
-    enabled: true
-    runAsNonRoot: true
-    runAsGroup: 1001
-    allowPrivilegeEscalation: false
-    seccompProfile:
-      type: RuntimeDefault
-    capabilities:
-      drop:
-        - ALL
+  server:
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+  controller:
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
 
 #***************************************************
 chartmuseum:
@@ -325,8 +337,6 @@ postgresql:
         emptyDir: {}
       - name: writabletmp
         emptyDir: {}
-
-
 
 #***************************************************
 redis:
