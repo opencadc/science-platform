@@ -147,7 +147,7 @@ paths:
         - name: view
           in: query
           type: string
-          description: If set to 'event', return the scheduling event logs.  If set to 'logs', return the container logs in text/plain format.  Responses are in text/plain format.
+          description: If set to 'events', return the scheduling event logs.  If set to 'logs', return the container logs in text/plain format.  Responses are in text/plain format.
           required: false
     post:
       description: |
