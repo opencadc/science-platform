@@ -1,4 +1,7 @@
-# CHANGELOG for Skaha User Session API (Chart 0.7.8)
+# CHANGELOG for Skaha User Session API (Chart 0.8.0)
+
+## 2024.10.18 (0.8.0)
+- Allow setting nodeAffinity values for proper scheduling.
 
 ## 2024.10.10 (0.7.8)
 - Fix for client certificate injection

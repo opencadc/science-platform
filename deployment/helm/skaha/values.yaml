@@ -17,7 +17,7 @@ skahaWorkload:
 deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
-    image: images.opencadc.org/platform/skaha:0.21.3
+    image: images.opencadc.org/platform/skaha:0.22.0
     imagePullPolicy: Always
 
     # Cron string for the image caching cron job schedule. Defaults to every minute.
@@ -26,9 +26,6 @@ deployment:
   
     # Set the top-level-directory name that gets mounted at the root.
     # skahaTld: "/cavern"
-
-    # When set to 'true' this flag will enable GPU node scheduling.
-    # gpuEnabled: false 
 
     # Used when allocating first-time users into the system.
     defaultQuotaGB: "10"
@@ -112,6 +109,14 @@ deployment:
       #     defaultMode: "0777"
       #   volumeMount:
       #     mountPath: "/scrt"
+
+      # When set to 'true' this flag will enable GPU node scheduling.  Don't forget to declare any related GPU configurations, if appropriate, in the nodeAffinity below!
+      # gpuEnabled: false
+
+      # Set the YAML that will go into the "affinity.nodeAffinity" stanza for Pod Spec in User Sessions.  This can be used to enable GPU scheduling, for example, 
+      # or to control how and where User Session Pods are scheduled.  This can be potentially dangerous unless you know what you are doing.
+      # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity
+      # nodeAffinity: {}
 
     # Optionally set the DEBUG port.
     # extraEnv:

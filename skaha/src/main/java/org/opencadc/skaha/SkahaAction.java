@@ -1,81 +1,102 @@
 /*
-************************************************************************
-*******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
-**************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
-*
-*  (c) 2020.                            (c) 2020.
-*  Government of Canada                 Gouvernement du Canada
-*  National Research Council            Conseil national de recherches
-*  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
-*  All rights reserved                  Tous droits réservés
-*
-*  NRC disclaims any warranties,        Le CNRC dénie toute garantie
-*  expressed, implied, or               énoncée, implicite ou légale,
-*  statutory, of any kind with          de quelque nature que ce
-*  respect to the software,             soit, concernant le logiciel,
-*  including without limitation         y compris sans restriction
-*  any warranty of merchantability      toute garantie de valeur
-*  or fitness for a particular          marchande ou de pertinence
-*  purpose. NRC shall not be            pour un usage particulier.
-*  liable in any event for any          Le CNRC ne pourra en aucun cas
-*  damages, whether direct or           être tenu responsable de tout
-*  indirect, special or general,        dommage, direct ou indirect,
-*  consequential or incidental,         particulier ou général,
-*  arising from the use of the          accessoire ou fortuit, résultant
-*  software.  Neither the name          de l'utilisation du logiciel. Ni
-*  of the National Research             le nom du Conseil National de
-*  Council of Canada nor the            Recherches du Canada ni les noms
-*  names of its contributors may        de ses  participants ne peuvent
-*  be used to endorse or promote        être utilisés pour approuver ou
-*  products derived from this           promouvoir les produits dérivés
-*  software without specific prior      de ce logiciel sans autorisation
-*  written permission.                  préalable et particulière
-*                                       par écrit.
-*
-*  This file is part of the             Ce fichier fait partie du projet
-*  OpenCADC project.                    OpenCADC.
-*
-*  OpenCADC is free software:           OpenCADC est un logiciel libre ;
-*  you can redistribute it and/or       vous pouvez le redistribuer ou le
-*  modify it under the terms of         modifier suivant les termes de
-*  the GNU Affero General Public        la “GNU Affero General Public
-*  License as published by the          License” telle que publiée
-*  Free Software Foundation,            par la Free Software Foundation
-*  either version 3 of the              : soit la version 3 de cette
-*  License, or (at your option)         licence, soit (à votre gré)
-*  any later version.                   toute version ultérieure.
-*
-*  OpenCADC is distributed in the       OpenCADC est distribué
-*  hope that it will be useful,         dans l’espoir qu’il vous
-*  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
-*  without even the implied             GARANTIE : sans même la garantie
-*  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
-*  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
-*  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
-*  General Public License for           Générale Publique GNU Affero
-*  more details.                        pour plus de détails.
-*
-*  You should have received             Vous devriez avoir reçu une
-*  a copy of the GNU Affero             copie de la Licence Générale
-*  General Public License along         Publique GNU Affero avec
-*  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
-*  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
-*                                       <http://www.gnu.org/licenses/>.
-*
-************************************************************************
-*/
+ ************************************************************************
+ *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
+ **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
+ *
+ *  (c) 2020.                            (c) 2020.
+ *  Government of Canada                 Gouvernement du Canada
+ *  National Research Council            Conseil national de recherches
+ *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+ *  All rights reserved                  Tous droits réservés
+ *
+ *  NRC disclaims any warranties,        Le CNRC dénie toute garantie
+ *  expressed, implied, or               énoncée, implicite ou légale,
+ *  statutory, of any kind with          de quelque nature que ce
+ *  respect to the software,             soit, concernant le logiciel,
+ *  including without limitation         y compris sans restriction
+ *  any warranty of merchantability      toute garantie de valeur
+ *  or fitness for a particular          marchande ou de pertinence
+ *  purpose. NRC shall not be            pour un usage particulier.
+ *  liable in any event for any          Le CNRC ne pourra en aucun cas
+ *  damages, whether direct or           être tenu responsable de tout
+ *  indirect, special or general,        dommage, direct ou indirect,
+ *  consequential or incidental,         particulier ou général,
+ *  arising from the use of the          accessoire ou fortuit, résultant
+ *  software.  Neither the name          de l'utilisation du logiciel. Ni
+ *  of the National Research             le nom du Conseil National de
+ *  Council of Canada nor the            Recherches du Canada ni les noms
+ *  names of its contributors may        de ses  participants ne peuvent
+ *  be used to endorse or promote        être utilisés pour approuver ou
+ *  products derived from this           promouvoir les produits dérivés
+ *  software without specific prior      de ce logiciel sans autorisation
+ *  written permission.                  préalable et particulière
+ *                                       par écrit.
+ *
+ *  This file is part of the             Ce fichier fait partie du projet
+ *  OpenCADC project.                    OpenCADC.
+ *
+ *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
+ *  you can redistribute it and/or       vous pouvez le redistribuer ou le
+ *  modify it under the terms of         modifier suivant les termes de
+ *  the GNU Affero General Public        la “GNU Affero General Public
+ *  License as published by the          License” telle que publiée
+ *  Free Software Foundation,            par la Free Software Foundation
+ *  either version 3 of the              : soit la version 3 de cette
+ *  License, or (at your option)         licence, soit (à votre gré)
+ *  any later version.                   toute version ultérieure.
+ *
+ *  OpenCADC is distributed in the       OpenCADC est distribué
+ *  hope that it will be useful,         dans l’espoir qu’il vous
+ *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
+ *  without even the implied             GARANTIE : sans même la garantie
+ *  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
+ *  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
+ *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
+ *  General Public License for           Générale Publique GNU Affero
+ *  more details.                        pour plus de détails.
+ *
+ *  You should have received             Vous devriez avoir reçu une
+ *  a copy of the GNU Affero             copie de la Licence Générale
+ *  General Public License along         Publique GNU Affero avec
+ *  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
+ *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
+ *                                       <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************
+ */
 
 package org.opencadc.skaha;
 
+import static java.util.stream.Collectors.toList;
+import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
+
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.*;
+import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
+import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.AccessControlException;
+import java.security.KeyPair;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
@@ -90,26 +111,8 @@ import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.RedisCache;
 
-import javax.security.auth.Subject;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.AccessControlException;
-import java.security.KeyPair;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.toList;
-import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
-
 
 public abstract class SkahaAction extends RestAction {
-
-    private static final Logger log = Logger.getLogger(SkahaAction.class);
-
-    private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
 
     public static final String SESSION_TYPE_CARTA = "carta";
     public static final String SESSION_TYPE_NOTEBOOK = "notebook";
@@ -118,10 +121,15 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_HEADLESS = "headless";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
+    private static final Logger log = Logger.getLogger(SkahaAction.class);
+    private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
     public static List<String> SESSION_TYPES = Arrays.asList(
-            SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
-            SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
-
+        SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
+        SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
+    protected final PosixMapperConfiguration posixMapperConfiguration;
+    private final String redisHost;
+    private final String redisPort;
+    public List<String> harborHosts = new ArrayList<>();
     protected PosixPrincipal posixPrincipal;
     protected boolean adminUser = false;
     protected boolean headlessUser = false;
@@ -130,8 +138,7 @@ public abstract class SkahaAction extends RestAction {
     protected String homedir;
     protected String scratchdir;
     protected String skahaTld;
-    protected boolean gpuEnabled; 
-    public List<String> harborHosts = new ArrayList<>();
+    protected boolean gpuEnabled;
     protected String skahaUsersGroup;
     protected String skahaHeadlessGroup;
     protected String skahaPriorityHeadlessGroup;
@@ -139,13 +146,7 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
     protected String skahaPosixCacheURL;
-    protected final PosixMapperConfiguration posixMapperConfiguration;
-
-
     protected RedisCache redis;
-    private final String redisHost;
-    private final String redisPort;
-
     protected boolean skahaCallbackFlow = false;
     protected String callbackSupplementalGroups = null;
 
@@ -155,7 +156,7 @@ public abstract class SkahaAction extends RestAction {
         homedir = System.getenv("skaha.homedir");
         skahaTld = System.getenv("SKAHA_TLD");
         gpuEnabled = Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
-      
+
         scratchdir = System.getenv("skaha.scratchdir");
         String harborHostList = System.getenv("skaha.harborhosts");
         if (harborHostList == null) {
@@ -209,6 +210,45 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
+    protected static TokenTool getTokenTool() throws Exception {
+        final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
+        return new TokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
+    }
+
+    private static EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
+        // Check the current secret
+        final JSONObject secretData = CommandExecutioner.getSecretData(K8SUtil.getPreAuthorizedTokenSecretName(),
+                                                                       K8SUtil.getWorkloadNamespace());
+        final String publicKeyPropertyName = "public";
+        final String privateKeyPropertyName = "private";
+
+        if (secretData.isEmpty()) {
+            final KeyPair keyPair = RsaSignatureGenerator.getKeyPair(2048);
+            final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
+            final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
+
+            // create new secret
+            final String[] createCmd = new String[] {
+                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
+                K8SUtil.getPreAuthorizedTokenSecretName(),
+                String.format("--from-literal=%s=", publicKeyPropertyName) + CommonUtils.encodeBase64(encodedPublicKey),
+                String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey)
+            };
+
+            final String createResult = CommandExecutioner.execute(createCmd);
+            log.debug("create secret result: " + createResult);
+
+            return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);
+        } else {
+            final Base64.Decoder base64Decoder = Base64.getDecoder();
+            // Decode twice since Kubernetes does a separate Base64 encoding.
+            return new EncodedKeyPair(base64Decoder.decode(base64Decoder.decode(
+                secretData.getString(publicKeyPropertyName))),
+                                      base64Decoder.decode(base64Decoder.decode(
+                                          secretData.getString(privateKeyPropertyName))));
+        }
+    }
+
     @Override
     protected InlineContentHandler getInlineContentHandler() {
         return null;
@@ -237,47 +277,6 @@ public abstract class SkahaAction extends RestAction {
         return authMethod == AuthMethod.ANON && isNotEmpty(syncInput.getHeader(X_AUTH_TOKEN_SKAHA));
     }
 
-    protected static TokenTool getTokenTool() throws Exception {
-        final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
-        return new TokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
-    }
-
-    private static EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
-        // Check the current secret
-        final JSONObject secretData = CommandExecutioner.getSecretData(K8SUtil.getPreAuthorizedTokenSecretName(),
-                                                                       K8SUtil.getWorkloadNamespace());
-        final String publicKeyPropertyName = "public";
-        final String privateKeyPropertyName = "private";
-
-        if (secretData.isEmpty()) {
-            final KeyPair keyPair = RsaSignatureGenerator.getKeyPair(2048);
-            final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
-            final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
-
-            // create new secret
-            final String[] createCmd = new String[] {
-                    "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
-                    K8SUtil.getPreAuthorizedTokenSecretName(),
-                    String.format("--from-literal=%s=", publicKeyPropertyName)
-                    + CommonUtils.encodeBase64(encodedPublicKey),
-                    String.format("--from-literal=%s=", privateKeyPropertyName)
-                    + CommonUtils.encodeBase64(encodedPrivateKey)
-            };
-
-            final String createResult = CommandExecutioner.execute(createCmd);
-            log.debug("create secret result: " + createResult);
-
-            return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);
-        } else {
-            final Base64.Decoder base64Decoder = Base64.getDecoder();
-            // Decode twice since Kubernetes does a separate Base64 encoding.
-            return new EncodedKeyPair(base64Decoder.decode(base64Decoder.decode(
-                    secretData.getString(publicKeyPropertyName))),
-                                      base64Decoder.decode(base64Decoder.decode(
-                                              secretData.getString(privateKeyPropertyName))));
-        }
-    }
-
     private void initiateSkahaCallbackFlow(Subject currentSubject, URI skahaUsersUri) {
         skahaCallbackFlow = true;
         final String xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
@@ -303,8 +302,7 @@ public abstract class SkahaAction extends RestAction {
     }
 
     private void initiateGeneralFlow(Subject currentSubject, URI skahaUsersUri)
-            throws IOException, InterruptedException, ResourceNotFoundException {
-        GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
+        throws IOException, InterruptedException, ResourceNotFoundException {
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
@@ -330,28 +328,28 @@ public abstract class SkahaAction extends RestAction {
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
+        URI gmsSearchURI = CommonUtils.firstLocalServiceURI(Standards.GMS_SEARCH_10);
 
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
 
         final GroupURI skahaHeadlessGroupURI = StringUtil.hasText(this.skahaHeadlessGroup)
-                                               ? new GroupURI(URI.create(this.skahaHeadlessGroup))
-                                               : null;
+            ? new GroupURI(URI.create(this.skahaHeadlessGroup))
+            : null;
 
         if (skahaHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaHeadlessGroupURI)) {
             headlessUser = true;
         }
 
         final GroupURI skahaPriorityHeadlessGroupURI = StringUtil.hasText(this.skahaPriorityHeadlessGroup)
-                                                       ? new GroupURI(URI.create(this.skahaPriorityHeadlessGroup))
-                                                       : null;
+            ? new GroupURI(URI.create(this.skahaPriorityHeadlessGroup))
+            : null;
 
         if (skahaPriorityHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaPriorityHeadlessGroupURI)) {
             priorityHeadlessUser = true;
         }
 
+        final GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
             throw new AccessControlException("Not authorized to use the skaha system");
@@ -372,8 +370,8 @@ public abstract class SkahaAction extends RestAction {
         }
 
         List<Group> groups = isNotEmpty(skahaUsersGroupUriSet)
-                             ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
-                             : Collections.emptyList();
+            ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
+            : Collections.emptyList();
 
         // adding all groups to the Subject
         currentSubject.getPublicCredentials().add(groups);
@@ -399,9 +397,9 @@ public abstract class SkahaAction extends RestAction {
             return null;
         }
         return images.parallelStream()
-             .filter(image -> image.getId().equals(imageID))
-             .findFirst()
-             .orElse(null);
+                     .filter(image -> image.getId().equals(imageID))
+                     .findFirst()
+                     .orElse(null);
     }
 
     /**
@@ -421,7 +419,7 @@ public abstract class SkahaAction extends RestAction {
                 baseURL = configuredPosixMapperID.toURL();
             } else {
                 throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
-                                                + configuredPosixMapperID + ").");
+                                                    + configuredPosixMapperID + ").");
             }
         }
 

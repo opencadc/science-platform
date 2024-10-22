@@ -116,15 +116,14 @@ The init containers for the launch scripts.
 {{- end }}
 
 {{/*
-The affinity for Jobs.
+The affinity for Jobs.  This will import the YAML as defined by the user in the deployment.skaha.sessions.nodeAffinity stanza.
 */}}
-{{- define "skaha.job.nodeSelector" -}}
-  selector:
-    matchExpressions:
-    - key: skaha.opencadc.org/node-type
-      operator: NotIn
-      values:
-      - service-node
+{{- define "skaha.job.nodeAffinity" -}}
+{{- with .Values.deployment.skaha.sessions.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
 {{- end }}
 
 {{/*
