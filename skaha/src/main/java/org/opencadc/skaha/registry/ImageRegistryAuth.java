@@ -2,6 +2,7 @@ package org.opencadc.skaha.registry;
 
 import ca.nrc.cadc.util.Base64;
 import ca.nrc.cadc.util.StringUtil;
+import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -40,7 +41,7 @@ public class ImageRegistryAuth {
             throw new IllegalArgumentException("Encoded auth username and key is required.");
         }
 
-        final String decodedValue = new String(Base64.decode(encodedValue));
+        final String decodedValue = new String(Base64.decode(encodedValue), StandardCharsets.UTF_8);
         final String[] values = decodedValue.split(ImageRegistryAuth.VALUE_DELIMITER);
 
         if (values.length != 2) {
