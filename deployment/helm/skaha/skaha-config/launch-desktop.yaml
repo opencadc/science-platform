@@ -57,8 +57,6 @@ spec:
           value: "v0"  
         - name: DESKTOP_SESSION_APP_TOKEN
           value: "${software.desktop.app.token}"
-        - name: DESKTOP_SESSION_APP_REGISTRY_AUTH
-          value: "${software.desktop.app.registry-auth}"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

@@ -3,8 +3,7 @@ HOST=(HOST)
 
 # Callback token
 TOKEN="${DESKTOP_SESSION_APP_TOKEN}"
-REGISTRY_AUTH="${DESKTOP_SESSION_APP_REGISTRY_AUTH}"
-CURL_APP_SESSION_HEADERS="--header \"x-auth-token-skaha: ${TOKEN}\" --header \"x-skaha-registry-auth: ${REGISTRY_AUTH}\""
+CURL_APP_SESSION_HEADERS="--header \"x-auth-token-skaha: ${TOKEN}\""
 
 handle_error() {
     echo "$1"

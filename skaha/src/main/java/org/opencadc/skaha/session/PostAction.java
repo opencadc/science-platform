@@ -136,13 +136,12 @@ public class PostAction extends SessionAction {
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     public static final String DEFAULT_SOFTWARE_IMAGESECRET_VALUE = "notused";
+
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
-    private static final String DESKTOP_SESSION_REGISTRY_AUTH = "software.desktop.app.registry-auth";
-    private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String SKAHA_TLD = "SKAHA_TLD";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
@@ -547,8 +546,6 @@ public class PostAction extends SessionAction {
                               String cmd, String args, List<String> envs)
         throws Exception {
 
-        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
-
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
@@ -590,15 +587,15 @@ public class PostAction extends SessionAction {
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
 
         final String imageRegistrySecretName;
-        final ImageRegistryAuth userRegistryAuth;
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have caught a non-existent Image already.
         if (getPublicImage(image) == null) {
-            userRegistryAuth = getRegistryAuth(getRegistryHost(image));
+            final ImageRegistryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
             imageRegistrySecretName = createRegistryImageSecret(userRegistryAuth);
         } else {
-            userRegistryAuth = null;
             imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
         }
+
+        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
                                                                .withGPUEnabled(this.gpuEnabled)
@@ -620,10 +617,6 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                                                               .withParameter(PostAction.POSIX_MAPPER_URI,
-                                                                              this.posixMapperConfiguration.getBaseURL() == null
-                                                                                  ? this.posixMapperConfiguration.getResourceID().toString()
-                                                                                  : this.posixMapperConfiguration.getBaseURL().toExternalForm())
                                                                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
         if (StringUtil.hasText(supplementalGroups)) {
