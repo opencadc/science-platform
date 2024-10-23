@@ -115,7 +115,6 @@ public abstract class SkahaAction extends RestAction {
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
     private static final String X_REGISTRY_AUTH_HEADER = "x-skaha-registry-auth";
     private static final Logger log = Logger.getLogger(SkahaAction.class);
-    private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
     public static List<String> SESSION_TYPES = Arrays.asList(
             SESSION_TYPE_CARTA,
             SESSION_TYPE_NOTEBOOK,
@@ -124,9 +123,7 @@ public abstract class SkahaAction extends RestAction {
             SESSION_TYPE_HEADLESS,
             TYPE_DESKTOP_APP);
     protected final PosixMapperConfiguration posixMapperConfiguration;
-    private final String redisHost;
-    private final String redisPort;
-    public List<String> harborHosts = new ArrayList<>();
+    public List<String> harborHosts;
     protected PosixPrincipal posixPrincipal;
     protected boolean adminUser = false;
     protected boolean headlessUser = false;
@@ -148,51 +145,36 @@ public abstract class SkahaAction extends RestAction {
     protected String callbackSupplementalGroups = null;
 
     public SkahaAction() {
-        server = System.getenv("skaha.hostname");
-        homedir = System.getenv("skaha.homedir");
-        skahaTld = System.getenv("SKAHA_TLD");
-        gpuEnabled = Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
-
-        scratchdir = System.getenv("skaha.scratchdir");
-        String harborHostList = System.getenv("skaha.harborhosts");
-        if (harborHostList == null) {
-            log.warn("no harbor host list configured!");
-        } else {
-            harborHosts = Arrays.asList(harborHostList.split(" "));
-        }
-        skahaUsersGroup = System.getenv("skaha.usersgroup");
-        skahaHeadlessGroup = System.getenv("skaha.headlessgroup");
-        skahaPriorityHeadlessGroup = System.getenv("skaha.headlessprioritygroup");
-        skahaAdminsGroup = System.getenv("skaha.adminsgroup");
-        skahaHeadlessPriortyClass = System.getenv("skaha.headlesspriortyclass");
-        String maxUsersSessionsString = System.getenv("skaha.maxusersessions");
-        if (maxUsersSessionsString == null) {
-            log.warn("no max user sessions value configured.");
-            maxUserSessions = 1;
-        } else {
-            maxUserSessions = Integer.parseInt(maxUsersSessionsString);
-        }
+        server = K8SUtil.getHostName();
+        homedir = K8SUtil.getHomeDir();
+        skahaTld = K8SUtil.getSkahaTld();
+        gpuEnabled = K8SUtil.isGpuEnabled();
+        scratchdir = K8SUtil.getScratchDir();
+        harborHosts = K8SUtil.getHarborHosts();
+        skahaUsersGroup = K8SUtil.getSkahaUsersGroup();
+        skahaHeadlessGroup = K8SUtil.getSkahaHeadlessGroup();
+        skahaPriorityHeadlessGroup = K8SUtil.getSkahaHeadlessPriorityGroup();
+        skahaAdminsGroup = K8SUtil.getSkahaAdminsGroup();
+        skahaHeadlessPriortyClass = K8SUtil.getSkahaHeadlessPriorityClass();
+        maxUserSessions = K8SUtil.getMaxUserSessions();
 
         // Check the catalina.properties for this setting.
-        skahaPosixCacheURL = System.getProperty(SkahaAction.class.getPackageName() + ".posixCache.url");
+        skahaPosixCacheURL = K8SUtil.getPosixCacheUrl(SkahaAction.class.getPackageName());
 
-        final String configuredPosixMapperResourceID = System.getenv(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY);
-
-        redisHost = System.getenv("REDIS_HOST");
-        redisPort = System.getenv("REDIS_PORT");
+        final String configuredPosixMapperResourceID = K8SUtil.getPosixMapperResourceId();
 
         log.debug("skaha.hostname=" + server);
         log.debug("skaha.homedir=" + homedir);
         log.debug("SKAHA_TLD=" + skahaTld);
         log.debug("skaha.scratchdir=" + scratchdir);
-        log.debug("skaha.harborHosts=" + harborHostList);
+        log.debug("skaha.harborHosts=" + harborHosts.toString());
         log.debug("skaha.usersgroup=" + skahaUsersGroup);
         log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
         log.debug("skaha.priorityheadlessgroup=" + skahaPriorityHeadlessGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
         log.debug("skaha.skahaheadlesspriorityclass=" + skahaHeadlessPriortyClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
-        log.debug(SkahaAction.POSIX_MAPPER_RESOURCE_ID_KEY + "=" + configuredPosixMapperResourceID);
+        log.debug("skaha.posixmapper.resourceid" + "=" + configuredPosixMapperResourceID);
 
         try {
             if (StringUtil.hasText(configuredPosixMapperResourceID)) {
@@ -261,7 +243,7 @@ public abstract class SkahaAction extends RestAction {
         URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
-        redis = new RedisCache(redisHost, redisPort);
+        redis = new RedisCache(K8SUtil.getRedisHost(), K8SUtil.getRedisPort());
         if (isSkahaCallBackFlow(currentSubject)) {
             initiateSkahaCallbackFlow(currentSubject, skahaUsersUri);
         } else {
