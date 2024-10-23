@@ -72,8 +72,6 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.reg.client.LocalAuthority;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import java.io.ByteArrayOutputStream;
@@ -124,7 +122,6 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
-    public static final String SKAHA_SCHEDULEGPU = "skaha.schedulegpu";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -132,16 +129,13 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_CONTAINERPARAM = "software.containerparam";
     public static final String SOFTWARE_TARGETIP = "software.targetip";
     public static final String SOFTWARE_IMAGEID = "software.imageid";
-    public static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
     public static final String SOFTWARE_REQUESTS_CORES = "software.requests.cores";
     public static final String SOFTWARE_REQUESTS_RAM = "software.requests.ram";
     public static final String SOFTWARE_LIMITS_CORES = "software.limits.cores";
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
-    public static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
     public static final String DEFAULT_SOFTWARE_IMAGESECRET_VALUE = "notused";
-    private static final Logger log = Logger.getLogger(PostAction.class);
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
@@ -149,8 +143,10 @@ public class PostAction extends SessionAction {
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String DESKTOP_SESSION_REGISTRY_AUTH = "software.desktop.app.registry-auth";
     private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
-    private static final String REGISTRY_URL = "REGISTRY_URL";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+
+    private static final Logger log = Logger.getLogger(PostAction.class);
+
 
     public PostAction() {
         super();
@@ -158,7 +154,7 @@ public class PostAction extends SessionAction {
 
     private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getRenewJobNamesCmd = new ArrayList<>();
+        final List<String> getRenewJobNamesCmd = new ArrayList<>();
         getRenewJobNamesCmd.add("kubectl");
         getRenewJobNamesCmd.add("get");
         getRenewJobNamesCmd.add("--namespace");
@@ -169,11 +165,7 @@ public class PostAction extends SessionAction {
         getRenewJobNamesCmd.add("--no-headers=true");
         getRenewJobNamesCmd.add("-o");
 
-        String customColumns = "custom-columns=" +
-            "NAME:.metadata.name," +
-            "UID:.metadata.uid," +
-            "STATUS:.status.active," +
-            "START:.status.startTime";
+        String customColumns = "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime";
 
         getRenewJobNamesCmd.add(customColumns);
         return getRenewJobNamesCmd;
@@ -218,10 +210,6 @@ public class PostAction extends SessionAction {
                 }
 
                 String name = syncInput.getParameter("name");
-                String gpusParam = syncInput.getParameter("gpus");
-                String cmd = syncInput.getParameter("cmd");
-                String args = syncInput.getParameter("args");
-                List<String> envs = syncInput.getParameters("env");
                 if (name == null) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
@@ -237,6 +225,7 @@ public class PostAction extends SessionAction {
                 this.sessionID = new RandomStringGenerator(8).getID();
 
                 int gpus = 0;
+                final String gpusParam = syncInput.getParameter("gpus");
                 if (gpusParam != null) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
@@ -249,6 +238,10 @@ public class PostAction extends SessionAction {
                 }
 
                 ensureUserBase();
+
+                final String cmd = syncInput.getParameter("cmd");
+                final String args = syncInput.getParameter("args");
+                final List<String> envs = syncInput.getParameters("env");
                 createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
@@ -536,19 +529,17 @@ public class PostAction extends SessionAction {
         int count = 0;
         for (Session session : sessions) {
             log.debug("checking session: " + session);
-            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) &&
-                !TYPE_DESKTOP_APP.equals(session.getType())) {
-                String status = session.getStatus();
-                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING) ||
-                    status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType()) && !TYPE_DESKTOP_APP.equals(session.getType())) {
+                final String status = session.getStatus();
+                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
+                    || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
                     count++;
                 }
             }
         }
         log.debug("active interactive sessions: " + count);
         if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " +
-                                                   maxUserSessions + " active sessions.");
+            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of " + maxUserSessions + " active sessions.");
         }
     }
 
@@ -560,8 +551,6 @@ public class PostAction extends SessionAction {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
-
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         final String jobLaunchPath;
         final String servicePath;
@@ -597,41 +586,8 @@ public class PostAction extends SessionAction {
                 throw new IllegalStateException("Bug: unknown session type: " + type);
         }
 
-        byte[] jobLaunchBytes = Files.readAllBytes(Paths.get(jobLaunchPath));
-        String jobLaunchString = new String(jobLaunchBytes, StandardCharsets.UTF_8);
-        String headlessPriority = getHeadlessPriority();
-        String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
-        String gpuScheduling = getGPUScheduling(gpus);
-
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONID, sessionID);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONNAME, name.toLowerCase());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_JOBNAME, jobName);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_HOSTNAME, K8SUtil.getHostName());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_USERID, getUsername());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
-        if (StringUtil.hasText(supplementalGroups)) {
-            jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SESSIONTYPE, type);
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_SCHEDULEGPU, gpuScheduling);
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_IMAGEID, image);
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_HOSTNAME, name.toLowerCase());
-        jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_IMAGE_BUNDLE, headlessImageBundle);
-        jobLaunchString = setConfigValue(jobLaunchString, HEADLESS_PRIORITY, headlessPriority);
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_CORES, cores.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi");
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_CORES, cores.toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_RAM, ram + "Gi");
-        jobLaunchString = setConfigValue(jobLaunchString, SOFTWARE_LIMITS_GPUS, getGPUResourceLimit(gpus));
-        jobLaunchString = setConfigValue(jobLaunchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-            ? posixMapperConfiguration.getResourceID().toString()
-            : posixMapperConfiguration.getBaseURL().toExternalForm());
-
-        // This property is mandatory in the Skaha configuration's cadc-registry.properties.
-        jobLaunchString = setConfigValue(jobLaunchString, REGISTRY_URL,
-                                         new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
-        jobLaunchString = setConfigValue(jobLaunchString, SKAHA_TLD, skahaTld);
+        final String headlessPriority = getHeadlessPriority();
+        final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
 
         final String imageRegistrySecretName;
         final ImageRegistryAuth userRegistryAuth;
@@ -644,15 +600,41 @@ public class PostAction extends SessionAction {
             imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
         }
 
-        jobLaunchString = setConfigValue(jobLaunchString, PostAction.SOFTWARE_IMAGESECRET, imageRegistrySecretName);
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
+                                                               .withGPUEnabled(this.gpuEnabled)
+                                                               .withGPUCount(gpus)
+                                                               .withImageSecret(imageRegistrySecretName)
+                                                               .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
+                                                               .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
+                                                               .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
+                                                               .withParameter(PostAction.SKAHA_JOBNAME, jobName)
+                                                               .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getHostName())
+                                                               .withParameter(PostAction.SKAHA_USERID, getUsername())
+                                                               .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
+                                                               .withParameter(PostAction.SKAHA_SESSIONTYPE, type)
+                                                               .withParameter(PostAction.SOFTWARE_IMAGEID, image)
+                                                               .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
+                                                               .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
+                                                               .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
+                                                               .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, cores.toString())
+                                                               .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
+                                                               .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
+                                                               .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
+                                                               .withParameter(PostAction.POSIX_MAPPER_URI,
+                                                                              this.posixMapperConfiguration.getBaseURL() == null
+                                                                                  ? this.posixMapperConfiguration.getResourceID().toString()
+                                                                                  : this.posixMapperConfiguration.getBaseURL().toExternalForm())
+                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
-        if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
-            jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
-            if (userRegistryAuth != null) {
-                jobLaunchString = setConfigValue(jobLaunchString, PostAction.DESKTOP_SESSION_REGISTRY_AUTH, userRegistryAuth.getEncoded());
-            }
+        if (StringUtil.hasText(supplementalGroups)) {
+            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
 
+        if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
+        }
+
+        String jobLaunchString = sessionJobBuilder.build();
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer configurations.
@@ -661,6 +643,7 @@ public class PostAction extends SessionAction {
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
 
+        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
@@ -668,7 +651,7 @@ public class PostAction extends SessionAction {
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
-            serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
+            serviceString = SessionJobBuilder.setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
@@ -678,8 +661,8 @@ public class PostAction extends SessionAction {
         if (ingressPath != null) {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
-            ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
             createResult = execute(launchCmd);
@@ -732,35 +715,31 @@ public class PostAction extends SessionAction {
      * @param limitRAM      Max amount of RAM in Gi.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
-                                 Integer limitRAM) throws Exception {
-
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         // Get the IP address based on the session
         String[] getIPCommand = new String[] {
             "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
             "--no-headers=true",
-            "-o", "custom-columns=" +
-            "IPADDR:.status.podIP," +
-            "DT:.metadata.deletionTimestamp," +
-            "TYPE:.metadata.labels.canfar-net-sessionType," +
-            "NAME:.metadata.name"};
+            "-o",
+            "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name"
+        };
+
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
         String targetIP = null;
         String[] ipLines = ipResult.split("\n");
-        for (String ipLine : ipLines) {
+        for (final String ipLine : ipLines) {
             log.debug("ipLine: " + ipLine);
             String[] parts = ipLine.split("\\s+");
             if (log.isDebugEnabled()) {
-                for (String part : parts) {
+                for (final String part : parts) {
                     log.debug("part: " + part);
                 }
             }
-            if (parts.length > 1 && parts[1].trim().equals(NONE) &&
-                SESSION_TYPE_DESKTOP.equals(parts[2])) {
+            if (parts.length > 1 && parts[1].trim().equals(NONE) && SESSION_TYPE_DESKTOP.equals(parts[2])) {
                 targetIP = parts[0].trim();
             }
         }
@@ -773,10 +752,6 @@ public class PostAction extends SessionAction {
 
         String name = getImageName(image);
         log.debug("name: " + name);
-
-        String supplementalGroups = getSupplementalGroupsList();
-        String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
-        byte[] launchBytes = Files.readAllBytes(Paths.get(launchSoftwarePath));
 
         // incoming params ignored for the time being.  set to the 'name' so
         // that it becomes the xterm title
@@ -803,40 +778,34 @@ public class PostAction extends SessionAction {
             }
         }
 
-        String gpuScheduling = getGPUScheduling(0);
-
-        String launchString = new String(launchBytes, StandardCharsets.UTF_8);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONID, sessionID);
-        launchString = setConfigValue(launchString, SOFTWARE_JOBNAME, jobName);
-        launchString = setConfigValue(launchString, SOFTWARE_HOSTNAME, containerName);
-        launchString = setConfigValue(launchString, SOFTWARE_CONTAINERNAME, containerName);
-        launchString = setConfigValue(launchString, SOFTWARE_APPID, appID);
-        launchString = setConfigValue(launchString, SOFTWARE_CONTAINERPARAM, param);
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_CORES, requestCores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_CORES, limitCores.toString());
-        launchString = setConfigValue(launchString, SOFTWARE_REQUESTS_RAM, requestRAM + "Gi");
-        launchString = setConfigValue(launchString, SOFTWARE_LIMITS_RAM, limitRAM + "Gi");
-        launchString = setConfigValue(launchString, SKAHA_USERID, posixPrincipal.username);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP);
-        launchString = setConfigValue(launchString, SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry());
-        launchString = setConfigValue(launchString, SOFTWARE_TARGETIP, targetIP + ":1");
-        launchString = setConfigValue(launchString, SKAHA_POSIXID, Integer.toString(posixPrincipal.getUidNumber()));
+        final String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
+                                                               .withGPUEnabled(this.gpuEnabled)
+                                                               .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
+                                                               .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
+                                                               .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
+                                                               .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
+                                                               .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getHostName())
+                                                               .withParameter(PostAction.SKAHA_USERID, getUsername())
+                                                               .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
+                                                               .withParameter(PostAction.SOFTWARE_IMAGEID, image)
+                                                               .withParameter(PostAction.SOFTWARE_APPID, this.appID)
+                                                               .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
+                                                               .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
+                                                               .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
+                                                               .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
+                                                               .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM + "Gi")
+                                                               .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
+                                                               .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
+                                                               .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
+                                                               .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
+                                                               .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+        final String supplementalGroups = getSupplementalGroupsList();
         if (StringUtil.hasText(supplementalGroups)) {
-            launchString = setConfigValue(launchString, SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
+            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
         }
-        launchString = setConfigValue(launchString, SKAHA_SCHEDULEGPU, gpuScheduling);
-        launchString = setConfigValue(launchString, SOFTWARE_IMAGEID, image);
-        launchString = setConfigValue(launchString, POSIX_MAPPER_URI, posixMapperConfiguration.getBaseURL() == null
-            ? posixMapperConfiguration.getResourceID().toString()
-            : posixMapperConfiguration.getBaseURL().toExternalForm());
 
-        // This property is mandatory in the Skaha configuration's cadc-registry.properties.
-        launchString = setConfigValue(launchString, REGISTRY_URL,
-                                      new LocalAuthority().getServiceURI(RegistryClient.class.getName() + ".baseURL").toString());
-        launchString = setConfigValue(launchString, SKAHA_TLD, skahaTld);
-
-        String launchFile = super.stageFile(launchString);
-
+        String launchFile = super.stageFile(sessionJobBuilder.build());
         String[] launchCmd = new String[] {
             "kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile
         };
@@ -854,12 +823,6 @@ public class PostAction extends SessionAction {
         } else if (!headlessUser) {
             throw new AccessControlException("Not authorized to create a headless session");
         }
-    }
-
-    private String setConfigValue(String doc, String key, String value) {
-        String regKey = key.replace(".", "\\.");
-        String regex = "\\$[{]" + regKey + "[}]";
-        return doc.replaceAll(regex, value);
     }
 
     private String getSupplementalGroupsList() throws Exception {
@@ -930,37 +893,6 @@ public class PostAction extends SessionAction {
             }
         }
 
-        return sb.toString();
-    }
-
-    private String getGPUResourceLimit(Integer gpus) {
-        if (!gpuEnabled) {
-            return "";
-        }
-        return "nvidia.com/gpu: ".concat(gpus.toString());
-    }
-
-    private String getGPUScheduling(Integer gpus) {
-        if (!gpuEnabled) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("affinity:\n");
-        sb.append("          nodeAffinity:\n");
-        sb.append("            requiredDuringSchedulingIgnoredDuringExecution:\n");
-        sb.append("              nodeSelectorTerms:\n");
-        sb.append("              - matchExpressions:\n");
-        if (gpus == null || gpus == 0) {
-            sb.append("                - key: nvidia.com/gpu.count\n");
-            sb.append("                  operator: DoesNotExist\n");
-        } else {
-            sb.append("                - key: nvidia.com/gpu.count\n");
-            sb.append("                  operator: Gt\n");
-            sb.append("                  values:\n");
-            sb.append("                  - \"0\"\n");
-            return sb.toString();
-        }
         return sb.toString();
     }
 

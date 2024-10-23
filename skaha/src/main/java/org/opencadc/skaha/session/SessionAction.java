@@ -75,7 +75,6 @@ import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.BufferedWriter;
@@ -99,6 +98,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.CommonUtils;
 
 
 public abstract class SessionAction extends SkahaAction {
@@ -184,8 +184,7 @@ public abstract class SessionAction extends SkahaAction {
 
         // inject a delegated proxy certificate if available
         try {
-            final LocalAuthority localAuthority = new LocalAuthority();
-            final URI credServiceID = localAuthority.getServiceURI(Standards.CRED_PROXY_10.toString());
+            final URI credServiceID = CommonUtils.firstLocalServiceURI(Standards.CRED_PROXY_10);
 
             // Should throw a NoSuchElementException if it's missing, but check here anyway.
             if (credServiceID != null) {
@@ -409,7 +408,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private List<String> getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        List<String> getSessionJobCMD = new ArrayList<>();
+        final List<String> getSessionJobCMD = new ArrayList<>();
         getSessionJobCMD.add("kubectl");
         getSessionJobCMD.add("get");
         getSessionJobCMD.add("--namespace");
@@ -420,8 +419,7 @@ public abstract class SessionAction extends SkahaAction {
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
 
-        String customColumns;
-        customColumns = "custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds";
+        String customColumns = "custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -444,7 +442,7 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        List<String> getAppJobNameCMD = new ArrayList<>();
+        final List<String> getAppJobNameCMD = new ArrayList<>();
         getAppJobNameCMD.add("kubectl");
         getAppJobNameCMD.add("get");
         getAppJobNameCMD.add("--namespace");

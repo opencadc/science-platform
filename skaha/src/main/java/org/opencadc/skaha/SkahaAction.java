@@ -78,7 +78,6 @@ import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
@@ -340,10 +339,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
-
-        LocalAuthority localAuthority = new LocalAuthority();
-        URI gmsSearchURI = localAuthority.getServiceURI(Standards.GMS_SEARCH_10.toString());
-
+        final URI gmsSearchURI = CommonUtils.firstLocalServiceURI(Standards.GMS_SEARCH_10);
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
 

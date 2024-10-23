@@ -1,7 +1,10 @@
-# CHANGELOG for Skaha User Session API (Chart 0.8.0)
+# CHANGELOG for Skaha User Session API (Chart 0.9.0)
 
-## 2024.10.10 (0.8.0)
+## 2024.10.23 (0.9.0)
 - Add `x-skaha-registry-auth` request header support to set Harbor CLI secret (or other Image Registry secret)
+
+## 2024.10.18 (0.8.0)
+- Allow setting nodeAffinity values for proper scheduling.
 
 ## 2024.10.10 (0.7.8)
 - Fix for client certificate injection

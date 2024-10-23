@@ -12,7 +12,6 @@ metadata:
 spec:
   parallelism: 1
   completions: 1
-  {{ template "skaha.job.nodeSelector" . }}
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
@@ -27,9 +26,9 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: OnFailure
-      ${skaha.schedulegpu}
       imagePullSecrets:
         - name: ${software.imagesecret}
+      {{ template "skaha.job.nodeAffinity" . }}
       securityContext:
         {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium

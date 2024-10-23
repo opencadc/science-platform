@@ -12,7 +12,6 @@ metadata:
 spec:
   parallelism: 1
   completions: 1
-  {{ template "skaha.job.nodeSelector" . }}
   activeDeadlineSeconds: 1209600
   ttlSecondsAfterFinished: 3600
   backoffLimit: 0
@@ -28,9 +27,9 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: Never
-      ${skaha.schedulegpu}
       imagePullSecrets:
         - name: ${software.imagesecret}
+      {{ template "skaha.job.nodeAffinity" . }}
       hostname: "${software.hostname}"
       initContainers:
       {{ template "skaha.job.initContainers" . }}
