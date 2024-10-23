@@ -67,10 +67,15 @@
 
 package org.opencadc.skaha;
 
+
+import java.util.List;
+import org.apache.log4j.Logger;
+
 public class K8SUtil {
 
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
+    private static final Logger log = Logger.getLogger(K8SUtil.class);
     public static String getHostName() {
         return System.getenv("skaha.hostname");
     }
@@ -100,24 +105,24 @@ public class K8SUtil {
         final String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
         return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
-
-    // skaha-notebook-svc-rdcc0219
+    
+    //skaha-notebook-svc-rdcc0219
     public static String getServiceName(String sessionID, String type) {
         return "skaha-" + type + "-svc-" + sessionID;
     }
-
+    
     public static String getIngressName(String sessionID, String type) {
         return "skaha-" + type + "-ingress-" + sessionID;
     }
-
+    
     public static String getMiddlewareName(String sessionID, String type) {
         return "skaha-" + type + "-middleware-" + sessionID;
     }
-
+    
     public static String getHomeDir() {
         return System.getenv("skaha.homedir");
     }
-
+    
     public static String getScratchDir() {
         return System.getenv("skaha.scratchdir");
     }
@@ -136,5 +141,72 @@ public class K8SUtil {
 
     public static String getPreAuthorizedTokenSecretName() {
         return "pre-auth-token-skaha";
+    }
+
+    public static String getSkahaTld() {
+        return System.getenv("SKAHA_TLD");
+    }
+
+    public static boolean isGpuEnabled() {
+        return Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
+    }
+
+    public static List<String> getHarborHosts() {
+        String rawHosts = System.getenv("skaha.harborhosts");
+        if (rawHosts == null) {
+            log.warn("No harbor hosts configured.");
+            return List.of();
+        }
+
+        return List.of(rawHosts.split(","));
+    }
+
+    public static String getSkahaUsersGroup() {
+        return System.getenv("skaha.usersgroup");
+    }
+
+    public static String getSkahaAdminsGroup() {
+        return System.getenv("skaha.adminsgroup");
+    }
+
+    public static String getSkahaHeadlessGroup() {
+        return System.getenv("skaha.headlessgroup");
+    }
+
+    public static String getSkahaHeadlessPriorityGroup() {
+        return System.getenv("skaha.headlessprioritygroup");
+    }
+
+    public static String getSkahaHeadlessPriorityClass() {
+        return System.getenv("skaha.headlesspriortyclass");
+    }
+
+    public static Integer getMaxUserSessions() {
+       String noOfSessions = System.getenv("skaha.maxusersessions");
+       if (noOfSessions == null) {
+           log.warn("no max user sessions value configured.");
+           return 1;
+       }
+       return Integer.parseInt(noOfSessions);
+    }
+
+    public static String getPosixCacheUrl(String packageName) {
+        return System.getProperty(packageName + ".posixCache.url");
+    }
+
+    public static String getPosixMapperResourceId() {
+        return System.getenv("skaha.posixmapper.resourceid");
+    }
+
+    public static String getRedisHost() {
+        return System.getenv("REDIS_HOST");
+    }
+
+    public static String getRedisPort() {
+        return System.getenv("REDIS_PORT");
+    }
+
+    public static String getUserHome() {
+        return System.getProperty("user.home");
     }
 }

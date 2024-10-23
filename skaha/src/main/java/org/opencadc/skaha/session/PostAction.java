@@ -566,30 +566,31 @@ public class PostAction extends SessionAction {
         final String jobLaunchPath;
         final String servicePath;
         final String ingressPath;
+        String userHome = K8SUtil.getUserHome();
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-desktop.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-desktop.yaml";
+                jobLaunchPath = userHome + "/config/launch-desktop.yaml";
+                servicePath = userHome + "/config/service-desktop.yaml";
+                ingressPath = userHome + "/config/ingress-desktop.yaml";
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-carta.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-carta.yaml";
+                jobLaunchPath = userHome + "/config/launch-carta.yaml";
+                servicePath = userHome + "/config/service-carta.yaml";
+                ingressPath = userHome + "/config/ingress-carta.yaml";
                 break;
             case SessionAction.SESSION_TYPE_NOTEBOOK:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
+                jobLaunchPath = userHome + "/config/launch-notebook.yaml";
+                servicePath = userHome + "/config/service-notebook.yaml";
+                ingressPath = userHome + "/config/ingress-notebook.yaml";
                 break;
             case SessionAction.SESSION_TYPE_CONTRIB:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-contributed.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-contributed.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-contributed.yaml";
+                jobLaunchPath = userHome + "/config/launch-contributed.yaml";
+                servicePath = userHome + "/config/service-contributed.yaml";
+                ingressPath = userHome + "/config/ingress-contributed.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 validateHeadlessMembership();
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
+                jobLaunchPath = userHome + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
                 break;
@@ -812,7 +813,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
+        final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
