@@ -632,7 +632,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(PostAction.SKAHA_LOCAL_QUEUE, this.getLocalQueue(type));
 
         sessionJobBuilder = sessionJobBuilder.withParameter(
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -832,7 +833,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(PostAction.SKAHA_LOCAL_QUEUE, this.getLocalQueue(SessionAction.TYPE_DESKTOP_APP));
         final String supplementalGroups = getSupplementalGroupsList();
         sessionJobBuilder = sessionJobBuilder.withParameter(
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -937,5 +939,21 @@ public class PostAction extends SessionAction {
         } else {
             return "";
         }
+    }
+
+    private String getLocalQueue(String type) throws IOException, InterruptedException {
+        List<String> groupNames = getGroupNames();
+        return QueueUtil.getLocalQueue(groupNames, type);
+    }
+
+    private List<String> getGroupNames() {
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+        return groups.stream()
+                .map(group -> group.getID().getName())
+                .collect(Collectors.toList());
     }
 }
