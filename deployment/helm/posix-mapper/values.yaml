@@ -46,6 +46,11 @@ deployment:
     minGID: 900000
     registryURL: https://spsrc27.iaa.csic.es/reg
 
+    # This applies to the POSIX Mapper itself.  Meaning, this Pod will be scheduled as described
+    # by the nodeAffinity clause.
+    # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+    # nodeAffinity: {}
+
     # Optionally mount a custom CA certificate
     # extraVolumeMounts:
     # - mountPath: "/config/cacerts"

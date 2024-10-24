@@ -31,6 +31,16 @@ deployment:
     # The Resource ID of the Service that contains the Posix Mapping information
     posixMapperResourceID: "ivo://example.org/posix-mapper"
 
+    # This applies to Skaha itself, not the User Sessions.  Meaning, this Pod will be scheduled on Nodes with the label.
+    # Note the different indentation level compared to the sessions.nodeAffinity.
+    nodeAffinity:
+      # Only allow executions of User Sessions on specific Nodes.
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: persistent-service-api-node
+            operator: Exists
+
     # Session settings.
     sessions:
       expirySeconds: "345600" # Four days
