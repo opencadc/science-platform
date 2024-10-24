@@ -85,6 +85,7 @@ import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommand;
 import org.opencadc.skaha.utils.PosixCache;
 import org.opencadc.skaha.utils.QueueUtil;
 
@@ -102,18 +103,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import javax.security.auth.Subject;
-import org.apache.log4j.Logger;
-import org.opencadc.auth.PosixGroup;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.utils.KubectlCommand;
-import org.opencadc.skaha.utils.PosixCache;
-import org.opencadc.skaha.utils.QueueUtil;
 
 /**
  * @author majorb
@@ -942,6 +931,9 @@ public class PostAction extends SessionAction {
     }
 
     private List<String> getGroupNames() {
+        if (skahaCallbackFlow) {
+            return redis.setFetch(getUserGroupsKey());
+        }
         // finding the local queue based on the user's group
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
         List<Group> groups = groupCredentials.stream()

@@ -67,35 +67,14 @@
 
 package org.opencadc.skaha;
 
-import static java.util.stream.Collectors.toList;
-import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
-
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.auth.NotAuthenticatedException;
-import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.AccessControlException;
-import java.security.KeyPair;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
@@ -112,6 +91,21 @@ import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommand;
 import org.opencadc.skaha.utils.RedisCache;
 
+import javax.security.auth.Subject;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.AccessControlException;
+import java.security.KeyPair;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
+import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
+
+
 public abstract class SkahaAction extends RestAction {
 
     public static final String SESSION_TYPE_CARTA = "carta";
@@ -123,6 +117,7 @@ public abstract class SkahaAction extends RestAction {
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
     private static final String X_REGISTRY_AUTH_HEADER = "x-skaha-registry-auth";
     private static final Logger log = Logger.getLogger(SkahaAction.class);
+    public static final String USER_GROUPS = "user_groups:";
     public static List<String> SESSION_TYPES = Arrays.asList(
             SESSION_TYPE_CARTA,
             SESSION_TYPE_NOTEBOOK,
@@ -368,6 +363,15 @@ public abstract class SkahaAction extends RestAction {
 
         // adding all groups to the Subject
         currentSubject.getPublicCredentials().add(groups);
+
+        List<String> groupNames = groups.stream()
+                .map(group -> group.getID().getName())
+                .collect(Collectors.toList());
+        redis.setAdd(getUserGroupsKey(), groupNames);
+    }
+
+    protected String getUserGroupsKey() {
+        return USER_GROUPS + posixPrincipal.username;
     }
 
     protected String getUsername() {
