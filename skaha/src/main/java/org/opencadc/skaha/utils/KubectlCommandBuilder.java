@@ -11,7 +11,7 @@ public class KubectlCommandBuilder {
     public static class KubectlCommand {
         private final List<String> commandParts;
 
-        public KubectlCommand(String operation) {
+        private KubectlCommand(String operation) {
             this.commandParts = new ArrayList<>();
             this.commandParts.add("kubectl");
             this.commandParts.add(operation);
