@@ -157,12 +157,13 @@ public class CommandExecutioner {
     }
 
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
-        KubectlCommand getSecretCommand = new KubectlCommand("get")
+        String[] getSecretCommand = KubectlCommandBuilder.command("get")
                 .namespace(secretNamespace)
                 .argument("--ignore-not-found")
                 .option("secret", secretName)
-                .outputFormat("jsonpath=\"{.data}\"");
-        final String data = CommandExecutioner.execute(getSecretCommand.command());
+                .outputFormat("jsonpath=\"{.data}\"")
+                .build();
+        final String data = CommandExecutioner.execute(getSecretCommand);
 
         // The data from the output begins with a double-quote and ends with one, so strip them.
         return StringUtil.hasText(data)

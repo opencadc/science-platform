@@ -84,7 +84,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommand;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -269,7 +269,7 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        KubectlCommand getCPUCoresCmd = new KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = new KubectlCommandBuilder.KubectlCommand("get")
                 .argument("pods")
                 .namespace(k8sNamespace)
                 .noHeaders()
@@ -279,7 +279,7 @@ public class GetAction extends SessionAction {
                 .argument("--field-selector=status.phase=Running")
                 .argument("--sort-by=.spec.nodeName");
 
-        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.command());
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -341,10 +341,10 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        KubectlCommand getAvailableResourcesCmd = new KubectlCommand("describe")
+        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = new KubectlCommandBuilder.KubectlCommand("describe")
                 .argument("nodes")
                 .namespace(k8sNamespace);
-        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.command());
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");

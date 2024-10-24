@@ -86,10 +86,7 @@ import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.CommonUtils;
-import org.opencadc.skaha.utils.KubectlCommand;
-import org.opencadc.skaha.utils.RedisCache;
+import org.opencadc.skaha.utils.*;
 
 import javax.security.auth.Subject;
 import java.io.IOException;
@@ -208,15 +205,16 @@ public abstract class SkahaAction extends RestAction {
             final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
             final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
 
-            KubectlCommand createCmd = new KubectlCommand("create")
+            String[] createCmd = KubectlCommandBuilder.command("create")
                     .argument("secret")
                     .argument("generic")
                     .argument(K8SUtil.getPreAuthorizedTokenSecretName())
                     .namespace(K8SUtil.getWorkloadNamespace())
                     .argument(String.format("--from-literal=%s=", publicKeyPropertyName) + CommonUtils.encodeBase64(encodedPublicKey))
-                    .argument(String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey));
+                    .argument(String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey))
+                    .build();
 
-            final String createResult = CommandExecutioner.execute(createCmd.command());
+            final String createResult = CommandExecutioner.execute(createCmd);
             log.debug("create secret result: " + createResult);
 
             return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);

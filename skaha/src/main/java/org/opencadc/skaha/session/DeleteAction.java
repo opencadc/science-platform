@@ -74,7 +74,7 @@ import java.security.AccessControlException;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommand;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
  *
@@ -95,14 +95,15 @@ public class DeleteAction extends SessionAction {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
-                KubectlCommand getSessionsCmd = new KubectlCommand("get")
+                String[] getSessionsCmd = KubectlCommandBuilder.command("get")
                         .namespace(K8SUtil.getWorkloadNamespace())
                         .argument("pod")
                         .selector("canfar-net-sessionID=" + sessionID)
                         .noHeaders()
-                        .outputFormat("custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid");
+                        .outputFormat("custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid")
+                        .build();
 
-                String session = CommandExecutioner.execute(getSessionsCmd.command());
+                String session = CommandExecutioner.execute(getSessionsCmd);
                 if (StringUtil.hasText(session)) {
                     final String[] lines = session.split("\n");
                     // sessionID was added to desktop-app. This resulted in the
@@ -172,11 +173,12 @@ public class DeleteAction extends SessionAction {
 
     private void delete(String k8sNamespace, String type, String name) throws InterruptedException, IOException {
         try {
-            KubectlCommand delete = new KubectlCommand("delete")
+            String[] delete = KubectlCommandBuilder.command("delete")
                     .namespace(k8sNamespace)
                     .argument(type)
-                    .argument(name);
-            CommandExecutioner.execute(delete.command());
+                    .argument(name)
+                    .build();
+            CommandExecutioner.execute(delete);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());

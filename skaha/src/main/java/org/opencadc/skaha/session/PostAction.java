@@ -85,7 +85,7 @@ import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommand;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 import org.opencadc.skaha.utils.QueueUtil;
 
@@ -368,14 +368,14 @@ public class PostAction extends SessionAction {
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
-            KubectlCommand renewExpiryTimeCmd = new KubectlCommand("patch")
+            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = new KubectlCommandBuilder.KubectlCommand("patch")
                     .namespace(K8SUtil.getWorkloadNamespace())
                     .argument("job")
                     .argument(entry.getKey())
                     .argument("--type=json")
                     .option("-p", "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
 
-            execute(renewExpiryTimeCmd.command());
+            execute(renewExpiryTimeCmd.build());
         }
     }
 
@@ -412,14 +412,14 @@ public class PostAction extends SessionAction {
     }
 
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        KubectlCommand getRenewJobNamesCmd = new KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = new KubectlCommandBuilder.KubectlCommand("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .argument("job")
                 .option("-l", "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
 
-        String renewJobNamesStr = execute(getRenewJobNamesCmd.command());
+        String renewJobNamesStr = execute(getRenewJobNamesCmd.build());
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
 
         Map<String, List<String>> renewJobMap = new HashMap<>();
@@ -646,11 +646,11 @@ public class PostAction extends SessionAction {
         injectPOSIXDetails();
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
-        KubectlCommand launchCmd = new KubectlCommand("create")
+        KubectlCommandBuilder.KubectlCommand launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
                 .namespace(k8sNamespace)
                 .option("-f" ,jsonLaunchFile);
 
-        String createResult = execute(launchCmd.command());
+        String createResult = execute(launchCmd.build());
         log.debug("Create job result: " + createResult);
 
         if (servicePath != null) {
@@ -658,10 +658,10 @@ public class PostAction extends SessionAction {
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = new KubectlCommand("create")
+            launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
                     .namespace(k8sNamespace)
                     .option("-f" ,jsonLaunchFile);
-            createResult = execute(launchCmd.command());
+            createResult = execute(launchCmd.build());
             log.debug("Create service result: " + createResult);
         }
 
@@ -671,10 +671,10 @@ public class PostAction extends SessionAction {
             ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
             ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = new KubectlCommand("create")
+            launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
                     .namespace(k8sNamespace)
                     .option("-f" ,jsonLaunchFile);
-            createResult = execute(launchCmd.command());
+            createResult = execute(launchCmd.build());
             log.debug("Create ingress result: " + createResult);
         }
     }
@@ -735,14 +735,14 @@ public class PostAction extends SessionAction {
 
 
         // Get the IP address based on the session
-        KubectlCommand getIPCommand = new KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getIPCommand = new KubectlCommandBuilder.KubectlCommand("get")
                 .argument("pod")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .selector("canfar-net-sessionID=" + sessionID)
                 .noHeaders()
                 .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name");
 
-        String ipResult = execute(getIPCommand.command());
+        String ipResult = execute(getIPCommand.build());
         log.debug("GET IP result: " + ipResult);
 
         String targetIP = null;
@@ -823,11 +823,11 @@ public class PostAction extends SessionAction {
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
 
-        KubectlCommand launchCmd = new KubectlCommand("create")
+        KubectlCommandBuilder.KubectlCommand launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("-f" ,launchFile);
 
-        String createResult = execute(launchCmd.command());
+        String createResult = execute(launchCmd.build());
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
