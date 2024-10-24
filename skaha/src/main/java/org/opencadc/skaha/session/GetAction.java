@@ -73,17 +73,11 @@ import com.google.gson.GsonBuilder;
 import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -223,8 +217,7 @@ public class GetAction extends SessionAction {
                     formatter.format(Double.valueOf((double) (normalizeToLong(withRAM)) / (1024 * 1024 * 1024))) + "G";
             String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024))) + "G";
             String requestedRAMStr = formatter.format(requestedRAM) + "G";
-            String ramAvailableStr =
-                    formatter.format(Double.valueOf((double) (ramAvailable) / (1024 * 1024 * 1024))) + "G";
+            String ramAvailableStr = formatter.format(Double.valueOf(ramAvailable / (1024 * 1024 * 1024))) + "G";
             return new ResourceStats(
                     desktopCount,
                     headlessCount,
@@ -268,12 +261,18 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " get pods --no-headers=true -o custom-columns="
-                + "NODENAME:.spec.nodeName,PODNAME:.metadata.name,"
-                + "REQCPUCORES:.spec.containers[].resources.requests.cpu,"
-                + "REQRAM:.spec.containers[].resources.requests.memory "
-                + "--field-selector status.phase=Running --sort-by=.spec.nodeName";
-        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.split(" "));
+        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = new KubectlCommandBuilder.KubectlCommand("get")
+                .argument("pods")
+                .namespace(k8sNamespace)
+                .noHeaders()
+                .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name,"
+                        + "REQCPUCORES:.spec.containers[].resources.requests.cpu,"
+                        + "REQRAM:.spec.containers[].resources.requests.memory")
+                .argument("--field-selector=status.phase=Running")
+                .argument("--sort-by=.spec.nodeName");
+
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
+
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -309,8 +308,8 @@ public class GetAction extends SessionAction {
 
     private Map<String, Double> initResourcesMap() {
         Map<String, Double> rMap = new HashMap<>();
-        rMap.put(REQ_CPU_CORES_KEY, Double.valueOf(0L));
-        rMap.put(REQ_RAM_KEY, Double.valueOf(0L));
+        rMap.put(REQ_CPU_CORES_KEY, (double) 0L);
+        rMap.put(REQ_RAM_KEY, (double) 0L);
         return rMap;
     }
 
@@ -326,8 +325,7 @@ public class GetAction extends SessionAction {
             resourcesMap.put(
                     REQ_RAM_KEY,
                     resourcesMap.get(REQ_RAM_KEY)
-                            + Double.valueOf(
-                                    (double) (normalizeToLong(toCommonUnit(resources[3]))) / (1024 * 1024 * 1024)));
+                            + (double) (normalizeToLong(toCommonUnit(resources[3]))) / (1024 * 1024 * 1024));
             log.debug("Node: " + resources[0] + " " + REQ_RAM_KEY + ": " + resourcesMap.get(REQ_RAM_KEY));
         }
 
@@ -335,8 +333,12 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
-        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.split(" "));
+        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = new KubectlCommandBuilder.KubectlCommand(
+                        "describe")
+                .argument("nodes")
+                .namespace(k8sNamespace);
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
+
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");

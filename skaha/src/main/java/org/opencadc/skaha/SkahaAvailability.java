@@ -69,19 +69,17 @@ package org.opencadc.skaha;
 
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import org.apache.log4j.Logger;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SkahaAvailability implements AvailabilityPlugin {
-    private static final Logger LOG = Logger.getLogger(SkahaAvailability.class);
-
     private static final Availability STATUS_UP = new Availability(true, "skaha service is available.");
 
     public SkahaAvailability() {}
 
     @Override
-    public void setAppName(String appName) {
-        // no op
+    public void setAppName(final String appName) {
+        // no-op
     }
 
     @Override
@@ -93,8 +91,11 @@ public class SkahaAvailability implements AvailabilityPlugin {
     public Availability getStatus() {
         // ensure we can run kubectl
         try {
-            String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            String[] getPods = new String[] {"kubectl", "get", "--namespace", k8sNamespace, "pods"};
+            final String[] getPods = KubectlCommandBuilder.command("get")
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .argument("pods")
+                    .build();
+
             CommandExecutioner.execute(getPods);
             return STATUS_UP;
         } catch (Exception e) {

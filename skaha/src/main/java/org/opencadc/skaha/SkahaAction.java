@@ -71,11 +71,7 @@ import static java.util.stream.Collectors.toList;
 import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.auth.NotAuthenticatedException;
-import ca.nrc.cadc.auth.PosixPrincipal;
+import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -89,12 +85,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.security.KeyPair;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -110,6 +101,7 @@ import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.RedisCache;
 
 public abstract class SkahaAction extends RestAction {
@@ -231,20 +223,17 @@ public abstract class SkahaAction extends RestAction {
             final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
             final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
 
-            // create new secret
-            final String[] createCmd = new String[] {
-                "kubectl",
-                "--namespace",
-                K8SUtil.getWorkloadNamespace(),
-                "create",
-                "secret",
-                "generic",
-                K8SUtil.getPreAuthorizedTokenSecretName(),
-                String.format(
-                        "--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
-                String.format(
-                        "--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
-            };
+            String[] createCmd = KubectlCommandBuilder.command("create")
+                    .argument("secret")
+                    .argument("generic")
+                    .argument(K8SUtil.getPreAuthorizedTokenSecretName())
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .argument(String.format(
+                            "--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)))
+                    .argument(String.format(
+                            "--from-literal=%s=%s",
+                            privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey)))
+                    .build();
 
             final String createResult = CommandExecutioner.execute(createCmd);
             log.debug("create secret result: " + createResult);
@@ -421,8 +410,8 @@ public abstract class SkahaAction extends RestAction {
     }
 
     /**
-     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic
-     * based on how the Resource ID of the POSIX mapper was set (URI or URL).
+     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic based on
+     * how the Resource ID of the POSIX mapper was set (URI or URL).
      */
     protected static class PosixMapperConfiguration {
         final URI resourceID;
@@ -439,14 +428,6 @@ public abstract class SkahaAction extends RestAction {
                 throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
                         + configuredPosixMapperID + ").");
             }
-        }
-
-        public URI getResourceID() {
-            return this.resourceID;
-        }
-
-        public URL getBaseURL() {
-            return this.baseURL;
         }
 
         public PosixMapperClient getPosixMapperClient() {

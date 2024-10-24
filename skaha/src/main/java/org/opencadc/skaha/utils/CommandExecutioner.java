@@ -89,7 +89,7 @@ public class CommandExecutioner {
      * Delete, if necessary, and recreate the image pull secret for the given registry.
      *
      * @param registryAuth The registry credentials.
-     * @param secretName   The name of the secret to create.
+     * @param secretName The name of the secret to create.
      * @throws Exception If there is an error creating the secret.
      */
     public static void ensureRegistrySecret(final ImageRepositoryAuth registryAuth, final String secretName)
@@ -157,19 +157,12 @@ public class CommandExecutioner {
     }
 
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
-        // Check the current secret
-        final String[] getSecretCommand = new String[] {
-            "kubectl",
-            "--namespace",
-            secretNamespace,
-            "get",
-            "--ignore-not-found",
-            "secret",
-            secretName,
-            "-o",
-            "jsonpath=\"{.data}\""
-        };
-
+        String[] getSecretCommand = KubectlCommandBuilder.command("get")
+                .namespace(secretNamespace)
+                .argument("--ignore-not-found")
+                .option("secret", secretName)
+                .outputFormat("jsonpath=\"{.data}\"")
+                .build();
         final String data = CommandExecutioner.execute(getSecretCommand);
 
         // The data from the output begins with a double-quote and ends with one, so strip them.
