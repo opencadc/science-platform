@@ -273,14 +273,15 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public String getPodID(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getPodCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        String[] getPodCmd =  KubectlCommandBuilder.command("get")
                 .argument("pod")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("-l","canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
+                .outputFormat("custom-columns=NAME:.metadata.name")
+                .build();
 
-        String podID = execute(getPodCmd.build());
+        String podID = execute(getPodCmd);
         log.debug("podID: " + podID);
         if (!StringUtil.hasLength(podID)) {
             throw new ResourceNotFoundException("session " + sessionID + " not found.");
@@ -292,13 +293,14 @@ public abstract class SessionAction extends SkahaAction {
 
         String podID = getPodID(forUserID, sessionID);
 
-        KubectlCommandBuilder.KubectlCommand getEventsCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        String[] getEventsCmd = KubectlCommandBuilder.command("get")
                 .argument("event")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("--field-selector", "involvedObject.name=" + podID)
-                .outputFormat("custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp");
+                .outputFormat("custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp")
+                .build();
 
-        String events = execute(getEventsCmd.build());
+        String events = execute(getEventsCmd);
         log.debug("events: " + events);
         if (events != null) {
             String[] lines = events.split("\n");
@@ -310,12 +312,13 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getLogsCmd = new KubectlCommandBuilder.KubectlCommand("logs")
+        String[] getLogsCmd = KubectlCommandBuilder.command("logs")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("-l", "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
-                .option("--tail", "-1");
+                .option("--tail", "-1")
+                .build();
 
-        execute(getLogsCmd.build(), out);
+        execute(getLogsCmd, out);
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
@@ -398,14 +401,13 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private String[] getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        KubectlCommandBuilder.KubectlCommand getSessionJobCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .argument("job")
                 .option("-l", "canfar-net-userid=" + forUserID)
                 .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name,EXPIRY:.spec.activeDeadlineSeconds");
-
-        return getSessionJobCmd.build();
+                .outputFormat("custom-columns=NAME:.metadata.name,EXPIRY:.spec.activeDeadlineSeconds")
+                .build();
     }
 
     protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
@@ -424,13 +426,12 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .argument("job")
                 .option("-l", labels)
                 .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        return getAppJobNameCmd.build();
+                .outputFormat("custom-columns=NAME:.metadata.name")
+                .build();
     }
 }

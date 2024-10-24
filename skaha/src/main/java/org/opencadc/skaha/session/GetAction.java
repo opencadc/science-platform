@@ -269,7 +269,7 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        String[] getCPUCoresCmd = KubectlCommandBuilder.command("get")
                 .argument("pods")
                 .namespace(k8sNamespace)
                 .noHeaders()
@@ -277,9 +277,10 @@ public class GetAction extends SessionAction {
                               "REQCPUCORES:.spec.containers[].resources.requests.cpu," +
                               "REQRAM:.spec.containers[].resources.requests.memory")
                 .argument("--field-selector=status.phase=Running")
-                .argument("--sort-by=.spec.nodeName");
+                .argument("--sort-by=.spec.nodeName")
+                .build();
 
-        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd);
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -341,10 +342,11 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = new KubectlCommandBuilder.KubectlCommand("describe")
+        String[] getAvailableResourcesCmd = KubectlCommandBuilder.command("describe")
                 .argument("nodes")
-                .namespace(k8sNamespace);
-        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
+                .namespace(k8sNamespace)
+                .build();
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd);
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");
