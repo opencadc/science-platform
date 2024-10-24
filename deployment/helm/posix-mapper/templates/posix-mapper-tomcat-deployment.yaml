@@ -16,6 +16,11 @@ spec:
       labels:
         run: posix-mapper-tomcat
     spec:
+{{- with .Values.deployment.posixMapper.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
       imagePullSecrets:
         - name: regcred
       containers:

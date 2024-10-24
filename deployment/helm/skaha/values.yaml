@@ -70,6 +70,12 @@ deployment:
     # The absolute URL of the IVOA Registry where services are registered
     # registryURL: https://spsrc27.iaa.csic.es/reg
 
+    # This applies to Skaha itself.  Meaning, this Pod will be scheduled as described
+    # by the nodeAffinity clause.
+    # Note the different indentation level compared to the sessions.nodeAffinity.
+    # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+    # nodeAffinity: {}
+
     # Settings for User Sessions.  Sensible defaults supplied, but can be overridden.
     # For units of storage, see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
     sessions:
