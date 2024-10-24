@@ -84,6 +84,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommand;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -268,12 +269,17 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        String getCPUCoresCmd = "kubectl -n " + k8sNamespace + " get pods --no-headers=true -o custom-columns="
-                + "NODENAME:.spec.nodeName,PODNAME:.metadata.name,"
-                + "REQCPUCORES:.spec.containers[].resources.requests.cpu,"
-                + "REQRAM:.spec.containers[].resources.requests.memory "
-                + "--field-selector status.phase=Running --sort-by=.spec.nodeName";
-        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.split(" "));
+        KubectlCommand getCPUCoresCmd = new KubectlCommand("get")
+                .argument("pods")
+                .namespace(k8sNamespace)
+                .noHeaders()
+                .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name," +
+                              "REQCPUCORES:.spec.containers[].resources.requests.cpu," +
+                              "REQRAM:.spec.containers[].resources.requests.memory")
+                .argument("--field-selector=status.phase=Running")
+                .argument("--sort-by=.spec.nodeName");
+
+        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.command());
         Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
@@ -335,8 +341,10 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        String getAvailableResourcesCmd = "kubectl -n " + k8sNamespace + " describe nodes ";
-        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.split(" "));
+        KubectlCommand getAvailableResourcesCmd = new KubectlCommand("describe")
+                .argument("nodes")
+                .namespace(k8sNamespace);
+        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.command());
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(rawResources)) {
             String[] lines = rawResources.split("\n");

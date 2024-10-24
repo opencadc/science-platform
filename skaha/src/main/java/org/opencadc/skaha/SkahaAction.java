@@ -89,7 +89,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.security.KeyPair;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -110,6 +109,7 @@ import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
+import org.opencadc.skaha.utils.KubectlCommand;
 import org.opencadc.skaha.utils.RedisCache;
 
 public abstract class SkahaAction extends RestAction {
@@ -213,22 +213,15 @@ public abstract class SkahaAction extends RestAction {
             final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
             final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
 
-            // create new secret
-            final String[] createCmd = new String[] {
-                "kubectl",
-                "--namespace",
-                K8SUtil.getWorkloadNamespace(),
-                "create",
-                "secret",
-                "generic",
-                K8SUtil.getPreAuthorizedTokenSecretName(),
-                String.format(
-                        "--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
-                String.format(
-                        "--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
-            };
+            KubectlCommand createCmd = new KubectlCommand("create")
+                    .argument("secret")
+                    .argument("generic")
+                    .argument(K8SUtil.getPreAuthorizedTokenSecretName())
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .argument(String.format("--from-literal=%s=", publicKeyPropertyName) + CommonUtils.encodeBase64(encodedPublicKey))
+                    .argument(String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey));
 
-            final String createResult = CommandExecutioner.execute(createCmd);
+            final String createResult = CommandExecutioner.execute(createCmd.command());
             log.debug("create secret result: " + createResult);
 
             return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);

@@ -25,10 +25,13 @@ public class QueueUtil {
     }
 
     private static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
-        String[] cmd = {"kubectl", "get", "localQueue", "-A", "-o",
-                "jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}"};
+        KubectlCommand cmd = new KubectlCommand("get")
+                .argument("-A")
+                .argument("localQueue")
+                .outputFormat("jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}");
+
         try {
-            String allLocalQueuesOutput = CommandExecutioner.execute(cmd, false);
+            String allLocalQueuesOutput = CommandExecutioner.execute(cmd.command(), false);
             log.debug("all local queues for the group " + groupName + " is : " + allLocalQueuesOutput);
             if (allLocalQueuesOutput.isEmpty()) return null;
             String[] allLocalQueues = allLocalQueuesOutput.split("\n");
