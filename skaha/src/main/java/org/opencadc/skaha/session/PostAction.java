@@ -370,7 +370,7 @@ public class PostAction extends SessionAction {
         if (newExpiryTime > 0) {
             KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
                     .namespace(K8SUtil.getWorkloadNamespace())
-                    .argument("job")
+                    .job()
                     .argument(entry.getKey())
                     .argument("--type=json")
                     .option("-p", "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
@@ -414,7 +414,7 @@ public class PostAction extends SessionAction {
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
         String[] getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .argument("job")
+                .job()
                 .label( "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime")
@@ -740,7 +740,7 @@ public class PostAction extends SessionAction {
 
         // Get the IP address based on the session
         String[]getIPCommand = KubectlCommandBuilder.command("get")
-                .argument("pod")
+                .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .selector("canfar-net-sessionID=" + sessionID)
                 .noHeaders()

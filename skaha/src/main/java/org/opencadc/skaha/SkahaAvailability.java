@@ -99,7 +99,7 @@ public class SkahaAvailability implements AvailabilityPlugin
         try {
             String[] getPods = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .argument("pods")
+                    .pod()
                     .build();
 
             CommandExecutioner.execute(getPods);

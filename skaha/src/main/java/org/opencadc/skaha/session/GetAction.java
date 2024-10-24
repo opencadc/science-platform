@@ -270,7 +270,7 @@ public class GetAction extends SessionAction {
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
         String[] getCPUCoresCmd = KubectlCommandBuilder.command("get")
-                .argument("pods")
+                .pod()
                 .namespace(k8sNamespace)
                 .noHeaders()
                 .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name," +
