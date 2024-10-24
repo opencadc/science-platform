@@ -415,7 +415,7 @@ public class PostAction extends SessionAction {
         String[] getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .argument("job")
-                .option("-l", "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label( "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime")
                 .build();
