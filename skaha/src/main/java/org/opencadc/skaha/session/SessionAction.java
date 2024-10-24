@@ -265,7 +265,7 @@ public abstract class SessionAction extends SkahaAction {
         final KubectlCommandBuilder.KubectlCommand getPodCmd = new KubectlCommandBuilder.KubectlCommand("get")
                 .argument("pod")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .option("-l", "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name");
 
@@ -305,7 +305,7 @@ public abstract class SessionAction extends SkahaAction {
 
         KubectlCommandBuilder.KubectlCommand getLogsCmd = new KubectlCommandBuilder.KubectlCommand("logs")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .option("-l", "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .option("--tail", "-1");
 
         CommandExecutioner.execute(getLogsCmd.build(), out);
@@ -394,7 +394,7 @@ public abstract class SessionAction extends SkahaAction {
         KubectlCommandBuilder.KubectlCommand getSessionJobCmd = new KubectlCommandBuilder.KubectlCommand("get")
                 .namespace(k8sNamespace)
                 .argument("job")
-                .option("-l", "canfar-net-userid=" + forUserID)
+                .label( "canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name,EXPIRY:.spec.activeDeadlineSeconds");
 
@@ -421,7 +421,7 @@ public abstract class SessionAction extends SkahaAction {
         KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = new KubectlCommandBuilder.KubectlCommand("get")
                 .namespace(k8sNamespace)
                 .argument("job")
-                .option("-l", labels)
+                .label(labels)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name");
 

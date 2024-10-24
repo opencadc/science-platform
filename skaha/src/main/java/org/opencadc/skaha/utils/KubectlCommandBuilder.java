@@ -40,6 +40,12 @@ public class KubectlCommandBuilder {
             return this;
         }
 
+        public KubectlCommand label(String label) {
+            this.commandParts.add("-l");
+            this.commandParts.add(label);
+            return this;
+        }
+
         public KubectlCommand noHeaders() {
             this.commandParts.add("--no-headers=true");
             return this;
