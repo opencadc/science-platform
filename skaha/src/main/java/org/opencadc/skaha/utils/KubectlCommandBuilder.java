@@ -40,6 +40,16 @@ public class KubectlCommandBuilder {
             return this;
         }
 
+        public KubectlCommand pod() {
+            this.commandParts.add("pod");
+            return this;
+        }
+
+        public KubectlCommand job() {
+            this.commandParts.add("job");
+            return this;
+        }
+
         public KubectlCommand label(String label) {
             this.commandParts.add("-l");
             this.commandParts.add(label);

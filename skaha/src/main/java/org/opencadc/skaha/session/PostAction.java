@@ -362,7 +362,7 @@ public class PostAction extends SessionAction {
         if (newExpiryTime > 0) {
             KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
                     .namespace(K8SUtil.getWorkloadNamespace())
-                    .argument("job")
+                    .job()
                     .argument(entry.getKey())
                     .argument("--type=json")
                     .option(
@@ -409,8 +409,8 @@ public class PostAction extends SessionAction {
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
         KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .argument("job")
-                .label( "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .job()
+                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat(
                         "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
@@ -632,9 +632,8 @@ public class PostAction extends SessionAction {
 
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
-        KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
-                .namespace(k8sNamespace)
-                .option("-f", jsonLaunchFile);
+        KubectlCommandBuilder.KubectlCommand launchCmd =
+                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
 
         String createResult = CommandExecutioner.execute(launchCmd.build());
 
@@ -724,12 +723,12 @@ public class PostAction extends SessionAction {
             throws Exception {
         // Get the IP address based on the session
         KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
-                .argument("pod")
+                .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .selector("canfar-net-sessionID=" + sessionID)
                 .noHeaders()
-                .outputFormat(
-                        "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name");
+                .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,"
+                        + "TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name");
 
         String ipResult = CommandExecutioner.execute(getIPCommand.build());
 

@@ -94,7 +94,7 @@ public class DeleteAction extends SessionAction {
             } else {
                 final String[] getSessionsCmd = KubectlCommandBuilder.command("get")
                         .namespace(K8SUtil.getWorkloadNamespace())
-                        .argument("pod")
+                        .pod()
                         .selector("canfar-net-sessionID=" + sessionID)
                         .noHeaders()
                         .outputFormat(

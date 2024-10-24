@@ -32,8 +32,8 @@ public class SessionDAO {
     static String[] getSessionsCMD(final String k8sNamespace, final String forUserID,
                                        final String sessionID) {
         KubectlCommandBuilder.KubectlCommand sessionsCmd = KubectlCommandBuilder.command("get")
+                .pod()
                 .namespace(k8sNamespace)
-                .argument("pod")
                 .noHeaders();
 
         final String[] labelCriteria = SessionDAO.getSessionsCommandLabelCriteria(forUserID, sessionID);
@@ -285,7 +285,7 @@ public class SessionDAO {
         return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .argument("top")
-                .argument("pod")
+                .pod()
                 .noHeaders()
                 .label( "canfar-net-userid=" + forUserID)
                 .argument("--use-protocol-buffers=true")
@@ -306,7 +306,7 @@ public class SessionDAO {
     private static String[] getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
         return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
-                .argument("job")
+                .job()
                 .label( "canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds")
