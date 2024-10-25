@@ -15,7 +15,7 @@ spec:
       labels:
         run: storage-ui-tomcat
     spec:
-{{- with .Values.deployment.skaha.nodeAffinity }}
+{{- with .Values.deployment.storageUI.nodeAffinity }}
       affinity:
         nodeAffinity:
 {{ . | toYaml | indent 10 }}
