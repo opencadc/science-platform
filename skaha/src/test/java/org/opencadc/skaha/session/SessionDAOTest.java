@@ -78,8 +78,10 @@ public class SessionDAOTest {
                 SessionDAO.getSessionsCMD("ns", null, "session-id-1");
         final String command = String.join(" ", commandValues);
         Assert.assertEquals("Wrong command.",
-                            "kubectl get --namespace ns pod -l canfar-net-sessionID=session-id-1 "
-                            + "--no-headers=true -o custom-columns=SESSION_ID:.metadata.labels.canfar-net-sessionID,"
+                "kubectl get pod -n ns "
+                        + "--no-headers=true "
+                        + "-l canfar-net-sessionID=session-id-1 "
+                        + "-o custom-columns=SESSION_ID:.metadata.labels.canfar-net-sessionID,"
                             + "USERID:.metadata.labels.canfar-net-userid,RUN_AS_UID:.spec.securityContext.runAsUser,"
                             + "RUN_AS_GID:.spec.securityContext.runAsGroup,"
                             + "SUPPLEMENTAL_GROUPS:.spec.securityContext.supplementalGroups,"
