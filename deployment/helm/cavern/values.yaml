@@ -20,6 +20,11 @@ deployment:
     # Set the Registry URL pointing to the desired registry (https:// URL)
     # registryURL: https://example.org/reg
 
+    # This applies to Cavern itself.  Meaning, this Pod will be scheduled as described
+    # by the nodeAffinity clause.
+    # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+    # nodeAffinity: {}
+
     # The Resource ID of the Service that contains the Posix Mapping information
     # posixMapperResourceID: "ivo://example.org/posix-mapper"
 

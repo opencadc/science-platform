@@ -74,7 +74,13 @@ deployment:
       # The standard OpenID scopes for token requests.  This is required.
       # scope: "openid profile offline_access"
 
-    registryURL: https://spsrc27.iaa.csic.es/reg
+    # Set the Registry URL pointing to the desired registry (https:// URL)
+    # registryURL: https://example.org/reg
+
+    # This applies to the Science Portal itself.  Meaning, this Pod will be scheduled as described
+    # by the nodeAffinity clause.
+    # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+    # nodeAffinity: {}
 
     # The IdentityManager class handling authentication.  This should generally be left alone
     identityManagerClass: org.opencadc.auth.StandardIdentityManager
