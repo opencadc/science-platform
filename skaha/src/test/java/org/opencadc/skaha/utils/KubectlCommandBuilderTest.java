@@ -83,4 +83,22 @@ public class KubectlCommandBuilderTest {
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
     }
+
+    @Test
+    public void testCombination() {
+        String[] actualCommand = KubectlCommandBuilder.command("get")
+                .pod()
+                .namespace( "test")
+                .argument("test")
+                .outputFormat("json")
+                .option("-f", "value")
+                .label("test")
+                .noHeaders()
+                .selector("test")
+                .build();
+
+        String[] expectedCommand = {"kubectl", "get", "pod", "-n", "test", "test", "-o", "json", "-f", "value", "-l", "test", "--no-headers=true", "--selector=test"};
+
+        Assert.assertArrayEquals(expectedCommand, actualCommand);
+    }
 }
