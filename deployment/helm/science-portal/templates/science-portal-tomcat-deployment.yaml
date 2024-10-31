@@ -15,6 +15,11 @@ spec:
       labels:
         run: science-portal-tomcat
     spec:
+{{- with .Values.deployment.sciencePortal.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
       imagePullSecrets:
         - name: regcred
       containers:

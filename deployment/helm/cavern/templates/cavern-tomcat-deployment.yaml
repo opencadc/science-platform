@@ -16,6 +16,11 @@ spec:
       labels:
         run: {{ .Release.Name }}-tomcat
     spec:
+{{- with .Values.deployment.cavern.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
 {{- with .Values.deployment.cavern.filesystem }}
       {{ $cavernTLD := printf "%s/%s" .dataDir .subPath }}
       securityContext:
