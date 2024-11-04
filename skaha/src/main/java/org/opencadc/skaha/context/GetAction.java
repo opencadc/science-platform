@@ -67,9 +67,6 @@
 
 package org.opencadc.skaha.context;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import org.opencadc.skaha.SkahaAction;
 
 import java.io.File;

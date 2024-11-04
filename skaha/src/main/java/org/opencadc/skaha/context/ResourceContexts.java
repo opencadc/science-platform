@@ -66,7 +66,6 @@
  */
 package org.opencadc.skaha.context;
 
-import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
 
 import java.io.File;
