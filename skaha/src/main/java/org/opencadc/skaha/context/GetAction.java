@@ -72,6 +72,10 @@ import com.google.gson.GsonBuilder;
 
 import org.opencadc.skaha.SkahaAction;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
 /**
  * Output the resource context information.
  * 
@@ -87,10 +91,21 @@ public class GetAction extends SkahaAction {
     public void doAction() throws Exception {
         super.initRequest();
         
-        ResourceContexts rc = new ResourceContexts();
-        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        String json = gson.toJson(rc);
+        File propertiesFile = ResourceContexts.getResourcesFile("k8s-resources.json");
+        byte[] bytes = getBytes(propertiesFile);
         syncOutput.setHeader("Content-Type", "application/json");
-        syncOutput.getOutputStream().write(json.getBytes());
+        syncOutput.getOutputStream().write(bytes);
+    }
+
+    private static byte[] getBytes(File propertiesFile) throws IOException {
+        byte[] bytes = new byte[(int) propertiesFile.length()];
+
+        try (FileInputStream fileInputStream = new FileInputStream(propertiesFile)) {
+            int bytesRead = fileInputStream.read(bytes);
+            if (bytesRead != bytes.length) {
+                throw new IOException("Could not read the entire file: " + propertiesFile.getAbsolutePath());
+            }
+        }
+        return bytes;
     }
 }

@@ -69,9 +69,12 @@ package org.opencadc.skaha.context;
 import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
 
+import java.io.File;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.gson.*;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
@@ -100,33 +103,41 @@ public class ResourceContexts {
 
     public ResourceContexts() {
         try {
-            PropertiesReader reader = new PropertiesReader("k8s-resources.properties");
-            MultiValuedProperties mvp = reader.getAllProperties();
-            defaultRequestCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-request"));
-            defaultLimitCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-limit"));
-            defaultCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default"));
-            defaultCoresHeadless = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-headless"));
-            defaultRequestRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-request"));
-            defaultLimitRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-limit"));
-            defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
-            defaultRAMHeadless = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-headless"));
-            String cOptions = mvp.getFirstPropertyValue("cores-options");
-            String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
-            String gOptions = mvp.getFirstPropertyValue("gpus-options");
-            
-            for (String c : cOptions.split(" ")) {
-                availableCores.add(Integer.valueOf(c));
-            }
-            for (String r : rOptions.split(" ")) {
-                availableRAM.add(Integer.valueOf(r));
-            }
-            for (String g : gOptions.split(" ")) {
-                availableGPUs.add(Integer.valueOf(g));
-            }
+            FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"));
+            JsonElement jsonElement = JsonParser.parseReader(reader);
+            JsonObject jsonObject = jsonElement.getAsJsonObject();
+
+            // Extract fields into variables
+            defaultRequestCores= jsonObject.get("cores-default-request").getAsInt();
+            defaultLimitCores = jsonObject.get("cores-default-limit").getAsInt();
+            defaultCores = jsonObject.get("cores-default").getAsInt();
+            defaultCoresHeadless = jsonObject.get("cores-default-headless").getAsInt();
+            defaultRequestRAM = jsonObject.get("mem-gb-default-request").getAsInt();
+            defaultLimitRAM = jsonObject.get("mem-gb-default-limit").getAsInt();
+            defaultRAM = jsonObject.get("mem-gb-default").getAsInt();
+            defaultRAMHeadless = jsonObject.get("mem-gb-default-headless").getAsInt();
+
+            JsonArray coresOptions = jsonObject.getAsJsonArray("cores-options");
+            coresOptions.asList().forEach(coreOption->availableCores.add(coreOption.getAsInt()));
+
+            JsonArray ramOptions = jsonObject.getAsJsonArray("mem-gb-options");
+            ramOptions.asList().forEach(ramOption -> availableRAM.add(ramOption.getAsInt()));
+
+            JsonArray gpuOptions = jsonObject.getAsJsonArray("gpus-option");
+            gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed reading k8s-resources.properties", e);
         }
+    }
+
+    public static File getResourcesFile(String fileName){
+        String configDir = System.getProperty("user.home") + "/config";
+        String configDirSystemProperty = PropertiesReader.class.getName() + ".dir";
+        if (System.getProperty(configDirSystemProperty) != null) {
+            configDir = System.getProperty(configDirSystemProperty);
+        }
+        return  new File(new File(configDir), fileName);
     }
 
     public Integer getDefaultRequestCores() {
