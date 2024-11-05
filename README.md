@@ -1,15 +1,24 @@
+# Skaha
 
-# skaha - A Container-based Science Platform in CANFAR
+*A container based science platform in CANFAR.*
 
-#### Table of contents
-  * [User Documentation](#canfar-science-portal-documentation)
-  * [Acknowledgements](#acknowledgements)
-  * [Overview](#overview)
-  * [System Components](#system-components)
-  * [Session Containers](#session-containers)
-  * [Software Containers](#software-containers)
-  * [Dependencies](#dependencies)
-  * [Deployment](#deployment)
+---
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/opencadc/science-platform/badge)](https://scorecard.dev/viewer/?uri=github.com/opencadc/science-platform)
+
+## Table of Contents
+- [Skaha](#skaha)
+  - [Table of Contents](#table-of-contents)
+  - [CANFAR Science Portal Documentation](#canfar-science-portal-documentation)
+  - [Acknowledgements](#acknowledgements)
+  - [Overview](#overview)
+  - [Helm Installation](#helm-installation)
+  - [System Components](#system-components)
+    - [skaha](#skaha-1)
+  - [Session Containers](#session-containers)
+  - [Software Containers](#software-containers)
+  - [Dependencies](#dependencies)
+  - [Deployment](#deployment)
 
 ## CANFAR Science Portal Documentation
 
