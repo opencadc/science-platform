@@ -20,7 +20,7 @@ tasks.withType(Test) {
     // reset the report destinations so that intTests go to their own page
     //reports.html.destination = file("${reporting.baseDir}/${name}")
     reports.html.destination = file(reporting.baseDir.getAbsolutePath() + '/' + name)
-    
+
     // Assign all Java system properties from
     // the command line to the tests
     systemProperties System.properties
@@ -30,7 +30,7 @@ task intTest(type: Test) {
     // set the configuration context
     testClassesDirs = sourceSets.intTest.output.classesDirs
     classpath = sourceSets.intTest.runtimeClasspath
-    
+
     // run the tests always
     outputs.upToDateWhen { false }
 }
@@ -38,7 +38,7 @@ task intTest(type: Test) {
 test {
     testLogging {
         events "PASSED", "FAILED", "SKIPPED"
-        // "STARTED", 
+        // "STARTED",
     }
 }
 
