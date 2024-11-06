@@ -15,7 +15,9 @@ IFS='\n'
 if [[ -z "${REDIS_URL}" ]]; then
     echo "Required argument REDIS_URL is missing."
     exit 1
-fi
+else
+    echo "Using REDIS_URL: ${REDIS_URL}"
+fi  
 
 TARGET_PASSWD_FILE="/etc-passwd/passwd"
 TARGET_GROUP_FILE="/etc-group/group"
@@ -25,8 +27,8 @@ cat /etc-passwd/passwd-orig > "${TARGET_PASSWD_FILE}"
 cat /etc-group/group-orig > "${TARGET_GROUP_FILE}"
 
 # Append Science Platform users
-redis-cli -u ${REDIS_URL} --raw smembers "users:posix" >> "${TARGET_PASSWD_FILE}"
-redis-cli -u ${REDIS_URL} --raw smembers "groups:posix" >> "${TARGET_GROUP_FILE}"
+redis-cli -u "${REDIS_URL}" --raw smembers "users:posix" >> "${TARGET_PASSWD_FILE}"
+redis-cli -u "${REDIS_URL}" --raw smembers "groups:posix" >> "${TARGET_GROUP_FILE}"
 
 # restore $IFS
 IFS=$SAVEIFS
