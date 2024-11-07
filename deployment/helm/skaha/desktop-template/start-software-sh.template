@@ -3,7 +3,6 @@ HOST=(HOST)
 
 # Callback token
 TOKEN="${DESKTOP_SESSION_APP_TOKEN}"
-CURL_APP_SESSION_HEADERS="--header \"x-auth-token-skaha: ${TOKEN}\""
 
 handle_error() {
     echo "$1"
@@ -19,10 +18,10 @@ get_resource_options() {
     else
       resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/context`
     fi   
-     core_default=`echo $resources | jq .defaultCores`
-     core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
-     ram_default=`echo $resources | jq .defaultRAM`
-     ram_options=`echo $resources | jq .availableRAM[] | tr '\n' ' '`
+     core_default=`echo $resources | jq .cores.default`
+     core_options=`echo $resources | jq .cores.options[] | tr '\n' ' '`
+     ram_default=`echo $resources | jq .memoryGB.default`
+     ram_options=`echo $resources | jq .memoryGB.options[] | tr '\n' ' '`
 }
 
 get_cores() {
@@ -90,7 +89,7 @@ prompt_user() {
             if [ -z "${TOKEN}" ]; then
               handle_error "[skaha] No credentials to call back to Skaha with."
             else
-              app_id=`curl -s -L -k "${CURL_APP_SESSION_HEADERS}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k "x-auth-token-skaha: ${TOKEN}" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
             fi 
             break
         elif [[ ${yn} == "y" || ${yn} == "Y" ]]; then
@@ -102,7 +101,7 @@ prompt_user() {
             if [ -z "${TOKEN}" ]; then
               handle_error "[skaha] No credentials to call back to Skaha with."              
             else
-              app_id=`curl -s -L -k "${CURL_APP_SESSION_HEADERS}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
+              app_id=`curl -s -L -k "x-auth-token-skaha: ${TOKEN}" -d "cores=${cores}" -d "ram=$ram" -d "image=(IMAGE_ID)" --data-urlencode "param=(NAME)" https://(HOST)/skaha/(SKAHA_API_VERSION)/session/${VNC_PW}/app`
             fi   
             break
         else 

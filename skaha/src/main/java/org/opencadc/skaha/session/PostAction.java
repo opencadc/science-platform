@@ -619,9 +619,8 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
                                                                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
-        if (StringUtil.hasText(supplementalGroups)) {
-            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
+        sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups)
+            ? supplementalGroups : "");
 
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
@@ -794,9 +793,8 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
                                                                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
         final String supplementalGroups = getSupplementalGroupsList();
-        if (StringUtil.hasText(supplementalGroups)) {
-            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
+        sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups)
+            ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         String[] launchCmd = new String[] {
