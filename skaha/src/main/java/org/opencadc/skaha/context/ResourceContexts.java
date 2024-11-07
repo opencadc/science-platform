@@ -108,19 +108,19 @@ public class ResourceContexts {
 
             // Extract fields into variables
             JsonObject cores = jsonObject.getAsJsonObject("cores");
-            defaultRequestCores= cores.get("default-request").getAsInt();
-            defaultLimitCores = cores.get("default-limit").getAsInt();
+            defaultRequestCores= cores.get("defaultRequest").getAsInt();
+            defaultLimitCores = cores.get("defaultLimit").getAsInt();
             defaultCores = cores.get("default").getAsInt();
-            defaultCoresHeadless = cores.get("default-headless").getAsInt();
+            defaultCoresHeadless = cores.get("defaultHeadless").getAsInt();
             JsonArray coresOptions = cores.getAsJsonArray("options");
             coresOptions.asList().forEach(coreOption->availableCores.add(coreOption.getAsInt()));
 
-            JsonObject memory = jsonObject.getAsJsonObject("memory");
-            defaultRequestRAM = memory.get("default-request-gb").getAsInt();
-            defaultLimitRAM = memory.get("default-limit-gb").getAsInt();
-            defaultRAM = memory.get("default-gb").getAsInt();
-            defaultRAMHeadless = memory.get("default-headless-gb").getAsInt();
-            JsonArray ramOptions = memory.getAsJsonArray("options-gb");
+            JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
+            defaultRequestRAM = memory.get("defaultRequest").getAsInt();
+            defaultLimitRAM = memory.get("defaultLimit").getAsInt();
+            defaultRAM = memory.get("default").getAsInt();
+            defaultRAMHeadless = memory.get("defaultHeadless").getAsInt();
+            JsonArray ramOptions = memory.getAsJsonArray("options");
             ramOptions.asList().forEach(ramOption -> availableRAM.add(ramOption.getAsInt()));
 
             JsonObject gpus = jsonObject.getAsJsonObject("gpus");

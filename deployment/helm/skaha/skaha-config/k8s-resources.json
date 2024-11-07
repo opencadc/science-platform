@@ -1,9 +1,9 @@
 {
   "cores": {
     "default": 1,
-    "default-request": 1,
-    "default-limit": 16,
-    "default-headless": 1,
+    "defaultRequest": 1,
+    "defaultLimit": 16,
+    "defaultHeadless": 1,
     "options": [
       1,
       2,
@@ -23,12 +23,12 @@
       16
     ]
   },
-  "memory": {
-    "default-request-gb": 4,
-    "default-limit-gb": 192,
-    "default-gb": 2,
-    "default-headless-gb": 4,
-    "options-gb": [
+  "memoryGB": {
+    "default": 2,
+    "defaultRequest": 4,
+    "defaultLimit": 192,
+    "defaultHeadless": 4,
+    "options": [
       1,
       2,
       4,
