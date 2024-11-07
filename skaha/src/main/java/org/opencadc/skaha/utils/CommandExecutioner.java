@@ -1,16 +1,19 @@
 package org.opencadc.skaha.utils;
 
 import ca.nrc.cadc.util.StringUtil;
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.registry.ImageRegistryAuth;
 
@@ -61,7 +64,7 @@ public class CommandExecutioner {
     }
 
     public static void execute(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-            throws IOException, InterruptedException {
+        throws IOException, InterruptedException {
         final Process p = Runtime.getRuntime().exec(command);
         final int code = p.waitFor();
         try (final InputStream stdOut = new BufferedInputStream(p.getInputStream());
@@ -82,10 +85,17 @@ public class CommandExecutioner {
         }
     }
 
+    /**
+     * Delete, if necessary, and recreate the image pull secret for the given registry.
+     *
+     * @param registryAuth The registry credentials.
+     * @param secretName   The name of the secret to create.
+     * @throws Exception If there is an error creating the secret.
+     */
     public static void ensureRegistrySecret(final ImageRegistryAuth registryAuth, final String secretName)
         throws Exception {
         // delete any old secret by this name
-        final String[] deleteCmd = new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+        final String[] deleteCmd = CommandExecutioner.getDeleteSecretCommand(secretName);
         log.debug("delete secret command: " + Arrays.toString(deleteCmd));
         try {
             String deleteResult = CommandExecutioner.execute(deleteCmd);
@@ -95,13 +105,7 @@ public class CommandExecutioner {
         }
 
         // create new secret
-        final String[] createCmd = new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
-            secretName,
-            "--docker-server=" + registryAuth.getHost(),
-            "--docker-username=" + registryAuth.getUsername(),
-            "--docker-password=" + new String(registryAuth.getSecret())
-        };
+        final String[] createCmd = CommandExecutioner.getRegistryCreateSecretCommand(registryAuth, secretName);
         log.debug("create secret command: " + Arrays.toString(createCmd));
 
         try {
@@ -124,11 +128,25 @@ public class CommandExecutioner {
         }
     }
 
+    static String[] getDeleteSecretCommand(final String secretName) {
+        return new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+    }
+
+    static String[] getRegistryCreateSecretCommand(final ImageRegistryAuth registryAuth, final String secretName) {
+        return new String[] {
+            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+            secretName,
+            "--docker-server=" + registryAuth.getHost(),
+            "--docker-username=" + registryAuth.getUsername(),
+            "--docker-password=" + new String(registryAuth.getSecret())
+        };
+    }
+
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
         // Check the current secret
         final String[] getSecretCommand = new String[] {
-                "kubectl", "--namespace", secretNamespace, "get", "--ignore-not-found", "secret",
-                secretName, "-o", "jsonpath=\"{.data}\""
+            "kubectl", "--namespace", secretNamespace, "get", "--ignore-not-found", "secret",
+            secretName, "-o", "jsonpath=\"{.data}\""
         };
 
         final String data = CommandExecutioner.execute(getSecretCommand);
@@ -136,13 +154,13 @@ public class CommandExecutioner {
         // The data from the output begins with a double-quote and ends with one, so strip them.
         return StringUtil.hasText(data) ? new JSONObject(data.replaceFirst("\"", "")
                                                              .substring(0, data.lastIndexOf("\"")))
-                                        : new JSONObject();
+            : new JSONObject();
     }
 
     protected static String readStream(InputStream in) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        int nRead;
         byte[] data = new byte[1024];
+        int nRead;
         while ((nRead = in.read(data, 0, data.length)) != -1) {
             buffer.write(data, 0, nRead);
         }
@@ -150,7 +168,7 @@ public class CommandExecutioner {
     }
 
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {
-        String[] chown = new String[]{"chown", posixId + ":" + groupId, path};
-        execute(chown);
+        String[] chown = new String[] {"chown", posixId + ":" + groupId, path};
+        CommandExecutioner.execute(chown);
     }
 }

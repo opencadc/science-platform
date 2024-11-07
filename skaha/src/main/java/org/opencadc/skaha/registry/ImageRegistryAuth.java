@@ -39,6 +39,8 @@ public class ImageRegistryAuth {
     public static ImageRegistryAuth fromEncoded(final String encodedValue, final String host) {
         if (!StringUtil.hasText(encodedValue)) {
             throw new IllegalArgumentException("Encoded auth username and key is required.");
+        } else if (!StringUtil.hasText(host)) {
+            throw new IllegalArgumentException("Registry host is required.");
         }
 
         final String decodedValue = new String(Base64.decode(encodedValue), StandardCharsets.UTF_8);
