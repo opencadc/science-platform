@@ -129,10 +129,19 @@ public class CommandExecutioner {
     }
 
     static String[] getDeleteSecretCommand(final String secretName) {
+        if (!StringUtil.hasText(secretName)) {
+            throw new IllegalArgumentException("secretName is required.");
+        }
         return new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
     }
 
     static String[] getRegistryCreateSecretCommand(final ImageRegistryAuth registryAuth, final String secretName) {
+        if (registryAuth == null) {
+            throw new IllegalArgumentException("registryAuth is required.");
+        } else if (!StringUtil.hasText(secretName)) {
+            throw new IllegalArgumentException("secretName is required.");
+        }
+
         return new String[] {
             "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
             secretName,
