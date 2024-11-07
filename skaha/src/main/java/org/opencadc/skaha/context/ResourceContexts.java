@@ -101,19 +101,18 @@ public class ResourceContexts {
     private final List<Integer> availableGPUs = new ArrayList<>();
 
     public ResourceContexts() {
-        try {
-            FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"));
+        try (final FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"))) {
             JsonElement jsonElement = JsonParser.parseReader(reader);
             JsonObject jsonObject = jsonElement.getAsJsonObject();
 
             // Extract fields into variables
             JsonObject cores = jsonObject.getAsJsonObject("cores");
-            defaultRequestCores= cores.get("defaultRequest").getAsInt();
+            defaultRequestCores = cores.get("defaultRequest").getAsInt();
             defaultLimitCores = cores.get("defaultLimit").getAsInt();
             defaultCores = cores.get("default").getAsInt();
             defaultCoresHeadless = cores.get("defaultHeadless").getAsInt();
             JsonArray coresOptions = cores.getAsJsonArray("options");
-            coresOptions.asList().forEach(coreOption->availableCores.add(coreOption.getAsInt()));
+            coresOptions.asList().forEach(coreOption -> availableCores.add(coreOption.getAsInt()));
 
             JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
             defaultRequestRAM = memory.get("defaultRequest").getAsInt();
@@ -128,17 +127,17 @@ public class ResourceContexts {
             gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.properties", e);
+            throw new IllegalStateException("failed reading k8s-resources.json", e);
         }
     }
 
-    public static File getResourcesFile(String fileName){
+    public static File getResourcesFile(String fileName) {
         String configDir = System.getProperty("user.home") + "/config";
         String configDirSystemProperty = PropertiesReader.class.getName() + ".dir";
         if (System.getProperty(configDirSystemProperty) != null) {
             configDir = System.getProperty(configDirSystemProperty);
         }
-        return  new File(new File(configDir), fileName);
+        return new File(new File(configDir), fileName);
     }
 
     public Integer getDefaultRequestCores() {
