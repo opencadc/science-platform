@@ -30,7 +30,6 @@ task intTest(type: Test) {
     // set the configuration context
     testClassesDirs = sourceSets.intTest.output.classesDirs
     classpath = sourceSets.intTest.runtimeClasspath
-
     // run the tests always
     outputs.upToDateWhen { false }
 }
