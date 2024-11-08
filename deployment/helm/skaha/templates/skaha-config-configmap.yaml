@@ -10,6 +10,6 @@ data:
   {{ base $path }}: |
   {{- tpl ($.Files.Get $path) $currContext | nindent 4 }}
 {{ end }}
-{{ ($.Files.Glob "skaha-config/*.properties").AsConfig | indent 2 }}
+{{ ($.Files.Glob "skaha-config/*.json").AsConfig | indent 2 }}
 {{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
 {{- (.Files.Glob "image-cache/*").AsConfig | nindent 2 }}

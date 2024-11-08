@@ -228,7 +228,7 @@ build_menu_item () {
 echo "[skaha] Start building menu."
 init
 create_merged_applications_menu
-curl_out=$(curl -s -k --header "x-auth-token-skaha:${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
+curl_out=$(curl -s -k --header "x-auth-token-skaha: ${TOKEN}" "https://${HOST}/skaha/${SKAHA_API_VERSION}/image?type=desktop-app")
 if [[ $(echo ${curl_out} | jq '[.[] | .id | length] | add') == 0 ]]; then
   echo "[skaha] no desktop-app"
   echo "${curl_out}"

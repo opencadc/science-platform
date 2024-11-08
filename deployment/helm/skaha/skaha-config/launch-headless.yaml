@@ -27,6 +27,8 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: Never
+      imagePullSecrets:
+        - name: ${software.imagesecret}
       {{ template "skaha.job.nodeAffinity" . }}
       hostname: "${software.hostname}"
       initContainers:

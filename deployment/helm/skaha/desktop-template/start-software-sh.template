@@ -18,10 +18,11 @@ get_resource_options() {
     else
       resources=`curl -s -L -k --header "x-auth-token-skaha: ${TOKEN}" https://(HOST)/skaha/(SKAHA_API_VERSION)/context`
     fi   
-     core_default=`echo $resources | jq .defaultCores`
-     core_options=`echo $resources | jq .availableCores[] | tr '\n' ' '`
-     ram_default=`echo $resources | jq .defaultRAM`
-     ram_options=`echo $resources | jq .availableRAM[] | tr '\n' ' '`
+    
+    core_default=`echo $resources | jq .cores.default`
+    core_options=`echo $resources | jq .cores.options[] | tr '\n' ' '`
+    ram_default=`echo $resources | jq .memoryGB.default`
+    ram_options=`echo $resources | jq .memoryGB.options[] | tr '\n' ' '`
 }
 
 get_cores() {

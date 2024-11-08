@@ -66,12 +66,14 @@
  */
 package org.opencadc.skaha.context;
 
-import ca.nrc.cadc.util.MultiValuedProperties;
 import ca.nrc.cadc.util.PropertiesReader;
 
+import java.io.File;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.gson.*;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
@@ -99,34 +101,43 @@ public class ResourceContexts {
     private final List<Integer> availableGPUs = new ArrayList<>();
 
     public ResourceContexts() {
-        try {
-            PropertiesReader reader = new PropertiesReader("k8s-resources.properties");
-            MultiValuedProperties mvp = reader.getAllProperties();
-            defaultRequestCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-request"));
-            defaultLimitCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-limit"));
-            defaultCores = Integer.valueOf(mvp.getFirstPropertyValue("cores-default"));
-            defaultCoresHeadless = Integer.valueOf(mvp.getFirstPropertyValue("cores-default-headless"));
-            defaultRequestRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-request"));
-            defaultLimitRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-limit"));
-            defaultRAM = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default"));
-            defaultRAMHeadless = Integer.valueOf(mvp.getFirstPropertyValue("mem-gb-default-headless"));
-            String cOptions = mvp.getFirstPropertyValue("cores-options");
-            String rOptions = mvp.getFirstPropertyValue("mem-gb-options");
-            String gOptions = mvp.getFirstPropertyValue("gpus-options");
-            
-            for (String c : cOptions.split(" ")) {
-                availableCores.add(Integer.valueOf(c));
-            }
-            for (String r : rOptions.split(" ")) {
-                availableRAM.add(Integer.valueOf(r));
-            }
-            for (String g : gOptions.split(" ")) {
-                availableGPUs.add(Integer.valueOf(g));
-            }
+        try (final FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"))) {
+            JsonElement jsonElement = JsonParser.parseReader(reader);
+            JsonObject jsonObject = jsonElement.getAsJsonObject();
+
+            // Extract fields into variables
+            JsonObject cores = jsonObject.getAsJsonObject("cores");
+            defaultRequestCores = cores.get("defaultRequest").getAsInt();
+            defaultLimitCores = cores.get("defaultLimit").getAsInt();
+            defaultCores = cores.get("default").getAsInt();
+            defaultCoresHeadless = cores.get("defaultHeadless").getAsInt();
+            JsonArray coresOptions = cores.getAsJsonArray("options");
+            coresOptions.asList().forEach(coreOption -> availableCores.add(coreOption.getAsInt()));
+
+            JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
+            defaultRequestRAM = memory.get("defaultRequest").getAsInt();
+            defaultLimitRAM = memory.get("defaultLimit").getAsInt();
+            defaultRAM = memory.get("default").getAsInt();
+            defaultRAMHeadless = memory.get("defaultHeadless").getAsInt();
+            JsonArray ramOptions = memory.getAsJsonArray("options");
+            ramOptions.asList().forEach(ramOption -> availableRAM.add(ramOption.getAsInt()));
+
+            JsonObject gpus = jsonObject.getAsJsonObject("gpus");
+            JsonArray gpuOptions = gpus.getAsJsonArray("options");
+            gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.properties", e);
+            throw new IllegalStateException("failed reading k8s-resources.json", e);
         }
+    }
+
+    public static File getResourcesFile(String fileName) {
+        String configDir = System.getProperty("user.home") + "/config";
+        String configDirSystemProperty = PropertiesReader.class.getName() + ".dir";
+        if (System.getProperty(configDirSystemProperty) != null) {
+            configDir = System.getProperty(configDirSystemProperty);
+        }
+        return new File(new File(configDir), fileName);
     }
 
     public Integer getDefaultRequestCores() {

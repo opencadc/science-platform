@@ -105,6 +105,7 @@ import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.CommandExecutioner;
@@ -121,6 +122,7 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_HEADLESS = "headless";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
+    private static final String X_REGISTRY_AUTH_HEADER = "x-skaha-registry-auth";
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
     public static List<String> SESSION_TYPES = Arrays.asList(
@@ -231,8 +233,8 @@ public abstract class SkahaAction extends RestAction {
             final String[] createCmd = new String[] {
                 "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
                 K8SUtil.getPreAuthorizedTokenSecretName(),
-                String.format("--from-literal=%s=", publicKeyPropertyName) + CommonUtils.encodeBase64(encodedPublicKey),
-                String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey)
+                String.format("--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
+                String.format("--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
             };
 
             final String createResult = CommandExecutioner.execute(createCmd);
@@ -268,6 +270,15 @@ public abstract class SkahaAction extends RestAction {
         } else {
             initiateGeneralFlow(currentSubject, skahaUsersUri);
         }
+    }
+
+    protected ImageRegistryAuth getRegistryAuth(final String registryHost) {
+        final String registryAuthValue = this.syncInput.getHeader(SkahaAction.X_REGISTRY_AUTH_HEADER);
+        if (!StringUtil.hasText(registryAuthValue)) {
+            throw new IllegalArgumentException("No authentication provided for unknown or private image.  Use "
+                                                   + SkahaAction.X_REGISTRY_AUTH_HEADER + " request header with base64Encode(username:secret).");
+        }
+        return ImageRegistryAuth.fromEncoded(registryAuthValue, registryHost);
     }
 
     private boolean isSkahaCallBackFlow(Subject currentSubject) {
@@ -328,8 +339,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
 
         // ensure user is a part of the skaha group
-        URI gmsSearchURI = CommonUtils.firstLocalServiceURI(Standards.GMS_SEARCH_10);
-
+        final URI gmsSearchURI = CommonUtils.firstLocalServiceURI(Standards.GMS_SEARCH_10);
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
 
@@ -389,7 +399,7 @@ public abstract class SkahaAction extends RestAction {
         return posixPrincipal.getUidNumber();
     }
 
-    public Image getImage(String imageID) throws Exception {
+    public Image getPublicImage(String imageID) {
         log.debug("get image: " + imageID);
         List<Image> images = redis.getAll("public", Image.class);
         if (images == null) {

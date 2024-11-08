@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 public class SessionJobBuilder {
     private static final Logger log = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
+    private static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
     private final Map<String, String> parameters = new HashMap<>();
     private Path jobFilePath;
     private boolean gpuEnabled;
@@ -118,6 +119,16 @@ public class SessionJobBuilder {
      */
     SessionJobBuilder withParameter(final String key, final String value) {
         this.parameters.put(key, value);
+        return this;
+    }
+
+    /**
+     * Use the provided Kubernetes secret to authenticate with the Image Registry to pull the Image.
+     * @param imageRegistrySecretName   String existing secret name.
+     * @return  This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withImageSecret(final String imageRegistrySecretName) {
+        this.withParameter(SessionJobBuilder.SOFTWARE_IMAGESECRET, imageRegistrySecretName);
         return this;
     }
 
