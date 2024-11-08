@@ -1,6 +1,7 @@
 package org.opencadc.skaha.utils;
 
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ public class QueueUtil {
 
     private static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
         String[] cmd = KubectlCommandBuilder.command("get")
-                .argument("-A")
+                .namespace(K8SUtil.getWorkloadNamespace())
                 .argument("localQueue")
                 .outputFormat("jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}")
                 .build();
