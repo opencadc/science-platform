@@ -4,7 +4,6 @@ import ca.nrc.cadc.util.Base64;
 import ca.nrc.cadc.util.StringUtil;
 import java.nio.charset.StandardCharsets;
 
-
 /**
  * Represents credentials to an image registry.  Will be used from the request input as a base64 encoded value.
  */

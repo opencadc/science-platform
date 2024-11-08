@@ -1,11 +1,9 @@
 package org.opencadc.skaha.session;
 
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
+
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -15,8 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
+import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -25,8 +24,7 @@ public class SessionDAO {
 
     // Ordered dictionary of columns requested from Kubernetes
 
-    static List<String> getSessionsCMD(final String k8sNamespace, final String forUserID,
-                                       final String sessionID) {
+    static List<String> getSessionsCMD(final String k8sNamespace, final String forUserID, final String sessionID) {
         final List<String> sessionsCMD = new ArrayList<>();
         sessionsCMD.add("kubectl");
         sessionsCMD.add("get");
@@ -45,11 +43,10 @@ public class SessionDAO {
         sessionsCMD.add("-o");
 
         final String customColumns = "custom-columns="
-                                     + Arrays.stream(CustomColumns.values())
-                                             .filter(customColumn -> !customColumn.forUserOnly || forUserID != null)
-                                             .map(customColumn -> String.format("%s:%s", customColumn.name(),
-                                                                                customColumn.columnDefinition))
-                                             .collect(Collectors.joining(","));
+                + Arrays.stream(CustomColumns.values())
+                        .filter(customColumn -> !customColumn.forUserOnly || forUserID != null)
+                        .map(customColumn -> String.format("%s:%s", customColumn.name(), customColumn.columnDefinition))
+                        .collect(Collectors.joining(","));
 
         sessionsCMD.add(customColumns);
         return sessionsCMD;
@@ -140,9 +137,9 @@ public class SessionDAO {
                         }
 
                         // if this session usages GPU, get the GPU usage
-                        if (StringUtil.hasText(session.getRequestedGPUCores()) &&
-                            !NONE.equals(session.getRequestedGPUCores()) &&
-                            Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
+                        if (StringUtil.hasText(session.getRequestedGPUCores())
+                                && !NONE.equals(session.getRequestedGPUCores())
+                                && Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
                             List<String> sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
                             String sessionGPUUsage = execute(sessionGPUUsageCMD.toArray(new String[0]));
                             List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
@@ -324,9 +321,7 @@ public class SessionDAO {
         getSessionJobCMD.add("--no-headers=true");
         getSessionJobCMD.add("-o");
 
-        String customColumns = "custom-columns="
-                               + "UID:.metadata.uid,"
-                               + "EXPIRY:.spec.activeDeadlineSeconds";
+        String customColumns = "custom-columns=" + "UID:.metadata.uid," + "EXPIRY:.spec.activeDeadlineSeconds";
 
         getSessionJobCMD.add(customColumns);
         return getSessionJobCMD;
@@ -362,8 +357,8 @@ public class SessionDAO {
         String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
         String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
-                              ? Session.STATUS_TERMINATING
-                              : parts[allColumns.indexOf(CustomColumns.STATUS)];
+                ? Session.STATUS_TERMINATING
+                : parts[allColumns.indexOf(CustomColumns.STATUS)];
         final String host = K8SUtil.getHostName();
         final String connectURL;
 
@@ -384,19 +379,19 @@ public class SessionDAO {
             connectURL = "not-applicable";
         }
 
-        final Session session = new Session(id,
-                                            userid,
-                                            parts[allColumns.indexOf(CustomColumns.RUN_AS_UID)],
-                                            parts[allColumns.indexOf(CustomColumns.RUN_AS_GID)],
-                                            SessionDAO.fromStringArray(parts[allColumns.indexOf(
-                                                    CustomColumns.SUPPLEMENTAL_GROUPS)]),
-                                            image,
-                                            type,
-                                            status,
-                                            parts[allColumns.indexOf(CustomColumns.NAME)],
-                                            parts[allColumns.indexOf(CustomColumns.STARTED)],
-                                            connectURL,
-                                            parts[allColumns.indexOf(CustomColumns.APP_ID)]);
+        final Session session = new Session(
+                id,
+                userid,
+                parts[allColumns.indexOf(CustomColumns.RUN_AS_UID)],
+                parts[allColumns.indexOf(CustomColumns.RUN_AS_GID)],
+                SessionDAO.fromStringArray(parts[allColumns.indexOf(CustomColumns.SUPPLEMENTAL_GROUPS)]),
+                image,
+                type,
+                status,
+                parts[allColumns.indexOf(CustomColumns.NAME)],
+                parts[allColumns.indexOf(CustomColumns.STARTED)],
+                connectURL,
+                parts[allColumns.indexOf(CustomColumns.APP_ID)]);
 
         // Check if all columns were requested (set by forUserId)
         final int requestedRamIndex = allColumns.indexOf(CustomColumns.REQUESTED_RAM);
@@ -427,11 +422,11 @@ public class SessionDAO {
         if (inputArray.equals(SessionDAO.NONE)) {
             return new Integer[0];
         } else {
-            final Object[] parsedArray =
-                    Arrays.stream(inputArray.replace("[", "").replace("]", "")
-                                          .trim().split(" "))
-                          .filter(StringUtil::hasText)
-                          .map(Integer::parseInt).toArray();
+            final Object[] parsedArray = Arrays.stream(
+                            inputArray.replace("[", "").replace("]", "").trim().split(" "))
+                    .filter(StringUtil::hasText)
+                    .map(Integer::parseInt)
+                    .toArray();
             return Arrays.copyOf(parsedArray, parsedArray.length, Integer[].class);
         }
     }

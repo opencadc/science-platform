@@ -105,7 +105,8 @@ public class ExpiryTimeRenewalTest {
 
     public ExpiryTimeRenewalTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
-        final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+        final URL sessionServiceURL =
+                regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         this.sessionURL = new URL(sessionServiceURL.toString() + "/session");
         log.info("sessions URL: " + sessionURL);
 
@@ -120,9 +121,12 @@ public class ExpiryTimeRenewalTest {
             SessionUtil.initializeCleanup(this.sessionURL);
 
             // create carta session
-            final String cartaSessionID = SessionUtil.createSession(this.sessionURL, "inttest-" + SessionAction.SESSION_TYPE_CARTA,
-                                                                    SessionUtil.getImageByName(ExpiryTimeRenewalTest.CARTA_IMAGE_SUFFIX).getId(),
-                                                                    SessionAction.SESSION_TYPE_CARTA);
+            final String cartaSessionID = SessionUtil.createSession(
+                    this.sessionURL,
+                    "inttest-" + SessionAction.SESSION_TYPE_CARTA,
+                    SessionUtil.getImageByName(ExpiryTimeRenewalTest.CARTA_IMAGE_SUFFIX)
+                            .getId(),
+                    SessionAction.SESSION_TYPE_CARTA);
             Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID, Session.STATUS_RUNNING);
 
             // Sleep to force time to pass before renewal
@@ -145,7 +149,8 @@ public class ExpiryTimeRenewalTest {
             long changedTime = timeToLiveAfterRenewal - timeToLive;
             if (changedTime <= SLEEP_TIME_SECONDS) {
                 // renew failed
-                Assert.fail("activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test.");
+                Assert.fail(
+                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test.");
             }
 
             SessionUtil.deleteSession(this.sessionURL, cartaSessionID);
@@ -163,11 +168,12 @@ public class ExpiryTimeRenewalTest {
 
             // create headless session
             final String headlessSessionID = SessionUtil.createHeadlessSession(
-                SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), this.sessionURL);
-            Session headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
+                    SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), this.sessionURL);
+            Session headlessSession =
+                    SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
             final Instant headlessExpiryTime = Instant.parse(headlessSession.getExpiryTime());
 
-            //renew session
+            // renew session
             renewSession(sessionURL, headlessSessionID);
 
             headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
@@ -191,32 +197,39 @@ public class ExpiryTimeRenewalTest {
             SessionUtil.initializeCleanup(this.sessionURL);
 
             // create desktop session
-            final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest-" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(),
-                                                                      SessionAction.SESSION_TYPE_DESKTOP);
+            final String desktopSessionID = SessionUtil.createSession(
+                    this.sessionURL,
+                    "inttest-" + SessionAction.SESSION_TYPE_DESKTOP,
+                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP)
+                            .getId(),
+                    SessionAction.SESSION_TYPE_DESKTOP);
             SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
 
             // create desktop app
             final URL desktopAppURL = new URL(sessionURL.toString() + "/" + desktopSessionID + "/app");
-            final String desktopApplicationSessionID =
-                SessionUtil.createDesktopAppSession(SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), desktopAppURL);
-            Session desktopApplicationSession = SessionUtil.waitForDesktopApplicationSession(desktopAppURL, desktopApplicationSessionID,
-                                                                                             Session.STATUS_RUNNING);
+            final String desktopApplicationSessionID = SessionUtil.createDesktopAppSession(
+                    SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), desktopAppURL);
+            Session desktopApplicationSession = SessionUtil.waitForDesktopApplicationSession(
+                    desktopAppURL, desktopApplicationSessionID, Session.STATUS_RUNNING);
             Instant desktopAppTimeToLiveStartTime = Instant.parse(desktopApplicationSession.getStartTime());
             Instant desktopAppTimeToLiveExpiryTime = Instant.parse(desktopApplicationSession.getExpiryTime());
-            final long desktopAppTimeToLive = desktopAppTimeToLiveStartTime.until(desktopAppTimeToLiveExpiryTime, ChronoUnit.SECONDS);
+            final long desktopAppTimeToLive =
+                    desktopAppTimeToLiveStartTime.until(desktopAppTimeToLiveExpiryTime, ChronoUnit.SECONDS);
 
             Assert.assertNotEquals("failed to calculate desktop app time-to-live", 0L, desktopAppTimeToLive);
 
-            //renew desktop session, the associated desktop-app should also be renewed
+            // renew desktop session, the associated desktop-app should also be renewed
             renewSession(this.sessionURL, desktopSessionID);
 
-            desktopApplicationSession = SessionUtil.waitForDesktopApplicationSession(desktopAppURL, desktopApplicationSessionID, Session.STATUS_RUNNING);
+            desktopApplicationSession = SessionUtil.waitForDesktopApplicationSession(
+                    desktopAppURL, desktopApplicationSessionID, Session.STATUS_RUNNING);
             Instant appStartTimeAfterRenewal = Instant.parse(desktopApplicationSession.getStartTime());
             Instant appExpiryTimeAfterRenewal = Instant.parse(desktopApplicationSession.getExpiryTime());
-            final long desktopAppTimeToLiveAfterRenewal = appStartTimeAfterRenewal.until(appExpiryTimeAfterRenewal, ChronoUnit.SECONDS);
+            final long desktopAppTimeToLiveAfterRenewal =
+                    appStartTimeAfterRenewal.until(appExpiryTimeAfterRenewal, ChronoUnit.SECONDS);
 
-            Assert.assertNotEquals("failed to calculate the renewed desktop app time-to-live", 0L, desktopAppTimeToLiveAfterRenewal);
+            Assert.assertNotEquals(
+                    "failed to calculate the renewed desktop app time-to-live", 0L, desktopAppTimeToLiveAfterRenewal);
 
             // delete desktop session, no need to delete the desktop-app
             SessionUtil.deleteSession(this.sessionURL, desktopSessionID);

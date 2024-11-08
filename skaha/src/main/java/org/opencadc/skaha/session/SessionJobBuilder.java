@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 
-
 /**
  * Class to interface with Kubernetes.
  */
@@ -34,10 +33,7 @@ public class SessionJobBuilder {
     private boolean gpuEnabled;
     private Integer gpuCount;
 
-
-    private SessionJobBuilder() {
-
-    }
+    private SessionJobBuilder() {}
 
     /**
      * Create a new builder from the provided path.
@@ -52,19 +48,21 @@ public class SessionJobBuilder {
         return sessionJobBuilder;
     }
 
-    private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
+    private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(
+            List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
         if (gpuRequiredNodeSelectorTerms.size() != 1) {
             throw new IllegalStateException("GPU Node Selector cannot exceed one selector.");
         }
 
         final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.get(0);
-        final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions = gpuNodeSelectorTerm.getMatchExpressions();
+        final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions =
+                gpuNodeSelectorTerm.getMatchExpressions();
 
         if (gpuNodeSelectorMatchExpressions == null) {
             throw new IllegalStateException("Preset GPU Node Selector match expressions are missing.");
         } else if (gpuNodeSelectorMatchExpressions.size() != 1) {
             throw new IllegalStateException("Preset GPU Node Selector match expressions must be exactly one (found "
-                                                + gpuNodeSelectorMatchExpressions.size() + ")");
+                    + gpuNodeSelectorMatchExpressions.size() + ")");
         }
 
         return gpuNodeSelectorMatchExpressions.get(0);
@@ -170,14 +168,15 @@ public class SessionJobBuilder {
                             affinity.setNodeAffinity(gpuAffinity.getNodeAffinity());
                         } else {
                             final List<V1PreferredSchedulingTerm> existingPreferredSchedulingTerms =
-                                nodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
+                                    nodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
                             final V1NodeAffinity gpuNodeAffinity = gpuAffinity.getNodeAffinity();
 
                             if (gpuNodeAffinity != null) {
                                 final List<V1PreferredSchedulingTerm> gpuAffinityPreferredSchedulingTerms =
-                                    gpuNodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
+                                        gpuNodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
 
-                                final List<V1PreferredSchedulingTerm> mergedPreferredSchedulingTerms = new ArrayList<>();
+                                final List<V1PreferredSchedulingTerm> mergedPreferredSchedulingTerms =
+                                        new ArrayList<>();
                                 if (existingPreferredSchedulingTerms != null) {
                                     mergedPreferredSchedulingTerms.addAll(existingPreferredSchedulingTerms);
                                 }
@@ -187,32 +186,41 @@ public class SessionJobBuilder {
                                 }
 
                                 if (!mergedPreferredSchedulingTerms.isEmpty()) {
-                                    nodeAffinity.setPreferredDuringSchedulingIgnoredDuringExecution(mergedPreferredSchedulingTerms);
+                                    nodeAffinity.setPreferredDuringSchedulingIgnoredDuringExecution(
+                                            mergedPreferredSchedulingTerms);
                                 }
 
                                 // spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
-                                final V1NodeSelector requiredNodeSelector = nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
-                                final V1NodeSelector gpuRequiredNodeSelector = gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
+                                final V1NodeSelector requiredNodeSelector =
+                                        nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
+                                final V1NodeSelector gpuRequiredNodeSelector =
+                                        gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
 
                                 // No preset one from the configuration, so assume the GPU setting is the only one.
                                 if (requiredNodeSelector == null) {
-                                    nodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(gpuRequiredNodeSelector);
+                                    nodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(
+                                            gpuRequiredNodeSelector);
                                 } else if (gpuRequiredNodeSelector != null) {
-                                    final List<V1NodeSelectorTerm> requiredNodeSelectorTerms = requiredNodeSelector.getNodeSelectorTerms();
-                                    final List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms = gpuRequiredNodeSelector.getNodeSelectorTerms();
+                                    final List<V1NodeSelectorTerm> requiredNodeSelectorTerms =
+                                            requiredNodeSelector.getNodeSelectorTerms();
+                                    final List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms =
+                                            gpuRequiredNodeSelector.getNodeSelectorTerms();
 
                                     if (requiredNodeSelectorTerms.isEmpty()) {
                                         requiredNodeSelector.setNodeSelectorTerms(gpuRequiredNodeSelectorTerms);
                                     } else {
                                         final V1NodeSelectorRequirement gpuNodeSelectorMatchExpression =
-                                            SessionJobBuilder.getV1NodeSelectorRequirement(gpuRequiredNodeSelectorTerms);
+                                                SessionJobBuilder.getV1NodeSelectorRequirement(
+                                                        gpuRequiredNodeSelectorTerms);
                                         requiredNodeSelectorTerms.forEach(requiredNodeSelectorTerm -> {
                                             final List<V1NodeSelectorRequirement> requiredNodeSelectorMatchExpressions =
-                                                requiredNodeSelectorTerm.getMatchExpressions();
+                                                    requiredNodeSelectorTerm.getMatchExpressions();
                                             if (requiredNodeSelectorMatchExpressions == null) {
-                                                requiredNodeSelectorTerm.setMatchExpressions(Collections.singletonList(gpuNodeSelectorMatchExpression));
+                                                requiredNodeSelectorTerm.setMatchExpressions(
+                                                        Collections.singletonList(gpuNodeSelectorMatchExpression));
                                             } else {
-                                                requiredNodeSelectorTerm.addMatchExpressionsItem(gpuNodeSelectorMatchExpression);
+                                                requiredNodeSelectorTerm.addMatchExpressionsItem(
+                                                        gpuNodeSelectorMatchExpression);
                                             }
                                         });
                                     }

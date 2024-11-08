@@ -97,7 +97,8 @@ public class SessionLifecycleTest {
 
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
-        final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+        final URL sessionServiceURL =
+                regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         sessionURL = new URL(sessionServiceURL.toString() + "/session");
         log.info("sessions URL: " + sessionURL);
 
@@ -113,22 +114,33 @@ public class SessionLifecycleTest {
             SessionUtil.initializeCleanup(this.sessionURL);
 
             // create desktop session
-            final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(),
-                                                                      SessionAction.SESSION_TYPE_DESKTOP);
+            final String desktopSessionID = SessionUtil.createSession(
+                    this.sessionURL,
+                    "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
+                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP)
+                            .getId(),
+                    SessionAction.SESSION_TYPE_DESKTOP);
 
-            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
-            SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
+            final Session desktopSession =
+                    SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            SessionUtil.verifySession(
+                    desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 
             // create carta session
-            final String cartaSessionID = SessionUtil.createSession(sessionURL, "inttest" + SessionAction.SESSION_TYPE_CARTA,
-                                                                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId(),
-                                                                    SessionAction.SESSION_TYPE_CARTA);
+            final String cartaSessionID = SessionUtil.createSession(
+                    sessionURL,
+                    "inttest" + SessionAction.SESSION_TYPE_CARTA,
+                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId(),
+                    SessionAction.SESSION_TYPE_CARTA);
             Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID, Session.STATUS_RUNNING);
-            SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
+            SessionUtil.verifySession(
+                    desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
 
             Assert.assertNotNull("CARTA session not running.", cartaSession);
-            Assert.assertEquals("CARTA session name is wrong", "inttest" + SessionAction.SESSION_TYPE_CARTA, cartaSession.getName());
+            Assert.assertEquals(
+                    "CARTA session name is wrong",
+                    "inttest" + SessionAction.SESSION_TYPE_CARTA,
+                    cartaSession.getName());
             Assert.assertNotNull("CARTA session id is null", cartaSession.getId());
             Assert.assertNotNull("CARTA connect URL is null", cartaSession.getConnectURL());
             Assert.assertNotNull("CARTA up since is null", cartaSession.getStartTime());

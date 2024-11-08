@@ -1,6 +1,14 @@
 package org.opencadc.skaha.utils;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.when;
+import static org.opencadc.skaha.utils.TestUtils.set;
+
 import com.google.gson.Gson;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -8,16 +16,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.opencadc.skaha.image.Image;
 import redis.clients.jedis.Jedis;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.when;
-import static org.opencadc.skaha.utils.TestUtils.set;
 
 @RunWith(MockitoJUnitRunner.class)
 public class RedisCacheTest {
@@ -27,7 +25,6 @@ public class RedisCacheTest {
 
     Gson gson = new Gson();
 
-
     private static final String OK = "OK";
 
     @Before
@@ -35,7 +32,6 @@ public class RedisCacheTest {
         jedis = Mockito.mock(Jedis.class);
         set(redisCache, "jedis", jedis);
     }
-
 
     @Test
     public void testGetAllWithRange() {
@@ -91,11 +87,13 @@ public class RedisCacheTest {
         long start = 0;
         long stop = -1;
 
-        Map<String, Object> image = new HashMap<>() {{
-            put("id-", "id");
-            put("types-", Set.of("type1", "type2"));
-            put("digest-", "digest");
-        }};
+        Map<String, Object> image = new HashMap<>() {
+            {
+                put("id-", "id");
+                put("types-", Set.of("type1", "type2"));
+                put("digest-", "digest");
+            }
+        };
         List<Image> expectedList = List.of();
 
         when(jedis.lrange(key, start, stop)).thenReturn(List.of(gson.toJson(image)));

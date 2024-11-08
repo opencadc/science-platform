@@ -66,14 +66,12 @@
  */
 package org.opencadc.skaha.image;
 
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.apache.log4j.Logger;
-import org.opencadc.skaha.SkahaAction;
-
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
+import org.opencadc.skaha.SkahaAction;
 
 /**
  * @author majorb
@@ -97,7 +95,7 @@ public class GetAction extends SkahaAction {
         List<Image> images = getImages(type);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         String json = gson.toJson(images);
-        
+
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(json.getBytes());
     }

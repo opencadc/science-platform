@@ -3,12 +3,11 @@ package org.opencadc.skaha.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.log4j.Logger;
-import redis.clients.jedis.Jedis;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
+import redis.clients.jedis.Jedis;
 
 public class RedisCache {
     private static final Logger log = Logger.getLogger(RedisCache.class);
@@ -38,8 +37,7 @@ public class RedisCache {
     public <T> List<T> getAll(String key, Class<T> className) {
         List<String> list = getAll(key);
         if (list.isEmpty()) return List.of();
-        return list
-                .parallelStream()
+        return list.parallelStream()
                 .map(item -> deserialize(className, item))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());

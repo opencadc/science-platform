@@ -69,10 +69,9 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import org.opencadc.auth.PosixMapperClient;
-
 import java.io.IOException;
 import java.net.URI;
+import org.opencadc.auth.PosixMapperClient;
 
 public class TestPosixMapperClient extends PosixMapperClient {
     public TestPosixMapperClient() throws IOException, ResourceNotFoundException {

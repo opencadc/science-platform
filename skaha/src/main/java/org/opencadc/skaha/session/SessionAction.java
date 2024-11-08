@@ -100,7 +100,6 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 
-
 public abstract class SessionAction extends SkahaAction {
 
     protected static final String REQUEST_TYPE_SESSION = "session";
@@ -125,7 +124,7 @@ public abstract class SessionAction extends SkahaAction {
     public static String getVNCURL(String host, String sessionID) {
         // vnc.html does not...
         return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-            + "&path=session/desktop/" + sessionID + "/";
+                + "&path=session/desktop/" + sessionID + "/";
     }
 
     public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
@@ -137,8 +136,9 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
-        return String.format("https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s", host, sessionID,
-                             skahaTLD.replaceAll("/", ""), userid, sessionID);
+        return String.format(
+                "https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s",
+                host, sessionID, skahaTLD.replaceAll("/", ""), userid, sessionID);
     }
 
     public static String getContributedURL(String host, String sessionID) {
@@ -189,19 +189,24 @@ public abstract class SessionAction extends SkahaAction {
             // Should throw a NoSuchElementException if it's missing, but check here anyway.
             if (credServiceID != null) {
                 final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
+                final URL credServiceURL =
+                        registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
 
                 if (credServiceURL != null) {
                     final CredClient credClient = new CredClient(credServiceID);
                     final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                    final X509CertificateChain proxyCert = Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>) ()
-                        -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
+                    final X509CertificateChain proxyCert =
+                            Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>)
+                                    () -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
 
                     log.debug("Proxy cert: " + proxyCert);
                     // inject the proxy cert
                     log.debug("Running docker exec to insert cert");
 
-                    writeClientCertificate(proxyCert, Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem").toString());
+                    writeClientCertificate(
+                            proxyCert,
+                            Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem")
+                                    .toString());
                     log.debug("injectProxyCertificate(): OK");
                 }
             }
@@ -214,7 +219,8 @@ public abstract class SessionAction extends SkahaAction {
         }
     }
 
-    private void writeClientCertificate(X509CertificateChain clientCertificateChain, String path) throws IOException, InterruptedException {
+    private void writeClientCertificate(X509CertificateChain clientCertificateChain, String path)
+            throws IOException, InterruptedException {
         final int uid = posixPrincipal.getUidNumber();
         // stage file
 
@@ -249,7 +255,6 @@ public abstract class SessionAction extends SkahaAction {
             log.warn("failed to determine name for image: " + image);
             return "unknown";
         }
-
     }
 
     protected String stageFile(String data) throws IOException {
@@ -299,15 +304,16 @@ public abstract class SessionAction extends SkahaAction {
         getEventsCmd.add("event");
         getEventsCmd.add("--field-selector");
         getEventsCmd.add("involvedObject.name=" + podID);
-        //getEventsCmd.add("--no-headers=true");
+        // getEventsCmd.add("--no-headers=true");
         getEventsCmd.add("-o");
-        String customColumns = "TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp";
+        String customColumns =
+                "TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp";
         getEventsCmd.add("custom-columns=" + customColumns);
         String events = CommandExecutioner.execute(getEventsCmd.toArray(new String[0]));
         log.debug("events: " + events);
         if (events != null) {
             String[] lines = events.split("\n");
-            if (lines.length > 1) {  // header row returned
+            if (lines.length > 1) { // header row returned
                 return events;
             }
         }
@@ -334,14 +340,15 @@ public abstract class SessionAction extends SkahaAction {
             for (Session session : sessions) {
                 // only include 'desktop-app'
                 if (SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())
-                    && (sessionID.equals(session.getId())) && (appID.equals(session.getAppId()))) {
+                        && (sessionID.equals(session.getId()))
+                        && (appID.equals(session.getAppId()))) {
                     return session;
                 }
             }
         }
 
         throw new ResourceNotFoundException(
-            "desktop app with session " + sessionID + " and app ID " + appID + " was not found");
+                "desktop app with session " + sessionID + " and app ID " + appID + " was not found");
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
@@ -424,8 +431,8 @@ public abstract class SessionAction extends SkahaAction {
         return getSessionJobCMD;
     }
 
-    protected String getAppJobName(String sessionID, String userID, String appID) throws
-                                                                                  IOException, InterruptedException {
+    protected String getAppJobName(String sessionID, String userID, String appID)
+            throws IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         List<String> getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
         return CommandExecutioner.execute(getAppJobNameCMD.toArray(new String[0]));
@@ -457,5 +464,4 @@ public abstract class SessionAction extends SkahaAction {
         getAppJobNameCMD.add(customColumns);
         return getAppJobNameCMD;
     }
-
 }

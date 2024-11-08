@@ -103,7 +103,8 @@ public class ImagesTest {
     public ImagesTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL imageServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+            final URL imageServiceURL = regClient.getServiceURL(
+                    SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
             imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
             log.info("sessions URL: " + imageURL);
 
@@ -122,8 +123,7 @@ public class ImagesTest {
         Assert.assertEquals("response code", 200, get.getResponseCode());
         Assert.assertEquals("content-type", "application/json", get.getContentType());
         String json = out.toString();
-        Type listType = new TypeToken<List<Image>>() {
-        }.getType();
+        Type listType = new TypeToken<List<Image>>() {}.getType();
         Gson gson = new Gson();
         return gson.fromJson(json, listType);
     }

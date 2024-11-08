@@ -66,6 +66,14 @@
  */
 package org.opencadc.skaha.image;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.when;
+import static org.opencadc.skaha.utils.TestUtils.set;
+import static org.opencadc.skaha.utils.TestUtils.setEnv;
+
+import java.util.List;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -74,16 +82,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.RedisCache;
-
-import java.util.List;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.when;
-import static org.opencadc.skaha.utils.TestUtils.set;
-import static org.opencadc.skaha.utils.TestUtils.setEnv;
-
 
 /**
  * @author majorb
@@ -113,11 +111,9 @@ public class GetActionTest {
     public void testGetImagesWithNullType() throws Exception {
         List<Image> expectedImages = List.of(
                 new Image("image1", Set.of("type1", "type2"), "digest1"),
-                new Image("image2", Set.of("type2", "type3"), "digest2")
-        );
+                new Image("image2", Set.of("type2", "type3"), "digest2"));
 
-        when(redis.getAll("public", Image.class))
-                .thenReturn(expectedImages);
+        when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
 
         List<Image> result = getAction.getImages(null);
 
@@ -138,18 +134,12 @@ public class GetActionTest {
         // Arrange
         String notebook = "notebook";
         Image notebookImage = new Image("image2", Set.of(notebook), "digest2");
-        List<Image> expectedImages = List.of(
-                new Image("image1", Set.of("type1", "type2"), "digest1"),
-                notebookImage
-        );
+        List<Image> expectedImages = List.of(new Image("image1", Set.of("type1", "type2"), "digest1"), notebookImage);
 
-        when(redis.getAll("public", Image.class))
-                .thenReturn(expectedImages);
+        when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
 
         List<Image> result = getAction.getImages(notebook);
 
         assertEquals(List.of(notebookImage), result);
     }
-
-
 }

@@ -10,7 +10,6 @@ import org.opencadc.auth.PosixMapperClient;
 import redis.clients.jedis.AbstractTransaction;
 import redis.clients.jedis.JedisPooled;
 
-
 /**
  * A simple Redis Cache for POSIX information.  This will update the underlying Redis Set in a transaction to ensure single access.
  * BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to properly reset it.
@@ -50,18 +49,17 @@ public class PosixCache {
      * @return String POSIX entry, never null;
      */
     private static String uidMapping(final PosixPrincipalEntry posixPrincipalEntry) {
-        return String.format("%s:x:%d:%d::%s:%s",
-                             posixPrincipalEntry.posixPrincipal.username,
-                             posixPrincipalEntry.posixPrincipal.getUidNumber(),
-                             posixPrincipalEntry.posixPrincipal.getUidNumber(),
-                             posixPrincipalEntry.homeFolder,
-                             PosixCache.NO_LOGIN_SHELL);
+        return String.format(
+                "%s:x:%d:%d::%s:%s",
+                posixPrincipalEntry.posixPrincipal.username,
+                posixPrincipalEntry.posixPrincipal.getUidNumber(),
+                posixPrincipalEntry.posixPrincipal.getUidNumber(),
+                posixPrincipalEntry.homeFolder,
+                PosixCache.NO_LOGIN_SHELL);
     }
 
     private static String gidMapping(final PosixGroup posixGroup) {
-        return String.format("%s:x:%d:",
-                             posixGroup.getGroupURI().getURI().getQuery(),
-                             posixGroup.getGID());
+        return String.format("%s:x:%d:", posixGroup.getGroupURI().getURI().getQuery(), posixGroup.getGID());
     }
 
     public void writePOSIXEntries() throws Exception {
@@ -72,11 +70,15 @@ public class PosixCache {
     private void writeUserEntries() throws Exception {
         LOGGER.debug("writeUserEntries()");
         try (final ResourceIterator<PosixPrincipal> posixPrincipalIterator = this.posixMapperClient.getUserMap();
-             final AbstractTransaction transaction = this.jedisPool.transaction(true)) {
+                final AbstractTransaction transaction = this.jedisPool.transaction(true)) {
             while (posixPrincipalIterator.hasNext()) {
                 final PosixPrincipal posixPrincipal = posixPrincipalIterator.next();
-                transaction.sadd(PosixCache.UID_MAP_KEY, PosixCache.uidMapping(
-                    new PosixPrincipalEntry(posixPrincipal, Path.of(this.rootHomeFolder, posixPrincipal.username).toString())));
+                transaction.sadd(
+                        PosixCache.UID_MAP_KEY,
+                        PosixCache.uidMapping(new PosixPrincipalEntry(
+                                posixPrincipal,
+                                Path.of(this.rootHomeFolder, posixPrincipal.username)
+                                        .toString())));
             }
 
             final List<Object> setEntries = transaction.exec();
@@ -87,7 +89,7 @@ public class PosixCache {
     private void writeGroupEntries() throws Exception {
         LOGGER.debug("writeGroupEntries()");
         try (final ResourceIterator<PosixGroup> posixGroupIterator = this.posixMapperClient.getGroupMap();
-             final AbstractTransaction transaction = this.jedisPool.transaction(true)) {
+                final AbstractTransaction transaction = this.jedisPool.transaction(true)) {
             while (posixGroupIterator.hasNext()) {
                 final PosixGroup posixGroup = posixGroupIterator.next();
                 transaction.sadd(PosixCache.GID_MAP_FIELD, PosixCache.gidMapping(posixGroup));

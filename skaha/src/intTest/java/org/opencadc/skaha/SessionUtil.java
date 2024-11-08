@@ -175,10 +175,12 @@ public class SessionUtil {
         }
 
         final RegistryClient registryClient = new RegistryClient();
-        URL newLoginURL = registryClient.getServiceURL(URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_10, AuthMethod.ANON);
+        URL newLoginURL = registryClient.getServiceURL(
+                URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_10, AuthMethod.ANON);
         final URL loginURL = newLoginURL == null
-            ? registryClient.getServiceURL(URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_01, AuthMethod.ANON)
-            : newLoginURL;
+                ? registryClient.getServiceURL(
+                        URI.create("ivo://cadc.nrc.ca/gms"), Standards.UMS_LOGIN_01, AuthMethod.ANON)
+                : newLoginURL;
         final NetrcFile netrcFile = new NetrcFile();
         final PasswordAuthentication passwordAuthentication = netrcFile.getCredentials(loginURL.getHost(), true);
         final Map<String, Object> loginPayload = new HashMap<>();
@@ -206,7 +208,8 @@ public class SessionUtil {
     private static AuthorizationToken getBearerToken(final URL sessionURL) throws Exception {
         final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token", SessionUtil.class);
         final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-        return new AuthorizationToken("Bearer", bearerToken.replaceAll("\n", ""), List.of(NetUtil.getDomainName(sessionURL)));
+        return new AuthorizationToken(
+                "Bearer", bearerToken.replaceAll("\n", ""), List.of(NetUtil.getDomainName(sessionURL)));
     }
 
     private static X509CertificateChain getProxyCertificate() throws Exception {
@@ -265,7 +268,8 @@ public class SessionUtil {
         return SessionUtil.createDesktopAppSession(image, desktopSessionURL, 1, 1);
     }
 
-    static String createDesktopAppSession(final String image, final URL desktopSessionURL, final int cores, final int ram) {
+    static String createDesktopAppSession(
+            final String image, final URL desktopSessionURL, final int cores, final int ram) {
         final Map<String, Object> params = new HashMap<>();
         final String name = new RandomStringGenerator(16).getID();
 
@@ -289,9 +293,10 @@ public class SessionUtil {
         return outputStream.toString().trim();
     }
 
-    static Session waitForDesktopApplicationSession(final URL desktopApplicationURL, final String desktopAppID, final String expectedState)
-        throws Exception {
-        Session requestedSession = SessionUtil.getDesktopApplicationSessionWithoutWait(desktopApplicationURL, desktopAppID, expectedState);
+    static Session waitForDesktopApplicationSession(
+            final URL desktopApplicationURL, final String desktopAppID, final String expectedState) throws Exception {
+        Session requestedSession =
+                SessionUtil.getDesktopApplicationSessionWithoutWait(desktopApplicationURL, desktopAppID, expectedState);
         long currentWaitTime = 0L;
         while (requestedSession == null) {
             LOGGER.info("Waiting for Desktop Application Session " + desktopAppID + " to reach " + expectedState);
@@ -299,11 +304,12 @@ public class SessionUtil {
             currentWaitTime += SessionUtil.ONE_SECOND;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
-                throw new TimeoutException("Timed out waiting for Desktop Application session " + desktopAppID + " and status " + expectedState + " after "
-                                               + currentWaitTime + "ms");
+                throw new TimeoutException("Timed out waiting for Desktop Application session " + desktopAppID
+                        + " and status " + expectedState + " after " + currentWaitTime + "ms");
             }
 
-            requestedSession = SessionUtil.getDesktopApplicationSessionWithoutWait(desktopApplicationURL, desktopAppID, expectedState);
+            requestedSession = SessionUtil.getDesktopApplicationSessionWithoutWait(
+                    desktopApplicationURL, desktopAppID, expectedState);
         }
 
         LOGGER.info("Desktop Application Session " + desktopAppID + " reached " + expectedState);
@@ -311,9 +317,11 @@ public class SessionUtil {
         return requestedSession;
     }
 
-    static void deleteDesktopApplicationSession(URL desktopApplicationSessionURL, String desktopApplicationSessionID) throws Exception {
+    static void deleteDesktopApplicationSession(URL desktopApplicationSessionURL, String desktopApplicationSessionID)
+            throws Exception {
         LOGGER.info("Deleting desktop application session " + desktopApplicationSessionID);
-        HttpDelete delete = new HttpDelete(new URL(desktopApplicationSessionURL.toString() + "/" + desktopApplicationSessionID), true);
+        HttpDelete delete = new HttpDelete(
+                new URL(desktopApplicationSessionURL.toString() + "/" + desktopApplicationSessionID), true);
         delete.run();
 
         SessionUtil.waitForSessionToTerminate(desktopApplicationSessionURL, desktopApplicationSessionID);
@@ -341,12 +349,13 @@ public class SessionUtil {
         return active;
     }
 
-    private static Session getDesktopApplicationSessionWithoutWait(final URL desktopApplicationURL, final String desktopApplicationSessionID,
-                                                                   final String expectedState) {
+    private static Session getDesktopApplicationSessionWithoutWait(
+            final URL desktopApplicationURL, final String desktopApplicationSessionID, final String expectedState) {
         return SessionUtil.getAllDesktopApplicationSessions(desktopApplicationURL).stream()
-                          .filter(session -> session.getAppId().equals(desktopApplicationSessionID) && session.getStatus().equals(expectedState))
-                          .findFirst()
-                          .orElse(null);
+                .filter(session -> session.getAppId().equals(desktopApplicationSessionID)
+                        && session.getStatus().equals(expectedState))
+                .findFirst()
+                .orElse(null);
     }
 
     static List<Session> getAllDesktopApplicationSessions(final URL desktopAppURL) {
@@ -356,8 +365,7 @@ public class SessionUtil {
         Assert.assertNull("get desktop app error", get.getThrowable());
         Assert.assertEquals("content-type", "application/json", get.getContentType());
         String json = out.toString();
-        Type listType = new TypeToken<List<Session>>() {
-        }.getType();
+        Type listType = new TypeToken<List<Session>>() {}.getType();
         Gson gson = new Gson();
         List<Session> sessions = gson.fromJson(json, listType);
         List<Session> active = new ArrayList<>();
@@ -370,11 +378,13 @@ public class SessionUtil {
         return active;
     }
 
-    private static Session getSessionWithoutWait(final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
+    private static Session getSessionWithoutWait(
+            final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
         return SessionUtil.getAllSessions(sessionURL).stream()
-                          .filter(session -> session.getId().equals(sessionID) && session.getStatus().equals(expectedState))
-                          .findFirst()
-                          .orElse(null);
+                .filter(session ->
+                        session.getId().equals(sessionID) && session.getStatus().equals(expectedState))
+                .findFirst()
+                .orElse(null);
     }
 
     static void waitForSessionToTerminate(final URL sessionURL, final String sessionID) throws Exception {
@@ -386,8 +396,8 @@ public class SessionUtil {
             currentWaitTime += SessionUtil.ONE_SECOND;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS) {
-                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + Session.STATUS_TERMINATING + " after "
-                                           + currentWaitTime + "ms");
+                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status "
+                        + Session.STATUS_TERMINATING + " after " + currentWaitTime + "ms");
             }
 
             requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, Session.STATUS_TERMINATING);
@@ -396,7 +406,8 @@ public class SessionUtil {
         LOGGER.info("Session " + sessionID + " terminated.");
     }
 
-    static Session waitForSession(final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
+    static Session waitForSession(final URL sessionURL, final String sessionID, final String expectedState)
+            throws Exception {
         Session requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, expectedState);
         long currentWaitTime = 0L;
         while (requestedSession == null) {
@@ -405,8 +416,8 @@ public class SessionUtil {
             currentWaitTime += SessionUtil.ONE_SECOND;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
-                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + expectedState + " after "
-                                           + currentWaitTime + "ms");
+                throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + expectedState
+                        + " after " + currentWaitTime + "ms");
             }
 
             requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, expectedState);
@@ -434,7 +445,7 @@ public class SessionUtil {
         Assert.assertEquals("content-type", "application/json", get.getContentType());
         final String json;
         try (final Writer writer = new StringWriter();
-             final BufferedReader reader = new BufferedReader(new InputStreamReader(get.getInputStream()))) {
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(get.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 writer.write(line);
@@ -443,19 +454,22 @@ public class SessionUtil {
             json = writer.toString();
         }
 
-        final Type listType = new TypeToken<List<Session>>() {
-        }.getType();
+        final Type listType = new TypeToken<List<Session>>() {}.getType();
         final Gson gson = new Gson();
         return gson.fromJson(json, listType);
     }
 
     static Image getImageByName(final String imagePath) throws Exception {
         final RegistryClient registryClient = new RegistryClient();
-        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+        final URL imageServiceURL = registryClient.getServiceURL(
+                SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         final URL imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
 
         final List<Image> allImagesList = ImagesTest.getImages(imageURL);
-        return allImagesList.stream().filter(image -> image.getId().endsWith(imagePath)).findFirst().orElseThrow();
+        return allImagesList.stream()
+                .filter(image -> image.getId().endsWith(imagePath))
+                .findFirst()
+                .orElseThrow();
     }
 
     protected static Image getImageOfType(final String type) throws Exception {
@@ -464,17 +478,20 @@ public class SessionUtil {
 
     protected static List<Image> getImagesOfType(final String type) throws Exception {
         final RegistryClient registryClient = new RegistryClient();
-        final URL imageServiceURL = registryClient.getServiceURL(SessionUtil.SKAHA_SERVICE_ID,
-                                                                 Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
+        final URL imageServiceURL = registryClient.getServiceURL(
+                SessionUtil.SKAHA_SERVICE_ID, Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         final URL imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
 
         final List<Image> allImagesList = ImagesTest.getImages(imageURL);
-        return allImagesList.stream().filter(image -> image.getTypes().contains(type)).collect(Collectors.toList());
+        return allImagesList.stream()
+                .filter(image -> image.getTypes().contains(type))
+                .collect(Collectors.toList());
     }
 
     protected static Image getDesktopAppImageOfType(final String fuzzySearch) throws Exception {
         return SessionUtil.getImagesOfType(SessionAction.TYPE_DESKTOP_APP).stream()
-                          .filter(image -> image.getId().contains(fuzzySearch))
-                          .findFirst().orElseThrow();
+                .filter(image -> image.getId().contains(fuzzySearch))
+                .findFirst()
+                .orElseThrow();
     }
 }
