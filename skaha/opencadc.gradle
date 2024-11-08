@@ -1,5 +1,7 @@
 configurations {
+    // Configuration for integration tests
     intTestRuntime.extendsFrom testRuntime
+    intTestImplementation.extendsFrom testImplementation
 }
 
 sourceSets {
