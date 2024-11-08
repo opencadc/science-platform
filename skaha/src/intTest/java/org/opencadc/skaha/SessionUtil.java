@@ -117,8 +117,8 @@ public class SessionUtil {
     public static final URI SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
     private static final long ONE_SECOND = 1000L;
-    private static final long TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 120L * SessionUtil.ONE_SECOND;
-    private static final long TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS = 120L * SessionUtil.ONE_SECOND;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 180L * SessionUtil.ONE_SECOND;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS = 180L * SessionUtil.ONE_SECOND;
 
     static URI getSkahaServiceID() {
         final String configuredServiceID = System.getenv("SKAHA_SERVICE_ID");
@@ -126,7 +126,7 @@ public class SessionUtil {
     }
 
     static void initializeCleanup(final URL sessionURL) throws Exception {
-        for (Session session : SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING, Session.STATUS_SUCCEEDED)) {
+        for (Session session : SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING)) {
             if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                 // delete desktop-app
                 String sessionID = session.getId();
@@ -139,7 +139,7 @@ public class SessionUtil {
         }
 
         int count = 0;
-        for (Session s : SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING, Session.STATUS_SUCCEEDED)) {
+        for (Session s : SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING)) {
             if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                 count++;
             }
