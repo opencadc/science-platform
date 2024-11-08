@@ -73,7 +73,6 @@ import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.List;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -87,10 +86,7 @@ import org.opencadc.skaha.session.SessionAction;
  */
 public class SessionLifecycleTest {
 
-    public static final String PROD_IMAGE_HOST = "images.canfar.net";
-    public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
     private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
-    private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
 
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
@@ -98,22 +94,8 @@ public class SessionLifecycleTest {
 
     protected final URL sessionURL;
     protected final Subject userSubject;
-    protected final String imageHost;
 
     public SessionLifecycleTest() throws Exception {
-        // determine image host
-        String hostP = System.getProperty(HOST_PROPERTY);
-        if (hostP == null || hostP.trim().isEmpty()) {
-            throw new IllegalArgumentException("missing server host, check " + HOST_PROPERTY);
-        } else {
-            hostP = hostP.trim();
-            if (hostP.startsWith("rc-")) {
-                imageHost = DEV_IMAGE_HOST;
-            } else {
-                imageHost = PROD_IMAGE_HOST;
-            }
-        }
-
         RegistryClient regClient = new RegistryClient();
         final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         sessionURL = new URL(sessionServiceURL.toString() + "/session");
@@ -128,18 +110,20 @@ public class SessionLifecycleTest {
         Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
 
             // ensure that there is no active session
-            initialize();
+            SessionUtil.initializeCleanup(this.sessionURL);
 
             // create desktop session
             final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
+                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(),
+                                                                      SessionAction.SESSION_TYPE_DESKTOP);
 
             final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
             SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 
             // create carta session
             final String cartaSessionID = SessionUtil.createSession(sessionURL, "inttest" + SessionAction.SESSION_TYPE_CARTA,
-                                                                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId());
+                                                                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId(),
+                                                                    SessionAction.SESSION_TYPE_CARTA);
             Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID, Session.STATUS_RUNNING);
             SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
 
@@ -165,28 +149,5 @@ public class SessionLifecycleTest {
 
             return null;
         });
-    }
-
-    private void initialize() throws Exception {
-        List<Session> sessions = getSessions();
-        for (Session session : sessions) {
-            // skip dekstop-app, deletion of desktop-app is not supported
-            if (!session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                SessionUtil.deleteSession(sessionURL, session.getId());
-            }
-        }
-
-        int count = 0;
-        sessions = getSessions();
-        for (Session s : sessions) {
-            if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                count++;
-            }
-        }
-        Assert.assertEquals("zero sessions #1", 0, count);
-    }
-
-    private List<Session> getSessions() throws Exception {
-        return SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING, Session.STATUS_SUCCEEDED);
     }
 }

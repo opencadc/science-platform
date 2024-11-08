@@ -19,6 +19,8 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: ${software.imagesecret}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

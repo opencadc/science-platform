@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2020.                            (c) 2020.
+ *  (c) 2024.                            (c) 2024.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -101,6 +101,8 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.PosixCache;
 
 /**
@@ -133,14 +135,17 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
-    private static final Logger log = Logger.getLogger(PostAction.class);
+    public static final String DEFAULT_SOFTWARE_IMAGESECRET_VALUE = "notused";
+
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
-    private static final String POSIX_MAPPER_URI = "POSIX_MAPPER_URI";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+
+    private static final Logger log = Logger.getLogger(PostAction.class);
+
 
     public PostAction() {
         super();
@@ -148,7 +153,7 @@ public class PostAction extends SessionAction {
 
     private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        List<String> getRenewJobNamesCmd = new ArrayList<>();
+        final List<String> getRenewJobNamesCmd = new ArrayList<>();
         getRenewJobNamesCmd.add("kubectl");
         getRenewJobNamesCmd.add("get");
         getRenewJobNamesCmd.add("--namespace");
@@ -187,7 +192,11 @@ public class PostAction extends SessionAction {
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                String type = syncInput.getParameter("type");
+                final String requestedType = syncInput.getParameter("type");
+
+                // Absence of type is assumed to be headless
+                final String type = StringUtil.hasText(requestedType) ? requestedType : PostAction.SESSION_TYPE_HEADLESS;
+
                 validatedType = validateImage(image, type);
                 Integer cores = getCoresParam();
                 if (cores == null) {
@@ -459,10 +468,10 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Validate and return the session type
+     * Validate and return the session type.  There exists a loophole
      *
      * @param imageID The image to validate
-     * @param type    User-provided session type (optional)
+     * @param type    User-provided session type (optional), defaults to headless
      * @return The system recognized session type
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
      * @throws Exception                 If Harbor calls fail
@@ -472,39 +481,42 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image is required");
         }
 
-        for (String harborHost : harborHosts) {
-            if (imageID.startsWith(harborHost)) {
-                Image image = getImage(imageID);
-                if (image == null) {
-                    throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
-                }
-                if (type == null) {
-                    return image.getTypes().iterator().next();
-                } else {
-                    if (image.getTypes().contains(type)) {
-                        return type;
-                    } else {
-                        throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
-                    }
-                }
+        // This will also vet the currently requested image's host (authority) against
+        // the list of configured ones.
+        final String imageRegistryHost = getRegistryHost(imageID);
+        log.debug("Image is located at " + imageRegistryHost);
+
+        final Image image = getPublicImage(imageID);
+        final String validatedType;
+
+        // Private images are also missing from this list.
+        // TODO: We currently rely on the image's host name to match a configured one
+        // TODO: to ensure a supported image from a configured source.  This is impossible
+        // TODO: with Private images as they cannot be obtained first.  This means that any
+        // TODO: image that is missing from the Public Cache can either be invalid or Private,
+        // TODO: and since we can't verify one way or the other, let them through.
+        if (image == null) {
+            log.warn("Image " + imageID + " missing from cache...");
+            final ImageRegistryAuth imageRegistryAuth = getRegistryAuth(imageRegistryHost);
+            if (imageRegistryAuth == null) {
+                throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
+            } else {
+                log.warn("Assuming image " + imageID + " is private as credentials were supplied.");
+                validatedType = type;
             }
+        } else if (image.getTypes().contains(type)) {
+            validatedType = type;
+        } else {
+            throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
         }
 
-        if (adminUser && type != null) {
-            if (!SESSION_TYPES.contains(type)) {
+        if (adminUser && validatedType != null) {
+            if (!SESSION_TYPES.contains(validatedType)) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
             }
-            return type;
         }
 
-        StringBuilder hostList = new StringBuilder("[").append(harborHosts.get(0));
-        for (String next : harborHosts.subList(1, harborHosts.size())) {
-            hostList.append(",").append(next);
-        }
-        hostList.append("]");
-
-        throw new IllegalArgumentException("session image must come from one of " + hostList);
-
+        return validatedType;
     }
 
     public void checkExistingSessions(String userid, String type) throws Exception {
@@ -533,8 +545,6 @@ public class PostAction extends SessionAction {
     public void createSession(String type, String image, String name, Integer cores, Integer ram, Integer gpus,
                               String cmd, String args, List<String> envs)
         throws Exception {
-
-        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
@@ -576,9 +586,21 @@ public class PostAction extends SessionAction {
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
 
+        final String imageRegistrySecretName;
+        // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have caught a non-existent Image already.
+        if (getPublicImage(image) == null) {
+            final ImageRegistryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
+            imageRegistrySecretName = createRegistryImageSecret(userRegistryAuth);
+        } else {
+            imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
+        }
+
+        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
                                                                .withGPUEnabled(this.gpuEnabled)
                                                                .withGPUCount(gpus)
+                                                               .withImageSecret(imageRegistrySecretName)
                                                                .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                                                                .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                                                                .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -595,15 +617,10 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                                                                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                                                               .withParameter(PostAction.POSIX_MAPPER_URI,
-                                                                              this.posixMapperConfiguration.getBaseURL() == null
-                                                                                  ? this.posixMapperConfiguration.getResourceID().toString()
-                                                                                  : this.posixMapperConfiguration.getBaseURL().toExternalForm())
                                                                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
 
-        if (StringUtil.hasText(supplementalGroups)) {
-            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
+        sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups)
+            ? supplementalGroups : "");
 
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
@@ -655,16 +672,42 @@ public class PostAction extends SessionAction {
     }
 
     /**
+     * Create a registry secret and return its name.
+     *
+     * @param registryAuth The credentials to use to authenticate to the Image Registry.
+     * @return String secret name, never null.
+     */
+    private String createRegistryImageSecret(final ImageRegistryAuth registryAuth) throws Exception {
+        final String username = this.posixPrincipal.username;
+        final String secretName = "registry-auth-" + username.toLowerCase();
+        log.debug("Creating user secret " + secretName);
+        CommandExecutioner.ensureRegistrySecret(registryAuth, secretName);
+
+        return secretName;
+    }
+
+    private String getRegistryHost(final String imageID) {
+        final String registryHost = this.harborHosts.stream().filter(imageID::startsWith).findFirst().orElse(null);
+        if (registryHost == null) {
+            throw new IllegalArgumentException("session image '" + imageID + "' must come from one of " + Arrays.toString(this.harborHosts.toArray()));
+        }
+
+        return registryHost;
+    }
+
+    /**
      * Attach a desktop application.
      * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
      * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
      *
      * @param image Container image name.
+     * @param requestCores  Requested number of cores.
+     * @param limitCores    Max number of cores.
+     * @param requestRAM    Requested amount of RAM in Gi.
+     * @param limitRAM      Max amount of RAM in Gi.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
-                                 Integer limitRAM) throws Exception {
-
+    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         // Get the IP address based on the session
@@ -672,17 +715,19 @@ public class PostAction extends SessionAction {
             "kubectl", "-n", k8sNamespace, "get", "pod", "--selector=canfar-net-sessionID=" + sessionID,
             "--no-headers=true",
             "-o",
-            "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name"};
+            "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name"
+        };
+
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
 
         String targetIP = null;
         String[] ipLines = ipResult.split("\n");
-        for (String ipLine : ipLines) {
+        for (final String ipLine : ipLines) {
             log.debug("ipLine: " + ipLine);
             String[] parts = ipLine.split("\\s+");
             if (log.isDebugEnabled()) {
-                for (String part : parts) {
+                for (final String part : parts) {
                     log.debug("part: " + part);
                 }
             }
@@ -728,6 +773,7 @@ public class PostAction extends SessionAction {
         final String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                                                                .withGPUEnabled(this.gpuEnabled)
+                                                               .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
                                                                .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                                                                .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                                                                .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
@@ -745,15 +791,10 @@ public class PostAction extends SessionAction {
                                                                .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                                                                .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                                                                .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                                                               .withParameter(PostAction.POSIX_MAPPER_URI,
-                                                                              this.posixMapperConfiguration.getBaseURL() == null
-                                                                                  ? this.posixMapperConfiguration.getResourceID().toString()
-                                                                                  : this.posixMapperConfiguration.getBaseURL().toExternalForm())
                                                                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
         final String supplementalGroups = getSupplementalGroupsList();
-        if (StringUtil.hasText(supplementalGroups)) {
-            sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, supplementalGroups);
-        }
+        sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups)
+            ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         String[] launchCmd = new String[] {
@@ -803,7 +844,7 @@ public class PostAction extends SessionAction {
 
     /**
      * Create the image, command, args, and env sections of the job launch yaml.  Example:
-     * <p/>
+     * <p />
      * image: "${software.imageid}"
      * command: ["/skaha-system/start-desktop-software.sh"]
      * args: [arg1, arg2]

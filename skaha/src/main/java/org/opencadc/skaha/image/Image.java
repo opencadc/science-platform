@@ -87,13 +87,13 @@ public class Image {
 
     public Image(String id, Set<String> types, String digest) {
         if (id == null) {
-            throw new IllegalArgumentException("id requried");
+            throw new IllegalArgumentException("id required");
         }
         if (types == null || types.isEmpty()) {
             throw new IllegalArgumentException("type required");
         }
         if (digest == null) {
-            throw new IllegalArgumentException("digest requried");
+            throw new IllegalArgumentException("digest required");
         }
         this.id = id;
         this.types = new HashSet<String>(types);

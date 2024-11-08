@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  version: 0.11.0
+  version: 0.23.0
   title: skaha
   description: |
     skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using Skaha can be found here:  https://www.opencadc.org/science-containers/
@@ -100,6 +100,14 @@ paths:
           description: |
               Only applies to session type 'headless'. Add additional environment to the container. Format is key=value. Multiple env parameters supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
           required: false
+        - name: x-skaha-registry-auth
+          in: header
+          type: string
+          description: |
+              If the image is not in a supported harbor registry, the x-registry-auth header must be provided.  This requires additional privileges.  The value is a base64 encoded string from "username:secret":
+              ```
+              $ echo -n "username:my-registry-secret" | base64 -i -
+              ```
       responses:
         '200':
           description: Successful response

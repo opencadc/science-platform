@@ -68,19 +68,12 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Type;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -122,11 +115,12 @@ public class DesktopAppLifecycleTest {
     public void testCreateDeleteDesktopApp() throws Exception {
         Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
-            initialize();
+            SessionUtil.initializeCleanup(this.sessionURL);
 
             // create desktop session
             final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
+                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(),
+                                                                      SessionAction.SESSION_TYPE_DESKTOP);
 
             final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
             SessionUtil.verifySession(desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
@@ -174,22 +168,5 @@ public class DesktopAppLifecycleTest {
 
             return null;
         });
-    }
-
-    private void initialize() throws Exception {
-        List<Session> sessions = SessionUtil.getSessions(this.sessionURL);
-        for (Session session : sessions) {
-            if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                // delete desktop-app
-                String sessionID = session.getId();
-                final URL desktopAppURL = new URL(sessionURL.toString() + "/" + sessionID + "/app");
-                SessionUtil.deleteDesktopApplicationSession(desktopAppURL, session.getAppId());
-            } else {
-                // delete session
-                SessionUtil.deleteSession(sessionURL, session.getId());
-            }
-        }
-        sessions = SessionUtil.getSessions(this.sessionURL);
-        Assert.assertEquals("zero sessions #1", 0, sessions.size());
     }
 }

@@ -73,7 +73,6 @@ import ca.nrc.cadc.net.HttpPost;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
@@ -82,10 +81,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.TimeUnit;
 import javax.security.auth.Subject;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
@@ -98,12 +95,9 @@ import org.opencadc.skaha.session.SessionAction;
  */
 public class ExpiryTimeRenewalTest {
 
-    private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
-    private static final String HOST_PROPERTY = RegistryClient.class.getName() + ".host";
     public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
-    public static final String PROD_IMAGE_HOST = "images.canfar.net";
-    public static final String DEV_IMAGE_HOST = "images-rc.canfar.net";
     public static final int SLEEP_TIME_SECONDS = 5;
+    private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
 
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
@@ -111,22 +105,8 @@ public class ExpiryTimeRenewalTest {
 
     protected final URL sessionURL;
     protected final Subject userSubject;
-    protected final String imageHost;
 
     public ExpiryTimeRenewalTest() throws Exception {
-        // determine image host
-        String hostP = System.getProperty(HOST_PROPERTY);
-        if (hostP == null || hostP.trim().isEmpty()) {
-            throw new IllegalArgumentException("missing server host, check " + HOST_PROPERTY);
-        } else {
-            hostP = hostP.trim();
-            if (hostP.startsWith("rc-")) {
-                imageHost = DEV_IMAGE_HOST;
-            } else {
-                imageHost = PROD_IMAGE_HOST;
-            }
-        }
-
         RegistryClient regClient = new RegistryClient();
         final URL sessionServiceURL = regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
         this.sessionURL = new URL(sessionServiceURL.toString() + "/session");
@@ -140,11 +120,12 @@ public class ExpiryTimeRenewalTest {
     public void testRenewCARTA() throws Exception {
         Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
-            initialize();
+            SessionUtil.initializeCleanup(this.sessionURL);
 
             // create carta session
             final String cartaSessionID = SessionUtil.createSession(this.sessionURL, "inttest-" + SessionAction.SESSION_TYPE_CARTA,
-                                                                    imageHost + CARTA_IMAGE_SUFFIX);
+                                                                    SessionUtil.getImageByName(ExpiryTimeRenewalTest.CARTA_IMAGE_SUFFIX).getId(),
+                                                                    SessionAction.SESSION_TYPE_CARTA);
             Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID, Session.STATUS_RUNNING);
 
             // Sleep to force time to pass before renewal
@@ -181,11 +162,11 @@ public class ExpiryTimeRenewalTest {
         Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
 
             // ensure that there is no active session
-            initialize();
+            SessionUtil.initializeCleanup(this.sessionURL);
 
             // create headless session
             final String headlessSessionID = SessionUtil.createHeadlessSession(
-                    SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), this.sessionURL);
+                SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), this.sessionURL);
             Session headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
             final Instant headlessExpiryTime = Instant.parse(headlessSession.getExpiryTime());
 
@@ -210,11 +191,12 @@ public class ExpiryTimeRenewalTest {
     public void testRenewDesktop() throws Exception {
         Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
             // ensure that there is no active session
-            initialize();
+            SessionUtil.initializeCleanup(this.sessionURL);
 
             // create desktop session
             final String desktopSessionID = SessionUtil.createSession(this.sessionURL, "inttest-" + SessionAction.SESSION_TYPE_DESKTOP,
-                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId());
+                                                                      SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP).getId(),
+                                                                      SessionAction.SESSION_TYPE_DESKTOP);
             SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
 
             // create desktop app
@@ -246,39 +228,10 @@ public class ExpiryTimeRenewalTest {
         });
     }
 
-    private void initialize() throws Exception {
-        List<Session> sessions = getSessions();
-        for (Session session : sessions) {
-            // skip dekstop-app, deletion of desktop-app is not supported
-            if (!session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                deleteSession(sessionURL, session.getId());
-            }
-        }
-
-        int count = 0;
-        sessions = getSessions();
-        for (Session s : sessions) {
-            if (!s.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
-                count++;
-            }
-        }
-        Assert.assertEquals("zero sessions #1", 0, count);
-    }
-
-    private void deleteSession(URL sessionURL, String sessionID) throws MalformedURLException {
-        HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + sessionID), true);
-        delete.run();
-        Assert.assertNull("delete session error", delete.getThrowable());
-    }
-
     private void renewSession(URL sessionURL, String sessionID) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
         HttpPost post = new HttpPost(new URL(sessionURL.toString() + "/" + sessionID), params, false);
         post.prepare();
-    }
-
-    private List<Session> getSessions() throws Exception {
-        return SessionUtil.getSessions(this.sessionURL, Session.STATUS_TERMINATING);
     }
 }

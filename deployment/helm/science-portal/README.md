@@ -57,6 +57,16 @@ deployment:
     # The Resource ID of the Service that contains the URL of the Skaha service in the IVOA Registry
     skahaResourceID: ivo://example.org/skaha
 
+    # Array of tab labels from left to right.  There are two supported tabs currently: Public (Standard) and Private (Advanced)
+    # Recommended is Standard and Advanced, but you do you.
+    # Example:
+    #
+    # tabLabels:
+    #   - Standard
+    #   - Advanced
+    #
+    tabLabels: []
+
     # The logo in the top left.  No link associated, just the image.  This can be relative, or absolute.
     # Default is the SRCNet Logo.
     # logoURL: /science-portal/images/SRCNetLogo.png

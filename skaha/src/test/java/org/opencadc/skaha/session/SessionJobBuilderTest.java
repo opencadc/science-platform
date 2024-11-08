@@ -4,6 +4,7 @@ import ca.nrc.cadc.util.FileUtil;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1NodeAffinity;
 import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
+import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.util.Yaml;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,10 +57,11 @@ public class SessionJobBuilderTest {
             parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
         }
 
-        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                                                         .withGPUEnabled(true)
-                                                         .withParameters(parametersToReplaceValues)
-                                                         .withGPUCount(2);
+        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
+                                                               .withGPUEnabled(true)
+                                                               .withParameters(parametersToReplaceValues)
+                                                               .withImageSecret("my-secret")
+                                                               .withGPUCount(2);
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
@@ -68,7 +70,8 @@ public class SessionJobBuilderTest {
         }
 
         final V1Job job = (V1Job) Yaml.load(output);
-        final V1NodeAffinity nodeAffinity = job.getSpec().getTemplate().getSpec().getAffinity().getNodeAffinity();
+        final V1PodSpec podSpec = job.getSpec().getTemplate().getSpec();
+        final V1NodeAffinity nodeAffinity = podSpec.getAffinity().getNodeAffinity();
 
         final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
         final List<V1NodeSelectorRequirement> matchExpressions =
@@ -77,6 +80,8 @@ public class SessionJobBuilderTest {
         if (matchExpressions != null) {
             testMatchExpressions.addAll(matchExpressions);
         }
+
+        Assert.assertEquals("Wrong pull secret.", "my-secret", podSpec.getImagePullSecrets().get(0).getName());
 
         final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
         gpuRequirement.setKey("nvidia.com/gpu.count");
