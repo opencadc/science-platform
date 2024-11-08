@@ -67,21 +67,19 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.PosixPrincipal;
-import org.apache.log4j.Logger;
-
-import java.lang.reflect.Array;
 import java.util.Arrays;
+import org.apache.log4j.Logger;
 
 /**
  * @author majorb
- * 
+ *
  * Represents a session running in skaha.
  *
  */
 public class Session {
-    
+
     private static final Logger log = Logger.getLogger(Session.class);
-    
+
     public static final String STATUS_TERMINATING = "Terminating";
     public static final String STATUS_SUCCEEDED = "Succeeded";
     public static final String STATUS_RUNNING = "Running";
@@ -97,7 +95,7 @@ public class Session {
     private final String status;
     private final String name;
     private final String startTime;
-    private String expiryTime;            // in seconds
+    private String expiryTime; // in seconds
     private final String connectURL;
     private String requestedRAM;
     private String requestedCPUCores;
@@ -107,9 +105,19 @@ public class Session {
     private String cpuCoresInUse;
     private String gpuUtilization;
 
-    public Session(String id, String userid, String runAsUID, String runAsGID, Integer[] supplementalGroups,
-                   String image, String type, String status, String name, String startTime, String connectURL,
-                   String appID) {
+    public Session(
+            String id,
+            String userid,
+            String runAsUID,
+            String runAsGID,
+            Integer[] supplementalGroups,
+            String image,
+            String type,
+            String status,
+            String name,
+            String startTime,
+            String connectURL,
+            String appID) {
         if (id == null) {
             throw new IllegalArgumentException("id is required");
         }
@@ -131,15 +139,15 @@ public class Session {
             this.supplementalGroups = new Integer[0];
         }
     }
-    
+
     public String getId() {
         return id;
     }
-    
+
     public String getUserid() {
         return userid;
     }
-    
+
     public String getImage() {
         return image;
     }
@@ -163,11 +171,11 @@ public class Session {
     public String getConnectURL() {
         return connectURL;
     }
-    
+
     public String getRequestedRAM() {
         return requestedRAM;
     }
-    
+
     public void setRequestedRAM(String ram) {
         this.requestedRAM = ram;
     }
@@ -227,7 +235,7 @@ public class Session {
     public void setExpiryTime(String timeInSeconds) {
         this.expiryTime = timeInSeconds;
     }
-    
+
     public String getAppId() {
         return appid;
     }
@@ -241,7 +249,6 @@ public class Session {
         return Arrays.copyOf(this.supplementalGroups, this.supplementalGroups.length);
     }
 
-
     public PosixPrincipal getPosixPrincipal() {
         final PosixPrincipal posixPrincipal = new PosixPrincipal(Integer.parseInt(this.runAsUID));
         posixPrincipal.username = this.userid;
@@ -249,7 +256,7 @@ public class Session {
 
         return posixPrincipal;
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (o instanceof Session) {
@@ -258,12 +265,11 @@ public class Session {
         }
         return false;
     }
-    
+
     @Override
     public String toString() {
         return String.format(
-            "Session[id=%s,userid=%s,image=%s,type=%s,status=%s,name=%s,startTime=%s,connectURL=%s]",
-            id, userid, image, type, status, name, startTime, connectURL);
+                "Session[id=%s,userid=%s,image=%s,type=%s,status=%s,name=%s,startTime=%s,connectURL=%s]",
+                id, userid, image, type, status, name, startTime, connectURL);
     }
-    
 }

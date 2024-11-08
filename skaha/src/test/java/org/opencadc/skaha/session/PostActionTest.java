@@ -69,13 +69,11 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
+import java.io.IOException;
+import java.io.OutputStream;
 import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.io.IOException;
-import java.io.OutputStream;
-
 
 public class PostActionTest {
     static {
@@ -113,9 +111,12 @@ public class PostActionTest {
             Assert.fail("Should throw IOException");
         } catch (IOException exception) {
             // Good.
-            Assert.assertEquals("Wrong message.", "Unable to create user home."
-                                                  + "\nError message from server: Forbidden to write."
-                                                  + "\nOutput from command: ", exception.getMessage());
+            Assert.assertEquals(
+                    "Wrong message.",
+                    "Unable to create user home."
+                            + "\nError message from server: Forbidden to write."
+                            + "\nOutput from command: ",
+                    exception.getMessage());
         }
     }
 
@@ -136,7 +137,6 @@ public class PostActionTest {
             String getDefaultQuota() {
                 return "14";
             }
-
 
             @Override
             void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)

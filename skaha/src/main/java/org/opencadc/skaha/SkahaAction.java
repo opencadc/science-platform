@@ -112,7 +112,6 @@ import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.RedisCache;
 
-
 public abstract class SkahaAction extends RestAction {
 
     public static final String SESSION_TYPE_CARTA = "carta";
@@ -126,8 +125,12 @@ public abstract class SkahaAction extends RestAction {
     private static final Logger log = Logger.getLogger(SkahaAction.class);
     private static final String POSIX_MAPPER_RESOURCE_ID_KEY = "skaha.posixmapper.resourceid";
     public static List<String> SESSION_TYPES = Arrays.asList(
-        SESSION_TYPE_CARTA, SESSION_TYPE_NOTEBOOK, SESSION_TYPE_DESKTOP,
-        SESSION_TYPE_CONTRIB, SESSION_TYPE_HEADLESS, TYPE_DESKTOP_APP);
+            SESSION_TYPE_CARTA,
+            SESSION_TYPE_NOTEBOOK,
+            SESSION_TYPE_DESKTOP,
+            SESSION_TYPE_CONTRIB,
+            SESSION_TYPE_HEADLESS,
+            TYPE_DESKTOP_APP);
     protected final PosixMapperConfiguration posixMapperConfiguration;
     private final String redisHost;
     private final String redisPort;
@@ -151,7 +154,6 @@ public abstract class SkahaAction extends RestAction {
     protected RedisCache redis;
     protected boolean skahaCallbackFlow = false;
     protected String callbackSupplementalGroups = null;
-
 
     public SkahaAction() {
         server = System.getenv("skaha.hostname");
@@ -219,8 +221,8 @@ public abstract class SkahaAction extends RestAction {
 
     private static EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
         // Check the current secret
-        final JSONObject secretData = CommandExecutioner.getSecretData(K8SUtil.getPreAuthorizedTokenSecretName(),
-                                                                       K8SUtil.getWorkloadNamespace());
+        final JSONObject secretData = CommandExecutioner.getSecretData(
+                K8SUtil.getPreAuthorizedTokenSecretName(), K8SUtil.getWorkloadNamespace());
         final String publicKeyPropertyName = "public";
         final String privateKeyPropertyName = "private";
 
@@ -231,10 +233,17 @@ public abstract class SkahaAction extends RestAction {
 
             // create new secret
             final String[] createCmd = new String[] {
-                "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "generic",
+                "kubectl",
+                "--namespace",
+                K8SUtil.getWorkloadNamespace(),
+                "create",
+                "secret",
+                "generic",
                 K8SUtil.getPreAuthorizedTokenSecretName(),
-                String.format("--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
-                String.format("--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
+                String.format(
+                        "--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)),
+                String.format(
+                        "--from-literal=%s=%s", privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey))
             };
 
             final String createResult = CommandExecutioner.execute(createCmd);
@@ -244,10 +253,9 @@ public abstract class SkahaAction extends RestAction {
         } else {
             final Base64.Decoder base64Decoder = Base64.getDecoder();
             // Decode twice since Kubernetes does a separate Base64 encoding.
-            return new EncodedKeyPair(base64Decoder.decode(base64Decoder.decode(
-                secretData.getString(publicKeyPropertyName))),
-                                      base64Decoder.decode(base64Decoder.decode(
-                                          secretData.getString(privateKeyPropertyName))));
+            return new EncodedKeyPair(
+                    base64Decoder.decode(base64Decoder.decode(secretData.getString(publicKeyPropertyName))),
+                    base64Decoder.decode(base64Decoder.decode(secretData.getString(privateKeyPropertyName))));
         }
     }
 
@@ -276,7 +284,7 @@ public abstract class SkahaAction extends RestAction {
         final String registryAuthValue = this.syncInput.getHeader(SkahaAction.X_REGISTRY_AUTH_HEADER);
         if (!StringUtil.hasText(registryAuthValue)) {
             throw new IllegalArgumentException("No authentication provided for unknown or private image.  Use "
-                                                   + SkahaAction.X_REGISTRY_AUTH_HEADER + " request header with base64Encode(username:secret).");
+                    + SkahaAction.X_REGISTRY_AUTH_HEADER + " request header with base64Encode(username:secret).");
         }
         return ImageRegistryAuth.fromEncoded(registryAuthValue, registryHost);
     }
@@ -293,15 +301,16 @@ public abstract class SkahaAction extends RestAction {
         final String xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         try {
-            final String callbackSessionId = SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
+            final String callbackSessionId =
+                    SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
 
             final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
             this.posixPrincipal = session.getPosixPrincipal();
             currentSubject.getPrincipals().add(posixPrincipal);
 
             this.callbackSupplementalGroups = Arrays.stream(session.getSupplementalGroups())
-                                                    .map(i -> Integer.toString(i))
-                                                    .collect(Collectors.joining(","));
+                    .map(i -> Integer.toString(i))
+                    .collect(Collectors.joining(","));
         } catch (Exception ex) {
             log.error("Unable to retrieve information for for callback flow", ex);
             if (ex instanceof IllegalStateException) {
@@ -313,7 +322,7 @@ public abstract class SkahaAction extends RestAction {
     }
 
     private void initiateGeneralFlow(Subject currentSubject, URI skahaUsersUri)
-        throws IOException, InterruptedException, ResourceNotFoundException {
+            throws IOException, InterruptedException, ResourceNotFoundException {
         if (currentSubject == null || currentSubject.getPrincipals().isEmpty()) {
             throw new NotAuthenticatedException("Unauthorized");
         }
@@ -343,17 +352,16 @@ public abstract class SkahaAction extends RestAction {
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
 
-        final GroupURI skahaHeadlessGroupURI = StringUtil.hasText(this.skahaHeadlessGroup)
-            ? new GroupURI(URI.create(this.skahaHeadlessGroup))
-            : null;
+        final GroupURI skahaHeadlessGroupURI =
+                StringUtil.hasText(this.skahaHeadlessGroup) ? new GroupURI(URI.create(this.skahaHeadlessGroup)) : null;
 
         if (skahaHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaHeadlessGroupURI)) {
             headlessUser = true;
         }
 
         final GroupURI skahaPriorityHeadlessGroupURI = StringUtil.hasText(this.skahaPriorityHeadlessGroup)
-            ? new GroupURI(URI.create(this.skahaPriorityHeadlessGroup))
-            : null;
+                ? new GroupURI(URI.create(this.skahaPriorityHeadlessGroup))
+                : null;
 
         if (skahaPriorityHeadlessGroupURI != null && skahaUsersGroupUriSet.contains(skahaPriorityHeadlessGroupURI)) {
             priorityHeadlessUser = true;
@@ -380,8 +388,8 @@ public abstract class SkahaAction extends RestAction {
         }
 
         List<Group> groups = isNotEmpty(skahaUsersGroupUriSet)
-            ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
-            : Collections.emptyList();
+                ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
+                : Collections.emptyList();
 
         // adding all groups to the Subject
         currentSubject.getPublicCredentials().add(groups);
@@ -407,9 +415,9 @@ public abstract class SkahaAction extends RestAction {
             return null;
         }
         return images.parallelStream()
-                     .filter(image -> image.getId().equals(imageID))
-                     .findFirst()
-                     .orElse(null);
+                .filter(image -> image.getId().equals(imageID))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -429,7 +437,7 @@ public abstract class SkahaAction extends RestAction {
                 baseURL = configuredPosixMapperID.toURL();
             } else {
                 throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
-                                                    + configuredPosixMapperID + ").");
+                        + configuredPosixMapperID + ").");
             }
         }
 

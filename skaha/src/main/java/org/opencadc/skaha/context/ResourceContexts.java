@@ -67,13 +67,11 @@
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.PropertiesReader;
-
+import com.google.gson.*;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.google.gson.*;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
@@ -82,22 +80,22 @@ import org.opencadc.skaha.SkahaAction;
  *
  */
 public class ResourceContexts {
-    
+
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
-    
+
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
     private final Integer defaultCores;
     private final Integer defaultCoresHeadless;
     private final List<Integer> availableCores = new ArrayList<>();
-    
+
     // units in GB
     private final Integer defaultRequestRAM;
     private final Integer defaultLimitRAM;
     private final Integer defaultRAM;
     private final Integer defaultRAMHeadless;
     private final List<Integer> availableRAM = new ArrayList<>();
-    
+
     private final List<Integer> availableGPUs = new ArrayList<>();
 
     public ResourceContexts() {
@@ -177,9 +175,8 @@ public class ResourceContexts {
     public List<Integer> getAvailableRAM() {
         return availableRAM;
     }
-    
+
     public List<Integer> getAvailableGPUs() {
         return availableGPUs;
     }
-    
 }

@@ -74,13 +74,10 @@ import org.junit.Test;
 public class K8SUtilTest {
     @Test
     public void sanitizeJobName() {
-        Assert.assertEquals("Wrong name", "skaha-type-userid-sess",
-                            K8SUtil.getJobName("SESS", "TYPE", "USERID"));
+        Assert.assertEquals("Wrong name", "skaha-type-userid-sess", K8SUtil.getJobName("SESS", "TYPE", "USERID"));
 
-        Assert.assertEquals("Wrong name", "skaha-type-my-user-sess",
-                            K8SUtil.getJobName("SESS", "TYPE", "my_user"));
+        Assert.assertEquals("Wrong name", "skaha-type-my-user-sess", K8SUtil.getJobName("SESS", "TYPE", "my_user"));
 
-        Assert.assertEquals("Wrong name", "skaha-type-my-us-e-r-sess",
-                            K8SUtil.getJobName("SESS", "TYPE", "my|us+e&r"));
+        Assert.assertEquals("Wrong name", "skaha-type-my-us-e-r-sess", K8SUtil.getJobName("SESS", "TYPE", "my|us+e&r"));
     }
 }

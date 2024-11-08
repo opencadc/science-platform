@@ -67,19 +67,18 @@
 
 package org.opencadc.skaha.context;
 
-import org.opencadc.skaha.SkahaAction;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import org.opencadc.skaha.SkahaAction;
 
 /**
  * Output the resource context information.
- * 
+ *
  * @author majorb
  */
 public class GetAction extends SkahaAction {
-    
+
     public GetAction() {
         super();
     }

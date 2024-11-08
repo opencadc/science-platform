@@ -70,14 +70,14 @@ import org.apache.log4j.Logger;
 
 /**
  * @author majorb
- * 
+ *
  * Public session information.
  *
  */
 public class PublicSession {
-    
+
     private static final Logger log = Logger.getLogger(PublicSession.class);
-    
+
     private String userid;
     private String type;
     private String status;
@@ -89,7 +89,7 @@ public class PublicSession {
         this.status = status;
         this.startTime = startTime;
     }
-    
+
     public String getUserid() {
         return userid;
     }
@@ -105,5 +105,4 @@ public class PublicSession {
     public String getStartTime() {
         return startTime;
     }
-    
 }

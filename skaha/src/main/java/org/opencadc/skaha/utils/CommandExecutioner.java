@@ -64,11 +64,11 @@ public class CommandExecutioner {
     }
 
     public static void execute(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
         final Process p = Runtime.getRuntime().exec(command);
         final int code = p.waitFor();
         try (final InputStream stdOut = new BufferedInputStream(p.getInputStream());
-             final InputStream stdErr = new BufferedInputStream(p.getErrorStream())) {
+                final InputStream stdErr = new BufferedInputStream(p.getErrorStream())) {
             final String commandOutput = readStream(stdOut);
             if (code != 0) {
                 final String errorOutput = readStream(stdErr);
@@ -93,7 +93,7 @@ public class CommandExecutioner {
      * @throws Exception If there is an error creating the secret.
      */
     public static void ensureRegistrySecret(final ImageRegistryAuth registryAuth, final String secretName)
-        throws Exception {
+            throws Exception {
         // delete any old secret by this name
         final String[] deleteCmd = CommandExecutioner.getDeleteSecretCommand(secretName);
         log.debug("delete secret command: " + Arrays.toString(deleteCmd));
@@ -143,7 +143,12 @@ public class CommandExecutioner {
         }
 
         return new String[] {
-            "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "create", "secret", "docker-registry",
+            "kubectl",
+            "--namespace",
+            K8SUtil.getWorkloadNamespace(),
+            "create",
+            "secret",
+            "docker-registry",
             secretName,
             "--docker-server=" + registryAuth.getHost(),
             "--docker-username=" + registryAuth.getUsername(),
@@ -154,16 +159,23 @@ public class CommandExecutioner {
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
         // Check the current secret
         final String[] getSecretCommand = new String[] {
-            "kubectl", "--namespace", secretNamespace, "get", "--ignore-not-found", "secret",
-            secretName, "-o", "jsonpath=\"{.data}\""
+            "kubectl",
+            "--namespace",
+            secretNamespace,
+            "get",
+            "--ignore-not-found",
+            "secret",
+            secretName,
+            "-o",
+            "jsonpath=\"{.data}\""
         };
 
         final String data = CommandExecutioner.execute(getSecretCommand);
 
         // The data from the output begins with a double-quote and ends with one, so strip them.
-        return StringUtil.hasText(data) ? new JSONObject(data.replaceFirst("\"", "")
-                                                             .substring(0, data.lastIndexOf("\"")))
-            : new JSONObject();
+        return StringUtil.hasText(data)
+                ? new JSONObject(data.replaceFirst("\"", "").substring(0, data.lastIndexOf("\"")))
+                : new JSONObject();
     }
 
     protected static String readStream(InputStream in) throws IOException {

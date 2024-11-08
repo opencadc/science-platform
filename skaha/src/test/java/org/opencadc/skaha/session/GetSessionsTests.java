@@ -67,46 +67,40 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
 import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
-
 
 /**
  * @author majorb
  *
  */
 public class GetSessionsTests {
-    
+
     private static final Logger log = Logger.getLogger(GetSessionsTests.class);
-    
+
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-
     private static final String K8S_LIST =
-        "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n" +
-        "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n" +
-        "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
-        "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n" +
-        "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n" +
-        "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n" +
-        "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
+            "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n"
+                    + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
+                    + "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
+                    + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
-    public GetSessionsTests() {
-    }
-    
+    public GetSessionsTests() {}
+
     @Test
     public void testListSessions() {
         try {
@@ -115,7 +109,7 @@ public class GetSessionsTests {
             log.info("json: \n" + json);
             List<Session> sessions1 = get.getAllSessions(null);
             Gson gson = new Gson();
-            Type listType = new TypeToken<List<Session>>(){}.getType();
+            Type listType = new TypeToken<List<Session>>() {}.getType();
             List<Session> sessions2 = gson.fromJson(json, listType);
             Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
             Assert.assertEquals("session count", sessions1.size(), sessions2.size());
@@ -125,13 +119,13 @@ public class GetSessionsTests {
                 // All start times should be parsable.
                 Instant.parse(s.getStartTime());
             }
-            
+
         } catch (Throwable t) {
             log.error("Unexpected", t);
             Assert.fail("Unexpected: " + t.getMessage());
         }
     }
-    
+
     @Test
     public void testFilterType() {
         try {
@@ -146,7 +140,7 @@ public class GetSessionsTests {
             Assert.fail("Unexpected: " + t.getMessage());
         }
     }
-    
+
     @Test
     public void testFilterStatus() throws Exception {
         GetAction get = new TestGetAction();
@@ -156,7 +150,7 @@ public class GetSessionsTests {
             Assert.assertEquals(s.getId(), "Running", s.getStatus());
         }
     }
-    
+
     @Test
     public void testFilterTypeStatus() {
         try {
@@ -172,7 +166,7 @@ public class GetSessionsTests {
             Assert.fail("Unexpected: " + t.getMessage());
         }
     }
-    
+
     static class TestGetAction extends GetAction {
 
         @Override

@@ -6,7 +6,6 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Set;
 
-
 public class CommonUtils {
     public static boolean isNotEmpty(Collection<?> collection) {
         return null != collection && !collection.isEmpty();

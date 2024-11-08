@@ -1,0 +1,30 @@
+name: "CI: Linting"
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  spotless:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+            fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v4.5.0
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'gradle'
+
+      - name: Run Spotless
+        run: |
+            cd skaha
+            ./gradlew clean spotlessCheck
+            

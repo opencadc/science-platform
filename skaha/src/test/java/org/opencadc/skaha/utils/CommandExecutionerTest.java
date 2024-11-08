@@ -17,8 +17,10 @@ public class CommandExecutionerTest {
         }
 
         final String[] deleteCommand = CommandExecutioner.getDeleteSecretCommand("mysecret");
-        Assert.assertArrayEquals("Wrong delete command.", new String[] { "kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret",
-                                     "mysecret" }, deleteCommand);
+        Assert.assertArrayEquals(
+                "Wrong delete command.",
+                new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", "mysecret"},
+                deleteCommand);
     }
 
     @Test
@@ -29,8 +31,8 @@ public class CommandExecutionerTest {
             Assert.assertEquals("registryAuth is required.", e.getMessage());
         }
 
-        final ImageRegistryAuth imageRegistryAuth = ImageRegistryAuth.fromEncoded(new String(Base64.getEncoder().encode("username:password".getBytes())),
-                                                                                  "host");
+        final ImageRegistryAuth imageRegistryAuth = ImageRegistryAuth.fromEncoded(
+                new String(Base64.getEncoder().encode("username:password".getBytes())), "host");
 
         try {
             CommandExecutioner.getRegistryCreateSecretCommand(imageRegistryAuth, "");

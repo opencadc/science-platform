@@ -20,12 +20,17 @@ import org.junit.Test;
 public class SessionJobBuilderTest {
     @Test
     public void testParsing() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource("test-base-values.yaml", SessionJobBuilderTest.class).toPath();
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values.yaml", SessionJobBuilderTest.class)
+                .toPath();
         final String fileContent = Files.readString(testBaseValuesPath);
 
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
         final String[] parametersToReplace = new String[] {
-            PostAction.SKAHA_SESSIONID, PostAction.SKAHA_HOSTNAME, PostAction.SKAHA_SESSIONTYPE, PostAction.SKAHA_POSIXID
+            PostAction.SKAHA_SESSIONID,
+            PostAction.SKAHA_HOSTNAME,
+            PostAction.SKAHA_SESSIONTYPE,
+            PostAction.SKAHA_POSIXID
         };
 
         for (final String param : parametersToReplace) {
@@ -33,7 +38,8 @@ public class SessionJobBuilderTest {
             parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
         }
 
-        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath).withParameters(parametersToReplaceValues);
+        SessionJobBuilder testSubject =
+                SessionJobBuilder.fromPath(testBaseValuesPath).withParameters(parametersToReplaceValues);
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
@@ -44,13 +50,13 @@ public class SessionJobBuilderTest {
 
     @Test
     public void testWithAffinityMerging() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource("test-base-values-affinity.yaml", SessionJobBuilderTest.class).toPath();
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
+                .toPath();
         final String fileContent = Files.readString(testBaseValuesPath);
 
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {
-            PostAction.SKAHA_SESSIONID
-        };
+        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
@@ -58,10 +64,10 @@ public class SessionJobBuilderTest {
         }
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                                                               .withGPUEnabled(true)
-                                                               .withParameters(parametersToReplaceValues)
-                                                               .withImageSecret("my-secret")
-                                                               .withGPUCount(2);
+                .withGPUEnabled(true)
+                .withParameters(parametersToReplaceValues)
+                .withImageSecret("my-secret")
+                .withGPUCount(2);
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
@@ -74,14 +80,20 @@ public class SessionJobBuilderTest {
         final V1NodeAffinity nodeAffinity = podSpec.getAffinity().getNodeAffinity();
 
         final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
-        final List<V1NodeSelectorRequirement> matchExpressions =
-            nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution().getNodeSelectorTerms().get(0).getMatchExpressions();
+        final List<V1NodeSelectorRequirement> matchExpressions = nodeAffinity
+                .getRequiredDuringSchedulingIgnoredDuringExecution()
+                .getNodeSelectorTerms()
+                .get(0)
+                .getMatchExpressions();
 
         if (matchExpressions != null) {
             testMatchExpressions.addAll(matchExpressions);
         }
 
-        Assert.assertEquals("Wrong pull secret.", "my-secret", podSpec.getImagePullSecrets().get(0).getName());
+        Assert.assertEquals(
+                "Wrong pull secret.",
+                "my-secret",
+                podSpec.getImagePullSecrets().get(0).getName());
 
         final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
         gpuRequirement.setKey("nvidia.com/gpu.count");
@@ -93,6 +105,8 @@ public class SessionJobBuilderTest {
         providedRequirement.setOperator("Exists");
 
         Assert.assertTrue("Missing GPU required match expression.", testMatchExpressions.contains(gpuRequirement));
-        Assert.assertTrue("Missing provided (custom) required match expression.", testMatchExpressions.contains(providedRequirement));
+        Assert.assertTrue(
+                "Missing provided (custom) required match expression.",
+                testMatchExpressions.contains(providedRequirement));
     }
 }

@@ -32,7 +32,8 @@ public class ImageRegistryAuthTest {
 
     @Test
     public void testFromEncoded() {
-        final String encodedValue = new String(Base64.getEncoder().encode("username:supersecret".getBytes(StandardCharsets.UTF_8)));
+        final String encodedValue =
+                new String(Base64.getEncoder().encode("username:supersecret".getBytes(StandardCharsets.UTF_8)));
         final ImageRegistryAuth auth = ImageRegistryAuth.fromEncoded(encodedValue, "host.example.com");
 
         Assert.assertEquals("Wrong username", "username", auth.getUsername());

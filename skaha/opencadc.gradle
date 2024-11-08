@@ -1,19 +1,7 @@
 configurations {
-    checkstyleDep
-    intTestImplementation.extendsFrom testImplementation
+    // Configuration for integration tests
     intTestRuntime.extendsFrom testRuntime
-}
-
-dependencies {
-    testImplementation 'com.puppycrawl.tools:checkstyle:8.2'
-    checkstyleDep 'org.opencadc:cadc-quality:[1.0,)'
-}
-
-checkstyle {
-    ignoreFailures = false
-    config = resources.text.fromArchiveEntry(configurations.checkstyleDep, 'cadc_checkstyle.xml')
-    toolVersion = '8.2'
-    sourceSets = []
+    intTestImplementation.extendsFrom testImplementation
 }
 
 sourceSets {
@@ -30,25 +18,11 @@ sourceSets {
     }
 }
 
-// Temporary work around for issue https://github.com/gradle/gradle/issues/881 - 
-// gradle not displaying fail build status when warnings reported -->
-
-tasks.withType(Checkstyle).each { checkstyleTask ->
-    checkstyleTask.doLast {
-        reports.all { report ->
-            def outputFile = report.destination
-            if (outputFile.exists() && outputFile.text.contains("<error ")) {
-                throw new GradleException("There were checkstyle warnings! For more info check $outputFile")
-            }
-        }
-    }
-}
-
 tasks.withType(Test) {
     // reset the report destinations so that intTests go to their own page
     //reports.html.destination = file("${reporting.baseDir}/${name}")
     reports.html.destination = file(reporting.baseDir.getAbsolutePath() + '/' + name)
-    
+
     // Assign all Java system properties from
     // the command line to the tests
     systemProperties System.properties
@@ -58,7 +32,6 @@ task intTest(type: Test) {
     // set the configuration context
     testClassesDirs = sourceSets.intTest.output.classesDirs
     classpath = sourceSets.intTest.runtimeClasspath
-    
     // run the tests always
     outputs.upToDateWhen { false }
 }
@@ -66,7 +39,7 @@ task intTest(type: Test) {
 test {
     testLogging {
         events "PASSED", "FAILED", "SKIPPED"
-        // "STARTED", 
+        // "STARTED",
     }
 }
 
