@@ -38,6 +38,8 @@ jobs:
   codecov:
     runs-on: ubuntu-latest
     needs: tests
+    permissions:
+      id-token: write
     steps:
       - 
         name: Download coverage artifacts
@@ -51,10 +53,11 @@ jobs:
             ls -lah $GITHUB_WORKSPACE
       -
         name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4.6.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: jacocoTestReport.xml
           flags: skaha-unittests-coverage
           name: skaha-unittests-coverage
           fail_ci_if_error: true
+          verbose: true
