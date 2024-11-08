@@ -30,7 +30,7 @@ jobs:
         uses: actions/upload-artifact@v4.4.3
         with:
           name: skaha-unittests-coverage
-          path: build/reports/jacoco/test/jacocoTestReport.xml
+          path: skaha/build/reports/jacoco/test/jacocoTestReport.xml
           if-no-files-found: error
           retention-days: 1
           overwrite: true
