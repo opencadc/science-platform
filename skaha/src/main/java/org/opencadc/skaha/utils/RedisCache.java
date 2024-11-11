@@ -46,7 +46,7 @@ public class RedisCache {
                 .collect(Collectors.toList());
     }
 
-    public void setAdd(String key, String... setParameters) {
+    public void addSet(String key, String... setParameters) {
         deleteKey(key);
         jedis.sadd(key, setParameters);
     }
@@ -55,11 +55,11 @@ public class RedisCache {
         jedis.del(key);
     }
 
-    public void setAdd(String key, List<String> setParameters) {
-        setAdd(key, setParameters.toArray(new String[0]));
+    public void addSet(String key, List<String> setParameters) {
+        addSet(key, setParameters.toArray(new String[0]));
     }
 
-    public List<String> setFetch(String key) {
+    public List<String> fetchSet(String key) {
         return new ArrayList<>(jedis.smembers(key));
     }
 

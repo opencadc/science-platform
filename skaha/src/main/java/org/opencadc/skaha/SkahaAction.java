@@ -365,7 +365,7 @@ public abstract class SkahaAction extends RestAction {
         List<String> groupNames = groups.stream()
                 .map(group -> group.getID().getName())
                 .collect(Collectors.toList());
-        redis.setAdd(getUserGroupsKey(), groupNames);
+        redis.addSet(getUserGroupsKey(), groupNames);
     }
 
     protected String getUserGroupsKey() {

@@ -938,7 +938,7 @@ public class PostAction extends SessionAction {
 
     private List<String> getGroupNames() {
         if (skahaCallbackFlow) {
-            return redis.setFetch(getUserGroupsKey());
+            return redis.fetchSet(getUserGroupsKey());
         }
         // finding the local queue based on the user's group
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
