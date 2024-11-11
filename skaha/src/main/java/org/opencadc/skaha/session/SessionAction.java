@@ -67,6 +67,8 @@
 
 package org.opencadc.skaha.session;
 
+import static org.opencadc.skaha.utils.CommandExecutioner.execute;
+
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
@@ -99,8 +101,6 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
-
-import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -273,7 +273,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public String getPodID(String forUserID, String sessionID) throws Exception {
-        String[] getPodCmd =  KubectlCommandBuilder.command("get")
+        String[] getPodCmd = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
@@ -297,7 +297,8 @@ public abstract class SessionAction extends SkahaAction {
                 .argument("event")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("--field-selector", "involvedObject.name=" + podID)
-                .outputFormat("custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp")
+                .outputFormat(
+                        "custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp")
                 .build();
 
         String events = execute(getEventsCmd);
@@ -404,13 +405,14 @@ public abstract class SessionAction extends SkahaAction {
         return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .job()
-                .label( "canfar-net-userid=" + forUserID)
+                .label("canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name,EXPIRY:.spec.activeDeadlineSeconds")
                 .build();
     }
 
-    protected String getAppJobName(String sessionID, String userID, String appID) throws IOException, InterruptedException {
+    protected String getAppJobName(String sessionID, String userID, String appID)
+            throws IOException, InterruptedException {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
         return execute(getAppJobNameCMD);

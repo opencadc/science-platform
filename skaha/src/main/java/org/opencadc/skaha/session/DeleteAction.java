@@ -100,7 +100,8 @@ public class DeleteAction extends SessionAction {
                         .pod()
                         .selector("canfar-net-sessionID=" + sessionID)
                         .noHeaders()
-                        .outputFormat("custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid")
+                        .outputFormat(
+                                "custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid")
                         .build();
 
                 String session = CommandExecutioner.execute(getSessionsCmd);

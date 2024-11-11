@@ -14,7 +14,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testNamespace() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").namespace("test");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").namespace("test");
         String[] expectedCommand = {"kubectl", "get", "-n", "test"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -22,7 +23,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testArgument() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").argument("test");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").argument("test");
         String[] expectedCommand = {"kubectl", "get", "test"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -30,7 +32,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testOutputFormat() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").outputFormat("test");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").outputFormat("test");
         String[] expectedCommand = {"kubectl", "get", "-o", "test"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -38,7 +41,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testOption() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").option("-f", "value");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").option("-f", "value");
         String[] expectedCommand = {"kubectl", "get", "-f", "value"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -46,7 +50,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testPod() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").pod();
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").pod();
         String[] expectedCommand = {"kubectl", "get", "pod"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -54,7 +59,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testJob() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").job();
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").job();
         String[] expectedCommand = {"kubectl", "get", "job"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -62,7 +68,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testSelector() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").selector("test");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").selector("test");
         String[] expectedCommand = {"kubectl", "get", "--selector=test"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -70,7 +77,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testLabel() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").label("test");
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").label("test");
         String[] expectedCommand = {"kubectl", "get", "-l", "test"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -78,7 +86,8 @@ public class KubectlCommandBuilderTest {
 
     @Test
     public void testNoHeaders() {
-        KubectlCommandBuilder.KubectlCommand actualCommand = KubectlCommandBuilder.command("get").noHeaders();
+        KubectlCommandBuilder.KubectlCommand actualCommand =
+                KubectlCommandBuilder.command("get").noHeaders();
         String[] expectedCommand = {"kubectl", "get", "--no-headers=true"};
 
         Assert.assertArrayEquals(expectedCommand, actualCommand.build());
@@ -88,7 +97,7 @@ public class KubectlCommandBuilderTest {
     public void testCombination() {
         String[] actualCommand = KubectlCommandBuilder.command("get")
                 .pod()
-                .namespace( "test")
+                .namespace("test")
                 .argument("test")
                 .outputFormat("json")
                 .option("-f", "value")
@@ -97,7 +106,22 @@ public class KubectlCommandBuilderTest {
                 .selector("test")
                 .build();
 
-        String[] expectedCommand = {"kubectl", "get", "pod", "-n", "test", "test", "-o", "json", "-f", "value", "-l", "test", "--no-headers=true", "--selector=test"};
+        String[] expectedCommand = {
+            "kubectl",
+            "get",
+            "pod",
+            "-n",
+            "test",
+            "test",
+            "-o",
+            "json",
+            "-f",
+            "value",
+            "-l",
+            "test",
+            "--no-headers=true",
+            "--selector=test"
+        };
 
         Assert.assertArrayEquals(expectedCommand, actualCommand);
     }

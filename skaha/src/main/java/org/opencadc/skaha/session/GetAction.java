@@ -273,9 +273,9 @@ public class GetAction extends SessionAction {
                 .pod()
                 .namespace(k8sNamespace)
                 .noHeaders()
-                .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name," +
-                              "REQCPUCORES:.spec.containers[].resources.requests.cpu," +
-                              "REQRAM:.spec.containers[].resources.requests.memory")
+                .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name,"
+                        + "REQCPUCORES:.spec.containers[].resources.requests.cpu,"
+                        + "REQRAM:.spec.containers[].resources.requests.memory")
                 .argument("--field-selector=status.phase=Running")
                 .argument("--sort-by=.spec.nodeName")
                 .build();

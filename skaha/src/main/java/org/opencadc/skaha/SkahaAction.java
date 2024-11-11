@@ -67,6 +67,9 @@
 
 package org.opencadc.skaha;
 
+import static java.util.stream.Collectors.toList;
+import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
+
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.*;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -75,6 +78,16 @@ import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.AccessControlException;
+import java.security.KeyPair;
+import java.util.*;
+import java.util.stream.Collectors;
+import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
@@ -87,21 +100,6 @@ import org.opencadc.skaha.registry.ImageRegistryAuth;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.utils.*;
-
-import javax.security.auth.Subject;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.AccessControlException;
-import java.security.KeyPair;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.toList;
-import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
-
 
 public abstract class SkahaAction extends RestAction {
 
@@ -210,8 +208,10 @@ public abstract class SkahaAction extends RestAction {
                     .argument("generic")
                     .argument(K8SUtil.getPreAuthorizedTokenSecretName())
                     .namespace(K8SUtil.getWorkloadNamespace())
-                    .argument(String.format("--from-literal=%s=", publicKeyPropertyName) + CommonUtils.encodeBase64(encodedPublicKey))
-                    .argument(String.format("--from-literal=%s=", privateKeyPropertyName) + CommonUtils.encodeBase64(encodedPrivateKey))
+                    .argument(String.format("--from-literal=%s=", publicKeyPropertyName)
+                            + CommonUtils.encodeBase64(encodedPublicKey))
+                    .argument(String.format("--from-literal=%s=", privateKeyPropertyName)
+                            + CommonUtils.encodeBase64(encodedPrivateKey))
                     .build();
 
             final String createResult = CommandExecutioner.execute(createCmd);
@@ -362,9 +362,8 @@ public abstract class SkahaAction extends RestAction {
         // adding all groups to the Subject
         currentSubject.getPublicCredentials().add(groups);
 
-        List<String> groupNames = groups.stream()
-                .map(group -> group.getID().getName())
-                .collect(Collectors.toList());
+        List<String> groupNames =
+                groups.stream().map(group -> group.getID().getName()).collect(Collectors.toList());
         redis.addSet(getUserGroupsKey(), groupNames);
     }
 

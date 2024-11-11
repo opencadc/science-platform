@@ -1,19 +1,19 @@
 package org.opencadc.skaha.utils;
 
-import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 public class QueueUtil {
     private static final Logger log = Logger.getLogger(QueueUtil.class);
 
-    public static String getLocalQueue(List<String> groupNames, String jobType) throws IOException, InterruptedException, RuntimeException {
+    public static String getLocalQueue(List<String> groupNames, String jobType)
+            throws IOException, InterruptedException, RuntimeException {
         List<String> localQueues = new ArrayList<>();
         for (String groupName : groupNames) {
             String localQueue = getLocalQueueByGroupAndJobType(groupName, jobType);
@@ -25,11 +25,13 @@ public class QueueUtil {
         return localQueues.get(0);
     }
 
-    private static String getLocalQueueByGroupAndJobType(String groupName, String jobType) throws IOException, InterruptedException {
+    private static String getLocalQueueByGroupAndJobType(String groupName, String jobType)
+            throws IOException, InterruptedException {
         String[] cmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .argument("localQueue")
-                .outputFormat("jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}")
+                .outputFormat("jsonpath={range .items[?(@.metadata.annotations.group==\"" + groupName
+                        + "\")]}{.metadata.name}::{.metadata.annotations.jobType}{\"\\n\"}{end}")
                 .build();
 
         try {

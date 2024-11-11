@@ -75,21 +75,6 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import org.apache.log4j.Logger;
-import org.opencadc.auth.PosixGroup;
-import org.opencadc.gms.GroupURI;
-import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.registry.ImageRegistryAuth;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
-import org.opencadc.skaha.utils.PosixCache;
-import org.opencadc.skaha.utils.QueueUtil;
-
-import javax.security.auth.Subject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -103,6 +88,20 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.security.auth.Subject;
+import org.apache.log4j.Logger;
+import org.opencadc.auth.PosixGroup;
+import org.opencadc.gms.GroupURI;
+import org.opencadc.permissions.WriteGrant;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.image.Image;
+import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.skaha.utils.QueueUtil;
 
 /**
  * @author majorb
@@ -373,7 +372,10 @@ public class PostAction extends SessionAction {
                     .job()
                     .argument(entry.getKey())
                     .argument("--type=json")
-                    .option("-p", "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
+                    .option(
+                            "-p",
+                            "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime
+                                    + "}]");
 
             execute(renewExpiryTimeCmd.build());
         }
@@ -415,9 +417,10 @@ public class PostAction extends SessionAction {
         String[] getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .job()
-                .label( "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime")
+                .outputFormat(
+                        "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime")
                 .build();
 
         String renewJobNamesStr = execute(getRenewJobNamesCmd);
@@ -628,12 +631,9 @@ public class PostAction extends SessionAction {
 
         // finding the local queue based on the user's group
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
-        List<Group> groups = groupCredentials.stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-        List<String> groupNames = groups.stream()
-                .map(group -> group.getID().getName())
-                .collect(Collectors.toList());
+        List<Group> groups = groupCredentials.stream().flatMap(List::stream).collect(Collectors.toList());
+        List<String> groupNames =
+                groups.stream().map(group -> group.getID().getName()).collect(Collectors.toList());
         String localQueue = QueueUtil.getLocalQueue(groupNames, type);
 
         String jobLaunchString = sessionJobBuilder.build();
@@ -649,7 +649,7 @@ public class PostAction extends SessionAction {
 
         String[] launchCmd = KubectlCommandBuilder.command("create")
                 .namespace(k8sNamespace)
-                .option("-f" ,jsonLaunchFile)
+                .option("-f", jsonLaunchFile)
                 .build();
 
         String createResult = execute(launchCmd);
@@ -662,7 +662,7 @@ public class PostAction extends SessionAction {
             jsonLaunchFile = super.stageFile(serviceString);
             launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
-                    .option("-f" ,jsonLaunchFile)
+                    .option("-f", jsonLaunchFile)
                     .build();
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
@@ -676,7 +676,7 @@ public class PostAction extends SessionAction {
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
-                    .option("-f" ,jsonLaunchFile)
+                    .option("-f", jsonLaunchFile)
                     .build();
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
@@ -734,17 +734,18 @@ public class PostAction extends SessionAction {
      * @param limitRAM      Max amount of RAM in Gi.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(String image, Integer requestCores, Integer limitCores, Integer requestRAM,
-                                 Integer limitRAM) throws Exception {
-
+    public void attachDesktopApp(
+            String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM)
+            throws Exception {
 
         // Get the IP address based on the session
-        String[]getIPCommand = KubectlCommandBuilder.command("get")
+        String[] getIPCommand = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .selector("canfar-net-sessionID=" + sessionID)
                 .noHeaders()
-                .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name")
+                .outputFormat(
+                        "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name")
                 .build();
 
         String ipResult = execute(getIPCommand);
@@ -830,7 +831,7 @@ public class PostAction extends SessionAction {
 
         String[] launchCmd = KubectlCommandBuilder.command("create")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .option("-f" ,launchFile)
+                .option("-f", launchFile)
                 .build();
 
         String createResult = execute(launchCmd);
@@ -942,11 +943,7 @@ public class PostAction extends SessionAction {
         }
         // finding the local queue based on the user's group
         Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
-        List<Group> groups = groupCredentials.stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-        return groups.stream()
-                .map(group -> group.getID().getName())
-                .collect(Collectors.toList());
+        List<Group> groups = groupCredentials.stream().flatMap(List::stream).collect(Collectors.toList());
+        return groups.stream().map(group -> group.getID().getName()).collect(Collectors.toList());
     }
 }
