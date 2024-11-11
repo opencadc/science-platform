@@ -132,7 +132,10 @@ public class CommandExecutioner {
         if (!StringUtil.hasText(secretName)) {
             throw new IllegalArgumentException("secretName is required.");
         }
-        return new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", secretName};
+        return KubectlCommandBuilder.command("delete")
+                .namespace(K8SUtil.getWorkloadNamespace())
+                .option("secret", secretName)
+                .build();
     }
 
     static String[] getRegistryCreateSecretCommand(final ImageRegistryAuth registryAuth, final String secretName) {
@@ -142,18 +145,14 @@ public class CommandExecutioner {
             throw new IllegalArgumentException("secretName is required.");
         }
 
-        return new String[] {
-            "kubectl",
-            "--namespace",
-            K8SUtil.getWorkloadNamespace(),
-            "create",
-            "secret",
-            "docker-registry",
-            secretName,
-            "--docker-server=" + registryAuth.getHost(),
-            "--docker-username=" + registryAuth.getUsername(),
-            "--docker-password=" + new String(registryAuth.getSecret())
-        };
+        return KubectlCommandBuilder.command("create")
+                .namespace(K8SUtil.getWorkloadNamespace())
+                .argument("secret")
+                .option("docker-registry", secretName)
+                .argument("--docker-server=" + registryAuth.getHost())
+                .argument("--docker-username=" + registryAuth.getUsername())
+                .argument("--docker-password=" + new String(registryAuth.getSecret()))
+                .build();
     }
 
     public static JSONObject getSecretData(final String secretName, final String secretNamespace) throws Exception {
