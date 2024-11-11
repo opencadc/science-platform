@@ -67,7 +67,6 @@
 
 package org.opencadc.skaha;
 
-
 import java.util.List;
 import org.apache.log4j.Logger;
 
@@ -76,6 +75,7 @@ public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
+
     public static String getHostName() {
         return System.getenv("skaha.hostname");
     }
@@ -105,24 +105,24 @@ public class K8SUtil {
         final String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
         return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
-    
-    //skaha-notebook-svc-rdcc0219
+
+    // skaha-notebook-svc-rdcc0219
     public static String getServiceName(String sessionID, String type) {
         return "skaha-" + type + "-svc-" + sessionID;
     }
-    
+
     public static String getIngressName(String sessionID, String type) {
         return "skaha-" + type + "-ingress-" + sessionID;
     }
-    
+
     public static String getMiddlewareName(String sessionID, String type) {
         return "skaha-" + type + "-middleware-" + sessionID;
     }
-    
+
     public static String getHomeDir() {
         return System.getenv("skaha.homedir");
     }
-    
+
     public static String getScratchDir() {
         return System.getenv("skaha.scratchdir");
     }
@@ -182,12 +182,12 @@ public class K8SUtil {
     }
 
     public static Integer getMaxUserSessions() {
-       String noOfSessions = System.getenv("skaha.maxusersessions");
-       if (noOfSessions == null) {
-           log.warn("no max user sessions value configured.");
-           return 1;
-       }
-       return Integer.parseInt(noOfSessions);
+        String noOfSessions = System.getenv("skaha.maxusersessions");
+        if (noOfSessions == null) {
+            log.warn("no max user sessions value configured.");
+            return 1;
+        }
+        return Integer.parseInt(noOfSessions);
     }
 
     public static String getPosixCacheUrl(String packageName) {
