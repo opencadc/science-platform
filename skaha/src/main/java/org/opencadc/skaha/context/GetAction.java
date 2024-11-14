@@ -88,7 +88,7 @@ public class GetAction extends SkahaAction {
         super.initRequest();
 
         File propertiesFile = ResourceContexts.getResourcesFile("k8s-resources.json");
-        byte[] bytes = getBytes(propertiesFile);
+        byte[] bytes = GetAction.getBytes(propertiesFile);
         syncOutput.setHeader("Content-Type", "application/json");
         syncOutput.getOutputStream().write(bytes);
     }

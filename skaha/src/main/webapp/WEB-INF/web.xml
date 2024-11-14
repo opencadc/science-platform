@@ -73,6 +73,16 @@
          <load-on-startup>2</load-on-startup>
     </servlet>
 
+    <servlet>
+        <servlet-name>ImageRepositoryServlet</servlet-name>
+        <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
+        <init-param>
+            <param-name>get</param-name>
+            <param-value>org.opencadc.skaha.repository.GetAction</param-value>
+        </init-param>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
+
     <!-- Servlet that identifies the services provided by platform -->
     <servlet>
       <servlet-name>CapabilitiesServlet</servlet-name>
@@ -121,6 +131,11 @@
     <servlet-mapping>
         <servlet-name>ImageServlet</servlet-name>
         <url-pattern>/v0/image/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>ImageRepositoryServlet</servlet-name>
+        <url-pattern>/v0/repository/*</url-pattern>
     </servlet-mapping>
         
     <servlet-mapping>

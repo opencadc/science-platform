@@ -4,7 +4,7 @@ import java.util.Base64;
 import org.junit.Assert;
 import org.junit.Test;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.repository.ImageRepositoryAuth;
 
 public class CommandExecutionerTest {
     @Test
@@ -31,17 +31,17 @@ public class CommandExecutionerTest {
             Assert.assertEquals("registryAuth is required.", e.getMessage());
         }
 
-        final ImageRegistryAuth imageRegistryAuth = ImageRegistryAuth.fromEncoded(
+        final ImageRepositoryAuth imageRepositoryAuth = ImageRepositoryAuth.fromEncoded(
                 new String(Base64.getEncoder().encode("username:password".getBytes())), "host");
 
         try {
-            CommandExecutioner.getRegistryCreateSecretCommand(imageRegistryAuth, "");
+            CommandExecutioner.getRegistryCreateSecretCommand(imageRepositoryAuth, "");
         } catch (IllegalArgumentException e) {
             Assert.assertEquals("secretName is required.", e.getMessage());
         }
 
         try {
-            CommandExecutioner.getRegistryCreateSecretCommand(imageRegistryAuth, null);
+            CommandExecutioner.getRegistryCreateSecretCommand(imageRepositoryAuth, null);
         } catch (IllegalArgumentException e) {
             Assert.assertEquals("secretName is required.", e.getMessage());
         }
