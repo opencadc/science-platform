@@ -27,4 +27,3 @@ jobs:
         run: |
             cd skaha
             ./gradlew clean spotlessCheck
-            
