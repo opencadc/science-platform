@@ -381,3 +381,22 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
+  /v0/registry:
+    get:
+      description: |
+        List the Image Registry hosts configured as a JSON Array.
+      tags:
+        - Harbor, Registry, Image, Repository
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Not authenticated
+        '403':
+          description: Permission denied
+        '500':
+          description: Internal error
+        '503':
+          description: Service busy
+        default:
+          description: Unexpected error
