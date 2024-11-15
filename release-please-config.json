@@ -12,7 +12,11 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "gradle.properties"
+          "path": "skaha/gradle.properties"
+        },
+        {
+          "tyoe": "yaml",
+          "path": "skaha/version.yaml"
         }
       ]
     }

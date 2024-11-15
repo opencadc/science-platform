@@ -1,0 +1,4 @@
+version: "0.23.0" # x-release-please-version
+major: "0" # x-release-please-major
+minor: "23" # x-release-please-minor
+patch: "0" # x-release-please-patch
