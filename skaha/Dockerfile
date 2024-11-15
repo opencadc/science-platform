@@ -1,11 +1,11 @@
-FROM eclipse-temurin:11-alpine@sha256:7f5e733cd9356305ce19f333cb362e5f542c44a9a68a3ae6b141b515d59bac13 AS base
+FROM eclipse-temurin:11-alpine AS base
 
 FROM base AS builder
 COPY . /skaha
 WORKDIR /skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
-FROM images.opencadc.org/library/cadc-tomcat@sha256:3f0b603542de3ec6b492af565b05a0f1af78b518a5e95ec9f10fc0656d0f3741 AS production
+FROM images.opencadc.org/library/cadc-tomcat:1.3 AS production
 
 RUN set -eux \
     && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core-4.9.0-1.fc40 \  
