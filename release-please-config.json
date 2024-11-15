@@ -11,7 +11,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "skaha/gradle.properties",
+          "path": "skaha/gradle.properties"
         }
       ]
     }
