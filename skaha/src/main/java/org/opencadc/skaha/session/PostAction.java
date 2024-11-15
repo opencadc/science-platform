@@ -97,7 +97,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
-import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
@@ -487,8 +487,8 @@ public class PostAction extends SessionAction {
         // TODO: and since we can't verify one way or the other, let them through.
         if (image == null) {
             log.warn("Image " + imageID + " missing from cache...");
-            final ImageRegistryAuth imageRegistryAuth = getRegistryAuth(imageRegistryHost);
-            if (imageRegistryAuth == null) {
+            final ImageRepositoryAuth imageRepositoryAuth = getRegistryAuth(imageRegistryHost);
+            if (imageRepositoryAuth == null) {
                 throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
             } else {
                 log.warn("Assuming image " + imageID + " is private as credentials were supplied.");
@@ -591,7 +591,7 @@ public class PostAction extends SessionAction {
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
         // caught a non-existent Image already.
         if (getPublicImage(image) == null) {
-            final ImageRegistryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
+            final ImageRepositoryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
             imageRegistrySecretName = createRegistryImageSecret(userRegistryAuth);
         } else {
             imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
@@ -700,7 +700,7 @@ public class PostAction extends SessionAction {
      * @param registryAuth The credentials to use to authenticate to the Image Registry.
      * @return String secret name, never null.
      */
-    private String createRegistryImageSecret(final ImageRegistryAuth registryAuth) throws Exception {
+    private String createRegistryImageSecret(final ImageRepositoryAuth registryAuth) throws Exception {
         final String username = this.posixPrincipal.username;
         final String secretName = "registry-auth-" + username.toLowerCase();
         log.debug("Creating user secret " + secretName);

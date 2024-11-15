@@ -15,7 +15,7 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.registry.ImageRegistryAuth;
+import org.opencadc.skaha.repository.ImageRepositoryAuth;
 
 public class CommandExecutioner {
     private static final Logger log = Logger.getLogger(CommandExecutioner.class);
@@ -92,7 +92,7 @@ public class CommandExecutioner {
      * @param secretName   The name of the secret to create.
      * @throws Exception If there is an error creating the secret.
      */
-    public static void ensureRegistrySecret(final ImageRegistryAuth registryAuth, final String secretName)
+    public static void ensureRegistrySecret(final ImageRepositoryAuth registryAuth, final String secretName)
             throws Exception {
         // delete any old secret by this name
         final String[] deleteCmd = CommandExecutioner.getDeleteSecretCommand(secretName);
@@ -138,7 +138,7 @@ public class CommandExecutioner {
                 .build();
     }
 
-    static String[] getRegistryCreateSecretCommand(final ImageRegistryAuth registryAuth, final String secretName) {
+    static String[] getRegistryCreateSecretCommand(final ImageRepositoryAuth registryAuth, final String secretName) {
         if (registryAuth == null) {
             throw new IllegalArgumentException("registryAuth is required.");
         } else if (!StringUtil.hasText(secretName)) {
