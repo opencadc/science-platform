@@ -1,0 +1,33 @@
+# Release Please Actions
+name: "CD: Release Please"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Create release
+        id: release-please
+        uses: googleapis/release-please-action@v4.1.3
+        with:
+          config-file: release-please-config.json
+          manifest-file: release-please-manifest.json
+      -
+        # This action will fail from forks, since GITHUB_TOKEN will not have write access
+        # for opencadc/science-platform repository.
+        # !TODO: Add a check to see if the PR is from a fork, and if so, skip this step on origin
+        name: Dispatch Edge Build
+        if: always()
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          repository: shinybrar/science-platform
+          event-type: edge-build
+          token: ${{ secrets.GITHUB_TOKEN }}
