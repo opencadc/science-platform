@@ -15,7 +15,7 @@
           "path": "skaha/gradle.properties"
         },
         {
-          "tyoe": "yaml",
+          "type": "yaml",
           "path": "skaha/version.yaml"
         }
       ]
