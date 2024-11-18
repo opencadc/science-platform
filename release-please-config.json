@@ -3,7 +3,7 @@
     "skaha": {
       "path": "skaha",
       "package-name": "skaha",
-      "changelog-path": "skaha/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "release-type": "simple",
       "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": false,
