@@ -64,5 +64,15 @@ jobs:
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          # push-to-registry: true
           show-summary: true
+      -
+        name: Install Cosign
+        id: install-cosign
+        uses: sigstore/cosign-installer@v3.7.0
+      -
+        name: CoSign Container Image
+        id: cosign
+        run: |
+          cosign version
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} --upload
