@@ -1,16 +1,18 @@
-name: "CD: Edge Build"
+name: "CD: Release Build"
 
 on:
   repository_dispatch:
-    types: [edge-build]
+    types: [release-build]
 
 env:
-  REGISTRY: ${{ secrets.CONTAINER_REGISTRY}}
-  IMAGE: platform/science-platform
-  TAG: edge
+  REGISTRY: images.opencadc.org
+  IMAGE: platform/skaha
+  TAG: latest
+  TAG_RELEASE: ${{ github.event.client_payload.tag_name }}
 
 jobs:
-  edge-build:
+  release-build:
+    if: github.repository == 'opencadc/science-platform'
     runs-on: ubuntu-latest
     permissions:
       attestations: write
@@ -33,9 +35,9 @@ jobs:
         name: Perform Container Registry Login
         uses: docker/login-action@v3.3.0
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: images.opencadc.org
+          username: ${{ secrets.SKAHA_REGISTRY_USERNAME }}
+          password: ${{ secrets.SKAHA_REGISTRY_TOKEN }}
       -
         name: Build and Push Docker Image
         id: build
@@ -50,11 +52,15 @@ jobs:
           provenance: mode=max
           sbom: true
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG_RELEASE }}
           labels: |
-            org.opencontainers.image.title=Science Platform
+            org.opencontainers.image.title=skaha
+            org.opencontainers.image.version=${{ env.TAG_RELEASE }}
+            org.opencontainers.image.description="Science Platform Backend"
             org.opencontainers.image.licenses=AGPL-3.0
-            org.opencontainers.image.url=https://github.com/shinybrar/science-platform
+            org.opencontainers.image.url=https://github.com/opencadc/science-platform
       -
         # See https://github.com/marketplace/actions/attest-build-provenance#container-image
         # for more information on the attest-build-provenance action
@@ -64,6 +70,7 @@ jobs:
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
+          # Currently not pushing attestations to Harbor Registry
           # push-to-registry: true
           show-summary: true
       -
@@ -78,3 +85,5 @@ jobs:
         run: |
           cosign version
           cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} --upload
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG_RELEASE }} --upload
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.build.outputs.digest }} --upload
