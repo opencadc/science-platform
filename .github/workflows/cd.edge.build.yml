@@ -22,7 +22,7 @@ jobs:
         id: client-payload
         run: |
           echo "Client Payload: ${{ toJson(github.event.client_payload) }}"
-      - 
+      -
         name: Checkout
         uses: actions/checkout@v3
       -
