@@ -70,8 +70,10 @@ jobs:
         name: Install Cosign
         id: install-cosign
         uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: 'v2.4.1'
       -
-        name: CoSign Container Image
+        name: Cosign Container Image
         id: cosign
         run: |
           cosign version
