@@ -15,8 +15,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    outputs:
-      release-please-output: ${{ steps.release-please.outputs }}
     if: github.repository == 'opencadc/science-platform'
     steps:
       -
