@@ -42,7 +42,7 @@ jobs:
       -
         name: Dispatch Release Build
         # Run this step only if the release-please completes successfully
-        if: ${{ steps.release-please.outputs.release_created }}
+        if: ${{ steps.release-please.outputs.releases_created }}
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
           repository: opencadc/science-platform
