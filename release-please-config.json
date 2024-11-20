@@ -1,6 +1,6 @@
 {
   "packages": {
-    "skaha": {
+    ".": {
       "path": ".",
       "package-name": "skaha",
       "changelog-path": "CHANGELOG.md",
@@ -18,7 +18,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "gradle.properties"
+          "path": "skaha/gradle.properties"
         }
       ]
     }

@@ -28,7 +28,7 @@ jobs:
         name: Release Please Outputs
         if: steps.release-please.outcome == 'success'
         run: |
-          echo ${{ steps.release-please.outputs }}
+          echo toJson(${{ steps.release-please.outputs }})
       -
         name: Dispatch Edge Build
         # Run this step only if the release-please completes successfully
@@ -47,7 +47,7 @@ jobs:
       -
         name: Dispatch Skaha Release Build
         # Run this step only if the release-please completes successfully
-        if: ${{ steps.release-please.outputs.releases_created == 'true' }}
+        if: ${{ steps.release-please.outputs.release_created == 'true' }}
         run: |
           echo "Release Build currently Disabled"
         # uses: peter-evans/repository-dispatch@v3.0.0
