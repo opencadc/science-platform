@@ -1,7 +1,7 @@
 {
   "packages": {
     "skaha": {
-      "path": "skaha",
+      "path": ".",
       "package-name": "skaha",
       "changelog-path": "CHANGELOG.md",
       "release-type": "simple",
@@ -9,14 +9,16 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": false,
+      "exclude-paths": [
+        "docs",
+        "deployment",
+        "image-cache",
+        "integration-test"
+      ],
       "extra-files": [
         {
           "type": "generic",
           "path": "gradle.properties"
-        },
-        {
-          "type": "generic",
-          "path": "version.yaml"
         }
       ]
     }
