@@ -15,6 +15,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      release-please-output: ${{ steps.release-please.outputs }}
     if: github.repository == 'opencadc/science-platform'
     steps:
       -
@@ -25,14 +27,9 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
       -
-        name: Release Please Outputs
-        if: steps.release-please.outcome == 'success'
-        run: |
-          echo toJson(${{ steps.release-please.outputs }})
-      -
         name: Dispatch Edge Build
         # Run this step only if the release-please completes successfully
-        if: steps.release-please.outcome == 'success'
+        if: steps.release-please.outcome == 'success' 
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
           repository: opencadc/science-platform
@@ -40,7 +37,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           client-payload: |-
             {
-              "releases_created": "${{ steps.release-please.outputs.releases_created }}",
+              "releases_created": "${{ steps.release-please.outputs.release_created }}",
               "tag_name": "${{ steps.release-please.outputs.tag_name }}",
               "sha": "${{ steps.release-please.outputs.sha }}"
             }
@@ -61,3 +58,11 @@ jobs:
         #       "tag_name": "${{ steps.release-please.outputs.tag_name }}",
         #       "sha": "${{ steps.release-please.outputs.sha }}"
         #     }
+  release-debug:
+    runs-on: ubuntu-latest
+    needs: release-please
+    steps:
+      - env:
+          RELEASE_PLEASE_OUTPUT: ${{ needs.release-please.outputs.release-please-output }}
+        run: |
+          echo "Release Please Output: $RELEASE_PLEASE_OUTPUT"
