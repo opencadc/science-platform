@@ -4,6 +4,7 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0'
     id 'java'
     id 'jacoco'
+    id 'org.jetbrains.dokka' version '1.6.0'
 }
 
 repositories {
@@ -55,6 +56,7 @@ dependencies {
     testImplementation 'junit:junit:[4.13,)'
     testImplementation 'org.json:json:20231013'
     testImplementation 'org.mockito:mockito-core:5.12.0'
+
 }
 
 spotless {
@@ -78,12 +80,43 @@ spotless {
     endWithNewline()
   }
 }
+check.dependsOn spotlessCheck
 
+// Create Java Code Coverage Reports
 jacocoTestReport {
     reports {
         xml.enabled true
         html.enabled true
     }
 }
-
 check.dependsOn jacocoTestReport
+
+// Create JavaDoc
+javadoc {
+    destinationDir = file("${buildDir}/docs/javadoc")
+}
+
+// Create Java Documentation using Dokka for Github Markdown and HTML
+tasks.dokkaGfm.configure {
+    outputDirectory.set(file("${buildDir}/docs/dokka/gfm"))
+    dokkaSourceSets {
+        register("main") {
+            sourceRoots.from(file("src/main/java"))
+        }
+    }
+}
+tasks.dokkaHtml.configure {
+    outputDirectory.set(file("${buildDir}/docs/dokka/html"))
+    dokkaSourceSets {
+        register("main") {
+            sourceRoots.from(file("src/main/java"))
+        }
+      configureEach {
+        jdkVersion.set(11)
+        sourceLink {
+        localDirectory.set(file("src/main/java"))
+        remoteUrl.set("https://github.com/opencadc/science-platform/tree/main/skaha/src/main/java")
+      }
+      }
+    }
+}

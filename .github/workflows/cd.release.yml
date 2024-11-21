@@ -1,0 +1,59 @@
+# Release Please Actions
+name: "CD: Release Please"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    if: github.repository == 'opencadc/science-platform'
+    steps:
+      -
+        name: Create release
+        id: release-please
+        uses: googleapis/release-please-action@v4.1.3
+        with:
+          manifest-file: .release-please-manifest.json
+      -
+        name: Dispatch Edge Build
+        # Run this step only if the release-please completes successfully
+        if: steps.release-please.outcome == 'success' 
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          repository: opencadc/science-platform
+          event-type: edge-build
+          token: ${{ secrets.GITHUB_TOKEN }}
+      -
+        name: Skaha Release Build Info
+        # Run this step only if the release-please completes successfully
+        if: ${{ steps.release-please.outputs.release_created == 'true' }}
+        run: |
+          echo "Release Build currently Disabled"
+          echo "Releases Created: ${{ steps.release-please.outputs.release_created }}"
+          echo "tag: ${{ steps.release-please.outputs.tag_name }}"
+          echo "sha: ${{ steps.release-please.outputs.sha }}"
+          echo "major: ${{ steps.release-please.outputs.major }}"
+          echo "minor: ${{ steps.release-please.outputs.minor }}"
+          echo "patch: ${{ steps.release-please.outputs.patch }}"
+      -
+        name: Dispatch Skaha Release Build
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          repository: opencadc/science-platform
+          event-type: release-build
+          token: ${{ secrets.GITHUB_TOKEN }}
+          client-payload: |-
+            {
+              "releases_created": "${{ steps.release-please.outputs.release_created }}",
+              "tag_name": "${{ steps.release-please.outputs.tag_name }}",
+              "sha": "${{ steps.release-please.outputs.sha }}"
+            }
