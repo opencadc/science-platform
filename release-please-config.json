@@ -1,7 +1,6 @@
 {
   "packages": {
     ".": {
-      "path": ".",
       "package-name": "skaha",
       "changelog-path": "CHANGELOG.md",
       "release-type": "simple",
