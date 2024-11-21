@@ -33,7 +33,7 @@ jobs:
           event-type: edge-build
           token: ${{ secrets.GITHUB_TOKEN }}
       -
-        name: Dispatch Skaha Release Build
+        name: Skaha Release Build Info
         # Run this step only if the release-please completes successfully
         if: ${{ steps.release-please.outputs.release_created == 'true' }}
         run: |
@@ -44,15 +44,16 @@ jobs:
           echo "major: ${{ steps.release-please.outputs.major }}"
           echo "minor: ${{ steps.release-please.outputs.minor }}"
           echo "patch: ${{ steps.release-please.outputs.patch }}"
-
-        # uses: peter-evans/repository-dispatch@v3.0.0
-        # with:
-        #   repository: opencadc/science-platform
-        #   event-type: release-build
-        #   token: ${{ secrets.GITHUB_TOKEN }}
-        #   client-payload: |-
-        #     {
-        #       "releases_created": "${{ steps.release-please.outputs.releases_created }}",
-        #       "tag_name": "${{ steps.release-please.outputs.tag_name }}",
-        #       "sha": "${{ steps.release-please.outputs.sha }}"
-        #     }
+      -
+        name: Dispatch Skaha Release Build
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          repository: opencadc/science-platform
+          event-type: release-build
+          token: ${{ secrets.GITHUB_TOKEN }}
+          client-payload: |-
+            {
+              "releases_created": "${{ steps.release-please.outputs.release_created }}",
+              "tag_name": "${{ steps.release-please.outputs.tag_name }}",
+              "sha": "${{ steps.release-please.outputs.sha }}"
+            }
