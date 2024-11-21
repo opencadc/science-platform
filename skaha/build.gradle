@@ -60,23 +60,18 @@ dependencies {
 
 spotless {
   java {
+    // Interpret all files as utf-8
+    encoding 'UTF-8'
+    // Only require formatting of files that diff from main
+    ratchetFrom 'origin/main'
     // Use the default importOrder configuration
     importOrder()
     // Remove unused imports
     removeUnusedImports()
     // Google Java Format, Android Open Source Project style which uses 4 spaces for indentation
-    palantirJavaFormat()
+    palantirJavaFormat('2.50.0').formatJavaDoc(true)
     // Format annotations on a single line
     formatAnnotations()
-  }
-  yaml {
-    target '**/*.yaml, **/*.yml, ../.github/workflows/*.yml'
-  }
-  format 'misc', {
-    target '**/*.gradle'
-    trimTrailingWhitespace()
-    indentWithSpaces(4)
-    endWithNewline()
   }
 }
 check.dependsOn spotlessCheck
