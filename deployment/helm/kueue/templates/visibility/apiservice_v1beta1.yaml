@@ -1,10 +1,9 @@
-{{- if include "kueue.isFeatureGateEnabled" (dict "List" .Values.controllerManager.featureGates "Feature" "VisibilityOnDemand") }}
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
   labels:
   {{- include "kueue.labels" . | nindent 4 }}
-  name: v1alpha1.visibility.kueue.x-k8s.io
+  name: v1beta1.visibility.kueue.x-k8s.io
 spec:
   group: visibility.kueue.x-k8s.io
   groupPriorityMinimum: 100
@@ -12,6 +11,5 @@ spec:
   service:
     name: '{{ include "kueue.fullname" . }}-visibility-server'
     namespace: '{{ .Release.Namespace }}'
-  version: v1alpha1
+  version: v1beta1
   versionPriority: 100
-{{- end }}

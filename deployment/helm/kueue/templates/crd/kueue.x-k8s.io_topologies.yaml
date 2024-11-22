@@ -9,7 +9,7 @@ metadata:
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "kueue.fullname" . }}-serving-cert
     {{- end }}
     controller-gen.kubebuilder.io/version: v0.16.5
-  name: multikueueconfigs.kueue.x-k8s.io
+  name: topologies.kueue.x-k8s.io
 spec:
   conversion:
     strategy: Webhook
@@ -23,16 +23,16 @@ spec:
       - v1
   group: kueue.x-k8s.io
   names:
-    kind: MultiKueueConfig
-    listKind: MultiKueueConfigList
-    plural: multikueueconfigs
-    singular: multikueueconfig
+    kind: Topology
+    listKind: TopologyList
+    plural: topologies
+    singular: topology
   scope: Cluster
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MultiKueueConfig is the Schema for the multikueue API
+        description: Topology is the Schema for the topology API
         properties:
           apiVersion:
             description: |-
@@ -52,19 +52,34 @@ spec:
           metadata:
             type: object
           spec:
-            description: MultiKueueConfigSpec defines the desired state of MultiKueueConfig
+            description: TopologySpec defines the desired state of Topology
             properties:
-              clusters:
-                description: List of MultiKueueClusters names where the workloads
-                  from the ClusterQueue should be distributed.
+              levels:
+                description: levels define the levels of topology.
                 items:
-                  type: string
-                maxItems: 10
+                  description: TopologyLevel defines the desired state of TopologyLevel
+                  properties:
+                    nodeLabel:
+                      description: |-
+                        nodeLabel indicates the name of the node label for a specific topology
+                        level.
+
+                        Examples:
+                        - cloud.provider.com/topology-block
+                        - cloud.provider.com/topology-rack
+                      maxLength: 316
+                      minLength: 1
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - nodeLabel
+                  type: object
+                maxItems: 8
                 minItems: 1
                 type: array
-                x-kubernetes-list-type: set
+                x-kubernetes-list-type: atomic
             required:
-            - clusters
+            - levels
             type: object
         type: object
     served: true
