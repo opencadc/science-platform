@@ -55,6 +55,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG_RELEASE }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.TAG_RELEASE }}
           labels: |
             org.opencontainers.image.title=skaha
             org.opencontainers.image.version=${{ env.TAG_RELEASE }}
@@ -84,6 +85,4 @@ jobs:
         id: cosign
         run: |
           cosign version
-          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} --upload
-          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG_RELEASE }} --upload
           cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.build.outputs.digest }} --upload

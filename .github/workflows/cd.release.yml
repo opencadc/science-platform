@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   release-please:
@@ -24,7 +21,7 @@ jobs:
       -
         name: Dispatch Edge Build
         # Run this step only if the release-please completes successfully
-        if: steps.release-please.outcome == 'success' 
+        if: steps.release-please.outcome == 'success' && github.event_name == 'push'
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
           repository: opencadc/science-platform
