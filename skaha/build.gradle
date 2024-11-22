@@ -69,7 +69,7 @@ spotless {
     // Remove unused imports
     removeUnusedImports()
     // Google Java Format, Android Open Source Project style which uses 4 spaces for indentation
-    palantirJavaFormat('2.50.0').formatJavaDoc(true)
+    palantirJavaFormat('2.50.0').formatJavadoc(true)
     // Format annotations on a single line
     formatAnnotations()
   }
