@@ -1,0 +1,34 @@
+name: "CI: Commit Check"
+
+on:
+  pull_request:
+    branches: [main]
+  # This check runs on every push to repository
+  push:
+    branches: [main]
+
+jobs:
+  commit-check:
+    runs-on: ubuntu-latest
+    permissions:  # use permissions because of use pr-comments
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}  # checkout PR HEAD commit
+          fetch-depth: 0  # required for merge-base check
+      - uses: commit-check/commit-check-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
+        with:
+          # Conventional Commits Check
+          message: true
+          # Convention Branch Check
+          branch: false
+          author-name: true
+          author-email: true
+          commit-signoff: false
+          merge-base: true
+          job-summary: true
+          pr-comments: ${{ github.event_name == 'pull_request' }}
