@@ -78,4 +78,4 @@ jobs:
         id: cosign
         run: |
           cosign version
-          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.build.outputs.digest }} --upload
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE }}@${{ steps.build.outputs.digest }} --upload
