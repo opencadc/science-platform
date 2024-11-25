@@ -63,7 +63,7 @@ These two kubernetes job configuration files are templates used by skaha to run 
 
 ## apply version tags
 ```bash
-. VERSION && echo "tags: $TAGS" 
+. VERSION && echo "tags: $TAGS"
 for t in $TAGS; do
    docker image tag images.canfar.net/skaha-system/skaha:latest images.canfar.net/skaha-system/skaha:$t
 done

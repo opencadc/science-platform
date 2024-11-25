@@ -2,7 +2,7 @@
 <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.2//EN" "http://java.sun.com/j2ee/dtds/web-app_2_2.dtd">
 <web-app>
     <display-name>skaha</display-name>
-    
+
     <servlet>
         <servlet-name>logControl</servlet-name>
         <servlet-class>ca.nrc.cadc.log.LogControlServlet</servlet-class>
@@ -21,18 +21,18 @@
         </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>
-    
+
      <servlet>
          <servlet-name>SessionServlet</servlet-name>
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.skaha.session.GetAction</param-value> 
+             <param-value>org.opencadc.skaha.session.GetAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <init-param>
              <param-name>post</param-name>
-             <param-value>org.opencadc.skaha.session.PostAction</param-value> 
+             <param-value>org.opencadc.skaha.session.PostAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerPost</param-value> -->
          </init-param>
          <init-param>
@@ -50,24 +50,24 @@
          </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
-    
+
     <servlet>
          <servlet-name>ContextServlet</servlet-name>
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.skaha.context.GetAction</param-value> 
+             <param-value>org.opencadc.skaha.context.GetAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <load-on-startup>2</load-on-startup>
     </servlet>
-    
+
     <servlet>
          <servlet-name>ImageServlet</servlet-name>
          <servlet-class>ca.nrc.cadc.rest.RestServlet</servlet-class>
          <init-param>
              <param-name>get</param-name>
-             <param-value>org.opencadc.skaha.image.GetAction</param-value> 
+             <param-value>org.opencadc.skaha.image.GetAction</param-value>
              <!-- <param-value>org.opencadc.platform.docker.DockerGet</param-value> -->
          </init-param>
          <load-on-startup>2</load-on-startup>
@@ -117,17 +117,17 @@
     </servlet>
 
     <!-- URL-to-servlet mapping -->
-    
+
     <servlet-mapping>
         <servlet-name>SessionServlet</servlet-name>
         <url-pattern>/v0/session/*</url-pattern>
     </servlet-mapping>
-    
+
     <servlet-mapping>
         <servlet-name>ContextServlet</servlet-name>
         <url-pattern>/v0/context/*</url-pattern>
     </servlet-mapping>
-    
+
     <servlet-mapping>
         <servlet-name>ImageServlet</servlet-name>
         <url-pattern>/v0/image/*</url-pattern>
@@ -137,23 +137,23 @@
         <servlet-name>ImageRepositoryServlet</servlet-name>
         <url-pattern>/v0/repository/*</url-pattern>
     </servlet-mapping>
-        
+
     <servlet-mapping>
         <servlet-name>CapabilitiesServlet</servlet-name>
         <url-pattern>/capabilities</url-pattern>
     </servlet-mapping>
-    
+
     <servlet-mapping>
         <servlet-name>AvailabilityServlet</servlet-name>
         <url-pattern>/availability</url-pattern>
     </servlet-mapping>
-    
+
       <!-- Log control servlet endpoint -->
     <servlet-mapping>
         <servlet-name>logControl</servlet-name>
         <url-pattern>/logControl</url-pattern>
     </servlet-mapping>
-    
+
     <welcome-file-list>
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>
