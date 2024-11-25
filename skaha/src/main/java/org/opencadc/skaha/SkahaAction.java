@@ -397,8 +397,8 @@ public abstract class SkahaAction extends RestAction {
     }
 
     /**
-     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic
-     * based on how the Resource ID of the POSIX mapper was set (URI or URL).
+     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic based on
+     * how the Resource ID of the POSIX mapper was set (URI or URL).
      */
     protected static class PosixMapperConfiguration {
         final URI resourceID;

@@ -103,9 +103,7 @@ import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 import org.opencadc.skaha.utils.QueueUtil;
 
-/**
- * @author majorb
- */
+/** @author majorb */
 public class PostAction extends SessionAction {
 
     // variables replaced in kubernetes yaml config files for
@@ -458,13 +456,13 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Validate and return the session type.  There exists a loophole
+     * Validate and return the session type. There exists a loophole
      *
      * @param imageID The image to validate
-     * @param type    User-provided session type (optional), defaults to headless
+     * @param type User-provided session type (optional), defaults to headless
      * @return The system recognized session type
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
-     * @throws Exception                 If Harbor calls fail
+     * @throws Exception If Harbor calls fail
      */
     private String validateImage(String imageID, String type) throws Exception {
         if (!StringUtil.hasText(imageID)) {
@@ -723,15 +721,15 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Attach a desktop application.
-     * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
-     * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
+     * Attach a desktop application. TODO: This method requires rework. The Job Name does not use the same mechanism as
+     * the K8SUtil.getJobName() TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object
+     * names.
      *
      * @param image Container image name.
-     * @param requestCores  Requested number of cores.
-     * @param limitCores    Max number of cores.
-     * @param requestRAM    Requested amount of RAM in Gi.
-     * @param limitRAM      Max amount of RAM in Gi.
+     * @param requestCores Requested number of cores.
+     * @param limitCores Max number of cores.
+     * @param requestRAM Requested amount of RAM in Gi.
+     * @param limitRAM Max amount of RAM in Gi.
      * @throws Exception For any unexpected errors.
      */
     public void attachDesktopApp(
@@ -873,16 +871,10 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Create the image, command, args, and env sections of the job launch yaml.  Example:
-     * <p />
-     * image: "${software.imageid}"
-     * command: ["/skaha-system/start-desktop-software.sh"]
-     * args: [arg1, arg2]
-     * env:
-     * - name: HOME
-     * value: "/cavern/home/${skaha.userid}"
-     * - name: SHELL
-     * value: "/bin/bash"
+     * Create the image, command, args, and env sections of the job launch yaml. Example:
+     *
+     * <p>image: "${software.imageid}" command: ["/skaha-system/start-desktop-software.sh"] args: [arg1, arg2] env: -
+     * name: HOME value: "/cavern/home/${skaha.userid}" - name: SHELL value: "/bin/bash"
      */
     private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
         StringBuilder sb = new StringBuilder();

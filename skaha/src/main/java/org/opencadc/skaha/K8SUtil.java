@@ -82,7 +82,8 @@ public class K8SUtil {
 
     /**
      * Helps reduce string constants in many places.
-     * @return  The Skaha namespace
+     *
+     * @return The Skaha namespace
      */
     public static String getNamespace() {
         return "skaha-system";
@@ -94,11 +95,13 @@ public class K8SUtil {
 
     /**
      * Filter out anything not in the alphanumeric or hyphen character set.
-     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object names</a>
-     * @param sessionID     The provided session ID.
-     * @param type          The defined type (desktop, notebook, etc.)
-     * @param userID        The running User's ID.
-     * @return              String sanitized name.  Never null.
+     *
+     * @param sessionID The provided session ID.
+     * @param type The defined type (desktop, notebook, etc.)
+     * @param userID The running User's ID.
+     * @return String sanitized name. Never null.
+     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object
+     *     names</a>
      */
     public static String getJobName(String sessionID, String type, String userID) {
         // Replace values that are NOT alphanumeric or a hyphen.
@@ -133,7 +136,8 @@ public class K8SUtil {
 
     /**
      * Obtain the configured default quota size in Gigabytes.
-     * @return  integer in GB.
+     *
+     * @return integer in GB.
      */
     public static String getDefaultQuota() {
         return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);

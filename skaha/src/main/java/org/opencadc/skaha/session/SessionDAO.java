@@ -395,7 +395,7 @@ public class SessionDAO {
     }
 
     /**
-     * Example input is [4444 5555 6666].  Convert to an actual integer array.
+     * Example input is [4444 5555 6666]. Convert to an actual integer array.
      *
      * @param inputArray Kubernetes output of an array of integers.
      * @return integer array, never null.

@@ -89,7 +89,7 @@ public class CommandExecutioner {
      * Delete, if necessary, and recreate the image pull secret for the given registry.
      *
      * @param registryAuth The registry credentials.
-     * @param secretName   The name of the secret to create.
+     * @param secretName The name of the secret to create.
      * @throws Exception If there is an error creating the secret.
      */
     public static void ensureRegistrySecret(final ImageRepositoryAuth registryAuth, final String secretName)

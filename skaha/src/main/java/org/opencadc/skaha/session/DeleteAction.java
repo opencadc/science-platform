@@ -76,10 +76,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
-/**
- *
- * @author majorb
- */
+/** @author majorb */
 public class DeleteAction extends SessionAction {
 
     private static final Logger log = Logger.getLogger(DeleteAction.class);

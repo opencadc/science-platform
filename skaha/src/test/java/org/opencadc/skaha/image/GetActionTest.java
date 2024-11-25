@@ -70,7 +70,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.opencadc.skaha.utils.TestUtils.set;
-import static org.opencadc.skaha.utils.TestUtils.setEnv;
 
 import java.util.List;
 import java.util.Set;
@@ -83,10 +82,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.RedisCache;
 
-/**
- * @author majorb
- *
- */
+/** @author majorb */
 @RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
 
