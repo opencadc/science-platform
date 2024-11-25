@@ -95,13 +95,8 @@ public class GetActionTest {
 
     RedisCache redis;
 
-    private static final String redisHost = "localhost";
-    private static final String redisPort = "6129";
-
     @Before
     public void setUp() {
-        setEnv("REDIS_HOST", redisHost);
-        setEnv("REDIS_PORT", redisPort);
         redis = Mockito.mock(RedisCache.class);
         getAction = new GetAction();
         set(getAction, SkahaAction.class, "redis", redis);
