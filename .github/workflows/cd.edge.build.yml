@@ -42,7 +42,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v6.9.0
         with:
-          context: skaha/
+          context: .
           target: production
           file: skaha/Dockerfile
           platforms: linux/amd64
