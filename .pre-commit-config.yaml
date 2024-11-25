@@ -23,10 +23,6 @@ repos:
       - id: check-executables-have-shebangs
       # Attempts to load all json files to verify syntax.
       - id: check-json
-        args: [
-          --autofix,
-          --no-sort-keys,
-        ]
       # Check for files that contain merge conflict strings.
       - id: check-merge-conflict
       # Checks for symlinks which do not point to anything.
@@ -35,6 +31,7 @@ repos:
       - id: check-toml
       # Attempts to load all yaml files to verify syntax.
       - id: check-yaml
+        exclude: ^skaha/src/test/resources/
       # Attempts to load all xml files to verify syntax.
       - id: check-xml
       # Check for debugger imports and py37+ breakpoint() calls in python source.
