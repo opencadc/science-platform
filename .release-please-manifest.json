@@ -1,22 +1,3 @@
 {
-  ".": "0.24.1",
-  "packages": {
-    ".": {
-      "package-name": "skaha",
-      "changelog-path": "CHANGELOG.md",
-      "release-type": "simple",
-      "exclude-paths": [
-        "docs",
-        "deployment",
-        "image-cache",
-        "integration-test"
-      ],
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "skaha/gradle.properties"
-        }
-      ]
-    }
-  }
+  ".": "0.25.0"
 }
