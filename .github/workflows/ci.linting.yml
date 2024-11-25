@@ -9,6 +9,18 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+            fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5.3.0
+      -
+        name: Run Pre-Commit
+        uses: pre-commit/action@v3.0.1
   spotless:
     runs-on: ubuntu-latest
     steps:
@@ -22,7 +34,6 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'gradle'
-
       - name: Run Spotless
         run: |
             cd skaha

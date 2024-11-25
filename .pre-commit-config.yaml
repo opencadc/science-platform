@@ -1,5 +1,6 @@
 # Pre-Commit Configuration File: https://pre-commit.com
 ---
+exclude: ^deployment/
 repos:
   # Commitizen Configuration
   # This configuration will add commitizen to your pre-commit hooks and will run it on commit-msg stage
@@ -22,6 +23,10 @@ repos:
       - id: check-executables-have-shebangs
       # Attempts to load all json files to verify syntax.
       - id: check-json
+        args: [
+          --autofix,
+          --no-sort-keys,
+        ]
       # Check for files that contain merge conflict strings.
       - id: check-merge-conflict
       # Checks for symlinks which do not point to anything.
