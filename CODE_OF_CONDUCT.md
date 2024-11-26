@@ -65,4 +65,3 @@ We strive to:
 1. Reporting Guidelines – We should assume good faith in our actions; however, issues that cannot be resolved that are addressed in this code of conduct should be sent to the Group Leader of the CADC: jj.kavelaars@nrc-cnrc.gc.ca
 
 1. This Code draws on the Apache Software Foundation Code of Conduct: [Code of Conduct](https://www.apache.org/foundation/policies/conduct.html) and the National Research Council Canada (NRC) Code of Conduct: [Code of Conduct](https://nrc.canada.ca/en/corporate/values-ethics/code-conduct).
-
