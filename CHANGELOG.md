@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.26.0](https://github.com/opencadc/science-platform/compare/v0.25.0...0.26.0) (2024-11-26)
+
+
+### Features
+
+* **dependabot:** added automated checks for github actions and docker configs ([98e8341](https://github.com/opencadc/science-platform/commit/98e8341050ad92292ddaddea289170d2bb39670e))
+* **gha:** added a new action to check for commit msg compliance ([47b0419](https://github.com/opencadc/science-platform/commit/47b0419a5869bae3c35808c48ab245d656b0b87c))
+* **pre-commit:** added base pre-commit config ([807e5f5](https://github.com/opencadc/science-platform/commit/807e5f56fede5513ec19faf25b5df019941da391))
+* **pre-commit:** added pre-commit config and checks for the repo ([a522163](https://github.com/opencadc/science-platform/commit/a5221639b9f23173a18e2a414e367840f17650f5))
+
+
+### Bug Fixes
+
+* **build:** fixed the build to be referenced to the base of the repo rather than dir:skaha ([2d6b60a](https://github.com/opencadc/science-platform/commit/2d6b60a3e0cc1f1c13d60fbf38a61d6eee161060))
+* **config:** update to the pre-commit config ([41776f5](https://github.com/opencadc/science-platform/commit/41776f56b07963a3126edc9f94144dfb825b83ec))
+* **gha:** cosign signing is not only done on sha digest, rather than tags, e.g. latest, vX.X.X etc ([9cfc1f5](https://github.com/opencadc/science-platform/commit/9cfc1f5b06283357705c885bc780551aee82dc2c))
+* **gha:** edge builds are now only triggered when pushed to main ([e1183bf](https://github.com/opencadc/science-platform/commit/e1183bf9ecb0c1a1d2e64331a33eb069c5640245))
+* **gha:** fix for cosign action to to properly sign the digest ([b57b945](https://github.com/opencadc/science-platform/commit/b57b9451ac2dfee6dfd95e3d3bffc32c0c2fa322))
+* **gha:** fixed for release build cosign ([2f2c79c](https://github.com/opencadc/science-platform/commit/2f2c79cc91b28796bf232bd70bb929c98ce2d237))
+* **gha:** release steps are now only run after a push to main, and not on pr events ([c5863c3](https://github.com/opencadc/science-platform/commit/c5863c354d8bf67c58f0e634f4791508c9d2f19d))
+* **gradle:** added javadoc req. to spotless and removed yaml and misc file checking ([d458b8d](https://github.com/opencadc/science-platform/commit/d458b8d84606cee38149be8741623cc0841bc43e))
+* **pre-commit:** added checks for code quality (currently disabled), leaking of secrets/passwords and errors in shell scripts ([f782245](https://github.com/opencadc/science-platform/commit/f782245c87f1dcdb697aa68942b90a4b97a4079b))
+* **release-please:** removed v from tags ([fa5db36](https://github.com/opencadc/science-platform/commit/fa5db3670e6425fd6fec9a0abec2700fbef11f88))
+* **security:** added egress audit for all github actions ([25e624c](https://github.com/opencadc/science-platform/commit/25e624ca9c8ed1297d5cf2e92fb5bc22e6e43b90))
+* **security:** pinned all mutable github action dependencies to sha ([2a7db65](https://github.com/opencadc/science-platform/commit/2a7db657b72760ddfab1597af2317ca661aa5f48))
+
 ## [0.25.0](https://github.com/opencadc/science-platform/compare/v0.24.1...v0.25.0) (2024-11-21)
 
 
