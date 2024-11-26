@@ -40,4 +40,4 @@ jobs:
           commit-signoff: false
           merge-base: true
           job-summary: true
-          pr-comments: ${{ github.event_name == 'pull_request' }}
+          pr-comments: false

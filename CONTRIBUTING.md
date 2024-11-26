@@ -36,9 +36,9 @@ All java libraries are published to Maven Central under the <a href="https://rep
 Java dependencies should be carefully curated to include direct dependencies on java libs and only rely on transitive dependencies for indirect dependencies. Exception: for external libraries (e.g. log4j, xerces and jdom2 xml parsers, spring-jdbc) it is preferrable to use the version specified by the core `cadc-util` library and _not_ declare any dependency on these even though they are used directly by the code. This allows for easier version upgrade (e.g. for security issues) and consistent use. For other external dependencies introduced elsewhere, care should be taken to consider future update scenarios and try to minimise the pain necessary to carry them out. The dependency list in all build files should be curated to remove unused dependencies and sometimes even block transitive dependencies from the runtime classpath.
 
 #### Code Style
-Java coding style is specified and validated using `checkstyle` via the <a href="https://github.com/opencadc/core/tree/main/cadc-quality">cadc-quality</a> library. Each repository includes this library in the test classpath and configures checkstyle via the repository `opencadc.gradle` file. Developers can run checkstyle locally using `gradle checkstyleMain` (we currently do not enforce checkstyle on test code **TBD**) to make sure they comply and **should** use the checkstyle configuration from `cadc-quality` to configure their development environment (IDE) where possible. 
+Java coding style is specified and validated using `checkstyle` via the <a href="https://github.com/opencadc/core/tree/main/cadc-quality">cadc-quality</a> library. Each repository includes this library in the test classpath and configures checkstyle via the repository `opencadc.gradle` file. Developers can run checkstyle locally using `gradle checkstyleMain` (we currently do not enforce checkstyle on test code **TBD**) to make sure they comply and **should** use the checkstyle configuration from `cadc-quality` to configure their development environment (IDE) where possible.
 
-This is currently checkstyle-8.2 -- pretty old -- and has some defiencies that need to be addressed. In addition, `gradle javadoc` must have no errors and ideally no warnings (technical debt: most older code has lots of warnings). 
+This is currently checkstyle-8.2 -- pretty old -- and has some defiencies that need to be addressed. In addition, `gradle javadoc` must have no errors and ideally no warnings (technical debt: most older code has lots of warnings).
 
 The current code style checking really only covers small scale syntax and not larger scale code organisation and design. General principles:
 * clear code so comments are not needed or can be minimised
@@ -52,7 +52,7 @@ The current code style checking really only covers small scale syntax and not la
 #### Continuous Integration
 Continuous Integration (CI) is used to validate pull requests in github (when PR is opened or new commits added). Reviewer(s) will usually not look at a PR when CI fails; it is the responsibility of the person who created the PR to fix CI issues or add a comment explaining it. For example, if a PR requires a new version of a library that has not been published yet, add a comment explaining that and then the reviewer can trigger the CI again once the library is published.
 
-Github CI is not currently used to publish java libraries or docker images. 
+Github CI is not currently used to publish java libraries or docker images.
 
 #### Publishing
 Java libraries are published to Maven Central manually by a CADC staff member.
