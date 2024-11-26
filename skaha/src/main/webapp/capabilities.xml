@@ -15,7 +15,7 @@
       <accessURL use="full">https://replace.me.com/skaha/availability</accessURL>
     </interface>
   </capability>
-  
+
   <capability standardID="vos://cadc.nrc.ca~vospace/CADC/std/Logging#control-1.0">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
       <accessURL use="full">https://replace.me.com/skaha/logControl</accessURL>
@@ -38,4 +38,3 @@
   </capability>
 
 </vosi:capabilities>
-

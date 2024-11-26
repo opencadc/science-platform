@@ -79,9 +79,9 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.util.StringUtil;
 
 public class DockerPost extends PostAction {
-    
+
     private static final Logger log = Logger.getLogger(DockerPost.class);
-    
+
     @Override
     public void checkForExistingSession(String userid) throws Exception {
         String[] getVNCSessions = new String[] {"docker", "ps", "--format", "{{.Names}}\\t{{.Status}}", "--filter", "label=canfar-net-userid=" + userID};
@@ -93,21 +93,21 @@ public class DockerPost extends PostAction {
             }
         }
     }
-    
+
     @Override
     public URL createSession(String sessionID, String name) throws Exception {
 
         String[] runNoVNCCmd = new String[] {"/scripts/docker/run-desktop.sh", userID, sessionID, name, homedir, scratchdir};
         String imageID = execute(runNoVNCCmd);
-        
+
         // insert the user's proxy cert on the container
         Subject subject = AuthenticationUtil.getCurrentSubject();
         //injectProxyCert("/home", subject, userID);
-        
+
         String[] getIpCmd = new String[] {
             "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", imageID};
         String ipAddress = execute(getIpCmd);
-        
+
         // give vnc a few seconds to initialize
         try {
             log.debug("3 second wait for vnc initialization");
@@ -115,26 +115,26 @@ public class DockerPost extends PostAction {
         } catch (InterruptedException ignore) {
         }
         log.debug("wait over");
-        
+
         String redirectPath = super.getVNCURL(server, sessionID, ipAddress);
         return new URL(redirectPath);
     }
-    
+
     @Override
     public void attachSoftware(String software, List<String> params, String targetIP) throws Exception {
-        
+
         confirmSoftware(software);
-        
+
         // only one parameter supported for now
         String param = "xterm";
         if (params != null && params.size() > 0) {
             param = params.get(0);
         }
         log.debug("Using parameter: " + param);
-        
+
         String[] runAppCmd = new String[] {"/scripts/docker/software.sh", software, targetIP, userID, homedir, scratchdir,  param};
         String imageID = execute(runAppCmd);
-        
+
         // refresh the user's proxy cert
         Subject subject = AuthenticationUtil.getCurrentSubject();
         //injectProxyCert("/home", subject, userID);
