@@ -81,8 +81,41 @@ pip3 install --user pre-commit
 pre-commit install --hook-type commit-msg
 ```
 
-This will install the pre-commit hooks to run on every commit.  If you want to run the hooks manually, you can run the following command:
+This will install the pre-commit hooks to run on every commit, even the checks defined under `./gradlew check`. If you want to run the hooks manually, you can run the following command:
 
 ```
 pre-commit run --all-files
 ```
+
+## Code Formatting
+
+Skaha uses `spotless` to enforce Java Code Formatting standards.  To format the code, run the following command:
+
+```bash
+cd science-platform/skaha
+./gradlew spotlessApply
+```
+
+You can find the spotless configuration in the `spotless` block in the `build.gradle` file.
+
+```java
+spotless {
+  java {
+    // Interpret all files as utf-8
+    encoding 'UTF-8'
+    // Only require formatting of files that diff from main
+    ratchetFrom 'origin/main'
+    // Use the default importOrder configuration
+    importOrder()
+    // Remove unused imports
+    removeUnusedImports()
+    // Google Java Format, Android Open Source Project style which uses 4 spaces for indentation
+    palantirJavaFormat('2.50.0').formatJavadoc(true)
+    // Format annotations on a single line
+    formatAnnotations()
+  }
+}
+check.dependsOn spotlessCheck
+```
+
+We specificly use the [Palantir Java Format](https://github.com/palantir/palantir-java-format), which is a a modern, lambda-friendly, 120 character Java formatter focused on readability and derived from Google Java Format.
