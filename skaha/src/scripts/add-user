@@ -11,10 +11,9 @@ CONFDIR=/add-user-config
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$3" ]
-  then
-    echo "Usage: add-user <username> <uid> <quota in GB> <absolute path to user home dir>"
-    exit 2
+if [ -z "$3" ]; then
+	echo "Usage: add-user <username> <uid> <quota in GB> <absolute path to user home dir>"
+	exit 2
 fi
 
 USERNAME=$1
@@ -27,22 +26,19 @@ XRESOURCES="$CONFDIR/Xresources"
 CASACONFIG="$CONFDIR/casa-config.tar"
 CERTFILE="/root/.ssl/cadcproxy.pem"
 
-if [ ! -f $CASACONFIG ]
-  then
-    echo "No file casa-config.tar found in $CONFDIR"
-    exit  2
+if [ ! -f $CASACONFIG ]; then
+	echo "No file casa-config.tar found in $CONFDIR"
+	exit 2
 fi
 
-if [ ! -f $BASHRC ]
-  then
-    echo "No file .bashrc found in $CONFDIR"
-    exit  2
+if [ ! -f $BASHRC ]; then
+	echo "No file .bashrc found in $CONFDIR"
+	exit 2
 fi
 
-if [ ! -f $XRESOURCES ]
-  then
-    echo "No file .Xresources found in $CONFDIR"
-    exit  2
+if [ ! -f $XRESOURCES ]; then
+	echo "No file .Xresources found in $CONFDIR"
+	exit 2
 fi
 
 echo "  Certfile: $CERTFILE"

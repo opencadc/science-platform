@@ -1,0 +1,81 @@
+# Pre-Commit Configuration File: https://pre-commit.com
+---
+exclude: ^deployment/
+repos:
+  # Commitizen Configuration
+  # This configuration will add commitizen to your pre-commit hooks and will run it on commit-msg stage
+  # of the git commit process.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.31.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+  # Pre-Commit Hooks Configuration
+  # This configuration will add pre-commit hooks to your pre-commit hooks and will run it on pre-commit stage
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Prevent giant files from being committed.
+      - id: check-added-large-files
+      # Check for files with names that would conflict on a case-insensitive filesystem like MacOS HFS+ or Windows FAT.
+      - id: check-case-conflict
+      # Checks that non-binary executables have a proper shebang.
+      - id: check-executables-have-shebangs
+      # Attempts to load all json files to verify syntax.
+      - id: check-json
+      # Check for files that contain merge conflict strings.
+      - id: check-merge-conflict
+      # Checks for symlinks which do not point to anything.
+      - id: check-symlinks
+      # Attempts to load all TOML files to verify syntax.
+      - id: check-toml
+      # Attempts to load all yaml files to verify syntax.
+      - id: check-yaml
+        exclude: ^skaha/src/test/resources/
+      # Attempts to load all xml files to verify syntax.
+      - id: check-xml
+      # Check for debugger imports and py37+ breakpoint() calls in python source.
+      - id: debug-statements
+      # Makes sure files end in a newline and only a newline.
+      - id: end-of-file-fixer
+      # Trims trailing whitespace.
+      - id: trailing-whitespace
+      # Checks for private key files.
+      - id: detect-private-key
+  - repo: local
+    hooks:
+      - id: gradle-build
+        name: Skaha Gradle Build
+        entry: /bin/bash
+        args:
+          - -c
+          - |
+            cd skaha
+            ./gradlew clean check
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
+  - repo: https://github.com/gherynos/pre-commit-java
+    rev: v0.2.4
+    hooks:
+      # - id: pmd
+      #   args: [
+      #     "--use-version=java-11",
+      #     "--dir=skaha",
+      #     "--no-fail-on-error",
+      #     "--min-priority=1",
+      #     "--format=sarif"
+      #   ]
+      - id: cpd # Copy/Paste Detector
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.16.3
+    hooks:
+      - id: gitleaks
+  # - repo: https://github.com/jumanjihouse/pre-commit-hooks
+  #   rev: 3.0.0
+  #   hooks:
+  #     - id: shellcheck
+  #       exclude: ^skaha/src/obselete/
+  #     - id: shfmt
+  #       exclude: ^skaha/src/obselete/

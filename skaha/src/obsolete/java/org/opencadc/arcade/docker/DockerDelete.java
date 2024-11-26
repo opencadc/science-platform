@@ -73,7 +73,7 @@ import org.opencadc.platform.DeleteAction;
 public class DockerDelete extends DeleteAction {
 
     private static final Logger log = Logger.getLogger(DockerDelete.class);
-    
+
     @Override
     public void stopSession(String userID, String sessionID) throws Exception {
         // kill the session specified by sessionID
@@ -81,5 +81,5 @@ public class DockerDelete extends DeleteAction {
         String[] stopVNCCmd = new String[] {"/scripts/docker/stop-desktop.sh", userID, sessionID};
         execute(stopVNCCmd);
     }
-    
+
 }

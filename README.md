@@ -2,23 +2,23 @@
 
 *A container based science platform in CANFAR.*
 
----
-
+[![CI: Linting](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml)
+[![CI: Testing](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml)
+[![CD: Edge Build](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml)
+[![CD: Release Build](https://github.com/opencadc/science-platform/actions/workflows/cd.release.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.release.build.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/opencadc/science-platform/badge)](https://scorecard.dev/viewer/?uri=github.com/opencadc/science-platform)
-
 ## Table of Contents
 - [Skaha](#skaha)
   - [Table of Contents](#table-of-contents)
   - [CANFAR Science Portal Documentation](#canfar-science-portal-documentation)
   - [Acknowledgements](#acknowledgements)
   - [Overview](#overview)
-  - [Helm Installation](#helm-installation)
+  - [Deployment](#deployment)
   - [System Components](#system-components)
     - [skaha](#skaha-1)
   - [Session Containers](#session-containers)
   - [Software Containers](#software-containers)
   - [Dependencies](#dependencies)
-  - [Deployment](#deployment)
 
 ## CANFAR Science Portal Documentation
 
@@ -32,17 +32,16 @@ This project has been funded in part by:
 
 ## Overview
 
-![science-platform-architecture](canfar-architecture-2024-04-08.png)
+Skaha is a general purpose online platform for running science containers interactively.  It is part of the [CANFAR Science Platform](https://canfar.net).  In the architecture diagram below, skaha is the main API to the Science Platform.
 
-skaha is a general purpose online platform for running science containers interactively.  It is part of the CANFAR science platform for containers.  In the architecture diagram below, skaha is the main API to the Science Platform.
+![science-platform-architecture](docs/images/canfar-architecture-2024-04-08.png)
+The CANFAR Science Platform Architecture.
+![canfar-architecture](docs/images/canfar-architecture-1.0.png)
+Skaha is the API to the Science Platform box.
 
-![canfar-architecture](canfar-architecture-1.0.png)
+## Deployment
 
-The CANFAR Science Platform Architecture.  Skaha is the API to the Science Platform box.
-
-## Helm Installation
-
-Deploying the Skaha service is made up of a small number of Helm installations.  See the [Deployment Guide](./deployment/helm/README.md) for installations.
+Skaha runs on Kubernetes and and is deployed using Helm. See the [Deployment Guide](./deployment/helm/README.md) for more information.
 
 ## System Components
 
@@ -76,6 +75,3 @@ skaha relies on a number of other opencadc modules to operate.
 * credential delegation (cdp) web service (https://github.com/opencadc/cdp) -- The cdp service is used to obtain users' delegated proxy certificates.
 * cavern -- skaha is complimented by having the cavern VOSpace implementation mounted as a shared POSIX file system.  (https://github.com/opencadc/vos/tree/master/cavern).  cavern is a vospace implementation where both the data and metadata are based on the contents of a file system.  If the software-containers have access to the cavern file system the contents of that file system can be accessed and shared through the cavern web service.
 * posix/sssd -- Containers in skaha are always run _as the user_ and with the users' group memberships.  If skaha-desktop and software-containers are run with a SSSD configuration that points to the same LDAP instance as used by ac, the names of those uids and gids can be resolved.
-
-## Deployment
-skaha runs on kubernetes.  See the deployment directory for specifics.

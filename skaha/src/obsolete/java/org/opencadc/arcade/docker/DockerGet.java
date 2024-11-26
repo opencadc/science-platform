@@ -76,15 +76,15 @@ import org.opencadc.platform.GetAction;
 import ca.nrc.cadc.util.StringUtil;
 
 public class DockerGet extends GetAction {
-    
+
     private static final Logger log = Logger.getLogger(DockerGet.class);
-    
+
     @Override
     public void listSessions() throws Exception {
 
         String[] getVNCSessions = new String[] {"docker", "ps", "--format", "{{.Names}}\\t{{.Status}}", "--filter", "label=canfar-net-userid=" + userID};
         String vncSessions = execute(getVNCSessions);
-        
+
         if (StringUtil.hasLength(vncSessions)) {
             String[] lines = vncSessions.split("\n");
             if (lines.length > 0) {
@@ -120,13 +120,13 @@ public class DockerGet extends GetAction {
         }
         log.debug("No container listing output");
     }
-    
+
     protected String parseCID(String vncName) {
         String[] parts = vncName.split("_");
         String sessionID = parts[parts.length - 2];
         return sessionID;
     }
-    
+
     protected String parseCURL(String vncName) throws IOException, InterruptedException {
         String sessionID = parseCID(vncName);
         String[] getIpCmd = new String[] {
@@ -134,7 +134,7 @@ public class DockerGet extends GetAction {
         String ipAddress = execute(getIpCmd);
         return getVNCURL(server, sessionID, ipAddress);
     }
-    
+
     protected String parseCName(String vncName) {
         String[] parts = vncName.split("_");
         return parts[parts.length - 1];
