@@ -56,3 +56,23 @@ repos:
         pass_filenames: false
         always_run: true
         verbose: true
+  - repo: https://github.com/gherynos/pre-commit-java
+    rev: v0.2.4
+    hooks:
+      # - id: pmd
+      #   args: [
+      #     "--use-version=java-11",
+      #     "--dir=skaha",
+      #     "--no-fail-on-error",
+      #     "--min-priority=1",
+      #     "--format=sarif"
+      #   ]
+      - id: cpd # Copy/Paste Detector
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.16.3
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: shellcheck
