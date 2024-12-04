@@ -482,6 +482,13 @@ deployment:
     # canfar: The CANFAR theme for internal CADC deployment
     # themeName: {src | canfar}
 
+    # Labels on the tabs
+    # Default:
+    # tabLabels:
+    #  - Public
+    #  - Advanced
+    # tabLabels: []
+
     # Other data to be included in the main ConfigMap of this deployment.
     # Of note, files that end in .key are special and base64 decoded.
     # 

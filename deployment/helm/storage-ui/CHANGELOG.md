@@ -1,4 +1,8 @@
-# Storage User Interface Helm Chart (0.1.7)
+# Storage User Interface Helm Chart (0.3.0)
+
+## December 3, 2024 (0.3.0)
+* Add batch download options
+* Small optimizations and fixes
 
 ## June 24, 2024 (0.2.3)
 * Fix to use tokens for APIs on a different host.

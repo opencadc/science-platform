@@ -11,7 +11,7 @@ skaha:
 deployment:
   hostname: example.host.com    # Change this!
   storageUI:
-    image: images.opencadc.org/client/storage-ui:1.1.8
+    image: images.opencadc.org/client/storage-ui:1.2.1
     imagePullPolicy: Always
 
     # Optionally set the DEBUG port.
@@ -52,9 +52,10 @@ deployment:
     #         batchUpload: false
     #         externalLinks: false
     #         paging: false
+    #         directDownload: false
 
     # ID (URI) of the GMS Service.
-    gmsID: ivo://skao.int/gms
+    # gmsID: ivo://example.org/gms
 
     # OIDC (IAM) server configuration.  These are required
     # oidc:
@@ -97,8 +98,11 @@ deployment:
     #     defaultMode: 420
     #     secretName: storage-ui-cacert-secret
 
-    # Default theme is the SRC one.
-    themeName: src
+    # Theme to use for presentation layer.
+    # Values are:
+    # - src   (SRCNet)
+    # - canfar  (CANFAR)
+    # themeName: src
 
 # secrets:
   # Uncomment to enable local or self-signed CA certificates for your domain to be trusted.
