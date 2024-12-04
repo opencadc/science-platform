@@ -1,4 +1,8 @@
-# CHANGELOG for Science Portal UI (Chart 0.2.8)
+# CHANGELOG for Science Portal UI (Chart 0.4.0)
+
+## 2024.12.04 (0.4.0)
+- Select by project enabled to constrain images in pull-down menu
+- Add Advanced tab to enable proprietary image support
 
 ## 2024.09.05 (0.2.11)
 - Fix screen blanking when image selection not yet loaded
