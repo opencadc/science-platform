@@ -70,7 +70,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.opencadc.skaha.utils.TestUtils.set;
-import static org.opencadc.skaha.utils.TestUtils.setEnv;
 
 import java.util.List;
 import java.util.Set;
@@ -83,10 +82,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.RedisCache;
 
-/**
- * @author majorb
- *
- */
+/** @author majorb */
 @RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
 
@@ -95,13 +91,8 @@ public class GetActionTest {
 
     RedisCache redis;
 
-    private static final String redisHost = "localhost";
-    private static final String redisPort = "6129";
-
     @Before
     public void setUp() {
-        setEnv("REDIS_HOST", redisHost);
-        setEnv("REDIS_PORT", redisPort);
         redis = Mockito.mock(RedisCache.class);
         getAction = new GetAction();
         set(getAction, SkahaAction.class, "redis", redis);
