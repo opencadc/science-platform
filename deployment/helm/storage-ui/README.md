@@ -62,6 +62,7 @@ deployment:
             batchUpload: false
             externalLinks: false
             paging: false
+            directDownload: false
 
     # Specify the SRC theme.
     themeName: src
