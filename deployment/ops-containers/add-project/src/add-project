@@ -6,21 +6,22 @@ set -e
 sleep 10
 
 SELF=add-project
-CONFDIR=/config
+USAGE_MESSAGE="Usage: add-project <project-dir-name> <project-dir-owner-uid> <group-gid> <read-only | read-write> <quota in GB> <project-dir-base>"
 
 TS=$(date)
 echo "$TS $SELF START"
 
-if [ -z "$5" ]
+if [ -z "$6" ]
   then
-    echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write> <quota in GB>"
+    echo "${USAGE_MESSAGE}"
     exit 2
 fi
 PROJECT=$1
-OWNER=$2
-GROUP=$3
+OWNER_UID=$2
+GRANT_GID=$3
 ACCESS_ARG=$4
 QUOTA=$5
+PROJECTS_BASE_DIR=$6
 ACCESS=""
 MODE=""
 
@@ -33,28 +34,33 @@ elif [ $ACCESS_ARG == "read-write" ]
     ACCESS="rwx"
     MODE="770"
 else
-  echo "Usage: add-project <project-dir-name> <project-dir-owner> <group-name> <read-only | read-write>"
+  echo "${USAGE_MESSAGE}"
   exit 2
 fi
 
-if [ ! -f $CONFDIR/projectdir ]
+if [ ! -d $PROJECTS_BASE_DIR ]
   then
-    echo "No file projectdir found in $CONFDIR"
-    exit  2
+  echo "${PROJECTS_BASE_DIR} does not exist."
+  exit 2
 fi
 
-PROJECTBASE=`cat $CONFDIR/projectdir`
-PROJECTDIR="$PROJECTBASE/$PROJECT"
+PROJECTDIR="$PROJECTS_BASE_DIR/$PROJECT"
+
+if [ -d $PROJECTDIR ]
+  then
+  echo "Project $PROJECT already exists."
+  exit 2
+fi
 
 echo "Creating project $PROJECT"
 echo -n "  Creating project dir $PROJECTDIR..."
 mkdir $PROJECTDIR
 echo " Done"
-echo -n "  Setting permissions to $ACCESS for group $GROUP"
-chown $OWNER:$OWNER $PROJECTDIR
+echo -n "  Setting permissions to $ACCESS for group $GRANT_GID"
+chown $OWNER_UID:$OWNER_UID $PROJECTDIR
 chmod $MODE $PROJECTDIR
-setfacl -d -m group:$GROUP:$ACCESS $PROJECTDIR
-setfacl -m group:$GROUP:$ACCESS $PROJECTDIR
+setfacl -d -m group:$GRANT_GID:$ACCESS $PROJECTDIR
+setfacl -m group:$GRANT_GID:$ACCESS $PROJECTDIR
 echo -n "  Setting quota to ${QUOTA}G"
 setfattr -n ceph.quota.max_bytes -v ${QUOTA}000000000 $PROJECTDIR
 setfattr -n user.ivo://ivoa.net/vospace/core#quota -v ${QUOTA}000000000 $PROJECTDIR

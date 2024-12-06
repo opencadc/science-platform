@@ -9,30 +9,26 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: "skaha-add-project"
-        image: images.canfar.net/skaha-system/add-project:1.2
+        image: images.canfar.net/skaha-system/add-project:1.3
         imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
-        # args: project-dir-name, owner-userid, project-group-name, read-only or read-write, quota-in-gb
-        args: ["myproject", "majorb", "mygroup", "read-write", "1000"]
+        # args: project-name, owner-uid, project-group-gid, read-only or read-write, quota-in-gb, project-base-dir
+        args: ["project-name", "owner-uid", "project-gid", "project-permission", "project-quota-gb", "project-base-dir"]
         volumeMounts:
-        - mountPath: "/config"
-          name: add-project-config
-        - mountPath: "/arc"
+        - mountPath: "/cavern"
           name: cavern-volume
           subPath: cavern
-        - mountPath: /var/lib/sss/pipes
-          name: sssd-dir
-          readOnly: true
-      securityContext:
-        runAsUser: 0
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: false
       serviceAccountName: skaha
       volumes:
-      - name: add-project-config
-        configMap:
-          name: add-project-config
       - name: cavern-volume
         cephfs:
           monitors:
@@ -40,11 +36,7 @@ spec:
           - 10.30.202.3:6789
           - 10.30.203.3:6789
           path: /volumes/_nogroup/054e398e-a08e-425e-9f7c-fc394362e38e
-          user: keel_prod
+          user: keel-prod-admin
           secretRef:
             name: cephfs-cephx-admin-key
           readOnly: false
-      - name: sssd-dir
-        hostPath:
-          path: /var/lib/ubernetes
-          type: Directory
