@@ -14,7 +14,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: "skaha-add-project"
-        image: images.canfar.net/skaha-system/add-project:1.3
+        image: images.canfar.net/skaha-system/add-project:1.4
         imagePullPolicy: Always
         # TODO: automate the setting of this in the calling script
         command: ["/usr/bin/add-project"]
