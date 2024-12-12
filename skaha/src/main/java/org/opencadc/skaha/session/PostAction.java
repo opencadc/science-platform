@@ -67,6 +67,7 @@
 
 package org.opencadc.skaha.session;
 
+import static org.opencadc.skaha.session.SessionJobBuilder.setConfigValue;
 import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.ac.Group;
@@ -85,12 +86,7 @@ import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -103,11 +99,11 @@ import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.skaha.utils.QueueUtil;
 
-/**
- * @author majorb
- */
+/** @author majorb */
 public class PostAction extends SessionAction {
 
     // variables replaced in kubernetes yaml config files for
@@ -143,31 +139,12 @@ public class PostAction extends SessionAction {
     private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
     private static final String SKAHA_TLD = "SKAHA_TLD";
+    private static final String SKAHA_LOCAL_QUEUE = "SKAHA_LOCAL_QUEUE";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
 
     public PostAction() {
         super();
-    }
-
-    private static List<String> getRenewJobNamesCmd(String forUserID, String sessionID) {
-        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        final List<String> getRenewJobNamesCmd = new ArrayList<>();
-        getRenewJobNamesCmd.add("kubectl");
-        getRenewJobNamesCmd.add("get");
-        getRenewJobNamesCmd.add("--namespace");
-        getRenewJobNamesCmd.add(k8sNamespace);
-        getRenewJobNamesCmd.add("job");
-        getRenewJobNamesCmd.add("-l");
-        getRenewJobNamesCmd.add("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID);
-        getRenewJobNamesCmd.add("--no-headers=true");
-        getRenewJobNamesCmd.add("-o");
-
-        String customColumns =
-                "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime";
-
-        getRenewJobNamesCmd.add(customColumns);
-        return getRenewJobNamesCmd;
     }
 
     private static Set<List<Group>> getCachedGroupsFromSubject() {
@@ -388,19 +365,17 @@ public class PostAction extends SessionAction {
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
-            String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            List<String> renewExpiryTimeCmd = new ArrayList<>();
-            renewExpiryTimeCmd.add("kubectl");
-            renewExpiryTimeCmd.add("--namespace");
-            renewExpiryTimeCmd.add(k8sNamespace);
-            renewExpiryTimeCmd.add("patch");
-            renewExpiryTimeCmd.add("job");
-            renewExpiryTimeCmd.add(entry.getKey());
-            renewExpiryTimeCmd.add("--type=json");
-            renewExpiryTimeCmd.add("-p");
-            renewExpiryTimeCmd.add(
-                    "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime + "}]");
-            execute(renewExpiryTimeCmd.toArray(new String[0]));
+            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .job()
+                    .argument(entry.getKey())
+                    .argument("--type=json")
+                    .option(
+                            "-p",
+                            "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime
+                                    + "}]");
+
+            execute(renewExpiryTimeCmd.build());
         }
     }
 
@@ -437,9 +412,16 @@ public class PostAction extends SessionAction {
     }
 
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        final List<String> getRenewJobNamesCmd = PostAction.getRenewJobNamesCmd(forUserID, sessionID);
+        String[] getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
+                .namespace(K8SUtil.getWorkloadNamespace())
+                .job()
+                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .noHeaders()
+                .outputFormat(
+                        "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime")
+                .build();
 
-        String renewJobNamesStr = execute(getRenewJobNamesCmd.toArray(new String[0]));
+        String renewJobNamesStr = execute(getRenewJobNamesCmd);
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
 
         Map<String, List<String>> renewJobMap = new HashMap<>();
@@ -474,13 +456,13 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Validate and return the session type.  There exists a loophole
+     * Validate and return the session type. There exists a loophole
      *
      * @param imageID The image to validate
-     * @param type    User-provided session type (optional), defaults to headless
+     * @param type User-provided session type (optional), defaults to headless
      * @return The system recognized session type
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
-     * @throws Exception                 If Harbor calls fail
+     * @throws Exception If Harbor calls fail
      */
     private String validateImage(String imageID, String type) throws Exception {
         if (!StringUtil.hasText(imageID)) {
@@ -568,30 +550,31 @@ public class PostAction extends SessionAction {
         final String jobLaunchPath;
         final String servicePath;
         final String ingressPath;
+        String userHome = K8SUtil.getUserHome();
         switch (type) {
             case SessionAction.SESSION_TYPE_DESKTOP:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-desktop.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-desktop.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-desktop.yaml";
+                jobLaunchPath = userHome + "/config/launch-desktop.yaml";
+                servicePath = userHome + "/config/service-desktop.yaml";
+                ingressPath = userHome + "/config/ingress-desktop.yaml";
                 break;
             case SessionAction.SESSION_TYPE_CARTA:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-carta.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-carta.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-carta.yaml";
+                jobLaunchPath = userHome + "/config/launch-carta.yaml";
+                servicePath = userHome + "/config/service-carta.yaml";
+                ingressPath = userHome + "/config/ingress-carta.yaml";
                 break;
             case SessionAction.SESSION_TYPE_NOTEBOOK:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-notebook.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-notebook.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-notebook.yaml";
+                jobLaunchPath = userHome + "/config/launch-notebook.yaml";
+                servicePath = userHome + "/config/service-notebook.yaml";
+                ingressPath = userHome + "/config/ingress-notebook.yaml";
                 break;
             case SessionAction.SESSION_TYPE_CONTRIB:
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-contributed.yaml";
-                servicePath = System.getProperty("user.home") + "/config/service-contributed.yaml";
-                ingressPath = System.getProperty("user.home") + "/config/ingress-contributed.yaml";
+                jobLaunchPath = userHome + "/config/launch-contributed.yaml";
+                servicePath = userHome + "/config/service-contributed.yaml";
+                ingressPath = userHome + "/config/ingress-contributed.yaml";
                 break;
             case SessionAction.SESSION_TYPE_HEADLESS:
                 validateHeadlessMembership();
-                jobLaunchPath = System.getProperty("user.home") + "/config/launch-headless.yaml";
+                jobLaunchPath = userHome + "/config/launch-headless.yaml";
                 servicePath = null;
                 ingressPath = null;
                 break;
@@ -634,7 +617,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(PostAction.SKAHA_LOCAL_QUEUE, this.getLocalQueue(type));
 
         sessionJobBuilder = sessionJobBuilder.withParameter(
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -642,6 +626,13 @@ public class PostAction extends SessionAction {
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
+
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream().flatMap(List::stream).collect(Collectors.toList());
+        List<String> groupNames =
+                groups.stream().map(group -> group.getID().getName()).collect(Collectors.toList());
+        String localQueue = QueueUtil.getLocalQueue(groupNames, type);
 
         String jobLaunchString = sessionJobBuilder.build();
         String jsonLaunchFile = super.stageFile(jobLaunchString);
@@ -652,18 +643,25 @@ public class PostAction extends SessionAction {
 
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
-
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+
+        String[] launchCmd = KubectlCommandBuilder.command("create")
+                .namespace(k8sNamespace)
+                .option("-f", jsonLaunchFile)
+                .build();
+
         String createResult = execute(launchCmd);
         log.debug("Create job result: " + createResult);
 
         if (servicePath != null) {
             byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
-            serviceString = SessionJobBuilder.setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
+            serviceString = setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = KubectlCommandBuilder.command("create")
+                    .namespace(k8sNamespace)
+                    .option("-f", jsonLaunchFile)
+                    .build();
             createResult = execute(launchCmd);
             log.debug("Create service result: " + createResult);
         }
@@ -671,10 +669,13 @@ public class PostAction extends SessionAction {
         if (ingressPath != null) {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
+            ingressString = setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", jsonLaunchFile};
+            launchCmd = KubectlCommandBuilder.command("create")
+                    .namespace(k8sNamespace)
+                    .option("-f", jsonLaunchFile)
+                    .build();
             createResult = execute(launchCmd);
             log.debug("Create ingress result: " + createResult);
         }
@@ -720,34 +721,30 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Attach a desktop application.
-     * TODO: This method requires rework.  The Job Name does not use the same mechanism as the K8SUtil.getJobName()
-     * TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object names.
+     * Attach a desktop application. TODO: This method requires rework. The Job Name does not use the same mechanism as
+     * the K8SUtil.getJobName() TODO: and will suffer the same issue(s) with invalid characters in the Kubernetes object
+     * names.
      *
      * @param image Container image name.
-     * @param requestCores  Requested number of cores.
-     * @param limitCores    Max number of cores.
-     * @param requestRAM    Requested amount of RAM in Gi.
-     * @param limitRAM      Max amount of RAM in Gi.
+     * @param requestCores Requested number of cores.
+     * @param limitCores Max number of cores.
+     * @param requestRAM Requested amount of RAM in Gi.
+     * @param limitRAM Max amount of RAM in Gi.
      * @throws Exception For any unexpected errors.
      */
     public void attachDesktopApp(
             String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM)
             throws Exception {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
         // Get the IP address based on the session
-        String[] getIPCommand = new String[] {
-            "kubectl",
-            "-n",
-            k8sNamespace,
-            "get",
-            "pod",
-            "--selector=canfar-net-sessionID=" + sessionID,
-            "--no-headers=true",
-            "-o",
-            "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name"
-        };
+        String[] getIPCommand = KubectlCommandBuilder.command("get")
+                .pod()
+                .namespace(K8SUtil.getWorkloadNamespace())
+                .selector("canfar-net-sessionID=" + sessionID)
+                .noHeaders()
+                .outputFormat(
+                        "custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name")
+                .build();
 
         String ipResult = execute(getIPCommand);
         log.debug("GET IP result: " + ipResult);
@@ -801,7 +798,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String launchSoftwarePath = System.getProperty("user.home") + "/config/launch-desktop-app.yaml";
+        final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
@@ -822,13 +819,18 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(PostAction.SKAHA_LOCAL_QUEUE, this.getLocalQueue(SessionAction.TYPE_DESKTOP_APP));
         final String supplementalGroups = getSupplementalGroupsList();
         sessionJobBuilder = sessionJobBuilder.withParameter(
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
-        String[] launchCmd = new String[] {"kubectl", "create", "--namespace", k8sNamespace, "-f", launchFile};
+
+        String[] launchCmd = KubectlCommandBuilder.command("create")
+                .namespace(K8SUtil.getWorkloadNamespace())
+                .option("-f", launchFile)
+                .build();
 
         String createResult = execute(launchCmd);
         log.debug("Create result: " + createResult);
@@ -869,16 +871,10 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Create the image, command, args, and env sections of the job launch yaml.  Example:
-     * <p />
-     * image: "${software.imageid}"
-     * command: ["/skaha-system/start-desktop-software.sh"]
-     * args: [arg1, arg2]
-     * env:
-     * - name: HOME
-     * value: "/cavern/home/${skaha.userid}"
-     * - name: SHELL
-     * value: "/bin/bash"
+     * Create the image, command, args, and env sections of the job launch yaml. Example:
+     *
+     * <p>image: "${software.imageid}" command: ["/skaha-system/start-desktop-software.sh"] args: [arg1, arg2] env: -
+     * name: HOME value: "/cavern/home/${skaha.userid}" - name: SHELL value: "/bin/bash"
      */
     private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
         StringBuilder sb = new StringBuilder();
@@ -926,5 +922,20 @@ public class PostAction extends SessionAction {
         } else {
             return "";
         }
+    }
+
+    private String getLocalQueue(String type) throws IOException, InterruptedException {
+        List<String> groupNames = getGroupNames();
+        return QueueUtil.getLocalQueue(groupNames, type);
+    }
+
+    private List<String> getGroupNames() {
+        if (skahaCallbackFlow) {
+            return redis.fetchSet(getUserGroupsKey());
+        }
+        // finding the local queue based on the user's group
+        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        List<Group> groups = groupCredentials.stream().flatMap(List::stream).collect(Collectors.toList());
+        return groups.stream().map(group -> group.getID().getName()).collect(Collectors.toList());
     }
 }

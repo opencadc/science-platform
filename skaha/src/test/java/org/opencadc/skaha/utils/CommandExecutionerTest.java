@@ -19,7 +19,7 @@ public class CommandExecutionerTest {
         final String[] deleteCommand = CommandExecutioner.getDeleteSecretCommand("mysecret");
         Assert.assertArrayEquals(
                 "Wrong delete command.",
-                new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", "mysecret"},
+                new String[] {"kubectl", "delete", "-n", K8SUtil.getWorkloadNamespace(), "secret", "mysecret"},
                 deleteCommand);
     }
 
