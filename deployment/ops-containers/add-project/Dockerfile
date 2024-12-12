@@ -1,4 +1,4 @@
-FROM fedora:30 
+FROM fedora:40 
 
 # add often used tools
 RUN dnf -y install which

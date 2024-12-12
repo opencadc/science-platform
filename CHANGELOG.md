@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.26.1](https://github.com/opencadc/science-platform/compare/0.26.0...0.26.1) (2024-12-09)
+
+
+### Bug Fixes
+
+* **build:** updated kubernetes-cli ([f2cd298](https://github.com/opencadc/science-platform/commit/f2cd29899a7f09b2d907705b1853814798576b30))
+* **gha:** commit check now does not try to post a pr comment, this is broken due to security reason when opening a pr from a fork ([5510bcf](https://github.com/opencadc/science-platform/commit/5510bcf6a94c628597156fced25d7892f5c2dba7))
+* **style:** linted code of conduct and contribution page ([87a267d](https://github.com/opencadc/science-platform/commit/87a267d4f1810afda8e130669a8da16916341022))
+
 ## [0.26.0](https://github.com/opencadc/science-platform/compare/v0.25.0...0.26.0) (2024-11-26)
 
 
