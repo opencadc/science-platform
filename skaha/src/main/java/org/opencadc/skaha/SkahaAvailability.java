@@ -71,6 +71,7 @@ import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SkahaAvailability implements AvailabilityPlugin {
     private static final Logger LOG = Logger.getLogger(SkahaAvailability.class);
@@ -93,8 +94,11 @@ public class SkahaAvailability implements AvailabilityPlugin {
     public Availability getStatus() {
         // ensure we can run kubectl
         try {
-            String k8sNamespace = K8SUtil.getWorkloadNamespace();
-            String[] getPods = new String[] {"kubectl", "get", "--namespace", k8sNamespace, "pods"};
+            String[] getPods = KubectlCommandBuilder.command("get")
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .pod()
+                    .build();
+
             CommandExecutioner.execute(getPods);
             return STATUS_UP;
         } catch (Exception e) {

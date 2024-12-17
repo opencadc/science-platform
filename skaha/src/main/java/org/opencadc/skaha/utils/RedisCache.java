@@ -3,6 +3,7 @@ package org.opencadc.skaha.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -41,6 +42,23 @@ public class RedisCache {
                 .map(item -> deserialize(className, item))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    public void addSet(String key, String... setParameters) {
+        deleteKey(key);
+        jedis.sadd(key, setParameters);
+    }
+
+    private void deleteKey(String key) {
+        jedis.del(key);
+    }
+
+    public void addSet(String key, List<String> setParameters) {
+        addSet(key, setParameters.toArray(new String[0]));
+    }
+
+    public List<String> fetchSet(String key) {
+        return new ArrayList<>(jedis.smembers(key));
     }
 
     private <T> T deserialize(Class<T> className, String item) {
