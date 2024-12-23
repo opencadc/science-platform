@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.2](https://github.com/opencadc/science-platform/compare/0.26.1...0.26.2) (2024-12-23)
+
+
+### Bug Fixes
+
+* move deployment for helm charts to deployments repository and fix skaha dockerfile ([d5b20d7](https://github.com/opencadc/science-platform/commit/d5b20d7456200d48e4ccd574f1d62ab4d8ded6ba))
+
 ## [0.26.1](https://github.com/opencadc/science-platform/compare/0.26.0...0.26.1) (2024-12-09)
 
 
