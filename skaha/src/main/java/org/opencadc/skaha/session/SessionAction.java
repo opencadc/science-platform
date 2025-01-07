@@ -396,7 +396,7 @@ public abstract class SessionAction extends SkahaAction {
                 .job()
                 .label("canfar-net-userid=" + forUserID)
                 .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name,EXPIRY:.spec.activeDeadlineSeconds");
+                .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
 
         return getSessionJobCmd.build();
     }

@@ -87,12 +87,10 @@ import org.junit.Test;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
-/**
- * @author majorb
- */
+/** @author majorb */
 public class ExpiryTimeRenewalTest {
 
-    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:3.0";
+    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:latest";
     public static final int SLEEP_TIME_SECONDS = 5;
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
 
