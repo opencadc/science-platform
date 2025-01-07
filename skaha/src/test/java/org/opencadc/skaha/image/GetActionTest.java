@@ -66,14 +66,9 @@
  */
 package org.opencadc.skaha.image;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.when;
-import static org.opencadc.skaha.utils.TestUtils.set;
-import static org.opencadc.skaha.utils.TestUtils.setEnv;
-
 import java.util.List;
 import java.util.Set;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -82,11 +77,9 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.RedisCache;
+import org.opencadc.skaha.utils.TestUtils;
 
-/**
- * @author majorb
- *
- */
+/** @author majorb */
 @RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
 
@@ -100,11 +93,13 @@ public class GetActionTest {
 
     @Before
     public void setUp() {
-        setEnv("REDIS_HOST", redisHost);
-        setEnv("REDIS_PORT", redisPort);
+        TestUtils.setEnv("REDIS_HOST", GetActionTest.redisHost);
+        TestUtils.setEnv("REDIS_PORT", GetActionTest.redisPort);
+
         redis = Mockito.mock(RedisCache.class);
         getAction = new GetAction();
-        set(getAction, SkahaAction.class, "redis", redis);
+
+        TestUtils.set(getAction, SkahaAction.class, "redis", redis);
     }
 
     @Test
@@ -113,20 +108,20 @@ public class GetActionTest {
                 new Image("image1", Set.of("type1", "type2"), "digest1"),
                 new Image("image2", Set.of("type2", "type3"), "digest2"));
 
-        when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
+        Mockito.when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
 
         List<Image> result = getAction.getImages(null);
 
-        assertEquals(expectedImages, result);
+        Assert.assertEquals(expectedImages, result);
     }
 
     @Test
     public void testGetImagesWithUnknownImageType() throws Exception {
         String type = "type3";
 
-        Exception exception = assertThrows(RuntimeException.class, () -> getAction.getImages(type));
+        Exception exception = Assert.assertThrows(RuntimeException.class, () -> getAction.getImages(type));
 
-        assertEquals("unknown type: type3", exception.getMessage());
+        Assert.assertEquals("unknown type: type3", exception.getMessage());
     }
 
     @Test
@@ -136,10 +131,10 @@ public class GetActionTest {
         Image notebookImage = new Image("image2", Set.of(notebook), "digest2");
         List<Image> expectedImages = List.of(new Image("image1", Set.of("type1", "type2"), "digest1"), notebookImage);
 
-        when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
+        Mockito.when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
 
         List<Image> result = getAction.getImages(notebook);
 
-        assertEquals(List.of(notebookImage), result);
+        Assert.assertEquals(List.of(notebookImage), result);
     }
 }
