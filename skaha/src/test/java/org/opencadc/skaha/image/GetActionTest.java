@@ -88,13 +88,13 @@ public class GetActionTest {
 
     RedisCache redis;
 
-    private static final String redisHost = "localhost";
-    private static final String redisPort = "6129";
+    public static final String REDIS_HOST = "localhost";
+    public static final String REDIS_PORT = "6129";
 
     @Before
     public void setUp() {
-        TestUtils.setEnv("REDIS_HOST", GetActionTest.redisHost);
-        TestUtils.setEnv("REDIS_PORT", GetActionTest.redisPort);
+        TestUtils.setEnv("REDIS_HOST", GetActionTest.REDIS_HOST);
+        TestUtils.setEnv("REDIS_PORT", GetActionTest.REDIS_PORT);
 
         redis = Mockito.mock(RedisCache.class);
         getAction = new GetAction();
