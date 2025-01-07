@@ -333,10 +333,8 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = KubectlCommandBuilder.command(
-                        "describe")
-                .argument("nodes")
-                .namespace(k8sNamespace);
+        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd =
+                KubectlCommandBuilder.command("describe").argument("nodes").namespace(k8sNamespace);
         String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
 
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();

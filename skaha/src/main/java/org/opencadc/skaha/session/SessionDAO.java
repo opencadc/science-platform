@@ -4,11 +4,6 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -21,6 +16,7 @@ import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -29,8 +25,7 @@ public class SessionDAO {
 
     // Ordered dictionary of columns requested from Kubernetes
 
-    static String[] getSessionsCMD(final String k8sNamespace, final String forUserID,
-                                       final String sessionID) {
+    static String[] getSessionsCMD(final String k8sNamespace, final String forUserID, final String sessionID) {
         KubectlCommandBuilder.KubectlCommand sessionsCmd = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(k8sNamespace)
@@ -136,9 +131,9 @@ public class SessionDAO {
                         }
 
                         // if this session usages GPU, get the GPU usage
-                        if (StringUtil.hasText(session.getRequestedGPUCores()) &&
-                            !NONE.equals(session.getRequestedGPUCores()) &&
-                            Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
+                        if (StringUtil.hasText(session.getRequestedGPUCores())
+                                && !NONE.equals(session.getRequestedGPUCores())
+                                && Double.parseDouble(session.getRequestedGPUCores()) > 0.0) {
                             String[] sessionGPUUsageCMD = getSessionGPUUsageCMD(k8sNamespace, fullName);
                             String sessionGPUUsage = execute(sessionGPUUsageCMD);
                             List<String> gpuUsage = getGPUUsage(sessionGPUUsage);
@@ -287,9 +282,10 @@ public class SessionDAO {
                 .argument("top")
                 .pod()
                 .noHeaders()
-                .label( "canfar-net-userid=" + forUserID)
+                .label("canfar-net-userid=" + forUserID)
                 .argument("--use-protocol-buffers=true")
-                .outputFormat("custom-columns=FULL_NAME:.metadata.name,REQUESTED_CPU:.spec.containers[0].resources.requests.cpu,REQUESTED_RAM:.spec.containers[0].resources.requests.memory")
+                .outputFormat(
+                        "custom-columns=FULL_NAME:.metadata.name,REQUESTED_CPU:.spec.containers[0].resources.requests.cpu,REQUESTED_RAM:.spec.containers[0].resources.requests.memory")
                 .build();
     }
 
@@ -307,7 +303,7 @@ public class SessionDAO {
         return KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .job()
-                .label( "canfar-net-userid=" + forUserID)
+                .label("canfar-net-userid=" + forUserID)
                 .noHeaders()
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds")
                 .build();
@@ -399,7 +395,7 @@ public class SessionDAO {
     }
 
     /**
-     * Example input is [4444 5555 6666].  Convert to an actual integer array.
+     * Example input is [4444 5555 6666]. Convert to an actual integer array.
      *
      * @param inputArray Kubernetes output of an array of integers.
      * @return integer array, never null.

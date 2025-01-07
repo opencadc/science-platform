@@ -74,20 +74,20 @@ import org.junit.Test;
 public class SessionDAOTest {
     @Test
     public void testCommand() {
-        final String[] commandValues =
-                SessionDAO.getSessionsCMD("ns", null, "session-id-1");
+        final String[] commandValues = SessionDAO.getSessionsCMD("ns", null, "session-id-1");
         final String command = String.join(" ", commandValues);
-        Assert.assertEquals("Wrong command.",
-                            "kubectl get --namespace ns pod --no-headers=true "
-                            + "-l canfar-net-sessionID=session-id-1 "
-                            + "-o custom-columns=SESSION_ID:.metadata.labels.canfar-net-sessionID,"
-                            + "USERID:.metadata.labels.canfar-net-userid,RUN_AS_UID:.spec.securityContext.runAsUser,"
-                            + "RUN_AS_GID:.spec.securityContext.runAsGroup,"
-                            + "SUPPLEMENTAL_GROUPS:.spec.securityContext.supplementalGroups,"
-                            + "IMAGE:.spec.containers[0].image,"
-                            + "TYPE:.metadata.labels.canfar-net-sessionType,STATUS:.status.phase,"
-                            + "NAME:.metadata.labels.canfar-net-sessionName,STARTED:.status.startTime,"
-                            + "DELETION:.metadata.deletionTimestamp,APP_ID:.metadata.labels.canfar-net-appID",
-                            command);
+        Assert.assertEquals(
+                "Wrong command.",
+                "kubectl get pod --namespace ns --no-headers=true "
+                        + "-l canfar-net-sessionID=session-id-1 "
+                        + "-o custom-columns=SESSION_ID:.metadata.labels.canfar-net-sessionID,"
+                        + "USERID:.metadata.labels.canfar-net-userid,RUN_AS_UID:.spec.securityContext.runAsUser,"
+                        + "RUN_AS_GID:.spec.securityContext.runAsGroup,"
+                        + "SUPPLEMENTAL_GROUPS:.spec.securityContext.supplementalGroups,"
+                        + "IMAGE:.spec.containers[0].image,"
+                        + "TYPE:.metadata.labels.canfar-net-sessionType,STATUS:.status.phase,"
+                        + "NAME:.metadata.labels.canfar-net-sessionName,STARTED:.status.startTime,"
+                        + "DELETION:.metadata.deletionTimestamp,APP_ID:.metadata.labels.canfar-net-appID",
+                command);
     }
 }
