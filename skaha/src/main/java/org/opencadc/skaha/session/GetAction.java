@@ -261,7 +261,7 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = KubectlCommandBuilder.command("get")
                 .argument("pods")
                 .namespace(k8sNamespace)
                 .noHeaders()
@@ -333,7 +333,7 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = new KubectlCommandBuilder.KubectlCommand(
+        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd = KubectlCommandBuilder.command(
                         "describe")
                 .argument("nodes")
                 .namespace(k8sNamespace);

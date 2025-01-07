@@ -18,7 +18,7 @@ public class KubectlCommandBuilder {
         }
 
         public KubectlCommand namespace(String namespace) {
-            this.commandParts.add("-n");
+            this.commandParts.add("--namespace");
             this.commandParts.add(namespace);
             return this;
         }

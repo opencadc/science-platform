@@ -360,7 +360,7 @@ public class PostAction extends SessionAction {
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
-            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = new KubectlCommandBuilder.KubectlCommand("patch")
+            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
                     .namespace(K8SUtil.getWorkloadNamespace())
                     .argument("job")
                     .argument(entry.getKey())
@@ -407,7 +407,7 @@ public class PostAction extends SessionAction {
     }
 
     private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .argument("job")
                 .label( "canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
@@ -632,7 +632,7 @@ public class PostAction extends SessionAction {
 
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
-        KubectlCommandBuilder.KubectlCommand launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
+        KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
                 .namespace(k8sNamespace)
                 .option("-f", jsonLaunchFile);
 
@@ -645,7 +645,7 @@ public class PostAction extends SessionAction {
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
             jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
+            launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
             createResult = CommandExecutioner.execute(launchCmd.build());
@@ -659,7 +659,7 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getHostName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
+            launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
             createResult = CommandExecutioner.execute(launchCmd.build());
@@ -723,7 +723,7 @@ public class PostAction extends SessionAction {
             String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM)
             throws Exception {
         // Get the IP address based on the session
-        KubectlCommandBuilder.KubectlCommand getIPCommand = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
                 .argument("pod")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .selector("canfar-net-sessionID=" + sessionID)
@@ -811,7 +811,7 @@ public class PostAction extends SessionAction {
                 PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
-        KubectlCommandBuilder.KubectlCommand launchCmd = new KubectlCommandBuilder.KubectlCommand("create")
+        KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("-f", launchFile);
 

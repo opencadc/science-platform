@@ -262,7 +262,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public String getPodID(String forUserID, String sessionID) throws Exception {
-        final KubectlCommandBuilder.KubectlCommand getPodCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        final KubectlCommandBuilder.KubectlCommand getPodCmd = KubectlCommandBuilder.command("get")
                 .argument("pod")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
@@ -282,7 +282,7 @@ public abstract class SessionAction extends SkahaAction {
 
         String podID = getPodID(forUserID, sessionID);
 
-        KubectlCommandBuilder.KubectlCommand getEventsCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getEventsCmd = KubectlCommandBuilder.command("get")
                 .argument("event")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .option("--field-selector", "involvedObject.name=" + podID)
@@ -303,7 +303,7 @@ public abstract class SessionAction extends SkahaAction {
 
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
 
-        KubectlCommandBuilder.KubectlCommand getLogsCmd = new KubectlCommandBuilder.KubectlCommand("logs")
+        KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
                 .option("--tail", "-1");
@@ -391,7 +391,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     private String[] getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        KubectlCommandBuilder.KubectlCommand getSessionJobCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getSessionJobCmd = KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .argument("job")
                 .label( "canfar-net-userid=" + forUserID)
@@ -418,7 +418,7 @@ public abstract class SessionAction extends SkahaAction {
             labels = labels + ",canfar-net-appID=" + appID;
         }
 
-        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = new KubectlCommandBuilder.KubectlCommand("get")
+        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .argument("job")
                 .label(labels)
