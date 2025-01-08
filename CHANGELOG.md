@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.26.3](https://github.com/opencadc/science-platform/compare/0.26.2...0.26.3) (2025-01-08)
+
+
+### Bug Fixes
+
+* fix for inaccessible private field for pre commit ([52b590a](https://github.com/opencadc/science-platform/commit/52b590ad54389dcc95c390d0ea667b6621753c4d))
+* hush the pre commit linter ([2e2bdb7](https://github.com/opencadc/science-platform/commit/2e2bdb7a1ec9468adae1e95b383312ba43ec2a16))
+* test fixes ([3fddb8d](https://github.com/opencadc/science-platform/commit/3fddb8d3a339979e6772065973a04cc6fd3d11f5))
+* trying to fix precommit ([ac86114](https://github.com/opencadc/science-platform/commit/ac86114c426a82603548d1bb68354ca099ff3459))
+* trying to hush the linter precommit ([21ba10c](https://github.com/opencadc/science-platform/commit/21ba10c679a9fed9b72bb07d154c9377353532d6))
+
 ## [0.26.2](https://github.com/opencadc/science-platform/compare/0.26.1...0.26.2) (2024-12-23)
 
 
