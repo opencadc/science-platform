@@ -4,6 +4,7 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0'
     id 'java'
     id 'jacoco'
+    id 'checkstyle'
     id 'org.jetbrains.dokka' version '1.6.0'
 }
 
@@ -37,7 +38,10 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
     implementation 'com.google.code.gson:gson:2.8.9'
     implementation 'commons-io:commons-io:[2.14.0,3.0.0)'
+
+    // Used to merge YAML sections to fully configure Job files.
     implementation 'io.kubernetes:client-java:21.0.2'
+
     implementation 'org.opencadc:cadc-access-control:[1.1.23,)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'
@@ -72,6 +76,12 @@ spotless {
     palantirJavaFormat('2.50.0').formatJavadoc(true)
     // Format annotations on a single line
     formatAnnotations()
+
+    // Checks for javadoc formatting
+    checkstyle {
+      // Point to the same checkstyle.xml file as the checkstyle task
+      configFile file("$rootDir/checkstyle.xml")
+    }
   }
 }
 check.dependsOn spotlessCheck
@@ -105,12 +115,12 @@ tasks.dokkaHtml.configure {
         register("main") {
             sourceRoots.from(file("src/main/java"))
         }
-      configureEach {
-        jdkVersion.set(11)
-        sourceLink {
-        localDirectory.set(file("src/main/java"))
-        remoteUrl.set("https://github.com/opencadc/science-platform/tree/main/skaha/src/main/java")
-      }
-      }
+        configureEach {
+            jdkVersion.set(11)
+            sourceLink {
+                localDirectory.set(file("src/main/java"))
+                remoteUrl.set("https://github.com/opencadc/science-platform/tree/main/skaha/src/main/java")
+            }
+        }
     }
 }

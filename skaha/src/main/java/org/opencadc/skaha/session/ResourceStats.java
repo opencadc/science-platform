@@ -69,16 +69,18 @@ package org.opencadc.skaha.session;
 import org.apache.log4j.Logger;
 
 /**
- * @author yeunga
+ * Current resource usage within the Kubernetes cluster, based on the number of sessions and the resources requested by
+ * the sessions.
  *
+ * @author yeunga
  */
 public class ResourceStats {
 
     private static final Logger log = Logger.getLogger(ResourceStats.class);
 
-    private JobInstances instances;
-    private Core cores;
-    private Ram ram;
+    private final JobInstances instances;
+    private final Core cores;
+    private final Ram ram;
 
     public ResourceStats(
             int desktopCount,

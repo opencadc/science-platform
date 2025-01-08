@@ -76,8 +76,9 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
 /**
- * @author majorb
+ * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.
  *
+ * @author majorb
  */
 public class ResourceContexts {
 

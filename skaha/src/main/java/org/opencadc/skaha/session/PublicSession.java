@@ -69,19 +69,18 @@ package org.opencadc.skaha.session;
 import org.apache.log4j.Logger;
 
 /**
- * @author majorb
- *
  * Public session information.
  *
+ * @author majorb
  */
 public class PublicSession {
 
     private static final Logger log = Logger.getLogger(PublicSession.class);
 
-    private String userid;
-    private String type;
-    private String status;
-    private String startTime;
+    private final String userid;
+    private final String type;
+    private final String status;
+    private final String startTime;
 
     public PublicSession(String userid, String type, String status, String startTime) {
         this.userid = userid;

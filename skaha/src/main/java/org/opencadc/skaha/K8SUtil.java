@@ -80,15 +80,6 @@ public class K8SUtil {
         return System.getenv("skaha.hostname");
     }
 
-    /**
-     * Helps reduce string constants in many places.
-     *
-     * @return The Skaha namespace
-     */
-    public static String getNamespace() {
-        return "skaha-system";
-    }
-
     public static String getWorkloadNamespace() {
         return System.getenv("skaha.namespace");
     }
@@ -109,7 +100,6 @@ public class K8SUtil {
         return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
 
-    // skaha-notebook-svc-rdcc0219
     public static String getServiceName(String sessionID, String type) {
         return "skaha-" + type + "-svc-" + sessionID;
     }

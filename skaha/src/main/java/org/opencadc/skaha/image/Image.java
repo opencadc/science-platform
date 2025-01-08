@@ -70,8 +70,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * @author majorb
+ * Represents a single Image to be used in a Job. An Image is identified by an id and a digest.
  *
+ * @author majorb
  */
 public class Image {
 
@@ -79,9 +80,7 @@ public class Image {
     private Set<String> types;
     private String digest;
 
-    /**
-     * The following constructor is used by the ObjectMapper class for creating instances using reflection
-     */
+    /** The following constructor is used by the ObjectMapper class for creating instances using reflection. */
     public Image() {}
 
     public Image(String id, Set<String> types, String digest) {
