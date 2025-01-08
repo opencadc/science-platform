@@ -87,6 +87,8 @@ import org.junit.Test;
 import org.opencadc.skaha.image.Image;
 
 /**
+ * Integration test for Image GET requests.
+ *
  * @author yeunga
  */
 public class ImagesTest {

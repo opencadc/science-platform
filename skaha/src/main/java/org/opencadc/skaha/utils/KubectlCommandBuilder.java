@@ -3,6 +3,11 @@ package org.opencadc.skaha.utils;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A builder for constructing kubectl commands.
+ *
+ * @author anujachaitanya
+ */
 public class KubectlCommandBuilder {
     public static KubectlCommand command(String operation) {
         return new KubectlCommand(operation);

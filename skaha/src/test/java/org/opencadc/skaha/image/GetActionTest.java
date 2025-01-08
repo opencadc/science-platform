@@ -79,7 +79,11 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.RedisCache;
 import org.opencadc.skaha.utils.TestUtils;
 
-/** @author majorb */
+/**
+ * Unit Test for GetAction class for images.
+ *
+ * @author majorb
+ */
 @RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
 

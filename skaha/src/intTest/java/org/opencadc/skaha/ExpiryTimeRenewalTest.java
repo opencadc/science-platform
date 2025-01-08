@@ -87,7 +87,11 @@ import org.junit.Test;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
-/** @author majorb */
+/**
+ * Integration Test to test renewing existing Sessions.
+ *
+ * @author majorb
+ */
 public class ExpiryTimeRenewalTest {
 
     public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta:latest";

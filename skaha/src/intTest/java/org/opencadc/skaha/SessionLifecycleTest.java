@@ -82,6 +82,8 @@ import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
 /**
+ * Integration test for session lifecycle creation and deletion.
+ *
  * @author majorb
  */
 public class SessionLifecycleTest {

@@ -67,14 +67,21 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * @author yeunga
+ * Unit Test for GetAction for sessions.
  *
+ * @author yeunga
  */
 public class GetActionTests {
 
@@ -97,11 +104,20 @@ public class GetActionTests {
     private static final long INVALID_VALUE = 6;
 
     private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
-    private static final String K_VALUE_STR = String.valueOf(2) + "K";
-    private static final String M_VALUE_STR = String.valueOf(3) + "M";
-    private static final String G_VALUE_STR = String.valueOf(4) + "G";
-    private static final String T_VALUE_STR = String.valueOf(5) + "T";
-    private static final String INVALID_VALUE_STR = String.valueOf(5) + "A";
+    private static final String K_VALUE_STR = 2 + "K";
+    private static final String M_VALUE_STR = 3 + "M";
+    private static final String G_VALUE_STR = 4 + "G";
+    private static final String T_VALUE_STR = 5 + "T";
+    private static final String INVALID_VALUE_STR = 5 + "A";
+
+    private static final String K8S_LIST =
+            "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n"
+                    + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
+                    + "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
+                    + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
     public GetActionTests() {}
 
@@ -125,7 +141,88 @@ public class GetActionTests {
         }
     }
 
+    @Test
+    public void testListSessions() {
+        try {
+            GetAction get = new TestGetAction();
+            String json = get.listSessions(null, null, false);
+            log.info("json: \n" + json);
+            List<Session> sessions1 = get.getAllSessions(null);
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<Session>>() {}.getType();
+            List<Session> sessions2 = gson.fromJson(json, listType);
+            Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+            Assert.assertEquals("session count", sessions1.size(), sessions2.size());
+            for (Session s : sessions1) {
+                Assert.assertTrue(s.getId(), sessions2.contains(s));
+
+                // All start times should be parsable.
+                Instant.parse(s.getStartTime());
+            }
+
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+    }
+
+    @Test
+    public void testFilterType() {
+        try {
+            GetAction get = new TestGetAction();
+            List<Session> sessions = get.getAllSessions(null);
+            List<Session> filtered = get.filter(sessions, "notebook", null);
+            for (Session s : filtered) {
+                Assert.assertEquals(s.getId(), "notebook", s.getType());
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+    }
+
+    @Test
+    public void testFilterStatus() throws Exception {
+        GetAction get = new TestGetAction();
+        List<Session> sessions = get.getAllSessions(null);
+        List<Session> filtered = get.filter(sessions, null, "Running");
+        for (Session s : filtered) {
+            Assert.assertEquals(s.getId(), "Running", s.getStatus());
+        }
+    }
+
+    @Test
+    public void testFilterTypeStatus() {
+        try {
+            GetAction get = new TestGetAction();
+            List<Session> sessions = get.getAllSessions(null);
+            List<Session> filtered = get.filter(sessions, "notebook", "Running");
+            for (Session s : filtered) {
+                Assert.assertEquals(s.getId(), "notebook", s.getType());
+                Assert.assertEquals(s.getId(), "Running", s.getStatus());
+            }
+        } catch (Throwable t) {
+            log.error("Unexpected", t);
+            Assert.fail("Unexpected: " + t.getMessage());
+        }
+    }
+
     static class TestGetAction extends GetAction {
+
+        @Override
+        public List<Session> getAllSessions(String forUserID) throws Exception {
+            // A bit of a hack to emulate the state.
+            this.skahaTld = "/cavern-vospace";
+
+            List<Session> sessions = new ArrayList<>();
+            String[] lines = K8S_LIST.split("\n");
+            for (String line : lines) {
+                Session session = SessionDAO.constructSession(line, this.skahaTld);
+                sessions.add(session);
+            }
+            return sessions;
+        }
+
         @Override
         protected String getUsername() {
             return null;
@@ -133,7 +230,7 @@ public class GetActionTests {
 
         @Override
         protected int getUID() {
-            return 32635;
+            return 997;
         }
     }
 }

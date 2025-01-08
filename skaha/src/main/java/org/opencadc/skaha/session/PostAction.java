@@ -99,7 +99,12 @@ import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 
-/** @author majorb */
+/**
+ * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
+ * pulled from the environment.
+ *
+ * @author majorb
+ */
 public class PostAction extends SessionAction {
 
     // variables replaced in kubernetes yaml config files for
