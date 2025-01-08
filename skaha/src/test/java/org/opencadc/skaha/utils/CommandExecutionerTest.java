@@ -19,7 +19,7 @@ public class CommandExecutionerTest {
         final String[] deleteCommand = CommandExecutioner.getDeleteSecretCommand("mysecret");
         Assert.assertArrayEquals(
                 "Wrong delete command.",
-                new String[] {"kubectl", "--namespace", K8SUtil.getWorkloadNamespace(), "delete", "secret", "mysecret"},
+                new String[] {"kubectl", "delete", "--namespace", K8SUtil.getWorkloadNamespace(), "secret", "mysecret"},
                 deleteCommand);
     }
 
@@ -45,5 +45,23 @@ public class CommandExecutionerTest {
         } catch (IllegalArgumentException e) {
             Assert.assertEquals("secretName is required.", e.getMessage());
         }
+
+        final String[] createCommand =
+                CommandExecutioner.getRegistryCreateSecretCommand(imageRepositoryAuth, "mysecret");
+        Assert.assertArrayEquals(
+                "Wrong delete command.",
+                new String[] {
+                    "kubectl",
+                    "create",
+                    "--namespace",
+                    K8SUtil.getWorkloadNamespace(),
+                    "secret",
+                    "docker-registry",
+                    "mysecret",
+                    "--docker-server=host",
+                    "--docker-username=username",
+                    "--docker-password=password"
+                },
+                createCommand);
     }
 }

@@ -71,10 +71,9 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 /**
- * @author majorb
- *
  * Represents a session running in skaha.
  *
+ * @author majorb
  */
 public class Session {
 
@@ -241,9 +240,10 @@ public class Session {
     }
 
     /**
-     * See the array of Supplemental Group IDs.  To ensure the integrity of this Session's Supplemental groups, this
+     * See the array of Supplemental Group IDs. To ensure the integrity of this Session's Supplemental groups, this
      * method will return a copy.
-     * @return  Integer array, never null.
+     *
+     * @return Integer array, never null.
      */
     public Integer[] getSupplementalGroups() {
         return Arrays.copyOf(this.supplementalGroups, this.supplementalGroups.length);

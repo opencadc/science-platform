@@ -23,16 +23,12 @@ public class TestUtils {
         }
     }
 
-    public static void setEnv(String key, String value) {
-        try {
-            Map<String, String> env = System.getenv();
-            Class<?> clazz = env.getClass();
-            Field field = clazz.getDeclaredField("m");
-            field.setAccessible(true);
-            Map<String, String> writableEnv = (Map<String, String>) field.get(env);
-            writableEnv.put(key, value);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to set environment variable", e);
-        }
+    public static void setEnv(String key, String value) throws Exception {
+        Map<String, String> env = System.getenv();
+        Class<?> clazz = env.getClass();
+        Field field = clazz.getDeclaredField("m");
+        field.setAccessible(true);
+        Map<String, String> writableEnv = (Map<String, String>) field.get(env);
+        writableEnv.put(key, value);
     }
 }

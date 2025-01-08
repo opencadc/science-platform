@@ -67,20 +67,17 @@
 
 package org.opencadc.skaha;
 
+import java.util.List;
+import org.apache.log4j.Logger;
+
 public class K8SUtil {
 
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
+    private static final Logger log = Logger.getLogger(K8SUtil.class);
+
     public static String getHostName() {
         return System.getenv("skaha.hostname");
-    }
-
-    /**
-     * Helps reduce string constants in many places.
-     * @return  The Skaha namespace
-     */
-    public static String getNamespace() {
-        return "skaha-system";
     }
 
     public static String getWorkloadNamespace() {
@@ -89,11 +86,13 @@ public class K8SUtil {
 
     /**
      * Filter out anything not in the alphanumeric or hyphen character set.
-     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object names</a>
-     * @param sessionID     The provided session ID.
-     * @param type          The defined type (desktop, notebook, etc.)
-     * @param userID        The running User's ID.
-     * @return              String sanitized name.  Never null.
+     *
+     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object
+     *     names</a>
+     * @param sessionID The provided session ID.
+     * @param type The defined type (desktop, notebook, etc.)
+     * @param userID The running User's ID.
+     * @return String sanitized name. Never null.
      */
     public static String getJobName(String sessionID, String type, String userID) {
         // Replace values that are NOT alphanumeric or a hyphen.
@@ -101,7 +100,6 @@ public class K8SUtil {
         return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
 
-    // skaha-notebook-svc-rdcc0219
     public static String getServiceName(String sessionID, String type) {
         return "skaha-" + type + "-svc-" + sessionID;
     }
@@ -128,7 +126,8 @@ public class K8SUtil {
 
     /**
      * Obtain the configured default quota size in Gigabytes.
-     * @return  integer in GB.
+     *
+     * @return integer in GB.
      */
     public static String getDefaultQuota() {
         return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
@@ -136,5 +135,72 @@ public class K8SUtil {
 
     public static String getPreAuthorizedTokenSecretName() {
         return "pre-auth-token-skaha";
+    }
+
+    public static String getSkahaTld() {
+        return System.getenv("SKAHA_TLD");
+    }
+
+    public static boolean isGpuEnabled() {
+        return Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
+    }
+
+    public static List<String> getHarborHosts() {
+        String rawHosts = System.getenv("skaha.harborhosts");
+        if (rawHosts == null) {
+            log.warn("No harbor hosts configured.");
+            return List.of();
+        }
+
+        return List.of(rawHosts.split(","));
+    }
+
+    public static String getSkahaUsersGroup() {
+        return System.getenv("skaha.usersgroup");
+    }
+
+    public static String getSkahaAdminsGroup() {
+        return System.getenv("skaha.adminsgroup");
+    }
+
+    public static String getSkahaHeadlessGroup() {
+        return System.getenv("skaha.headlessgroup");
+    }
+
+    public static String getSkahaHeadlessPriorityGroup() {
+        return System.getenv("skaha.headlessprioritygroup");
+    }
+
+    public static String getSkahaHeadlessPriorityClass() {
+        return System.getenv("skaha.headlesspriortyclass");
+    }
+
+    public static Integer getMaxUserSessions() {
+        String noOfSessions = System.getenv("skaha.maxusersessions");
+        if (noOfSessions == null) {
+            log.warn("no max user sessions value configured.");
+            return 1;
+        }
+        return Integer.parseInt(noOfSessions);
+    }
+
+    public static String getPosixCacheUrl(String packageName) {
+        return System.getProperty(packageName + ".posixCache.url");
+    }
+
+    public static String getPosixMapperResourceId() {
+        return System.getenv("skaha.posixmapper.resourceid");
+    }
+
+    public static String getRedisHost() {
+        return System.getenv("REDIS_HOST");
+    }
+
+    public static String getRedisPort() {
+        return System.getenv("REDIS_PORT");
+    }
+
+    public static String getUserHome() {
+        return System.getProperty("user.home");
     }
 }

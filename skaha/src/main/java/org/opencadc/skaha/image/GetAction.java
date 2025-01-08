@@ -74,8 +74,9 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
 
 /**
- * @author majorb
+ * Handle GET requests for images. This will optionally list by type.
  *
+ * @author majorb
  */
 public class GetAction extends SkahaAction {
 
@@ -100,7 +101,7 @@ public class GetAction extends SkahaAction {
         syncOutput.getOutputStream().write(json.getBytes());
     }
 
-    protected List<Image> getImages(String type) throws Exception {
+    protected List<Image> getImages(String type) {
         if (null != type && !SESSION_TYPES.contains(type)) {
             log.error("unknown image type: " + type);
             throw new IllegalArgumentException("unknown type: " + type);

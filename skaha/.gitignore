@@ -4,3 +4,5 @@
 /.settings/
 /.tmp/
 /.classpth/
+src/intTest/resources/*.pem
+src/intTest/resources/*.token

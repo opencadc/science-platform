@@ -74,8 +74,10 @@ import java.security.AccessControlException;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
+ * Handle a delete request for a session or an app.
  *
  * @author majorb
  */
@@ -94,22 +96,17 @@ public class DeleteAction extends SessionAction {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
+                final String[] getSessionsCmd = KubectlCommandBuilder.command("get")
+                        .namespace(K8SUtil.getWorkloadNamespace())
+                        .pod()
+                        .selector("canfar-net-sessionID=" + sessionID)
+                        .noHeaders()
+                        .outputFormat(
+                                "custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid")
+                        .build();
 
-                String k8sNamespace = K8SUtil.getWorkloadNamespace();
-                String[] getSessionCMD = new String[] {
-                    "kubectl",
-                    "get",
-                    "--namespace",
-                    k8sNamespace,
-                    "pod",
-                    "--selector=canfar-net-sessionID=" + sessionID,
-                    "--no-headers=true",
-                    "-o",
-                    "custom-columns=" + "TYPE:.metadata.labels.canfar-net-sessionType,"
-                            + "USERID:.metadata.labels.canfar-net-userid"
-                };
+                final String session = CommandExecutioner.execute(getSessionsCmd);
 
-                String session = CommandExecutioner.execute(getSessionCMD);
                 if (StringUtil.hasText(session)) {
                     final String[] lines = session.split("\n");
                     // sessionID was added to desktop-app. This resulted in the
@@ -179,8 +176,12 @@ public class DeleteAction extends SessionAction {
 
     private void delete(String k8sNamespace, String type, String name) throws InterruptedException, IOException {
         try {
-            String[] cmd = new String[] {"kubectl", "delete", "--namespace", k8sNamespace, type, name};
-            CommandExecutioner.execute(cmd);
+            String[] delete = KubectlCommandBuilder.command("delete")
+                    .namespace(k8sNamespace)
+                    .argument(type)
+                    .argument(name)
+                    .build();
+            CommandExecutioner.execute(delete);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());
