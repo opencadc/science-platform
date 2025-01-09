@@ -45,6 +45,7 @@ deployment:
     #
     # quotaPlugin: {NoQuotaPlugin | CephFSQuotaPlug}
 
+    # The /home and /projects folders will be automatically created if not present.
     # filesystem:
       # persistent data directory in container
       # dataDir: "/data"
