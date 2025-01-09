@@ -539,6 +539,9 @@ deployment:
 The Cavern API provides access to the User Storage which is shared between Skaha and all of the User Sessions.  A [Bearer token](#obtaining-a-bearer-token) is required when trying to read
 private access, or any writing.
 
+> [!NOTE]
+> The `/home` and `/projects` folders will be created if not present during install.  Do **not** include them with your configuration!
+
 Create a `my-cavern-local-values-file.yaml` file to override Values from the main [template `values.yaml` file](cavern/values.yaml).
 
 `my-cavern-local-values-file.yaml`
