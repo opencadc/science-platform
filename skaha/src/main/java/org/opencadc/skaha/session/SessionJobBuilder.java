@@ -1,14 +1,7 @@
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.openapi.models.V1Affinity;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1NodeAffinity;
-import io.kubernetes.client.openapi.models.V1NodeSelector;
-import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
-import io.kubernetes.client.openapi.models.V1NodeSelectorTerm;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1PreferredSchedulingTerm;
+import ca.nrc.cadc.util.StringUtil;
+import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,15 +18,24 @@ import org.apache.log4j.Logger;
  * Class to interface with Kubernetes.
  */
 public class SessionJobBuilder {
-    private static final Logger log = Logger.getLogger(SessionJobBuilder.class);
+    private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     private static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
+
+    static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
+
     private final Map<String, String> parameters = new HashMap<>();
-    private Path jobFilePath;
+    private final Path jobFilePath;
+
+    // Options
     private boolean gpuEnabled;
     private Integer gpuCount;
+    private String queueName;
 
-    private SessionJobBuilder() {}
+    private SessionJobBuilder(final Path jobFilePath) {
+        this.jobFilePath = jobFilePath;
+
+    }
 
     /**
      * Create a new builder from the provided path.
@@ -42,10 +44,7 @@ public class SessionJobBuilder {
      * @return SessionJobBuilder instance.  Never null.
      */
     static SessionJobBuilder fromPath(final Path jobFilePath) {
-        final SessionJobBuilder sessionJobBuilder = new SessionJobBuilder();
-        sessionJobBuilder.jobFilePath = jobFilePath;
-
-        return sessionJobBuilder;
+        return new SessionJobBuilder(jobFilePath);
     }
 
     private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(
@@ -109,6 +108,16 @@ public class SessionJobBuilder {
     }
 
     /**
+     * Set the queue name for the job to use with Kueue.
+     * @param queueName The name of the queue to use.
+     * @return  This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withQueue(final String queueName) {
+        this.queueName = queueName;
+        return this;
+    }
+
+    /**
      * Build a single parameter into this builder's parameter map.
      *
      * @param key   The key to find.
@@ -133,7 +142,7 @@ public class SessionJobBuilder {
     /**
      * Construct the Job YAML output of this builder.
      *
-     * @return String of YAML, never null.
+     * @return String of Job YAML, never null.
      * @throws IOException If the provided Path cannot be read.
      */
     String build() throws IOException {
@@ -143,13 +152,58 @@ public class SessionJobBuilder {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return mergeAffinity(jobFileString);
+        final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
+
+        mergeQueue(launchJob);
+        return mergeAffinity(launchJob);
     }
 
-    private String mergeAffinity(final String jobFileString) throws IOException {
+    /**
+     * For the given Job, determine if it's queue-able, and set the appropriate label and suspend information.
+     * @param launchJob The Job to modify.
+     */
+    void mergeQueue(final V1Job launchJob) {
+        if (StringUtil.hasText(this.queueName)) {
+            LOGGER.debug("Setting queue name to " + this.queueName);
+            final V1ObjectMeta jobMetadata;
+            final V1ObjectMeta existingJobMetadata = launchJob.getMetadata();
+            if (existingJobMetadata == null) {
+                jobMetadata = new V1ObjectMeta();
+                launchJob.setMetadata(jobMetadata);
+            } else {
+                jobMetadata = existingJobMetadata;
+            }
+
+            final Map<String, String> labels = jobMetadata.getLabels();
+            if (labels != null) {
+                labels.put(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueName);
+            } else {
+                jobMetadata.setLabels(Collections.singletonMap(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueName));
+            }
+
+            final V1JobSpec jobSpec;
+            final V1JobSpec existingJobSpec = launchJob.getSpec();
+            if (existingJobSpec == null) {
+                jobSpec = new V1JobSpec();
+                launchJob.setSpec(jobSpec);
+            } else {
+                jobSpec = existingJobSpec;
+            }
+
+            jobSpec.setSuspend(true);
+        } else {
+            LOGGER.debug("No queue name provided.");
+        }
+    }
+
+    /**
+     * Merge the Node Affinity, if present, with the GPU affinity, if present, with any existing affinity.
+     * @param launchJob The Job to modify.
+     * @return  The YAML representation of the Job.  Never null.
+     */
+    private String mergeAffinity(final V1Job launchJob) {
         final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
         if (gpuAffinity != null) {
-            final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
             final V1JobSpec podTemplate = launchJob.getSpec();
             if (podTemplate != null) {
                 // spec.template.spec
@@ -225,20 +279,22 @@ public class SessionJobBuilder {
                                         });
                                     }
                                 } else {
-                                    log.debug("Nothing to alter for Node Affinity.");
+                                    LOGGER.debug("Nothing to alter for Node Affinity.");
                                 }
                             }
                         }
                     }
                 }
             }
-
-            return Yaml.dump(launchJob);
         }
 
-        return jobFileString;
+        return Yaml.dump(launchJob);
     }
 
+    /**
+     * Obtain the existing GPU scheduling affinity.
+     * @return V1Affinity instance, or null if not enabled.
+     */
     private V1Affinity getGPUSchedulingAffinity() {
         if (!this.gpuEnabled) {
             return null;

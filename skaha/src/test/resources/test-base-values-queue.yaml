@@ -1,0 +1,91 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
+  name: test-base-values-queue-job
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: 88
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: ${software.imagesecret}
+      priorityClassName: uber-user-preempt-medium
+      hostname: test-base-values-queue-job.com
+      containers:
+      - name: test-base-values-queue-job
+        env:
+        - name: skaha_hostname
+          value: test-base-values-queue-job.com
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: JUPYTER_TOKEN
+          value: "${skaha.sessionid}"
+        image: test.com/image
+        command: ["/skaha-system/start-jupyterlab.sh"]
+        args:
+        - ${skaha.sessionid}
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1"
+            ephemeral-storage: "10Gi"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+            ${software.limits.gpus}
+            ephemeral-storage: "20Gi"
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+          name: notebook-port
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-jupyterlab
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+      volumes:
+      - name: start-jupyterlab
+        configMap:
+          name: launch-scripts
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: init-users-groups-config
+          defaultMode: 0777
+      - name: cavern-volume
+        persistentVolumeClaim:
+          claimName: skaha-workload-cavern-pvc
+      - name: scratch-dir
+        emptyDir: {}
+      - name: etc-group
+        emptyDir: {}
+      - name: etc-passwd
+        emptyDir: {}
