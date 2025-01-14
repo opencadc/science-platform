@@ -1,4 +1,8 @@
-# CHANGELOG for Cavern User Storage (Chart 0.5.0)
+# CHANGELOG for Cavern User Storage (Chart 0.6.0)
+
+## 2025.01.09 (0.6.0)
+- Small fix to remove unnecessary init container for Cavern
+- Small fix to remove public access to /home folder (`cavern` 0.8.0)
 
 ## 2024.10.08
 - Update to omit PostgreSQL in favour of an existing database.

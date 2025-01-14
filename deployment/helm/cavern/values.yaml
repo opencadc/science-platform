@@ -11,8 +11,8 @@ skaha:
 deployment:
   hostname: example.org
   cavern:
-    image: images.opencadc.org/platform/cavern:0.7.14
-    imagePullPolicy: Always
+    image: images.opencadc.org/platform/cavern:0.8.0
+    imagePullPolicy: IfNotPresent
 
     # How cavern identifies itself.
     resourceID: "ivo://example.org/cavern"
@@ -45,6 +45,7 @@ deployment:
     #
     # quotaPlugin: {NoQuotaPlugin | CephFSQuotaPlug}
 
+    # The /home and /projects folders will be automatically created if not present.
     # filesystem:
       # persistent data directory in container
       # dataDir: "/data"

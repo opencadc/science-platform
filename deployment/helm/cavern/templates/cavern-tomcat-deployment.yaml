@@ -21,24 +21,11 @@ spec:
         nodeAffinity:
 {{ . | toYaml | indent 10 }}
 {{- end }}
-{{- with .Values.deployment.cavern.filesystem }}
-      {{ $cavernTLD := printf "%s/%s" .dataDir .subPath }}
       securityContext:
-        fsGroup: {{ .rootOwner.gid }}
+        fsGroup: {{ .Values.deployment.cavern.filesystem.rootOwner.gid }}
         runAsUser: 0
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-      - name: init-{{ $.Release.Name }}-fs
-        image: busybox
-        imagePullPolicy: IfNotPresent
-        command: ['sh', '-c', 'mkdir -p {{ $cavernTLD }}/home && mkdir -p {{ $cavernTLD }}/projects && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/home && chown {{ .rootOwner.uid }}:{{ .rootOwner.gid }} {{ $cavernTLD }}/projects']
-        volumeMounts:
-        - mountPath: "{{ .dataDir }}"
-          name: cavern-volume
-        securityContext:
-          allowPrivilegeEscalation: false
-{{- end }}
       containers:
       - image: {{ .Values.deployment.cavern.image }}
         imagePullPolicy: {{ .Values.deployment.cavern.imagePullPolicy }}
