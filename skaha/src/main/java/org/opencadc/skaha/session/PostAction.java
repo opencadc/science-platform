@@ -601,7 +601,7 @@ public class PostAction extends SessionAction {
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withImageSecret(imageRegistrySecretName)
-                .withQueue(getQueueConfiguration(type))
+                .withQueue(getQueueConfiguration(type)) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -791,9 +791,10 @@ public class PostAction extends SessionAction {
         }
 
         final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
+        final String supplementalGroups = getSupplementalGroupsList();
+        final SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
-                .withQueue(K8SUtil.getInteractiveQueueConfiguration())
+                .withQueue(K8SUtil.getInteractiveQueueConfiguration()) // Can be null.
                 .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -812,10 +813,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
-        final String supplementalGroups = getSupplementalGroupsList();
-        sessionJobBuilder = sessionJobBuilder.withParameter(
-                PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(
+                        PostAction.SKAHA_SUPPLEMENTALGROUPS,
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")

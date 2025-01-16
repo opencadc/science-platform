@@ -223,8 +223,7 @@ public class K8SUtil {
     }
 
     /**
-     * Pull the name of the headless queue from the environment, using the default priority class.  Defaults to the
-     * interactive queue if not set.
+     * Pull the name of the headless queue from the environment, using the default priority class.
      *
      * @return String name of the headless queue, or null if not set.
      */
