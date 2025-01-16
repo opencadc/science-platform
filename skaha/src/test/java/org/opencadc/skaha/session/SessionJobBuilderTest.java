@@ -159,7 +159,7 @@ public class SessionJobBuilderTest {
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
-                .withQueue("my-queue");
+                .withQueue(new QueueConfiguration("high", "my-queue"));
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
@@ -176,6 +176,10 @@ public class SessionJobBuilderTest {
                 "Wrong queue name.",
                 "my-queue",
                 Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_QUEUE_LABEL_KEY));
+        Assert.assertEquals(
+                "Wrong priority class.",
+                "high",
+                Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY));
     }
 
     @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {

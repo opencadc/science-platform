@@ -595,12 +595,13 @@ public class PostAction extends SessionAction {
             imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
         }
 
-        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withImageSecret(imageRegistrySecretName)
+                .withQueue(getQueueConfiguration(type))
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -792,6 +793,7 @@ public class PostAction extends SessionAction {
         final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
+                .withQueue(K8SUtil.getInteractiveQueueConfiguration())
                 .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -911,5 +913,30 @@ public class PostAction extends SessionAction {
         } else {
             return "";
         }
+    }
+
+    private String getHeadlessPriorityClass() {
+        if (skahaPriorityHeadlessGroup == null) {
+            return "";
+        } else if (skahaHeadlessPriortyClass == null) {
+            log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
+            return "";
+        }
+
+        return priorityHeadlessUser ? skahaHeadlessPriortyClass : "";
+    }
+
+    private QueueConfiguration getQueueConfiguration(final String sessionType) {
+        final QueueConfiguration queueConfiguration;
+        if (PostAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
+            final String headlessPriorityClass = getHeadlessPriorityClass();
+            queueConfiguration = StringUtil.hasText(headlessPriorityClass)
+                    ? K8SUtil.getHeadlessQueueConfiguration(headlessPriorityClass)
+                    : K8SUtil.getHeadlessQueueConfiguration();
+        } else {
+            queueConfiguration = K8SUtil.getInteractiveQueueConfiguration();
+        }
+
+        return queueConfiguration;
     }
 }

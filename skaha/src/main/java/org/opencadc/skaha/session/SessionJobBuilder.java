@@ -1,6 +1,5 @@
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
@@ -14,15 +13,14 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 
-/**
- * Class to interface with Kubernetes.
- */
+/** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
     private static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
 
     static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
+    static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
 
     private final Map<String, String> parameters = new HashMap<>();
     private final Path jobFilePath;
@@ -30,18 +28,17 @@ public class SessionJobBuilder {
     // Options
     private boolean gpuEnabled;
     private Integer gpuCount;
-    private String queueName;
+    private QueueConfiguration queueConfiguration;
 
     private SessionJobBuilder(final Path jobFilePath) {
         this.jobFilePath = jobFilePath;
-
     }
 
     /**
      * Create a new builder from the provided path.
      *
      * @param jobFilePath The Path of the template file.
-     * @return SessionJobBuilder instance.  Never null.
+     * @return SessionJobBuilder instance. Never null.
      */
     static SessionJobBuilder fromPath(final Path jobFilePath) {
         return new SessionJobBuilder(jobFilePath);
@@ -109,18 +106,19 @@ public class SessionJobBuilder {
 
     /**
      * Set the queue name for the job to use with Kueue.
-     * @param queueName The name of the queue to use.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param queueConfiguration The QueueConfiguration.
+     * @return This SessionJobBuilder, never null.
      */
-    SessionJobBuilder withQueue(final String queueName) {
-        this.queueName = queueName;
+    SessionJobBuilder withQueue(final QueueConfiguration queueConfiguration) {
+        this.queueConfiguration = queueConfiguration;
         return this;
     }
 
     /**
      * Build a single parameter into this builder's parameter map.
      *
-     * @param key   The key to find.
+     * @param key The key to find.
      * @param value The value to replace with.
      * @return This SessionJobBuilder, never null.
      */
@@ -131,8 +129,9 @@ public class SessionJobBuilder {
 
     /**
      * Use the provided Kubernetes secret to authenticate with the Image Registry to pull the Image.
-     * @param imageRegistrySecretName   String existing secret name.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param imageRegistrySecretName String existing secret name.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withImageSecret(final String imageRegistrySecretName) {
         this.withParameter(SessionJobBuilder.SOFTWARE_IMAGESECRET, imageRegistrySecretName);
@@ -160,11 +159,12 @@ public class SessionJobBuilder {
 
     /**
      * For the given Job, determine if it's queue-able, and set the appropriate label and suspend information.
+     *
      * @param launchJob The Job to modify.
      */
     void mergeQueue(final V1Job launchJob) {
-        if (StringUtil.hasText(this.queueName)) {
-            LOGGER.debug("Setting queue name to " + this.queueName);
+        if (this.queueConfiguration != null) {
+            LOGGER.debug("Setting queue name to " + this.queueConfiguration);
             final V1ObjectMeta jobMetadata;
             final V1ObjectMeta existingJobMetadata = launchJob.getMetadata();
             if (existingJobMetadata == null) {
@@ -176,9 +176,13 @@ public class SessionJobBuilder {
 
             final Map<String, String> labels = jobMetadata.getLabels();
             if (labels != null) {
-                labels.put(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueName);
+                labels.put(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueConfiguration.queueName);
+                labels.put(SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY, this.queueConfiguration.priorityClass);
             } else {
-                jobMetadata.setLabels(Collections.singletonMap(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueName));
+                jobMetadata.setLabels(Collections.singletonMap(
+                        SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueConfiguration.queueName));
+                jobMetadata.setLabels(Collections.singletonMap(
+                        SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY, this.queueConfiguration.priorityClass));
             }
 
             final V1JobSpec jobSpec;
@@ -198,8 +202,9 @@ public class SessionJobBuilder {
 
     /**
      * Merge the Node Affinity, if present, with the GPU affinity, if present, with any existing affinity.
+     *
      * @param launchJob The Job to modify.
-     * @return  The YAML representation of the Job.  Never null.
+     * @return The YAML representation of the Job. Never null.
      */
     private String mergeAffinity(final V1Job launchJob) {
         final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
@@ -293,6 +298,7 @@ public class SessionJobBuilder {
 
     /**
      * Obtain the existing GPU scheduling affinity.
+     *
      * @return V1Affinity instance, or null if not enabled.
      */
     private V1Affinity getGPUSchedulingAffinity() {
