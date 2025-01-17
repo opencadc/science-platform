@@ -35,7 +35,7 @@ do
         # no corresponding pod, delete orphaned session
 	      if [[ -z "${CLEANUP_DEBUG}" ]]
 	      then
-	        echo "Exec: ${CMD}"
+	        ${CMD}
 	      fi
       elif [[ "${CLEANUP_DEBUG}" == "1" ]]
       then
