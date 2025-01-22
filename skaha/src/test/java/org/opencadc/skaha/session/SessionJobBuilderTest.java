@@ -1,7 +1,12 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.FileUtil;
-import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1NodeAffinity;
+import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.util.Yaml;
 import java.nio.file.Files;
 import java.nio.file.Path;

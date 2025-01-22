@@ -1,6 +1,15 @@
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.openapi.models.V1Affinity;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1NodeAffinity;
+import io.kubernetes.client.openapi.models.V1NodeSelector;
+import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
+import io.kubernetes.client.openapi.models.V1NodeSelectorTerm;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1PreferredSchedulingTerm;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
