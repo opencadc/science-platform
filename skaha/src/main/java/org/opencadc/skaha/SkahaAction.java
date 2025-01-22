@@ -128,7 +128,6 @@ public abstract class SkahaAction extends RestAction {
     protected boolean adminUser = false;
     protected boolean headlessUser = false;
     protected boolean priorityHeadlessUser = false;
-    protected String server;
     protected String homedir;
     protected String scratchdir;
     protected String skahaTld;
@@ -145,7 +144,6 @@ public abstract class SkahaAction extends RestAction {
     protected String callbackSupplementalGroups = null;
 
     public SkahaAction() {
-        server = K8SUtil.getHostName();
         homedir = K8SUtil.getHomeDir();
         skahaTld = K8SUtil.getSkahaTld();
         gpuEnabled = K8SUtil.isGpuEnabled();
@@ -163,7 +161,7 @@ public abstract class SkahaAction extends RestAction {
 
         final String configuredPosixMapperResourceID = K8SUtil.getPosixMapperResourceId();
 
-        log.debug("skaha.hostname=" + server);
+        log.debug("skaha.hostname=" + K8SUtil.getSessionsHostName());
         log.debug("skaha.homedir=" + homedir);
         log.debug("SKAHA_TLD=" + skahaTld);
         log.debug("skaha.scratchdir=" + scratchdir);

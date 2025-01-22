@@ -71,13 +71,20 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 public class K8SUtil {
+    private static final String VNC_URL_TEMPLATE =
+            "https://%s/session/desktop/%s/?password=%s&path=session/desktop/%s/";
+    private static final String CARTA_URL_TEMPLATE = "https://%s/session/carta/http/%s/";
+    private static final String CARTA_ALT_SOCKET_URL_TEMPLATE =
+            K8SUtil.CARTA_URL_TEMPLATE + "?socketUrl=wss://%s/session/carta/ws/%s/";
+    private static final String NOTEBOOK_URL_TEMPLATE = "https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s";
+    private static final String CONTRIBUTED_URL_TEMPLATE = "https://%s/session/contrib/%s/";
 
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
-    public static String getHostName() {
-        return System.getenv("skaha.hostname");
+    public static String getSessionsHostName() {
+        return System.getenv("SKAHA_SESSIONS_HOSTNAME");
     }
 
     public static String getWorkloadNamespace() {
@@ -202,5 +209,36 @@ public class K8SUtil {
 
     public static String getUserHome() {
         return System.getProperty("user.home");
+    }
+
+    public static String getVNCURL(String sessionID) {
+        return String.format(K8SUtil.VNC_URL_TEMPLATE, K8SUtil.getSessionsHostName(), sessionID, sessionID, sessionID);
+    }
+
+    public static String getCartaURL(String sessionID, boolean altSocketUrl) {
+        final String host = K8SUtil.getSessionsHostName();
+        return altSocketUrl ? K8SUtil.getCartaAltSocketURL(host, sessionID) : K8SUtil.getCartaURL(host, sessionID);
+    }
+
+    private static String getCartaURL(final String host, final String sessionID) {
+        return String.format(K8SUtil.CARTA_URL_TEMPLATE, host, sessionID);
+    }
+
+    private static String getCartaAltSocketURL(final String host, final String sessionID) {
+        return String.format(K8SUtil.CARTA_ALT_SOCKET_URL_TEMPLATE, host, sessionID, host, sessionID);
+    }
+
+    public static String getNotebookURL(String sessionID, String userid, String skahaTLD) {
+        return String.format(
+                K8SUtil.NOTEBOOK_URL_TEMPLATE,
+                K8SUtil.getSessionsHostName(),
+                sessionID,
+                skahaTLD.replaceAll("/", ""),
+                userid,
+                sessionID);
+    }
+
+    public static String getContributedURL(String sessionID) {
+        return String.format(K8SUtil.CONTRIBUTED_URL_TEMPLATE, K8SUtil.getSessionsHostName(), sessionID);
     }
 }

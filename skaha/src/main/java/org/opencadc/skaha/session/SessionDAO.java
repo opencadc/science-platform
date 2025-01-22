@@ -341,22 +341,16 @@ public class SessionDAO {
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                 ? Session.STATUS_TERMINATING
                 : parts[allColumns.indexOf(CustomColumns.STATUS)];
-        final String host = K8SUtil.getHostName();
         final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
+            connectURL = K8SUtil.getVNCURL(id);
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            if (image.endsWith(":1.4")) {
-                // support alt web socket path for 1.4 carta
-                connectURL = SessionAction.getCartaURL(host, id, true);
-            } else {
-                connectURL = SessionAction.getCartaURL(host, id, false);
-            }
+            connectURL = K8SUtil.getCartaURL(id, image.endsWith(":1.4"));
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid, topLevelDirectory);
+            connectURL = K8SUtil.getNotebookURL(id, userid, topLevelDirectory);
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
-            connectURL = SessionAction.getContributedURL(host, id);
+            connectURL = K8SUtil.getContributedURL(id);
         } else {
             connectURL = "not-applicable";
         }
