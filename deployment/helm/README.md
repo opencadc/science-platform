@@ -315,6 +315,11 @@ deployment:
       maxCount: "3"  # Max number of sessions per user.
       minEphemeralStorage: "20Gi"   # The initial requested amount of ephemeral (local) storage.  Does NOT apply to Desktop sessions.
       maxEphemeralStorage: "200Gi"  # The maximum amount of ephemeral (local) storage to allow a Session to extend to.  Does NOT apply to Desktop sessions.
+      
+      # Optionally setup a separate host for User Sessions for Skaha to redirect to.  The HTTPS scheme is assumed.  Defaults to the Skaha hostname (.Values.deployment.hostname).
+      # Example:
+      #   hostname: myhost.example.org
+      hostname: sessions.example.org
 
       # When set to 'true' this flag will enable GPU node scheduling.  Don't forget to declare any related GPU configurations, if appropriate, in the nodeAffinity below!
       # gpuEnabled: false

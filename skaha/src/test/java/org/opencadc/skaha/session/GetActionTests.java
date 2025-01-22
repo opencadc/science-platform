@@ -210,14 +210,14 @@ public class GetActionTests {
     static class TestGetAction extends GetAction {
 
         @Override
-        public List<Session> getAllSessions(String forUserID) throws Exception {
+        public List<Session> getAllSessions(String forUserID) {
             // A bit of a hack to emulate the state.
             this.skahaTld = "/cavern-vospace";
 
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession(line, this.skahaTld);
+                Session session = SessionDAO.constructSession("host.example.org", line, this.skahaTld);
                 sessions.add(session);
             }
             return sessions;

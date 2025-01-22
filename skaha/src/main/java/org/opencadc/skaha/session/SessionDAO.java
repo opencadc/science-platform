@@ -75,7 +75,7 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    protected static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
+    static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
             throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] sessionsCMD = SessionDAO.getSessionsCMD(k8sNamespace, forUserID, sessionID);
@@ -93,7 +93,7 @@ public class SessionDAO {
 
             String[] lines = sessionList.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession(line, topLevelDirectory);
+                Session session = SessionDAO.constructSession(K8SUtil.getSessionsHostName(), line, topLevelDirectory);
                 if (forUserID != null) {
                     // get expiry time
                     String uid = getUID(line);
@@ -325,7 +325,7 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    static Session constructSession(String k8sOutput, final String topLevelDirectory) throws IOException {
+    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory) {
         LOGGER.debug("line: " + k8sOutput);
         final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
 
@@ -338,7 +338,6 @@ public class SessionDAO {
         String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
         String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
         String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
-        final String sessionHostName = K8SUtil.getSessionsHostName();
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                 ? Session.STATUS_TERMINATING
                 : parts[allColumns.indexOf(CustomColumns.STATUS)];
