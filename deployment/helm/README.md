@@ -57,6 +57,15 @@ secrets:
     default-certificate:
         tls.crt: <base64 encoded server certificate>
         tls.key: <base64 encoded server key>
+
+# Settings passed to Traefik.  The install flag is used by Helm to proceed to install Traefik or not.  If false, ensure v2.11.0 is at minimum installed.
+traefik:
+  install: true
+  tlsStore:
+    default:
+      defaultCertificate:
+        # See default-certificate secret(s) above
+        secretName: default-certificate
 ```
 
 ```bash
@@ -185,10 +194,6 @@ secrets:
 #     spec:
 #       hostPath:
 #         path: "/posixmapper/data"
-
-# An omission equals true, so set this explicitly to false as we already installed it.
-base:
-  install: false
 ```
 
 It is recommended to install into the `skaha-system` namespace, but not required.
