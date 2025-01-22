@@ -1,7 +1,16 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
-import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.openapi.models.V1Affinity;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1NodeAffinity;
+import io.kubernetes.client.openapi.models.V1NodeSelector;
+import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
+import io.kubernetes.client.openapi.models.V1NodeSelectorTerm;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1PreferredSchedulingTerm;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,9 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 
-/**
- * Class to interface with Kubernetes.
- */
+/** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
@@ -34,14 +41,13 @@ public class SessionJobBuilder {
 
     private SessionJobBuilder(final Path jobFilePath) {
         this.jobFilePath = jobFilePath;
-
     }
 
     /**
      * Create a new builder from the provided path.
      *
      * @param jobFilePath The Path of the template file.
-     * @return SessionJobBuilder instance.  Never null.
+     * @return SessionJobBuilder instance. Never null.
      */
     static SessionJobBuilder fromPath(final Path jobFilePath) {
         return new SessionJobBuilder(jobFilePath);
@@ -109,8 +115,9 @@ public class SessionJobBuilder {
 
     /**
      * Set the queue name for the job to use with Kueue.
+     *
      * @param queueName The name of the queue to use.
-     * @return  This SessionJobBuilder, never null.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withQueue(final String queueName) {
         this.queueName = queueName;
@@ -120,7 +127,7 @@ public class SessionJobBuilder {
     /**
      * Build a single parameter into this builder's parameter map.
      *
-     * @param key   The key to find.
+     * @param key The key to find.
      * @param value The value to replace with.
      * @return This SessionJobBuilder, never null.
      */
@@ -131,8 +138,9 @@ public class SessionJobBuilder {
 
     /**
      * Use the provided Kubernetes secret to authenticate with the Image Registry to pull the Image.
-     * @param imageRegistrySecretName   String existing secret name.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param imageRegistrySecretName String existing secret name.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withImageSecret(final String imageRegistrySecretName) {
         this.withParameter(SessionJobBuilder.SOFTWARE_IMAGESECRET, imageRegistrySecretName);
@@ -160,6 +168,7 @@ public class SessionJobBuilder {
 
     /**
      * For the given Job, determine if it's queue-able, and set the appropriate label and suspend information.
+     *
      * @param launchJob The Job to modify.
      */
     void mergeQueue(final V1Job launchJob) {
@@ -198,8 +207,9 @@ public class SessionJobBuilder {
 
     /**
      * Merge the Node Affinity, if present, with the GPU affinity, if present, with any existing affinity.
+     *
      * @param launchJob The Job to modify.
-     * @return  The YAML representation of the Job.  Never null.
+     * @return The YAML representation of the Job. Never null.
      */
     private String mergeAffinity(final V1Job launchJob) {
         final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
@@ -293,6 +303,7 @@ public class SessionJobBuilder {
 
     /**
      * Obtain the existing GPU scheduling affinity.
+     *
      * @return V1Affinity instance, or null if not enabled.
      */
     private V1Affinity getGPUSchedulingAffinity() {
