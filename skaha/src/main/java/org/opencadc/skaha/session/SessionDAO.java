@@ -338,19 +338,20 @@ public class SessionDAO {
         String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
         String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
         String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
+        final String sessionHostName = K8SUtil.getSessionsHostName();
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                 ? Session.STATUS_TERMINATING
                 : parts[allColumns.indexOf(CustomColumns.STATUS)];
         final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = K8SUtil.getVNCURL(id);
+            connectURL = K8SUtil.getVNCURL(sessionHostName, id);
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = K8SUtil.getCartaURL(id, image.endsWith(":1.4"));
+            connectURL = K8SUtil.getCartaURL(sessionHostName, id, image.endsWith(":1.4"));
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = K8SUtil.getNotebookURL(id, userid, topLevelDirectory);
+            connectURL = K8SUtil.getNotebookURL(sessionHostName, id, userid, topLevelDirectory);
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
-            connectURL = K8SUtil.getContributedURL(id);
+            connectURL = K8SUtil.getContributedURL(sessionHostName, id);
         } else {
             connectURL = "not-applicable";
         }

@@ -80,4 +80,75 @@ public class K8SUtilTest {
 
         Assert.assertEquals("Wrong name", "skaha-type-my-us-e-r-sess", K8SUtil.getJobName("SESS", "TYPE", "my|us+e&r"));
     }
+
+    @Test
+    public void getVNCURL() {
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/desktop/8675309/?password=8675309&path=session/desktop/8675309/",
+                K8SUtil.getVNCURL("host.example.org", "8675309"));
+
+        try {
+            K8SUtil.getVNCURL(null, "8675309");
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void getCartaURL() {
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/carta/http/8675309/",
+                K8SUtil.getCartaURL("host.example.org", "8675309", false));
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/carta/http/8675309/?socketUrl=wss://host.example.org/session/carta/ws/8675309/",
+                K8SUtil.getCartaURL("host.example.org", "8675309", true));
+
+        try {
+            K8SUtil.getCartaURL(null, "8675309", false);
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void getNotebookURL() {
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/notebook/8675309/lab/tree/top-level-dir/home/user?token=8675309",
+                K8SUtil.getNotebookURL("host.example.org", "8675309", "user", "/top-level-dir"));
+
+        try {
+            K8SUtil.getNotebookURL(null, "8675309", "user", "/top-level-dir");
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
+
+        try {
+            K8SUtil.getNotebookURL("host.example.org", "8675309", null, "/top-level-dir");
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void getContributedURL() {
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/contrib/8675309/",
+                K8SUtil.getContributedURL("host.example.org", "8675309"));
+
+        try {
+            K8SUtil.getContributedURL(null, "8675309");
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
+    }
 }

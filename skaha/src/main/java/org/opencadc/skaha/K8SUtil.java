@@ -68,6 +68,7 @@
 package org.opencadc.skaha;
 
 import java.util.List;
+import java.util.Objects;
 import org.apache.log4j.Logger;
 
 public class K8SUtil {
@@ -211,34 +212,41 @@ public class K8SUtil {
         return System.getProperty("user.home");
     }
 
-    public static String getVNCURL(String sessionID) {
-        return String.format(K8SUtil.VNC_URL_TEMPLATE, K8SUtil.getSessionsHostName(), sessionID, sessionID, sessionID);
+    public static String getVNCURL(String host, String sessionID) {
+        final String cleanSessionID = Objects.requireNonNull(sessionID);
+        return String.format(
+                K8SUtil.VNC_URL_TEMPLATE, Objects.requireNonNull(host), cleanSessionID, cleanSessionID, cleanSessionID);
     }
 
-    public static String getCartaURL(String sessionID, boolean altSocketUrl) {
-        final String host = K8SUtil.getSessionsHostName();
+    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
         return altSocketUrl ? K8SUtil.getCartaAltSocketURL(host, sessionID) : K8SUtil.getCartaURL(host, sessionID);
     }
 
     private static String getCartaURL(final String host, final String sessionID) {
-        return String.format(K8SUtil.CARTA_URL_TEMPLATE, host, sessionID);
+        return String.format(
+                K8SUtil.CARTA_URL_TEMPLATE, Objects.requireNonNull(host), Objects.requireNonNull(sessionID));
     }
 
     private static String getCartaAltSocketURL(final String host, final String sessionID) {
-        return String.format(K8SUtil.CARTA_ALT_SOCKET_URL_TEMPLATE, host, sessionID, host, sessionID);
+        final String cleanSessionID = Objects.requireNonNull(sessionID);
+        final String cleanHost = Objects.requireNonNull(host);
+        return String.format(
+                K8SUtil.CARTA_ALT_SOCKET_URL_TEMPLATE, cleanHost, cleanSessionID, cleanHost, cleanSessionID);
     }
 
-    public static String getNotebookURL(String sessionID, String userid, String skahaTLD) {
+    public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
+        final String cleanSessionID = Objects.requireNonNull(sessionID);
         return String.format(
                 K8SUtil.NOTEBOOK_URL_TEMPLATE,
-                K8SUtil.getSessionsHostName(),
-                sessionID,
+                Objects.requireNonNull(host),
+                cleanSessionID,
                 skahaTLD.replaceAll("/", ""),
-                userid,
-                sessionID);
+                Objects.requireNonNull(userid),
+                cleanSessionID);
     }
 
-    public static String getContributedURL(String sessionID) {
-        return String.format(K8SUtil.CONTRIBUTED_URL_TEMPLATE, K8SUtil.getSessionsHostName(), sessionID);
+    public static String getContributedURL(String host, String sessionID) {
+        return String.format(
+                K8SUtil.CONTRIBUTED_URL_TEMPLATE, Objects.requireNonNull(host), Objects.requireNonNull(sessionID));
     }
 }
