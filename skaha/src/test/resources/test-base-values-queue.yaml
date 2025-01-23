@@ -47,7 +47,6 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "2"
-            ${software.limits.gpus}
             ephemeral-storage: "20Gi"
         ports:
         - containerPort: 8888

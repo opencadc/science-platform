@@ -12,7 +12,7 @@ metadata:
 spec:
   parallelism: 1
   completions: 1
-  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  activeDeadlineSeconds: 3600
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
@@ -21,22 +21,17 @@ spec:
         canfar-net-sessionName: "${skaha.sessionname}"
         canfar-net-sessionType: "${skaha.sessiontype}"
         canfar-net-userid: "${skaha.userid}"
-        job-name: "${skaha.jobname}"
+        job-name: "test-job"
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: OnFailure
-      {{ template "skaha.job.nodeAffinity" . }}
       imagePullSecrets:
         - name: "${software.imagesecret}"
-      securityContext:
-        {{ template "skaha.job.securityContext" . }}
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
-      initContainers:
-      {{ template "skaha.job.initContainers" . }}
       containers:
-      - name: "${skaha.jobname}"
+      - name: "test-job"
         env:
         - name: skaha_hostname
           value: "${skaha.hostname}"
@@ -81,16 +76,6 @@ spec:
         args:
         - ${skaha.sessionid}
         imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            memory: "${software.requests.ram}"
-            cpu: "${software.requests.cores}"
-            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
-          limits:
-            memory: "${software.limits.ram}"
-            cpu: "${software.limits.cores}"
-            ${software.limits.gpus}
-            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
         ports:
         - containerPort: 8888
           protocol: TCP
@@ -104,9 +89,6 @@ spec:
           subPath: group
         - mountPath: "/skaha-system"
           name: start-jupyterlab
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
