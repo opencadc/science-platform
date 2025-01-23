@@ -67,18 +67,11 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.util.StringUtil;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.session.QueueConfiguration;
 
 public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
-
-    public static final String INTERACTIVE_QUEUE_NAME_VAR_NAME = "INTERACTIVE_QUEUE_NAME";
-    public static final String INTERACTIVE_QUEUE_PRIORITY_CLASS_VAR_NAME = "INTERACTIVE_QUEUE_PRIORITY_CLASS";
-    public static final String HEADLESS_QUEUE_NAME_VAR_NAME = "HEADLESS_QUEUE_NAME";
-    public static final String HEADLESS_QUEUE_PRIORITY_CLASS_VAR_NAME = "HEADLESS_QUEUE_PRIORITY_CLASS";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
@@ -208,42 +201,5 @@ public class K8SUtil {
 
     public static String getUserHome() {
         return System.getProperty("user.home");
-    }
-
-    /**
-     * Pull the name of the interactive queue from the environment.
-     *
-     * @return String name of the interactive queue, or null if not set.
-     */
-    public static QueueConfiguration getInteractiveQueueConfiguration() {
-        final String queueName = System.getenv(K8SUtil.INTERACTIVE_QUEUE_NAME_VAR_NAME);
-        final String priorityClass = System.getenv(K8SUtil.INTERACTIVE_QUEUE_PRIORITY_CLASS_VAR_NAME);
-
-        return StringUtil.hasText(queueName) ? new QueueConfiguration(queueName, priorityClass) : null;
-    }
-
-    /**
-     * Pull the name of the headless queue from the environment, using the default priority class.
-     *
-     * @return String name of the headless queue, or null if not set.
-     */
-    public static QueueConfiguration getHeadlessQueueConfiguration() {
-        final String priorityClass = System.getenv(K8SUtil.HEADLESS_QUEUE_NAME_VAR_NAME);
-        final QueueConfiguration headlessQueueConfiguration = K8SUtil.getHeadlessQueueConfiguration(priorityClass);
-        return headlessQueueConfiguration == null
-                ? K8SUtil.getInteractiveQueueConfiguration()
-                : headlessQueueConfiguration;
-    }
-
-    /**
-     * Pull the name of the headless queue from the environment. Useful for setting a very high priority class (preempt)
-     * for high priority Jobs.
-     *
-     * @param priorityClass The priority class to use for the headless queue.
-     * @return String name of the headless queue, or null if not set.
-     */
-    public static QueueConfiguration getHeadlessQueueConfiguration(final String priorityClass) {
-        final String queueName = System.getenv(K8SUtil.HEADLESS_QUEUE_PRIORITY_CLASS_VAR_NAME);
-        return StringUtil.hasText(queueName) ? new QueueConfiguration(queueName, priorityClass) : null;
     }
 }

@@ -601,7 +601,7 @@ public class PostAction extends SessionAction {
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withImageSecret(imageRegistrySecretName)
-                .withQueue(getQueueConfiguration(type)) // Can be null.
+                .withQueue(QueueConfiguration.fromType(type)) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -794,7 +794,7 @@ public class PostAction extends SessionAction {
         final String supplementalGroups = getSupplementalGroupsList();
         final SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
-                .withQueue(K8SUtil.getInteractiveQueueConfiguration()) // Can be null.
+                .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
                 .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -914,30 +914,5 @@ public class PostAction extends SessionAction {
         } else {
             return "";
         }
-    }
-
-    private String getHeadlessPriorityClass() {
-        if (skahaPriorityHeadlessGroup == null) {
-            return "";
-        } else if (skahaHeadlessPriortyClass == null) {
-            log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
-            return "";
-        }
-
-        return priorityHeadlessUser ? skahaHeadlessPriortyClass : "";
-    }
-
-    private QueueConfiguration getQueueConfiguration(final String sessionType) {
-        final QueueConfiguration queueConfiguration;
-        if (PostAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
-            final String headlessPriorityClass = getHeadlessPriorityClass();
-            queueConfiguration = StringUtil.hasText(headlessPriorityClass)
-                    ? K8SUtil.getHeadlessQueueConfiguration(headlessPriorityClass)
-                    : K8SUtil.getHeadlessQueueConfiguration();
-        } else {
-            queueConfiguration = K8SUtil.getInteractiveQueueConfiguration();
-        }
-
-        return queueConfiguration;
     }
 }

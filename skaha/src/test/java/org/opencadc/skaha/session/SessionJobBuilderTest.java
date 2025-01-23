@@ -164,7 +164,7 @@ public class SessionJobBuilderTest {
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
-                .withQueue(new QueueConfiguration("high", "my-queue"));
+                .withQueue(new QueueConfiguration("notebook", "high", "my-queue"));
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {

@@ -68,67 +68,66 @@
 
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.openapi.models.V1CustomResourceDefinition;
-import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class InitializationActionTest {
+public class QueueConfigurationTest {
     @Test
-    public void testInitializationActionErrorWrongQueueName() {
-        final InitializationAction testSubject = new InitializationAction() {
-            @Override
-            String getWorkloadNamespace() {
-                return "test-workload";
-            }
-
-            @Override
-            V1CustomResourceDefinitionList queryLocalQueues() {
-                final V1CustomResourceDefinitionList v1CustomResourceDefinitionList =
-                        new V1CustomResourceDefinitionList();
-                final V1CustomResourceDefinition localQueue = new V1CustomResourceDefinition();
-                final V1ObjectMeta localQueueMetadata = new V1ObjectMeta();
-                localQueueMetadata.setName("different-queue");
-                localQueue.setMetadata(localQueueMetadata);
-                v1CustomResourceDefinitionList.addItemsItem(localQueue);
-
-                return v1CustomResourceDefinitionList;
-            }
-        };
+    public void testQueueConfigurationBadInput() {
+        try {
+            QueueConfiguration.fromType(null);
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
+        }
 
         try {
-            testSubject.ensureLocalQueuesValid(
-                    new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.fail("Expected IllegalStateException");
-        } catch (IllegalStateException illegalStateException) {
-            // Expected
+            QueueConfiguration.fromType("notebook", null);
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException nullPointerException) {
+            // Good.
         }
     }
 
     @Test
-    public void testInitializationAction() throws Exception {
-        final InitializationAction testSubject = new InitializationAction() {
-            @Override
-            String getWorkloadNamespace() {
-                return "test-workload";
-            }
+    public void testQueueConfiguration() {
+        final Map<String, String> testEnvironment = new HashMap<>();
+        testEnvironment.put("SKAHA_QUEUE_NOTEBOOK_NAME", "notebook-queue");
+        testEnvironment.put("SKAHA_QUEUE_NOTEBOOK_PRIORITY_CLASS", "high-med-priority");
 
-            @Override
-            V1CustomResourceDefinitionList queryLocalQueues() {
-                final V1CustomResourceDefinitionList v1CustomResourceDefinitionList =
-                        new V1CustomResourceDefinitionList();
-                final V1CustomResourceDefinition localQueue = new V1CustomResourceDefinition();
-                final V1ObjectMeta localQueueMetadata = new V1ObjectMeta();
-                localQueueMetadata.setName("test-queue");
-                localQueue.setMetadata(localQueueMetadata);
-                v1CustomResourceDefinitionList.addItemsItem(localQueue);
+        Assert.assertNull("Should be no desktop type.", QueueConfiguration.fromType("desktop", testEnvironment));
+        Assert.assertNull("Should be no default type.", QueueConfiguration.fromType("default", testEnvironment));
+        Assert.assertEquals(
+                "Wrong queue name.",
+                "notebook-queue",
+                Objects.requireNonNull(QueueConfiguration.fromType("notebook", testEnvironment)).queueName);
+        Assert.assertEquals(
+                "Wrong priority class name.",
+                "high-med-priority",
+                Objects.requireNonNull(QueueConfiguration.fromType("notebook", testEnvironment)).priorityClass);
 
-                return v1CustomResourceDefinitionList;
-            }
-        };
+        testEnvironment.put("SKAHA_QUEUE_DEFAULT_NAME", "all-workload-queue");
+        testEnvironment.put("SKAHA_QUEUE_DEFAULT_PRIORITY_CLASS", "med-priority");
 
-        testSubject.ensureLocalQueuesValid(
-                new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
+        Assert.assertEquals(
+                "Wrong queue name as should use default.",
+                "all-workload-queue",
+                Objects.requireNonNull(QueueConfiguration.fromType("carta", testEnvironment)).queueName);
+        Assert.assertEquals(
+                "Wrong priority class name as should use default.",
+                "med-priority",
+                Objects.requireNonNull(QueueConfiguration.fromType("carta", testEnvironment)).priorityClass);
+
+        Assert.assertEquals(
+                "Wrong queue name as should not use default.",
+                "notebook-queue",
+                Objects.requireNonNull(QueueConfiguration.fromType("notebook", testEnvironment)).queueName);
+        Assert.assertEquals(
+                "Wrong priority class name as should not use default.",
+                "high-med-priority",
+                Objects.requireNonNull(QueueConfiguration.fromType("notebook", testEnvironment)).priorityClass);
     }
 }

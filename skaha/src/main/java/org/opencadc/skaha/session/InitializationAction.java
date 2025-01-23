@@ -73,10 +73,12 @@ import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaAction;
 
 /** One-time initialization action for Skaha. This will verify the existence of the local queues, if specified. */
 public class InitializationAction extends InitAction {
@@ -84,29 +86,26 @@ public class InitializationAction extends InitAction {
     private static final String FATAL_LOG_MESSAGE =
             "Queue %s specified in configuration but no local queues exist in namespace %s";
 
+    private static QueueConfiguration[] getQueueConfigurations() {
+        return SkahaAction.SESSION_TYPES.stream()
+                .map(QueueConfiguration::fromType)
+                .filter(Objects::nonNull)
+                .toArray(QueueConfiguration[]::new);
+    }
+
     @Override
     public void doInit() {
         LOGGER.info("Verifying QueueConfigurations, if any...");
-        final QueueConfiguration interactiveQueueConfig = getInteractiveQueueConfiguration();
-        int queuesChecked = 0;
-        if (interactiveQueueConfig == null) {
-            LOGGER.info("Skipping missing InteractiveQueueConfiguration");
-        } else {
-            ensureLocalQueueValid(interactiveQueueConfig);
-            queuesChecked++;
-        }
+        ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+        LOGGER.info("Verifying QueueConfigurations: OK");
+    }
 
-        final QueueConfiguration headlessQueueConfig = getHeadlessQueueConfiguration();
-        if (headlessQueueConfig == null) {
-            LOGGER.info("Skipping missing HeadlessQueueConfiguration");
-        } else {
-            ensureLocalQueueValid(headlessQueueConfig);
-            queuesChecked++;
-        }
-        LOGGER.info("Verifying QueueConfigurations: OK ({} queues checked)", queuesChecked);
+    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
+        Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
     }
 
     private void ensureLocalQueueValid(final QueueConfiguration queueConfiguration) {
+        LOGGER.info("Checking queue {}", queueConfiguration.queueName);
         final V1CustomResourceDefinitionList listResults = queryLocalQueues();
         if (listResults == null
                 || listResults.getItems().stream()
@@ -118,6 +117,7 @@ public class InitializationAction extends InitAction {
             LOGGER.fatal(message);
             throw new IllegalStateException(message);
         }
+        LOGGER.info("Checking queue {}: OK", queueConfiguration.queueName);
     }
 
     /**
@@ -142,14 +142,6 @@ public class InitializationAction extends InitAction {
         } catch (ApiException apiException) {
             throw new IllegalStateException(apiException.getMessage(), apiException);
         }
-    }
-
-    QueueConfiguration getInteractiveQueueConfiguration() {
-        return K8SUtil.getInteractiveQueueConfiguration();
-    }
-
-    QueueConfiguration getHeadlessQueueConfiguration() {
-        return K8SUtil.getHeadlessQueueConfiguration();
     }
 
     String getWorkloadNamespace() {

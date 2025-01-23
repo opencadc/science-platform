@@ -68,13 +68,90 @@
 
 package org.opencadc.skaha.session;
 
-/** Simple DTO to hold the configuration of a queue. */
+import ca.nrc.cadc.util.StringUtil;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Class to contain configuration of a queue. Specifics are pulled from the provided environment, which defaults to the
+ * system environment.
+ */
 public class QueueConfiguration {
+    private static final String QUEUE_CONFIG_VAR_NAME_PREFIX = "SKAHA_QUEUE_";
+    private static final String QUEUE_CONFIG_VAR_NAME = "%s%s_NAME";
+    private static final String QUEUE_CONFIG_VAR_PRIORITY_CLASS = "%s%s_PRIORITY_CLASS";
+    private static final String QUEUE_CONFIG_VAR_DEFAULT_TYPE = "DEFAULT";
+
+    final String sessionType;
     final String queueName;
     final String priorityClass;
 
-    public QueueConfiguration(final String priorityClass, final String queueName) {
+    /**
+     * Create a new QueueConfiguration. Used for testing.
+     *
+     * @param sessionType The session type.
+     * @param priorityClass The priority class.
+     * @param queueName The queue name.
+     */
+    QueueConfiguration(final String sessionType, final String priorityClass, final String queueName) {
+        this.sessionType = sessionType;
         this.priorityClass = priorityClass;
         this.queueName = queueName;
+    }
+
+    /**
+     * Obtain the configured QueueConfiguration for the given session type. This will look in the environment for the
+     * configuration, and return null if none found.
+     *
+     * @param type The session type.
+     * @return QueueConfiguration for the given session type, or null if none found.
+     */
+    public static QueueConfiguration fromType(final String type) {
+        return QueueConfiguration.fromType(type, System.getenv());
+    }
+
+    /**
+     * Obtain the configured QueueConfiguration for the given session type. This will look in the supplied environment.
+     * Tests can use directly to avoid side environment setup. Default queue name is used if no specific queue is found,
+     * if configured.
+     *
+     * @param type The session type.
+     * @param env The environment to look in.
+     * @return QueueConfiguration for the given session type, or null if none found.
+     */
+    static QueueConfiguration fromType(final String type, final Map<String, String> env) {
+        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
+        final Map<String, String> cleanEnv = Objects.requireNonNull(env);
+        final String queueName = QueueConfiguration.getQueueNameForType(expectedTypeCase, cleanEnv);
+        if (StringUtil.hasText(queueName)) {
+            final String priorityClass = QueueConfiguration.getQueuePriorityClassForType(expectedTypeCase, cleanEnv);
+            return new QueueConfiguration(expectedTypeCase, priorityClass, queueName);
+        } else {
+            final String defaultQueueName =
+                    QueueConfiguration.getQueueNameForType(QueueConfiguration.QUEUE_CONFIG_VAR_DEFAULT_TYPE, cleanEnv);
+            if (StringUtil.hasText(defaultQueueName)) {
+                final String priorityClass = QueueConfiguration.getQueuePriorityClassForType(
+                        QueueConfiguration.QUEUE_CONFIG_VAR_DEFAULT_TYPE, cleanEnv);
+                return new QueueConfiguration(expectedTypeCase, priorityClass, defaultQueueName);
+            } else {
+                return null;
+            }
+        }
+    }
+
+    private static String getQueueNameForType(final String type, final Map<String, String> env) {
+        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
+        return env.get(String.format(
+                QueueConfiguration.QUEUE_CONFIG_VAR_NAME,
+                QueueConfiguration.QUEUE_CONFIG_VAR_NAME_PREFIX,
+                expectedTypeCase));
+    }
+
+    private static String getQueuePriorityClassForType(final String type, final Map<String, String> env) {
+        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
+        return env.get(String.format(
+                QueueConfiguration.QUEUE_CONFIG_VAR_PRIORITY_CLASS,
+                QueueConfiguration.QUEUE_CONFIG_VAR_NAME_PREFIX,
+                expectedTypeCase));
     }
 }
