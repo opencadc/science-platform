@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/opencadc/science-platform/compare/0.27.0...0.27.1) (2025-01-24)
+
+
+### Bug Fixes
+
+* correct package version of kubernetes-client in dockerfile ([4e955d8](https://github.com/opencadc/science-platform/commit/4e955d8b89d2b26063e2f5b3d260485f86e4ec22))
+
 ## [0.27.0](https://github.com/opencadc/science-platform/compare/0.26.3...0.27.0) (2025-01-24)
 
 
