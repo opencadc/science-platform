@@ -325,7 +325,8 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory) {
+    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
+            throws Exception {
         LOGGER.debug("line: " + k8sOutput);
         final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
 
@@ -344,13 +345,19 @@ public class SessionDAO {
         final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = K8SUtil.getVNCURL(sessionHostName, id);
+            connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = K8SUtil.getCartaURL(sessionHostName, id, image.endsWith(":1.4"));
+            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
+                    .withAlternateSocket(image.endsWith(":1.4"))
+                    .build();
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = K8SUtil.getNotebookURL(sessionHostName, id, userid, topLevelDirectory);
+            connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
+                    .withTopLevelDirectory(topLevelDirectory)
+                    .withUserName(userid)
+                    .build();
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
-            connectURL = K8SUtil.getContributedURL(sessionHostName, id);
+            connectURL =
+                    SessionURLBuilder.contributedSession(sessionHostName, id).build();
         } else {
             connectURL = "not-applicable";
         }

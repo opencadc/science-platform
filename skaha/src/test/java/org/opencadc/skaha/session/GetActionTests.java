@@ -210,7 +210,7 @@ public class GetActionTests {
     static class TestGetAction extends GetAction {
 
         @Override
-        public List<Session> getAllSessions(String forUserID) {
+        public List<Session> getAllSessions(String forUserID) throws Exception {
             // A bit of a hack to emulate the state.
             this.skahaTld = "/cavern-vospace";
 
