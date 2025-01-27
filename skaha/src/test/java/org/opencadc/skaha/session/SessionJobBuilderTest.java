@@ -47,8 +47,7 @@ public class SessionJobBuilderTest {
         }
     }
 
-    @Test
-    public void testWithAffinityMerging() throws Exception {
+    private V1Job getTestBaseValuesAffinityJob() throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
@@ -74,7 +73,12 @@ public class SessionJobBuilderTest {
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
 
-        final V1Job job = (V1Job) Yaml.load(output);
+        return (V1Job) Yaml.load(output);
+    }
+
+    @Test
+    public void testWithAffinityMerging() throws Exception {
+        final V1Job job = getTestBaseValuesAffinityJob();
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         assert podSpec != null;
@@ -103,30 +107,7 @@ public class SessionJobBuilderTest {
 
     @Test
     public void testWithAffinityMergingWithNoGPU() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
-        }
-
-        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withImageSecret("my-secret");
-        final String output = testSubject.build();
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        final V1Job job = (V1Job) Yaml.load(output);
+        final V1Job job = getTestBaseValuesAffinityJob();
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         assert podSpec != null;
