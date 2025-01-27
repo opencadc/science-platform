@@ -19,7 +19,7 @@ RUN set -eux \
         containerd.io-1.7.22-3.1.fc40 \
         docker-ce-3:27.3.1-1.fc40 \
         docker-ce-cli-1:27.3.1-1.fc40 \
-        kubernetes-client \
+        kubernetes-client-1.29.12-1.fc40 \
     # Clean up dnf cache and other unneeded files to reduce image size
     && dnf clean all
 

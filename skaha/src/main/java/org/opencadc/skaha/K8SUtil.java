@@ -75,8 +75,8 @@ public class K8SUtil {
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
-    public static String getHostName() {
-        return System.getenv("skaha.hostname");
+    public static String getSessionsHostName() {
+        return System.getenv("SKAHA_SESSIONS_HOSTNAME");
     }
 
     public static String getWorkloadNamespace() {

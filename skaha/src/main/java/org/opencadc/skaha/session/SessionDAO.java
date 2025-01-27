@@ -75,7 +75,7 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    protected static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
+    static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
             throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] sessionsCMD = SessionDAO.getSessionsCMD(k8sNamespace, forUserID, sessionID);
@@ -93,7 +93,7 @@ public class SessionDAO {
 
             String[] lines = sessionList.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession(line, topLevelDirectory);
+                Session session = SessionDAO.constructSession(K8SUtil.getSessionsHostName(), line, topLevelDirectory);
                 if (forUserID != null) {
                     // get expiry time
                     String uid = getUID(line);
@@ -325,7 +325,8 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    static Session constructSession(String k8sOutput, final String topLevelDirectory) throws IOException {
+    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
+            throws Exception {
         LOGGER.debug("line: " + k8sOutput);
         final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
 
@@ -341,22 +342,22 @@ public class SessionDAO {
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                 ? Session.STATUS_TERMINATING
                 : parts[allColumns.indexOf(CustomColumns.STATUS)];
-        final String host = K8SUtil.getHostName();
         final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
-            connectURL = SessionAction.getVNCURL(host, id);
+            connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            if (image.endsWith(":1.4")) {
-                // support alt web socket path for 1.4 carta
-                connectURL = SessionAction.getCartaURL(host, id, true);
-            } else {
-                connectURL = SessionAction.getCartaURL(host, id, false);
-            }
+            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
+                    .withAlternateSocket(image.endsWith(":1.4"))
+                    .build();
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
-            connectURL = SessionAction.getNotebookURL(host, id, userid, topLevelDirectory);
+            connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
+                    .withTopLevelDirectory(topLevelDirectory)
+                    .withUserName(userid)
+                    .build();
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
-            connectURL = SessionAction.getContributedURL(host, id);
+            connectURL =
+                    SessionURLBuilder.contributedSession(sessionHostName, id).build();
         } else {
             connectURL = "not-applicable";
         }
