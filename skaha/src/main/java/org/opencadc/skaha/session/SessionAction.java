@@ -112,30 +112,6 @@ public abstract class SessionAction extends SkahaAction {
         super();
     }
 
-    public static String getVNCURL(String host, String sessionID) {
-        // vnc.html does not...
-        return "https://" + host + "/session/desktop/" + sessionID + "/?password=" + sessionID
-                + "&path=session/desktop/" + sessionID + "/";
-    }
-
-    public static String getCartaURL(String host, String sessionID, boolean altSocketUrl) {
-        String url = "https://" + host + "/session/carta/http/" + sessionID + "/";
-        if (altSocketUrl) {
-            url = url + "?socketUrl=wss://" + host + "/session/carta/ws/" + sessionID + "/";
-        }
-        return url;
-    }
-
-    public static String getNotebookURL(String host, String sessionID, String userid, String skahaTLD) {
-        return String.format(
-                "https://%s/session/notebook/%s/lab/tree/%s/home/%s?token=%s",
-                host, sessionID, skahaTLD.replaceAll("/", ""), userid, sessionID);
-    }
-
-    public static String getContributedURL(String host, String sessionID) {
-        return "https://" + host + "/session/contrib/" + sessionID + "/";
-    }
-
     protected void initRequest() throws Exception {
         super.initRequest();
 

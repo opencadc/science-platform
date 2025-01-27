@@ -217,7 +217,7 @@ public class GetActionTests {
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession(line, this.skahaTld);
+                Session session = SessionDAO.constructSession("host.example.org", line, this.skahaTld);
                 sessions.add(session);
             }
             return sessions;
