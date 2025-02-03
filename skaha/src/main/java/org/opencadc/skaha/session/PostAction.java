@@ -111,6 +111,7 @@ public class PostAction extends SessionAction {
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
+    public static final String SKAHA_SESSIONS_HOSTNAME = "skaha.sessions.hostname";
     public static final String SKAHA_USERID = "skaha.userid";
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
@@ -605,7 +606,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
-                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSessionsHostName())
+                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
+                .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, getUsername())
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type)
@@ -662,8 +664,8 @@ public class PostAction extends SessionAction {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString = SessionJobBuilder.setConfigValue(
+                    ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
@@ -797,7 +799,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
-                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSessionsHostName())
+                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
+                .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, getUsername())
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
