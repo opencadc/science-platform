@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.2](https://github.com/opencadc/science-platform/compare/0.27.1...0.27.2) (2025-02-03)
+
+
+### Bug Fixes
+
+* correct hostnames for desktop and all areas ([3809f32](https://github.com/opencadc/science-platform/commit/3809f321a26fbf25ebef5592ce2084c7f44e7256))
+
 ## [0.27.1](https://github.com/opencadc/science-platform/compare/0.27.0...0.27.1) (2025-01-24)
 
 
