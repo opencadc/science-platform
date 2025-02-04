@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.3](https://github.com/opencadc/science-platform/compare/0.27.2...0.27.3) (2025-02-04)
+
+
+### Bug Fixes
+
+* re add the swagger documentation ([1911713](https://github.com/opencadc/science-platform/commit/19117136a0e38dae3724d76b2ad2bfa118f7d2c1))
+
 ## [0.27.2](https://github.com/opencadc/science-platform/compare/0.27.1...0.27.2) (2025-02-03)
 
 
