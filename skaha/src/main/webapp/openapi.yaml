@@ -1,0 +1,497 @@
+openapi: 3.0.0
+info:
+  version: 0.23.0
+  title: skaha
+  description: >
+    skaha API Documentation.  This API allows authorized users to create and
+    interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook
+    sessions in the skaha processing environment.  Desktop apps can also be
+    launched and attached to skaha desktop sessions through this
+    API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing
+    a bearer token in the Authorization header.<br/>2.  Using a client
+    certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The
+    main skaha github page with documentation and source code is
+    here:  https://github.com/opencadc/science-platform<br/><br/>Documentation
+    on using Skaha can be found
+    here:  https://www.opencadc.org/science-containers/
+paths:
+  /v0/session:
+    get:
+      description: >
+        List the sessions for the calling user, returned as a JSON
+        array.  Session attributes include:<br/><br/>Session ID<br/>User
+        ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect
+        URL<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and
+        'headless'.
+      tags:
+        - Session Management
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: type
+          in: query
+          description: Only show sessions of this type (desktop, notebook, carta, or
+            headless)
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Only show sessions with this status (Pending, Running, Terminating,
+            Succeeded, Error)
+          required: false
+          schema:
+            type: string
+        - name: view
+          in: query
+          description: Session list view level and stats.  If set to 'all', all users'
+            sessions are listed (with limited information), not just the calling
+            user's sessions. If set to 'stats', jobs and resources (cores and
+            ram) information is listed.
+          required: false
+          schema:
+            type: string
+    post:
+      description: >
+        Launch a new session.  Depending on the underlying image and system
+        state, sessions may take time for the system to download in
+        startup.  Normal initialization time to a running session is less than
+        10 seconds.  After a successful POST, the sessionID is returned in the
+        response body.
+      tags:
+        - Session Management
+      parameters:
+        - name: name
+          in: query
+          description: |
+            The name for the session (for user informational purposes only).
+          required: true
+          schema:
+            type: string
+        - name: image
+          in: query
+          description: |
+            The image ID of the session.  For example:
+            ```
+            images.canfar.net/skaha/notebook-scipy:0.2
+            ```
+          required: true
+          schema:
+            type: string
+        - name: cores
+          in: query
+          description: >
+            Request this many cores for the session.  This value must match a
+            value retruned from the /context endpoint.  The default value
+            returned from /context will be used if this parameter is not
+            provided.
+          required: false
+          schema:
+            type: string
+        - name: ram
+          in: query
+          description: >
+            Request this much RAM (GB) for the session.  This value must match a
+            value retruned from the /context endpoint.  The default value
+            returned from /context will be used if this parameter is not
+            provided.
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: >
+            For images that reside outside of the supported harbor registries,
+            the type parameter must be provided.  This requires additional
+            privileges.
+          required: false
+          schema:
+            type: string
+        - name: cmd
+          in: query
+          description: >
+            Only applies to session type 'headless'. Override the image
+            entrypoint with this command.
+          required: false
+          schema:
+            type: string
+        - name: args
+          in: query
+          description: >
+            Only applies to session type 'headless'. Override the image CMD
+            params with these values. Multiple arguments are separated with a
+            space. The value must be URL encoded. For example, "args=arg1 arg2"
+            is represented as "args=arg1%20arg2".
+          required: false
+          schema:
+            type: string
+        - name: env
+          in: query
+          description: >
+            Only applies to session type 'headless'. Add additional environment
+            to the container. Format is key=value. Multiple env parameters
+            supported. 'key=value' must be URL encoded, so, for example,
+            PATH=/usr/local/bin should be supplied as
+            PATH%3D%2Fusr%2Flocal%2Fbin.
+          required: false
+          schema:
+            type: string
+        - name: x-skaha-registry-auth
+          in: header
+          description: >
+            If the image is not in a supported harbor registry, the
+            x-registry-auth header must be provided.  This requires additional
+            privileges.  The value is a base64 encoded string from
+            "username:secret":
+
+            ```
+
+            $ echo -n "username:my-registry-secret" | base64 -i -
+
+            ```
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "400":
+          description: If the image is not found
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "404":
+          description: If the image ID format is incorrect
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+  "/v0/session/{sessionID}":
+    get:
+      description: |
+        Get the session identified by sessionID as a JSON object.
+      tags:
+        - Session Management
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "404":
+          description: Not found
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: sessionID
+          in: path
+          description: The session to get, returned in application/json format.
+          required: true
+          schema:
+            type: string
+        - name: view
+          in: query
+          description: If set to 'events', return the scheduling event logs.  If set to
+            'logs', return the container logs in text/plain format.  Responses
+            are in text/plain format.
+          required: false
+          schema:
+            type: string
+    post:
+      description: >
+        Applies an action to the session identified by sessionID.  This applies
+        to all session types. For a 'desktop' session, the action will apply to
+        the 'desktop' session as well as all of the 'desktop-app' that share the
+        same sessionID.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          description: The session on which to apply the action.
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: query
+          description: The action to be applied to the session. Currently the applicable
+            action is 'renew' which sets the session expiry time in
+            activeDeadlineseconds based on the configured expiry time in
+            skaha.sessionexpiry.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+    delete:
+      description: |
+        Delete the session identified by sessionID.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          description: The session to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+  "/session/{sessionID}/app":
+    get:
+      description: >
+        List the desktop apps for the calling user, returned as a JSON
+        array.  Desktop app attributes include:<br/><br/>Desktop Session
+        ID<br/>App ID<br/>User
+        ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect
+        URL<br/><br/>Valid type is 'desktop-app'.
+      tags:
+        - Session Management
+      parameters:
+        - name: status
+          in: query
+          description: Only show sessions with this status (Pending, Running, Terminating,
+            Succeeded, Error)
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+    post:
+      description: >
+        Attach a desktop-app to the session identified by sessionID.  This only
+        applies to sessions of type 'desktop'.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          description: The desktop session on which to attach the desktop-app
+          required: true
+          schema:
+            type: string
+        - name: image
+          in: query
+          description: The imageID of the desktop-app to attach
+          required: true
+          schema:
+            type: string
+        - name: cores
+          in: query
+          description: >
+            Request this many cores for the desktop app.  This value must match
+            a value retruned from the /context endpoint.  The default value
+            returned from /context will be used if this parameter is not
+            provided.
+          required: false
+          schema:
+            type: string
+        - name: ram
+          in: query
+          description: >
+            Request this much RAM (GB) for the desktop app.  This value must
+            match a value retruned from the /context endpoint.  The default
+            value returned from /context will be used if this parameter is not
+            provided.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+  "/session/{sessionID}/app/{appID}":
+    get:
+      description: |
+        Get the desktop app identified by sessionID and appID as a JSON object.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          description: Session ID of the desktop app.
+          required: true
+          schema:
+            type: string
+        - name: appID
+          in: path
+          description: ID of the desktop app to get, returned in application/json format.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "404":
+          description: Not found
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+    delete:
+      description: |
+        Delete the desktop app identified by sessionID and appID.
+      tags:
+        - Session Management
+      parameters:
+        - name: sessionID
+          in: path
+          description: Session ID of the desktop app to delete.
+          required: true
+          schema:
+            type: string
+        - name: appID
+          in: path
+          description: ID of the desktop app to delete.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+  /v0/image:
+    get:
+      description: >
+        List the images available for launching to the calling user, returned as
+        a JSON array.  Image attributes include:<br/><br/>Image ID<br/>Image
+        Type<br/>Digest (checksum)
+      tags:
+        - Images
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+      parameters:
+        - name: type
+          in: query
+          description: Only show images of this type (desktop, notebook, or carta)
+          required: false
+          schema:
+            type: string
+  /v0/context:
+    get:
+      description: >
+        List the CPU cores and Random Access Memory available for launching to
+        the calling user, returned as JSON objects.  The default values for both
+        cores and RAM are also returned.
+      tags:
+        - Resource Contexts
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+  /v0/repository:
+    get:
+      description: |
+        List the Image Repository hosts configured as a JSON Array.
+      tags:
+        - Harbor, Image, Repository
+      responses:
+        "200":
+          description: Successful response
+        "401":
+          description: Not authenticated
+        "403":
+          description: Permission denied
+        "500":
+          description: Internal error
+        "503":
+          description: Service busy
+        default:
+          description: Unexpected error
+servers:
+  - url: /skaha
