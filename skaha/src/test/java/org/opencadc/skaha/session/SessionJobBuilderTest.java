@@ -43,52 +43,9 @@ public class SessionJobBuilderTest {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
-    }
-
-    @Test
-    public void testWithWithoutSecret() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {
-            PostAction.SKAHA_SESSIONID,
-            PostAction.SKAHA_HOSTNAME,
-            PostAction.SKAHA_SESSIONTYPE,
-            PostAction.SKAHA_POSIXID
-        };
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
-        }
-
-        SessionJobBuilder testSubject =
-                SessionJobBuilder.fromPath(testBaseValuesPath).withParameters(parametersToReplaceValues);
-        String output = testSubject.build();
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
 
         V1Job job = (V1Job) Yaml.load(output);
         V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        Assert.assertNotNull("PodSpec should not be null", podSpec);
-        Assert.assertNull("PodSpec should not have image pull secrets", podSpec.getImagePullSecrets());
-
-        testSubject = SessionJobBuilder.fromPath(testBaseValuesPath).withParameters(parametersToReplaceValues);
-        output = testSubject.build();
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        job = (V1Job) Yaml.load(output);
-        podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
         Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
     }
