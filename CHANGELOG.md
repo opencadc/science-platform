@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.4](https://github.com/opencadc/science-platform/compare/0.27.3...0.27.4) (2025-02-06)
+
+
+### Bug Fixes
+
+* use java api to merge image pull secret if present or omit otherwise ([d5f3374](https://github.com/opencadc/science-platform/commit/d5f3374f70a5f4bf03dfd2335a9dad2549e83a40))
+
 ## [0.27.3](https://github.com/opencadc/science-platform/compare/0.27.2...0.27.3) (2025-02-04)
 
 
