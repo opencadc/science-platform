@@ -163,7 +163,6 @@ public abstract class SkahaAction extends RestAction {
 
         log.debug("skaha.hostname=" + K8SUtil.getSkahaHostName());
         log.debug("skaha.sessions.hostname=" + K8SUtil.getSessionsHostName());
-        log.debug("skaha.hostname=" + K8SUtil.getSkahaHostName());
         log.debug("skaha.homedir=" + homedir);
         log.debug("SKAHA_TLD=" + skahaTld);
         log.debug("skaha.scratchdir=" + scratchdir);

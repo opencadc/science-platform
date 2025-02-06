@@ -8,12 +8,9 @@ import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.util.Yaml;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -46,6 +43,11 @@ public class SessionJobBuilderTest {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
+
+        V1Job job = (V1Job) Yaml.load(output);
+        V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
     }
 
     @Test
@@ -76,24 +78,15 @@ public class SessionJobBuilderTest {
         }
 
         final V1Job job = (V1Job) Yaml.load(output);
-        final V1PodSpec podSpec = job.getSpec().getTemplate().getSpec();
-        final V1NodeAffinity nodeAffinity = podSpec.getAffinity().getNodeAffinity();
-
-        final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
-        final List<V1NodeSelectorRequirement> matchExpressions = nodeAffinity
-                .getRequiredDuringSchedulingIgnoredDuringExecution()
-                .getNodeSelectorTerms()
-                .get(0)
-                .getMatchExpressions();
-
-        if (matchExpressions != null) {
-            testMatchExpressions.addAll(matchExpressions);
-        }
+        final V1PodSpec podSpec =
+                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
 
         Assert.assertEquals(
                 "Wrong pull secret.",
                 "my-secret",
-                podSpec.getImagePullSecrets().get(0).getName());
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
 
         final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
         gpuRequirement.setKey("nvidia.com/gpu.count");
@@ -108,5 +101,23 @@ public class SessionJobBuilderTest {
         Assert.assertTrue(
                 "Missing provided (custom) required match expression.",
                 testMatchExpressions.contains(providedRequirement));
+    }
+
+    @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {
+        assert podSpec != null;
+        final V1NodeAffinity nodeAffinity =
+                Objects.requireNonNull(podSpec.getAffinity()).getNodeAffinity();
+
+        final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
+        final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
+                        Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
+                .getNodeSelectorTerms()
+                .get(0)
+                .getMatchExpressions();
+
+        if (matchExpressions != null) {
+            testMatchExpressions.addAll(matchExpressions);
+        }
+        return testMatchExpressions;
     }
 }

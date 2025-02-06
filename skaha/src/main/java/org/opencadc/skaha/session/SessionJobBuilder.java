@@ -1,8 +1,10 @@
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.openapi.models.V1Affinity;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1LocalObjectReference;
 import io.kubernetes.client.openapi.models.V1NodeAffinity;
 import io.kubernetes.client.openapi.models.V1NodeSelector;
 import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
@@ -21,17 +23,15 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 
-/**
- * Class to interface with Kubernetes.
- */
+/** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger log = Logger.getLogger(SessionJobBuilder.class);
     private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
-    private static final String SOFTWARE_IMAGESECRET = "software.imagesecret";
     private final Map<String, String> parameters = new HashMap<>();
     private Path jobFilePath;
     private boolean gpuEnabled;
     private Integer gpuCount;
+    private String imageRegistrySecretName;
 
     private SessionJobBuilder() {}
 
@@ -39,7 +39,7 @@ public class SessionJobBuilder {
      * Create a new builder from the provided path.
      *
      * @param jobFilePath The Path of the template file.
-     * @return SessionJobBuilder instance.  Never null.
+     * @return SessionJobBuilder instance. Never null.
      */
     static SessionJobBuilder fromPath(final Path jobFilePath) {
         final SessionJobBuilder sessionJobBuilder = new SessionJobBuilder();
@@ -111,7 +111,7 @@ public class SessionJobBuilder {
     /**
      * Build a single parameter into this builder's parameter map.
      *
-     * @param key   The key to find.
+     * @param key The key to find.
      * @param value The value to replace with.
      * @return This SessionJobBuilder, never null.
      */
@@ -122,11 +122,12 @@ public class SessionJobBuilder {
 
     /**
      * Use the provided Kubernetes secret to authenticate with the Image Registry to pull the Image.
-     * @param imageRegistrySecretName   String existing secret name.
-     * @return  This SessionJobBuilder, never null.
+     *
+     * @param imageRegistrySecretName String existing secret name.
+     * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withImageSecret(final String imageRegistrySecretName) {
-        this.withParameter(SessionJobBuilder.SOFTWARE_IMAGESECRET, imageRegistrySecretName);
+        this.imageRegistrySecretName = imageRegistrySecretName;
         return this;
     }
 
@@ -143,13 +144,20 @@ public class SessionJobBuilder {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return mergeAffinity(jobFileString);
+        return buildJob(jobFileString);
     }
 
-    private String mergeAffinity(final String jobFileString) throws IOException {
+    private String buildJob(final String jobFileString) throws IOException {
+        final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
+        mergeAffinity(launchJob);
+        mergeImagePullSecret(launchJob);
+
+        return Yaml.dump(launchJob);
+    }
+
+    private void mergeAffinity(final V1Job launchJob) {
         final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
         if (gpuAffinity != null) {
-            final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
             final V1JobSpec podTemplate = launchJob.getSpec();
             if (podTemplate != null) {
                 // spec.template.spec
@@ -232,11 +240,23 @@ public class SessionJobBuilder {
                     }
                 }
             }
-
-            return Yaml.dump(launchJob);
         }
+    }
 
-        return jobFileString;
+    private void mergeImagePullSecret(final V1Job launchJob) {
+        final V1JobSpec podTemplate = launchJob.getSpec();
+        if (podTemplate != null && StringUtil.hasText(this.imageRegistrySecretName)) {
+            final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
+            if (podTemplateSpec != null) {
+                final List<V1LocalObjectReference> imagePullSecrets = podTemplateSpec.getImagePullSecrets();
+                if (imagePullSecrets == null) {
+                    podTemplateSpec.setImagePullSecrets(
+                            Collections.singletonList(new V1LocalObjectReference().name(this.imageRegistrySecretName)));
+                } else {
+                    imagePullSecrets.add(new V1LocalObjectReference().name(this.imageRegistrySecretName));
+                }
+            }
+        }
     }
 
     private V1Affinity getGPUSchedulingAffinity() {
