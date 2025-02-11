@@ -122,6 +122,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
+    public static final String SKAHA_JOBUID = "skaha.jobuid";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -618,15 +619,17 @@ public class PostAction extends SessionAction {
             log.debug("Create service result: " + createResult);
         }
 
+        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
+        // API is in place, we can swap this out with a proper Java client API.
         if (type.supportsIngress()) {
             final Job job = CommandExecutioner.getJob(jobName);
             byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, sessionID);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, job.getName());
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, "skaha.jobuid", job.getUID());
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, job.getUID());
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, job.getName());
             jsonLaunchFile = super.stageFile(ingressString);
             final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
