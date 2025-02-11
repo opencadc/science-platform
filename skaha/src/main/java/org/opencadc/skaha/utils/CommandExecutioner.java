@@ -14,7 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
+import org.opencadc.skaha.Job;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 
 public class CommandExecutioner {
@@ -183,5 +185,38 @@ public class CommandExecutioner {
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {
         String[] chown = new String[] {"chown", posixId + ":" + groupId, path};
         CommandExecutioner.execute(chown);
+    }
+
+    /**
+     * Get the UID of a job by name.
+     *
+     * @param jobName The job to look up.
+     * @return Job instance.
+     * @throws IOException If there is an error executing the command.
+     * @throws InterruptedException If the command is interrupted.
+     */
+    public static Job getJob(String jobName) throws IOException, InterruptedException {
+        final String[] getJobCommand = CommandExecutioner.getJobCommand(jobName, K8SUtil.getWorkloadNamespace());
+        final StringBuilder output = new StringBuilder(CommandExecutioner.execute(getJobCommand));
+
+        if (output.toString().startsWith("'")) {
+            output.deleteCharAt(0);
+        }
+
+        if (output.toString().endsWith("'")) {
+            output.deleteCharAt(output.length() - 1);
+        }
+
+        final String[] parts = output.toString().split("\t");
+        return new Job(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
+    }
+
+    static String[] getJobCommand(final String jobName, final String namespace) {
+        return KubectlCommandBuilder.command("get")
+                .namespace(namespace)
+                .option("job", jobName)
+                .outputFormat(
+                        "jsonpath='{.metadata.uid}{\"\\t\"}{.metadata.labels.canfar-net-sessionID}{\"\\t\"}{.metadata.labels.canfar-net-sessionType}'")
+                .build();
     }
 }
