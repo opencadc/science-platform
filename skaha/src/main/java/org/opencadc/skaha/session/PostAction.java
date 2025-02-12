@@ -111,6 +111,7 @@ public class PostAction extends SessionAction {
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
+    public static final String SKAHA_SESSIONS_HOSTNAME = "skaha.sessions.hostname";
     public static final String SKAHA_USERID = "skaha.userid";
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
@@ -132,7 +133,6 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
-    public static final String DEFAULT_SOFTWARE_IMAGESECRET_VALUE = "notused";
 
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
@@ -584,29 +584,18 @@ public class PostAction extends SessionAction {
 
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
-
-        final String imageRegistrySecretName;
-        // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
-        // caught a non-existent Image already.
-        if (getPublicImage(image) == null) {
-            final ImageRepositoryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
-            imageRegistrySecretName = createRegistryImageSecret(userRegistryAuth);
-        } else {
-            imageRegistrySecretName = PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE;
-        }
-
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
-                .withImageSecret(imageRegistrySecretName)
                 .withQueue(QueueConfiguration.fromType(type)) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
-                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSessionsHostName())
+                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
+                .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, getUsername())
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type)
@@ -618,13 +607,20 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
-
-        sessionJobBuilder = sessionJobBuilder.withParameter(
-                PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(
+                        PostAction.SKAHA_SUPPLEMENTALGROUPS,
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
+        }
+
+        // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
+        // caught a non-existent Image already.
+        if (getPublicImage(image) == null) {
+            final ImageRepositoryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
+            sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
         }
 
         String jobLaunchString = sessionJobBuilder.build();
@@ -663,8 +659,8 @@ public class PostAction extends SessionAction {
             byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, SKAHA_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString = SessionJobBuilder.setConfigValue(
+                    ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
             jsonLaunchFile = super.stageFile(ingressString);
             launchCmd = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
@@ -796,11 +792,11 @@ public class PostAction extends SessionAction {
         final SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
-                .withImageSecret(PostAction.DEFAULT_SOFTWARE_IMAGESECRET_VALUE)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
-                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSessionsHostName())
+                .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
+                .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, getUsername())
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)

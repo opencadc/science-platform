@@ -161,7 +161,8 @@ public abstract class SkahaAction extends RestAction {
 
         final String configuredPosixMapperResourceID = K8SUtil.getPosixMapperResourceId();
 
-        log.debug("skaha.hostname=" + K8SUtil.getSessionsHostName());
+        log.debug("skaha.hostname=" + K8SUtil.getSkahaHostName());
+        log.debug("skaha.sessions.hostname=" + K8SUtil.getSessionsHostName());
         log.debug("skaha.homedir=" + homedir);
         log.debug("SKAHA_TLD=" + skahaTld);
         log.debug("skaha.scratchdir=" + scratchdir);

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.27.4](https://github.com/opencadc/science-platform/compare/0.27.3...0.27.4) (2025-02-06)
+
+
+### Bug Fixes
+
+* use java api to merge image pull secret if present or omit otherwise ([d5f3374](https://github.com/opencadc/science-platform/commit/d5f3374f70a5f4bf03dfd2335a9dad2549e83a40))
+
+## [0.27.3](https://github.com/opencadc/science-platform/compare/0.27.2...0.27.3) (2025-02-04)
+
+
+### Bug Fixes
+
+* re add the swagger documentation ([1911713](https://github.com/opencadc/science-platform/commit/19117136a0e38dae3724d76b2ad2bfa118f7d2c1))
+
+## [0.27.2](https://github.com/opencadc/science-platform/compare/0.27.1...0.27.2) (2025-02-03)
+
+
+### Bug Fixes
+
+* correct hostnames for desktop and all areas ([3809f32](https://github.com/opencadc/science-platform/commit/3809f321a26fbf25ebef5592ce2084c7f44e7256))
+
 ## [0.27.1](https://github.com/opencadc/science-platform/compare/0.27.0...0.27.1) (2025-01-24)
 
 

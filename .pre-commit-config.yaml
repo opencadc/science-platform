@@ -1,6 +1,11 @@
 # Pre-Commit Configuration File: https://pre-commit.com
 ---
-exclude: ^deployment/
+exclude: |
+  (?x)(
+    ^deployment/
+    |^skaha/src/obselete/
+    |^skaha/src/main/webapp/swagger-ui/
+  )
 repos:
   # Commitizen Configuration
   # This configuration will add commitizen to your pre-commit hooks and will run it on commit-msg stage

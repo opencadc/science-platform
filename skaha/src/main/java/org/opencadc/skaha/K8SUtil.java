@@ -79,6 +79,10 @@ public class K8SUtil {
         return System.getenv("SKAHA_SESSIONS_HOSTNAME");
     }
 
+    public static String getSkahaHostName() {
+        return System.getenv("SKAHA_HOSTNAME");
+    }
+
     public static String getWorkloadNamespace() {
         return System.getenv("skaha.namespace");
     }
