@@ -14,8 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
-import org.opencadc.skaha.Job;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 
@@ -195,20 +195,12 @@ public class CommandExecutioner {
      * @throws IOException If there is an error executing the command.
      * @throws InterruptedException If the command is interrupted.
      */
-    public static Job getJob(String jobName) throws IOException, InterruptedException {
+    public static KubernetesJob getJob(String jobName) throws IOException, InterruptedException {
         final String[] getJobCommand = CommandExecutioner.getJobCommand(jobName, K8SUtil.getWorkloadNamespace());
-        final StringBuilder output = new StringBuilder(CommandExecutioner.execute(getJobCommand));
-
-        if (output.toString().startsWith("'")) {
-            output.deleteCharAt(0);
-        }
-
-        if (output.toString().endsWith("'")) {
-            output.deleteCharAt(output.length() - 1);
-        }
-
-        final String[] parts = output.toString().split("\t");
-        return new Job(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
+        final String[] parts = CommandExecutioner.execute(getJobCommand)
+                .replaceAll("^'|'$", "")
+                .split("\t");
+        return new KubernetesJob(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
     }
 
     static String[] getJobCommand(final String jobName, final String namespace) {

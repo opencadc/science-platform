@@ -3,7 +3,7 @@
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2019.                            (c) 2019.
+ *  (c) 2025.                            (c) 2025.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -64,140 +64,43 @@
  *
  ************************************************************************
  */
-
 package org.opencadc.skaha;
 
-import java.util.List;
-import org.apache.log4j.Logger;
-
-public class K8SUtil {
-
-    static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
-
-    private static final Logger log = Logger.getLogger(K8SUtil.class);
-
-    public static String getSessionsHostName() {
-        return System.getenv("SKAHA_SESSIONS_HOSTNAME");
-    }
-
-    public static String getSkahaHostName() {
-        return System.getenv("SKAHA_HOSTNAME");
-    }
-
-    public static String getWorkloadNamespace() {
-        return System.getenv("skaha.namespace");
-    }
+/** Simple class to represent a Kubernetes Job. This is just a clean way to encompass elements that it has access to. */
+public class KubernetesJob {
+    private final String name;
+    private final String uid;
+    private final String sessionID;
+    private final SessionType sessionType;
 
     /**
-     * Filter out anything not in the alphanumeric or hyphen character set.
+     * Constructor for a Job. Can be created from a single call to kubectl.
      *
-     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object
-     *     names</a>
-     * @param sessionID The provided session ID.
-     * @param type The defined type (desktop, notebook, etc.)
-     * @param userID The running User's ID.
-     * @return String sanitized name. Never null.
+     * @param name Name of the job
+     * @param uid Unique ID of the job
+     * @param sessionID Unique Session ID, provided by Skaha
+     * @param sessionType Session Type provided by the user
      */
-    public static String getJobName(String sessionID, SessionType type, String userID) {
-        // Replace values that are NOT alphanumeric or a hyphen.
-        final String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
-        return ("skaha-" + type.name().toLowerCase() + "-" + userJobID + "-" + sessionID).toLowerCase();
+    public KubernetesJob(final String name, final String uid, final String sessionID, final SessionType sessionType) {
+        this.name = name;
+        this.uid = uid;
+        this.sessionID = sessionID;
+        this.sessionType = sessionType;
     }
 
-    public static String getHomeDir() {
-        return System.getenv("skaha.homedir");
+    public SessionType getSessionType() {
+        return sessionType;
     }
 
-    public static String getScratchDir() {
-        return System.getenv("skaha.scratchdir");
+    public String getSessionID() {
+        return sessionID;
     }
 
-    public static String getSessionExpiry() {
-        return System.getenv("skaha.sessionexpiry");
+    public String getName() {
+        return name;
     }
 
-    /**
-     * Obtain the configured default quota size in Gigabytes.
-     *
-     * @return integer in GB.
-     */
-    public static String getDefaultQuota() {
-        return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
-    }
-
-    public static String getPreAuthorizedTokenSecretName() {
-        return "pre-auth-token-skaha";
-    }
-
-    public static String getSkahaTld() {
-        return System.getenv("SKAHA_TLD");
-    }
-
-    public static boolean isGpuEnabled() {
-        return Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
-    }
-
-    public static List<String> getHarborHosts() {
-        String rawHosts = System.getenv("skaha.harborhosts");
-        if (rawHosts == null) {
-            log.warn("No harbor hosts configured.");
-            return List.of();
-        }
-
-        return List.of(rawHosts.split(","));
-    }
-
-    public static String getSkahaUsersGroup() {
-        return System.getenv("skaha.usersgroup");
-    }
-
-    public static String getSkahaAdminsGroup() {
-        return System.getenv("skaha.adminsgroup");
-    }
-
-    public static String getSkahaHeadlessGroup() {
-        return System.getenv("skaha.headlessgroup");
-    }
-
-    public static String getSkahaHeadlessPriorityGroup() {
-        return System.getenv("skaha.headlessprioritygroup");
-    }
-
-    public static String getSkahaHeadlessPriorityClass() {
-        return System.getenv("skaha.headlesspriortyclass");
-    }
-
-    public static Integer getMaxUserSessions() {
-        String noOfSessions = System.getenv("skaha.maxusersessions");
-        if (noOfSessions == null) {
-            log.warn("no max user sessions value configured.");
-            return 1;
-        }
-        return Integer.parseInt(noOfSessions);
-    }
-
-    public static String getPosixCacheUrl(String packageName) {
-        return System.getProperty(packageName + ".posixCache.url");
-    }
-
-    public static String getPosixMapperResourceId() {
-        return System.getenv("skaha.posixmapper.resourceid");
-    }
-
-    public static String getRedisHost() {
-        return System.getenv("REDIS_HOST");
-    }
-
-    public static String getRedisPort() {
-        return System.getenv("REDIS_PORT");
-    }
-
-    /**
-     * Obtain the working directory for the current process.
-     *
-     * @return String working directory from Java's System properties.
-     */
-    public static String getWorkingDirectory() {
-        return System.getProperty("user.home");
+    public String getUID() {
+        return uid;
     }
 }

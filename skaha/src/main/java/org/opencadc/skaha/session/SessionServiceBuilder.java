@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.opencadc.skaha.Job;
+import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 
 /**
@@ -29,14 +29,14 @@ public class SessionServiceBuilder {
     private static final String RUN_LABEL_KEY = "run";
     private static final String SELECTOR_KEY = "canfar-net-sessionID";
 
-    private final Job job;
+    private final KubernetesJob kubernetesJob;
 
-    public SessionServiceBuilder(final Job job) {
-        this.job = Objects.requireNonNull(job);
+    public SessionServiceBuilder(final KubernetesJob kubernetesJob) {
+        this.kubernetesJob = Objects.requireNonNull(kubernetesJob, "KubernetesJob cannot be null.");
     }
 
     public String build() throws IOException {
-        final SessionType sessionType = this.job.getSessionType();
+        final SessionType sessionType = this.kubernetesJob.getSessionType();
         final V1Service service = loadService();
         if (service == null) {
             throw new IOException("Service configuration not found for session type: " + sessionType);
@@ -45,26 +45,21 @@ public class SessionServiceBuilder {
             if (metadata == null) {
                 throw new IOException("Service metadata not found for session type: " + sessionType);
             } else {
-                final String serviceName = sessionType.getServiceName(this.job.getSessionID());
+                final String serviceName = sessionType.getServiceName(this.kubernetesJob.getSessionID());
                 metadata.setName(serviceName);
-                final Map<String, String> labels;
-                if (metadata.getLabels() == null) {
-                    labels = new HashMap<>();
-                } else {
-                    labels = metadata.getLabels();
-                }
-
+                final Map<String, String> labels = Objects.requireNonNullElse(metadata.getLabels(), new HashMap<>());
                 labels.put(SessionServiceBuilder.RUN_LABEL_KEY, serviceName);
 
                 final V1OwnerReference ownerReference;
-                final List<V1OwnerReference> ownerReferences = metadata.getOwnerReferences();
-                if (ownerReferences == null || ownerReferences.isEmpty()) {
+                final List<V1OwnerReference> ownerReferences =
+                        Objects.requireNonNullElse(metadata.getOwnerReferences(), List.of());
+                if (ownerReferences.isEmpty()) {
                     ownerReference = new V1OwnerReference();
                 } else {
                     ownerReference = ownerReferences.get(0);
                 }
-                ownerReference.name(this.job.getName());
-                ownerReference.uid(this.job.getUID());
+                ownerReference.name(this.kubernetesJob.getName());
+                ownerReference.uid(this.kubernetesJob.getUID());
 
                 final V1ServiceSpec spec;
                 if (service.getSpec() == null) {
@@ -73,14 +68,9 @@ public class SessionServiceBuilder {
                     spec = service.getSpec();
                 }
 
-                final Map<String, String> selector;
-                if (spec.getSelector() == null) {
-                    selector = new HashMap<>();
-                } else {
-                    selector = spec.getSelector();
-                }
+                final Map<String, String> selector = Objects.requireNonNullElse(spec.getSelector(), new HashMap<>());
 
-                selector.put(SessionServiceBuilder.SELECTOR_KEY, this.job.getSessionID());
+                selector.put(SessionServiceBuilder.SELECTOR_KEY, this.kubernetesJob.getSessionID());
                 spec.selector(selector);
             }
         }
@@ -89,7 +79,7 @@ public class SessionServiceBuilder {
     }
 
     V1Service loadService() throws IOException {
-        return (V1Service)
-                Yaml.load(this.job.getSessionType().getServiceConfigPath().toFile());
+        return (V1Service) Yaml.load(
+                this.kubernetesJob.getSessionType().getServiceConfigPath().toFile());
     }
 }

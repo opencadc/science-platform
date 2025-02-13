@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.util.Objects;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.skaha.Job;
+import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 
 public class SessionServiceBuilderTest {
@@ -22,8 +22,8 @@ public class SessionServiceBuilderTest {
             // NullPointerException expected
         }
 
-        final Job job = new Job("name", "uid", "my-sessionID", SessionType.CARTA);
-        final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(job) {
+        final KubernetesJob kubernetesJob = new KubernetesJob("name", "uid", "my-sessionID", SessionType.CARTA);
+        final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(kubernetesJob) {
             @Override
             V1Service loadService() throws IOException {
                 final File file =

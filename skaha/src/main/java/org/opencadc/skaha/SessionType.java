@@ -38,17 +38,20 @@ public enum SessionType {
 
     public Path getIngressConfigPath() {
         return Path.of(String.format(
-                "%s/config/ingress-%s.yaml", K8SUtil.getUserHome(), this.name().toLowerCase()));
+                "%s/config/ingress-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
     public Path getServiceConfigPath() {
         return Path.of(String.format(
-                "%s/config/service-%s.yaml", K8SUtil.getUserHome(), this.name().toLowerCase()));
+                "%s/config/service-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
     public Path getJobConfigPath() {
         return Path.of(String.format(
-                "%s/config/launch-%s.yaml", K8SUtil.getUserHome(), this.name().toLowerCase()));
+                "%s/config/launch-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
     public String getServiceName(final String sessionID) {

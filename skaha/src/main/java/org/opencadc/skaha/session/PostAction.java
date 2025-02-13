@@ -90,8 +90,8 @@ import org.apache.log4j.Logger;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.Job;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
@@ -198,7 +198,7 @@ public class PostAction extends SessionAction {
 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkExistingSessions(posixPrincipal.username, validatedType);
+                checkExistingSessions(validatedType);
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
@@ -509,10 +509,10 @@ public class PostAction extends SessionAction {
         return SessionType.fromApplicationStringType(validatedType);
     }
 
-    public void checkExistingSessions(String userid, SessionType type) throws Exception {
+    public void checkExistingSessions(SessionType type) throws Exception {
         // multiple
         if (!type.isHeadless()) {
-            List<Session> sessions = super.getAllSessions(userid);
+            List<Session> sessions = super.getAllSessions(posixPrincipal.username);
             int count = 0;
             for (Session session : sessions) {
                 log.debug("checking session: " + session);
@@ -608,8 +608,8 @@ public class PostAction extends SessionAction {
         log.debug("Create job result: " + createResult);
 
         if (type.supportsService()) {
-            final Job job = CommandExecutioner.getJob(jobName);
-            final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(job);
+            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
+            final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(kubernetesJob);
             jsonLaunchFile = super.stageFile(sessionServiceBuilder.build());
             final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
@@ -622,14 +622,16 @@ public class PostAction extends SessionAction {
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
         if (type.supportsIngress()) {
-            final Job job = CommandExecutioner.getJob(jobName);
+            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
             byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, job.getUID());
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, job.getName());
+            ingressString =
+                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+            ingressString =
+                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
             jsonLaunchFile = super.stageFile(ingressString);
             final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
@@ -756,7 +758,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
+        final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
