@@ -91,6 +91,8 @@ import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.KubernetesJob;
+import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
@@ -120,6 +122,7 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
+    public static final String SKAHA_JOBUID = "skaha.jobuid";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -158,7 +161,6 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
 
-        final String validatedType;
         ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
@@ -176,7 +178,7 @@ public class PostAction extends SessionAction {
                 final String type =
                         StringUtil.hasText(requestedType) ? requestedType : PostAction.SESSION_TYPE_HEADLESS;
 
-                validatedType = validateImage(image, type);
+                final SessionType validatedType = validateImage(image, type);
                 Integer cores = getCoresParam();
                 if (cores == null) {
                     cores = rc.getDefaultCores(validatedType);
@@ -196,7 +198,7 @@ public class PostAction extends SessionAction {
 
                 // check for no existing session for this user
                 // (rule: only 1 session of same type per user allowed)
-                checkExistingSessions(posixPrincipal.username, validatedType);
+                checkExistingSessions(validatedType);
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
@@ -464,7 +466,7 @@ public class PostAction extends SessionAction {
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
      * @throws Exception If Harbor calls fail
      */
-    private String validateImage(String imageID, String type) throws Exception {
+    private SessionType validateImage(String imageID, String type) throws Exception {
         if (!StringUtil.hasText(imageID)) {
             throw new IllegalArgumentException("image is required");
         }
@@ -504,36 +506,35 @@ public class PostAction extends SessionAction {
             }
         }
 
-        return validatedType;
+        return SessionType.fromApplicationStringType(validatedType);
     }
 
-    public void checkExistingSessions(String userid, String type) throws Exception {
+    public void checkExistingSessions(SessionType type) throws Exception {
         // multiple
-        if (SESSION_TYPE_HEADLESS.equals(type)) {
-            return;
-        }
-        List<Session> sessions = super.getAllSessions(userid);
-        int count = 0;
-        for (Session session : sessions) {
-            log.debug("checking session: " + session);
-            if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())
-                    && !TYPE_DESKTOP_APP.equals(session.getType())) {
-                final String status = session.getStatus();
-                if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
-                        || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
-                    count++;
+        if (!type.isHeadless()) {
+            List<Session> sessions = super.getAllSessions(posixPrincipal.username);
+            int count = 0;
+            for (Session session : sessions) {
+                log.debug("checking session: " + session);
+                if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())
+                        && !TYPE_DESKTOP_APP.equals(session.getType())) {
+                    final String status = session.getStatus();
+                    if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
+                            || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                        count++;
+                    }
                 }
             }
-        }
-        log.debug("active interactive sessions: " + count);
-        if (count >= maxUserSessions) {
-            throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of "
-                    + maxUserSessions + " active sessions.");
+            log.debug("active interactive sessions: " + count);
+            if (count >= maxUserSessions) {
+                throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of "
+                        + maxUserSessions + " active sessions.");
+            }
         }
     }
 
     public void createSession(
-            String type,
+            SessionType type,
             String image,
             String name,
             Integer cores,
@@ -547,47 +548,12 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
-        final String jobLaunchPath;
-        final String servicePath;
-        final String ingressPath;
-        String userHome = K8SUtil.getUserHome();
-        switch (type) {
-            case SessionAction.SESSION_TYPE_DESKTOP:
-                jobLaunchPath = userHome + "/config/launch-desktop.yaml";
-                servicePath = userHome + "/config/service-desktop.yaml";
-                ingressPath = userHome + "/config/ingress-desktop.yaml";
-                break;
-            case SessionAction.SESSION_TYPE_CARTA:
-                jobLaunchPath = userHome + "/config/launch-carta.yaml";
-                servicePath = userHome + "/config/service-carta.yaml";
-                ingressPath = userHome + "/config/ingress-carta.yaml";
-                break;
-            case SessionAction.SESSION_TYPE_NOTEBOOK:
-                jobLaunchPath = userHome + "/config/launch-notebook.yaml";
-                servicePath = userHome + "/config/service-notebook.yaml";
-                ingressPath = userHome + "/config/ingress-notebook.yaml";
-                break;
-            case SessionAction.SESSION_TYPE_CONTRIB:
-                jobLaunchPath = userHome + "/config/launch-contributed.yaml";
-                servicePath = userHome + "/config/service-contributed.yaml";
-                ingressPath = userHome + "/config/ingress-contributed.yaml";
-                break;
-            case SessionAction.SESSION_TYPE_HEADLESS:
-                validateHeadlessMembership();
-                jobLaunchPath = userHome + "/config/launch-headless.yaml";
-                servicePath = null;
-                ingressPath = null;
-                break;
-            default:
-                throw new IllegalStateException("Bug: unknown session type: " + type);
-        }
-
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
 
         String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(jobLaunchPath))
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
@@ -598,7 +564,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, getUsername())
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
-                .withParameter(PostAction.SKAHA_SESSIONTYPE, type)
+                .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
@@ -612,7 +578,7 @@ public class PostAction extends SessionAction {
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
-        if (type.equals(SessionAction.SESSION_TYPE_DESKTOP)) {
+        if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         }
 
@@ -635,37 +601,42 @@ public class PostAction extends SessionAction {
 
         final String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
-        KubectlCommandBuilder.KubectlCommand launchCmd =
+        final KubectlCommandBuilder.KubectlCommand launchCmd =
                 KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-
         String createResult = CommandExecutioner.execute(launchCmd.build());
 
         log.debug("Create job result: " + createResult);
 
-        if (servicePath != null) {
-            byte[] serviceBytes = Files.readAllBytes(Paths.get(servicePath));
-            String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
-            serviceString = SessionJobBuilder.setConfigValue(serviceString, SKAHA_SESSIONID, sessionID);
-            jsonLaunchFile = super.stageFile(serviceString);
-            launchCmd = KubectlCommandBuilder.command("create")
+        if (type.supportsService()) {
+            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
+            final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(kubernetesJob);
+            jsonLaunchFile = super.stageFile(sessionServiceBuilder.build());
+            final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(launchCmd.build());
+            createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
 
             log.debug("Create service result: " + createResult);
         }
 
-        if (ingressPath != null) {
-            byte[] ingressBytes = Files.readAllBytes(Paths.get(ingressPath));
+        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
+        // API is in place, we can swap this out with a proper Java client API.
+        if (type.supportsIngress()) {
+            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
+            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, SKAHA_SESSIONID, sessionID);
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString =
+                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+            ingressString =
+                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
             jsonLaunchFile = super.stageFile(ingressString);
-            launchCmd = KubectlCommandBuilder.command("create")
+            final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(launchCmd.build());
+            createResult = CommandExecutioner.execute(ingressLaunchCommand.build());
 
             log.debug("Create ingress result: " + createResult);
         }
@@ -787,7 +758,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String launchSoftwarePath = K8SUtil.getUserHome() + "/config/launch-desktop-app.yaml";
+        final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
