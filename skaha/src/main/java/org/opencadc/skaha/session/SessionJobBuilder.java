@@ -167,9 +167,9 @@ public class SessionJobBuilder {
 
     private String buildJob(final String jobFileString) throws IOException {
         final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
+        mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
-        mergeQueue(launchJob);
 
         return Yaml.dump(launchJob);
     }

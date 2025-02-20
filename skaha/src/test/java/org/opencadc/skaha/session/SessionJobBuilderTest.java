@@ -52,8 +52,7 @@ public class SessionJobBuilderTest {
         Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
     }
 
-    @Test
-    public void testWithAffinityMerging() throws Exception {
+    private V1Job getTestBaseValuesAffinityJob() throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
@@ -79,7 +78,12 @@ public class SessionJobBuilderTest {
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
 
-        final V1Job job = (V1Job) Yaml.load(output);
+        return (V1Job) Yaml.load(output);
+    }
+
+    @Test
+    public void testWithAffinityMerging() throws Exception {
+        final V1Job job = getTestBaseValuesAffinityJob();
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
