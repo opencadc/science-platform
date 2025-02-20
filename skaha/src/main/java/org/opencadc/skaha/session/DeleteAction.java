@@ -69,10 +69,10 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.IOException;
 import java.security.AccessControlException;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
@@ -114,8 +114,8 @@ public class DeleteAction extends SessionAction {
                     // want to ignore them as we pick the session to be deleted.
                     for (String line : lines) {
                         String[] parts = line.split("\\s+");
-                        String type = parts[0];
-                        if (!TYPE_DESKTOP_APP.equals(type)) {
+                        SessionType type = SessionType.fromApplicationStringType(parts[0]);
+                        if (SessionType.DESKTOP_APP != type) {
                             String sessionUserId = parts[1];
                             if (!posixPrincipal.username.equals(sessionUserId)) {
                                 throw new AccessControlException("forbidden");
@@ -133,16 +133,16 @@ public class DeleteAction extends SessionAction {
         }
 
         if (requestType.equals(REQUEST_TYPE_APP)) {
-            deleteSession(posixPrincipal.username, TYPE_DESKTOP_APP, sessionID);
+            deleteSession(posixPrincipal.username, SessionType.DESKTOP_APP, sessionID);
         }
     }
 
-    public void deleteSession(String userID, String type, String sessionID) throws Exception {
+    public void deleteSession(String userID, SessionType type, String sessionID) throws Exception {
         // kill the session specified by sessionID
         log.debug("Stopping " + type + " session: " + sessionID);
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
 
-        if (TYPE_DESKTOP_APP.equalsIgnoreCase(type)) {
+        if (SessionType.DESKTOP_APP == type) {
             // deleting a desktop-app
             if (StringUtil.hasText(appID)) {
                 log.debug("appID " + appID);
@@ -161,20 +161,15 @@ public class DeleteAction extends SessionAction {
             String jobName = K8SUtil.getJobName(sessionID, type, userID);
             delete(k8sNamespace, "job", jobName);
 
-            if (!SESSION_TYPE_HEADLESS.equals(type)) {
-                String ingressName = K8SUtil.getIngressName(sessionID, type);
-                delete(k8sNamespace, "ingressroute", ingressName);
-
-                String serviceName = K8SUtil.getServiceName(sessionID, type);
-                delete(k8sNamespace, "service", serviceName);
-
-                String middlewareName = K8SUtil.getMiddlewareName(sessionID, type);
-                delete(k8sNamespace, "middleware", middlewareName);
+            if (!type.isHeadless()) {
+                delete(k8sNamespace, "ingressroute", type.getIngressName(sessionID));
+                delete(k8sNamespace, "service", type.getServiceName(sessionID));
+                delete(k8sNamespace, "middleware", type.getMiddlewareName(sessionID));
             }
         }
     }
 
-    private void delete(String k8sNamespace, String type, String name) throws InterruptedException, IOException {
+    private void delete(String k8sNamespace, String type, String name) {
         try {
             String[] delete = KubectlCommandBuilder.command("delete")
                     .namespace(k8sNamespace)

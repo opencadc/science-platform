@@ -12,7 +12,7 @@ metadata:
 spec:
   parallelism: 1
   completions: 1
-  activeDeadlineSeconds: 3600
+  activeDeadlineSeconds: 86400
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
@@ -26,8 +26,6 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: OnFailure
-      imagePullSecrets:
-        - name: "${software.imagesecret}"
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
@@ -76,6 +74,15 @@ spec:
         args:
         - ${skaha.sessionid}
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1"
+            ephemeral-storage: "10Gi"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+            ephemeral-storage: "100Gi"
         ports:
         - containerPort: 8888
           protocol: TCP

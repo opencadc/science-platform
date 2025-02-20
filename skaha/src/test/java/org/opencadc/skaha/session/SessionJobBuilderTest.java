@@ -45,6 +45,11 @@ public class SessionJobBuilderTest {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
+
+        V1Job job = (V1Job) Yaml.load(output);
+        V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
     }
 
     @Test
@@ -77,9 +82,8 @@ public class SessionJobBuilderTest {
         final V1Job job = (V1Job) Yaml.load(output);
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        assert podSpec != null;
-        final List<V1NodeSelectorRequirement> testMatchExpressions =
-                SessionJobBuilderTest.getV1NodeSelectorRequirements(podSpec);
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
 
         Assert.assertEquals(
                 "Wrong pull secret.",
@@ -96,52 +100,6 @@ public class SessionJobBuilderTest {
         providedRequirement.setOperator("Exists");
 
         Assert.assertTrue("Missing GPU required match expression.", testMatchExpressions.contains(gpuRequirement));
-        Assert.assertTrue(
-                "Missing provided (custom) required match expression.",
-                testMatchExpressions.contains(providedRequirement));
-    }
-
-    @Test
-    public void testWithAffinityMergingWithNoGPU() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
-        }
-
-        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withImageSecret("my-secret");
-        final String output = testSubject.build();
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        final V1Job job = (V1Job) Yaml.load(output);
-        final V1PodSpec podSpec =
-                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        assert podSpec != null;
-        final List<V1NodeSelectorRequirement> testMatchExpressions =
-                SessionJobBuilderTest.getV1NodeSelectorRequirements(podSpec);
-
-        Assert.assertEquals(
-                "Wrong pull secret.",
-                "my-secret",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
-
-        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
-        providedRequirement.setKey("my-node-please");
-        providedRequirement.setOperator("Exists");
-
         Assert.assertTrue(
                 "Missing provided (custom) required match expression.",
                 testMatchExpressions.contains(providedRequirement));
@@ -188,13 +146,14 @@ public class SessionJobBuilderTest {
     }
 
     @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {
+        assert podSpec != null;
         final V1NodeAffinity nodeAffinity =
                 Objects.requireNonNull(podSpec.getAffinity()).getNodeAffinity();
 
         final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
         assert nodeAffinity != null;
         final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
-                        nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution())
+                        Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
                 .get(0)
                 .getMatchExpressions();

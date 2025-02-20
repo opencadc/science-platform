@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.27.5](https://github.com/opencadc/science-platform/compare/0.27.4...0.27.5) (2025-02-13)
+
+
+### Bug Fixes
+
+* last testing ([93f8dc2](https://github.com/opencadc/science-platform/commit/93f8dc27d7c956e3ffb05a0896f711bdcd6a0f7b))
+* review rework and cleanup ([ce53b69](https://github.com/opencadc/science-platform/commit/ce53b6995db4595a12fe346b2dac71e9d989031c))
+* some refactoring and setup of owner reference to cascade deletes ([69939f0](https://github.com/opencadc/science-platform/commit/69939f0841ebb5d0508a31ac4570795cc29b028c))
+
+## [0.27.4](https://github.com/opencadc/science-platform/compare/0.27.3...0.27.4) (2025-02-06)
+
+
+### Bug Fixes
+
+* use java api to merge image pull secret if present or omit otherwise ([d5f3374](https://github.com/opencadc/science-platform/commit/d5f3374f70a5f4bf03dfd2335a9dad2549e83a40))
+
+## [0.27.3](https://github.com/opencadc/science-platform/compare/0.27.2...0.27.3) (2025-02-04)
+
+
+### Bug Fixes
+
+* re add the swagger documentation ([1911713](https://github.com/opencadc/science-platform/commit/19117136a0e38dae3724d76b2ad2bfa118f7d2c1))
+
+## [0.27.2](https://github.com/opencadc/science-platform/compare/0.27.1...0.27.2) (2025-02-03)
+
+
+### Bug Fixes
+
+* correct hostnames for desktop and all areas ([3809f32](https://github.com/opencadc/science-platform/commit/3809f321a26fbf25ebef5592ce2084c7f44e7256))
+
+## [0.27.1](https://github.com/opencadc/science-platform/compare/0.27.0...0.27.1) (2025-01-24)
+
+
+### Bug Fixes
+
+* correct package version of kubernetes-client in dockerfile ([4e955d8](https://github.com/opencadc/science-platform/commit/4e955d8b89d2b26063e2f5b3d260485f86e4ec22))
+
+## [0.27.0](https://github.com/opencadc/science-platform/compare/0.26.3...0.27.0) (2025-01-24)
+
+
+### Features
+
+* add configuration for separate hostname for sessions in workload ([5ee71f8](https://github.com/opencadc/science-platform/commit/5ee71f835248d14015832348f9000c9761447d2e))
+
+
+### Bug Fixes
+
+* remove unused dockerfile ([0ba1a2a](https://github.com/opencadc/science-platform/commit/0ba1a2a67fb13621ee4128ab63a7bf4cd2cc3cbb))
+
 ## [0.26.3](https://github.com/opencadc/science-platform/compare/0.26.2...0.26.3) (2025-01-08)
 
 

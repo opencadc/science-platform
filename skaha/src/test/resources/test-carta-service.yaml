@@ -1,0 +1,25 @@
+# Sample Service YAML for a CARTA interactive session.  This will be loaded by Skaha and modified to include the session ID and job name.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skaha-carta-svc-${skaha.sessionid}
+  labels:
+    run: skaha-carta-svc-${skaha.sessionid}
+  ownerReferences:
+    - apiVersion: batch/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Job
+      name: "${skaha.jobname}"
+      uid: "${skaha.jobuid}"
+spec:
+  ports:
+    - port: 6901
+      protocol: TCP
+      name: http-connection
+    - port: 5901
+      protocol: TCP
+      name: socket-connection
+  selector:
+    canfar-net-sessionID: ${skaha.sessionid}
