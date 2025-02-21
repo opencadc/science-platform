@@ -69,8 +69,6 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
-import org.opencadc.skaha.SessionType;
-
 import java.util.Map;
 import java.util.Objects;
 
@@ -91,7 +89,7 @@ public class QueueConfiguration {
     /**
      * Create a new QueueConfiguration. Used for testing.
      *
-     * @param sessionType The session type name.  This is the key for the lookup.
+     * @param sessionType The session type name. This is the key for the lookup.
      * @param priorityClass The priority class.
      * @param queueName The queue name.
      */
@@ -122,7 +120,8 @@ public class QueueConfiguration {
      * @return QueueConfiguration for the given session type, or null if none found.
      */
     static QueueConfiguration fromType(final String type, final Map<String, String> env) {
-        final String expectedTypeCase = Objects.requireNonNull(type, "Session type must be provided.").toUpperCase();
+        final String expectedTypeCase =
+                Objects.requireNonNull(type, "Session type must be provided.").toUpperCase();
         final Map<String, String> cleanEnv = Objects.requireNonNull(env, "Environment must be provided.");
         final String queueName = QueueConfiguration.getQueueNameForType(expectedTypeCase, cleanEnv);
         if (StringUtil.hasText(queueName)) {
