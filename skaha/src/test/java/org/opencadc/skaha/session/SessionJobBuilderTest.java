@@ -86,9 +86,9 @@ public class SessionJobBuilderTest {
         final V1Job job = getTestBaseValuesAffinityJob();
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        assert podSpec != null;
-        final List<V1NodeSelectorRequirement> testMatchExpressions =
-                SessionJobBuilderTest.getV1NodeSelectorRequirements(podSpec);
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
+
         Assert.assertEquals(
                 "Wrong pull secret.",
                 "my-secret",
@@ -150,13 +150,14 @@ public class SessionJobBuilderTest {
     }
 
     @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {
+        assert podSpec != null;
         final V1NodeAffinity nodeAffinity =
                 Objects.requireNonNull(podSpec.getAffinity()).getNodeAffinity();
 
         final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
         assert nodeAffinity != null;
         final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
-                        nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution())
+                        Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
                 .get(0)
                 .getMatchExpressions();

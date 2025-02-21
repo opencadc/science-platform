@@ -500,9 +500,11 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
         }
 
-        if (adminUser && validatedType != null) {
-            if (!SESSION_TYPES.contains(validatedType)) {
+        if (validatedType != null) {
+            if (adminUser && !SESSION_TYPES.contains(validatedType)) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
+            } else if (validatedType.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                validateHeadlessMembership();
             }
         }
 

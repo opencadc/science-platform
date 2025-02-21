@@ -174,6 +174,11 @@ public class SessionJobBuilder {
         return Yaml.dump(launchJob);
     }
 
+    /**
+     * Merge the Node Affinity, if present, with the GPU affinity, if present, with any existing affinity.
+     *
+     * @param launchJob The Job to modify.
+     */
     private void mergeAffinity(final V1Job launchJob) {
         final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
         if (gpuAffinity != null) {
@@ -262,22 +267,6 @@ public class SessionJobBuilder {
         }
     }
 
-    private void mergeImagePullSecret(final V1Job launchJob) {
-        final V1JobSpec podTemplate = launchJob.getSpec();
-        if (podTemplate != null && StringUtil.hasText(this.imageRegistrySecretName)) {
-            final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
-            if (podTemplateSpec != null) {
-                final List<V1LocalObjectReference> imagePullSecrets = podTemplateSpec.getImagePullSecrets();
-                if (imagePullSecrets == null) {
-                    podTemplateSpec.setImagePullSecrets(
-                            Collections.singletonList(new V1LocalObjectReference().name(this.imageRegistrySecretName)));
-                } else {
-                    imagePullSecrets.add(new V1LocalObjectReference().name(this.imageRegistrySecretName));
-                }
-            }
-        }
-    }
-
     /**
      * For the given Job, determine if it's queue-able, and set the appropriate label and suspend information.
      *
@@ -318,6 +307,22 @@ public class SessionJobBuilder {
             jobSpec.setSuspend(true);
         } else {
             LOGGER.debug("No queue name provided.");
+        }
+    }
+
+    private void mergeImagePullSecret(final V1Job launchJob) {
+        final V1JobSpec podTemplate = launchJob.getSpec();
+        if (podTemplate != null && StringUtil.hasText(this.imageRegistrySecretName)) {
+            final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
+            if (podTemplateSpec != null) {
+                final List<V1LocalObjectReference> imagePullSecrets = podTemplateSpec.getImagePullSecrets();
+                if (imagePullSecrets == null) {
+                    podTemplateSpec.setImagePullSecrets(
+                            Collections.singletonList(new V1LocalObjectReference().name(this.imageRegistrySecretName)));
+                } else {
+                    imagePullSecrets.add(new V1LocalObjectReference().name(this.imageRegistrySecretName));
+                }
+            }
         }
     }
 
