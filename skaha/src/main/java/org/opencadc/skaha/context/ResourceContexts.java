@@ -73,7 +73,7 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SessionType;
 
 /**
  * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.
@@ -147,11 +147,8 @@ public class ResourceContexts {
         return defaultLimitCores;
     }
 
-    public Integer getDefaultCores(String sessionType) {
-        if (SkahaAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
-            return defaultCoresHeadless;
-        }
-        return defaultCores;
+    public Integer getDefaultCores(SessionType sessionType) {
+        return sessionType.isHeadless() ? defaultCoresHeadless : defaultCores;
     }
 
     public boolean isCoreCountAvailable(final Integer coreCount) {
@@ -166,11 +163,8 @@ public class ResourceContexts {
         return defaultLimitRAM;
     }
 
-    public Integer getDefaultRAM(String sessionType) {
-        if (SkahaAction.SESSION_TYPE_HEADLESS.equals(sessionType)) {
-            return defaultRAMHeadless;
-        }
-        return defaultRAM;
+    public Integer getDefaultRAM(SessionType sessionType) {
+        return sessionType.isHeadless() ? defaultRAMHeadless : defaultRAM;
     }
 
     public List<Integer> getAvailableRAM() {

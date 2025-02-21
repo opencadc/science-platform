@@ -257,6 +257,7 @@ public class SessionDAO {
         Map<String, String[]> resourceUsages = new HashMap<>();
         String[] sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID);
         try {
+            LOGGER.debug("Resource usage command: " + String.join(" ", sessionResourceUsageCMD));
             String sessionResourceUsageMap = execute(sessionResourceUsageCMD);
             LOGGER.debug("Resource used: " + sessionResourceUsageMap);
             if (StringUtil.hasLength(sessionResourceUsageMap)) {
@@ -283,7 +284,6 @@ public class SessionDAO {
                 .pod()
                 .noHeaders()
                 .label("canfar-net-userid=" + forUserID)
-                .argument("--use-protocol-buffers=true")
                 .outputFormat(
                         "custom-columns=FULL_NAME:.metadata.name,REQUESTED_CPU:.spec.containers[0].resources.requests.cpu,REQUESTED_RAM:.spec.containers[0].resources.requests.memory")
                 .build();

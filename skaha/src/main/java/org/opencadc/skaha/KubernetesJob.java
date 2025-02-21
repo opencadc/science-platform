@@ -62,98 +62,45 @@
  *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
  *                                       <http://www.gnu.org/licenses/>.
  *
- *
  ************************************************************************
  */
+package org.opencadc.skaha;
 
-package org.opencadc.skaha.session;
-
-import ca.nrc.cadc.util.StringUtil;
-import org.opencadc.skaha.SessionType;
-
-import java.util.Map;
-import java.util.Objects;
-
-/**
- * Class to contain configuration of a queue. Specifics are pulled from the provided environment, which defaults to the
- * system environment.
- */
-public class QueueConfiguration {
-    private static final String QUEUE_CONFIG_VAR_NAME_PREFIX = "SKAHA_QUEUE_";
-    private static final String QUEUE_CONFIG_VAR_NAME = "%s%s_NAME";
-    private static final String QUEUE_CONFIG_VAR_PRIORITY_CLASS = "%s%s_PRIORITY_CLASS";
-    private static final String QUEUE_CONFIG_VAR_DEFAULT_TYPE = "DEFAULT";
-
-    final String sessionType;
-    final String queueName;
-    final String priorityClass;
+/** Simple class to represent a Kubernetes Job. This is just a clean way to encompass elements that it has access to. */
+public class KubernetesJob {
+    private final String name;
+    private final String uid;
+    private final String sessionID;
+    private final SessionType sessionType;
 
     /**
-     * Create a new QueueConfiguration. Used for testing.
+     * Constructor for a Job. Can be created from a single call to kubectl.
      *
-     * @param sessionType The session type name.  This is the key for the lookup.
-     * @param priorityClass The priority class.
-     * @param queueName The queue name.
+     * @param name Name of the job
+     * @param uid Unique ID of the job
+     * @param sessionID Unique Session ID, provided by Skaha
+     * @param sessionType Session Type provided by the user
      */
-    QueueConfiguration(final String sessionType, final String priorityClass, final String queueName) {
+    public KubernetesJob(final String name, final String uid, final String sessionID, final SessionType sessionType) {
+        this.name = name;
+        this.uid = uid;
+        this.sessionID = sessionID;
         this.sessionType = sessionType;
-        this.priorityClass = priorityClass;
-        this.queueName = queueName;
     }
 
-    /**
-     * Obtain the configured QueueConfiguration for the given session type. This will look in the environment for the
-     * configuration, and return null if none found.
-     *
-     * @param type The session type.
-     * @return QueueConfiguration for the given session type, or null if none found.
-     */
-    public static QueueConfiguration fromType(final String type) {
-        return QueueConfiguration.fromType(type, System.getenv());
+    public SessionType getSessionType() {
+        return sessionType;
     }
 
-    /**
-     * Obtain the configured QueueConfiguration for the given session type. This will look in the supplied environment.
-     * Tests can use directly to avoid side environment setup. Default queue name is used if no specific queue is found,
-     * if configured.
-     *
-     * @param type The session type.
-     * @param env The environment to look in.
-     * @return QueueConfiguration for the given session type, or null if none found.
-     */
-    static QueueConfiguration fromType(final String type, final Map<String, String> env) {
-        final String expectedTypeCase = Objects.requireNonNull(type, "Session type must be provided.").toUpperCase();
-        final Map<String, String> cleanEnv = Objects.requireNonNull(env, "Environment must be provided.");
-        final String queueName = QueueConfiguration.getQueueNameForType(expectedTypeCase, cleanEnv);
-        if (StringUtil.hasText(queueName)) {
-            final String priorityClass = QueueConfiguration.getQueuePriorityClassForType(expectedTypeCase, cleanEnv);
-            return new QueueConfiguration(expectedTypeCase, priorityClass, queueName);
-        } else {
-            final String defaultQueueName =
-                    QueueConfiguration.getQueueNameForType(QueueConfiguration.QUEUE_CONFIG_VAR_DEFAULT_TYPE, cleanEnv);
-            if (StringUtil.hasText(defaultQueueName)) {
-                final String priorityClass = QueueConfiguration.getQueuePriorityClassForType(
-                        QueueConfiguration.QUEUE_CONFIG_VAR_DEFAULT_TYPE, cleanEnv);
-                return new QueueConfiguration(expectedTypeCase, priorityClass, defaultQueueName);
-            } else {
-                return null;
-            }
-        }
+    public String getSessionID() {
+        return sessionID;
     }
 
-    private static String getQueueNameForType(final String type, final Map<String, String> env) {
-        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
-        return env.get(String.format(
-                QueueConfiguration.QUEUE_CONFIG_VAR_NAME,
-                QueueConfiguration.QUEUE_CONFIG_VAR_NAME_PREFIX,
-                expectedTypeCase));
+    public String getName() {
+        return name;
     }
 
-    private static String getQueuePriorityClassForType(final String type, final Map<String, String> env) {
-        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
-        return env.get(String.format(
-                QueueConfiguration.QUEUE_CONFIG_VAR_PRIORITY_CLASS,
-                QueueConfiguration.QUEUE_CONFIG_VAR_NAME_PREFIX,
-                expectedTypeCase));
+    public String getUID() {
+        return uid;
     }
 }

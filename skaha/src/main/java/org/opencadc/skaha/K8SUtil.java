@@ -97,22 +97,10 @@ public class K8SUtil {
      * @param userID The running User's ID.
      * @return String sanitized name. Never null.
      */
-    public static String getJobName(String sessionID, String type, String userID) {
+    public static String getJobName(String sessionID, SessionType type, String userID) {
         // Replace values that are NOT alphanumeric or a hyphen.
         final String userJobID = userID.replaceAll("[^0-9a-zA-Z-]", "-");
-        return ("skaha-" + type + "-" + userJobID + "-" + sessionID).toLowerCase();
-    }
-
-    public static String getServiceName(String sessionID, String type) {
-        return "skaha-" + type + "-svc-" + sessionID;
-    }
-
-    public static String getIngressName(String sessionID, String type) {
-        return "skaha-" + type + "-ingress-" + sessionID;
-    }
-
-    public static String getMiddlewareName(String sessionID, String type) {
-        return "skaha-" + type + "-middleware-" + sessionID;
+        return ("skaha-" + type.name().toLowerCase() + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
 
     public static String getHomeDir() {
@@ -203,7 +191,12 @@ public class K8SUtil {
         return System.getenv("REDIS_PORT");
     }
 
-    public static String getUserHome() {
+    /**
+     * Obtain the working directory for the current process.
+     *
+     * @return String working directory from Java's System properties.
+     */
+    public static String getWorkingDirectory() {
         return System.getProperty("user.home");
     }
 }
