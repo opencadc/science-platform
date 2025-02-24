@@ -257,6 +257,7 @@ public class SessionDAO {
         Map<String, String[]> resourceUsages = new HashMap<>();
         String[] sessionResourceUsageCMD = getSessionResourceUsageCMD(k8sNamespace, forUserID);
         try {
+            LOGGER.debug("Resource usage command: " + String.join(" ", sessionResourceUsageCMD));
             String sessionResourceUsageMap = execute(sessionResourceUsageCMD);
             LOGGER.debug("Resource used: " + sessionResourceUsageMap);
             if (StringUtil.hasLength(sessionResourceUsageMap)) {

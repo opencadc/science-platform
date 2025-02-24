@@ -89,7 +89,7 @@ public class QueueConfiguration {
     /**
      * Create a new QueueConfiguration. Used for testing.
      *
-     * @param sessionType The session type.
+     * @param sessionType The session type name. This is the key for the lookup.
      * @param priorityClass The priority class.
      * @param queueName The queue name.
      */
@@ -120,8 +120,9 @@ public class QueueConfiguration {
      * @return QueueConfiguration for the given session type, or null if none found.
      */
     static QueueConfiguration fromType(final String type, final Map<String, String> env) {
-        final String expectedTypeCase = Objects.requireNonNull(type).toUpperCase();
-        final Map<String, String> cleanEnv = Objects.requireNonNull(env);
+        final String expectedTypeCase =
+                Objects.requireNonNull(type, "Session type must be provided.").toUpperCase();
+        final Map<String, String> cleanEnv = Objects.requireNonNull(env, "Environment must be provided.");
         final String queueName = QueueConfiguration.getQueueNameForType(expectedTypeCase, cleanEnv);
         if (StringUtil.hasText(queueName)) {
             final String priorityClass = QueueConfiguration.getQueuePriorityClassForType(expectedTypeCase, cleanEnv);
