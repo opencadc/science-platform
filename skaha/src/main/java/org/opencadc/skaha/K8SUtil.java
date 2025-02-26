@@ -71,7 +71,6 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 public class K8SUtil {
-
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
