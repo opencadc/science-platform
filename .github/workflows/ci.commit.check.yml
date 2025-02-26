@@ -27,7 +27,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}  # checkout PR HEAD commit
           fetch-depth: 0  # required for merge-base check
       - name: Run Commit Check
-        uses: commit-check/commit-check-action@3b406fc3006cde0e64a760fb50063f79027259c2 # v1
+        uses: commit-check/commit-check-action@cac2d49b6c81b73cefef7a842f69b872543a18dc # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
         with:
