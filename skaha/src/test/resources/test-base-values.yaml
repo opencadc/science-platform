@@ -29,7 +29,7 @@ spec:
       priorityClassName: uber-user-preempt-medium
       hostname: "${software.hostname}"
       containers:
-      - name: "${skaha.jobname}"
+      - name: "test-job"
         env:
         - name: skaha_hostname
           value: "${skaha.hostname}"
@@ -96,9 +96,6 @@ spec:
           subPath: group
         - mountPath: "/skaha-system"
           name: start-jupyterlab
-        - mountPath: "${SKAHA_TLD}"
-          name: cavern-volume
-          subPath: "cavern"
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
