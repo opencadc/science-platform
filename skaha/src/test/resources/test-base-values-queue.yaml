@@ -5,7 +5,7 @@ metadata:
   labels:
     canfar-net-sessionID: "${skaha.sessionid}"
     kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
-  name: test-base-values-affinity-job
+  name: test-base-values-queue-job
 spec:
   parallelism: 1
   completions: 1
@@ -19,20 +19,15 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: OnFailure
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: my-node-please
-                    operator: Exists
+      imagePullSecrets:
+        - name: ${software.imagesecret}
       priorityClassName: uber-user-preempt-medium
-      hostname: test-base-values-affinity-job.com
+      hostname: test-base-values-queue-job.com
       containers:
-      - name: test-base-values-affinity-job
+      - name: test-base-values-queue-job
         env:
         - name: skaha_hostname
-          value: test-base-values-affinity-job.com
+          value: test-base-values-queue-job.com
         - name: skaha_username
           value: "${skaha.userid}"
         - name: skaha_sessionid

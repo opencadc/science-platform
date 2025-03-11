@@ -500,9 +500,11 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
         }
 
-        if (adminUser && validatedType != null) {
-            if (!SESSION_TYPES.contains(validatedType)) {
+        if (validatedType != null) {
+            if (adminUser && !SESSION_TYPES.contains(validatedType)) {
                 throw new IllegalArgumentException("Illegal session type: " + type);
+            } else if (validatedType.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                validateHeadlessMembership();
             }
         }
 
@@ -550,12 +552,12 @@ public class PostAction extends SessionAction {
 
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
-
-        String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
+                .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -758,9 +760,11 @@ public class PostAction extends SessionAction {
             }
         }
 
+        final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
+                .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
@@ -779,10 +783,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld);
-        final String supplementalGroups = getSupplementalGroupsList();
-        sessionJobBuilder = sessionJobBuilder.withParameter(
-                PostAction.SKAHA_SUPPLEMENTALGROUPS, StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(
+                        PostAction.SKAHA_SUPPLEMENTALGROUPS,
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
