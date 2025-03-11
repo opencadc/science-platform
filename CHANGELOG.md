@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.27.6](https://github.com/opencadc/science-platform/compare/0.27.5...0.27.6) (2025-03-11)
+
+
+### Bug Fixes
+
+* merge main and resolve conflicts ([93e0551](https://github.com/opencadc/science-platform/commit/93e0551c70421d6968cc614f0ec227555428df9d))
+* merge main with conflicts ([31375e0](https://github.com/opencadc/science-platform/commit/31375e010662688c671b4afce597bfa1892cfaa7))
+* new kubernetes client version in dockerfile ([bda6626](https://github.com/opencadc/science-platform/commit/bda6626c7809f77a8d047ab2f8c55046c4f5c06c))
+* remove old switch that causes warning or error in logs ([be90450](https://github.com/opencadc/science-platform/commit/be904505bf28fb641da39c32c113255ecbd84718))
+
 ## [0.27.5](https://github.com/opencadc/science-platform/compare/0.27.4...0.27.5) (2025-02-13)
 
 
