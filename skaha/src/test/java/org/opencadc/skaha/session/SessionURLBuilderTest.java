@@ -66,9 +66,7 @@ public class SessionURLBuilderTest {
                 SessionURLBuilder.cartaSession("host.example.org", "8675309");
 
         Assert.assertEquals(
-                "Wrong Carta URL",
-                "https://host.example.org/session/carta/http/8675309/",
-                testSubject.build());
+                "Wrong Carta URL", "https://host.example.org/session/carta/http/8675309/", testSubject.build());
 
         final SessionURLBuilder.CartaSessionURLBuilder testSubjectWithSocketUrl = testSubject.withAlternateSocket(true);
 
