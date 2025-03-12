@@ -195,9 +195,9 @@ public abstract class SessionURLBuilder {
 
         /**
          * Build the URL for a Carta session. Example output: <code>
-         *     https://host.example.org/session/carta/8675309?
+         *     https://host.example.org/session/carta/http/8675309/
          * </code> or <code>
-         *     https://host.example.org/session/carta/8675309?socketUrl=wss://host.example.org/session/carta/ws/8675309/
+         *     https://host.example.org/session/carta/ws/8675309/?socketUrl=wss://host.example.org/session/carta/ws/8675309/
          *     </code>
          *
          * @return URL string in format <code>
