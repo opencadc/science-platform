@@ -69,10 +69,14 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.rest.InitAction;
+import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
+import io.kubernetes.client.util.Config;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.logging.log4j.LogManager;
@@ -126,10 +130,13 @@ public class InitializationAction extends InitAction {
      * @return V1CustomResourceDefinitionList instance, or null if none exist.
      */
     V1CustomResourceDefinitionList queryLocalQueues() {
-        final CoreV1Api api = new CoreV1Api();
-        final CustomObjectsApi customObjectsApi = new CustomObjectsApi(api.getApiClient());
-
         try {
+            final ApiClient client = Config.defaultClient();
+            Configuration.setDefaultApiClient(client);
+
+            final CoreV1Api api = new CoreV1Api();
+            final CustomObjectsApi customObjectsApi = new CustomObjectsApi(api.getApiClient());
+
             final Object listResults = customObjectsApi
                     .listNamespacedCustomObject("kueue.x-k8s.io", "v1", getWorkloadNamespace(), "localqueues")
                     .execute();
@@ -139,8 +146,8 @@ public class InitializationAction extends InitAction {
             } else {
                 return (V1CustomResourceDefinitionList) listResults;
             }
-        } catch (ApiException apiException) {
-            throw new IllegalStateException(apiException.getMessage(), apiException);
+        } catch (ApiException | IOException exception) {
+            throw new IllegalStateException(exception.getMessage(), exception);
         }
     }
 
