@@ -71,6 +71,7 @@ package org.opencadc.skaha.session;
 import io.kubernetes.client.openapi.models.V1CustomResourceDefinition;
 import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.io.IOException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -102,6 +103,33 @@ public class InitializationActionTest {
                     new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
             Assert.fail("Expected IllegalStateException");
         } catch (IllegalStateException illegalStateException) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testUnusableConfig() {
+        final InitializationAction testSubject = new InitializationAction() {
+            @Override
+            String getWorkloadNamespace() {
+                return "test-workload";
+            }
+
+            @Override
+            void setupConfiguration() throws IOException {
+                throw new IOException("Test exception");
+            }
+        };
+
+        try {
+            testSubject.ensureLocalQueuesValid(
+                    new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
+            Assert.fail("Expected IllegalStateException");
+        } catch (IllegalStateException illegalStateException) {
+            Assert.assertEquals(
+                    "Wrong base exception.",
+                    IOException.class,
+                    illegalStateException.getCause().getClass());
             // Expected
         }
     }

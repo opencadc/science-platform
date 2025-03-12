@@ -131,8 +131,7 @@ public class InitializationAction extends InitAction {
      */
     V1CustomResourceDefinitionList queryLocalQueues() {
         try {
-            final ApiClient client = Config.defaultClient();
-            Configuration.setDefaultApiClient(client);
+            setupConfiguration();
 
             final CoreV1Api api = new CoreV1Api();
             final CustomObjectsApi customObjectsApi = new CustomObjectsApi(api.getApiClient());
@@ -149,6 +148,11 @@ public class InitializationAction extends InitAction {
         } catch (ApiException | IOException exception) {
             throw new IllegalStateException(exception.getMessage(), exception);
         }
+    }
+
+    void setupConfiguration() throws IOException {
+        final ApiClient client = Config.defaultClient();
+        Configuration.setDefaultApiClient(client);
     }
 
     String getWorkloadNamespace() {
