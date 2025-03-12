@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.7](https://github.com/opencadc/science-platform/compare/0.27.6...0.27.7) (2025-03-12)
+
+
+### Bug Fixes
+
+* fix for proper kueue checking ([f57a516](https://github.com/opencadc/science-platform/commit/f57a516d4a87788d7530579973f154ad3262ce8f))
+* fix for proper kueue checking ([5d188df](https://github.com/opencadc/science-platform/commit/5d188dff85c44928a9439ba8175490aab802eb64))
+
 ## [0.27.6](https://github.com/opencadc/science-platform/compare/0.27.5...0.27.6) (2025-03-11)
 
 
