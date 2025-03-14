@@ -68,16 +68,14 @@
 
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.openapi.models.V1CustomResourceDefinition;
-import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.io.IOException;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class InitializationActionTest {
     @Test
-    public void testInitializationActionErrorWrongQueueName() {
+    public void testInitializationActionErrorWrongQueueName() throws Exception {
+        final boolean[] setupCalled = new boolean[] {false};
         final InitializationAction testSubject = new InitializationAction() {
             @Override
             String getWorkloadNamespace() {
@@ -85,22 +83,20 @@ public class InitializationActionTest {
             }
 
             @Override
-            V1CustomResourceDefinitionList queryLocalQueues() {
-                final V1CustomResourceDefinitionList v1CustomResourceDefinitionList =
-                        new V1CustomResourceDefinitionList();
-                final V1CustomResourceDefinition localQueue = new V1CustomResourceDefinition();
-                final V1ObjectMeta localQueueMetadata = new V1ObjectMeta();
-                localQueueMetadata.setName("different-queue");
-                localQueue.setMetadata(localQueueMetadata);
-                v1CustomResourceDefinitionList.addItemsItem(localQueue);
+            boolean localQueueMissing(QueueConfiguration queueConfiguration) {
+                return true;
+            }
 
-                return v1CustomResourceDefinitionList;
+            @Override
+            void setupKubernetesAPIConfiguration() {
+                setupCalled[0] = true;
             }
         };
 
         try {
             testSubject.ensureLocalQueuesValid(
                     new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
+            Assert.assertTrue("Setup was not called", setupCalled[0]);
             Assert.fail("Expected IllegalStateException");
         } catch (IllegalStateException illegalStateException) {
             // Expected
@@ -116,7 +112,7 @@ public class InitializationActionTest {
             }
 
             @Override
-            void setupConfiguration() throws IOException {
+            void setupKubernetesAPIConfiguration() throws IOException {
                 throw new IOException("Test exception");
             }
         };
@@ -124,18 +120,15 @@ public class InitializationActionTest {
         try {
             testSubject.ensureLocalQueuesValid(
                     new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.fail("Expected IllegalStateException");
-        } catch (IllegalStateException illegalStateException) {
-            Assert.assertEquals(
-                    "Wrong base exception.",
-                    IOException.class,
-                    illegalStateException.getCause().getClass());
+            Assert.fail("Expected IOException");
+        } catch (IOException ioException) {
             // Expected
         }
     }
 
     @Test
     public void testInitializationAction() throws Exception {
+        final boolean[] setupCalled = new boolean[] {false};
         final InitializationAction testSubject = new InitializationAction() {
             @Override
             String getWorkloadNamespace() {
@@ -143,20 +136,18 @@ public class InitializationActionTest {
             }
 
             @Override
-            V1CustomResourceDefinitionList queryLocalQueues() {
-                final V1CustomResourceDefinitionList v1CustomResourceDefinitionList =
-                        new V1CustomResourceDefinitionList();
-                final V1CustomResourceDefinition localQueue = new V1CustomResourceDefinition();
-                final V1ObjectMeta localQueueMetadata = new V1ObjectMeta();
-                localQueueMetadata.setName("test-queue");
-                localQueue.setMetadata(localQueueMetadata);
-                v1CustomResourceDefinitionList.addItemsItem(localQueue);
+            boolean localQueueMissing(QueueConfiguration queueConfiguration) {
+                return false;
+            }
 
-                return v1CustomResourceDefinitionList;
+            @Override
+            void setupKubernetesAPIConfiguration() {
+                setupCalled[0] = true;
             }
         };
 
         testSubject.ensureLocalQueuesValid(
                 new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
+        Assert.assertTrue("Setup was not called", setupCalled[0]);
     }
 }
