@@ -72,9 +72,7 @@ import ca.nrc.cadc.rest.InitAction;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
-import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
-import io.kubernetes.client.openapi.models.V1CustomResourceDefinitionList;
 import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.util.Arrays;
@@ -100,22 +98,23 @@ public class InitializationAction extends InitAction {
     @Override
     public void doInit() {
         LOGGER.info("Verifying QueueConfigurations, if any...");
-        ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+        try {
+            ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+        } catch (IOException ioException) {
+            throw new IllegalStateException(ioException.getMessage(), ioException);
+        }
         LOGGER.info("Verifying QueueConfigurations: OK");
     }
 
-    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
+    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) throws IOException {
+        setupKubernetesAPIConfiguration();
         Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
     }
 
     private void ensureLocalQueueValid(final QueueConfiguration queueConfiguration) {
         LOGGER.info("Checking queue {}", queueConfiguration.queueName);
-        final V1CustomResourceDefinitionList listResults = queryLocalQueues();
-        if (listResults == null
-                || listResults.getItems().stream()
-                        .noneMatch(localQueueCRD ->
-                                queueConfiguration.queueName.equals(Objects.requireNonNull(localQueueCRD.getMetadata())
-                                        .getName()))) {
+        final boolean localQueueMissing = localQueueMissing(queueConfiguration);
+        if (localQueueMissing) {
             final String message = String.format(
                     InitializationAction.FATAL_LOG_MESSAGE, queueConfiguration.queueName, getWorkloadNamespace());
             LOGGER.fatal(message);
@@ -127,32 +126,42 @@ public class InitializationAction extends InitAction {
     /**
      * Query the local queues in the workload namespace. Tests can override this method to return a mock response.
      *
-     * @return V1CustomResourceDefinitionList instance, or null if none exist.
+     * @return true if the local queue exists, false otherwise.
      */
-    V1CustomResourceDefinitionList queryLocalQueues() {
+    boolean localQueueMissing(final QueueConfiguration queueConfiguration) {
         try {
-            setupConfiguration();
+            final ApiClient apiClient = Configuration.getDefaultApiClient();
+            final CustomObjectsApi customObjectsApi = new CustomObjectsApi(apiClient);
 
-            final CoreV1Api api = new CoreV1Api();
-            final CustomObjectsApi customObjectsApi = new CustomObjectsApi(api.getApiClient());
-
-            final Object listResults = customObjectsApi
-                    .listNamespacedCustomObject("kueue.x-k8s.io", "v1", getWorkloadNamespace(), "localqueues")
+            // Throws an API Exception with a 404 is the queue does not exist.
+            customObjectsApi
+                    .getNamespacedCustomObject(
+                            QueueConfiguration.KUEUE_API_GROUP,
+                            QueueConfiguration.KUEUE_API_VERSION,
+                            getWorkloadNamespace(),
+                            QueueConfiguration.KUEUE_API_PLURAL,
+                            queueConfiguration.queueName)
                     .execute();
-            if (listResults == null) {
-                LOGGER.warn("No local queues exist in namespace {}", getWorkloadNamespace());
-                return null;
+            return false;
+        } catch (ApiException exception) {
+            if (exception.getCode() == 404) {
+                LOGGER.error(
+                        "No local queues exist in namespace {} with name {}",
+                        getWorkloadNamespace(),
+                        queueConfiguration.queueName);
+                return true;
             } else {
-                return (V1CustomResourceDefinitionList) listResults;
+                // Unexpected error, die here.
+                throw new IllegalStateException(exception.getMessage(), exception);
             }
-        } catch (ApiException | IOException exception) {
-            throw new IllegalStateException(exception.getMessage(), exception);
         }
     }
 
-    void setupConfiguration() throws IOException {
-        final ApiClient client = Config.defaultClient();
+    void setupKubernetesAPIConfiguration() throws IOException {
+        final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
+
+        LOGGER.info("API Server base path: {}", client.getBasePath());
     }
 
     String getWorkloadNamespace() {
