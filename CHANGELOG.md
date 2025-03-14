@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.8](https://github.com/opencadc/science-platform/compare/0.27.7...0.27.8) (2025-03-14)
+
+
+### Bug Fixes
+
+* correct queue lookup on init ([29ab8b0](https://github.com/opencadc/science-platform/commit/29ab8b02be7d4d17a988c00423709c6e041a7b82))
+* correct queue lookup on init ([86a6cc0](https://github.com/opencadc/science-platform/commit/86a6cc0024b026d899411e77ca638336d0e93359))
+
 ## [0.27.7](https://github.com/opencadc/science-platform/compare/0.27.6...0.27.7) (2025-03-12)
 
 
