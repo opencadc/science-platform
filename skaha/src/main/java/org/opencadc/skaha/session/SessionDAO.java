@@ -7,12 +7,14 @@ import ca.nrc.cadc.util.StringUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.BatchV1Api;
+import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.util.Config;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
@@ -40,7 +42,7 @@ public class SessionDAO {
         final String customColumns = "custom-columns="
                 + Arrays.stream(CustomColumns.values())
                         .filter(customColumn -> !customColumn.forUserOnly || forUserID != null)
-                        .map(customColumn -> String.format("%s:%s", customColumn.name(), customColumn.columnDefinition))
+                        .map(customColumn -> String.format("%s:%s", customColumn.name(), customColumn.selectorPrefix))
                         .collect(Collectors.joining(","));
 
         return sessionsCmd.outputFormat(customColumns).build();
@@ -73,6 +75,22 @@ public class SessionDAO {
         }
 
         throw new ResourceNotFoundException("session " + sessionID + " not found");
+    }
+
+    static List<Session> getInteractiveSessions(final String forUserID) throws Exception {
+        Objects.requireNonNull(forUserID, "User ID to search for must not be null");
+        final ApiClient client = Config.fromCluster();
+        Configuration.setDefaultApiClient(client);
+
+        final BatchV1Api api = new BatchV1Api(client);
+        final V1JobList jobList = api.listNamespacedJob(K8SUtil.getWorkloadNamespace())
+                .allowWatchBookmarks(Boolean.TRUE)
+                .labelSelector("canfar-net-userid=" + forUserID)
+                .execute();
+
+        return jobList.getItems().stream()
+                .map(SessionMapper::from)
+                .collect(Collectors.toList());
     }
 
     static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
@@ -415,30 +433,137 @@ public class SessionDAO {
     }
 
     private enum CustomColumns {
-        SESSION_ID(".metadata.labels.canfar-net-sessionID", false),
-        USERID(".metadata.labels.canfar-net-userid", false),
-        RUN_AS_UID(".spec.securityContext.runAsUser", false),
-        RUN_AS_GID(".spec.securityContext.runAsGroup", false),
-        SUPPLEMENTAL_GROUPS(".spec.securityContext.supplementalGroups", false),
-        IMAGE(".spec.containers[0].image", false),
-        TYPE(".metadata.labels.canfar-net-sessionType", false),
-        STATUS(".status.phase", false),
-        NAME(".metadata.labels.canfar-net-sessionName", false),
-        STARTED(".status.startTime", false),
-        DELETION(".metadata.deletionTimestamp", false),
-        APP_ID(".metadata.labels.canfar-net-appID", false),
-        REQUESTED_RAM(".spec.containers[0].resources.requests.memory", true),
-        REQUESTED_CPU(".spec.containers[0].resources.requests.cpu", true),
-        REQUESTED_GPU(".spec.containers[0].resources.requests.nvidia\\.com/gpu", true),
-        FULL_NAME(".metadata.name", true),
-        UID(".metadata.ownerReferences[].uid", true);
+        SESSION_ID(".metadata.labels", "canfar-net-sessionID", false),
+        USERID(".metadata.labels", "canfar-net-userid", false),
+        RUN_AS_UID(".spec.securityContext", "runAsUser",false),
+        RUN_AS_GID(".spec.securityContext", "runAsGroup", false),
+        SUPPLEMENTAL_GROUPS(".spec.securityContext", "supplementalGroups", false),
+        IMAGE(".spec.containers[0]", "image", false),
+        TYPE(".metadata.labels", "canfar-net-sessionType", false),
+        STATUS(".status", "phase", false),
+        NAME(".metadata.labels", "canfar-net-sessionName", false),
+        STARTED(".status", "startTime", false),
+        DELETION(".metadata", "deletionTimestamp", false),
+        APP_ID(".metadata.labels", "canfar-net-appID", false),
+        REQUESTED_RAM(".spec.containers[0].resources.requests", "memory", true),
+        REQUESTED_CPU(".spec.containers[0].resources.requests", "cpu", true),
+        REQUESTED_GPU(".spec.containers[0].resources.requests", "nvidia\\.com/gpu", true),
+        FULL_NAME(".metadata", "name", true),
+        UID(".metadata.ownerReferences[]", "uid", true);
 
-        final String columnDefinition;
+        final String selectorPrefix;
+        final String simpleName;
         final boolean forUserOnly;
 
-        CustomColumns(String columnDefinition, boolean forUserOnly) {
-            this.columnDefinition = columnDefinition;
+        CustomColumns(String selectorPrefix, String simpleName, boolean forUserOnly) {
+            this.selectorPrefix = selectorPrefix;
+            this.simpleName = simpleName;
             this.forUserOnly = forUserOnly;
+        }
+    }
+
+    private static class SessionMapper {
+        static Session from(final V1Job job) {
+            final V1ObjectMeta meta = job.getMetadata();
+            final V1JobSpec jobSpec = job.getSpec();
+            Objects.requireNonNull(jobSpec, "jobSpec cannot be null");
+            final SessionBuilder sessionBuilder = SessionBuilder.fromMetadata(meta)
+                    .withPodSpec(jobSpec.getTemplate().getSpec())
+                    .withStatus(job.getStatus());
+
+            return sessionBuilder.build();
+        }
+    }
+
+    private static class SessionBuilder {
+        private final String id;
+        private final String userID;
+        private final String type;
+        private final String name;
+        private String appID;
+        private Long runAsUID;
+        private Long runAsGID;
+        private List<Integer> supplementalGroups = new ArrayList<>();
+        private String image;
+        private String status;
+        private String startTime;
+        private String connectURL;
+
+        private SessionBuilder(final String id, final String userID, final String type, final String name) {
+            Objects.requireNonNull(id, "Session ID cannot be null");
+            Objects.requireNonNull(userID, "Session UserID cannot be null");
+            Objects.requireNonNull(type, "Session Type cannot be null");
+            Objects.requireNonNull(name, "Session Name cannot be null");
+            this.id = id;
+            this.userID = userID;
+            this.type = type;
+            this.name = name;
+        }
+
+        static SessionBuilder fromMetadata(final V1ObjectMeta jobMetadata) {
+            Objects.requireNonNull(jobMetadata, "Invalid Job with null Metadata");
+            final Map<String, String> labels = jobMetadata.getLabels();
+            Objects.requireNonNull(labels, "Invalid Job with null Labels");
+
+            final SessionBuilder sessionBuilder = new SessionBuilder(labels.get(CustomColumns.SESSION_ID.simpleName),
+                    labels.get(CustomColumns.USERID.simpleName), labels.get(CustomColumns.TYPE.simpleName),
+                    labels.get(CustomColumns.NAME.simpleName));
+
+            sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
+
+            return sessionBuilder;
+        }
+
+        SessionBuilder withPodSpec(final V1PodSpec podSpec) {
+            Objects.requireNonNull(podSpec, "Invalid PodSpec");
+            final V1PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
+            if (podSecurityContext == null) {
+                LOGGER.warn("No Pod Security Context found.");
+            } else {
+                this.runAsUID = podSecurityContext.getRunAsUser();
+                this.runAsGID = podSecurityContext.getRunAsGroup();
+                final List<Long> supplementalGroupGIDs = podSecurityContext.getSupplementalGroups();
+                if (supplementalGroupGIDs != null && !supplementalGroupGIDs.isEmpty()) {
+                    this.supplementalGroups.addAll(supplementalGroupGIDs.stream().map(Long::intValue)
+                            .collect(Collectors.toList()));
+                }
+            }
+
+            final List<V1Container> podContainers = podSpec.getContainers();
+            if (podContainers.isEmpty()) {
+                LOGGER.warn("No Container found.");
+            } else {
+                this.image = podContainers.get(0).getImage();
+            }
+
+            return this;
+        }
+
+        SessionBuilder withStatus(final V1JobStatus jobStatus) {
+            Objects.requireNonNull(jobStatus, "Invalid JobStatus");
+            final List<V1JobCondition> conditions = jobStatus.getConditions();
+            if (conditions == null || conditions.isEmpty()) {
+                LOGGER.warn("No Pod Status Conditions found.");
+            } else {
+                conditions.sort((condition1, condition2) -> {
+                    Objects.requireNonNull(condition1.getLastTransitionTime(), "Invalid Job Status Condition 1");
+                    Objects.requireNonNull(condition2.getLastTransitionTime(), "Invalid Job Status Condition 2");
+                    return condition2.getLastTransitionTime().compareTo(condition1.getLastTransitionTime());
+                });
+
+                Collections.reverse(conditions);
+
+                this.status = conditions.get(0).getStatus();
+                this.startTime = Objects.requireNonNull(jobStatus.getStartTime(), "Missing Job start time.").toString();
+            }
+
+            return this;
+        }
+
+        Session build() {
+            return new Session(this.id, this.userID, runAsUID == null ? "" : Long.toString(this.runAsUID),
+                    runAsGID == null ? "" : Long.toString(this.runAsGID), this.supplementalGroups.toArray(new Integer[0]), this.image,
+                    this.type, this.status, this.name, this.startTime, this.connectURL, this.appID);
         }
     }
 }
