@@ -42,7 +42,7 @@ dependencies {
     implementation 'commons-io:commons-io:[2.14.0,3.0.0)'
 
     // Used to merge YAML sections to fully configure Job files.
-    implementation 'io.kubernetes:client-java:21.0.2'
+    implementation 'io.kubernetes:client-java:23.0.0'
 
     implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
@@ -57,6 +57,8 @@ dependencies {
     implementation 'redis.clients:jedis:[5.0.2,6.0.0)'
 
     runtimeOnly 'org.opencadc:cadc-registry:[1.7.7,)'
+    runtimeOnly 'org.slf4j:slf4j-api:2.0.17'
+    runtimeOnly 'org.slf4j:slf4j-reload4j:2.0.17'
 
     testImplementation 'junit:junit:[4.13,)'
     testImplementation 'org.json:json:20231013'

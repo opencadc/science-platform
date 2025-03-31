@@ -12,7 +12,7 @@ RUN ./gradlew clean spotlessCheck build --no-daemon
 FROM images.opencadc.org/library/cadc-tomcat:1.3 AS production
 
 RUN set -eux \
-    && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core-4.10.0-1.fc40 \
+    && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core-4.10.1-1.fc40 \
     && dnf -y config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo \
     && dnf -y install --nodocs --assumeyes --setopt=install_weak_deps=False \
         acl-2.3.2-1.fc40 attr-2.5.2-3.fc40 \
