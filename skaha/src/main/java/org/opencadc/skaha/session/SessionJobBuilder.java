@@ -111,7 +111,6 @@ public class SessionJobBuilder {
      */
     SessionJobBuilder withGPUCount(final int gpuCount) {
         this.gpuCount = gpuCount;
-        this.withParameter(SessionJobBuilder.SOFTWARE_LIMITS_GPUS, getGPUResourceLimit(gpuCount));
         return this;
     }
 
@@ -188,7 +187,7 @@ public class SessionJobBuilder {
                 final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
                 if (podTemplateSpec != null) {
                     final V1Affinity affinity = podTemplateSpec.getAffinity();
-
+                    podTemplateSpec.getContainers().get(0).getResources().getLimits()
                     // spec.template.spec.affinity
                     if (affinity == null) {
                         podTemplateSpec.setAffinity(gpuAffinity);
