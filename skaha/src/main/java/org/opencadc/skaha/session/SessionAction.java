@@ -319,6 +319,10 @@ public abstract class SessionAction extends SkahaAction {
         return SessionDAO.getSessions(forUserID, null, skahaTld);
     }
 
+    List<Session> getInteractiveSessions(final String forUserID) throws Exception {
+        return SessionDAO.getUserSessions(forUserID, true);
+    }
+
     protected String toCoreUnit(String cores) {
         String ret = NONE;
         if (StringUtil.hasLength(cores)) {

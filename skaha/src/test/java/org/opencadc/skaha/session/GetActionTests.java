@@ -224,6 +224,11 @@ public class GetActionTests {
         }
 
         @Override
+        List<Session> getInteractiveSessions(String forUserID) throws Exception {
+            return getAllSessions(forUserID);
+        }
+
+        @Override
         protected String getUsername() {
             return null;
         }

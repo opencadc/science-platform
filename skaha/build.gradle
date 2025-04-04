@@ -35,7 +35,7 @@ dependencies {
 
     // https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5
     // Used to assemble URIs programmatically
-    implementation 'org.apache.httpcomponents.client5:httpclient5:5.4.1'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:[5.4.1,5.5)'
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
     implementation 'com.google.code.gson:gson:2.8.9'
@@ -43,6 +43,9 @@ dependencies {
 
     // Used to merge YAML sections to fully configure Job files.
     implementation 'io.kubernetes:client-java:23.0.0'
+
+    // https://mvnrepository.com/artifact/io.fabric8/kubernetes-client
+//    implementation 'io.fabric8:kubernetes-client:7.1.0'
 
     implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'

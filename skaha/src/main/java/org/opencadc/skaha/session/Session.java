@@ -103,6 +103,7 @@ public class Session {
     private String gpuRAMInUse;
     private String cpuCoresInUse;
     private String gpuUtilization;
+    private String jobName; // used tomatch up resource usages (metrics)
 
     public Session(
             String id,
@@ -247,6 +248,14 @@ public class Session {
      */
     public Integer[] getSupplementalGroups() {
         return Arrays.copyOf(this.supplementalGroups, this.supplementalGroups.length);
+    }
+
+    public String getJobName() {
+        return jobName;
+    }
+
+    public void setJobName(String jobName) {
+        this.jobName = jobName;
     }
 
     public PosixPrincipal getPosixPrincipal() {

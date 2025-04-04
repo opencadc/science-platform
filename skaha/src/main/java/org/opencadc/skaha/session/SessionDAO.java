@@ -4,20 +4,28 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.stream.Collectors;
-
+import io.kubernetes.client.Metrics;
+import io.kubernetes.client.custom.ContainerMetrics;
+import io.kubernetes.client.custom.PodMetrics;
+import io.kubernetes.client.custom.PodMetricsList;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.stream.Collectors;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SessionDAO {
@@ -42,7 +50,8 @@ public class SessionDAO {
         final String customColumns = "custom-columns="
                 + Arrays.stream(CustomColumns.values())
                         .filter(customColumn -> !customColumn.forUserOnly || forUserID != null)
-                        .map(customColumn -> String.format("%s:%s", customColumn.name(), customColumn.selectorPrefix))
+                        .map(customColumn -> String.format(
+                                "%s:%s.%s", customColumn.name(), customColumn.selectorPrefix, customColumn.simpleName))
                         .collect(Collectors.joining(","));
 
         return sessionsCmd.outputFormat(customColumns).build();
@@ -77,19 +86,36 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    static List<Session> getInteractiveSessions(final String forUserID) throws Exception {
-        Objects.requireNonNull(forUserID, "User ID to search for must not be null");
+    static List<Session> getUserSessions(final String forUserID, final boolean omitHeadless) throws Exception {
+        Objects.requireNonNull(forUserID, "UserID (username) is required to query.");
         final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
 
-        final BatchV1Api api = new BatchV1Api(client);
-        final V1JobList jobList = api.listNamespacedJob(K8SUtil.getWorkloadNamespace())
-                .allowWatchBookmarks(Boolean.TRUE)
-                .labelSelector("canfar-net-userid=" + forUserID)
-                .execute();
+        final List<String> labelSelectors = new ArrayList<>();
+        if (omitHeadless) {
+            labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
+        }
 
-        return jobList.getItems().stream()
-                .map(SessionMapper::from)
+        final BatchV1Api api = new BatchV1Api(client);
+        final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
+                api.listNamespacedJob(K8SUtil.getWorkloadNamespace()).allowWatchBookmarks(Boolean.TRUE);
+
+        labelSelectors.add("canfar-net-userid=" + forUserID);
+
+        final String labelSelector = String.join(",", labelSelectors);
+        jobListRequest.labelSelector(labelSelector);
+
+        final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, true);
+        return jobListRequest.execute().getItems().stream()
+                .map(job -> {
+                    final String jobName =
+                            Objects.requireNonNull(job.getMetadata()).getName();
+                    final Session session = SessionBuilder.fromJob(job);
+                    session.setCPUCoresInUse(podResourceUsage.cpu.get(jobName));
+                    session.setRAMInUse(podResourceUsage.memory.get(jobName));
+
+                    return session;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -343,23 +369,14 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
-            throws Exception {
-        LOGGER.debug("line: " + k8sOutput);
-        final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
-
-        // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
-        // are in a space-delimited array.
-        final String[] parts = k8sOutput.trim().split(" {3,}");
-
-        String id = parts[allColumns.indexOf(CustomColumns.SESSION_ID)];
-        String userid = parts[allColumns.indexOf(CustomColumns.USERID)];
-        String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
-        String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
-        String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
-        final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
-                ? Session.STATUS_TERMINATING
-                : parts[allColumns.indexOf(CustomColumns.STATUS)];
+    static String getConnectURL(
+            final String sessionHostName,
+            final String type,
+            final String id,
+            final String image,
+            final String topLevelDirectory,
+            final String userid)
+            throws URISyntaxException {
         final String connectURL;
 
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
@@ -379,6 +396,28 @@ public class SessionDAO {
         } else {
             connectURL = "not-applicable";
         }
+
+        return connectURL;
+    }
+
+    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
+            throws Exception {
+        LOGGER.debug("line: " + k8sOutput);
+        final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
+
+        // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
+        // are in a space-delimited array.
+        final String[] parts = k8sOutput.trim().split(" {3,}");
+
+        String id = parts[allColumns.indexOf(CustomColumns.SESSION_ID)];
+        String userid = parts[allColumns.indexOf(CustomColumns.USERID)];
+        String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
+        String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
+        String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
+        final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
+                ? Session.STATUS_TERMINATING
+                : parts[allColumns.indexOf(CustomColumns.STATUS)];
+        final String connectURL = SessionDAO.getConnectURL(sessionHostName, type, id, image, topLevelDirectory, userid);
 
         final Session session = new Session(
                 id,
@@ -435,7 +474,7 @@ public class SessionDAO {
     private enum CustomColumns {
         SESSION_ID(".metadata.labels", "canfar-net-sessionID", false),
         USERID(".metadata.labels", "canfar-net-userid", false),
-        RUN_AS_UID(".spec.securityContext", "runAsUser",false),
+        RUN_AS_UID(".spec.securityContext", "runAsUser", false),
         RUN_AS_GID(".spec.securityContext", "runAsGroup", false),
         SUPPLEMENTAL_GROUPS(".spec.securityContext", "supplementalGroups", false),
         IMAGE(".spec.containers[0]", "image", false),
@@ -462,19 +501,6 @@ public class SessionDAO {
         }
     }
 
-    private static class SessionMapper {
-        static Session from(final V1Job job) {
-            final V1ObjectMeta meta = job.getMetadata();
-            final V1JobSpec jobSpec = job.getSpec();
-            Objects.requireNonNull(jobSpec, "jobSpec cannot be null");
-            final SessionBuilder sessionBuilder = SessionBuilder.fromMetadata(meta)
-                    .withPodSpec(jobSpec.getTemplate().getSpec())
-                    .withStatus(job.getStatus());
-
-            return sessionBuilder.build();
-        }
-    }
-
     private static class SessionBuilder {
         private final String id;
         private final String userID;
@@ -483,57 +509,126 @@ public class SessionDAO {
         private String appID;
         private Long runAsUID;
         private Long runAsGID;
-        private List<Integer> supplementalGroups = new ArrayList<>();
+        private final List<Integer> supplementalGroups = new ArrayList<>();
         private String image;
+        private String requestedMemory;
+        private String requestedCPUCores;
+        private String requestedGPUCores;
         private String status;
         private String startTime;
+        private String expiryTime;
+        private Long activeExpirySeconds;
         private String connectURL;
+        private String jobName; // used to match up resource usages (metrics)
 
         private SessionBuilder(final String id, final String userID, final String type, final String name) {
             Objects.requireNonNull(id, "Session ID cannot be null");
             Objects.requireNonNull(userID, "Session UserID cannot be null");
             Objects.requireNonNull(type, "Session Type cannot be null");
             Objects.requireNonNull(name, "Session Name cannot be null");
+
             this.id = id;
             this.userID = userID;
             this.type = type;
             this.name = name;
         }
 
-        static SessionBuilder fromMetadata(final V1ObjectMeta jobMetadata) {
+        static Session fromJob(final V1Job job) {
+            final V1ObjectMeta jobMetadata = job.getMetadata();
             Objects.requireNonNull(jobMetadata, "Invalid Job with null Metadata");
+
+            final V1JobSpec jobSpec = job.getSpec();
+            Objects.requireNonNull(jobSpec, "jobSpec cannot be null");
+
             final Map<String, String> labels = jobMetadata.getLabels();
             Objects.requireNonNull(labels, "Invalid Job with null Labels");
 
-            final SessionBuilder sessionBuilder = new SessionBuilder(labels.get(CustomColumns.SESSION_ID.simpleName),
-                    labels.get(CustomColumns.USERID.simpleName), labels.get(CustomColumns.TYPE.simpleName),
+            final String sessionID = labels.get(CustomColumns.SESSION_ID.simpleName);
+            final SessionBuilder sessionBuilder = new SessionBuilder(
+                    sessionID,
+                    labels.get(CustomColumns.USERID.simpleName),
+                    labels.get(CustomColumns.TYPE.simpleName),
                     labels.get(CustomColumns.NAME.simpleName));
 
             sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
+            sessionBuilder.connectURL = new URIBuilder()
+                    .setScheme("https")
+                    .setHost(K8SUtil.getSessionsHostName())
+                    .setPathSegments(sessionID)
+                    .toString();
 
-            return sessionBuilder;
+            return sessionBuilder
+                    .withJobSpec(jobSpec)
+                    .withStatus(job.getStatus())
+                    .build();
         }
 
-        SessionBuilder withPodSpec(final V1PodSpec podSpec) {
-            Objects.requireNonNull(podSpec, "Invalid PodSpec");
-            final V1PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
-            if (podSecurityContext == null) {
-                LOGGER.warn("No Pod Security Context found.");
-            } else {
-                this.runAsUID = podSecurityContext.getRunAsUser();
-                this.runAsGID = podSecurityContext.getRunAsGroup();
-                final List<Long> supplementalGroupGIDs = podSecurityContext.getSupplementalGroups();
-                if (supplementalGroupGIDs != null && !supplementalGroupGIDs.isEmpty()) {
-                    this.supplementalGroups.addAll(supplementalGroupGIDs.stream().map(Long::intValue)
-                            .collect(Collectors.toList()));
+        SessionBuilder withJobSpec(final V1JobSpec jobSpec) {
+            Objects.requireNonNull(jobSpec, "Invalid JobSpec");
+
+            final Long secondsUntilExpire = jobSpec.getActiveDeadlineSeconds();
+            if (this.startTime != null) {
+                if (secondsUntilExpire == null) {
+                    LOGGER.warn("No expiry set for " + this.id);
+                } else {
+                    final Instant instant = Instant.parse(this.startTime);
+                    this.expiryTime = instant.plusSeconds(secondsUntilExpire).toString();
                 }
+            } else {
+                this.activeExpirySeconds = secondsUntilExpire;
             }
 
-            final List<V1Container> podContainers = podSpec.getContainers();
-            if (podContainers.isEmpty()) {
-                LOGGER.warn("No Container found.");
-            } else {
-                this.image = podContainers.get(0).getImage();
+            final V1PodSpec podSpec = jobSpec.getTemplate().getSpec();
+
+            if (podSpec != null) {
+                this.jobName = podSpec.getHostname();
+
+                final V1PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
+                if (podSecurityContext == null) {
+                    LOGGER.warn("No Pod Security Context found.");
+                } else {
+                    this.runAsUID = podSecurityContext.getRunAsUser();
+                    this.runAsGID = podSecurityContext.getRunAsGroup();
+                    final List<Long> supplementalGroupGIDs = podSecurityContext.getSupplementalGroups();
+                    if (supplementalGroupGIDs != null && !supplementalGroupGIDs.isEmpty()) {
+                        this.supplementalGroups.addAll(supplementalGroupGIDs.stream()
+                                .map(Long::intValue)
+                                .collect(Collectors.toList()));
+                    }
+                }
+
+                final List<V1Container> podContainers = podSpec.getContainers();
+                if (podContainers.isEmpty()) {
+                    LOGGER.warn("No Container found.");
+                } else {
+                    final V1Container podContainer = podContainers.get(0);
+                    this.image = podContainer.getImage();
+
+                    final V1ResourceRequirements resourceRequirements = podContainer.getResources();
+
+                    if (resourceRequirements != null) {
+                        final Map<String, Quantity> resourceRequests = resourceRequirements.getRequests();
+                        if (resourceRequests != null) {
+                            if (resourceRequests.containsKey("memory")) {
+                                this.requestedMemory =
+                                        resourceRequests.get("memory").toSuffixedString();
+                            }
+
+                            if (resourceRequests.containsKey("cpu")) {
+                                this.requestedCPUCores =
+                                        resourceRequests.get("cpu").toSuffixedString();
+                            }
+
+                            if (resourceRequests.containsKey("nvidia\\.com/gpu")) {
+                                this.requestedGPUCores =
+                                        resourceRequests.get("nvidia\\.com/gpu").toSuffixedString();
+                            } else {
+                                // Set to zero to satisfy UI conditions.
+                                this.requestedGPUCores = "0";
+                            }
+                        }
+                    }
+                }
             }
 
             return this;
@@ -541,29 +636,148 @@ public class SessionDAO {
 
         SessionBuilder withStatus(final V1JobStatus jobStatus) {
             Objects.requireNonNull(jobStatus, "Invalid JobStatus");
-            final List<V1JobCondition> conditions = jobStatus.getConditions();
-            if (conditions == null || conditions.isEmpty()) {
-                LOGGER.warn("No Pod Status Conditions found.");
+
+            this.startTime = Objects.requireNonNull(jobStatus.getStartTime(), "Missing Job start time.")
+                    .toString();
+            if (this.activeExpirySeconds != null) {
+                final Instant instant = Instant.parse(this.startTime);
+                this.expiryTime = instant.plusSeconds(this.activeExpirySeconds).toString();
+            }
+
+            final Integer failure = jobStatus.getFailed();
+            final Integer success = jobStatus.getSucceeded();
+            final Integer running = jobStatus.getActive();
+            if (failure != null && failure > 0) {
+                final List<V1JobCondition> conditions = jobStatus.getConditions();
+                if (conditions == null || conditions.isEmpty()) {
+                    LOGGER.warn("No Pod Status Conditions found.");
+                    this.status = "Failed";
+                } else {
+                    // Sort, then reverse it to get the latest.
+                    conditions.sort((condition1, condition2) -> {
+                        Objects.requireNonNull(condition1.getLastTransitionTime(), "Invalid Job Status Condition 1");
+                        Objects.requireNonNull(condition2.getLastTransitionTime(), "Invalid Job Status Condition 2");
+                        return condition2.getLastTransitionTime().compareTo(condition1.getLastTransitionTime());
+                    });
+
+                    Collections.reverse(conditions);
+                    final V1JobCondition jobCondition = conditions.get(0);
+                    this.status = String.format("%s (%s)", jobCondition.getType(), jobCondition.getReason());
+                }
+            } else if (success != null && success > 0) {
+                this.status = "Completed";
+            } else if (running != null && running > 0) {
+                this.status = "Running";
             } else {
-                conditions.sort((condition1, condition2) -> {
-                    Objects.requireNonNull(condition1.getLastTransitionTime(), "Invalid Job Status Condition 1");
-                    Objects.requireNonNull(condition2.getLastTransitionTime(), "Invalid Job Status Condition 2");
-                    return condition2.getLastTransitionTime().compareTo(condition1.getLastTransitionTime());
-                });
-
-                Collections.reverse(conditions);
-
-                this.status = conditions.get(0).getStatus();
-                this.startTime = Objects.requireNonNull(jobStatus.getStartTime(), "Missing Job start time.").toString();
+                this.status = "Pending";
             }
 
             return this;
         }
 
         Session build() {
-            return new Session(this.id, this.userID, runAsUID == null ? "" : Long.toString(this.runAsUID),
-                    runAsGID == null ? "" : Long.toString(this.runAsGID), this.supplementalGroups.toArray(new Integer[0]), this.image,
-                    this.type, this.status, this.name, this.startTime, this.connectURL, this.appID);
+            final Session session = new Session(
+                    this.id,
+                    this.userID,
+                    runAsUID == null ? "" : Long.toString(this.runAsUID),
+                    runAsGID == null ? "" : Long.toString(this.runAsGID),
+                    this.supplementalGroups.toArray(new Integer[0]),
+                    this.image,
+                    this.type,
+                    this.status,
+                    this.name,
+                    this.startTime,
+                    this.connectURL,
+                    this.appID);
+
+            session.setExpiryTime(this.expiryTime);
+            session.setRequestedRAM(this.requestedMemory);
+            session.setRequestedCPUCores(this.requestedCPUCores);
+            session.setRequestedGPUCores(this.requestedGPUCores);
+            session.setJobName(this.jobName);
+
+            return session;
+        }
+    }
+
+    private static class PodResourceUsage {
+        final Map<String, String> cpu;
+        final Map<String, String> memory;
+
+        private PodResourceUsage(final Map<String, String> cpu, final Map<String, String> memory) {
+            this.cpu = Collections.unmodifiableMap(cpu);
+            this.memory = Collections.unmodifiableMap(memory);
+        }
+
+        static PodResourceUsage get(final ApiClient client, final boolean omitHeadless) throws Exception {
+            // Unfortunately, this will query ALL Pods in this Namespace.
+            // @see https://github.com/kubernetes-client/java/issues/3998
+            final PodMetricsList list = new Metrics(client).getPodMetrics(K8SUtil.getWorkloadNamespace());
+            final Map<String, String> cpuMetrics = new HashMap<>();
+            final Map<String, String> memoryMetrics = new HashMap<>();
+
+            for (final PodMetrics podMetrics : list.getItems()) {
+                final V1ObjectMeta podMetadata = podMetrics.getMetadata();
+                if (podMetadata != null) {
+                    final Map<String, String> podLabels = podMetadata.getLabels();
+                    if (podLabels != null) {
+                        final String sessionID = podLabels.get(CustomColumns.SESSION_ID.simpleName);
+                        final List<ContainerMetrics> containerMetrics = podMetrics.getContainers();
+                        if (!containerMetrics.isEmpty()) {
+                            final ContainerMetrics containerMetric = containerMetrics.get(0);
+                            cpuMetrics.put(
+                                    sessionID,
+                                    CommonUtils.formatCPUCores(containerMetric
+                                            .getUsage()
+                                            .get("cpu")
+                                            .getNumber()));
+                            memoryMetrics.put(
+                                    sessionID,
+                                    CommonUtils.formatMemoryFromBytes(containerMetric
+                                            .getUsage()
+                                            .get("memory")
+                                            .getNumber()));
+                        }
+                    }
+                }
+            }
+
+            return new PodResourceUsage(cpuMetrics, memoryMetrics);
+        }
+
+        static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
+            final Map<String, String> cpuMetrics = new HashMap<>();
+            final Map<String, String> memoryMetrics = new HashMap<>();
+            final List<String> labelSelectors = new ArrayList<>();
+            labelSelectors.add("canfar-net-userid=" + userID);
+
+            if (omitHeadless) {
+                labelSelectors.add("canfar-net-sessionType!=headless");
+            }
+
+            final String[] topCommand = KubectlCommandBuilder.command("top")
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .noHeaders()
+                    .pod()
+                    .label(String.join(",", labelSelectors))
+                    .build();
+
+            LOGGER.debug("Resource usage command: " + String.join(" ", topCommand));
+            final String sessionResourceUsageMap = CommandExecutioner.execute(topCommand);
+            LOGGER.debug("Resource usage command output: " + sessionResourceUsageMap);
+            if (StringUtil.hasLength(sessionResourceUsageMap)) {
+                final String[] lines = sessionResourceUsageMap.split("\n");
+                for (final String line : lines) {
+                    final String[] resourceUsage =
+                            line.trim().replaceAll("\\s+", " ").split(" ");
+                    final String fullName = resourceUsage[0];
+
+                    cpuMetrics.put(fullName, resourceUsage[1]);
+                    memoryMetrics.put(fullName, resourceUsage[2]);
+                }
+            }
+
+            return new PodResourceUsage(cpuMetrics, memoryMetrics);
         }
     }
 }

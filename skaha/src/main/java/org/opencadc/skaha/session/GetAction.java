@@ -429,7 +429,7 @@ public class GetAction extends SessionAction {
     public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
         final String forUser = allUsers ? null : getUsername();
-        final List<Session> sessions = getAllSessions(forUser);
+        final List<Session> sessions = getInteractiveSessions(forUser);
 
         log.debug("typeFilter=" + typeFilter);
         log.debug("statusFilter=" + statusFilter);

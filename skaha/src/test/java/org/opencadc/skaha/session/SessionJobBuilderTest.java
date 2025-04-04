@@ -49,7 +49,9 @@ public class SessionJobBuilderTest {
         V1Job job = (V1Job) Yaml.load(output);
         V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
-        Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
+        Assert.assertTrue(
+                "PodSpec should not have image pull secrets",
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).isEmpty());
     }
 
     private V1Job getTestBaseValuesAffinityJob() throws Exception {
