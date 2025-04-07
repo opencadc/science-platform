@@ -105,17 +105,9 @@ public class SessionDAO {
         final String labelSelector = String.join(",", labelSelectors);
         jobListRequest.labelSelector(labelSelector);
 
-        final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, true);
+        final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, omitHeadless);
         return jobListRequest.execute().getItems().stream()
-                .map(job -> {
-                    final String jobName =
-                            Objects.requireNonNull(job.getMetadata()).getName();
-                    final Session session = SessionBuilder.fromJob(job);
-                    session.setCPUCoresInUse(podResourceUsage.cpu.get(jobName));
-                    session.setRAMInUse(podResourceUsage.memory.get(jobName));
-
-                    return session;
-                })
+                .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
     }
 
@@ -514,6 +506,8 @@ public class SessionDAO {
         private String requestedMemory;
         private String requestedCPUCores;
         private String requestedGPUCores;
+        private String memoryInUse;
+        private String cpuCoresInUse;
         private String status;
         private String startTime;
         private String expiryTime;
@@ -533,7 +527,7 @@ public class SessionDAO {
             this.name = name;
         }
 
-        static Session fromJob(final V1Job job) {
+        static Session fromJob(final V1Job job, final PodResourceUsage podResourceUsage) {
             final V1ObjectMeta jobMetadata = job.getMetadata();
             Objects.requireNonNull(jobMetadata, "Invalid Job with null Metadata");
 
@@ -556,14 +550,15 @@ public class SessionDAO {
                     .setHost(K8SUtil.getSessionsHostName())
                     .setPathSegments(sessionID)
                     .toString();
+            sessionBuilder.jobName = jobMetadata.getName();
 
             return sessionBuilder
-                    .withJobSpec(jobSpec)
+                    .withJobSpec(jobSpec, podResourceUsage)
                     .withStatus(job.getStatus())
                     .build();
         }
 
-        SessionBuilder withJobSpec(final V1JobSpec jobSpec) {
+        SessionBuilder withJobSpec(final V1JobSpec jobSpec, final PodResourceUsage podResourceUsage) {
             Objects.requireNonNull(jobSpec, "Invalid JobSpec");
 
             final Long secondsUntilExpire = jobSpec.getActiveDeadlineSeconds();
@@ -581,8 +576,6 @@ public class SessionDAO {
             final V1PodSpec podSpec = jobSpec.getTemplate().getSpec();
 
             if (podSpec != null) {
-                this.jobName = podSpec.getHostname();
-
                 final V1PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
                 if (podSecurityContext == null) {
                     LOGGER.warn("No Pod Security Context found.");
@@ -596,6 +589,17 @@ public class SessionDAO {
                                 .collect(Collectors.toList()));
                     }
                 }
+
+                this.memoryInUse = podResourceUsage.memory.entrySet().stream()
+                        .filter(entry -> entry.getKey().startsWith(this.jobName))
+                        .map(Map.Entry::getValue)
+                        .findFirst()
+                        .orElse(null);
+                this.cpuCoresInUse = podResourceUsage.cpu.entrySet().stream()
+                        .filter(entry -> entry.getKey().startsWith(this.jobName))
+                        .map(Map.Entry::getValue)
+                        .findFirst()
+                        .orElse(null);
 
                 final List<V1Container> podContainers = podSpec.getContainers();
                 if (podContainers.isEmpty()) {
@@ -694,7 +698,8 @@ public class SessionDAO {
             session.setRequestedRAM(this.requestedMemory);
             session.setRequestedCPUCores(this.requestedCPUCores);
             session.setRequestedGPUCores(this.requestedGPUCores);
-            session.setJobName(this.jobName);
+            session.setCPUCoresInUse(this.cpuCoresInUse);
+            session.setRAMInUse(this.memoryInUse);
 
             return session;
         }

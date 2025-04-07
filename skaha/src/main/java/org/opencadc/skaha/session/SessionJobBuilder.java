@@ -182,6 +182,7 @@ public class SessionJobBuilder {
                         final Map<String, Quantity> limits =
                                 Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
                         limits.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+                        resourceRequirements.setLimits(limits);
                     }
 
                     // spec.template.spec.affinity

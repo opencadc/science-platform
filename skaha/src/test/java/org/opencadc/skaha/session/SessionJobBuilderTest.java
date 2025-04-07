@@ -52,6 +52,16 @@ public class SessionJobBuilderTest {
         Assert.assertTrue(
                 "PodSpec should not have image pull secrets",
                 Objects.requireNonNull(podSpec.getImagePullSecrets()).isEmpty());
+        Assert.assertFalse(
+                "Wrong GPU limit.",
+                job.getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources()
+                        .getLimits()
+                        .containsKey("nvidia.com/gpu"));
     }
 
     private V1Job getTestBaseValuesAffinityJob() throws Exception {
@@ -79,6 +89,21 @@ public class SessionJobBuilderTest {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
+
+        final V1Job job = (V1Job) Yaml.load(output);
+        Assert.assertEquals(
+                "Wrong GPU limit.",
+                2,
+                job.getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources()
+                        .getLimits()
+                        .get("nvidia.com/gpu")
+                        .getNumber()
+                        .intValue());
 
         return (V1Job) Yaml.load(output);
     }
