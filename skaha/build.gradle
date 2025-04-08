@@ -61,7 +61,6 @@ dependencies {
 
     runtimeOnly 'org.opencadc:cadc-registry:[1.7.7,)'
     runtimeOnly 'org.slf4j:slf4j-api:2.0.17'
-    runtimeOnly 'org.slf4j:slf4j-reload4j:2.0.17'
 
     testImplementation 'junit:junit:[4.13,)'
     testImplementation 'org.json:json:20231013'

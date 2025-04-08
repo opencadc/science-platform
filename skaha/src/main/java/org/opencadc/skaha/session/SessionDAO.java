@@ -17,10 +17,10 @@ import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
@@ -87,7 +87,6 @@ public class SessionDAO {
     }
 
     static List<Session> getUserSessions(final String forUserID, final boolean omitHeadless) throws Exception {
-        Objects.requireNonNull(forUserID, "UserID (username) is required to query.");
         final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
 
@@ -100,7 +99,9 @@ public class SessionDAO {
         final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
                 api.listNamespacedJob(K8SUtil.getWorkloadNamespace()).allowWatchBookmarks(Boolean.TRUE);
 
-        labelSelectors.add("canfar-net-userid=" + forUserID);
+        if (StringUtil.hasLength(forUserID)) {
+            labelSelectors.add("canfar-net-userid=" + forUserID);
+        }
 
         final String labelSelector = String.join(",", labelSelectors);
         jobListRequest.labelSelector(labelSelector);
@@ -386,7 +387,7 @@ public class SessionDAO {
             connectURL =
                     SessionURLBuilder.contributedSession(sessionHostName, id).build();
         } else {
-            connectURL = "not-applicable";
+            connectURL = "";
         }
 
         return connectURL;
@@ -545,11 +546,6 @@ public class SessionDAO {
                     labels.get(CustomColumns.NAME.simpleName));
 
             sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
-            sessionBuilder.connectURL = new URIBuilder()
-                    .setScheme("https")
-                    .setHost(K8SUtil.getSessionsHostName())
-                    .setPathSegments(sessionID)
-                    .toString();
             sessionBuilder.jobName = jobMetadata.getName();
 
             return sessionBuilder
@@ -590,6 +586,7 @@ public class SessionDAO {
                     }
                 }
 
+                // The Pod Name starts with the Job Name.  Is this reliable?
                 this.memoryInUse = podResourceUsage.memory.entrySet().stream()
                         .filter(entry -> entry.getKey().startsWith(this.jobName))
                         .map(Map.Entry::getValue)
@@ -633,6 +630,19 @@ public class SessionDAO {
                         }
                     }
                 }
+
+                try {
+                    this.connectURL = SessionDAO.getConnectURL(
+                            K8SUtil.getSessionsHostName(),
+                            this.type,
+                            this.id,
+                            this.image,
+                            K8SUtil.getSkahaTld(),
+                            this.userID);
+                } catch (URISyntaxException e) {
+                    LOGGER.warn("Invalid URI for connect URL: " + this);
+                    throw new IllegalStateException(e.getMessage(), e);
+                }
             }
 
             return this;
@@ -641,8 +651,10 @@ public class SessionDAO {
         SessionBuilder withStatus(final V1JobStatus jobStatus) {
             Objects.requireNonNull(jobStatus, "Invalid JobStatus");
 
-            this.startTime = Objects.requireNonNull(jobStatus.getStartTime(), "Missing Job start time.")
-                    .toString();
+            if (jobStatus.getStartTime() != null) {
+                this.startTime = jobStatus.getStartTime().toString();
+            }
+
             if (this.activeExpirySeconds != null) {
                 final Instant instant = Instant.parse(this.startTime);
                 this.expiryTime = instant.plusSeconds(this.activeExpirySeconds).toString();
@@ -659,9 +671,18 @@ public class SessionDAO {
                 } else {
                     // Sort, then reverse it to get the latest.
                     conditions.sort((condition1, condition2) -> {
-                        Objects.requireNonNull(condition1.getLastTransitionTime(), "Invalid Job Status Condition 1");
-                        Objects.requireNonNull(condition2.getLastTransitionTime(), "Invalid Job Status Condition 2");
-                        return condition2.getLastTransitionTime().compareTo(condition1.getLastTransitionTime());
+                        final OffsetDateTime conditionOneDateTime = condition1.getLastTransitionTime();
+                        final OffsetDateTime conditionTwoDateTime = condition2.getLastTransitionTime();
+
+                        if (conditionOneDateTime == null && conditionTwoDateTime == null) {
+                            return 0;
+                        } else if (conditionOneDateTime == null) {
+                            return 1;
+                        } else if (conditionTwoDateTime == null) {
+                            return -1;
+                        } else {
+                            return conditionTwoDateTime.compareTo(conditionOneDateTime);
+                        }
                     });
 
                     Collections.reverse(conditions);
@@ -702,6 +723,27 @@ public class SessionDAO {
             session.setRAMInUse(this.memoryInUse);
 
             return session;
+        }
+
+        @Override
+        public String toString() {
+            return "SessionBuilder{" + "id='"
+                    + id + '\'' + ", type='"
+                    + type + '\'' + ", name='"
+                    + name + '\'' + ", appID='"
+                    + appID + '\'' + ", image='"
+                    + image + '\'' + ", requestedMemory='"
+                    + requestedMemory + '\'' + ", requestedCPUCores='"
+                    + requestedCPUCores + '\'' + ", requestedGPUCores='"
+                    + requestedGPUCores + '\'' + ", memoryInUse='"
+                    + memoryInUse + '\'' + ", cpuCoresInUse='"
+                    + cpuCoresInUse + '\'' + ", status='"
+                    + status + '\'' + ", startTime='"
+                    + startTime + '\'' + ", expiryTime='"
+                    + expiryTime + '\'' + ", activeExpirySeconds="
+                    + activeExpirySeconds + ", connectURL='"
+                    + connectURL + '\'' + ", jobName='"
+                    + jobName + '\'' + '}';
         }
     }
 
@@ -754,10 +796,13 @@ public class SessionDAO {
             final Map<String, String> cpuMetrics = new HashMap<>();
             final Map<String, String> memoryMetrics = new HashMap<>();
             final List<String> labelSelectors = new ArrayList<>();
-            labelSelectors.add("canfar-net-userid=" + userID);
+
+            if (StringUtil.hasLength(userID)) {
+                labelSelectors.add("canfar-net-userid=" + userID);
+            }
 
             if (omitHeadless) {
-                labelSelectors.add("canfar-net-sessionType!=headless");
+                labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
             }
 
             final String[] topCommand = KubectlCommandBuilder.command("top")

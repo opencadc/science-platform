@@ -315,12 +315,13 @@ public abstract class SessionAction extends SkahaAction {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    public List<Session> getAllSessions(String forUserID) throws Exception {
+    @Deprecated
+    public List<Session> _getUserSessions(String forUserID) throws Exception {
         return SessionDAO.getSessions(forUserID, null, skahaTld);
     }
 
-    List<Session> getInteractiveSessions(final String forUserID) throws Exception {
-        return SessionDAO.getUserSessions(forUserID, true);
+    List<Session> getAllSessions(final String forUserID) throws Exception {
+        return SessionDAO.getUserSessions(forUserID, false);
     }
 
     protected String toCoreUnit(String cores) {
