@@ -655,7 +655,7 @@ public class SessionDAO {
                 this.startTime = jobStatus.getStartTime().toString();
             }
 
-            if (this.activeExpirySeconds != null) {
+            if (this.activeExpirySeconds != null && this.startTime != null) {
                 final Instant instant = Instant.parse(this.startTime);
                 this.expiryTime = instant.plusSeconds(this.activeExpirySeconds).toString();
             }
