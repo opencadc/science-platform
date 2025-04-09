@@ -67,7 +67,9 @@
 
 package org.opencadc.skaha;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 
 public class K8SUtil {
@@ -143,7 +145,11 @@ public class K8SUtil {
             return List.of();
         }
 
-        return List.of(rawHosts.split(","));
+        return K8SUtil.getHarborHosts(rawHosts);
+    }
+
+    static List<String> getHarborHosts(final String rawHosts) {
+        return Arrays.stream(rawHosts.split(" ")).map(String::trim).collect(Collectors.toList());
     }
 
     public static String getSkahaUsersGroup() {
