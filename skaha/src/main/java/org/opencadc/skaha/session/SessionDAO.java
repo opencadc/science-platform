@@ -18,8 +18,9 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -138,13 +139,12 @@ public class SessionDAO {
                     if (startTimeStr.equalsIgnoreCase(NONE)) {
                         session.setExpiryTime(startTimeStr);
                     } else {
-                        Instant instant = Instant.parse(startTimeStr);
                         String jobExpiryTimesStr = jobExpiryTimes.get(uid);
                         if (jobExpiryTimesStr == null) {
                             session.setExpiryTime(NONE);
                         } else {
-                            instant = instant.plus(Integer.parseInt(jobExpiryTimesStr), ChronoUnit.SECONDS);
-                            session.setExpiryTime(instant.toString());
+                            session.setExpiryTime(
+                                    SessionDAO.getExpiryTimeString(startTimeStr, Long.parseLong(jobExpiryTimesStr)));
                         }
                     }
 
@@ -562,8 +562,7 @@ public class SessionDAO {
                 if (secondsUntilExpire == null) {
                     LOGGER.warn("No expiry set for " + this.id);
                 } else {
-                    final Instant instant = Instant.parse(this.startTime);
-                    this.expiryTime = instant.plusSeconds(secondsUntilExpire).toString();
+                    this.expiryTime = SessionDAO.getExpiryTimeString(this.startTime, secondsUntilExpire);
                 }
             } else {
                 this.activeExpirySeconds = secondsUntilExpire;
@@ -656,8 +655,7 @@ public class SessionDAO {
             }
 
             if (this.activeExpirySeconds != null && this.startTime != null) {
-                final Instant instant = Instant.parse(this.startTime);
-                this.expiryTime = instant.plusSeconds(this.activeExpirySeconds).toString();
+                this.expiryTime = SessionDAO.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
             }
 
             final Integer failure = jobStatus.getFailed();
@@ -687,7 +685,13 @@ public class SessionDAO {
 
                     Collections.reverse(conditions);
                     final V1JobCondition jobCondition = conditions.get(0);
-                    this.status = String.format("%s (%s)", jobCondition.getType(), jobCondition.getReason());
+
+                    // Suspended and then resumed.
+                    if ("JobResumed".equals(jobCondition.getReason())) {
+                        this.status = "Running";
+                    } else {
+                        this.status = String.format("%s (%s)", jobCondition.getType(), jobCondition.getReason());
+                    }
                 }
             } else if (success != null && success > 0) {
                 this.status = "Completed";
@@ -829,5 +833,42 @@ public class SessionDAO {
 
             return new PodResourceUsage(cpuMetrics, memoryMetrics);
         }
+    }
+
+    static String getExpiryTimeString(final String startTimeString, final Long expiryTimeInSeconds) {
+        final String outputTemplate = "%s-%s-%sT%s:%s:%sZ";
+        final Pattern expectedFormat = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):?(\\d{2})?.*Z");
+        final Matcher matcher = expectedFormat.matcher(startTimeString);
+        final List<String> captureGroups = new ArrayList<>();
+        if (matcher.find()) {
+            for (int i = 0; i < matcher.groupCount(); i++) {
+                final String nextMatch = matcher.group(i + 1);
+                if (StringUtil.hasLength(nextMatch)) {
+                    captureGroups.add(nextMatch);
+                }
+            }
+        }
+
+        final int capturedGroupCount = captureGroups.size();
+
+        // Expected order of the groups resulting in count:
+        // Calendar.YEAR, Calendar.MONTH, Calendar.DAY_OF_MONTH, Calendar.HOUR, Calendar.MINUTE, Calendar.SECOND
+        final int expectedCount = 6;
+        final int missingGroups = expectedCount - capturedGroupCount;
+        if (missingGroups > 3) {
+            LOGGER.warn("Unparsable start time: " + startTimeString);
+            return null;
+        } else {
+            if (missingGroups > 0) {
+                for (int i = 0; i < missingGroups; i++) {
+                    captureGroups.add("00");
+                }
+            }
+        }
+
+        final String[] captureGroupsArray = captureGroups.toArray(new String[0]);
+        final String instantTime = String.format(outputTemplate, captureGroupsArray);
+        final Instant instant = Instant.parse(instantTime);
+        return instant.plusSeconds(expiryTimeInSeconds).toString();
     }
 }
