@@ -68,6 +68,7 @@
 
 package org.opencadc.skaha;
 
+import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -84,5 +85,14 @@ public class K8SUtilTest {
                 "Wrong name",
                 "skaha-notebook-my-us-e-r-sess",
                 K8SUtil.getJobName("SESS", SessionType.NOTEBOOK, "my|us+e&r"));
+    }
+
+    @Test
+    public void getHarborHosts() {
+        Assert.assertEquals("Wrong hosts.", List.of("localhost"), K8SUtil.getHarborHosts("localhost"));
+        Assert.assertEquals(
+                "Wrong hosts.", List.of("localhost", "example.org"), K8SUtil.getHarborHosts("localhost example.org"));
+        Assert.assertEquals(
+                "Wrong hosts.", List.of("localhost,anotherhost"), K8SUtil.getHarborHosts("localhost,anotherhost"));
     }
 }
