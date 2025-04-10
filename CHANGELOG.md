@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.9](https://github.com/opencadc/science-platform/compare/0.27.8...0.27.9) (2025-04-10)
+
+
+### Bug Fixes
+
+* properly read harbor hosts ([cf6df87](https://github.com/opencadc/science-platform/commit/cf6df879c9747597cf667f332c61165780e50e19))
+* properly read harbor hosts ([5c07283](https://github.com/opencadc/science-platform/commit/5c07283ebc166b81863644c124b00e1de555b1a9))
+
 ## [0.27.8](https://github.com/opencadc/science-platform/compare/0.27.7...0.27.8) (2025-03-14)
 
 
