@@ -3,8 +3,6 @@ package org.opencadc.skaha.utils;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import java.math.BigDecimal;
 import java.net.URI;
-import java.text.CharacterIterator;
-import java.text.StringCharacterIterator;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Set;
@@ -35,7 +33,7 @@ public class CommonUtils {
     }
 
     /**
-     * Format to Binary SI values.
+     * Format to Binary SI values, which users powers of 1000, not 1024.
      *
      * @param bytes Bytes reported from Kubernetes.
      * @return String formatted, never null.
@@ -48,16 +46,16 @@ public class CommonUtils {
             return longBytes + " B";
         }
 
-        long value = absB;
-        CharacterIterator ci = new StringCharacterIterator("KMGTPE");
-        for (int i = 40; i >= 0 && absB > 0xfffccccccccccccL >> i; i -= 10) {
-            value >>= 10;
-            ci.next();
-        }
+        final String[] units = {"Ki", "Mi", "Gi", "Ti", "Pi", "Ei"};
+        int unitIndex = -1;
+        double value = longBytes;
 
-        value *= Long.signum(longBytes);
+        do {
+            value = value / 1024.0D;
+            unitIndex++;
+        } while (value >= 1024.0D && unitIndex < units.length - 1);
 
-        return String.format("%d%ci", Double.valueOf(value / 1024.0).longValue(), ci.current());
+        return String.format("%d%s", Double.valueOf(value).longValue(), units[unitIndex]);
     }
 
     /**
