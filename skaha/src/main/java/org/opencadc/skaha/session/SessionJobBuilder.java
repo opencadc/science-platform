@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
-    private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
 
     static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
     static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
@@ -176,7 +175,9 @@ public class SessionJobBuilder {
                 if (podTemplateSpec != null) {
                     final V1Affinity affinity = podTemplateSpec.getAffinity();
 
-                    if (this.gpuEnabled && this.gpuCount > 0) {
+                    // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is
+                    // greater than 0.
+                    if (this.gpuCount > 0) {
                         final V1ResourceRequirements resourceRequirements =
                                 SessionJobBuilder.getResourceRequirements(podTemplateSpec);
                         final Map<String, Quantity> limits =
@@ -368,12 +369,5 @@ public class SessionJobBuilder {
         gpuAffinity.setNodeAffinity(gpuNodeAffinity);
 
         return gpuAffinity;
-    }
-
-    private String getGPUResourceLimit(int gpus) {
-        if (!this.gpuEnabled) {
-            return "";
-        }
-        return "nvidia.com/gpu: ".concat(Integer.toString(gpus));
     }
 }

@@ -4,10 +4,6 @@ import static org.opencadc.skaha.utils.CommandExecutioner.execute;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import io.kubernetes.client.Metrics;
-import io.kubernetes.client.custom.ContainerMetrics;
-import io.kubernetes.client.custom.PodMetrics;
-import io.kubernetes.client.custom.PodMetricsList;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
@@ -26,7 +22,6 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SessionDAO {
@@ -72,9 +67,8 @@ public class SessionDAO {
         return labelCriteria.toArray(new String[0]);
     }
 
-    public static Session getSession(String forUserID, String sessionID, final String topLevelDirectory)
-            throws Exception {
-        final List<Session> sessions = SessionDAO.getSessions(forUserID, sessionID, topLevelDirectory);
+    public static Session getSession(String forUserID, String sessionID) throws Exception {
+        final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
@@ -87,13 +81,18 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    static List<Session> getUserSessions(final String forUserID, final boolean omitHeadless) throws Exception {
+    static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
+            throws Exception {
         final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
 
         final List<String> labelSelectors = new ArrayList<>();
         if (omitHeadless) {
             labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
+        }
+
+        if (StringUtil.hasLength(sessionID)) {
+            labelSelectors.add("canfar-net-sessionID=" + sessionID);
         }
 
         final BatchV1Api api = new BatchV1Api(client);
@@ -498,7 +497,7 @@ public class SessionDAO {
         private final String id;
         private final String userID;
         private final String type;
-        private final String name;
+        private String name;
         private String appID;
         private Long runAsUID;
         private Long runAsGID;
@@ -516,16 +515,14 @@ public class SessionDAO {
         private String connectURL;
         private String jobName; // used to match up resource usages (metrics)
 
-        private SessionBuilder(final String id, final String userID, final String type, final String name) {
+        private SessionBuilder(final String id, final String userID, final String type) {
             Objects.requireNonNull(id, "Session ID cannot be null");
             Objects.requireNonNull(userID, "Session UserID cannot be null");
             Objects.requireNonNull(type, "Session Type cannot be null");
-            Objects.requireNonNull(name, "Session Name cannot be null");
 
             this.id = id;
             this.userID = userID;
             this.type = type;
-            this.name = name;
         }
 
         static Session fromJob(final V1Job job, final PodResourceUsage podResourceUsage) {
@@ -540,12 +537,10 @@ public class SessionDAO {
 
             final String sessionID = labels.get(CustomColumns.SESSION_ID.simpleName);
             final SessionBuilder sessionBuilder = new SessionBuilder(
-                    sessionID,
-                    labels.get(CustomColumns.USERID.simpleName),
-                    labels.get(CustomColumns.TYPE.simpleName),
-                    labels.get(CustomColumns.NAME.simpleName));
+                    sessionID, labels.get(CustomColumns.USERID.simpleName), labels.get(CustomColumns.TYPE.simpleName));
 
             sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
+            sessionBuilder.name = labels.get(CustomColumns.NAME.simpleName);
             sessionBuilder.jobName = jobMetadata.getName();
 
             return sessionBuilder
@@ -683,7 +678,6 @@ public class SessionDAO {
                         }
                     });
 
-                    Collections.reverse(conditions);
                     final V1JobCondition jobCondition = conditions.get(0);
 
                     // Suspended and then resumed.
@@ -760,42 +754,6 @@ public class SessionDAO {
             this.memory = Collections.unmodifiableMap(memory);
         }
 
-        static PodResourceUsage get(final ApiClient client, final boolean omitHeadless) throws Exception {
-            // Unfortunately, this will query ALL Pods in this Namespace.
-            // @see https://github.com/kubernetes-client/java/issues/3998
-            final PodMetricsList list = new Metrics(client).getPodMetrics(K8SUtil.getWorkloadNamespace());
-            final Map<String, String> cpuMetrics = new HashMap<>();
-            final Map<String, String> memoryMetrics = new HashMap<>();
-
-            for (final PodMetrics podMetrics : list.getItems()) {
-                final V1ObjectMeta podMetadata = podMetrics.getMetadata();
-                if (podMetadata != null) {
-                    final Map<String, String> podLabels = podMetadata.getLabels();
-                    if (podLabels != null) {
-                        final String sessionID = podLabels.get(CustomColumns.SESSION_ID.simpleName);
-                        final List<ContainerMetrics> containerMetrics = podMetrics.getContainers();
-                        if (!containerMetrics.isEmpty()) {
-                            final ContainerMetrics containerMetric = containerMetrics.get(0);
-                            cpuMetrics.put(
-                                    sessionID,
-                                    CommonUtils.formatCPUCores(containerMetric
-                                            .getUsage()
-                                            .get("cpu")
-                                            .getNumber()));
-                            memoryMetrics.put(
-                                    sessionID,
-                                    CommonUtils.formatMemoryFromBytes(containerMetric
-                                            .getUsage()
-                                            .get("memory")
-                                            .getNumber()));
-                        }
-                    }
-                }
-            }
-
-            return new PodResourceUsage(cpuMetrics, memoryMetrics);
-        }
-
         static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
             final Map<String, String> cpuMetrics = new HashMap<>();
             final Map<String, String> memoryMetrics = new HashMap<>();
@@ -853,6 +811,8 @@ public class SessionDAO {
 
         // Expected order of the groups resulting in count:
         // Calendar.YEAR, Calendar.MONTH, Calendar.DAY_OF_MONTH, Calendar.HOUR, Calendar.MINUTE, Calendar.SECOND
+        //
+        // Some dates, however, are missing some elements if the value is 0.
         final int expectedCount = 6;
         final int missingGroups = expectedCount - capturedGroupCount;
         if (missingGroups > 3) {
@@ -867,7 +827,7 @@ public class SessionDAO {
         }
 
         final String[] captureGroupsArray = captureGroups.toArray(new String[0]);
-        final String instantTime = String.format(outputTemplate, captureGroupsArray);
+        final String instantTime = String.format(outputTemplate, (Object[]) captureGroupsArray);
         final Instant instant = Instant.parse(instantTime);
         return instant.plusSeconds(expiryTimeInSeconds).toString();
     }

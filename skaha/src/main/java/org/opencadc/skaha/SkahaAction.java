@@ -274,7 +274,7 @@ public abstract class SkahaAction extends RestAction {
             final String callbackSessionId =
                     SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
 
-            final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
+            final Session session = SessionDAO.getSession(null, callbackSessionId);
             this.posixPrincipal = session.getPosixPrincipal();
             currentSubject.getPrincipals().add(posixPrincipal);
 
