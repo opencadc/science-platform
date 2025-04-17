@@ -1,33 +1,20 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
-import io.kubernetes.client.openapi.models.V1Affinity;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1LocalObjectReference;
-import io.kubernetes.client.openapi.models.V1NodeAffinity;
-import io.kubernetes.client.openapi.models.V1NodeSelector;
-import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
-import io.kubernetes.client.openapi.models.V1NodeSelectorTerm;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1PreferredSchedulingTerm;
+import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
-    private static final String SOFTWARE_LIMITS_GPUS = "software.limits.gpus";
 
     static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
     static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
@@ -111,7 +98,6 @@ public class SessionJobBuilder {
      */
     SessionJobBuilder withGPUCount(final int gpuCount) {
         this.gpuCount = gpuCount;
-        this.withParameter(SessionJobBuilder.SOFTWARE_LIMITS_GPUS, getGPUResourceLimit(gpuCount));
         return this;
     }
 
@@ -189,6 +175,17 @@ public class SessionJobBuilder {
                 if (podTemplateSpec != null) {
                     final V1Affinity affinity = podTemplateSpec.getAffinity();
 
+                    // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is
+                    // greater than 0.
+                    if (this.gpuCount > 0) {
+                        final V1ResourceRequirements resourceRequirements =
+                                SessionJobBuilder.getResourceRequirements(podTemplateSpec);
+                        final Map<String, Quantity> limits =
+                                Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
+                        limits.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+                        resourceRequirements.setLimits(limits);
+                    }
+
                     // spec.template.spec.affinity
                     if (affinity == null) {
                         podTemplateSpec.setAffinity(gpuAffinity);
@@ -265,6 +262,20 @@ public class SessionJobBuilder {
                 }
             }
         }
+    }
+
+    @NotNull private static V1ResourceRequirements getResourceRequirements(V1PodSpec podTemplateSpec) {
+        final V1ResourceRequirements resourceRequirements;
+        final V1Container container = podTemplateSpec.getContainers().get(0);
+        final V1ResourceRequirements configuredResourceRequirements = container.getResources();
+
+        if (configuredResourceRequirements == null) {
+            resourceRequirements = new V1ResourceRequirements();
+            container.setResources(resourceRequirements);
+        } else {
+            resourceRequirements = configuredResourceRequirements;
+        }
+        return resourceRequirements;
     }
 
     /**
@@ -358,12 +369,5 @@ public class SessionJobBuilder {
         gpuAffinity.setNodeAffinity(gpuNodeAffinity);
 
         return gpuAffinity;
-    }
-
-    private String getGPUResourceLimit(int gpus) {
-        if (!this.gpuEnabled) {
-            return "";
-        }
-        return "nvidia.com/gpu: ".concat(Integer.toString(gpus));
     }
 }
