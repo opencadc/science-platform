@@ -69,6 +69,7 @@ package org.opencadc.skaha;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 
@@ -204,5 +205,10 @@ public class K8SUtil {
      */
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
+    }
+
+    public static String userDatasetsRootPath(){
+        String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
+        return Objects.requireNonNullElse(userDatasetsRootPath, "/datasets");
     }
 }
