@@ -14,12 +14,6 @@ public class UserVolumeUtils {
 
     private static final String USER_DATASETS_ROOT_PATH = K8SUtil.userDatasetsRootPath();
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-        Map<String, String> userVolumeTemplate = populateUserVolumeTemplate("abhishek.ghosh", "skaha-workload");
-        System.out.println(userVolumeTemplate.getOrDefault("runtimeVolumes", ""));
-        System.out.println(userVolumeTemplate.getOrDefault("runtimeVolumeMounts", ""));
-    }
-
     public static Map<String, String> populateUserVolumeTemplate(String userName, String namespace)
             throws IOException, InterruptedException {
         List<Map<String, String>> userRuntimePvcs = getUserPvc(userName, namespace);
