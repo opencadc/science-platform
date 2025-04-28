@@ -556,7 +556,8 @@ public class PostAction extends SessionAction {
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
-        Map<String, String> userVolumeTemplate = UserVolumeUtils.populateUserVolumeTemplate(posixPrincipal.username, K8SUtil.getWorkloadNamespace());
+        Map<String, String> userVolumeTemplate =
+                UserVolumeUtils.populateUserVolumeTemplate(posixPrincipal.username, K8SUtil.getWorkloadNamespace());
         String userRuntimeVolumes = userVolumeTemplate.getOrDefault("runtimeVolumes", "");
         String userRuntimeVolumeMounts = userVolumeTemplate.getOrDefault("runtimeVolumeMounts", "");
 

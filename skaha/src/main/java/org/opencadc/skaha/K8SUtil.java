@@ -207,7 +207,7 @@ public class K8SUtil {
         return System.getProperty("user.home");
     }
 
-    public static String userDatasetsRootPath(){
+    public static String userDatasetsRootPath() {
         String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
         return Objects.requireNonNullElse(userDatasetsRootPath, "/datasets");
     }
