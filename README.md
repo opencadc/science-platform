@@ -2,7 +2,6 @@
 
 *A container based science platform in CANFAR.*
 
-
 [![CI: Linting](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml)
 [![CI: Testing](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml)
 [![CD: Edge Build](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml)
