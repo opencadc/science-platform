@@ -8,7 +8,8 @@ public enum SessionType {
     DESKTOP(true, true, "desktop"),
     NOTEBOOK(true, true, "notebook"),
     HEADLESS(false, false, "headless"),
-    DESKTOP_APP(false, false, "desktop-app");
+    DESKTOP_APP(false, false, "desktop-app"),
+    FIREFLY(true, true, "firefly");
 
     private final boolean supportsIngress;
     private final boolean supportsService;

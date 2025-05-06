@@ -97,4 +97,21 @@ public class SessionURLBuilderTest {
             // Expected
         }
     }
+
+    @Test
+    public void testFireflySession() throws Exception {
+        final String fireflyURL = SessionURLBuilder.fireflySession("host.example.org", "8675309").build();
+
+        Assert.assertEquals(
+                "Wrong URL",
+                "https://host.example.org/session/firefly/8675309/firefly/",
+                fireflyURL);
+
+        try {
+            SessionURLBuilder.fireflySession(null, "8675309").build();
+            Assert.fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            // Expected
+        }
+    }
 }
