@@ -44,9 +44,6 @@ dependencies {
     // Used to merge YAML sections to fully configure Job files.
     implementation 'io.kubernetes:client-java:23.0.0'
 
-    // https://mvnrepository.com/artifact/io.fabric8/kubernetes-client
-//    implementation 'io.fabric8:kubernetes-client:7.1.0'
-
     implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'
