@@ -68,6 +68,17 @@ public abstract class SessionURLBuilder {
     }
 
     /**
+     * Create a builder to a Firefly session.
+     *
+     * @param host The host name.
+     * @param sessionID The session ID.
+     * @return FireflySessionURLBuilder instance. Never null.
+     */
+    static FireflySessionURLBuilder fireflySession(final String host, final String sessionID) {
+        return new FireflySessionURLBuilder(host, sessionID);
+    }
+
+    /**
      * Abstract method to build the URL.
      *
      * @return The URL string. Never null.
@@ -252,6 +263,39 @@ public abstract class SessionURLBuilder {
                     .setScheme("https")
                     .setHost(this.host)
                     .setPathSegments("session", "contrib", this.sessionID, "")
+                    .build()
+                    .toString();
+        }
+    }
+
+    /** Construct a URL for a Firefly session. Used to redirect the end user to the Firefly viewer. */
+    static final class FireflySessionURLBuilder extends SessionURLBuilder {
+        /**
+         * Constructor.
+         *
+         * @param host The host name.
+         * @param sessionID The session ID.
+         */
+        FireflySessionURLBuilder(String host, String sessionID) {
+            super(host, sessionID);
+        }
+
+        /**
+         * Build the URL for a Firefly session. Example output: <code>
+         *     https://host.example.org/session/firefly/8675309/firefly/
+         * </code>
+         *
+         * @return URL string in format <code>
+         *     https://${host}/session/firefly/${sessionID}/firefly/
+         *     </code>
+         * @throws URISyntaxException If the URI cannot be created.
+         */
+        @Override
+        String build() throws URISyntaxException {
+            return new URIBuilder()
+                    .setScheme("https")
+                    .setHost(this.host)
+                    .setPathSegments("session", "firefly", this.sessionID, "firefly", "")
                     .build()
                     .toString();
         }

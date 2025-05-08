@@ -24,10 +24,10 @@ public class CommonUtils {
      * Obtain the first configured Service URI for the given base standard ID.
      *
      * @param baseStandardID The URI to lookup.
-     * @return A single URI (first matching).  Never null.
+     * @return A single URI (first matching). Never null.
      */
     public static URI firstLocalServiceURI(final URI baseStandardID) {
-        final Set<URI> serviceURIs = new LocalAuthority().getServiceURIs(baseStandardID);
+        final Set<URI> serviceURIs = new LocalAuthority().getResourceIDs(baseStandardID);
         return serviceURIs.stream().findFirst().orElseThrow(IllegalStateException::new);
     }
 }

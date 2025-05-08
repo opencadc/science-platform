@@ -55,8 +55,7 @@ dependencies {
     implementation 'org.opencadc:cadc-vosi:[1.4.3,)'
     implementation 'org.opencadc:cadc-permissions:[0.3.4,2.0)'
     implementation 'redis.clients:jedis:[5.0.2,6.0.0)'
-
-    runtimeOnly 'org.opencadc:cadc-registry:[1.7.7,)'
+    implementation 'org.opencadc:cadc-registry:[1.7.7,)'
 
     testImplementation 'junit:junit:[4.13,)'
     testImplementation 'org.json:json:20231013'
