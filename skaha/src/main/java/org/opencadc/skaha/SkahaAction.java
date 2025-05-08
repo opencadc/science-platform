@@ -38,19 +38,19 @@
  *  OpenCADC is free software:           OpenCADC est un logiciel libre ;
  *  you can redistribute it and/or       vous pouvez le redistribuer ou le
  *  modify it under the terms of         modifier suivant les termes de
- *  the GNU Affero General Public        la “GNU Affero General Public
- *  License as published by the          License” telle que publiée
+ *  the GNU Affero General Public        la "GNU Affero General Public
+ *  License as published by the          License" telle que publiée
  *  Free Software Foundation,            par la Free Software Foundation
  *  either version 3 of the              : soit la version 3 de cette
  *  License, or (at your option)         licence, soit (à votre gré)
  *  any later version.                   toute version ultérieure.
  *
  *  OpenCADC is distributed in the       OpenCADC est distribué
- *  hope that it will be useful,         dans l’espoir qu’il vous
+ *  hope that it will be useful,         dans l'espoir qu'il vous
  *  but WITHOUT ANY WARRANTY;            sera utile, mais SANS AUCUNE
  *  without even the implied             GARANTIE : sans même la garantie
  *  warranty of MERCHANTABILITY          implicite de COMMERCIALISABILITÉ
- *  or FITNESS FOR A PARTICULAR          ni d’ADÉQUATION À UN OBJECTIF
+ *  or FITNESS FOR A PARTICULAR          ni d'ADÉQUATION À UN OBJECTIF
  *  PURPOSE.  See the GNU Affero         PARTICULIER. Consultez la Licence
  *  General Public License for           Générale Publique GNU Affero
  *  more details.                        pour plus de détails.
@@ -58,7 +58,7 @@
  *  You should have received             Vous devriez avoir reçu une
  *  a copy of the GNU Affero             copie de la Licence Générale
  *  General Public License along         Publique GNU Affero avec
- *  with OpenCADC.  If not, see          OpenCADC ; si ce n’est
+ *  with OpenCADC.  If not, see          OpenCADC ; si ce n'est
  *  <http://www.gnu.org/licenses/>.      pas le cas, consultez :
  *                                       <http://www.gnu.org/licenses/>.
  *
@@ -111,6 +111,7 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_CONTRIB = "contributed";
     public static final String SESSION_TYPE_HEADLESS = "headless";
+    public static final String SESSION_TYPE_FIREFLY = "firefly";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
     private static final String X_REGISTRY_AUTH_HEADER = "x-skaha-registry-auth";
@@ -121,6 +122,7 @@ public abstract class SkahaAction extends RestAction {
             SESSION_TYPE_DESKTOP,
             SESSION_TYPE_CONTRIB,
             SESSION_TYPE_HEADLESS,
+            SESSION_TYPE_FIREFLY,
             TYPE_DESKTOP_APP);
     protected final PosixMapperConfiguration posixMapperConfiguration;
     public List<String> harborHosts;
