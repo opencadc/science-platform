@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/opencadc/science-platform/compare/0.27.9...0.28.0) (2025-05-08)
+
+
+### Features
+
+* **firefly:** added firefly session and connectURL modifications ([994b308](https://github.com/opencadc/science-platform/commit/994b308127a94fee1d4f990f3dff90e4bca03b1a))
+
 ## [0.27.9](https://github.com/opencadc/science-platform/compare/0.27.8...0.27.9) (2025-04-10)
 
 
