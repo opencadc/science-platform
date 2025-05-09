@@ -3,45 +3,54 @@ package org.opencadc.skaha.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 
 public class UserVolumeUtils {
-
+    private static final Logger log = Logger.getLogger(UserVolumeUtils.class);
     private static final String USER_DATASETS_ROOT_PATH = K8SUtil.userDatasetsRootPath();
 
-    public static Map<String, String> populateUserVolumeTemplate(String userName, String namespace)
-            throws IOException, InterruptedException {
-        List<Map<String, String>> userRuntimePvcs = getUserPvc(userName, namespace);
+    public static Map<String, String> populateUserVolumeTemplate(String userName, String namespace) {
         StringBuilder runtimeVolumes = new StringBuilder();
         StringBuilder runtimeVolumeMounts = new StringBuilder();
-        for (int i = 0; i < userRuntimePvcs.size(); i++) {
-            Map<String, String> pvcInfo = userRuntimePvcs.get(i);
-            String volumeName = "runtime-volume-" + userName + "-" + i;
-            runtimeVolumeMounts.append(
-                    createRuntimeVolumeMount(USER_DATASETS_ROOT_PATH, volumeName, pvcInfo.get("linkTarget")));
-            runtimeVolumes.append(createRuntimeVolume(volumeName, pvcInfo.get("pvcName")));
+        try {
+            List<Map<String, String>> userRuntimePvcs = getUserPvc(userName, namespace);
+            log.info("userRuntimePvcs size : " + userRuntimePvcs.size());
+            Set<String> linkedTargetsSet = new HashSet<>();
+            for (int i = 0; i < userRuntimePvcs.size(); i++) {
+                Map<String, String> pvcInfo = userRuntimePvcs.get(i);
+                String linkTarget = pvcInfo.get("linkTarget");
+                // if the linked target is already added, skip it
+                if (linkedTargetsSet.contains(linkTarget)) continue;
+                linkedTargetsSet.add(linkTarget);
+
+                String volumeName = createRuntimeVolumeName(userName, i);
+                runtimeVolumeMounts.append(createRuntimeVolumeMount(USER_DATASETS_ROOT_PATH, volumeName, linkTarget));
+                runtimeVolumes.append(createRuntimeVolume(volumeName, pvcInfo.get("pvcName")));
+            }
+        } catch (Exception e) {
+            log.error("Error while populating user volume template: " + e.getMessage());
         }
         return Map.of(
                 "runtimeVolumes", runtimeVolumes.toString(),
                 "runtimeVolumeMounts", runtimeVolumeMounts.toString());
     }
 
+    private static String createRuntimeVolumeName(String userName, int i) {
+        return "runtime-volume-" + userName.replaceAll("[^0-9a-zA-Z-]", "-") + "-" + i;
+    }
+
     private static String createRuntimeVolume(String volumeName, String claimName) {
         return "      - name: " + volumeName + "\n" + "        persistentVolumeClaim:\n"
-                + "          name: "
+                + "         claimName: "
                 + claimName + "\n";
     }
 
     private static String createRuntimeVolumeMount(String rootPath, String volumeName, String linkTarget) {
         String fullPath = Path.of(rootPath, linkTarget).toString();
-        return "        - mountPath: \"" + fullPath + "\"\n" + "          name: "
-                + volumeName + "\n" + "          subPath: "
-                + linkTarget + "\n";
+        return "        - mountPath: \"" + fullPath + "\"\n" + "          name: " + volumeName + "\n";
     }
 
     @SuppressWarnings("unchecked")
@@ -57,6 +66,10 @@ public class UserVolumeUtils {
         ObjectMapper objectMapper = new ObjectMapper();
         Map<String, Map> pvcMap = objectMapper.readValue(pvcResult, Map.class);
         List<Map<String, Map>> pvcList = ((List<Map<String, Map>>) pvcMap.get("items"));
+        if (pvcList == null || pvcList.isEmpty()) {
+            log.error("No PVCs found for user: " + userName);
+            return List.of();
+        }
         return pvcList.stream()
                 .filter(Objects::nonNull)
                 .filter(pvc -> "Bound"
@@ -65,7 +78,7 @@ public class UserVolumeUtils {
                     Map metadata = pvc.get("metadata");
                     String pvcName = metadata.get("name").toString();
                     Map<String, String> labels = (Map<String, String>) metadata.get("labels");
-                    String linkTarget = labels.get("link-target");
+                    String linkTarget = labels.get("link_target");
                     if (null == linkTarget) return null;
                     return Map.of(
                             "pvcName", pvcName,

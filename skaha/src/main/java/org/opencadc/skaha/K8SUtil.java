@@ -77,6 +77,7 @@ public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
+    public static final String TRUE = "true";
 
     public static String getSessionsHostName() {
         return System.getenv("SKAHA_SESSIONS_HOSTNAME");
@@ -210,5 +211,14 @@ public class K8SUtil {
     public static String userDatasetsRootPath() {
         String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
         return Objects.requireNonNullElse(userDatasetsRootPath, "/datasets");
+    }
+
+    public static boolean isPrepareDataEnabled() {
+        String prepareDataEnabled = System.getenv("PREPARE_DATA_ENABLED");
+        if (prepareDataEnabled == null) {
+            log.warn("No prepare data enabled value configured.");
+            return false;
+        }
+        return TRUE.equalsIgnoreCase(prepareDataEnabled);
     }
 }

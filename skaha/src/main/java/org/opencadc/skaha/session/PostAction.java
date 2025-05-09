@@ -556,10 +556,6 @@ public class PostAction extends SessionAction {
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
-        Map<String, String> userVolumeTemplate =
-                UserVolumeUtils.populateUserVolumeTemplate(posixPrincipal.username, K8SUtil.getWorkloadNamespace());
-        String userRuntimeVolumes = userVolumeTemplate.getOrDefault("runtimeVolumes", "");
-        String userRuntimeVolumeMounts = userVolumeTemplate.getOrDefault("runtimeVolumeMounts", "");
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
@@ -585,9 +581,17 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
-                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
-                .withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, userRuntimeVolumeMounts)
-                .withParameter(PostAction.USER_RUNTIME_VOLUMES, userRuntimeVolumes);
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+
+        if (K8SUtil.isPrepareDataEnabled()) {
+            Map<String, String> userVolumeTemplate =
+                    UserVolumeUtils.populateUserVolumeTemplate(posixPrincipal.username, K8SUtil.getWorkloadNamespace());
+            String userRuntimeVolumes = userVolumeTemplate.getOrDefault("runtimeVolumes", "");
+            String userRuntimeVolumeMounts = userVolumeTemplate.getOrDefault("runtimeVolumeMounts", "");
+            sessionJobBuilder
+                    .withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, userRuntimeVolumeMounts)
+                    .withParameter(PostAction.USER_RUNTIME_VOLUMES, userRuntimeVolumes);
+        }
 
         if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
