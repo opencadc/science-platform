@@ -358,6 +358,8 @@ public class SessionDAO {
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
             connectURL =
                     SessionURLBuilder.contributedSession(sessionHostName, id).build();
+        } else if (SessionAction.SESSION_TYPE_FIREFLY.equals(type)) {
+            connectURL = SessionURLBuilder.fireflySession(sessionHostName, id).build();
         } else {
             connectURL = "not-applicable";
         }
