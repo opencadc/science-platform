@@ -591,6 +591,9 @@ public class PostAction extends SessionAction {
             sessionJobBuilder
                     .withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, userRuntimeVolumeMounts)
                     .withParameter(PostAction.USER_RUNTIME_VOLUMES, userRuntimeVolumes);
+        } else {
+            sessionJobBuilder.withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, "");
+            sessionJobBuilder.withParameter(PostAction.USER_RUNTIME_VOLUMES, "");
         }
 
         if (type == SessionType.DESKTOP) {
