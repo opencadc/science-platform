@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.1](https://github.com/opencadc/science-platform/compare/0.28.0...0.28.1) (2025-05-08)
+
+
+### Bug Fixes
+
+* **dockerfile:** updated dnf-plugins-core to v4.10.1-1.fc40 ([e9e103c](https://github.com/opencadc/science-platform/commit/e9e103c63860e0e9d31fdd57098e3c99e8651490))
+* **dockerfile:** updated dnf-plugins-core to v4.10.1-1.fc40 ([01e1157](https://github.com/opencadc/science-platform/commit/01e11578f22c79eba7bf0536ddf7237f7d8f4e0f))
+
 ## [0.28.0](https://github.com/opencadc/science-platform/compare/0.27.9...0.28.0) (2025-05-08)
 
 
