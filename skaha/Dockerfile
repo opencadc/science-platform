@@ -2,7 +2,7 @@
 #   git clone https://github.com/opencadc/science-platform.git
 #   cd science-platform && docker build -t skaha:local -f skaha/Dockerfile .
 # Note: The build requires the .git directory to be included in the build context.
-FROM eclipse-temurin:11-alpine AS base
+FROM eclipse-temurin:17-alpine AS base
 
 FROM base AS builder
 COPY . /src
