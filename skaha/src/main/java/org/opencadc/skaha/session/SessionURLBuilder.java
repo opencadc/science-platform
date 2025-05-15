@@ -181,8 +181,6 @@ public abstract class SessionURLBuilder {
 
     /** Construct a URL for a Carta session. Used to redirect the end user to the Carta viewer. */
     static final class CartaSessionURLBuilder extends SessionURLBuilder {
-        private boolean useAlternateSocketURL = false;
-
         /**
          * Constructor.
          *
@@ -194,22 +192,9 @@ public abstract class SessionURLBuilder {
         }
 
         /**
-         * Set the use of an alternate socket for the Carta session.
-         *
-         * @param useAlternateSocketURL Specify the alternate socket URL, omit it otherwise.
-         * @return This builder.
-         */
-        CartaSessionURLBuilder withAlternateSocket(boolean useAlternateSocketURL) {
-            this.useAlternateSocketURL = useAlternateSocketURL;
-            return this;
-        }
-
-        /**
          * Build the URL for a Carta session. Example output: <code>
-         *     https://host.example.org/session/carta/http/8675309/
-         * </code> or <code>
-         *     https://host.example.org/session/carta/ws/8675309/?socketUrl=wss://host.example.org/session/carta/ws/8675309/
-         *     </code>
+         *     https://host.example.org/session/carta/8675309/
+         * </code>
          *
          * @return URL string in format <code>
          *     https://${host}/session/carta/${sessionID}?token=${sessionID}
@@ -221,17 +206,9 @@ public abstract class SessionURLBuilder {
             final URIBuilder builder = new URIBuilder()
                     .setScheme("https")
                     .setHost(this.host)
-                    .setPathSegments("session", "carta", "http", this.sessionID, "");
-            final URIBuilder uriBuilder;
+                    .setPathSegments("session", "carta", this.sessionID, "");
 
-            if (this.useAlternateSocketURL) {
-                uriBuilder = builder.setCustomQuery(
-                        String.format("socketUrl=wss://%s/session/carta/ws/%s/", this.host, this.sessionID));
-            } else {
-                uriBuilder = builder;
-            }
-
-            return uriBuilder.build().toString();
+            return builder.build().toString();
         }
     }
 

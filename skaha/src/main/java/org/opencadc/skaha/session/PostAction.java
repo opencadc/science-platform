@@ -118,7 +118,6 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
-    public static final String SKAHA_SESSIONURL = "skaha.sessionurl";
     public static final String SKAHA_SESSIONURLPATH = "skaha.sessionurlpath";
     public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
@@ -587,12 +586,10 @@ public class PostAction extends SessionAction {
         } else if (type == SessionType.CARTA) {
             final String connectURLPrefix = SessionURLBuilder.cartaSession(
                             K8SUtil.getSessionsHostName(), this.sessionID)
-                    .withAlternateSocket(image.endsWith(":1.4"))
                     .build();
             final String connectURLPath = URI.create(connectURLPrefix).getPath();
-            sessionJobBuilder = sessionJobBuilder
-                    .withParameter(PostAction.SKAHA_SESSIONURL, connectURLPrefix)
-                    .withParameter(PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
+            sessionJobBuilder = sessionJobBuilder.withParameter(
+                    PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
         }
 
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have

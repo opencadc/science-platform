@@ -347,9 +347,7 @@ public class SessionDAO {
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
             connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
-            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
-                    .withAlternateSocket(image.endsWith(":1.4"))
-                    .build();
+            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id).build();
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
                     .withTopLevelDirectory(topLevelDirectory)
