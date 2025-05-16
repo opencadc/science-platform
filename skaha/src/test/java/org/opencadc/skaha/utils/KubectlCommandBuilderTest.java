@@ -4,6 +4,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.opencadc.skaha.utils.KubectlCommandBuilder.KubectlCommand;
 
 @RunWith(MockitoJUnitRunner.class)
 public class KubectlCommandBuilderTest {
@@ -11,7 +12,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testCommand() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command = KubectlCommandBuilder.command(operation);
+        KubectlCommand command = KubectlCommandBuilder.command(operation);
         String[] expectedCommand = {"kubectl", operation};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -20,8 +21,7 @@ public class KubectlCommandBuilderTest {
     public void testNamespace() {
         String operation = "get";
         String namespace = "test-namespace";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).namespace(namespace);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).namespace(namespace);
         String[] expectedCommand = {"kubectl", operation, "--namespace", namespace};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -30,8 +30,7 @@ public class KubectlCommandBuilderTest {
     public void testArgument() {
         String operation = "get";
         String argument = "pods";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).argument(argument);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).argument(argument);
         String[] expectedCommand = {"kubectl", operation, argument};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -40,8 +39,7 @@ public class KubectlCommandBuilderTest {
     public void testOutputFormat() {
         String operation = "get";
         String format = "json";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).outputFormat(format);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).outputFormat(format);
         String[] expectedCommand = {"kubectl", operation, "-o", format};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -49,8 +47,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testJson() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).json();
+        KubectlCommand command = KubectlCommandBuilder.command(operation).json();
         String[] expectedCommand = {"kubectl", operation, "-o", "json"};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -60,8 +57,7 @@ public class KubectlCommandBuilderTest {
         String operation = "get";
         String option = "--label";
         String value = "app=myapp";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).option(option, value);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).option(option, value);
         String[] expectedCommand = {"kubectl", operation, option, value};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -69,8 +65,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testPod() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).pod();
+        KubectlCommand command = KubectlCommandBuilder.command(operation).pod();
         String[] expectedCommand = {"kubectl", operation, "pod"};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -78,8 +73,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testJob() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).job();
+        KubectlCommand command = KubectlCommandBuilder.command(operation).job();
         String[] expectedCommand = {"kubectl", operation, "job"};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -87,8 +81,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testPvc() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).pvc();
+        KubectlCommand command = KubectlCommandBuilder.command(operation).pvc();
         String[] expectedCommand = {"kubectl", operation, "pvc"};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -97,8 +90,7 @@ public class KubectlCommandBuilderTest {
     public void testLabel() {
         String operation = "get";
         String label = "app=myapp";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).label(label);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).label(label);
         String[] expectedCommand = {"kubectl", operation, "-l", label};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -108,7 +100,7 @@ public class KubectlCommandBuilderTest {
         String operation = "get";
         String namespace = "test-namespace";
         String argument = "pods";
-        KubectlCommandBuilder.KubectlCommand command =
+        KubectlCommand command =
                 KubectlCommandBuilder.command(operation).namespace(namespace).argument(argument);
         String[] expectedCommand = {"kubectl", operation, "--namespace", namespace, argument};
         Assert.assertArrayEquals(expectedCommand, command.build());
@@ -120,7 +112,7 @@ public class KubectlCommandBuilderTest {
         String namespace = "test-namespace";
         String argument = "pods";
         String label = "app=myapp";
-        KubectlCommandBuilder.KubectlCommand command = KubectlCommandBuilder.command(operation)
+        KubectlCommand command = KubectlCommandBuilder.command(operation)
                 .namespace(namespace)
                 .argument(argument)
                 .label(label);
@@ -133,7 +125,7 @@ public class KubectlCommandBuilderTest {
         String operation = "get";
         String namespace = "test-namespace";
         String argument = "pods";
-        KubectlCommandBuilder.KubectlCommand command = KubectlCommandBuilder.command(operation)
+        KubectlCommand command = KubectlCommandBuilder.command(operation)
                 .namespace(namespace)
                 .argument(argument)
                 .json();
@@ -144,8 +136,7 @@ public class KubectlCommandBuilderTest {
     @Test
     public void testNoHeaders() {
         String operation = "get";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).noHeaders();
+        KubectlCommand command = KubectlCommandBuilder.command(operation).noHeaders();
         String[] expectedCommand = {"kubectl", operation, "--no-headers=true"};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -154,8 +145,7 @@ public class KubectlCommandBuilderTest {
     public void testSelector() {
         String operation = "get";
         String selector = "env=prod";
-        KubectlCommandBuilder.KubectlCommand command =
-                KubectlCommandBuilder.command(operation).selector(selector);
+        KubectlCommand command = KubectlCommandBuilder.command(operation).selector(selector);
         String[] expectedCommand = {"kubectl", operation, "--selector=" + selector};
         Assert.assertArrayEquals(expectedCommand, command.build());
     }
@@ -167,7 +157,7 @@ public class KubectlCommandBuilderTest {
         String argument = "pods";
         String label = "app=myapp";
         String selector = "env=prod";
-        KubectlCommandBuilder.KubectlCommand command = KubectlCommandBuilder.command(operation)
+        KubectlCommand command = KubectlCommandBuilder.command(operation)
                 .namespace(namespace)
                 .argument(argument)
                 .label(label)

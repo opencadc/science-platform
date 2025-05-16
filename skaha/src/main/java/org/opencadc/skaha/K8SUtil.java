@@ -214,11 +214,11 @@ public class K8SUtil {
     }
 
     public static boolean isPrepareDataEnabled() {
-        String prepareDataEnabled = System.getenv("PREPARE_DATA_ENABLED");
-        if (prepareDataEnabled == null) {
+        String prepareDataEnabledFlag = System.getenv("PREPARE_DATA_ENABLED");
+        if (prepareDataEnabledFlag == null) {
             log.warn("No prepare data enabled value configured.");
-            return false;
         }
-        return TRUE.equalsIgnoreCase(prepareDataEnabled);
+
+        return Boolean.parseBoolean(prepareDataEnabledFlag);
     }
 }
