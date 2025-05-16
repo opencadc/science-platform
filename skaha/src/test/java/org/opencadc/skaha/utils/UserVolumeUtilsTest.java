@@ -13,11 +13,11 @@ import org.opencadc.skaha.K8SUtil;
 
 @RunWith(MockitoJUnitRunner.class)
 public class UserVolumeUtilsTest {
+    private static final String USERNAME = "testUser";
+    private static final String NAMESPACE = "testNamespace";
+
     @Test
     public void testPopulateUserVolumeTemplate() throws Exception {
-        String userName = "testUser";
-        String namespace = "testNamespace";
-
         String mockPvcResult =
                 "{ \"items\": [ { \"metadata\": { \"name\": \"pvc1\", \"labels\": { \"link_target\": \"target1\" } }, \"status\": { \"phase\": \"Bound\" } } ] }";
 
@@ -26,7 +26,7 @@ public class UserVolumeUtilsTest {
                     .when(() -> CommandExecutioner.execute(any(String[].class)))
                     .thenReturn(mockPvcResult);
 
-            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(userName, namespace);
+            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(USERNAME, NAMESPACE);
 
             String expectedVolumes =
                     "      - name: runtime-volume-testUser-0\n        persistentVolumeClaim:\n         claimName: pvc1\n";
@@ -39,17 +39,12 @@ public class UserVolumeUtilsTest {
             Assert.assertEquals(expectedVolumes, result.get("runtimeVolumes"));
             Assert.assertEquals(expectedVolumeMounts, result.get("runtimeVolumeMounts"));
 
-            mockedStatic.verify(() -> CommandExecutioner.execute(new String[] {
-                "kubectl", "get", "--namespace", namespace, "pvc", "-l", "username=testUser", "-o", "json"
-            }));
+            verifyKubectlCommand(mockedStatic);
         }
     }
 
     @Test
     public void testPopulateUserVolumeTemplateWithNoPvc() throws Exception {
-        String userName = "testUser";
-        String namespace = "testNamespace";
-
         String mockPvcResult = "{ \"items\": [] }";
 
         try (MockedStatic<CommandExecutioner> mockedStatic = mockStatic(CommandExecutioner.class)) {
@@ -57,41 +52,38 @@ public class UserVolumeUtilsTest {
                     .when(() -> CommandExecutioner.execute(any(String[].class)))
                     .thenReturn(mockPvcResult);
 
-            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(userName, namespace);
+            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(USERNAME, NAMESPACE);
 
-            Assert.assertNotNull(result);
-            Assert.assertTrue(result.containsKey("runtimeVolumes"));
-            Assert.assertTrue(result.containsKey("runtimeVolumeMounts"));
-            Assert.assertEquals("", result.get("runtimeVolumes"));
-            Assert.assertEquals("", result.get("runtimeVolumeMounts"));
-
-            mockedStatic.verify(() -> CommandExecutioner.execute(new String[] {
-                "kubectl", "get", "--namespace", namespace, "pvc", "-l", "username=testUser", "-o", "json"
-            }));
+            verifyEmptyResults(result);
+            verifyKubectlCommand(mockedStatic);
         }
     }
 
     @Test
     public void testPopulateUserVolumeTemplateWithException() throws Exception {
-        String userName = "testUser";
-        String namespace = "testNamespace";
-
         try (MockedStatic<CommandExecutioner> mockedStatic = mockStatic(CommandExecutioner.class)) {
             mockedStatic
                     .when(() -> CommandExecutioner.execute(any(String[].class)))
                     .thenThrow(new RuntimeException("Test exception"));
 
-            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(userName, namespace);
+            Map<String, String> result = UserVolumeUtils.populateUserVolumeTemplate(USERNAME, NAMESPACE);
 
-            Assert.assertNotNull(result);
-            Assert.assertTrue(result.containsKey("runtimeVolumes"));
-            Assert.assertTrue(result.containsKey("runtimeVolumeMounts"));
-            Assert.assertEquals("", result.get("runtimeVolumes"));
-            Assert.assertEquals("", result.get("runtimeVolumeMounts"));
-
-            mockedStatic.verify(() -> CommandExecutioner.execute(new String[] {
-                "kubectl", "get", "--namespace", namespace, "pvc", "-l", "username=testUser", "-o", "json"
-            }));
+            verifyEmptyResults(result);
+            verifyKubectlCommand(mockedStatic);
         }
+    }
+
+    private void verifyEmptyResults(Map<String, String> result) {
+        Assert.assertNotNull(result);
+        Assert.assertTrue(result.containsKey("runtimeVolumes"));
+        Assert.assertTrue(result.containsKey("runtimeVolumeMounts"));
+        Assert.assertEquals("", result.get("runtimeVolumes"));
+        Assert.assertEquals("", result.get("runtimeVolumeMounts"));
+    }
+
+    private void verifyKubectlCommand(MockedStatic<CommandExecutioner> mockedStatic) {
+        mockedStatic.verify(() -> CommandExecutioner.execute(
+                new String[] {"kubectl", "get", "--namespace", NAMESPACE, "pvc", "-l", "username=testUser", "-o", "json"
+                }));
     }
 }
