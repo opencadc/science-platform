@@ -208,11 +208,21 @@ public class K8SUtil {
         return System.getProperty("user.home");
     }
 
+    /**
+     * Obtain the configured user datasets root path.
+     *
+     * @return String user datasets root path.
+     */
     public static String userDatasetsRootPath() {
         String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
         return Objects.requireNonNullElse(userDatasetsRootPath, "/datasets");
     }
 
+    /**
+     * Obtain the configured prepare data enabled flag.
+     *
+     * @return boolean true if prepare data is enabled.
+     */
     public static boolean isPrepareDataEnabled() {
         String prepareDataEnabledFlag = System.getenv("PREPARE_DATA_ENABLED");
         if (prepareDataEnabledFlag == null) {
