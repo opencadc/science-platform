@@ -18,6 +18,8 @@ public class UserVolumeUtilsTest {
 
     @Test
     public void testPopulateUserVolumeTemplate() throws Exception {
+        TestUtils.setEnv("USER_DATASETS_ROOT_PATH", "/datasets");
+
         String mockPvcResult =
                 "{ \"items\": [ { \"metadata\": { \"name\": \"pvc1\", \"labels\": { \"link_target\": \"target1\" } }, \"status\": { \"phase\": \"Bound\" } } ] }";
 
