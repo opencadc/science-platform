@@ -102,4 +102,10 @@ public class K8SUtilTest {
         TestUtils.setEnv("PREPARE_DATA_ENABLED", "true");
         Assert.assertTrue(K8SUtil.isPrepareDataEnabled());
     }
+
+    @Test
+    public void isPrepareDataDisabled() throws Exception {
+        TestUtils.setEnv("PREPARE_DATA_ENABLED", "false");
+        Assert.assertFalse(K8SUtil.isPrepareDataEnabled());
+    }
 }
