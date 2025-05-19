@@ -71,6 +71,7 @@ package org.opencadc.skaha;
 import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.utils.TestUtils;
 
 public class K8SUtilTest {
     @Test
@@ -94,5 +95,11 @@ public class K8SUtilTest {
                 "Wrong hosts.", List.of("localhost", "example.org"), K8SUtil.getHarborHosts("localhost example.org"));
         Assert.assertEquals(
                 "Wrong hosts.", List.of("localhost,anotherhost"), K8SUtil.getHarborHosts("localhost,anotherhost"));
+    }
+
+    @Test
+    public void isPrepareDataEnabled() throws Exception {
+        TestUtils.setEnv("PREPARE_DATA_ENABLED", "true");
+        Assert.assertTrue(K8SUtil.isPrepareDataEnabled());
     }
 }
