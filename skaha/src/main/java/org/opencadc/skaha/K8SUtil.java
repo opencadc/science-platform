@@ -67,12 +67,11 @@
 
 package org.opencadc.skaha;
 
-import org.apache.log4j.Logger;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
 
 public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
