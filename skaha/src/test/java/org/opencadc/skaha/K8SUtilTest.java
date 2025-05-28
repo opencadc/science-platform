@@ -112,14 +112,14 @@ public class K8SUtilTest {
     // Add test for getUserDatasetsRootPath one for success and one for failure
 
     @Test
-    public void getUserDatasetsRootPathSuccess() throws Exception {
+    public void getGetUserDatasetsRootPathSuccess() throws Exception {
         TestUtils.setEnv("USER_DATASETS_ROOT_PATH", "/data/datasets");
-        Assert.assertEquals("/data/datasets", K8SUtil.userDatasetsRootPath());
+        Assert.assertEquals("/data/datasets", K8SUtil.getUserDatasetsRootPath());
     }
 
     @Test(expected = NullPointerException.class)
-    public void getUserDatasetsRootPathFailure() throws Exception {
+    public void getGetUserDatasetsRootPathFailure() throws Exception {
         TestUtils.setEnv("USER_DATASETS_ROOT_PATH", null);
-        K8SUtil.userDatasetsRootPath();
+        K8SUtil.getUserDatasetsRootPath();
     }
 }

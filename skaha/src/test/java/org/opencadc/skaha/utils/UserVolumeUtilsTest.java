@@ -32,7 +32,7 @@ public class UserVolumeUtilsTest {
 
             String expectedVolumes =
                     "      - name: runtime-volume-testUser-0\n        persistentVolumeClaim:\n         claimName: pvc1\n";
-            String expectedVolumeMounts = "        - mountPath: \"" + K8SUtil.userDatasetsRootPath()
+            String expectedVolumeMounts = "        - mountPath: \"" + K8SUtil.getUserDatasetsRootPath()
                     + "/target1\"\n          name: runtime-volume-testUser-0\n";
 
             Assert.assertNotNull(result);

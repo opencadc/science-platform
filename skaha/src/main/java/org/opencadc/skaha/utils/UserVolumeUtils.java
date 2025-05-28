@@ -3,14 +3,19 @@ package org.opencadc.skaha.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 
 public class UserVolumeUtils {
     private static final Logger log = Logger.getLogger(UserVolumeUtils.class);
-    private static final String USER_DATASETS_ROOT_PATH = K8SUtil.userDatasetsRootPath();
+    private static final String USER_DATASETS_ROOT_PATH = K8SUtil.getUserDatasetsRootPath();
 
     /**
      * Populates the user volume template with runtime volumes and mounts.

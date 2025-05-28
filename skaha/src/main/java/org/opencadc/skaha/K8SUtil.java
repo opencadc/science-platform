@@ -213,7 +213,7 @@ public class K8SUtil {
      *
      * @return String user datasets root path.
      */
-    public static String userDatasetsRootPath() {
+    public static String getUserDatasetsRootPath() {
         String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
         return Objects.requireNonNull(userDatasetsRootPath);
     }
