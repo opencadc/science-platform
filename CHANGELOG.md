@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.29.0](https://github.com/opencadc/science-platform/compare/0.28.1...0.29.0) (2025-05-28)
+
+
+### Features
+
+* Add javadoc to userVolumeUtils methods ([624fe11](https://github.com/opencadc/science-platform/commit/624fe11e6be6e950c5437ae765ae8e78ee4eebd5))
+* Add tests for isPrepareData ([152bc66](https://github.com/opencadc/science-platform/commit/152bc66284785bb5c3209f83d0f1fedc35971898))
+* Add tests for userDatasetsRootPath ([1586d27](https://github.com/opencadc/science-platform/commit/1586d27c7c4b9948929a62b4a6fcb20466b46a8a))
+* removed default path for USER_DATASETS_ROOT_PATH ([b9605ce](https://github.com/opencadc/science-platform/commit/b9605ce635c347cfa215462351fc3d4df0c38ac9))
+* Use parseBoolean for prepareDataEnabled flag ([b1e1823](https://github.com/opencadc/science-platform/commit/b1e182347be8e8cc223d3cecc758d5dcc7d7f1ed))
+
+
+### Bug Fixes
+
+* fix pipeline ([78db05e](https://github.com/opencadc/science-platform/commit/78db05edce4f5330433a74e241ce712c71985744))
+* linter issues ([ed497b7](https://github.com/opencadc/science-platform/commit/ed497b7351fbcb74ae6440fb6600f7225d067945))
+
 ## [0.28.1](https://github.com/opencadc/science-platform/compare/0.28.0...0.28.1) (2025-05-08)
 
 
