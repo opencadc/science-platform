@@ -39,10 +39,6 @@ public class KubectlCommandBuilder {
             return this;
         }
 
-        public KubectlCommand json() {
-            return outputFormat("json");
-        }
-
         public KubectlCommand option(String option, String value) {
             this.commandParts.add(option);
             this.commandParts.add(value);
@@ -56,11 +52,6 @@ public class KubectlCommandBuilder {
 
         public KubectlCommand job() {
             this.commandParts.add("job");
-            return this;
-        }
-
-        public KubectlCommand pvc() {
-            this.commandParts.add("pvc");
             return this;
         }
 
