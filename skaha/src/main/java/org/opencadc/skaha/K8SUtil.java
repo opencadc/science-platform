@@ -69,7 +69,6 @@ package org.opencadc.skaha;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 
@@ -77,7 +76,6 @@ public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
-    public static final String TRUE = "true";
 
     public static String getSessionsHostName() {
         return System.getenv("SKAHA_SESSIONS_HOSTNAME");
@@ -206,29 +204,5 @@ public class K8SUtil {
      */
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
-    }
-
-    /**
-     * Obtain the configured user datasets root path.
-     *
-     * @return String user datasets root path.
-     */
-    public static String getUserDatasetsRootPath() {
-        String userDatasetsRootPath = System.getenv("USER_DATASETS_ROOT_PATH");
-        return Objects.requireNonNull(userDatasetsRootPath);
-    }
-
-    /**
-     * Obtain the configured prepare data enabled flag.
-     *
-     * @return boolean true if prepare data is enabled.
-     */
-    public static boolean isPrepareDataEnabled() {
-        String prepareDataEnabledFlag = System.getenv("PREPARE_DATA_ENABLED");
-        if (prepareDataEnabledFlag == null) {
-            log.warn("No prepare data enabled value configured.");
-        }
-
-        return Boolean.parseBoolean(prepareDataEnabledFlag);
     }
 }
