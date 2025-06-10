@@ -100,7 +100,6 @@ import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
-import org.opencadc.skaha.utils.UserVolumeUtils;
 
 /**
  * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
@@ -137,8 +136,6 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
-    public static final String USER_RUNTIME_VOLUME_MOUNTS = "user.runtime.volumemounts";
-    public static final String USER_RUNTIME_VOLUMES = "user.runtime.volumes";
 
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
@@ -582,19 +579,6 @@ public class PostAction extends SessionAction {
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
-
-        if (K8SUtil.isPrepareDataEnabled()) {
-            Map<String, String> userVolumeTemplate =
-                    UserVolumeUtils.populateUserVolumeTemplate(posixPrincipal.username, K8SUtil.getWorkloadNamespace());
-            String userRuntimeVolumes = userVolumeTemplate.getOrDefault("runtimeVolumes", "");
-            String userRuntimeVolumeMounts = userVolumeTemplate.getOrDefault("runtimeVolumeMounts", "");
-            sessionJobBuilder
-                    .withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, userRuntimeVolumeMounts)
-                    .withParameter(PostAction.USER_RUNTIME_VOLUMES, userRuntimeVolumes);
-        } else {
-            sessionJobBuilder.withParameter(PostAction.USER_RUNTIME_VOLUME_MOUNTS, "");
-            sessionJobBuilder.withParameter(PostAction.USER_RUNTIME_VOLUMES, "");
-        }
 
         if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
