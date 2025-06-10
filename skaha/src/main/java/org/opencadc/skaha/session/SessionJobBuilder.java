@@ -2,7 +2,19 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.openapi.models.V1Affinity;
+import io.kubernetes.client.openapi.models.V1Container;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1LocalObjectReference;
+import io.kubernetes.client.openapi.models.V1NodeAffinity;
+import io.kubernetes.client.openapi.models.V1NodeSelector;
+import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
+import io.kubernetes.client.openapi.models.V1NodeSelectorTerm;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1PreferredSchedulingTerm;
+import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+
 
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
