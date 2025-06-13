@@ -93,8 +93,8 @@ check.dependsOn spotlessCheck
 // Create Java Code Coverage Reports
 jacocoTestReport {
     reports {
-        xml.enabled true
-        html.enabled true
+        xml.required = true
+        html.required = true
     }
 }
 check.dependsOn jacocoTestReport

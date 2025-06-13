@@ -29,7 +29,6 @@ import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
-
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
@@ -37,7 +36,9 @@ public class SessionJobBuilder {
     static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
     static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
 
+    /** Configuration for the queue to use. */
     private final Map<String, String> parameters = new HashMap<>();
+
     private final Path jobFilePath;
 
     // Options
