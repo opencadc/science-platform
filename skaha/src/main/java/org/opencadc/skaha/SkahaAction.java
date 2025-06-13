@@ -132,7 +132,7 @@ public abstract class SkahaAction extends RestAction {
     protected boolean priorityHeadlessUser = false;
     protected String homedir;
     protected String scratchdir;
-    protected String skahaTld;
+    protected URI userHomeURI;
     protected boolean gpuEnabled;
     protected String skahaUsersGroup;
     protected String skahaHeadlessGroup;
@@ -147,10 +147,10 @@ public abstract class SkahaAction extends RestAction {
 
     public SkahaAction() {
         homedir = K8SUtil.getHomeDir();
-        skahaTld = K8SUtil.getSkahaTld();
+        userHomeURI = K8SUtil.getUserHomeURI();
         gpuEnabled = K8SUtil.isGpuEnabled();
         scratchdir = K8SUtil.getScratchDir();
-        harborHosts = K8SUtil.getHarborHosts();
+        harborHosts = K8SUtil.getSessionsImageRegistryHosts();
         skahaUsersGroup = K8SUtil.getSkahaUsersGroup();
         skahaHeadlessGroup = K8SUtil.getSkahaHeadlessGroup();
         skahaPriorityHeadlessGroup = K8SUtil.getSkahaHeadlessPriorityGroup();
@@ -166,7 +166,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.hostname=" + K8SUtil.getSkahaHostName());
         log.debug("skaha.sessions.hostname=" + K8SUtil.getSessionsHostName());
         log.debug("skaha.homedir=" + homedir);
-        log.debug("SKAHA_TLD=" + skahaTld);
+        log.debug("SKAHA_USER_HOME_URI=" + userHomeURI);
         log.debug("skaha.scratchdir=" + scratchdir);
         log.debug("skaha.harborHosts=" + harborHosts.toString());
         log.debug("skaha.usersgroup=" + skahaUsersGroup);

@@ -88,11 +88,11 @@ public class K8SUtilTest {
     }
 
     @Test
-    public void getHarborHosts() {
-        Assert.assertEquals("Wrong hosts.", List.of("localhost"), K8SUtil.getHarborHosts("localhost"));
+    public void getSessionsImageRegistryHosts() {
+        Assert.assertEquals("Wrong hosts.", List.of("localhost"), K8SUtil.getSessionsImageRegistryHosts("localhost"));
         Assert.assertEquals(
-                "Wrong hosts.", List.of("localhost", "example.org"), K8SUtil.getHarborHosts("localhost example.org"));
+                "Wrong hosts.", List.of("localhost", "example.org"), K8SUtil.getSessionsImageRegistryHosts("localhost example.org"));
         Assert.assertEquals(
-                "Wrong hosts.", List.of("localhost,anotherhost"), K8SUtil.getHarborHosts("localhost,anotherhost"));
+                "Wrong hosts.", List.of("localhost,anotherhost"), K8SUtil.getSessionsImageRegistryHosts("localhost,anotherhost"));
     }
 }

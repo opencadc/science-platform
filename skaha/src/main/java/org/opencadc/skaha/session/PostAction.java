@@ -69,12 +69,10 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationTokenPrincipal;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -100,6 +98,11 @@ import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.vospace.ContainerNode;
+import org.opencadc.vospace.NodeProperty;
+import org.opencadc.vospace.VOS;
+import org.opencadc.vospace.VOSURI;
+import org.opencadc.vospace.client.VOSpaceClient;
 
 /**
  * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
@@ -274,9 +277,12 @@ public class PostAction extends SessionAction {
     }
 
     void ensureUserBase() throws Exception {
-        final Path homeDir = getUserHomeDirectory();
-
-        if (Files.notExists(homeDir)) {
+        final VOSpaceClient voSpaceClient = K8SUtil.getVOSpaceClient();
+        final String homeDir = getUserHomeDirectory().toString();
+        try {
+            voSpaceClient.getNode(homeDir);
+            log.debug(homeDir + " already exists, skipping allocation.");
+        } catch (ResourceNotFoundException resourceNotFoundException) {
             log.debug("Allocating new user home to " + homeDir);
             allocateUser();
             log.debug("Allocating new user home to " + homeDir + ": OK");
@@ -284,48 +290,41 @@ public class PostAction extends SessionAction {
     }
 
     void allocateUser() throws Exception {
-        log.debug("PostAction.makeUserBase()");
+        log.debug("PostAction allocateUser()");
+        final URI userHomeVOSpaceURI = K8SUtil.getUserHomeURI();
+        final VOSpaceClient voSpaceClient = K8SUtil.getVOSpaceClient();
+        final ContainerNode containerNode = new ContainerNode(getUsername());
+        containerNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
+        containerNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR_JWT, K8SUtil.getCreatorJWT()));
+        voSpaceClient.createNode(new VOSURI(URI.create(userHomeVOSpaceURI + "/" + getUsername())), containerNode);
+
         final Path userHomePath = getUserHomeDirectory();
-        final String[] allocateUserCommand = new String[] {
-            PostAction.CREATE_USER_BASE_COMMAND,
-            getUsername(),
-            Integer.toString(getUID()),
-            getDefaultQuota(),
-            userHomePath.toAbsolutePath().toString()
-        };
+        //        final String[] allocateUserCommand = new String[] {
+        //            PostAction.CREATE_USER_BASE_COMMAND,
+        //            getUsername(),
+        //            Integer.toString(getUID()),
+        //            getDefaultQuota(),
+        //            userHomePath.toAbsolutePath().toString()
+        //        };
 
-        log.debug("Executing " + Arrays.toString(allocateUserCommand));
-        try (final ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
-                final ByteArrayOutputStream standardError = new ByteArrayOutputStream()) {
-            executeCommand(allocateUserCommand, standardOutput, standardError);
+        //        log.debug("Executing " + Arrays.toString(allocateUserCommand));
+        //        try (final ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
+        //                final ByteArrayOutputStream standardError = new ByteArrayOutputStream()) {
+        //            executeCommand(allocateUserCommand, standardOutput, standardError);
+        //
+        //            final String errorOutput = standardError.toString();
+        //            final String commandOutput = standardOutput.toString();
+        //
+        //            if (StringUtil.hasText(errorOutput)) {
+        //                throw new IOException("Unable to create user home."
+        //                        + "\nError message from server: " + errorOutput
+        //                        + "\nOutput from command: " + commandOutput);
+        //            } else {
+        //                log.debug("PostAction allocateUser() success creating: " + commandOutput);
+        //            }
+        //        }
 
-            final String errorOutput = standardError.toString();
-            final String commandOutput = standardOutput.toString();
-
-            if (StringUtil.hasText(errorOutput)) {
-                throw new IOException("Unable to create user home."
-                        + "\nError message from server: " + errorOutput
-                        + "\nOutput from command: " + commandOutput);
-            } else {
-                log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
-            }
-        }
-
-        log.debug("PostAction.makeUserBase(): OK");
-    }
-
-    void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-            throws IOException, InterruptedException {
-        CommandExecutioner.execute(command, standardOut, standardErr);
-    }
-
-    /**
-     * Override to test injected quota value without processing an entire Request.
-     *
-     * @return String quota number in GB, or null if not configured.
-     */
-    String getDefaultQuota() {
-        return K8SUtil.getDefaultQuota();
+        log.debug("PostAction allocateUser(): OK");
     }
 
     private Integer getCoresParam() {
@@ -884,5 +883,21 @@ public class PostAction extends SessionAction {
         } else {
             return "";
         }
+    }
+
+    private String getCallerToken() {
+        return AuthenticationUtil.getCurrentSubject().getPrincipals(AuthorizationTokenPrincipal.class).stream()
+                .filter(tokenPrincipal ->
+                        tokenPrincipal.getHeaderKey().equalsIgnoreCase(AuthenticationUtil.AUTHORIZATION_HEADER)
+                                && tokenPrincipal
+                                        .getHeaderValue()
+                                        .toUpperCase()
+                                        .startsWith(AuthenticationUtil.CHALLENGE_TYPE_BEARER.toUpperCase()))
+                .map(tokenPrincipal -> {
+                    final String tokenValue = tokenPrincipal.getHeaderValue();
+                    return tokenValue.substring(tokenValue.lastIndexOf(" "));
+                })
+                .findFirst()
+                .orElse("");
     }
 }

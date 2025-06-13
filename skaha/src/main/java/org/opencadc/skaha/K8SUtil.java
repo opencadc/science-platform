@@ -67,26 +67,46 @@
 
 package org.opencadc.skaha;
 
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import ca.nrc.cadc.util.StringUtil;
 import org.apache.log4j.Logger;
+import org.apache.logging.log4j.core.appender.rolling.FileSize;
+import org.opencadc.vospace.client.VOSpaceClient;
 
 public class K8SUtil {
-    static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
+    static final String SKAHA_USER_STORAGE_QUOTA_IN_GB = "SKAHA_DEFAULT_STORAGE_QUOTA_GB";
+    static final String SKAHA_SESSIONS_IMAGE_REGISTRY_HOSTS = "SKAHA_SESSIONS_IMAGE_REGISTRY_HOSTS";
+    static final String SKAHA_SESSIONS_HOSTNAME = "SKAHA_SESSIONS_HOSTNAME";
+    static final String SKAHA_HOSTNAME = "SKAHA_HOSTNAME";
+    static final String SKAHA_USERS_GROUP = "SKAHA_USERS_GROUP";
+    static final String SKAHA_HEADLESS_GROUP = "SKAHA_HEADLESS_GROUP";
+    static final String SKAHA_WORKLOAD_NAMESPACE = "SKAHA_WORKLOAD_NAMESPACE";
+    static final String SKAHA_HEADLESS_PRIORITY_GROUP = "SKAHA_HEADLESS_PRIORITY_GROUP";
+    static final String SKAHA_HEADLESS_PRIORITY_CLASS = "SKAHA_HEADLESS_PRIORITY_CLASS";
+    static final String SKAHA_ADMINS_GROUP = "SKAHA_ADMINS_GROUP";
+    static final String SKAHA_SESSIONS_MAX_COUNT = "SKAHA_SESSIONS_MAX_COUNT";
+    static final String SKAHA_POSIX_MAPPER_RESOURCE_ID = "SKAHA_POSIX_MAPPER_RESOURCE_ID";
+    static final String SKAHA_SESSIONS_EXPIRY_SECONDS = "SKAHA_SESSIONS_EXPIRY_SECONDS";
+    static final String SKAHA_SESSIONS_GPU_ENABLED = "SKAHA_SESSIONS_GPU_ENABLED";
+    static final String SKAHA_CAVERN_SERVICE_URI = "SKAHA_CAVERN_SERVICE_URI";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
+
     public static String getSessionsHostName() {
-        return System.getenv("SKAHA_SESSIONS_HOSTNAME");
+        return System.getenv(K8SUtil.SKAHA_SESSIONS_HOSTNAME);
     }
 
     public static String getSkahaHostName() {
-        return System.getenv("SKAHA_HOSTNAME");
+        return System.getenv(K8SUtil.SKAHA_HOSTNAME);
     }
 
     public static String getWorkloadNamespace() {
-        return System.getenv("skaha.namespace");
+        return System.getenv(K8SUtil.SKAHA_WORKLOAD_NAMESPACE);
     }
 
     /**
@@ -113,67 +133,110 @@ public class K8SUtil {
         return System.getenv("skaha.scratchdir");
     }
 
+    /**
+     * Get the configured session expiry time in seconds.  This need never be an integer as it will always be
+     * sent to Kubernetes configuration as a string.
+     *
+     * @return String representing the number of seconds.
+     */
     public static String getSessionExpiry() {
-        return System.getenv("skaha.sessionexpiry");
+        return System.getenv(K8SUtil.SKAHA_SESSIONS_EXPIRY_SECONDS);
     }
 
     /**
-     * Obtain the configured default quota size in Gigabytes.
+     * Get the configured default quota size in Gigabytes.
      *
-     * @return integer in GB.
+     * @return String representing the quota size in GB.
      */
     public static String getDefaultQuota() {
-        return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
+        return System.getenv(K8SUtil.SKAHA_USER_STORAGE_QUOTA_IN_GB);
+    }
+
+    public static String getDefaultQuotaBytes() {
+        final String defaultQuotaGB = K8SUtil.getDefaultQuota();
+        return Long.toString(FileSize.parse(defaultQuotaGB + "GB", 0L)); // Validate the value is a valid size.
     }
 
     public static String getPreAuthorizedTokenSecretName() {
         return "pre-auth-token-skaha";
     }
 
-    public static String getSkahaTld() {
-        return System.getenv("SKAHA_TLD");
+    public static String getSessionsUserStorageTopLevelDir() {
+        final String configuredUserStorageTopLevelDir = System.getenv("SKAHA_USER_STORAGE_TOP_LEVEL_DIR");
+        if (!StringUtil.hasText(configuredUserStorageTopLevelDir)) {
+            throw new IllegalStateException("Environment variable SKAHA_USER_STORAGE_TOP_LEVEL_DIR is not set as expected.");
+        } else {
+            return configuredUserStorageTopLevelDir;
+        }
+    }
+
+    public static URI getUserHomeURI() {
+        final String configuredUserHomeURI = System.getenv("SKAHA_USER_HOME_URI");
+        if (!StringUtil.hasText(configuredUserHomeURI)) {
+            throw new IllegalStateException("Environment variable SKAHA_USER_HOME_URI is not set as expected.");
+        } else {
+            return URI.create(System.getenv("SKAHA_USER_HOME_URI"));
+        }
+    }
+
+    public static URI getCavernServiceURI() {
+        final String configuredCavernServiceURI = System.getenv(K8SUtil.SKAHA_CAVERN_SERVICE_URI);
+        if (!StringUtil.hasText(configuredCavernServiceURI)) {
+            throw new IllegalStateException("Environment variable SKAHA_CAVERN_SERVICE_URI is not set as expected.");
+        } else {
+            return URI.create(configuredCavernServiceURI);
+        }
+    }
+
+    /**
+     * Get a VOSpaceClient instance configured to connect to the Cavern service.
+     *
+     * @return VOSpaceClient instance.
+     */
+    public static VOSpaceClient getVOSpaceClient() {
+        return new VOSpaceClient(K8SUtil.getCavernServiceURI());
     }
 
     public static boolean isGpuEnabled() {
-        return Boolean.parseBoolean(System.getenv("GPU_ENABLED"));
+        return Boolean.parseBoolean(System.getenv(K8SUtil.SKAHA_SESSIONS_GPU_ENABLED));
     }
 
-    public static List<String> getHarborHosts() {
-        String rawHosts = System.getenv("skaha.harborhosts");
+    public static List<String> getSessionsImageRegistryHosts() {
+        final String rawHosts = System.getenv(K8SUtil.SKAHA_SESSIONS_IMAGE_REGISTRY_HOSTS);
         if (rawHosts == null) {
             log.warn("No harbor hosts configured.");
             return List.of();
         }
 
-        return K8SUtil.getHarborHosts(rawHosts);
+        return K8SUtil.getSessionsImageRegistryHosts(rawHosts);
     }
 
-    static List<String> getHarborHosts(final String rawHosts) {
+    static List<String> getSessionsImageRegistryHosts(final String rawHosts) {
         return Arrays.stream(rawHosts.split(" ")).map(String::trim).collect(Collectors.toList());
     }
 
     public static String getSkahaUsersGroup() {
-        return System.getenv("skaha.usersgroup");
+        return System.getenv(K8SUtil.SKAHA_USERS_GROUP);
     }
 
     public static String getSkahaAdminsGroup() {
-        return System.getenv("skaha.adminsgroup");
+        return System.getenv(K8SUtil.SKAHA_ADMINS_GROUP);
     }
 
     public static String getSkahaHeadlessGroup() {
-        return System.getenv("skaha.headlessgroup");
+        return System.getenv(K8SUtil.SKAHA_HEADLESS_GROUP);
     }
 
     public static String getSkahaHeadlessPriorityGroup() {
-        return System.getenv("skaha.headlessprioritygroup");
+        return System.getenv(K8SUtil.SKAHA_HEADLESS_PRIORITY_GROUP);
     }
 
     public static String getSkahaHeadlessPriorityClass() {
-        return System.getenv("skaha.headlesspriortyclass");
+        return System.getenv(K8SUtil.SKAHA_HEADLESS_PRIORITY_CLASS);
     }
 
     public static Integer getMaxUserSessions() {
-        String noOfSessions = System.getenv("skaha.maxusersessions");
+        String noOfSessions = System.getenv(K8SUtil.SKAHA_SESSIONS_MAX_COUNT);
         if (noOfSessions == null) {
             log.warn("no max user sessions value configured.");
             return 1;
@@ -186,7 +249,7 @@ public class K8SUtil {
     }
 
     public static String getPosixMapperResourceId() {
-        return System.getenv("skaha.posixmapper.resourceid");
+        return System.getenv(K8SUtil.SKAHA_POSIX_MAPPER_RESOURCE_ID);
     }
 
     public static String getRedisHost() {
