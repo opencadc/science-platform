@@ -93,6 +93,13 @@ public class K8SUtil {
     static final String SKAHA_SESSIONS_EXPIRY_SECONDS = "SKAHA_SESSIONS_EXPIRY_SECONDS";
     static final String SKAHA_SESSIONS_GPU_ENABLED = "SKAHA_SESSIONS_GPU_ENABLED";
     static final String SKAHA_CAVERN_SERVICE_URI = "SKAHA_CAVERN_SERVICE_URI";
+    static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIR = "SKAHA_USER_STORAGE_TOP_LEVEL_DIR";
+
+    // User Storage administrative credentials.
+    static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID";
+    static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET";
+    static final String SKAHA_USER_STORAGE_ADMIN_OIDC_URI = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_URI";
+    static final String SKAHA_USER_STORAGE_ADMIN_USERNAME = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_USERNAME";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
@@ -162,9 +169,10 @@ public class K8SUtil {
     }
 
     public static String getSessionsUserStorageTopLevelDir() {
-        final String configuredUserStorageTopLevelDir = System.getenv("SKAHA_USER_STORAGE_TOP_LEVEL_DIR");
+        final String configuredUserStorageTopLevelDir = System.getenv(K8SUtil.SKAHA_USER_STORAGE_TOP_LEVEL_DIR);
         if (!StringUtil.hasText(configuredUserStorageTopLevelDir)) {
-            throw new IllegalStateException("Environment variable SKAHA_USER_STORAGE_TOP_LEVEL_DIR is not set as expected.");
+            throw new IllegalStateException("Environment variable " + K8SUtil.SKAHA_USER_STORAGE_TOP_LEVEL_DIR
+                                                    + " is not set as expected.");
         } else {
             return configuredUserStorageTopLevelDir;
         }
@@ -268,4 +276,18 @@ public class K8SUtil {
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
     }
+
+    public static class UserStorageAdminCredentials {
+        public final String oidcClientID;
+        public final String oidcClientSecret;
+        public final String oidcURI;
+        public final String username;
+
+        public UserStorageAdminCredentials() {
+            this.oidcClientID = System.getenv(K8SUtil.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID);
+            this.oidcClientSecret = System.getenv(K8SUtil.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET);
+            this.oidcURI = System.getenv(K8SUtil.SKAHA_USER_STORAGE_ADMIN_OIDC_URI);
+            this.username = System.getenv(K8SUtil.SKAHA_USER_STORAGE_ADMIN_USERNAME);
+        }
+        }
 }

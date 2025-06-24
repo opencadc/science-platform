@@ -288,7 +288,8 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
-        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID, skahaTld);
+        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID,
+                                                        K8SUtil.getSessionsUserStorageTopLevelDir());
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
@@ -305,7 +306,8 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
-        for (final Session session : SessionDAO.getSessions(forUserID, sessionID, skahaTld)) {
+        for (final Session session : SessionDAO.getSessions(forUserID, sessionID,
+                                                            K8SUtil.getSessionsUserStorageTopLevelDir())) {
             // exclude 'desktop-app'
             if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
                 return session;
@@ -316,7 +318,8 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public List<Session> getAllSessions(String forUserID) throws Exception {
-        return SessionDAO.getSessions(forUserID, null, skahaTld);
+        return SessionDAO.getSessions(forUserID, null,
+                                      K8SUtil.getSessionsUserStorageTopLevelDir());
     }
 
     protected String toCoreUnit(String cores) {

@@ -104,6 +104,7 @@ import org.opencadc.vospace.VOS;
 import org.opencadc.vospace.VOSURI;
 import org.opencadc.vospace.client.VOSpaceClient;
 
+
 /**
  * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
  * pulled from the environment.
@@ -294,6 +295,8 @@ public class PostAction extends SessionAction {
         final URI userHomeVOSpaceURI = K8SUtil.getUserHomeURI();
         final VOSpaceClient voSpaceClient = K8SUtil.getVOSpaceClient();
         final ContainerNode containerNode = new ContainerNode(getUsername());
+        final K8SUtil.UserStorageAdminCredentials userStorageAdminCredentials =
+                new K8SUtil.UserStorageAdminCredentials();
         containerNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
         containerNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR_JWT, K8SUtil.getCreatorJWT()));
         voSpaceClient.createNode(new VOSURI(URI.create(userHomeVOSpaceURI + "/" + getUsername())), containerNode);
@@ -574,7 +577,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(PostAction.SKAHA_TLD, K8SUtil.getSessionsUserStorageTopLevelDir())
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");

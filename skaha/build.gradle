@@ -33,6 +33,8 @@ tasks.withType(Copy).configureEach {
 dependencies {
     providedCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 
+    implementation 'com.nimbusds:oauth2-oidc-sdk:11.26'
+
     // https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5
     // Used to assemble URIs programmatically
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.4.1'
