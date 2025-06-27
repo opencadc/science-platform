@@ -1,5 +1,6 @@
 package org.opencadc.skaha.session;
 
+import java.nio.file.Path;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ public class SessionURLBuilderTest {
         }
 
         final SessionURLBuilder.NotebookSessionURLBuilder testSubjectWithTLD =
-                testSubject.withTopLevelDirectory("/top-level-dir/sub-dir");
+                testSubject.withHomeDirectory(Path.of("/top-level-dir/sub-dir/home"));
 
         try {
             testSubjectWithTLD.build();

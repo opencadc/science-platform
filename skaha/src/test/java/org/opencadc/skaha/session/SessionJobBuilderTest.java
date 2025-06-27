@@ -34,7 +34,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         SessionJobBuilder testSubject =
@@ -49,7 +49,14 @@ public class SessionJobBuilderTest {
         V1Job job = (V1Job) Yaml.load(output);
         V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
-        Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
+
+        // Verify that the image pull secrets are not set.  Version 21.0+ of the Skaha API returns null for no secrets,
+        // but
+        // 24.0.0 returns an empty list.
+        Assert.assertTrue(
+                "PodSpec should not have image pull secrets",
+                (podSpec.getImagePullSecrets() == null
+                        || podSpec.getImagePullSecrets().isEmpty()));
     }
 
     private V1Job getTestBaseValuesAffinityJob() throws Exception {
@@ -63,7 +70,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -92,7 +99,7 @@ public class SessionJobBuilderTest {
         Assert.assertEquals(
                 "Wrong pull secret.",
                 "my-secret",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).getFirst().getName());
 
         final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
         gpuRequirement.setKey("nvidia.com/gpu.count");
@@ -121,7 +128,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -159,7 +166,7 @@ public class SessionJobBuilderTest {
         final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
                         Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
-                .get(0)
+                .getFirst()
                 .getMatchExpressions();
 
         if (matchExpressions != null) {

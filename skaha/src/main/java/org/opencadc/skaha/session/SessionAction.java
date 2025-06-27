@@ -70,7 +70,6 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
-import ca.nrc.cadc.cred.CertUtil;
 import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
@@ -80,16 +79,19 @@ import ca.nrc.cadc.util.StringUtil;
 import java.io.*;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Path;
-import java.security.PrivilegedExceptionAction;
 import java.util.*;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.vospace.DataNode;
+import org.opencadc.vospace.Node;
+import org.opencadc.vospace.VOSURI;
+import org.opencadc.vospace.client.VOSpaceClient;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -160,51 +162,33 @@ public abstract class SessionAction extends SkahaAction {
                         registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
 
                 if (credServiceURL != null) {
+                    final UserStorageAdminConfiguration userStorageAdminConfiguration =
+                            UserStorageAdminConfiguration.fromEnv();
+                    final VOSpaceClient cavernClient = new VOSpaceClient(userStorageAdminConfiguration.serviceURI);
+                    final DataNode certificateNode = new DataNode("cadcproxy.pem");
                     final CredClient credClient = new CredClient(credServiceID);
                     final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                    final X509CertificateChain proxyCert =
-                            Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>)
-                                    () -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
+                    final X509CertificateChain proxyCert = Subject.callAs(
+                            CredUtil.createOpsSubject(),
+                            () -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
 
                     log.debug("Proxy cert: " + proxyCert);
-                    // inject the proxy cert
-                    log.debug("Running docker exec to insert cert");
-
-                    writeClientCertificate(
-                            proxyCert,
-                            Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem")
-                                    .toString());
-                    log.debug("injectProxyCertificate(): OK");
+                    final URI sslFolderURI = new URI(userStorageAdminConfiguration.userHomeBaseURI + "/" + getUsername()
+                            + "/.ssl/cadcproxy.pem");
+                    final VOSURI targetVOSURI = new VOSURI(sslFolderURI);
+                    final Node injectedCertificateNode = cavernClient.createNode(targetVOSURI, certificateNode);
+                    log.debug("injectProxyCertificate(): OK -> " + injectedCertificateNode.getName());
                 }
             }
         } catch (NoSuchElementException noSuchElementException) {
             log.debug("Not using proxy certificates");
             log.debug("injectProxyCertificate(): UNSUCCESSFUL");
+        } catch (ResourceNotFoundException resourceNotFoundException) {
+            log.debug("No home node found for user: " + getUsername());
         } catch (Exception e) {
             log.warn("failed to inject cert: " + e.getMessage(), e);
             log.debug("injectProxyCertificate(): UNSUCCESSFUL");
         }
-    }
-
-    private void writeClientCertificate(X509CertificateChain clientCertificateChain, String path)
-            throws IOException, InterruptedException {
-        final int uid = posixPrincipal.getUidNumber();
-        // stage file
-
-        final String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        final Writer writer = new BufferedWriter(new FileWriter(file));
-        CertUtil.writePEMCertificateAndKey(clientCertificateChain, writer);
-
-        // update file permissions
-        CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
-
-        // inject file
-        String[] inject = new String[] {"mv", "-f", tmpFileName, path};
-        CommandExecutioner.execute(inject);
     }
 
     protected String getImageName(String image) {
@@ -288,7 +272,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
-        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID, skahaTld);
+        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
@@ -305,7 +289,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
-        for (final Session session : SessionDAO.getSessions(forUserID, sessionID, skahaTld)) {
+        for (final Session session : SessionDAO.getSessions(forUserID, sessionID)) {
             // exclude 'desktop-app'
             if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
                 return session;
@@ -316,7 +300,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public List<Session> getAllSessions(String forUserID) throws Exception {
-        return SessionDAO.getSessions(forUserID, null, skahaTld);
+        return SessionDAO.getSessions(forUserID, null);
     }
 
     protected String toCoreUnit(String cores) {

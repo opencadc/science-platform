@@ -75,7 +75,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -120,6 +122,16 @@ public class GetActionTests {
                     + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
     public GetActionTests() {}
+
+    @Before
+    public void setupHomePath() {
+        System.setProperty("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY", "/tmp/skaha-test");
+    }
+
+    @After
+    public void removeHomePath() {
+        System.getProperties().remove("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY");
+    }
 
     @Test
     public void testNormalizeToLong() {
@@ -189,6 +201,7 @@ public class GetActionTests {
         for (Session s : filtered) {
             Assert.assertEquals(s.getId(), "Running", s.getStatus());
         }
+        System.getProperties().remove("SKAHA_USER_STORAGE_HOME_DIRECTORY");
     }
 
     @Test
@@ -211,13 +224,10 @@ public class GetActionTests {
 
         @Override
         public List<Session> getAllSessions(String forUserID) throws Exception {
-            // A bit of a hack to emulate the state.
-            this.skahaTld = "/cavern-vospace";
-
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession("host.example.org", line, this.skahaTld);
+                Session session = SessionDAO.constructSession("host.example.org", line);
                 sessions.add(session);
             }
             return sessions;
@@ -226,11 +236,6 @@ public class GetActionTests {
         @Override
         protected String getUsername() {
             return null;
-        }
-
-        @Override
-        protected int getUID() {
-            return 997;
         }
     }
 }

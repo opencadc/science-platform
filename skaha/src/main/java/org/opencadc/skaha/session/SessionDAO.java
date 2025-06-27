@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public class SessionDAO {
@@ -60,9 +61,8 @@ public class SessionDAO {
         return labelCriteria.toArray(new String[0]);
     }
 
-    public static Session getSession(String forUserID, String sessionID, final String topLevelDirectory)
-            throws Exception {
-        final List<Session> sessions = SessionDAO.getSessions(forUserID, sessionID, topLevelDirectory);
+    public static Session getSession(String forUserID, String sessionID) throws Exception {
+        final List<Session> sessions = SessionDAO.getSessions(forUserID, sessionID);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // exclude 'desktop-app'
@@ -75,8 +75,7 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    static List<Session> getSessions(String forUserID, String sessionID, final String topLevelDirectory)
-            throws Exception {
+    static List<Session> getSessions(String forUserID, String sessionID) throws Exception {
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         String[] sessionsCMD = SessionDAO.getSessionsCMD(k8sNamespace, forUserID, sessionID);
         String sessionList = execute(sessionsCMD);
@@ -93,7 +92,7 @@ public class SessionDAO {
 
             String[] lines = sessionList.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession(K8SUtil.getSessionsHostName(), line, topLevelDirectory);
+                Session session = SessionDAO.constructSession(K8SUtil.getSessionsHostName(), line);
                 if (forUserID != null) {
                     // get expiry time
                     String uid = getUID(line);
@@ -325,8 +324,7 @@ public class SessionDAO {
         return jobExpiryTimes;
     }
 
-    static Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
-            throws Exception {
+    static Session constructSession(String sessionHostName, String k8sOutput) throws Exception {
         LOGGER.debug("line: " + k8sOutput);
         final List<CustomColumns> allColumns = Arrays.asList(CustomColumns.values());
 
@@ -351,8 +349,9 @@ public class SessionDAO {
                     .withAlternateSocket(image.endsWith(":1.4"))
                     .build();
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+            final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
-                    .withTopLevelDirectory(topLevelDirectory)
+                    .withHomeDirectory(userStorageConfiguration.homeBaseDirectory)
                     .withUserName(userid)
                     .build();
         } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {

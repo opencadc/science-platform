@@ -72,18 +72,16 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -97,9 +95,17 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
+import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
+import org.opencadc.vospace.ContainerNode;
+import org.opencadc.vospace.Node;
+import org.opencadc.vospace.NodeProperty;
+import org.opencadc.vospace.VOS;
+import org.opencadc.vospace.VOSURI;
+import org.opencadc.vospace.client.VOSpaceClient;
 
 /**
  * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
@@ -140,9 +146,7 @@ public class PostAction extends SessionAction {
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
-    private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
-    private static final String SKAHA_TLD = "SKAHA_TLD";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
 
@@ -274,58 +278,65 @@ public class PostAction extends SessionAction {
     }
 
     void ensureUserBase() throws Exception {
-        final Path homeDir = getUserHomeDirectory();
+        final UserStorageAdminConfiguration userStorageAdminConfiguration = UserStorageAdminConfiguration.fromEnv();
+        final VOSpaceClient cavernClient = new VOSpaceClient(userStorageAdminConfiguration.serviceURI);
+        final String userHomeBasePath = userStorageAdminConfiguration.userHomeBaseURI.getPath();
+        final String userHomePath = userHomeBasePath + "/" + getUsername();
 
-        if (Files.notExists(homeDir)) {
-            log.debug("Allocating new user home to " + homeDir);
-            allocateUser();
-            log.debug("Allocating new user home to " + homeDir + ": OK");
-        }
-    }
+        // Call as null user to ensure that the owner is properly augmented without the actual current user in the
+        // context.
+        final Subject owner = Subject.callAs(null, userStorageAdminConfiguration.owner::toSubject);
 
-    void allocateUser() throws Exception {
-        log.debug("PostAction.makeUserBase()");
-        final Path userHomePath = getUserHomeDirectory();
-        final String[] allocateUserCommand = new String[] {
-            PostAction.CREATE_USER_BASE_COMMAND,
-            getUsername(),
-            Integer.toString(getUID()),
-            getDefaultQuota(),
-            userHomePath.toAbsolutePath().toString()
-        };
-
-        log.debug("Executing " + Arrays.toString(allocateUserCommand));
-        try (final ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
-                final ByteArrayOutputStream standardError = new ByteArrayOutputStream()) {
-            executeCommand(allocateUserCommand, standardOutput, standardError);
-
-            final String errorOutput = standardError.toString();
-            final String commandOutput = standardOutput.toString();
-
-            if (StringUtil.hasText(errorOutput)) {
-                throw new IOException("Unable to create user home."
-                        + "\nError message from server: " + errorOutput
-                        + "\nOutput from command: " + commandOutput);
+        try {
+            Subject.callAs(owner, () -> cavernClient.getNode(userHomePath));
+            log.debug("User home already exists: " + userHomePath);
+        } catch (CompletionException completionException) {
+            final Throwable cause = completionException.getCause();
+            if (cause instanceof ResourceNotFoundException) {
+                log.debug("User home does not exist, allocating new user home at " + userHomePath);
+                allocateUser(owner, cavernClient, userStorageAdminConfiguration);
+                log.debug("User home does not exist, allocating new user home at " + userHomePath + ": OK");
             } else {
-                log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
+                // Otherwise, something else went wrong, rethrow the exception.
+                throw new IllegalStateException(cause.getMessage(), cause);
             }
         }
-
-        log.debug("PostAction.makeUserBase(): OK");
     }
 
-    void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-            throws IOException, InterruptedException {
-        CommandExecutioner.execute(command, standardOut, standardErr);
-    }
+    void allocateUser(
+            final Subject owner,
+            final VOSpaceClient voSpaceClient,
+            final UserStorageAdminConfiguration userStorageAdminConfiguration)
+            throws IOException {
+        log.debug("PostAction.allocateUser()");
+        try {
+            final ContainerNode userHomeNode = new ContainerNode(getUsername());
+            userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
+            userStorageAdminConfiguration.configureOwner(userHomeNode, AuthenticationUtil.getCurrentSubject());
 
-    /**
-     * Override to test injected quota value without processing an entire Request.
-     *
-     * @return String quota number in GB, or null if not configured.
-     */
-    String getDefaultQuota() {
-        return K8SUtil.getDefaultQuota();
+            final ContainerNode newUserHome = Subject.callAs(owner, () -> {
+                final Node createdNode = voSpaceClient.createNode(
+                        new VOSURI(userStorageAdminConfiguration.userHomeBaseURI + "/" + getUsername()),
+                        userHomeNode,
+                        false);
+                if (createdNode instanceof ContainerNode) {
+                    return (ContainerNode) createdNode;
+                } else {
+                    throw new IllegalStateException("BADNESS: Created Node is not a ContainerNode: " + createdNode
+                            + ".  Expected ContainerNode called " + userHomeNode.getName() + " at "
+                            + userStorageAdminConfiguration.userHomeBaseURI.getPath());
+                }
+            });
+
+            log.debug("PostAction.allocateUser(): OK -> " + newUserHome.getName());
+        } catch (CompletionException exception) {
+            final Throwable cause = exception.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            } else {
+                throw new IOException(cause.getMessage(), cause);
+            }
+        }
     }
 
     private Integer getCoresParam() {
@@ -575,7 +586,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -645,8 +655,11 @@ public class PostAction extends SessionAction {
     }
 
     private void injectPOSIXDetails() throws Exception {
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
-                this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+                this.skahaPosixCacheURL,
+                userStorageConfiguration.homeBaseDirectory.toString(),
+                this.posixMapperConfiguration.getPosixMapperClient());
         posixCache.writePOSIXEntries();
     }
 
@@ -783,7 +796,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
