@@ -227,7 +227,18 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, requestCores, limitCores, requestRam, limitRam, gpus, cmd, args, envs);
+                createSession(
+                        validatedType,
+                        image,
+                        name,
+                        requestCores,
+                        limitCores,
+                        requestRAM,
+                        limitRAM,
+                        gpus,
+                        cmd,
+                        args,
+                        envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -546,8 +557,8 @@ public class PostAction extends SessionAction {
             String name,
             Integer requestCores,
             Integer limitCores,
-            Integer requestRam,
-            Integer limitRam,
+            Integer requestRAM,
+            Integer limitRAM,
             Integer gpus,
             String cmd,
             String args,
@@ -579,9 +590,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRam.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRam + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
