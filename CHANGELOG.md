@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.29.1](https://github.com/opencadc/science-platform/compare/0.29.0...0.29.1) (2025-07-18)
+
+
+### Bug Fixes
+
+* docker and build updates for new gradle 8 and jdk 21 ([c15a212](https://github.com/opencadc/science-platform/commit/c15a212143f0a218951c48c644481d8db80a02c8))
+* docker and build updates for new gradle 8 and jdk 21 ([8e0d7f7](https://github.com/opencadc/science-platform/commit/8e0d7f7c5dbc4f6577faa0fe09b020fa6bd627a9))
+* set defaults appropriately when no resources requested ([135f6c3](https://github.com/opencadc/science-platform/commit/135f6c3c4a31b68982305d6b240d14216f54e97d))
+
 ## [0.29.0](https://github.com/opencadc/science-platform/compare/0.28.1...0.29.0) (2025-05-28)
 
 
