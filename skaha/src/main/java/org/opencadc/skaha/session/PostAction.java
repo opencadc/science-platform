@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
@@ -286,6 +287,15 @@ public class PostAction extends SessionAction {
         // Call as null user to ensure that the owner is properly augmented without the actual current user in the
         // context.
         final Subject owner = Subject.callAs(null, userStorageAdminConfiguration.owner::toSubject);
+
+        // TODO: This is a bit of a hack, but we need to ensure that the AuthorizationToken
+        // TODO: can access Cavern.
+        // TODO: Ideally, this would set the Audience ("aud") field in the Token instead.
+        // TODO: jenkinsd 2025.07.11
+        final Set<AuthorizationToken> ats = owner.getPublicCredentials(AuthorizationToken.class);
+        for (final AuthorizationToken at : ats) {
+            at.getDomains().add(URI.create(cavernClient.getBaseURL()).getHost()); // not sure if this should work
+        }
 
         try {
             Subject.callAs(owner, () -> cavernClient.getNode(userHomePath));

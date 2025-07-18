@@ -4,18 +4,13 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
-import ca.nrc.cadc.net.HttpGet;
+import com.nimbusds.oauth2.sdk.GeneralException;
 import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.id.ClientID;
-import java.io.BufferedReader;
+import com.nimbusds.oauth2.sdk.id.Issuer;
+import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Objects;
@@ -29,7 +24,6 @@ import org.apache.commons.configuration2.convert.DefaultConversionHandler;
 import org.apache.commons.configuration2.ex.ConversionException;
 import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
 import org.apache.commons.configuration2.tree.MergeCombiner;
-import org.json.JSONObject;
 import org.opencadc.vospace.ContainerNode;
 import org.opencadc.vospace.NodeProperty;
 import org.opencadc.vospace.VOS;
@@ -39,12 +33,7 @@ import org.opencadc.vospace.VOS;
  * as well as Environment Variables and System Properties (for testing) for configuration.
  */
 public class UserStorageAdminConfiguration {
-    private static final String WELL_KNOWN_ENDPOINT = "/.well-known/openid-configuration";
-    private static final String TOKEN_ENDPOINT_KEY = "token_endpoint";
-
-    // User Storage administrative credentials.
-    private static final String SKAHA_USER_STORAGE_ADMIN_USERNAME = "SKAHA_USER_STORAGE_ADMIN_USERNAME";
-    private static final String SKAHA_USER_STORAGE_ADMIN_PASSWORD = "SKAHA_USER_STORAGE_ADMIN_PASSWORD";
+    // User Storage access control.
     private static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID";
     private static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET =
             "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET";
@@ -88,11 +77,7 @@ public class UserStorageAdminConfiguration {
                     configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET);
             final String issuerURI =
                     configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_URI);
-            final String adminUsername =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_USERNAME);
-            final String adminPassword =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_PASSWORD);
-            owner = configureOIDCOwner(clientID, clientSecret, issuerURI, adminUsername, adminPassword);
+            owner = configureOIDCOwner(clientID, clientSecret, issuerURI);
         } else if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
             final String certificateString =
                     configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE);
@@ -105,58 +90,29 @@ public class UserStorageAdminConfiguration {
         this.userHomeBaseURI = configuration.get(URI.class, SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI);
     }
 
-    private UserStorageAdministrator configureOIDCOwner(
-            String clientID, String clientSecret, String issuerURI, String adminUsername, String adminPassword) {
+    private UserStorageAdministrator configureOIDCOwner(String clientID, String clientSecret, String issuerURI) {
         Objects.requireNonNull(clientID, "OIDC client ID must not be null");
         Objects.requireNonNull(clientSecret, "OIDC client secret must not be null");
         Objects.requireNonNull(issuerURI, "OIDC issuer URI must not be null");
-        Objects.requireNonNull(adminUsername, "Administrator username must not be null");
-        Objects.requireNonNull(adminPassword, "Administrator password must not be null");
 
         return new UserStorageOIDCAdministrator(
-                new ClientID(clientID),
-                new Secret(clientSecret),
-                URI.create(issuerURI),
-                adminUsername,
-                adminPassword.getBytes(StandardCharsets.UTF_8));
+                new ClientID(clientID), new Secret(clientSecret), URI.create(issuerURI));
     }
 
     /**
-     * Pull the Token Endpoint URL from the Well Known JSON document.
+     * TODO: Cache this. Pull the Token Endpoint URL from the Well Known JSON document.
      *
      * @return URL of the Token Endpoint for access and refresh tokens. Never null.
      * @throws IOException For a poorly formed URL.
      */
     public static URI getTokenEndpoint(final URI oidcIssuerURI) throws IOException {
-        final JSONObject jsonObject = UserStorageAdminConfiguration.getWellKnownJSON(oidcIssuerURI);
-        final String tokenEndpointString = jsonObject.getString(UserStorageAdminConfiguration.TOKEN_ENDPOINT_KEY);
-        return URI.create(tokenEndpointString);
-    }
-
-    /**
-     * Obtain the .well-known endpoint JSON document. TODO: Cache this?
-     *
-     * @return The JSON Object of the response data.
-     * @throws MalformedURLException If URLs cannot be created as expected.
-     */
-    private static JSONObject getWellKnownJSON(final URI oidcIssuerURI) throws IOException {
-        final URL configurationURL = URI.create(
-                        oidcIssuerURI.toString() + UserStorageAdminConfiguration.WELL_KNOWN_ENDPOINT)
-                .toURL();
-        final Writer writer = new StringWriter();
-        final HttpGet httpGet = new HttpGet(configurationURL, inputStream -> {
-            final Reader inputReader = new BufferedReader(new InputStreamReader(inputStream));
-            final char[] buffer = new char[8192];
-            int charsRead;
-            while ((charsRead = inputReader.read(buffer)) >= 0) {
-                writer.write(buffer, 0, charsRead);
-            }
-            writer.flush();
-        });
-
-        httpGet.run();
-
-        return new JSONObject(writer.toString());
+        try {
+            final OIDCProviderMetadata oidcProviderMetadata = OIDCProviderMetadata.resolve(new Issuer(oidcIssuerURI));
+            return oidcProviderMetadata.getTokenEndpointURI();
+        } catch (GeneralException generalException) {
+            throw new IOException(
+                    "Failed to resolve OIDC Provider Metadata from issuer URI: " + oidcIssuerURI, generalException);
+        }
     }
 
     private UserStorageAdministrator configureCertificateOwner(final String certificateString) {

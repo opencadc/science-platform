@@ -33,7 +33,7 @@ tasks.withType(Copy).configureEach {
 dependencies {
     providedCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 
-    implementation 'com.nimbusds:oauth2-oidc-sdk:11.26'
+    implementation 'com.nimbusds:oauth2-oidc-sdk:11.27-SNAPSHOT'
 
     // https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5
     // Used to assemble URIs programmatically
@@ -52,10 +52,10 @@ dependencies {
     implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'
-    implementation 'org.opencadc:cadc-gms:[1.0.14,2.0)'
+    implementation 'org.opencadc:cadc-gms:[1.0.15,2.0)'
     implementation 'org.opencadc:cadc-log:[1.2.1,1.3.0)'
     implementation 'org.opencadc:cadc-rest:[1.4.0,)'
-    implementation 'org.opencadc:cadc-util:[1.9.7,2.0)'
+    implementation 'org.opencadc:cadc-util:[1.12.8,2.0)'
     implementation 'org.opencadc:cadc-uws-server:[1.1.3,)'
     implementation 'org.opencadc:cadc-vos-client:[2.0.6,2.1.0)'
     implementation 'org.opencadc:cadc-vosi:[1.4.3,)'

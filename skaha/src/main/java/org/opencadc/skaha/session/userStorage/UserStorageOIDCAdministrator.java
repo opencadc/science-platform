@@ -2,20 +2,27 @@ package org.opencadc.skaha.session.userStorage;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationTokenPrincipal;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.oauth2.sdk.AccessTokenResponse;
+import com.nimbusds.oauth2.sdk.ClientCredentialsGrant;
 import com.nimbusds.oauth2.sdk.ParseException;
-import com.nimbusds.oauth2.sdk.ResourceOwnerPasswordCredentialsGrant;
 import com.nimbusds.oauth2.sdk.Scope;
 import com.nimbusds.oauth2.sdk.TokenRequest;
 import com.nimbusds.oauth2.sdk.TokenResponse;
-import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic;
+import com.nimbusds.oauth2.sdk.auth.ClientSecretJWT;
 import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.token.AccessToken;
-import com.nimbusds.oauth2.sdk.token.TokenTypeURI;
-import com.nimbusds.oauth2.sdk.tokenexchange.TokenExchangeGrant;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Date;
+import java.util.UUID;
 import javax.security.auth.Subject;
 
 /**
@@ -23,11 +30,11 @@ import javax.security.auth.Subject;
  * client credentials.
  */
 public class UserStorageOIDCAdministrator implements UserStorageAdministrator {
+    private static final String EXPECTED_SCOPE = "storage:allocations:write";
+
     private final ClientID clientID;
     private final Secret clientSecret;
     private final URI issuer;
-    private final String adminUsername;
-    private final byte[] adminPassword;
 
     /**
      * Constructs an administrator for the user storage service using OIDC client credentials.
@@ -35,22 +42,11 @@ public class UserStorageOIDCAdministrator implements UserStorageAdministrator {
      * @param clientID The client ID of the OIDC client.
      * @param clientSecret The client secret of the OIDC client.
      * @param issuer The issuer URI of the OIDC provider.
-     * @param adminUsername The username of the administrator.
-     * @param adminPassword The password of the administrator, as a byte array.
      */
-    public UserStorageOIDCAdministrator(
-            final ClientID clientID,
-            final Secret clientSecret,
-            final URI issuer,
-            final String adminUsername,
-            final byte[] adminPassword) {
+    public UserStorageOIDCAdministrator(final ClientID clientID, final Secret clientSecret, final URI issuer) {
         this.clientID = clientID;
         this.clientSecret = clientSecret;
         this.issuer = issuer;
-        this.adminUsername = adminUsername;
-
-        this.adminPassword = new byte[adminPassword.length];
-        System.arraycopy(adminPassword, 0, this.adminPassword, 0, adminPassword.length);
     }
 
     /**
@@ -61,58 +57,38 @@ public class UserStorageOIDCAdministrator implements UserStorageAdministrator {
      */
     @Override
     public Subject toSubject() throws IOException {
-        final ClientSecretBasic oidcClientSecretBasic = new ClientSecretBasic(this.clientID, this.clientSecret);
-        final AccessToken adminAccessToken = authenticateAdminUser();
-        final TokenExchangeGrant tokenExchangeGrant =
-                new TokenExchangeGrant(adminAccessToken, TokenTypeURI.ACCESS_TOKEN);
-        final TokenRequest tokenRequest = new TokenRequest.Builder(
-                        UserStorageAdminConfiguration.getTokenEndpoint(this.issuer),
-                        oidcClientSecretBasic,
-                        tokenExchangeGrant)
-                .scope(new Scope("openid", "profile"))
+        final JWTClaimsSet signingPayload = new JWTClaimsSet.Builder()
+                .audience(UserStorageAdminConfiguration.getTokenEndpoint(this.issuer)
+                        .toString())
+                .subject(this.clientID.getValue())
+                .issuer(this.clientID.getValue())
+                .jwtID(UUID.randomUUID().toString())
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() + (120 * 1000)))
                 .build();
+
+        final JWSHeader jwsHeader = new JWSHeader.Builder(JWSAlgorithm.HS256).build();
         final TokenResponse tokenResponse;
 
         try {
+            final JWSSigner macSigner = new MACSigner(this.clientSecret.getValueBytes());
+            final SignedJWT signedJWT = new SignedJWT(jwsHeader, signingPayload);
+
+            signedJWT.sign(macSigner);
+
+            final ClientSecretJWT jwtAuthentication = new ClientSecretJWT(signedJWT);
+            final TokenRequest tokenRequest = new TokenRequest.Builder(
+                            UserStorageAdminConfiguration.getTokenEndpoint(this.issuer),
+                            jwtAuthentication,
+                            new ClientCredentialsGrant())
+                    .customParameter("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                    .scope(new Scope(UserStorageOIDCAdministrator.EXPECTED_SCOPE))
+                    .build();
             tokenResponse = TokenResponse.parse(tokenRequest.toHTTPRequest().send());
-        } catch (ParseException parseException) {
-            throw new IllegalArgumentException(
-                    "Invalid or missing response parameters from token endpoint: " + parseException.getMessage(),
-                    parseException);
-        } catch (IOException ioException) {
+        } catch (JOSEException keyGenerationException) {
             throw new IllegalStateException(
-                    "Unable to send token request to the OIDC server: " + ioException.getMessage(), ioException);
-        }
-
-        if (!tokenResponse.indicatesSuccess()) {
-            // We got an error response...
-            throw new IllegalStateException("Bad response from the OIDC server: " + tokenResponse.toErrorResponse());
-        }
-
-        final AccessTokenResponse tokenSuccessResponse = tokenResponse.toSuccessResponse();
-        final AccessToken ownerAccessToken = tokenSuccessResponse.getTokens().getAccessToken();
-        final AuthorizationTokenPrincipal authorizationTokenPrincipal = new AuthorizationTokenPrincipal(
-                AuthenticationUtil.AUTHORIZATION_HEADER,
-                AuthenticationUtil.CHALLENGE_TYPE_BEARER + " " + ownerAccessToken.getValue());
-        final Subject subject = new Subject();
-        subject.getPrincipals().add(authorizationTokenPrincipal);
-
-        final Subject validatedSubject = AuthenticationUtil.validateSubject(subject);
-        return AuthenticationUtil.augmentSubject(validatedSubject);
-    }
-
-    private AccessToken authenticateAdminUser() throws IOException {
-        final ClientSecretBasic oidcClientSecretBasic = new ClientSecretBasic(this.clientID, this.clientSecret);
-        final TokenRequest tokenRequest = new TokenRequest.Builder(
-                        UserStorageAdminConfiguration.getTokenEndpoint(this.issuer),
-                        oidcClientSecretBasic,
-                        new ResourceOwnerPasswordCredentialsGrant(
-                                this.adminUsername, new Secret(new String(this.adminPassword))))
-                .build();
-        final TokenResponse tokenResponse;
-
-        try {
-            tokenResponse = TokenResponse.parse(tokenRequest.toHTTPRequest().send());
+                    "Unable to generate JWT for OIDC client credentials: " + keyGenerationException.getMessage(),
+                    keyGenerationException);
         } catch (ParseException parseException) {
             throw new IllegalArgumentException(
                     "Invalid or missing response parameters from token endpoint: " + parseException.getMessage(),
@@ -125,10 +101,20 @@ public class UserStorageOIDCAdministrator implements UserStorageAdministrator {
         if (!tokenResponse.indicatesSuccess()) {
             // We got an error response...
             throw new IllegalStateException("Bad response from the OIDC server: "
-                    + tokenResponse.toErrorResponse().getErrorObject());
+                    + tokenResponse.toErrorResponse().getErrorObject().getDescription());
         }
 
         final AccessTokenResponse tokenSuccessResponse = tokenResponse.toSuccessResponse();
-        return tokenSuccessResponse.getTokens().getAccessToken();
+        final AccessToken ownerAccessToken = tokenSuccessResponse.getTokens().getAccessToken();
+
+        final AuthorizationTokenPrincipal authorizationTokenPrincipal = new AuthorizationTokenPrincipal(
+                AuthenticationUtil.AUTHORIZATION_HEADER,
+                AuthenticationUtil.CHALLENGE_TYPE_BEARER + " " + ownerAccessToken.getValue());
+
+        final Subject subject = new Subject();
+        subject.getPrincipals().add(authorizationTokenPrincipal);
+
+        final Subject validatedSubject = AuthenticationUtil.validateSubject(subject);
+        return AuthenticationUtil.augmentSubject(validatedSubject);
     }
 }
