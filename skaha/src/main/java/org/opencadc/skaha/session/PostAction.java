@@ -179,14 +179,19 @@ public class PostAction extends SessionAction {
                         StringUtil.hasText(requestedType) ? requestedType : PostAction.SESSION_TYPE_HEADLESS;
 
                 final SessionType validatedType = validateImage(image, type);
-                Integer cores = getCoresParam();
-                if (cores == null) {
-                    cores = rc.getDefaultCores(validatedType);
+
+                Integer requestCores = getCoresParam();
+                Integer limitCores = requestCores;
+                if (requestCores == null) {
+                    requestCores = rc.getDefaultRequestCores();
+                    limitCores = rc.getDefaultLimitCores();
                 }
 
-                Integer ram = getRamParam();
-                if (ram == null) {
-                    ram = rc.getDefaultRAM(validatedType);
+                Integer requestRAM = getRamParam();
+                Integer limitRAM = requestRAM;
+                if (requestRAM == null) {
+                    requestRAM = rc.getDefaultRequestRAM();
+                    limitRAM = rc.getDefaultLimitRAM();
                 }
 
                 String name = syncInput.getParameter("name");
@@ -222,7 +227,7 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                createSession(validatedType, image, name, requestCores, limitCores, requestRam, limitRam, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -539,8 +544,10 @@ public class PostAction extends SessionAction {
             SessionType type,
             String image,
             String name,
-            Integer cores,
-            Integer ram,
+            Integer requestCores,
+            Integer limitCores,
+            Integer requestRam,
+            Integer limitRam,
             Integer gpus,
             String cmd,
             String args,
@@ -571,10 +578,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, cores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRam.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRam + "Gi")
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
