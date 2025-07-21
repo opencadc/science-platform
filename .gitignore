@@ -4,6 +4,7 @@
 /**/build
 /**/bin
 .vscode
+Dockerfile.local
 
 # Local build stuff
 *tgz*

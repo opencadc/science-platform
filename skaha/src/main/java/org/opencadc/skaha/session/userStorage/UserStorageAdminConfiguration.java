@@ -4,12 +4,8 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
-import com.nimbusds.oauth2.sdk.GeneralException;
-import com.nimbusds.oauth2.sdk.auth.Secret;
-import com.nimbusds.oauth2.sdk.id.ClientID;
-import com.nimbusds.oauth2.sdk.id.Issuer;
-import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
-import java.io.IOException;
+import ca.nrc.cadc.reg.client.RegistryClient;
+import ca.nrc.cadc.util.InvalidConfigException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -34,10 +30,7 @@ import org.opencadc.vospace.VOS;
  */
 public class UserStorageAdminConfiguration {
     // User Storage access control.
-    private static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID = "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID";
-    private static final String SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET =
-            "SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET";
-    private static final String SKAHA_USER_STORAGE_ADMIN_OIDC_URI = "SKAHA_USER_STORAGE_ADMIN_OIDC_URI";
+    private static final String SKAHA_USER_STORAGE_ADMIN_API_KEY = "SKAHA_USER_STORAGE_ADMIN_API_KEY";
     private static final String SKAHA_USER_STORAGE_ADMIN_SERVICE_URI = "SKAHA_USER_STORAGE_ADMIN_SERVICE_URI";
     private static final String SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI = "SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI";
 
@@ -53,7 +46,7 @@ public class UserStorageAdminConfiguration {
      *
      * @return A new UserStorageAdminConfiguration instance. Never null.
      */
-    public static UserStorageAdminConfiguration fromEnv() {
+    public static UserStorageAdminConfiguration fromEnv() throws Exception {
         final CombinedConfiguration configuration = new CombinedConfiguration(new MergeCombiner());
         configuration.setConversionHandler(new URIConversionHandler());
 
@@ -65,54 +58,47 @@ public class UserStorageAdminConfiguration {
         return new UserStorageAdminConfiguration(configuration);
     }
 
-    private UserStorageAdminConfiguration(final Configuration configuration) {
-        if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID)
+    private UserStorageAdminConfiguration(final Configuration configuration) throws Exception {
+        if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY)
                 && configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
-            throw new IllegalArgumentException("Both OIDC client ID and certificate provided for User Storage admin. "
+            throw new InvalidConfigException("Both an API Key and certificate provided for User Storage admin. "
                     + "Please provide only one method of authentication.");
-        } else if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID)) {
-            final String clientID =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_ID);
-            final String clientSecret =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_CLIENT_SECRET);
-            final String issuerURI =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_OIDC_URI);
-            owner = configureOIDCOwner(clientID, clientSecret, issuerURI);
-        } else if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
+        }
+
+        this.serviceURI =
+                configuration.get(URI.class, UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_SERVICE_URI);
+        this.userHomeBaseURI =
+                configuration.get(URI.class, UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI);
+
+        Objects.requireNonNull(
+                this.serviceURI,
+                "User Storage (Cavern) Service URI must not be null.  Please set the "
+                        + UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_SERVICE_URI
+                        + " environment variable or system property.");
+        ;
+        Objects.requireNonNull(
+                this.userHomeBaseURI,
+                "User Storage (Cavern) User Home Base URI must not be null.  Please set the "
+                        + UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI
+                        + " environment variable or system property.");
+
+        if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
             final String certificateString =
                     configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE);
             owner = configureCertificateOwner(certificateString);
+        } else if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY)) {
+            owner = configureAPIKeyOwner(
+                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY));
         } else {
             throw new IllegalArgumentException("No OIDC client ID or certificate provided for User Storage admin.");
         }
-
-        this.serviceURI = configuration.get(URI.class, SKAHA_USER_STORAGE_ADMIN_SERVICE_URI);
-        this.userHomeBaseURI = configuration.get(URI.class, SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI);
     }
 
-    private UserStorageAdministrator configureOIDCOwner(String clientID, String clientSecret, String issuerURI) {
-        Objects.requireNonNull(clientID, "OIDC client ID must not be null");
-        Objects.requireNonNull(clientSecret, "OIDC client secret must not be null");
-        Objects.requireNonNull(issuerURI, "OIDC issuer URI must not be null");
+    private UserStorageAdministrator configureAPIKeyOwner(String apiKey) throws Exception {
+        Objects.requireNonNull(apiKey, "API Key must not be null");
 
-        return new UserStorageOIDCAdministrator(
-                new ClientID(clientID), new Secret(clientSecret), URI.create(issuerURI));
-    }
-
-    /**
-     * TODO: Cache this. Pull the Token Endpoint URL from the Well Known JSON document.
-     *
-     * @return URL of the Token Endpoint for access and refresh tokens. Never null.
-     * @throws IOException For a poorly formed URL.
-     */
-    public static URI getTokenEndpoint(final URI oidcIssuerURI) throws IOException {
-        try {
-            final OIDCProviderMetadata oidcProviderMetadata = OIDCProviderMetadata.resolve(new Issuer(oidcIssuerURI));
-            return oidcProviderMetadata.getTokenEndpointURI();
-        } catch (GeneralException generalException) {
-            throw new IOException(
-                    "Failed to resolve OIDC Provider Metadata from issuer URI: " + oidcIssuerURI, generalException);
-        }
+        final RegistryClient registryClient = new RegistryClient();
+        return new UserStorageAPIKeyAdministrator(apiKey, registryClient.getAccessURL(this.serviceURI));
     }
 
     private UserStorageAdministrator configureCertificateOwner(final String certificateString) {
