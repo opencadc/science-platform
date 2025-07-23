@@ -72,7 +72,8 @@ public class SessionJobBuilderTest {
     }
 
     private Path getTestFilePath(final String jobFileName) {
-        return FileUtil.getFileFromResource(jobFileName, SessionJobBuilderTest.class).toPath();
+        return FileUtil.getFileFromResource(jobFileName, SessionJobBuilderTest.class)
+                .toPath();
     }
 
     private V1Job getTestBaseValuesAffinityJob() throws Exception {
