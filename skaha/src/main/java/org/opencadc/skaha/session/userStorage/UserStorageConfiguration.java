@@ -12,9 +12,14 @@ import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
 import org.apache.commons.configuration2.tree.MergeCombiner;
 
 public class UserStorageConfiguration {
+    private static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY = "SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY";
     private static final String SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY = "SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY";
+    private static final String SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY =
+            "SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY";
 
+    public final Path topLevelDirectory;
     public final Path homeBaseDirectory;
+    public final Path projectsBaseDirectory;
 
     public static UserStorageConfiguration fromEnv() {
         final CombinedConfiguration configuration = new CombinedConfiguration(new MergeCombiner());
@@ -30,6 +35,10 @@ public class UserStorageConfiguration {
     private UserStorageConfiguration(final Configuration configuration) {
         this.homeBaseDirectory =
                 configuration.get(Path.class, UserStorageConfiguration.SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY);
+        this.projectsBaseDirectory =
+                configuration.get(Path.class, UserStorageConfiguration.SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY);
+        this.topLevelDirectory =
+                configuration.get(Path.class, UserStorageConfiguration.SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY);
     }
 
     private static class PathConversionHandler extends DefaultConversionHandler {

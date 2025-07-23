@@ -129,6 +129,9 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SKAHA_JOBUID = "skaha.jobuid";
+    public static final String SKAHA_TOP_LEVEL_DIR = "SKAHA_TOP_LEVEL_DIR";
+    public static final String SKAHA_USER_HOME_DIR = "SKAHA_USER_HOME_DIR";
+    public static final String SKAHA_PROJECTS_DIR = "SKAHA_PROJECTS_DIR";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -586,6 +589,7 @@ public class PostAction extends SessionAction {
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
@@ -604,6 +608,11 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
+                .withParameter(
+                        PostAction.SKAHA_USER_HOME_DIR,
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + getUsername())
+                .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
+                .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
@@ -795,6 +804,7 @@ public class PostAction extends SessionAction {
             }
         }
 
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
@@ -818,6 +828,11 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
+                .withParameter(
+                        PostAction.SKAHA_USER_HOME_DIR,
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + getUsername())
+                .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
+                .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");

@@ -125,12 +125,16 @@ public class GetActionTests {
 
     @Before
     public void setupHomePath() {
+        System.setProperty("SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY", "/tmp");
         System.setProperty("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY", "/tmp/skaha-test");
+        System.setProperty("SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY", "/tmp/skaha-test-projects");
     }
 
     @After
     public void removeHomePath() {
+        System.getProperties().remove("SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY ");
         System.getProperties().remove("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY");
+        System.getProperties().remove("SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY");
     }
 
     @Test
