@@ -56,7 +56,7 @@ dependencies {
     implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'
-    implementation 'org.opencadc:cadc-gms:[1.0.16,2.0)'
+    implementation 'org.opencadc:cadc-gms:[1.0.15,2.0)'
     implementation 'org.opencadc:cadc-log:[1.2.1,1.3.0)'
     implementation 'org.opencadc:cadc-rest:[1.4.0,)'
     implementation 'org.opencadc:cadc-util:[1.12.7,2.0)'
