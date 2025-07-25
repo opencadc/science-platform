@@ -115,7 +115,7 @@ public abstract class SessionURLBuilder {
 
     /** Construct a URL for a Notebook session. Used to redirect the end user to the Jupyter Notebook. */
     static final class NotebookSessionURLBuilder extends SessionURLBuilder {
-        private String topLevelDirectory;
+        private Path homeDirectory;
         private String userName;
 
         NotebookSessionURLBuilder(String host, String sessionID) {
@@ -125,11 +125,11 @@ public abstract class SessionURLBuilder {
         /**
          * Set the top-level directory in the Jupyter Notebook session.
          *
-         * @param topLevelDirectory The top-level directory in the Jupyter Notebook session.
+         * @param homeDirectory The absolute Home folder path in the Jupyter Notebook session.
          * @return This builder.
          */
-        NotebookSessionURLBuilder withTopLevelDirectory(String topLevelDirectory) {
-            this.topLevelDirectory = topLevelDirectory;
+        NotebookSessionURLBuilder withHomeDirectory(Path homeDirectory) {
+            this.homeDirectory = homeDirectory;
             return this;
         }
 
@@ -156,17 +156,14 @@ public abstract class SessionURLBuilder {
          */
         @Override
         String build() throws URISyntaxException {
-            final Path topLevelDirectoryPath = Path.of(Objects.requireNonNull(this.topLevelDirectory));
+            final Path homeDirectoryPath = Objects.requireNonNull(this.homeDirectory);
             final List<String> topLevelDirectoryPathSegments = new ArrayList<>();
             topLevelDirectoryPathSegments.add("session");
             topLevelDirectoryPathSegments.add("notebook");
             topLevelDirectoryPathSegments.add(this.sessionID);
             topLevelDirectoryPathSegments.add("lab");
             topLevelDirectoryPathSegments.add("tree");
-            topLevelDirectoryPath
-                    .iterator()
-                    .forEachRemaining(name -> topLevelDirectoryPathSegments.add(name.toString()));
-            topLevelDirectoryPathSegments.add("home");
+            homeDirectoryPath.iterator().forEachRemaining(name -> topLevelDirectoryPathSegments.add(name.toString()));
             topLevelDirectoryPathSegments.add(Objects.requireNonNull(this.userName));
 
             return new URIBuilder()
