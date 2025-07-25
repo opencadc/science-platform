@@ -4,7 +4,6 @@ import ca.nrc.cadc.reg.client.LocalAuthority;
 import java.net.URI;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.Set;
 
 public class CommonUtils {
     public static boolean isNotEmpty(Collection<?> collection) {
@@ -27,7 +26,16 @@ public class CommonUtils {
      * @return A single URI (first matching). Never null.
      */
     public static URI firstLocalServiceURI(final URI baseStandardID) {
-        final Set<URI> serviceURIs = new LocalAuthority().getResourceIDs(baseStandardID);
-        return serviceURIs.stream().findFirst().orElseThrow(IllegalStateException::new);
+        return CommonUtils.firstLocalServiceURI(baseStandardID, false);
+    }
+
+    /**
+     * Obtai n the first configured Service URI for the given base standard ID.
+     *
+     * @param baseStandardID The URI to lookup.
+     * @return A single URI (first matching). Never null.
+     */
+    public static URI firstLocalServiceURI(final URI baseStandardID, final boolean ignoreMissing) {
+        return new LocalAuthority().getResourceID(baseStandardID);
     }
 }

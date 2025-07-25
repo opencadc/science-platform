@@ -67,31 +67,15 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.X509CertificateChain;
-import ca.nrc.cadc.cred.client.CredClient;
-import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.*;
-import java.net.URI;
-import java.net.URL;
 import java.util.*;
-import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
-import org.opencadc.vospace.DataNode;
-import org.opencadc.vospace.Node;
-import org.opencadc.vospace.VOSURI;
-import org.opencadc.vospace.client.VOSpaceClient;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -104,7 +88,6 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String NONE = "<none>";
 
     private static final Logger log = Logger.getLogger(SessionAction.class);
-    private static final double ONE_WEEK_DAYS = 7.0D;
 
     protected String requestType;
     protected String sessionID;
@@ -142,53 +125,6 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("sessionID: " + sessionID);
         log.debug("appID: " + appID);
         log.debug("userID: " + posixPrincipal);
-    }
-
-    protected void injectCredentials() {
-        injectProxyCertificate();
-    }
-
-    private void injectProxyCertificate() {
-        log.debug("injectProxyCertificate()");
-
-        // inject a delegated proxy certificate if available
-        try {
-            final URI credServiceID = CommonUtils.firstLocalServiceURI(Standards.CRED_PROXY_10);
-
-            // Should throw a NoSuchElementException if it's missing, but check here anyway.
-            if (credServiceID != null) {
-                final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL =
-                        registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
-
-                if (credServiceURL != null) {
-                    final UserStorageAdminConfiguration userStorageAdminConfiguration =
-                            UserStorageAdminConfiguration.fromEnv();
-                    final VOSpaceClient cavernClient = new VOSpaceClient(userStorageAdminConfiguration.serviceURI);
-                    final DataNode certificateNode = new DataNode("cadcproxy.pem");
-                    final CredClient credClient = new CredClient(credServiceID);
-                    final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                    final X509CertificateChain proxyCert = Subject.callAs(
-                            CredUtil.createOpsSubject(),
-                            () -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
-
-                    log.debug("Proxy cert: " + proxyCert);
-                    final URI sslFolderURI = new URI(userStorageAdminConfiguration.userHomeBaseURI + "/" + getUsername()
-                            + "/.ssl/cadcproxy.pem");
-                    final VOSURI targetVOSURI = new VOSURI(sslFolderURI);
-                    final Node injectedCertificateNode = cavernClient.createNode(targetVOSURI, certificateNode);
-                    log.debug("injectProxyCertificate(): OK -> " + injectedCertificateNode.getName());
-                }
-            }
-        } catch (NoSuchElementException noSuchElementException) {
-            log.debug("Not using proxy certificates");
-            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
-        } catch (ResourceNotFoundException resourceNotFoundException) {
-            log.debug("No home node found for user: " + getUsername());
-        } catch (Exception e) {
-            log.warn("failed to inject cert: " + e.getMessage(), e);
-            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
-        }
     }
 
     protected String getImageName(String image) {

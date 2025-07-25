@@ -72,7 +72,6 @@ import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -80,8 +79,12 @@ import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.concurrent.CompletionException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -95,17 +98,10 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
-import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
-import org.opencadc.vospace.ContainerNode;
-import org.opencadc.vospace.Node;
-import org.opencadc.vospace.NodeProperty;
-import org.opencadc.vospace.VOS;
-import org.opencadc.vospace.VOSURI;
-import org.opencadc.vospace.client.VOSpaceClient;
 
 /**
  * POST submission for creating a new session or app, or updating (renewing) an existing session. Configuration is
@@ -152,6 +148,7 @@ public class PostAction extends SessionAction {
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
+    private final UserStorageClient userStorageClient = new UserStorageClient();
 
     public PostAction() {
         super();
@@ -229,7 +226,7 @@ public class PostAction extends SessionAction {
                     }
                 }
 
-                ensureUserBase();
+                this.userStorageClient.ensureUserBase(getUsername());
 
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
@@ -292,72 +289,6 @@ public class PostAction extends SessionAction {
                 syncOutput.getOutputStream().write((appID + "\n").getBytes());
             } else {
                 throw new UnsupportedOperationException("Cannot modify an existing app.");
-            }
-        }
-    }
-
-    void ensureUserBase() throws Exception {
-        final UserStorageAdminConfiguration userStorageAdminConfiguration = UserStorageAdminConfiguration.fromEnv();
-        final VOSpaceClient cavernClient = new VOSpaceClient(userStorageAdminConfiguration.serviceURI);
-        final String userHomeBasePath = userStorageAdminConfiguration.userHomeBaseURI.getPath();
-        final String userHomePath = userHomeBasePath + "/" + getUsername();
-
-        // Call as null user to ensure that the owner is properly augmented without the actual current user in the
-        // context.
-        final Subject adminOwner = Subject.callAs(null, userStorageAdminConfiguration.owner::toSubject);
-
-        try {
-            // Run this as the current user.
-            cavernClient.getNode(userHomePath);
-            log.debug("User home already exists: " + userHomePath);
-        } catch (ResourceNotFoundException nodeNotFoundException) {
-            log.debug("User home does not exist, allocating new user home at " + userHomePath);
-            allocateUser(adminOwner, cavernClient, userStorageAdminConfiguration);
-            log.debug("User home does not exist, allocating new user home at " + userHomePath + ": OK");
-        }
-    }
-
-    /**
-     * Call the Cavern service to allocate a new user home. The new User Allocation (ContainerNode) will be created with
-     * the appropriate "creator" (Resource Owner) set, and the default quota.
-     *
-     * @param adminOwner The owner of the allocation folder (i.e. /home) to create the user home in.
-     * @param voSpaceClient An existing VOSpace client
-     * @param userStorageAdminConfiguration The configuration to connect to the Cavern service.
-     * @throws IOException For any issues with writing the Node to the Cavern service.
-     */
-    void allocateUser(
-            final Subject adminOwner,
-            final VOSpaceClient voSpaceClient,
-            final UserStorageAdminConfiguration userStorageAdminConfiguration)
-            throws IOException {
-        log.debug("PostAction.allocateUser()");
-        try {
-            final ContainerNode userHomeNode = new ContainerNode(getUsername());
-            userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
-            userStorageAdminConfiguration.configureOwner(userHomeNode, AuthenticationUtil.getCurrentSubject());
-
-            final ContainerNode newUserHome = Subject.callAs(adminOwner, () -> {
-                final Node createdNode = voSpaceClient.createNode(
-                        new VOSURI(userStorageAdminConfiguration.userHomeBaseURI + "/" + getUsername()),
-                        userHomeNode,
-                        false);
-                if (createdNode instanceof ContainerNode) {
-                    return (ContainerNode) createdNode;
-                } else {
-                    throw new IllegalStateException("BADNESS: Created Node is not a ContainerNode: " + createdNode
-                            + ".  Expected ContainerNode called " + userHomeNode.getName() + " at "
-                            + userStorageAdminConfiguration.userHomeBaseURI.getPath());
-                }
-            });
-
-            log.debug("PostAction.allocateUser(): OK -> " + newUserHome.getName());
-        } catch (CompletionException exception) {
-            final Throwable cause = exception.getCause();
-            if (cause instanceof IOException) {
-                throw (IOException) cause;
-            } else {
-                throw new IOException(cause.getMessage(), cause);
             }
         }
     }
@@ -590,6 +521,11 @@ public class PostAction extends SessionAction {
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
+        final String owner = getUsername();
+
+        if (type.isDesktop()) {
+            this.userStorageClient.ensureDesktopUserHomePreparation(owner);
+        }
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
@@ -601,7 +537,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, getUsername())
+                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
@@ -610,7 +546,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
-                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + getUsername())
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
                 .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
                 .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
@@ -637,7 +573,7 @@ public class PostAction extends SessionAction {
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
-        injectCredentials();
+        this.userStorageClient.injectProxyCertificate(owner);
 
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
@@ -807,6 +743,7 @@ public class PostAction extends SessionAction {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
+        final String owner = getUsername();
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
@@ -815,7 +752,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, getUsername())
+                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
@@ -830,7 +767,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
-                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + getUsername())
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
                 .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
                 .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(
@@ -847,7 +784,7 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        injectCredentials();
+        this.userStorageClient.injectProxyCertificate(owner);
     }
 
     private void validateHeadlessMembership() {

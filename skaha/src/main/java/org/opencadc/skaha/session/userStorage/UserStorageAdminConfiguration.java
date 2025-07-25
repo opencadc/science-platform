@@ -4,8 +4,10 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.InvalidConfigException;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -31,22 +33,20 @@ import org.opencadc.vospace.VOS;
 public class UserStorageAdminConfiguration {
     // User Storage access control.
     private static final String SKAHA_USER_STORAGE_ADMIN_API_KEY = "SKAHA_USER_STORAGE_ADMIN_API_KEY";
-    private static final String SKAHA_USER_STORAGE_ADMIN_SERVICE_URI = "SKAHA_USER_STORAGE_ADMIN_SERVICE_URI";
-    private static final String SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI = "SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI";
 
     // For Certificate-based authentication.
     private static final String SKAHA_USER_STORAGE_ADMIN_CERTIFICATE = "SKAHA_USER_STORAGE_ADMIN_CERTIFICATE";
 
     public final UserStorageAdministrator owner;
-    public final URI serviceURI;
-    public final URI userHomeBaseURI;
+
+    private final UserStorageConfiguration userStorageConfiguration;
 
     /**
      * Create a UserStorageAdminConfiguration from the environment variables.
      *
      * @return A new UserStorageAdminConfiguration instance. Never null.
      */
-    public static UserStorageAdminConfiguration fromEnv() throws Exception {
+    public static UserStorageAdminConfiguration fromEnv() {
         final CombinedConfiguration configuration = new CombinedConfiguration(new MergeCombiner());
         configuration.setConversionHandler(new URIConversionHandler());
 
@@ -58,29 +58,14 @@ public class UserStorageAdminConfiguration {
         return new UserStorageAdminConfiguration(configuration);
     }
 
-    private UserStorageAdminConfiguration(final Configuration configuration) throws Exception {
+    private UserStorageAdminConfiguration(final Configuration configuration) {
+        this.userStorageConfiguration = UserStorageConfiguration.fromConfiguration(configuration);
+
         if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY)
                 && configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
             throw new InvalidConfigException("Both an API Key and certificate provided for User Storage admin. "
                     + "Please provide only one method of authentication.");
         }
-
-        this.serviceURI =
-                configuration.get(URI.class, UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_SERVICE_URI);
-        this.userHomeBaseURI =
-                configuration.get(URI.class, UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI);
-
-        Objects.requireNonNull(
-                this.serviceURI,
-                "User Storage (Cavern) Service URI must not be null.  Please set the "
-                        + UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_SERVICE_URI
-                        + " environment variable or system property.");
-        ;
-        Objects.requireNonNull(
-                this.userHomeBaseURI,
-                "User Storage (Cavern) User Home Base URI must not be null.  Please set the "
-                        + UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_USER_HOME_URI
-                        + " environment variable or system property.");
 
         if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
             final String certificateString =
@@ -94,11 +79,17 @@ public class UserStorageAdminConfiguration {
         }
     }
 
-    private UserStorageAdministrator configureAPIKeyOwner(String apiKey) throws Exception {
+    private UserStorageAdministrator configureAPIKeyOwner(String apiKey) {
         Objects.requireNonNull(apiKey, "API Key must not be null");
 
         final RegistryClient registryClient = new RegistryClient();
-        return new UserStorageAPIKeyAdministrator(apiKey, registryClient.getAccessURL(this.serviceURI));
+        try {
+            return new UserStorageAPIKeyAdministrator(
+                    apiKey, registryClient.getAccessURL(this.userStorageConfiguration.serviceURI));
+        } catch (IOException | ResourceNotFoundException lookupException) {
+            throw new InvalidConfigException(
+                    "Failed to get access to: " + this.userStorageConfiguration.serviceURI, lookupException);
+        }
     }
 
     private UserStorageAdministrator configureCertificateOwner(final String certificateString) {
