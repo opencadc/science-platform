@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletionException;
@@ -336,8 +337,13 @@ public class UserStorageClient {
                 if (tarEntry.isFile()) {
                     // Create the directory structure in the output directory.
                     final Path filePath = outputDirectoryPath.resolve(tarEntry.getName());
-                    if (filePath.getParent() != null && !Files.exists(filePath.getParent())) {
-                        Files.createDirectories(filePath.getParent());
+                    if (filePath.getParent() != null) {
+                        try {
+                            Files.createDirectories(filePath.getParent());
+                        } catch (FileAlreadyExistsException fileAlreadyExistsException) {
+                            // Directory already exists, ignore.
+                            LOGGER.debug("Directory already exists: " + filePath.getParent());
+                        }
                     }
                     try (final FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
                         IOUtils.copy(tarArchiveInputStream, fileOutputStream);
