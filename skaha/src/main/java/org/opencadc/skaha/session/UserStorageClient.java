@@ -329,24 +329,33 @@ public class UserStorageClient {
      * @throws IOException If the TAR file cannot be read or processed.
      */
     static Path extractDesktopSetupFiles(final File sourceFile) throws IOException {
-        final Path outputDirectoryPath = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), "");
+        final Path outputDirectoryPath = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), "")
+                .normalize();
         try (final TarArchiveInputStream tarArchiveInputStream =
                 new TarArchiveInputStream(new FileInputStream(sourceFile))) {
             TarArchiveEntry tarEntry;
             while ((tarEntry = tarArchiveInputStream.getNextEntry()) != null) {
                 if (tarEntry.isFile()) {
                     // Create the directory structure in the output directory.
-                    final Path filePath = outputDirectoryPath.resolve(tarEntry.getName());
-                    if (filePath.getParent() != null) {
-                        try {
-                            Files.createDirectories(filePath.getParent());
-                        } catch (FileAlreadyExistsException fileAlreadyExistsException) {
-                            // Directory already exists, ignore.
-                            LOGGER.debug("Directory already exists: " + filePath.getParent());
+                    final Path filePath =
+                            outputDirectoryPath.resolve(tarEntry.getName()).normalize();
+                    if (filePath.startsWith(outputDirectoryPath)) {
+                        // Ensure the file path is within the output directory.
+                        LOGGER.debug("Extracting file: " + filePath);
+                        if (filePath.getParent() != null) {
+                            try {
+                                Files.createDirectories(filePath.getParent());
+                            } catch (FileAlreadyExistsException fileAlreadyExistsException) {
+                                // Directory already exists, ignore.
+                                LOGGER.debug("Directory already exists: " + filePath.getParent());
+                            }
                         }
-                    }
-                    try (final FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
-                        IOUtils.copy(tarArchiveInputStream, fileOutputStream);
+                        try (final FileOutputStream fileOutputStream = new FileOutputStream(filePath.toFile())) {
+                            IOUtils.copy(tarArchiveInputStream, fileOutputStream);
+                        }
+                    } else {
+                        throw new IOException("Invalid file path: " + filePath + ".  Extraction outside of "
+                                + outputDirectoryPath + " is not allowed.");
                     }
                 }
             }
