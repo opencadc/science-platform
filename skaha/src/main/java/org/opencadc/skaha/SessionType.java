@@ -75,6 +75,10 @@ public enum SessionType {
         return this.supportsService;
     }
 
+    public boolean isDesktop() {
+        return this == DESKTOP;
+    }
+
     public boolean isHeadless() {
         return this == HEADLESS;
     }
