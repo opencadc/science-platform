@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.2](https://github.com/opencadc/science-platform/compare/0.29.1...0.29.2) (2025-08-01)
+
+
+### Bug Fixes
+
+* reduce sockets to redis cache ([6aa5471](https://github.com/opencadc/science-platform/commit/6aa5471cf4606a13f4635f64292f9b0576fc1898))
+* reduce sockets to redis cache ([63dbbf7](https://github.com/opencadc/science-platform/commit/63dbbf7679bddc38768a5372313fd33b83a8bfaf))
+
 ## [0.29.1](https://github.com/opencadc/science-platform/compare/0.29.0...0.29.1) (2025-07-18)
 
 
