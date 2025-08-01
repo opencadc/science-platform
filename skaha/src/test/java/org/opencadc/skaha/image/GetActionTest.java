@@ -69,15 +69,9 @@ package org.opencadc.skaha.image;
 import java.util.List;
 import java.util.Set;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.utils.RedisCache;
-import org.opencadc.skaha.utils.TestUtils;
 
 /**
  * Unit Test for GetAction class for images.
@@ -86,38 +80,30 @@ import org.opencadc.skaha.utils.TestUtils;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class GetActionTest {
-
-    @InjectMocks
-    GetAction getAction;
-
-    RedisCache redis;
-
-    @Before
-    public void setUp() {
-        redis = Mockito.mock(RedisCache.class);
-        getAction = new GetAction();
-
-        TestUtils.set(getAction, SkahaAction.class, "redis", redis);
-    }
-
     @Test
-    public void testGetImagesWithNullType() throws Exception {
+    public void testGetImagesWithNullType() {
         List<Image> expectedImages = List.of(
                 new Image("image1", Set.of("type1", "type2"), "digest1"),
                 new Image("image2", Set.of("type2", "type3"), "digest2"));
+        final GetAction testSubject = new GetAction() {
+            @Override
+            protected List<Image> queryCache() {
+                return expectedImages;
+            }
+        };
 
-        Mockito.when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
-
-        List<Image> result = getAction.getImages(null);
+        List<Image> result = testSubject.getImages(null);
 
         Assert.assertEquals(expectedImages, result);
     }
 
     @Test
-    public void testGetImagesWithUnknownImageType() throws Exception {
+    public void testGetImagesWithUnknownImageType() {
         String type = "type3";
 
-        Exception exception = Assert.assertThrows(RuntimeException.class, () -> getAction.getImages(type));
+        final GetAction testSubject = new GetAction();
+
+        Exception exception = Assert.assertThrows(IllegalArgumentException.class, () -> testSubject.getImages(type));
 
         Assert.assertEquals("unknown type: type3", exception.getMessage());
     }
@@ -129,9 +115,13 @@ public class GetActionTest {
         Image notebookImage = new Image("image2", Set.of(notebook), "digest2");
         List<Image> expectedImages = List.of(new Image("image1", Set.of("type1", "type2"), "digest1"), notebookImage);
 
-        Mockito.when(redis.getAll("public", Image.class)).thenReturn(expectedImages);
-
-        List<Image> result = getAction.getImages(notebook);
+        final GetAction testSubject = new GetAction() {
+            @Override
+            protected List<Image> queryCache() {
+                return expectedImages;
+            }
+        };
+        List<Image> result = testSubject.getImages(notebook);
 
         Assert.assertEquals(List.of(notebookImage), result);
     }
