@@ -1,17 +1,17 @@
 swagger: '2.0'
 info:
-  version: 0.23.0
+  version: 1.0
   title: skaha
   description: |
-    skaha API Documentation.  This API allows authorized users to create and interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook sessions in the skaha processing environment.  Desktop apps can also be launched and attached to skaha desktop sessions through this API.<br/><br/>Clients may authenticate to this service by:<br/>1.  Providing a bearer token in the Authorization header.<br/>2.  Using a client certificate.<br/>3.  Using a browser cookie from CADC Login.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using Skaha can be found here:  https://www.opencadc.org/science-containers/
+    skaha API Documentation.<br/><br/>This API allows authorized users to manage interactive and headless sessions on this CANFAR Science Platform.<br/><br/>The main skaha github page with documentation and source code is here:  https://github.com/opencadc/science-platform<br/><br/>Documentation on using Skaha can be found here:  https://www.opencadc.org/science-containers/
 schemes:
   - https
 basePath: /skaha
 paths:
-  /v0/session:
+  /v1/session:
     get:
       description: |
-        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>User ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect URL<br/><br/>Valid types are 'desktop', 'carta', 'notebook', and 'headless'.
+        List the sessions for the calling user, returned as a JSON array.  Session attributes include:<br/><br/>Session ID<br/>User ID<br/>Image<br/>Type<br/>Status<br/>Name<br/>StartTime<br/>Connect URL<br/><br/>Valid types are 'desktop', 'notebook', 'carta', 'firefly' and 'headless'.
       tags:
         - Session Management
       responses:
@@ -28,10 +28,10 @@ paths:
         default:
           description: Unexpected error
       parameters:
-      - name: type
+      - name: interact
         in: query
         type: string
-        description: Only show sessions of this type (desktop, notebook, carta, or headless)
+        description: Only show sessions of this interact type (desktop, notebook, carta, firefly, contributed, and headless)
         required: false
       - name: status
         in: query
@@ -45,7 +45,7 @@ paths:
         required: false
     post:
       description: |
-            Launch a new session.  Depending on the underlying image and system state, sessions may take time for the system to download in startup.  Normal initialization time to a running session is less than 10 seconds.  After a successful POST, the sessionID is returned in the response body.
+            Launch a new session.  After a successful POST, the sessionID is returned in the response body.  Image scheduling may take time and can be monitored by viewing the events of the session.  The image initialization process is independent of image launching and can be monitored by viewing the logs of the session.
       tags:
         - Session Management
       parameters:
@@ -61,7 +61,7 @@ paths:
           description: |
               The image ID of the session.  For example:
               ```
-              images.canfar.net/skaha/notebook-scipy:0.2
+              images.canfar.net/skaha/astroml-notebook-scipy:latest
               ```
           required: true
         - name: cores
@@ -76,29 +76,29 @@ paths:
           description: |
               Request this much RAM (GB) for the session.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
           required: false
-        - name: type
+        - name: interact
           in: query
           type: string
           description: |
-              For images that reside outside of the supported harbor registries, the type parameter must be provided.  This requires additional privileges.
+              If supplied, make the session interactive according to the value.  Supported values are: desktop, notebook, firefly, carta, and contributed.  If not supplied, the session will be run as a headless job.
           required: false
         - name: cmd
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Override the image entrypoint with this command.
+              Only applies to headless sessions. Override the image entrypoint with this command.
           required: false
         - name: args
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Override the image CMD params with these values. Multiple arguments are separated with a space. The value must be URL encoded. For example, "args=arg1 arg2" is represented as "args=arg1%20arg2".
+              Only applies to headless sessions. Override the image CMD params with these values.  Multiple arguments are separated with a space.  The value must be URL encoded. For example, "args=arg1 arg2" is represented as "args=arg1%20arg2".
           required: false
         - name: env
           in: query
           type: string
           description: |
-              Only applies to session type 'headless'. Add additional environment to the container. Format is key=value. Multiple env parameters supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
+              Only applies to headless sessions. Add additional environment to the container. Format is key=value. Multiple env parameters supported. 'key=value' must be URL encoded, so, for example, PATH=/usr/local/bin should be supplied as PATH%3D%2Fusr%2Flocal%2Fbin.
           required: false
         - name: x-skaha-registry-auth
           in: header
@@ -108,6 +108,7 @@ paths:
               ```
               $ echo -n "username:my-registry-secret" | base64 -i -
               ```
+          required: false
       responses:
         '200':
           description: Successful response
@@ -125,7 +126,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/session/{sessionID}:
+  /v1/session/{sessionID}:
     get:
       description: |
         Get the session identified by sessionID as a JSON object.
@@ -337,7 +338,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/image:
+  /v1/image:
     get:
       description: |
         List the images available for launching to the calling user, returned as a JSON array.  Image attributes include:<br/><br/>Image ID<br/>Image Type<br/>Digest (checksum)
@@ -360,9 +361,9 @@ paths:
       - name: type
         in: query
         type: string
-        description: Only show images of this type (desktop, notebook, or carta)
+        description: Only show images of this type (desktop, notebook, firefly, carta or contributed)
         required: false
-  /v0/context:
+  /v1/context:
     get:
       description: |
         List the CPU cores and Random Access Memory available for launching to the calling user, returned as JSON objects.  The default values for both cores and RAM are also returned.
@@ -381,7 +382,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/repository:
+  /v1/repository:
     get:
       description: |
         List the Image Repository hosts configured as a JSON Array.
