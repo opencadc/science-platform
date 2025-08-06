@@ -11,8 +11,9 @@ import redis.clients.jedis.AbstractTransaction;
 import redis.clients.jedis.JedisPooled;
 
 /**
- * A simple Redis Cache for POSIX information.  This will update the underlying Redis Set in a transaction to ensure single access.
- * BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to properly reset it.
+ * A simple Redis Cache for POSIX information. This will update the underlying Redis Set in a transaction to ensure
+ * single access. BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to
+ * properly reset it.
  */
 public class PosixCache {
     private static final Logger LOGGER = Logger.getLogger(PosixCache.class);
@@ -28,10 +29,11 @@ public class PosixCache {
     private final PosixMapperClient posixMapperClient;
 
     /**
-     * Construct a new Cache.  This will initialize the Redis Pool (JediPooled) with the given URL and client to the POSIX Mapper API.
+     * Construct a new Cache. This will initialize the Redis Pool (JediPooled) with the given URL and client to the
+     * POSIX Mapper API.
      *
-     * @param cacheURL          The Redis URL.
-     * @param rootHomeFolder    Root of entire system (i.e. containing home and project folders)
+     * @param cacheURL The Redis URL.
+     * @param rootHomeFolder Root of the entire system (i.e., containing home and project folders)
      * @param posixMapperClient The Client to the POSIX Mapper API.
      */
     public PosixCache(final String cacheURL, final String rootHomeFolder, final PosixMapperClient posixMapperClient) {
@@ -41,8 +43,7 @@ public class PosixCache {
     }
 
     /**
-     * Obtain the POSIX entry for the provided POSIX Principal in POSIX form.
-     * Example output:
+     * Obtain the POSIX entry for the provided POSIX Principal in POSIX form. Example output:
      * "username1:x:1000:1000::/rootdir/home/username:/sbin/nologin"
      *
      * @param posixPrincipalEntry The POSIX Principal wrapper to transform.
@@ -100,13 +101,5 @@ public class PosixCache {
         }
     }
 
-    private static final class PosixPrincipalEntry {
-        private final PosixPrincipal posixPrincipal;
-        private final String homeFolder;
-
-        PosixPrincipalEntry(final PosixPrincipal posixPrincipal, final String homeFolder) {
-            this.posixPrincipal = posixPrincipal;
-            this.homeFolder = homeFolder;
-        }
-    }
+    private record PosixPrincipalEntry(PosixPrincipal posixPrincipal, String homeFolder) {}
 }

@@ -68,7 +68,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.auth.PosixPrincipal;
 import java.util.Arrays;
-import org.apache.log4j.Logger;
 
 /**
  * Represents a session running in skaha.
@@ -76,8 +75,6 @@ import org.apache.log4j.Logger;
  * @author majorb
  */
 public class Session {
-
-    private static final Logger log = Logger.getLogger(Session.class);
 
     public static final String STATUS_TERMINATING = "Terminating";
     public static final String STATUS_SUCCEEDED = "Succeeded";
