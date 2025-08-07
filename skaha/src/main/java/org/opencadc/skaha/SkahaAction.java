@@ -127,7 +127,6 @@ public abstract class SkahaAction extends RestAction {
     protected final PosixMapperConfiguration posixMapperConfiguration;
     public List<String> harborHosts;
     protected PosixPrincipal posixPrincipal;
-    protected boolean adminUser = false;
     protected boolean headlessUser = false;
     protected boolean priorityHeadlessUser = false;
     protected String homedir;
@@ -344,18 +343,6 @@ public abstract class SkahaAction extends RestAction {
         }
 
         log.debug("user is a member of skaha user group ");
-        if (skahaAdminsGroup == null) {
-            log.warn("skaha.adminsgroup not defined in system properties");
-        } else {
-            try {
-                final GroupURI adminGroupURI = new GroupURI(URI.create(skahaAdminsGroup));
-                if (skahaUsersGroupUriSet.contains(adminGroupURI)) {
-                    adminUser = true;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
 
         List<Group> groups = isNotEmpty(skahaUsersGroupUriSet)
                 ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
