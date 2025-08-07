@@ -76,11 +76,11 @@ paths:
           description: |
               Request this much RAM (GB) for the session.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
           required: false
-        - name: interact
+        - name: access
           in: query
           type: string
           description: |
-              If supplied, make the session interactive according to the value.  Supported values are: desktop, notebook, firefly, carta, and contributed.  If not supplied, the session will be run as a headless job.
+              If supplied, make the session accessible according to the value.  Supported values are: desktop, notebook, firefly, carta, and contributed.  If not supplied, the session will be run as a headless job.
           required: false
         - name: cmd
           in: query

@@ -171,7 +171,7 @@ public class PostAction extends SessionAction {
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                final String requestedType = syncInput.getParameter("interact");
+                final String requestedType = syncInput.getParameter("access");
 
                 // Absence of type is assumed to be headless
                 final String type =
