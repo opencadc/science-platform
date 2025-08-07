@@ -28,10 +28,10 @@ paths:
         default:
           description: Unexpected error
       parameters:
-      - name: interact
+      - name: access
         in: query
         type: string
-        description: Only show sessions of this interact type (desktop, notebook, carta, firefly, contributed, and headless)
+        description: Only show sessions of this access type (desktop, notebook, carta, firefly, contributed, and headless)
         required: false
       - name: status
         in: query
