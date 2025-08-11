@@ -494,12 +494,12 @@ public class PostAction extends SessionAction {
 
         for (String authorizedHost : harborHosts) {
             if (authorizedHost.equals(imageRegistryHost)) {
-        	    if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
-        	        // assert headless group membership
-        	        validateHeadlessMembership();
-        	    }
-        	    return SessionType.fromApplicationStringType(type);
-        	}
+                if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                    // assert headless group membership
+                    validateHeadlessMembership();
+                }
+                return SessionType.fromApplicationStringType(type);
+            }
         }
         throw new IllegalArgumentException("image not in a trusted repository");
     }
