@@ -67,6 +67,7 @@
 
 package org.opencadc.skaha;
 
+import ca.nrc.cadc.util.StringUtil;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -105,10 +106,6 @@ public class K8SUtil {
         return ("skaha-" + type.name().toLowerCase() + "-" + userJobID + "-" + sessionID).toLowerCase();
     }
 
-    public static String getHomeDir() {
-        return System.getenv("skaha.homedir");
-    }
-
     public static String getScratchDir() {
         return System.getenv("skaha.scratchdir");
     }
@@ -122,16 +119,37 @@ public class K8SUtil {
      *
      * @return integer in GB.
      */
-    public static String getDefaultQuota() {
+    public static String getDefaultQuotaGB() {
         return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
+    }
+
+    public static String getDefaultQuotaBytes() {
+        return K8SUtil.getDefaultQuotaBytes(K8SUtil.getDefaultQuotaGB());
+    }
+
+    /**
+     * Obtain the default quota size in bytes.
+     *
+     * @param defaultQuotaGB The default quota size in Gigabytes as a String.
+     * @return String representing the default quota size in bytes.
+     */
+    static String getDefaultQuotaBytes(final String defaultQuotaGB) {
+        final double sizeInGB;
+        if (StringUtil.hasText(defaultQuotaGB)) {
+            try {
+                sizeInGB = Double.parseDouble(defaultQuotaGB);
+            } catch (NumberFormatException numberFormatException) {
+                throw new IllegalArgumentException("Invalid default quota size in GB: " + defaultQuotaGB);
+            }
+        } else {
+            sizeInGB = 10.0D; // Default to 10 GB if not specified
+        }
+
+        return Double.valueOf(sizeInGB * 1024.0D * 1024.0D * 1024.0D).longValue() + "";
     }
 
     public static String getPreAuthorizedTokenSecretName() {
         return "pre-auth-token-skaha";
-    }
-
-    public static String getSkahaTld() {
-        return System.getenv("SKAHA_TLD");
     }
 
     public static boolean isGpuEnabled() {
