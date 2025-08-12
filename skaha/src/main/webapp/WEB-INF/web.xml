@@ -121,22 +121,22 @@
 
     <servlet-mapping>
         <servlet-name>SessionServlet</servlet-name>
-        <url-pattern>/v0/session/*</url-pattern>
+        <url-pattern>/v1/session/*</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
         <servlet-name>ContextServlet</servlet-name>
-        <url-pattern>/v0/context/*</url-pattern>
+        <url-pattern>/v1/context/*</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
         <servlet-name>ImageServlet</servlet-name>
-        <url-pattern>/v0/image/*</url-pattern>
+        <url-pattern>/v1/image/*</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
         <servlet-name>ImageRepositoryServlet</servlet-name>
-        <url-pattern>/v0/repository/*</url-pattern>
+        <url-pattern>/v1/repository/*</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
