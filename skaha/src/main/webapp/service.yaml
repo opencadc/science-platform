@@ -28,7 +28,7 @@ paths:
         default:
           description: Unexpected error
       parameters:
-      - name: access
+      - name: type
         in: query
         type: string
         description: Only show sessions of this access type (desktop, notebook, carta, firefly, contributed, and headless)
@@ -76,7 +76,7 @@ paths:
           description: |
               Request this much RAM (GB) for the session.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
           required: false
-        - name: access
+        - name: type
           in: query
           type: string
           description: |
