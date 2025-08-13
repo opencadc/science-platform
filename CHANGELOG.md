@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.30.0](https://github.com/opencadc/science-platform/compare/0.29.2...0.30.0) (2025-08-13)
+
+
+### Features
+
+* fix checkstyle ([7f444cd](https://github.com/opencadc/science-platform/commit/7f444cd7ffd7241b740e4afa1e87736e7ffc69d0))
+* fix checkstyle ([db556f8](https://github.com/opencadc/science-platform/commit/db556f83093fe5a2e11950a25d5dbb2034383850))
+* revert param name to 'type' ([464a78b](https://github.com/opencadc/science-platform/commit/464a78bcd64bd7cd8879185a432cf7d4cdf87596))
+
+## [0.29.2](https://github.com/opencadc/science-platform/compare/0.29.1...0.29.2) (2025-08-01)
+
+
+### Bug Fixes
+
+* reduce sockets to redis cache ([6aa5471](https://github.com/opencadc/science-platform/commit/6aa5471cf4606a13f4635f64292f9b0576fc1898))
+* reduce sockets to redis cache ([63dbbf7](https://github.com/opencadc/science-platform/commit/63dbbf7679bddc38768a5372313fd33b83a8bfaf))
+
 ## [0.29.1](https://github.com/opencadc/science-platform/compare/0.29.0...0.29.1) (2025-07-18)
 
 
