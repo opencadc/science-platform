@@ -2,14 +2,12 @@ package org.opencadc.skaha.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
-import static org.opencadc.skaha.utils.TestUtils.set;
 
 import com.google.gson.Gson;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -19,19 +17,9 @@ import redis.clients.jedis.Jedis;
 
 @RunWith(MockitoJUnitRunner.class)
 public class RedisCacheTest {
-    private final RedisCache redisCache = new RedisCache();
-
-    Jedis jedis;
-
     Gson gson = new Gson();
 
     private static final String OK = "OK";
-
-    @Before
-    public void setUp() throws Exception {
-        jedis = Mockito.mock(Jedis.class);
-        set(redisCache, "jedis", jedis);
-    }
 
     @Test
     public void testGetAllWithRange() {
@@ -40,10 +28,11 @@ public class RedisCacheTest {
         long start = 0;
         long stop = 1;
         List<String> expectedList = List.of("value1");
+        final Jedis jedis = Mockito.mock(Jedis.class);
 
         when(jedis.lrange(key, start, stop)).thenReturn(expectedList);
 
-        List<String> result = redisCache.getRange(key, start, stop);
+        List<String> result = RedisCache.getRange(jedis, key, start, stop);
 
         assertEquals(expectedList, result);
     }
@@ -55,10 +44,11 @@ public class RedisCacheTest {
         long start = 0;
         long stop = -1;
         List<String> expectedList = List.of("value1", "value2", "value3", "value4", "value5");
+        final Jedis jedis = Mockito.mock(Jedis.class);
 
         when(jedis.lrange(key, start, stop)).thenReturn(expectedList);
 
-        List<String> result = redisCache.getAll(key);
+        List<String> result = RedisCache.getAll(jedis, key);
 
         assertEquals(expectedList, result);
     }
@@ -72,10 +62,11 @@ public class RedisCacheTest {
 
         Image image = new Image("ID", Set.of("type1", "type2"), "digest");
         List<Image> expectedList = List.of(image);
+        final Jedis jedis = Mockito.mock(Jedis.class);
 
         when(jedis.lrange(key, start, stop)).thenReturn(List.of(gson.toJson(image)));
 
-        List<Image> result = redisCache.getAll(key, Image.class);
+        List<Image> result = RedisCache.getAll(jedis, key, Image.class);
 
         assertEquals(expectedList, result);
     }
@@ -95,10 +86,11 @@ public class RedisCacheTest {
             }
         };
         List<Image> expectedList = List.of();
+        final Jedis jedis = Mockito.mock(Jedis.class);
 
         when(jedis.lrange(key, start, stop)).thenReturn(List.of(gson.toJson(image)));
 
-        List<Image> result = redisCache.getAll(key, Image.class);
+        List<Image> result = RedisCache.getAll(jedis, key, Image.class);
         assertEquals(expectedList, result);
     }
 }

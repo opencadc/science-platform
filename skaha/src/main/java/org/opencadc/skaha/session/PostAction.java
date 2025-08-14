@@ -95,7 +95,6 @@ import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
@@ -180,14 +179,19 @@ public class PostAction extends SessionAction {
                         StringUtil.hasText(requestedType) ? requestedType : PostAction.SESSION_TYPE_HEADLESS;
 
                 final SessionType validatedType = validateImage(image, type);
-                Integer cores = getCoresParam();
-                if (cores == null) {
-                    cores = rc.getDefaultCores(validatedType);
+
+                Integer requestCores = getCoresParam();
+                Integer limitCores = requestCores;
+                if (requestCores == null) {
+                    requestCores = rc.getDefaultRequestCores();
+                    limitCores = rc.getDefaultLimitCores();
                 }
 
-                Integer ram = getRamParam();
-                if (ram == null) {
-                    ram = rc.getDefaultRAM(validatedType);
+                Integer requestRAM = getRamParam();
+                Integer limitRAM = requestRAM;
+                if (requestRAM == null) {
+                    requestRAM = rc.getDefaultRequestRAM();
+                    limitRAM = rc.getDefaultLimitRAM();
                 }
 
                 String name = syncInput.getParameter("name");
@@ -223,7 +227,18 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, cores, ram, gpus, cmd, args, envs);
+                createSession(
+                        validatedType,
+                        image,
+                        name,
+                        requestCores,
+                        limitCores,
+                        requestRAM,
+                        limitRAM,
+                        gpus,
+                        cmd,
+                        args,
+                        envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -459,10 +474,10 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Validate and return the session type. There exists a loophole
+     * Validate and return the session type.
      *
      * @param imageID The image to validate
-     * @param type User-provided session type (optional), defaults to headless
+     * @param type Session type
      * @return The system recognized session type
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
      * @throws Exception If Harbor calls fail
@@ -472,44 +487,22 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image is required");
         }
 
-        // This will also vet the currently requested image's host (authority) against
-        // the list of configured ones.
+        // make sure the host of the image matches one of the allowed image hosts
+        // in the configuration
+        log.debug("validating image: " + imageID);
         final String imageRegistryHost = getRegistryHost(imageID);
-        log.debug("Image is located at " + imageRegistryHost);
+        log.debug("imageRegistryHost " + imageRegistryHost);
 
-        final Image image = getPublicImage(imageID);
-        final String validatedType;
-
-        // Private images are also missing from this list.
-        // TODO: We currently rely on the image's host name to match a configured one
-        // TODO: to ensure a supported image from a configured source.  This is impossible
-        // TODO: with Private images as they cannot be obtained first.  This means that any
-        // TODO: image that is missing from the Public Cache can either be invalid or Private,
-        // TODO: and since we can't verify one way or the other, let them through.
-        if (image == null) {
-            log.warn("Image " + imageID + " missing from cache...");
-            final ImageRepositoryAuth imageRepositoryAuth = getRegistryAuth(imageRegistryHost);
-            if (imageRepositoryAuth == null) {
-                throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
-            } else {
-                log.warn("Assuming image " + imageID + " is private as credentials were supplied.");
-                validatedType = type;
-            }
-        } else if (image.getTypes().contains(type)) {
-            validatedType = type;
-        } else {
-            throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
-        }
-
-        if (validatedType != null) {
-            if (adminUser && !SESSION_TYPES.contains(validatedType)) {
-                throw new IllegalArgumentException("Illegal session type: " + type);
-            } else if (validatedType.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
-                validateHeadlessMembership();
+        for (String authorizedHost : harborHosts) {
+            if (authorizedHost.equals(imageRegistryHost)) {
+                if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                    // assert headless group membership
+                    validateHeadlessMembership();
+                }
+                return SessionType.fromApplicationStringType(type);
             }
         }
-
-        return SessionType.fromApplicationStringType(validatedType);
+        throw new IllegalArgumentException("image not in a trusted repository");
     }
 
     public void checkExistingSessions(SessionType type) throws Exception {
@@ -540,8 +533,10 @@ public class PostAction extends SessionAction {
             SessionType type,
             String image,
             String name,
-            Integer cores,
-            Integer ram,
+            Integer requestCores,
+            Integer limitCores,
+            Integer requestRAM,
+            Integer limitRAM,
             Integer gpus,
             String cmd,
             String args,
@@ -572,10 +567,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, cores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, ram.toString() + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, cores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, ram + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,

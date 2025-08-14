@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.30.0](https://github.com/opencadc/science-platform/compare/0.29.2...0.30.0) (2025-08-13)
+
+
+### Features
+
+* fix checkstyle ([7f444cd](https://github.com/opencadc/science-platform/commit/7f444cd7ffd7241b740e4afa1e87736e7ffc69d0))
+* fix checkstyle ([db556f8](https://github.com/opencadc/science-platform/commit/db556f83093fe5a2e11950a25d5dbb2034383850))
+* revert param name to 'type' ([464a78b](https://github.com/opencadc/science-platform/commit/464a78bcd64bd7cd8879185a432cf7d4cdf87596))
+
+## [0.29.2](https://github.com/opencadc/science-platform/compare/0.29.1...0.29.2) (2025-08-01)
+
+
+### Bug Fixes
+
+* reduce sockets to redis cache ([6aa5471](https://github.com/opencadc/science-platform/commit/6aa5471cf4606a13f4635f64292f9b0576fc1898))
+* reduce sockets to redis cache ([63dbbf7](https://github.com/opencadc/science-platform/commit/63dbbf7679bddc38768a5372313fd33b83a8bfaf))
+
+## [0.29.1](https://github.com/opencadc/science-platform/compare/0.29.0...0.29.1) (2025-07-18)
+
+
+### Bug Fixes
+
+* docker and build updates for new gradle 8 and jdk 21 ([c15a212](https://github.com/opencadc/science-platform/commit/c15a212143f0a218951c48c644481d8db80a02c8))
+* docker and build updates for new gradle 8 and jdk 21 ([8e0d7f7](https://github.com/opencadc/science-platform/commit/8e0d7f7c5dbc4f6577faa0fe09b020fa6bd627a9))
+* set defaults appropriately when no resources requested ([135f6c3](https://github.com/opencadc/science-platform/commit/135f6c3c4a31b68982305d6b240d14216f54e97d))
+
+## [0.29.0](https://github.com/opencadc/science-platform/compare/0.28.1...0.29.0) (2025-05-28)
+
+
+### Features
+
+* Add javadoc to userVolumeUtils methods ([624fe11](https://github.com/opencadc/science-platform/commit/624fe11e6be6e950c5437ae765ae8e78ee4eebd5))
+* Add tests for isPrepareData ([152bc66](https://github.com/opencadc/science-platform/commit/152bc66284785bb5c3209f83d0f1fedc35971898))
+* Add tests for userDatasetsRootPath ([1586d27](https://github.com/opencadc/science-platform/commit/1586d27c7c4b9948929a62b4a6fcb20466b46a8a))
+* removed default path for USER_DATASETS_ROOT_PATH ([b9605ce](https://github.com/opencadc/science-platform/commit/b9605ce635c347cfa215462351fc3d4df0c38ac9))
+* Use parseBoolean for prepareDataEnabled flag ([b1e1823](https://github.com/opencadc/science-platform/commit/b1e182347be8e8cc223d3cecc758d5dcc7d7f1ed))
+
+
+### Bug Fixes
+
+* fix pipeline ([78db05e](https://github.com/opencadc/science-platform/commit/78db05edce4f5330433a74e241ce712c71985744))
+* linter issues ([ed497b7](https://github.com/opencadc/science-platform/commit/ed497b7351fbcb74ae6440fb6600f7225d067945))
+
 ## [0.28.1](https://github.com/opencadc/science-platform/compare/0.28.0...0.28.1) (2025-05-08)
 
 

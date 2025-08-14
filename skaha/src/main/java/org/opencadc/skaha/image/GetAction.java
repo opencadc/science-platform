@@ -71,7 +71,9 @@ import com.google.gson.GsonBuilder;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.utils.RedisCache;
 
 /**
  * Handle GET requests for images. This will optionally list by type.
@@ -106,10 +108,14 @@ public class GetAction extends SkahaAction {
             log.error("unknown image type: " + type);
             throw new IllegalArgumentException("unknown type: " + type);
         }
-        List<Image> images = redis.getAll(PUBLIC_IMAGES, Image.class);
+        List<Image> images = queryCache();
         if (null == type) return images;
         return images.parallelStream()
                 .filter(image -> null != image.getTypes() && image.getTypes().contains(type))
                 .collect(Collectors.toList());
+    }
+
+    protected List<Image> queryCache() {
+        return RedisCache.getAll(K8SUtil.getRedisHost(), K8SUtil.getRedisPort(), PUBLIC_IMAGES, Image.class);
     }
 }
