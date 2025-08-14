@@ -347,8 +347,19 @@ public class SessionDAO {
         if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
             connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
         } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+            final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
+            Integer majorVersion;
+
+            try {
+                majorVersion = Integer.parseInt(imageVersion.substring(0, 1));
+            } catch (NumberFormatException nfe) {
+                LOGGER.warn("Invalid CARTA image version: " + imageVersion + ", defaulting to 1.4");
+                majorVersion = null;
+            }
+
             connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
-                    .withAlternateSocket(image.endsWith(":1.4"))
+                    .withAlternateSocket(imageVersion.equalsIgnoreCase("1.4"))
+                    .withVersion5Path(majorVersion != null && majorVersion >= 5)
                     .build();
         } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
