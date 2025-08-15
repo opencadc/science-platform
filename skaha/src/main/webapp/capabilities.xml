@@ -36,7 +36,7 @@
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>
-  
+
   <capability standardID="http://www.opencadc.org/std/platform#session-1">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
         <accessURL use="base">https://replace.me.com/skaha/v1/session</accessURL>
@@ -51,7 +51,7 @@
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>
-  
+
   <capability standardID="http://www.opencadc.org/std/platform#context-1">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
         <accessURL use="base">https://replace.me.com/skaha/v1/context</accessURL>
@@ -66,7 +66,7 @@
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>
-  
+
   <capability standardID="http://www.opencadc.org/std/platform#image-1">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
         <accessURL use="base">https://replace.me.com/skaha/v1/image</accessURL>
@@ -81,7 +81,7 @@
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>
-  
+
   <capability standardID="http://www.opencadc.org/std/platform#repository-1">
     <interface xsi:type="vs:ParamHTTP" role="std" version="1.0">
         <accessURL use="base">https://replace.me.com/skaha/v1/repository</accessURL>
@@ -96,6 +96,6 @@
       <securityMethod standardID="ivo://ivoa.net/sso#token"/>
     </interface>
   </capability>
-  
+
 
 </vosi:capabilities>
