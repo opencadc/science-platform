@@ -73,7 +73,7 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.SessionType;
+import org.opencadc.skaha.session.SessionType;
 
 /**
  * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.

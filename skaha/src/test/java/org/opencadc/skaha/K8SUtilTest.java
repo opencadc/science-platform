@@ -71,6 +71,7 @@ package org.opencadc.skaha;
 import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtilTest {
     @Test

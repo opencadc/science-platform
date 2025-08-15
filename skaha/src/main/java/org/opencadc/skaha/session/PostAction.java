@@ -92,7 +92,6 @@ import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
-import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
@@ -482,10 +481,8 @@ public class PostAction extends SessionAction {
      * @param imageID The image to validate
      * @param type Session type
      * @return The system recognized session type
-     * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
-     * @throws Exception If Harbor calls fail
      */
-    private SessionType validateImage(String imageID, String type) throws Exception {
+    private SessionType validateImage(String imageID, String type) {
         if (!StringUtil.hasText(imageID)) {
             throw new IllegalArgumentException("image is required");
         }
@@ -498,11 +495,12 @@ public class PostAction extends SessionAction {
 
         for (String authorizedHost : harborHosts) {
             if (authorizedHost.equals(imageRegistryHost)) {
-                if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                final SessionType sessionType = SessionType.fromApplicationStringTypeAndImage(type);
+                if (SessionType.HEADLESS == sessionType) {
                     // assert headless group membership
                     validateHeadlessMembership();
                 }
-                return SessionType.fromApplicationStringType(type);
+                return sessionType;
             }
         }
         throw new IllegalArgumentException("image not in a trusted repository");
@@ -553,7 +551,10 @@ public class PostAction extends SessionAction {
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
+        final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
+        final boolean isLegacyCARTA = (type == SessionType.CARTA && (majorVersion == null || majorVersion < 5));
+
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath(isLegacyCARTA))
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
@@ -586,6 +587,8 @@ public class PostAction extends SessionAction {
             if (imageVersion.startsWith("5")) {
                 final String connectURLPrefix = SessionURLBuilder.cartaSession(
                                 K8SUtil.getSessionsHostName(), this.sessionID)
+                        .withVersion5Path(true)
+                        .withAlternateSocket(false)
                         .build();
                 final String connectURLPath = URI.create(connectURLPrefix).getPath();
                 sessionJobBuilder = sessionJobBuilder.withParameter(
@@ -618,10 +621,20 @@ public class PostAction extends SessionAction {
 
         log.debug("Create job result: " + createResult);
 
+        final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName, type);
+
+        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
+        // API is in place, we can swap this out with a proper Java client API.
+        // TODO: Use the Kubernetes Java client to create Service objects.
         if (type.supportsService()) {
-            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
-            final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(kubernetesJob);
-            jsonLaunchFile = super.stageFile(sessionServiceBuilder.build());
+            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
+            String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
+            serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            serviceString =
+                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+            serviceString =
+                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+            jsonLaunchFile = super.stageFile(serviceString);
             final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
@@ -632,9 +645,10 @@ public class PostAction extends SessionAction {
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
+        // TODO: Use the Kubernetes Gateway API to create Ingresses.
+        // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
-            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
-            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
+            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(

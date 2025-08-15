@@ -16,8 +16,8 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
-import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
+import org.opencadc.skaha.session.SessionType;
 
 public class CommandExecutioner {
     private static final Logger log = Logger.getLogger(CommandExecutioner.class);
@@ -195,12 +195,13 @@ public class CommandExecutioner {
      * @throws IOException If there is an error executing the command.
      * @throws InterruptedException If the command is interrupted.
      */
-    public static KubernetesJob getJob(String jobName) throws IOException, InterruptedException {
+    public static KubernetesJob getJob(String jobName, SessionType sessionType)
+            throws IOException, InterruptedException {
         final String[] getJobCommand = CommandExecutioner.getJobCommand(jobName, K8SUtil.getWorkloadNamespace());
         final String[] parts = CommandExecutioner.execute(getJobCommand)
                 .replaceAll("^'|'$", "")
                 .split("\t");
-        return new KubernetesJob(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
+        return new KubernetesJob(jobName, parts[0], parts[1], sessionType);
     }
 
     static String[] getJobCommand(final String jobName, final String namespace) {

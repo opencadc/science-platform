@@ -337,39 +337,33 @@ public class SessionDAO {
         String id = parts[allColumns.indexOf(CustomColumns.SESSION_ID)];
         String userid = parts[allColumns.indexOf(CustomColumns.USERID)];
         String image = parts[allColumns.indexOf(CustomColumns.IMAGE)];
-        String type = parts[allColumns.indexOf(CustomColumns.TYPE)];
+        final SessionType type =
+                SessionType.fromApplicationStringTypeAndImage(parts[allColumns.indexOf(CustomColumns.TYPE)]);
         String deletionTimestamp = parts[allColumns.indexOf(CustomColumns.DELETION)];
         final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                 ? Session.STATUS_TERMINATING
                 : parts[allColumns.indexOf(CustomColumns.STATUS)];
         final String connectURL;
 
-        if (SessionAction.SESSION_TYPE_DESKTOP.equals(type)) {
+        if (SessionType.DESKTOP == type) {
             connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
-        } else if (SessionAction.SESSION_TYPE_CARTA.equals(type)) {
+        } else if (SessionType.CARTA == type) {
             final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
-            Integer majorVersion;
-
-            try {
-                majorVersion = Integer.parseInt(imageVersion.substring(0, 1));
-            } catch (NumberFormatException nfe) {
-                LOGGER.warn("Invalid CARTA image version: " + imageVersion + ", defaulting to 1.4");
-                majorVersion = null;
-            }
+            final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
 
             connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
                     .withAlternateSocket(imageVersion.equalsIgnoreCase("1.4"))
                     .withVersion5Path(majorVersion != null && majorVersion >= 5)
                     .build();
-        } else if (SessionAction.SESSION_TYPE_NOTEBOOK.equals(type)) {
+        } else if (SessionType.NOTEBOOK == type) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
                     .withTopLevelDirectory(topLevelDirectory)
                     .withUserName(userid)
                     .build();
-        } else if (SessionAction.SESSION_TYPE_CONTRIB.equals(type)) {
+        } else if (SessionType.CONTRIBUTED == type) {
             connectURL =
                     SessionURLBuilder.contributedSession(sessionHostName, id).build();
-        } else if (SessionAction.SESSION_TYPE_FIREFLY.equals(type)) {
+        } else if (SessionType.FIREFLY == type) {
             connectURL = SessionURLBuilder.fireflySession(sessionHostName, id).build();
         } else {
             connectURL = "not-applicable";
@@ -382,7 +376,7 @@ public class SessionDAO {
                 parts[allColumns.indexOf(CustomColumns.RUN_AS_GID)],
                 SessionDAO.fromStringArray(parts[allColumns.indexOf(CustomColumns.SUPPLEMENTAL_GROUPS)]),
                 image,
-                type,
+                type.applicationName,
                 status,
                 parts[allColumns.indexOf(CustomColumns.NAME)],
                 parts[allColumns.indexOf(CustomColumns.STARTED)],

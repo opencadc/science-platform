@@ -376,31 +376,4 @@ public abstract class SessionAction extends SkahaAction {
 
         return getSessionJobCmd.build();
     }
-
-    protected String getAppJobName(String sessionID, String userID, String appID)
-            throws IOException, InterruptedException {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
-        return CommandExecutioner.execute(getAppJobNameCMD);
-    }
-
-    private String[] getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
-        String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
-        labels = labels + ",canfar-net-userid=" + userID;
-        if (sessionID != null) {
-            labels = labels + ",canfar-net-sessionID=" + sessionID;
-        }
-        if (appID != null) {
-            labels = labels + ",canfar-net-appID=" + appID;
-        }
-
-        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = KubectlCommandBuilder.command("get")
-                .namespace(k8sNamespace)
-                .job()
-                .label(labels)
-                .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        return getAppJobNameCmd.build();
-    }
 }
