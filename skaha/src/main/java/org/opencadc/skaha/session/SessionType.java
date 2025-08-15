@@ -1,6 +1,7 @@
-package org.opencadc.skaha;
+package org.opencadc.skaha.session;
 
 import java.nio.file.Path;
+import org.opencadc.skaha.K8SUtil;
 
 public enum SessionType {
     CARTA(true, true, "carta"),
@@ -13,7 +14,7 @@ public enum SessionType {
 
     private final boolean supportsIngress;
     private final boolean supportsService;
-    private final String applicationName;
+    final String applicationName;
 
     SessionType(final boolean supportsIngress, final boolean supportsService, final String applicationName) {
         this.supportsIngress = supportsIngress;
@@ -30,41 +31,35 @@ public enum SessionType {
      */
     public static SessionType fromApplicationStringType(final String applicationStringType) {
         for (SessionType type : SessionType.values()) {
-            if (type.applicationName.equalsIgnoreCase(applicationStringType)) {
+            if (type.applicationName.equalsIgnoreCase(applicationStringType.trim())) {
                 return type;
             }
         }
         throw new IllegalArgumentException("Invalid session type: " + applicationStringType);
     }
 
-    public Path getIngressConfigPath() {
+    public Path getIngressConfigPath(final boolean isLegacyCARTA) {
         return Path.of(String.format(
-                "%s/config/ingress-%s.yaml",
-                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
+                "%s/config/ingress-%s%s.yaml",
+                K8SUtil.getWorkingDirectory(),
+                this.name().toLowerCase(),
+                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
     }
 
-    public Path getServiceConfigPath() {
+    public Path getServiceConfigPath(final boolean isLegacyCARTA) {
         return Path.of(String.format(
-                "%s/config/service-%s.yaml",
-                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
+                "%s/config/service-%s%s.yaml",
+                K8SUtil.getWorkingDirectory(),
+                this.name().toLowerCase(),
+                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
     }
 
-    public Path getJobConfigPath() {
+    public Path getJobConfigPath(final boolean isLegacyCARTA) {
         return Path.of(String.format(
-                "%s/config/launch-%s.yaml",
-                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
-    }
-
-    public String getServiceName(final String sessionID) {
-        return String.format("skaha-%s-svc-%s", this.name().toLowerCase(), sessionID);
-    }
-
-    public String getIngressName(final String sessionID) {
-        return String.format("skaha-%s-ingress-%s", this.name().toLowerCase(), sessionID);
-    }
-
-    public String getMiddlewareName(final String sessionID) {
-        return String.format("skaha-%s-middleware-%s", this.name().toLowerCase(), sessionID);
+                "%s/config/launch-%s%s.yaml",
+                K8SUtil.getWorkingDirectory(),
+                this.name().toLowerCase(),
+                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
     }
 
     public boolean supportsIngress() {

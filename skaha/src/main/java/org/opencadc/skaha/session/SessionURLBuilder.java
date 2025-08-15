@@ -94,7 +94,8 @@ public abstract class SessionURLBuilder {
 
         /**
          * Build the URL for a VNC session. Example output: <code>
-         * https://host.example.org/session/desktop/8675309?password=8675309&path=session/desktop/8675309/</code>
+         * <a href="https://host.example.org/session/desktop/8675309?password=8675309&path=session/desktop/8675309/">...</a>
+         * </code>
          *
          * @return URL string in format <code>
          *     https://${host}/session/desktop/${sessionID}?password=${sessionID}&path=session/desktop/${sessionID}
@@ -146,7 +147,7 @@ public abstract class SessionURLBuilder {
 
         /**
          * Build the URL for a Notebook session. Example output: <code>
-         *     https://host.example.org/session/notebook/8675309/lab/tree/top-level-dir/home/username?token=8675309
+         *     <a href="https://host.example.org/session/notebook/8675309/lab/tree/top-level-dir/home/username?token=8675309">...</a>
          * </code>
          *
          * @return URL string in format <code>
@@ -182,6 +183,7 @@ public abstract class SessionURLBuilder {
     /** Construct a URL for a Carta session. Used to redirect the end user to the Carta viewer. */
     static final class CartaSessionURLBuilder extends SessionURLBuilder {
         private boolean useAlternateSocketURL = false;
+        private boolean useVersion5Path = false;
 
         /**
          * Constructor.
@@ -194,7 +196,7 @@ public abstract class SessionURLBuilder {
         }
 
         /**
-         * Set the use of an alternate socket for the Carta session.
+         * Set the use of an alternate socket for the Carta session. This only
          *
          * @param useAlternateSocketURL Specify the alternate socket URL, omit it otherwise.
          * @return This builder.
@@ -205,23 +207,42 @@ public abstract class SessionURLBuilder {
         }
 
         /**
+         * With CARTA 5, the path to the session has changed. This method allows that to be passed through properly.
+         *
+         * @param useVersion5Path Specify whether to use the CARTA 5 path format.
+         * @return This builder.
+         */
+        CartaSessionURLBuilder withVersion5Path(boolean useVersion5Path) {
+            this.useVersion5Path = useVersion5Path;
+            return this;
+        }
+
+        /**
          * Build the URL for a Carta session. Example output: <code>
-         *     https://host.example.org/session/carta/8675309?
+         *     <a href="https://host.example.org/session/carta/8675309">...</a>?
          * </code> or <code>
          *     https://host.example.org/session/carta/8675309?socketUrl=wss://host.example.org/session/carta/ws/8675309/
-         *     </code>
+         * </code>
          *
          * @return URL string in format <code>
          *     https://${host}/session/carta/${sessionID}?token=${sessionID}
-         *     </code>
+         * </code>
          * @throws URISyntaxException If the URI cannot be created.
          */
         @Override
         String build() throws URISyntaxException {
-            final URIBuilder builder = new URIBuilder()
-                    .setScheme("https")
-                    .setHost(this.host)
-                    .setPathSegments("session", "carta", "http", this.sessionID, "");
+            final String[] pathSegments;
+
+            if (this.useVersion5Path) {
+                // CARTA 5 path format
+                pathSegments = new String[] {"session", "carta", this.sessionID, ""};
+            } else {
+                // CARTA <5 path format
+                pathSegments = new String[] {"session", "carta", "http", this.sessionID, ""};
+            }
+
+            final URIBuilder builder =
+                    new URIBuilder().setScheme("https").setHost(this.host).setPathSegments(pathSegments);
             final URIBuilder uriBuilder;
 
             if (this.useAlternateSocketURL) {
@@ -249,7 +270,7 @@ public abstract class SessionURLBuilder {
 
         /**
          * Build the URL for a contributed session. Example output: <code>
-         *     https://host.example.org/session/contrib/8675309
+         *     <a href="https://host.example.org/session/contrib/8675309">...</a>
          * </code>
          *
          * @return URL string in format <code>
@@ -282,7 +303,7 @@ public abstract class SessionURLBuilder {
 
         /**
          * Build the URL for a Firefly session. Example output: <code>
-         *     https://host.example.org/session/firefly/8675309/firefly/
+         *     <a href="https://host.example.org/session/firefly/8675309/firefly/">...</a>
          * </code>
          *
          * @return URL string in format <code>

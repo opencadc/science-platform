@@ -66,6 +66,8 @@
  */
 package org.opencadc.skaha;
 
+import org.opencadc.skaha.session.SessionType;
+
 /** Simple class to represent a Kubernetes Job. This is just a clean way to encompass elements that it has access to. */
 public class KubernetesJob {
     private final String name;

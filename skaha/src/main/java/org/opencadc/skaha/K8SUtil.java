@@ -71,6 +71,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
@@ -204,5 +205,20 @@ public class K8SUtil {
      */
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
+    }
+
+    /**
+     * Extract the major version number from a docker image tag.
+     *
+     * @param image The docker image string, e.g. "myrepo/myimage:1.2.3"
+     */
+    public static Integer getMajorImageVersion(final String image) {
+        final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
+
+        try {
+            return Integer.parseInt(imageVersion.substring(0, 1));
+        } catch (NumberFormatException nfe) {
+            return null;
+        }
     }
 }
