@@ -148,7 +148,7 @@ public class DeleteAction extends SessionAction {
                 log.debug("appID " + appID);
                 String jobName = this.getAppJobName(sessionID, userID, appID);
                 if (StringUtil.hasText(jobName)) {
-                    delete(k8sNamespace, "job", jobName);
+                    delete(k8sNamespace, jobName);
                 } else {
                     log.warn("no job deleted, desktop-app job name not found for userID " + userID + ", sessionID "
                             + sessionID + ", appID " + appID);
@@ -159,21 +159,15 @@ public class DeleteAction extends SessionAction {
         } else {
             // deleting a session
             String jobName = K8SUtil.getJobName(sessionID, type, userID);
-            delete(k8sNamespace, "job", jobName);
-
-            if (!type.isHeadless()) {
-                delete(k8sNamespace, "ingressroute", type.getIngressName(sessionID));
-                delete(k8sNamespace, "service", type.getServiceName(sessionID));
-                delete(k8sNamespace, "middleware", type.getMiddlewareName(sessionID));
-            }
+            delete(k8sNamespace, jobName);
         }
     }
 
-    private void delete(String k8sNamespace, String type, String name) {
+    private void delete(String k8sNamespace, String name) {
         try {
             String[] delete = KubectlCommandBuilder.command("delete")
                     .namespace(k8sNamespace)
-                    .argument(type)
+                    .argument("job")
                     .argument(name)
                     .build();
             CommandExecutioner.execute(delete);
