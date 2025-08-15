@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.30.1](https://github.com/opencadc/science-platform/compare/0.30.0...0.30.1) (2025-08-15)
+
+
+### Bug Fixes
+
+* **add-separate-endpoints-for-v1-skaha-in-capabilities:** Transition … ([a9f95ad](https://github.com/opencadc/science-platform/commit/a9f95ad277b6ce12683a2f4a7b65dd3ac00e1dbd))
+* **add-separate-endpoints-for-v1-skaha-in-capabilities:** Transition to capabilities file with entry for each endpoint ([88ba95e](https://github.com/opencadc/science-platform/commit/88ba95ee6fc8a05f6f17ced6c68ca4e9649484c8))
+* **capabilities.xml:** switch previous capabilities entry back to skaha/v0 ([039e95a](https://github.com/opencadc/science-platform/commit/039e95a9d8cf294c265cf71699a037fff5a63b2c))
+* **capabilities.xml:** switch previous capabilities entry back to skaha/v0 ([35df58d](https://github.com/opencadc/science-platform/commit/35df58dfa5b2fea838c916ac92c59168d385b004))
+* **style:** lint ([15b758c](https://github.com/opencadc/science-platform/commit/15b758c00e99aecd92ae1c289a43954373f9b1f0))
+
 ## [0.30.0](https://github.com/opencadc/science-platform/compare/0.29.2...0.30.0) (2025-08-13)
 
 
