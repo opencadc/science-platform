@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import java.io.ByteArrayOutputStream;
@@ -179,22 +180,10 @@ public class PostAction extends SessionAction {
 
                 final SessionType validatedType = validateImage(image, type);
 
-                Integer requestCores = getCoresParam();
-                Integer limitCores = requestCores;
-                if (requestCores == null) {
-                    requestCores = rc.getDefaultRequestCores();
-                    limitCores = rc.getDefaultLimitCores();
-                }
-
-                Integer requestRAM = getRamParam();
-                Integer limitRAM = requestRAM;
-                if (requestRAM == null) {
-                    requestRAM = rc.getDefaultRequestRAM();
-                    limitRAM = rc.getDefaultLimitRAM();
-                }
+                final ResourceSpecification resourceSpecification = ResourceSpecification.fromSyncInput(this.syncInput);
 
                 String name = syncInput.getParameter("name");
-                if (name == null) {
+                if (!StringUtil.hasText(name)) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
 
@@ -210,7 +199,7 @@ public class PostAction extends SessionAction {
 
                 int gpus = 0;
                 final String gpusParam = syncInput.getParameter("gpus");
-                if (gpusParam != null) {
+                if (StringUtil.hasText(gpusParam)) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
                         if (!rc.getAvailableGPUs().contains(gpus)) {
@@ -226,18 +215,7 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(
-                        validatedType,
-                        image,
-                        name,
-                        requestCores,
-                        limitCores,
-                        requestRAM,
-                        limitRAM,
-                        gpus,
-                        cmd,
-                        args,
-                        envs);
+                createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -264,22 +242,9 @@ public class PostAction extends SessionAction {
             }
         } else if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
-                // create an app
-                Integer requestCores = getCoresParam();
-                Integer limitCores = requestCores;
-                if (requestCores == null) {
-                    requestCores = rc.getDefaultRequestCores();
-                    limitCores = rc.getDefaultLimitCores();
-                }
+                final ResourceSpecification resourceSpecification = ResourceSpecification.fromSyncInput(this.syncInput);
 
-                Integer requestRAM = getRamParam();
-                Integer limitRAM = requestRAM;
-                if (requestRAM == null) {
-                    requestRAM = rc.getDefaultRequestRAM();
-                    limitRAM = rc.getDefaultLimitRAM();
-                }
-
-                attachDesktopApp(image, requestCores, limitCores, requestRAM, limitRAM);
+                attachDesktopApp(image, resourceSpecification);
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((appID + "\n").getBytes());
             } else {
@@ -341,42 +306,6 @@ public class PostAction extends SessionAction {
      */
     String getDefaultQuota() {
         return K8SUtil.getDefaultQuota();
-    }
-
-    private Integer getCoresParam() {
-        Integer cores = null;
-        String coresParam = syncInput.getParameter("cores");
-        if (coresParam != null) {
-            try {
-                cores = Integer.valueOf(coresParam);
-                final ResourceContexts rc = new ResourceContexts();
-                if (!rc.isCoreCountAvailable(cores)) {
-                    throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
-            }
-        }
-
-        return cores;
-    }
-
-    private Integer getRamParam() {
-        Integer ram = null;
-        String ramParam = syncInput.getParameter("ram");
-        if (ramParam != null) {
-            try {
-                ram = Integer.valueOf(ramParam);
-                ResourceContexts rc = new ResourceContexts();
-                if (!rc.getAvailableRAM().contains(ram)) {
-                    throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
-            }
-        }
-
-        return ram;
     }
 
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
@@ -532,10 +461,7 @@ public class PostAction extends SessionAction {
             SessionType type,
             String image,
             String name,
-            Integer requestCores,
-            Integer limitCores,
-            Integer requestRAM,
-            Integer limitRAM,
+            ResourceSpecification resourceSpecification,
             Integer gpus,
             String cmd,
             String args,
@@ -566,10 +492,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
@@ -684,15 +610,10 @@ public class PostAction extends SessionAction {
      * names.
      *
      * @param image Container image name.
-     * @param requestCores Requested number of cores.
-     * @param limitCores Max number of cores.
-     * @param requestRAM Requested amount of RAM in Gi.
-     * @param limitRAM Max amount of RAM in Gi.
+     * @param resourceSpecification The resource specification for the app.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(
-            String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM)
-            throws Exception {
+    public void attachDesktopApp(String image, ResourceSpecification resourceSpecification) throws Exception {
         // Get the IP address based on the session
         KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
                 .pod()
@@ -734,10 +655,10 @@ public class PostAction extends SessionAction {
         // that it becomes the xterm title
         String param = name;
         log.debug("Using parameter: " + param);
-        log.debug("Using requests.cores: " + requestCores.toString());
-        log.debug("Using limits.cores: " + limitCores.toString());
-        log.debug("Using requests.ram: " + requestRAM.toString() + "Gi");
-        log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
+        log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
+        log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
+        log.debug("Using requests.ram: " + resourceSpecification.requestRAM.toString() + "Gi");
+        log.debug("Using limits.ram: " + resourceSpecification.limitRAM.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
         String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
@@ -771,10 +692,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                 .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
@@ -878,6 +799,75 @@ public class PostAction extends SessionAction {
             return "priorityClassName: " + skahaHeadlessPriortyClass;
         } else {
             return "";
+        }
+    }
+
+    /** DTO for resource specification parameters. */
+    public static class ResourceSpecification {
+        private static final ResourceContexts RESOURCE_CONTEXTS = new ResourceContexts();
+        private final SyncInput syncInput;
+
+        Integer requestCores;
+        Integer limitCores;
+        Integer requestRAM;
+        Integer limitRAM;
+
+        static ResourceSpecification fromSyncInput(final SyncInput input) {
+            return new ResourceSpecification(input);
+        }
+
+        private ResourceSpecification(SyncInput syncInput) {
+            this.syncInput = syncInput;
+
+            this.requestCores = getCoresParam();
+            this.limitCores = this.requestCores;
+            if (this.requestCores == null) {
+                this.requestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
+                this.limitCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
+            }
+
+            this.requestRAM = getRamParam();
+            this.limitRAM = this.requestRAM;
+            if (this.requestRAM == null) {
+                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
+                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+            }
+        }
+
+        private Integer getCoresParam() {
+            Integer cores = null;
+            String coresParam = syncInput.getParameter("cores");
+            if (StringUtil.hasText(coresParam)) {
+                try {
+                    cores = Integer.valueOf(coresParam);
+                    final ResourceContexts rc = new ResourceContexts();
+                    if (!rc.isCoreCountAvailable(cores)) {
+                        throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
+                }
+            }
+
+            return cores;
+        }
+
+        private Integer getRamParam() {
+            Integer ram = null;
+            String ramParam = syncInput.getParameter("ram");
+            if (StringUtil.hasText(ramParam)) {
+                try {
+                    ram = Integer.valueOf(ramParam);
+                    ResourceContexts rc = new ResourceContexts();
+                    if (!rc.getAvailableRAM().contains(ram)) {
+                        throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+                }
+            }
+
+            return ram;
         }
     }
 }

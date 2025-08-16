@@ -285,7 +285,7 @@ public class GetAction extends SessionAction {
                         resourcesMap = getResourcesMap(resourcesMap, parts);
                     } else {
                         if (nodeName.length() > 0) {
-                            // processing first line of a subsequent nodeName
+                            // processing the first line of a subsequent nodeName
                             nodeToResourcesMap.put(nodeName, resourcesMap);
                             resourcesMap = initResourcesMap();
                             nodeName = parts[0];
