@@ -547,7 +547,7 @@ public class PostAction extends SessionAction {
 
         log.debug("Create job result: " + createResult);
 
-        final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName, type);
+        final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.

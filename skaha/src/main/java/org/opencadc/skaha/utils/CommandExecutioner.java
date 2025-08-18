@@ -195,13 +195,12 @@ public class CommandExecutioner {
      * @throws IOException If there is an error executing the command.
      * @throws InterruptedException If the command is interrupted.
      */
-    public static KubernetesJob getJob(String jobName, SessionType sessionType)
-            throws IOException, InterruptedException {
+    public static KubernetesJob getJob(String jobName) throws IOException, InterruptedException {
         final String[] getJobCommand = CommandExecutioner.getJobCommand(jobName, K8SUtil.getWorkloadNamespace());
         final String[] parts = CommandExecutioner.execute(getJobCommand)
                 .replaceAll("^'|'$", "")
                 .split("\t");
-        return new KubernetesJob(jobName, parts[0], parts[1], sessionType);
+        return new KubernetesJob(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
     }
 
     static String[] getJobCommand(final String jobName, final String namespace) {
