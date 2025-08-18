@@ -271,30 +271,28 @@ public class GetAction extends SessionAction {
                 .argument("--field-selector=status.phase=Running")
                 .argument("--sort-by=.spec.nodeName");
 
-        String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
+        final String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
+        final Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
 
-        Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
         if (StringUtil.hasLength(cpuCores)) {
             String[] lines = cpuCores.split("\n");
             if (lines.length > 0) {
-                Map<String, Double> resourcesMap = initResourcesMap();
+                final Map<String, Double> resourcesMap = initResourcesMap();
                 String nodeName = "";
                 for (String line : lines) {
                     String[] parts = line.split("\\s+");
                     if (nodeName.equals(parts[0])) {
-                        resourcesMap = getResourcesMap(resourcesMap, parts);
+                        setResources(resourcesMap, parts);
                     } else {
-                        if (nodeName.length() > 0) {
+                        if (!nodeName.isEmpty()) {
                             // processing the first line of a subsequent nodeName
                             nodeToResourcesMap.put(nodeName, resourcesMap);
-                            resourcesMap = initResourcesMap();
-                            nodeName = parts[0];
-                            resourcesMap = getResourcesMap(resourcesMap, parts);
-                        } else {
-                            // processing first line of first nodeName
-                            nodeName = parts[0];
-                            resourcesMap = getResourcesMap(resourcesMap, parts);
+                            resourcesMap.clear();
+                            resourcesMap.putAll(initResourcesMap());
                         }
+
+                        nodeName = parts[0];
+                        setResources(resourcesMap, parts);
                     }
                 }
 
@@ -307,13 +305,13 @@ public class GetAction extends SessionAction {
     }
 
     private Map<String, Double> initResourcesMap() {
-        Map<String, Double> rMap = new HashMap<>();
-        rMap.put(REQ_CPU_CORES_KEY, (double) 0L);
-        rMap.put(REQ_RAM_KEY, (double) 0L);
+        final Map<String, Double> rMap = new HashMap<>();
+        rMap.put(REQ_CPU_CORES_KEY, 0D);
+        rMap.put(REQ_RAM_KEY, 0D);
         return rMap;
     }
 
-    private Map<String, Double> getResourcesMap(Map<String, Double> resourcesMap, String[] resources) {
+    private void setResources(Map<String, Double> resourcesMap, String[] resources) {
         if (!NONE.equalsIgnoreCase(resources[2])) {
             resourcesMap.put(
                     REQ_CPU_CORES_KEY,
@@ -328,8 +326,6 @@ public class GetAction extends SessionAction {
                             + (double) (normalizeToLong(toCommonUnit(resources[3]))) / (1024 * 1024 * 1024));
             log.debug("Node: " + resources[0] + " " + REQ_RAM_KEY + ": " + resourcesMap.get(REQ_RAM_KEY));
         }
-
-        return resourcesMap;
     }
 
     private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {

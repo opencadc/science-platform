@@ -34,7 +34,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         SessionJobBuilder testSubject =
@@ -75,7 +75,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -104,6 +104,12 @@ public class SessionJobBuilderTest {
                         .get("nvidia.com/gpu")
                         .getNumber()
                         .intValue());
+
+        Assert.assertEquals(
+                "Wrong fixed label",
+                Boolean.TRUE.toString(),
+                Objects.requireNonNull(job.getMetadata().getLabels())
+                        .get(SessionJobBuilder.JOB_RESOURCE_FIXED_LABEL_KEY));
 
         return (V1Job) Yaml.load(output);
     }
@@ -148,7 +154,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -174,6 +180,10 @@ public class SessionJobBuilderTest {
                 "Wrong priority class.",
                 "high",
                 Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY));
+        Assert.assertEquals(
+                "Wrong flex label",
+                Boolean.TRUE.toString(),
+                Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_RESOURCE_FLEXIBLE_LABEL_KEY));
     }
 
     @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {

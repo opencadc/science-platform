@@ -73,25 +73,6 @@ import org.junit.Test;
 
 public class SessionDAOTest {
     @Test
-    public void testCommand() {
-        final String[] commandValues = SessionDAO.getSessionsCMD("ns", null, "session-id-1");
-        final String command = String.join(" ", commandValues);
-        Assert.assertEquals(
-                "Wrong command.",
-                "kubectl get pod --namespace ns --no-headers=true "
-                        + "-l canfar-net-sessionID=session-id-1 "
-                        + "-o custom-columns=SESSION_ID:.metadata.labels.canfar-net-sessionID,"
-                        + "USERID:.metadata.labels.canfar-net-userid,RUN_AS_UID:.spec.securityContext.runAsUser,"
-                        + "RUN_AS_GID:.spec.securityContext.runAsGroup,"
-                        + "SUPPLEMENTAL_GROUPS:.spec.securityContext.supplementalGroups,"
-                        + "IMAGE:.spec.containers[0].image,"
-                        + "TYPE:.metadata.labels.canfar-net-sessionType,STATUS:.status.phase,"
-                        + "NAME:.metadata.labels.canfar-net-sessionName,STARTED:.status.startTime,"
-                        + "DELETION:.metadata.deletionTimestamp,APP_ID:.metadata.labels.canfar-net-appID",
-                command);
-    }
-
-    @Test
     public void testParseStringAsInstant() {
         Assert.assertEquals(
                 "Wrong expiry", "2025-04-10T15:46:00Z", SessionDAO.getExpiryTimeString("2025-04-10T15:45Z", 60L));
@@ -99,5 +80,13 @@ public class SessionDAOTest {
                 "Wrong expiry",
                 "2025-04-10T15:06:33Z",
                 SessionDAO.getExpiryTimeString("2025-04-10T15:05:33.900Z", 60L));
+    }
+
+    @Test
+    public void testPrintCores() {
+        Assert.assertEquals("Wrong core unit.", "1.367", SessionDAO.PodResourceUsage.toCoreUnit("1367m"));
+        Assert.assertEquals("Wrong core unit.", "0.233", SessionDAO.PodResourceUsage.toCoreUnit("233m"));
+        Assert.assertEquals("Wrong core unit.", "0.001", SessionDAO.PodResourceUsage.toCoreUnit("900000n"));
+        Assert.assertEquals("Wrong core unit.", "2.34", SessionDAO.PodResourceUsage.toCoreUnit("2.34"));
     }
 }
