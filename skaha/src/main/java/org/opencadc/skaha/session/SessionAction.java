@@ -142,11 +142,7 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("userID: " + posixPrincipal);
     }
 
-    protected void injectCredentials() {
-        injectProxyCertificate();
-    }
-
-    private void injectProxyCertificate() {
+    protected void injectProxyCertificate() {
         log.debug("injectProxyCertificate()");
 
         // inject a delegated proxy certificate if available

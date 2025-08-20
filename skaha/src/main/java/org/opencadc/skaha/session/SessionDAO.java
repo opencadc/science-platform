@@ -263,13 +263,13 @@ public class SessionDAO {
                         final Map<String, Quantity> resourceRequests = resourceRequirements.getRequests();
                         if (resourceRequests != null) {
                             if (resourceRequests.containsKey("memory")) {
-                                this.requestedMemory =
-                                        resourceRequests.get("memory").toSuffixedString();
+                                this.requestedMemory = PodResourceUsage.toCommonUnit(
+                                        resourceRequests.get("memory").toSuffixedString());
                             }
 
                             if (resourceRequests.containsKey("cpu")) {
-                                this.requestedCPUCores =
-                                        resourceRequests.get("cpu").toSuffixedString();
+                                this.requestedCPUCores = PodResourceUsage.toCoreUnit(
+                                        resourceRequests.get("cpu").toSuffixedString());
                             }
 
                             if (resourceRequests.containsKey("nvidia\\.com/gpu")) {

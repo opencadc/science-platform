@@ -326,6 +326,8 @@ public class PostAction extends SessionAction {
 
             CommandExecutioner.execute(renewExpiryTimeCmd.build());
         }
+
+        injectProxyCertificate();
     }
 
     private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
@@ -534,7 +536,7 @@ public class PostAction extends SessionAction {
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
-        injectCredentials();
+        injectProxyCertificate();
 
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
@@ -704,6 +706,8 @@ public class PostAction extends SessionAction {
             }
         }
 
+        final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
+        final KubernetesJob ownerKubernetesJob = CommandExecutioner.getJob(ownerJobName);
         final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
@@ -730,7 +734,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
-                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
+                .withParameter(PostAction.SKAHA_JOBUID, ownerKubernetesJob.getUID())
+                .withParameter(PostAction.SKAHA_JOBNAME, ownerKubernetesJob.getName());
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
@@ -742,7 +748,7 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        injectCredentials();
+        injectProxyCertificate();
     }
 
     private void validateHeadlessMembership() {

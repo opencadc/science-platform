@@ -28,6 +28,6 @@ public class CommonUtils {
      */
     public static URI firstLocalServiceURI(final URI baseStandardID) {
         final Set<URI> serviceURIs = new LocalAuthority().getResourceIDs(baseStandardID);
-        return serviceURIs.stream().findFirst().orElseThrow(IllegalStateException::new);
+        return serviceURIs.stream().findFirst().orElse(null);
     }
 }
