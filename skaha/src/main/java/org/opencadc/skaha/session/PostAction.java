@@ -440,12 +440,11 @@ public class PostAction extends SessionAction {
     public void checkExistingSessions(SessionType type) throws Exception {
         // multiple
         if (!type.isHeadless()) {
-            List<Session> sessions = super.getAllSessions(posixPrincipal.username);
+            final List<Session> sessions = SessionDAO.getUserSessions(this.posixPrincipal.username, null, true);
             int count = 0;
             for (Session session : sessions) {
                 log.debug("checking session: " + session);
-                if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())
-                        && !TYPE_DESKTOP_APP.equals(session.getType())) {
+                if (!TYPE_DESKTOP_APP.equals(session.getType())) {
                     final String status = session.getStatus();
                     if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
                             || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
@@ -549,7 +548,7 @@ public class PostAction extends SessionAction {
 
         log.debug("Create job result: " + createResult);
 
-        final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
+        final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
@@ -707,7 +706,7 @@ public class PostAction extends SessionAction {
         }
 
         final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
-        final KubernetesJob ownerKubernetesJob = CommandExecutioner.getJob(ownerJobName);
+        final KubernetesJob ownerKubernetesJob = SessionDAO.getJob(ownerJobName);
         final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))

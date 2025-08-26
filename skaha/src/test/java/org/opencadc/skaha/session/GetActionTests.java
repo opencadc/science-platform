@@ -144,27 +144,21 @@ public class GetActionTests {
     }
 
     @Test
-    public void testListSessions() {
-        try {
-            GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null, false);
-            log.info("json: \n" + json);
-            List<Session> sessions1 = get.getAllSessions(null);
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<Session>>() {}.getType();
-            List<Session> sessions2 = gson.fromJson(json, listType);
-            Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
-            Assert.assertEquals("session count", sessions1.size(), sessions2.size());
-            for (Session s : sessions1) {
-                Assert.assertTrue(s.getId(), sessions2.contains(s));
+    public void testListSessions() throws Exception {
+        GetAction get = new TestGetAction();
+        String json = get.listSessions(null, null, false);
+        log.info("json: \n" + json);
+        List<Session> sessions1 = get.getAllSessions(null);
+        Gson gson = new Gson();
+        Type listType = new TypeToken<List<Session>>() {}.getType();
+        List<Session> sessions2 = gson.fromJson(json, listType);
+        Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+        Assert.assertEquals("session count", sessions1.size(), sessions2.size());
+        for (Session s : sessions1) {
+            Assert.assertTrue(s.getId(), sessions2.contains(s));
 
-                // All start times should be parsable.
-                Instant.parse(s.getStartTime());
-            }
-
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+            // All start times should be parsable.
+            log.info("Parsed start time: " + Instant.parse(s.getStartTime()));
         }
     }
 
@@ -219,14 +213,13 @@ public class GetActionTests {
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = constructSession("host.example.org", line, this.skahaTld);
+                Session session = constructSession(line);
                 sessions.add(session);
             }
             return sessions;
         }
 
-        Session constructSession(String sessionHostName, String k8sOutput, final String topLevelDirectory)
-                throws Exception {
+        Session constructSession(String k8sOutput) {
             final List<SessionDAO.CustomColumns> allColumns = Arrays.asList(SessionDAO.CustomColumns.values());
 
             // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
@@ -242,8 +235,7 @@ public class GetActionTests {
             final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                     ? Session.STATUS_TERMINATING
                     : parts[allColumns.indexOf(SessionDAO.CustomColumns.STATUS)];
-            final String connectURL =
-                    SessionDAO.getConnectURL(sessionHostName, type, id, image, topLevelDirectory, userid);
+            final String connectURL = String.format("https://example.org/session/test/%s", id);
 
             final Session session = new Session(
                     id,

@@ -16,28 +16,37 @@ import io.kubernetes.client.openapi.models.V1PodSecurityContext;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.util.Config;
+import java.io.IOException;
 import java.net.URISyntaxException;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.skaha.utils.CommonUtils;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
 
+    private static final String SESSION_ID_LABEL = "canfar-net-sessionID";
+    private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
+
     static final String NONE = "<none>";
+
+    static {
+        try {
+            final ApiClient client = Config.fromCluster();
+            Configuration.setDefaultApiClient(client);
+        } catch (IOException e) {
+            LOGGER.error("Failed to configure k8s client from cluster: " + e.getMessage(), e);
+        }
+    }
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
@@ -53,10 +62,26 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
+    static KubernetesJob getJob(final String jobName) throws Exception {
+        final ApiClient client = Configuration.getDefaultApiClient();
+        final BatchV1Api api = new BatchV1Api(client);
+
+        final V1Job job =
+                api.readNamespacedJob(jobName, K8SUtil.getWorkloadNamespace()).execute();
+        final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
+        final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
+
+        return new KubernetesJob(
+                jobName,
+                jobMetadata.getUid(),
+                labels.get(SessionDAO.SESSION_ID_LABEL),
+                SessionType.fromApplicationStringType(Objects.requireNonNullElse(
+                        labels.get(SessionDAO.SESSION_TYPE_LABEL), SessionType.HEADLESS.applicationName)));
+    }
+
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
             throws Exception {
-        final ApiClient client = Config.fromCluster();
-        Configuration.setDefaultApiClient(client);
+        final ApiClient client = Configuration.getDefaultApiClient();
 
         final List<String> labelSelectors = new ArrayList<>();
         if (omitHeadless) {
@@ -79,7 +104,12 @@ public class SessionDAO {
         jobListRequest.labelSelector(labelSelector);
 
         final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, omitHeadless);
-        return jobListRequest.execute().getItems().stream()
+        final List<V1Job> userJobs = jobListRequest.execute().getItems();
+        LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector);
+        return userJobs.stream()
+                .filter(job -> job.getStatus() != null
+                        && 1 == Objects.requireNonNullElse(job.getStatus().getActive(), 0)
+                        && 0 == Objects.requireNonNullElse(job.getStatus().getFailed(), 0))
                 .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
     }
@@ -172,6 +202,7 @@ public class SessionDAO {
         private Long activeExpirySeconds;
         private String connectURL;
         private String jobName; // used to match up resource usages (metrics)
+        private boolean isFixedResources;
 
         private SessionBuilder(final String id, final String userID, final String type) {
             Objects.requireNonNull(id, "Session ID cannot be null");
@@ -199,6 +230,12 @@ public class SessionDAO {
 
             sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
             sessionBuilder.name = labels.get(CustomColumns.NAME.simpleName);
+            final String flexLabelValue = labels.get(SessionJobBuilder.JOB_RESOURCE_FLEXIBLE_LABEL_KEY);
+
+            // Absence of flex is interpreted as fixed resources.  This allows the existing sessions to be treated as
+            // fixed.
+            sessionBuilder.isFixedResources =
+                    !StringUtil.hasText(flexLabelValue) || !Boolean.parseBoolean(flexLabelValue);
             sessionBuilder.jobName = jobMetadata.getName();
 
             return sessionBuilder
@@ -215,7 +252,7 @@ public class SessionDAO {
                 if (secondsUntilExpire == null) {
                     LOGGER.warn("No expiry set for " + this.id);
                 } else {
-                    this.expiryTime = SessionDAO.getExpiryTimeString(this.startTime, secondsUntilExpire);
+                    this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, secondsUntilExpire);
                 }
             } else {
                 this.activeExpirySeconds = secondsUntilExpire;
@@ -262,14 +299,16 @@ public class SessionDAO {
                     if (resourceRequirements != null) {
                         final Map<String, Quantity> resourceRequests = resourceRequirements.getRequests();
                         if (resourceRequests != null) {
-                            if (resourceRequests.containsKey("memory")) {
-                                this.requestedMemory = PodResourceUsage.toCommonUnit(
-                                        resourceRequests.get("memory").toSuffixedString());
-                            }
+                            if (this.isFixedResources) {
+                                if (resourceRequests.containsKey("memory")) {
+                                    this.requestedMemory = PodResourceUsage.toCommonMemoryUnit(
+                                            resourceRequests.get("memory").toSuffixedString());
+                                }
 
-                            if (resourceRequests.containsKey("cpu")) {
-                                this.requestedCPUCores = PodResourceUsage.toCoreUnit(
-                                        resourceRequests.get("cpu").toSuffixedString());
+                                if (resourceRequests.containsKey("cpu")) {
+                                    this.requestedCPUCores = PodResourceUsage.toCoreUnit(
+                                            resourceRequests.get("cpu").toSuffixedString());
+                                }
                             }
 
                             if (resourceRequests.containsKey("nvidia\\.com/gpu")) {
@@ -308,7 +347,7 @@ public class SessionDAO {
             }
 
             if (this.activeExpirySeconds != null && this.startTime != null) {
-                this.expiryTime = SessionDAO.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
+                this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
             }
 
             final Integer failure = jobStatus.getFailed();
@@ -377,6 +416,7 @@ public class SessionDAO {
             session.setRequestedGPUCores(this.requestedGPUCores);
             session.setCPUCoresInUse(this.cpuCoresInUse);
             session.setRAMInUse(this.memoryInUse);
+            session.setFixedResources(this.isFixedResources);
 
             return session;
         }
@@ -401,137 +441,5 @@ public class SessionDAO {
                     + connectURL + '\'' + ", jobName='"
                     + jobName + '\'' + '}';
         }
-    }
-
-    static class PodResourceUsage {
-        final Map<String, String> cpu;
-        final Map<String, String> memory;
-
-        private static final Map<String, Integer> CORE_DIVIDENDS = new HashMap<>();
-
-        static {
-            PodResourceUsage.CORE_DIVIDENDS.put("m", 3);
-            PodResourceUsage.CORE_DIVIDENDS.put("n", 9);
-        }
-
-        private PodResourceUsage(final Map<String, String> cpu, final Map<String, String> memory) {
-            this.cpu = Collections.unmodifiableMap(cpu);
-            this.memory = Collections.unmodifiableMap(memory);
-        }
-
-        static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
-            final Map<String, String> cpuMetrics = new HashMap<>();
-            final Map<String, String> memoryMetrics = new HashMap<>();
-            final List<String> labelSelectors = new ArrayList<>();
-
-            if (StringUtil.hasLength(userID)) {
-                labelSelectors.add("canfar-net-userid=" + userID);
-            }
-
-            if (omitHeadless) {
-                labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
-            }
-
-            final String[] topCommand = KubectlCommandBuilder.command("top")
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .noHeaders()
-                    .pod()
-                    .label(String.join(",", labelSelectors))
-                    .build();
-
-            LOGGER.debug("Resource usage command: " + String.join(" ", topCommand));
-            final String sessionResourceUsageMap = CommandExecutioner.execute(topCommand);
-            LOGGER.debug("Resource usage command output: " + sessionResourceUsageMap);
-            if (StringUtil.hasLength(sessionResourceUsageMap)) {
-                final String[] lines = sessionResourceUsageMap.split("\n");
-                for (final String line : lines) {
-                    final String[] resourceUsage =
-                            line.trim().replaceAll("\\s+", " ").split(" ");
-                    final String fullName = resourceUsage[0];
-
-                    cpuMetrics.put(fullName, PodResourceUsage.toCoreUnit(resourceUsage[1]));
-                    memoryMetrics.put(fullName, PodResourceUsage.toCommonUnit(resourceUsage[2]));
-                }
-            }
-
-            return new PodResourceUsage(cpuMetrics, memoryMetrics);
-        }
-
-        static String toCoreUnit(String cores) {
-            final String ret;
-            if (StringUtil.hasLength(cores)) {
-                final String coreUnit = cores.substring(cores.length() - 1);
-                final Integer dividend = PodResourceUsage.CORE_DIVIDENDS.get(coreUnit);
-                if (dividend == null) {
-                    // use value as is, can be '<none>' or some value
-                    ret = cores;
-                } else {
-                    // in specified unit, covert to cores
-                    int coreValueWithoutUnit = Integer.parseInt(cores.substring(0, cores.length() - 1));
-                    final double coreValue = coreValueWithoutUnit / Math.pow(10, dividend);
-                    ret = String.format("%.3f", coreValue);
-                }
-            } else {
-                ret = SessionDAO.NONE;
-            }
-
-            return ret;
-        }
-
-        static String toCommonUnit(String inK8sUnit) {
-            final String ret;
-            if (StringUtil.hasLength(inK8sUnit)) {
-                if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1))) {
-                    // unit is in Ki, Mi, Gi, etc., remove the i
-                    ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
-                } else {
-                    // use value as is, can be '<none>' or some value
-                    ret = inK8sUnit;
-                }
-            } else {
-                ret = SessionDAO.NONE;
-            }
-
-            return ret;
-        }
-    }
-
-    static String getExpiryTimeString(final String startTimeString, final Long expiryTimeInSeconds) {
-        final String outputTemplate = "%s-%s-%sT%s:%s:%sZ";
-        final Pattern expectedFormat = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):?(\\d{2})?.*Z");
-        final Matcher matcher = expectedFormat.matcher(startTimeString);
-        final List<String> captureGroups = new ArrayList<>();
-        if (matcher.find()) {
-            for (int i = 0; i < matcher.groupCount(); i++) {
-                final String nextMatch = matcher.group(i + 1);
-                if (StringUtil.hasLength(nextMatch)) {
-                    captureGroups.add(nextMatch);
-                }
-            }
-        }
-
-        final int capturedGroupCount = captureGroups.size();
-
-        // Expected order of the groups resulting in count:
-        // Calendar.YEAR, Calendar.MONTH, Calendar.DAY_OF_MONTH, Calendar.HOUR, Calendar.MINUTE, Calendar.SECOND
-        //
-        // Some dates, however, are missing some elements if the value is 0.
-        final int expectedCount = 6;
-        final int missingGroups = expectedCount - capturedGroupCount;
-        if (missingGroups > 3) {
-            LOGGER.warn("Unparsable start time: " + startTimeString);
-            return null;
-        } else {
-            if (missingGroups > 0) {
-                for (int i = 0; i < missingGroups; i++) {
-                    captureGroups.add("00");
-                }
-            }
-        }
-
-        final String[] captureGroupsArray = captureGroups.toArray(new String[0]);
-        final String instantTime = String.format(outputTemplate, (Object[]) captureGroupsArray);
-        final Instant instant = Instant.parse(instantTime);
-        return instant.plusSeconds(expiryTimeInSeconds).toString();
     }
 }
