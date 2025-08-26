@@ -121,7 +121,7 @@ public class DeleteAction extends SessionAction {
                         }
 
                         final String jobName = parts[1];
-                        delete(K8SUtil.getWorkloadNamespace(), jobName);
+                        delete(jobName);
                         return;
                     }
                 }
@@ -139,13 +139,12 @@ public class DeleteAction extends SessionAction {
     private void deleteDesktopApp() throws Exception {
         // kill the session specified by sessionID
         log.debug("Stopping Desktop App for Session " + sessionID);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
         // deleting a desktop-app
         if (StringUtil.hasText(appID)) {
             log.debug("appID " + appID);
             String jobName = this.getAppJobName(sessionID, posixPrincipal.username, appID);
             if (StringUtil.hasText(jobName)) {
-                delete(k8sNamespace, jobName);
+                delete(jobName);
             } else {
                 log.warn("no job deleted, desktop-app job name not found for userID " + posixPrincipal.username
                         + ", sessionID " + sessionID + ", appID " + appID);
@@ -155,14 +154,9 @@ public class DeleteAction extends SessionAction {
         }
     }
 
-    private void delete(String k8sNamespace, String name) {
+    private void delete(String name) {
         try {
-            String[] delete = KubectlCommandBuilder.command("delete")
-                    .namespace(k8sNamespace)
-                    .argument("job")
-                    .argument(name)
-                    .build();
-            CommandExecutioner.execute(delete);
+            SessionDAO.deleteJob(name);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());

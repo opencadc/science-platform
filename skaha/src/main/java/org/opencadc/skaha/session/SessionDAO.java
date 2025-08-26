@@ -6,15 +6,7 @@ import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
-import io.kubernetes.client.openapi.models.V1Container;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobCondition;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1JobStatus;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import io.kubernetes.client.openapi.models.V1PodSecurityContext;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1ResourceRequirements;
+import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -60,6 +52,30 @@ public class SessionDAO {
         }
 
         throw new ResourceNotFoundException("session " + sessionID + " not found");
+    }
+
+    static void deleteJob(final String jobName) throws Exception {
+        final ApiClient client = Configuration.getDefaultApiClient();
+        final BatchV1Api api = new BatchV1Api(client);
+
+        final V1Status status = api.deleteNamespacedJob(jobName, K8SUtil.getWorkloadNamespace())
+                .propagationPolicy("Background")
+                .execute();
+
+        if (status == null) {
+            LOGGER.debug("Deleted job " + jobName + ": NO STATUS REPORTED");
+        } else if (status.getStatus() != null) {
+            LOGGER.debug("Deleted job " + jobName + ": " + status);
+            if (status.getStatus().equalsIgnoreCase("failure")) {
+                LOGGER.warn("Delete job " + jobName + " returned non-success status: " + status.getReason());
+            } else if (status.getStatus().equalsIgnoreCase("success")) {
+                LOGGER.info("Delete job " + jobName + " succeeded.");
+            } else {
+                LOGGER.info("Delete job " + jobName + " returned unknown status: " + status.getStatus());
+            }
+        } else {
+            LOGGER.debug("Deleted job " + jobName + ": NO INFORMATION AVAILABLE");
+        }
     }
 
     static KubernetesJob getJob(final String jobName) throws Exception {

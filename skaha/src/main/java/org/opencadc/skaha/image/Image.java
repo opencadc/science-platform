@@ -94,7 +94,7 @@ public class Image {
             throw new IllegalArgumentException("digest required");
         }
         this.id = id;
-        this.types = new HashSet<String>(types);
+        this.types = new HashSet<>(types);
         this.digest = digest;
     }
 

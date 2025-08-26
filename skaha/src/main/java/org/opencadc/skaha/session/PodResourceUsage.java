@@ -2,7 +2,6 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
 import java.util.*;
-
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
@@ -139,7 +138,11 @@ class PodResourceUsage {
             final Long multiplier = MemoryUnitConverter.MEMORY_UNIT_MAP.get(unit);
             if (multiplier == null) {
                 LOGGER.error("Unknown memory unit: " + unit);
-                return 0L;
+                try {
+                    return Long.parseLong(numberStr);
+                } catch (NumberFormatException e) {
+                    return 0L;
+                }
             }
 
             final double number = Double.parseDouble(numberStr);
