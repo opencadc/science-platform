@@ -101,11 +101,12 @@ public class SessionDAO {
 
         final List<String> labelSelectors = new ArrayList<>();
         if (omitHeadless) {
-            labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
+            labelSelectors.add(
+                    String.format("%s!=%s", SessionDAO.SESSION_TYPE_LABEL, SessionAction.SESSION_TYPE_HEADLESS));
         }
 
         if (StringUtil.hasLength(sessionID)) {
-            labelSelectors.add("canfar-net-sessionID=" + sessionID);
+            labelSelectors.add(String.format("%s=%s", SessionDAO.SESSION_ID_LABEL, sessionID));
         }
 
         final BatchV1Api api = new BatchV1Api(client);

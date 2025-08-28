@@ -179,7 +179,7 @@ public class GetAction extends SessionAction {
             double withCores = 0.0;
             String withRAM = "0G";
             Map<String, Map<String, Double>> nodeResourcesMap = getNodeResources(k8sNamespace);
-            Map<String, String[]> aResourceMap = getAvailableResources(k8sNamespace);
+            Map<String, String[]> aResourceMap = getAvailableResources();
             List<String> nodeNames = new ArrayList<>(aResourceMap.keySet());
             for (String nodeName : nodeNames) {
                 String[] aResources = aResourceMap.get(nodeName);
@@ -328,9 +328,9 @@ public class GetAction extends SessionAction {
         }
     }
 
-    private Map<String, String[]> getAvailableResources(String k8sNamespace) throws Exception {
+    private Map<String, String[]> getAvailableResources() throws Exception {
         KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd =
-                KubectlCommandBuilder.command("describe").argument("nodes").namespace(k8sNamespace);
+                KubectlCommandBuilder.command("describe").argument("nodes");
         String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
 
         Map<String, String[]> nodeToResourcesMap = new HashMap<>();
