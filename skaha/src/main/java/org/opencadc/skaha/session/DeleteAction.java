@@ -67,14 +67,8 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.IOException;
-import java.security.AccessControlException;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
  * Handle a delete request for a session or an app.
@@ -96,38 +90,7 @@ public class DeleteAction extends SessionAction {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
-                final String[] getSessionsCmd = KubectlCommandBuilder.command("get")
-                        .namespace(K8SUtil.getWorkloadNamespace())
-                        .job()
-                        .selector(String.format(
-                                "canfar-net-sessionID=%s,canfar-net-sessionType!=%s",
-                                sessionID, SessionType.DESKTOP_APP.applicationName))
-                        .noHeaders()
-                        .outputFormat("custom-columns=USERID:.metadata.labels.canfar-net-userid,JOBNAME:.metadata.name")
-                        .build();
-
-                final String session = CommandExecutioner.execute(getSessionsCmd);
-
-                if (StringUtil.hasText(session)) {
-                    final String[] lines = session.split("\n");
-                    // sessionID was added to desktop-app. This resulted in the
-                    // above kubectl command returning desktop-app as well. We
-                    // want to ignore them as we pick the session to be deleted.
-                    for (String line : lines) {
-                        String[] parts = line.split("\\s+");
-                        String sessionUserId = parts[0];
-                        if (!posixPrincipal.username.equals(sessionUserId)) {
-                            throw new AccessControlException("forbidden");
-                        }
-
-                        final String jobName = parts[1];
-                        delete(jobName);
-                        return;
-                    }
-                }
-
-                // no session to delete
-                throw new ResourceNotFoundException(sessionID);
+                deleteJob();
             }
         } else if (requestType.equals(REQUEST_TYPE_APP)) {
             deleteDesktopApp();
@@ -142,51 +105,18 @@ public class DeleteAction extends SessionAction {
         // deleting a desktop-app
         if (StringUtil.hasText(appID)) {
             log.debug("appID " + appID);
-            String jobName = this.getAppJobName(sessionID, posixPrincipal.username, appID);
-            if (StringUtil.hasText(jobName)) {
-                delete(jobName);
-            } else {
-                log.warn("no job deleted, desktop-app job name not found for userID " + posixPrincipal.username
-                        + ", sessionID " + sessionID + ", appID " + appID);
-            }
+            SessionDAO.deleteDesktopApplicationJob(sessionID, posixPrincipal.username, appID);
         } else {
             throw new IllegalArgumentException("Missing app ID");
         }
     }
 
-    private void delete(String name) {
+    private void deleteJob() {
         try {
-            SessionDAO.deleteJob(name);
+            SessionDAO.deleteJob(sessionID, posixPrincipal.username);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());
         }
-    }
-
-    private String getAppJobName(String sessionID, String userID, String appID)
-            throws IOException, InterruptedException {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
-        return CommandExecutioner.execute(getAppJobNameCMD);
-    }
-
-    private String[] getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
-        String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
-        labels = labels + ",canfar-net-userid=" + userID;
-        if (sessionID != null) {
-            labels = labels + ",canfar-net-sessionID=" + sessionID;
-        }
-        if (appID != null) {
-            labels = labels + ",canfar-net-appID=" + appID;
-        }
-
-        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = KubectlCommandBuilder.command("get")
-                .namespace(k8sNamespace)
-                .job()
-                .label(labels)
-                .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        return getAppJobNameCmd.build();
     }
 }

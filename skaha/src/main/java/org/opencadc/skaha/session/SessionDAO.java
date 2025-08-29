@@ -27,6 +27,8 @@ public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
 
     private static final String SESSION_ID_LABEL = "canfar-net-sessionID";
+    private static final String DESKTOP_APP_ID_LABEL = "canfar-net-appID";
+    private static final String USER_ID_LABEL = "canfar-net-userid";
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
 
     static final String NONE = "<none>";
@@ -54,27 +56,76 @@ public class SessionDAO {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    static void deleteJob(final String jobName) throws Exception {
+    static void deleteDesktopApplicationJob(final String sessionID, final String username, final String appID)
+            throws Exception {
+        Objects.requireNonNull(sessionID, "sessionID cannot be null");
+        Objects.requireNonNull(username, "username cannot be null");
+        Objects.requireNonNull(appID, "appID cannot be null");
+
         final ApiClient client = Configuration.getDefaultApiClient();
         final BatchV1Api api = new BatchV1Api(client);
+        final List<String> labelsSelector = new ArrayList<>();
 
-        final V1Status status = api.deleteNamespacedJob(jobName, K8SUtil.getWorkloadNamespace())
+        labelsSelector.add(String.format("%s=%s", SESSION_ID_LABEL, sessionID));
+        labelsSelector.add(String.format("%s=%s", USER_ID_LABEL, username));
+        labelsSelector.add(String.format("%s=%s", DESKTOP_APP_ID_LABEL, appID));
+        labelsSelector.add(String.format("%s=%s", SESSION_TYPE_LABEL, SessionType.DESKTOP_APP.applicationName));
+
+        final V1Status status = api.deleteCollectionNamespacedJob(K8SUtil.getWorkloadNamespace())
+                .labelSelector(String.join(",", labelsSelector))
                 .propagationPolicy("Background")
                 .execute();
 
         if (status == null) {
-            LOGGER.debug("Deleted job " + jobName + ": NO STATUS REPORTED");
+            LOGGER.debug("Deleted desktop-app job " + appID + ": NO STATUS REPORTED");
         } else if (status.getStatus() != null) {
-            LOGGER.debug("Deleted job " + jobName + ": " + status);
+            LOGGER.debug("Deleted desktop-app job " + appID + ": " + status);
             if (status.getStatus().equalsIgnoreCase("failure")) {
-                LOGGER.warn("Delete job " + jobName + " returned non-success status: " + status.getReason());
+                LOGGER.warn("Delete desktop-app job " + appID + " returned non-success status: " + status.getReason());
             } else if (status.getStatus().equalsIgnoreCase("success")) {
-                LOGGER.info("Delete job " + jobName + " succeeded.");
+                LOGGER.info("Delete desktop-app job " + appID + " succeeded.");
             } else {
-                LOGGER.info("Delete job " + jobName + " returned unknown status: " + status.getStatus());
+                LOGGER.info("Delete desktop-app job " + appID + " returned unknown status: " + status.getStatus());
             }
         } else {
-            LOGGER.debug("Deleted job " + jobName + ": NO INFORMATION AVAILABLE");
+            LOGGER.debug("Deleted desktop-app job " + appID + ": NO INFORMATION AVAILABLE");
+        }
+    }
+
+    static void deleteJob(final String sessionID, final String username) throws Exception {
+        Objects.requireNonNull(sessionID, "sessionID cannot be null");
+        Objects.requireNonNull(username, "username cannot be null");
+
+        final ApiClient client = Configuration.getDefaultApiClient();
+        final BatchV1Api api = new BatchV1Api(client);
+        final List<String> labelsSelector = new ArrayList<>();
+
+        labelsSelector.add(String.format("%s=%s", SESSION_ID_LABEL, sessionID));
+        labelsSelector.add(String.format("%s=%s", USER_ID_LABEL, username));
+        labelsSelector.add(String.format("%s!=%s", SESSION_TYPE_LABEL, SessionType.DESKTOP_APP.applicationName));
+
+        final V1Status status = api.deleteCollectionNamespacedJob(K8SUtil.getWorkloadNamespace())
+                .labelSelector(String.join(",", labelsSelector))
+                .propagationPolicy("Background")
+                .execute();
+
+        if (status == null) {
+            LOGGER.debug("Deleted job " + sessionID + ": NO STATUS REPORTED");
+        } else if (status.getStatus() != null) {
+            LOGGER.debug("Deleted desktop-app job " + sessionID + ": " + status);
+            if (status.getStatus().equalsIgnoreCase("failure")) {
+                if (Integer.valueOf(404).equals(status.getCode())) {
+                    throw new ResourceNotFoundException("session " + sessionID + " not found");
+                } else {
+                    LOGGER.warn("Delete job " + sessionID + " returned non-success status: " + status.getReason());
+                }
+            } else if (status.getStatus().equalsIgnoreCase("success")) {
+                LOGGER.info("Delete job " + sessionID + " succeeded.");
+            } else {
+                LOGGER.info("Delete job " + sessionID + " returned unknown status: " + status.getStatus());
+            }
+        } else {
+            LOGGER.debug("Delete job " + sessionID + ": NO INFORMATION AVAILABLE");
         }
     }
 

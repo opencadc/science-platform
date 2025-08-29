@@ -1,13 +1,17 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.*;
 import org.apache.log4j.Logger;
+import org.json.JSONWriter;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
-class PodResourceUsage {
+public class PodResourceUsage {
     private static final Logger LOGGER = Logger.getLogger(PodResourceUsage.class);
 
     final Map<String, String> cpu;
@@ -25,7 +29,7 @@ class PodResourceUsage {
         this.memory = Collections.unmodifiableMap(memory);
     }
 
-    static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
+    public static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
         final Map<String, String> cpuMetrics = new HashMap<>();
         final Map<String, String> memoryMetrics = new HashMap<>();
         final List<String> labelSelectors = new ArrayList<>();
@@ -61,6 +65,28 @@ class PodResourceUsage {
         }
 
         return new PodResourceUsage(cpuMetrics, memoryMetrics);
+    }
+
+    @Override
+    public String toString() {
+        final Writer stringWriter = new StringWriter();
+        final JSONWriter jsonWriter = new JSONWriter(stringWriter);
+        jsonWriter.array();
+        cpu.keySet().forEach(podName -> {
+            jsonWriter.object();
+            jsonWriter.key("podName").value(podName);
+            jsonWriter.key("cpuCores").value(cpu.get(podName));
+            jsonWriter.key("memoryGB").value(memory.get(podName));
+            jsonWriter.endObject();
+        });
+        jsonWriter.endArray();
+
+        try {
+            stringWriter.flush();
+        } catch (IOException e) {
+            LOGGER.error("failed to flush string writer: " + e.getMessage(), e);
+        }
+        return stringWriter.toString();
     }
 
     static String toCoreUnit(String cores) {

@@ -69,12 +69,9 @@ package org.opencadc.skaha;
 
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.skaha.session.PodResourceUsage;
 
 public class SkahaAvailability implements AvailabilityPlugin {
-    private static final Availability STATUS_UP = new Availability(true, "skaha service is available.");
-
     public SkahaAvailability() {}
 
     @Override
@@ -91,15 +88,12 @@ public class SkahaAvailability implements AvailabilityPlugin {
     public Availability getStatus() {
         // ensure we can run kubectl
         try {
-            final String[] getPods = KubectlCommandBuilder.command("get")
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .argument("pods")
-                    .build();
-
-            CommandExecutioner.execute(getPods);
-            return STATUS_UP;
+            return new Availability(
+                    true,
+                    "Skaha Service Available.\n\nCurrent Pods in " + K8SUtil.getWorkloadNamespace() + ":\n"
+                            + PodResourceUsage.get(null, false) + "\n");
         } catch (Exception e) {
-            return new Availability(false, "failed to run kubectl: " + e.getMessage());
+            return new Availability(false, "failed to access cluster: " + e.getMessage());
         }
     }
 
