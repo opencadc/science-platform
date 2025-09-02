@@ -211,8 +211,8 @@ public class K8SUtil {
         return System.getenv("REDIS_HOST");
     }
 
-    public static String getRedisPort() {
-        return System.getenv("REDIS_PORT");
+    public static int getRedisPort() {
+        return Integer.parseInt(System.getenv("REDIS_PORT"));
     }
 
     /**

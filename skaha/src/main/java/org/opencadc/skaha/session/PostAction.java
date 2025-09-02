@@ -96,7 +96,6 @@ import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
@@ -423,10 +422,10 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Validate and return the session type. There exists a loophole
+     * Validate and return the session type.
      *
      * @param imageID The image to validate
-     * @param type User-provided session type (optional), defaults to headless
+     * @param type Session type
      * @return The system recognized session type
      * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
      * @throws Exception If Harbor calls fail
@@ -436,44 +435,22 @@ public class PostAction extends SessionAction {
             throw new IllegalArgumentException("image is required");
         }
 
-        // This will also vet the currently requested image's host (authority) against
-        // the list of configured ones.
+        // make sure the host of the image matches one of the allowed image hosts
+        // in the configuration
+        log.debug("validating image: " + imageID);
         final String imageRegistryHost = getRegistryHost(imageID);
-        log.debug("Image is located at " + imageRegistryHost);
+        log.debug("imageRegistryHost " + imageRegistryHost);
 
-        final Image image = getPublicImage(imageID);
-        final String validatedType;
-
-        // Private images are also missing from this list.
-        // TODO: We currently rely on the image's host name to match a configured one
-        // TODO: to ensure a supported image from a configured source.  This is impossible
-        // TODO: with Private images as they cannot be obtained first.  This means that any
-        // TODO: image that is missing from the Public Cache can either be invalid or Private,
-        // TODO: and since we can't verify one way or the other, let them through.
-        if (image == null) {
-            log.warn("Image " + imageID + " missing from cache...");
-            final ImageRepositoryAuth imageRepositoryAuth = getRegistryAuth(imageRegistryHost);
-            if (imageRepositoryAuth == null) {
-                throw new ResourceNotFoundException("image not found or not labelled: " + imageID);
-            } else {
-                log.warn("Assuming image " + imageID + " is private as credentials were supplied.");
-                validatedType = type;
-            }
-        } else if (image.getTypes().contains(type)) {
-            validatedType = type;
-        } else {
-            throw new IllegalArgumentException("image/type mismatch: " + imageID + "/" + type);
-        }
-
-        if (validatedType != null) {
-            if (adminUser && !SESSION_TYPES.contains(validatedType)) {
-                throw new IllegalArgumentException("Illegal session type: " + type);
-            } else if (validatedType.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
-                validateHeadlessMembership();
+        for (String authorizedHost : harborHosts) {
+            if (authorizedHost.equals(imageRegistryHost)) {
+                if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                    // assert headless group membership
+                    validateHeadlessMembership();
+                }
+                return SessionType.fromApplicationStringType(type);
             }
         }
-
-        return SessionType.fromApplicationStringType(validatedType);
+        throw new IllegalArgumentException("image not in a trusted repository");
     }
 
     public void checkExistingSessions(SessionType type) throws Exception {

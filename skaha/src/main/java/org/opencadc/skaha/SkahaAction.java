@@ -125,7 +125,6 @@ public abstract class SkahaAction extends RestAction {
     protected final PosixMapperConfiguration posixMapperConfiguration;
     public List<String> harborHosts;
     protected PosixPrincipal posixPrincipal;
-    protected boolean adminUser = false;
     protected boolean headlessUser = false;
     protected boolean priorityHeadlessUser = false;
     protected String scratchdir;
@@ -137,7 +136,6 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaHeadlessPriortyClass;
     protected int maxUserSessions;
     protected String skahaPosixCacheURL;
-    protected RedisCache redis;
     protected boolean skahaCallbackFlow = false;
     protected String callbackSupplementalGroups = null;
 
@@ -236,7 +234,6 @@ public abstract class SkahaAction extends RestAction {
         URI skahaUsersUri = URI.create(skahaUsersGroup);
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         log.debug("Subject: " + currentSubject);
-        redis = new RedisCache(K8SUtil.getRedisHost(), K8SUtil.getRedisPort());
         if (isSkahaCallBackFlow(currentSubject)) {
             initiateSkahaCallbackFlow(currentSubject, skahaUsersUri);
         } else {
@@ -338,18 +335,6 @@ public abstract class SkahaAction extends RestAction {
         }
 
         log.debug("user is a member of skaha user group ");
-        if (skahaAdminsGroup == null) {
-            log.warn("skaha.adminsgroup not defined in system properties");
-        } else {
-            try {
-                final GroupURI adminGroupURI = new GroupURI(URI.create(skahaAdminsGroup));
-                if (skahaUsersGroupUriSet.contains(adminGroupURI)) {
-                    adminUser = true;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
 
         List<Group> groups = isNotEmpty(skahaUsersGroupUriSet)
                 ? skahaUsersGroupUriSet.stream().map(Group::new).collect(toList())
@@ -365,7 +350,7 @@ public abstract class SkahaAction extends RestAction {
 
     public Image getPublicImage(String imageID) {
         log.debug("get image: " + imageID);
-        List<Image> images = redis.getAll("public", Image.class);
+        List<Image> images = RedisCache.getAll(K8SUtil.getRedisHost(), K8SUtil.getRedisPort(), "public", Image.class);
         if (images == null) {
             log.debug("no images in cache");
             return null;

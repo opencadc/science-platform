@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.30.1](https://github.com/opencadc/science-platform/compare/0.30.0...0.30.1) (2025-08-15)
+
+
+### Bug Fixes
+
+* **add-separate-endpoints-for-v1-skaha-in-capabilities:** Transition … ([a9f95ad](https://github.com/opencadc/science-platform/commit/a9f95ad277b6ce12683a2f4a7b65dd3ac00e1dbd))
+* **add-separate-endpoints-for-v1-skaha-in-capabilities:** Transition to capabilities file with entry for each endpoint ([88ba95e](https://github.com/opencadc/science-platform/commit/88ba95ee6fc8a05f6f17ced6c68ca4e9649484c8))
+* **capabilities.xml:** switch previous capabilities entry back to skaha/v0 ([039e95a](https://github.com/opencadc/science-platform/commit/039e95a9d8cf294c265cf71699a037fff5a63b2c))
+* **capabilities.xml:** switch previous capabilities entry back to skaha/v0 ([35df58d](https://github.com/opencadc/science-platform/commit/35df58dfa5b2fea838c916ac92c59168d385b004))
+* **style:** lint ([15b758c](https://github.com/opencadc/science-platform/commit/15b758c00e99aecd92ae1c289a43954373f9b1f0))
+
+## [0.30.0](https://github.com/opencadc/science-platform/compare/0.29.2...0.30.0) (2025-08-13)
+
+
+### Features
+
+* fix checkstyle ([7f444cd](https://github.com/opencadc/science-platform/commit/7f444cd7ffd7241b740e4afa1e87736e7ffc69d0))
+* fix checkstyle ([db556f8](https://github.com/opencadc/science-platform/commit/db556f83093fe5a2e11950a25d5dbb2034383850))
+* revert param name to 'type' ([464a78b](https://github.com/opencadc/science-platform/commit/464a78bcd64bd7cd8879185a432cf7d4cdf87596))
+
+## [0.29.2](https://github.com/opencadc/science-platform/compare/0.29.1...0.29.2) (2025-08-01)
+
+
+### Bug Fixes
+
+* reduce sockets to redis cache ([6aa5471](https://github.com/opencadc/science-platform/commit/6aa5471cf4606a13f4635f64292f9b0576fc1898))
+* reduce sockets to redis cache ([63dbbf7](https://github.com/opencadc/science-platform/commit/63dbbf7679bddc38768a5372313fd33b83a8bfaf))
+
 ## [0.29.1](https://github.com/opencadc/science-platform/compare/0.29.0...0.29.1) (2025-07-18)
 
 

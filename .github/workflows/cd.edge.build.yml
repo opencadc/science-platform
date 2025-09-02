@@ -29,13 +29,13 @@ jobs:
         run: |
           echo "Client Payload: ${{ toJson(github.event.client_payload) }}"
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
           install: true
       - name: Perform Container Registry Login
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           registry: images.opencadc.org
           username: ${{ secrets.SKAHA_REGISTRY_USERNAME }}
@@ -62,7 +62,7 @@ jobs:
         # See https://github.com/marketplace/actions/attest-build-provenance#container-image
         # for more information on the attest-build-provenance action
         id: attest
-        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
