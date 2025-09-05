@@ -12,7 +12,7 @@ import javax.security.auth.Subject;
 public class UserStorageAPIKeyAdministrator implements UserStorageAdministrator {
     private static final String CLIENT_APPLICATION_NAME = "skaha";
     // The challenge type (after the authorization header and before the token) for API Key authentication.
-    private static final String ALLOCATION_API_KEY_HEADER_CHALLENGE_TYPE = "api-key";
+    private static final String ALLOCATION_API_KEY_HEADER_CHALLENGE_TYPE = "admin-api-key";
 
     private final URL serviceURL;
 
