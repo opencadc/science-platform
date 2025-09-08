@@ -68,15 +68,8 @@ public class SessionJobBuilderTest {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
-        }
+        commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withGPUEnabled(true)
@@ -147,15 +140,8 @@ public class SessionJobBuilderTest {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-queue.yaml", SessionJobBuilderTest.class)
                 .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
-        }
+        commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
@@ -203,5 +189,17 @@ public class SessionJobBuilderTest {
             testMatchExpressions.addAll(matchExpressions);
         }
         return testMatchExpressions;
+    }
+
+    private void commonValues(final Path testBaseValuesPath, final Map<String, String> parametersToReplaceValues)
+            throws Exception {
+        final String fileContent = Files.readString(testBaseValuesPath);
+        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
+
+        for (final String param : parametersToReplace) {
+            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
+        }
+
     }
 }
