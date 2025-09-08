@@ -67,14 +67,8 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import java.security.AccessControlException;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SessionType;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 /**
  * Handle a delete request for a session or an app.
@@ -96,87 +90,30 @@ public class DeleteAction extends SessionAction {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");
             } else {
-                final String[] getSessionsCmd = KubectlCommandBuilder.command("get")
-                        .namespace(K8SUtil.getWorkloadNamespace())
-                        .pod()
-                        .selector("canfar-net-sessionID=" + sessionID)
-                        .noHeaders()
-                        .outputFormat(
-                                "custom-columns=TYPE:.metadata.labels.canfar-net-sessionType,USERID:.metadata.labels.canfar-net-userid")
-                        .build();
-
-                final String session = CommandExecutioner.execute(getSessionsCmd);
-
-                if (StringUtil.hasText(session)) {
-                    final String[] lines = session.split("\n");
-                    // sessionID was added to desktop-app. This resulted in the
-                    // above kubectl command returning desktop-app as well. We
-                    // want to ignore them as we pick the session to be deleted.
-                    for (String line : lines) {
-                        String[] parts = line.split("\\s+");
-                        SessionType type = SessionType.fromApplicationStringType(parts[0]);
-                        if (SessionType.DESKTOP_APP != type) {
-                            String sessionUserId = parts[1];
-                            if (!posixPrincipal.username.equals(sessionUserId)) {
-                                throw new AccessControlException("forbidden");
-                            }
-
-                            deleteSession(posixPrincipal.username, type, sessionID);
-                            return;
-                        }
-                    }
-                }
-
-                // no session to delete
-                throw new ResourceNotFoundException(sessionID);
+                deleteJob();
             }
-        }
-
-        if (requestType.equals(REQUEST_TYPE_APP)) {
-            deleteSession(posixPrincipal.username, SessionType.DESKTOP_APP, sessionID);
-        }
-    }
-
-    public void deleteSession(String userID, SessionType type, String sessionID) throws Exception {
-        // kill the session specified by sessionID
-        log.debug("Stopping " + type + " session: " + sessionID);
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
-        if (SessionType.DESKTOP_APP == type) {
-            // deleting a desktop-app
-            if (StringUtil.hasText(appID)) {
-                log.debug("appID " + appID);
-                String jobName = this.getAppJobName(sessionID, userID, appID);
-                if (StringUtil.hasText(jobName)) {
-                    delete(k8sNamespace, "job", jobName);
-                } else {
-                    log.warn("no job deleted, desktop-app job name not found for userID " + userID + ", sessionID "
-                            + sessionID + ", appID " + appID);
-                }
-            } else {
-                throw new IllegalArgumentException("Missing app ID");
-            }
+        } else if (requestType.equals(REQUEST_TYPE_APP)) {
+            deleteDesktopApp();
         } else {
-            // deleting a session
-            String jobName = K8SUtil.getJobName(sessionID, type, userID);
-            delete(k8sNamespace, "job", jobName);
-
-            if (!type.isHeadless()) {
-                delete(k8sNamespace, "ingressroute", type.getIngressName(sessionID));
-                delete(k8sNamespace, "service", type.getServiceName(sessionID));
-                delete(k8sNamespace, "middleware", type.getMiddlewareName(sessionID));
-            }
+            throw new IllegalArgumentException("Invalid request type for deletion: " + requestType);
         }
     }
 
-    private void delete(String k8sNamespace, String type, String name) {
+    private void deleteDesktopApp() throws Exception {
+        // kill the session specified by sessionID
+        log.debug("Stopping Desktop App for Session " + sessionID);
+        // deleting a desktop-app
+        if (StringUtil.hasText(appID)) {
+            log.debug("appID " + appID);
+            SessionDAO.deleteDesktopApplicationJob(sessionID, posixPrincipal.username, appID);
+        } else {
+            throw new IllegalArgumentException("Missing app ID");
+        }
+    }
+
+    private void deleteJob() {
         try {
-            String[] delete = KubectlCommandBuilder.command("delete")
-                    .namespace(k8sNamespace)
-                    .argument(type)
-                    .argument(name)
-                    .build();
-            CommandExecutioner.execute(delete);
+            SessionDAO.deleteJob(sessionID, posixPrincipal.username);
         } catch (Exception ex) {
             // fail to delete the object, just log a warning and continue
             log.warn(ex.getMessage());

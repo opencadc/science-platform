@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
 import java.io.ByteArrayOutputStream;
@@ -92,7 +93,6 @@ import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
-import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
@@ -117,6 +117,10 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_POSIXID = "skaha.posixid";
     public static final String SKAHA_SUPPLEMENTALGROUPS = "skaha.supgroups";
     public static final String SKAHA_SESSIONID = "skaha.sessionid";
+
+    // Used only with CARTA-5 images.
+    public static final String SKAHA_SESSIONURLPATH = "skaha.sessionurlpath";
+
     public static final String SKAHA_SESSIONNAME = "skaha.sessionname";
     public static final String SKAHA_SESSIONTYPE = "skaha.sessiontype";
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
@@ -179,22 +183,10 @@ public class PostAction extends SessionAction {
 
                 final SessionType validatedType = validateImage(image, type);
 
-                Integer requestCores = getCoresParam();
-                Integer limitCores = requestCores;
-                if (requestCores == null) {
-                    requestCores = rc.getDefaultRequestCores();
-                    limitCores = rc.getDefaultLimitCores();
-                }
-
-                Integer requestRAM = getRamParam();
-                Integer limitRAM = requestRAM;
-                if (requestRAM == null) {
-                    requestRAM = rc.getDefaultRequestRAM();
-                    limitRAM = rc.getDefaultLimitRAM();
-                }
+                final ResourceSpecification resourceSpecification = ResourceSpecification.fromSyncInput(this.syncInput);
 
                 String name = syncInput.getParameter("name");
-                if (name == null) {
+                if (!StringUtil.hasText(name)) {
                     throw new IllegalArgumentException("Missing parameter 'name'");
                 }
 
@@ -210,7 +202,7 @@ public class PostAction extends SessionAction {
 
                 int gpus = 0;
                 final String gpusParam = syncInput.getParameter("gpus");
-                if (gpusParam != null) {
+                if (StringUtil.hasText(gpusParam)) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
                         if (!rc.getAvailableGPUs().contains(gpus)) {
@@ -226,18 +218,7 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(
-                        validatedType,
-                        image,
-                        name,
-                        requestCores,
-                        limitCores,
-                        requestRAM,
-                        limitRAM,
-                        gpus,
-                        cmd,
-                        args,
-                        envs);
+                createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -264,22 +245,9 @@ public class PostAction extends SessionAction {
             }
         } else if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
-                // create an app
-                Integer requestCores = getCoresParam();
-                Integer limitCores = requestCores;
-                if (requestCores == null) {
-                    requestCores = rc.getDefaultRequestCores();
-                    limitCores = rc.getDefaultLimitCores();
-                }
+                final ResourceSpecification resourceSpecification = ResourceSpecification.fromSyncInput(this.syncInput);
 
-                Integer requestRAM = getRamParam();
-                Integer limitRAM = requestRAM;
-                if (requestRAM == null) {
-                    requestRAM = rc.getDefaultRequestRAM();
-                    limitRAM = rc.getDefaultLimitRAM();
-                }
-
-                attachDesktopApp(image, requestCores, limitCores, requestRAM, limitRAM);
+                attachDesktopApp(image, resourceSpecification);
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((appID + "\n").getBytes());
             } else {
@@ -343,42 +311,6 @@ public class PostAction extends SessionAction {
         return K8SUtil.getDefaultQuota();
     }
 
-    private Integer getCoresParam() {
-        Integer cores = null;
-        String coresParam = syncInput.getParameter("cores");
-        if (coresParam != null) {
-            try {
-                cores = Integer.valueOf(coresParam);
-                final ResourceContexts rc = new ResourceContexts();
-                if (!rc.isCoreCountAvailable(cores)) {
-                    throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
-            }
-        }
-
-        return cores;
-    }
-
-    private Integer getRamParam() {
-        Integer ram = null;
-        String ramParam = syncInput.getParameter("ram");
-        if (ramParam != null) {
-            try {
-                ram = Integer.valueOf(ramParam);
-                ResourceContexts rc = new ResourceContexts();
-                if (!rc.getAvailableRAM().contains(ram)) {
-                    throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
-            }
-        }
-
-        return ram;
-    }
-
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -394,6 +326,8 @@ public class PostAction extends SessionAction {
 
             CommandExecutioner.execute(renewExpiryTimeCmd.build());
         }
+
+        injectProxyCertificate();
     }
 
     private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
@@ -478,10 +412,8 @@ public class PostAction extends SessionAction {
      * @param imageID The image to validate
      * @param type Session type
      * @return The system recognized session type
-     * @throws ResourceNotFoundException If an image with the supplied ID cannot be found
-     * @throws Exception If Harbor calls fail
      */
-    private SessionType validateImage(String imageID, String type) throws Exception {
+    private SessionType validateImage(String imageID, String type) {
         if (!StringUtil.hasText(imageID)) {
             throw new IllegalArgumentException("image is required");
         }
@@ -494,11 +426,12 @@ public class PostAction extends SessionAction {
 
         for (String authorizedHost : harborHosts) {
             if (authorizedHost.equals(imageRegistryHost)) {
-                if (type.equals(SESSION_TYPE_HEADLESS.stripTrailing())) {
+                final SessionType sessionType = SessionType.fromApplicationStringType(type);
+                if (SessionType.HEADLESS == sessionType) {
                     // assert headless group membership
                     validateHeadlessMembership();
                 }
-                return SessionType.fromApplicationStringType(type);
+                return sessionType;
             }
         }
         throw new IllegalArgumentException("image not in a trusted repository");
@@ -507,12 +440,11 @@ public class PostAction extends SessionAction {
     public void checkExistingSessions(SessionType type) throws Exception {
         // multiple
         if (!type.isHeadless()) {
-            List<Session> sessions = super.getAllSessions(posixPrincipal.username);
+            final List<Session> sessions = SessionDAO.getUserSessions(this.posixPrincipal.username, null, true);
             int count = 0;
             for (Session session : sessions) {
                 log.debug("checking session: " + session);
-                if (!SESSION_TYPE_HEADLESS.equalsIgnoreCase(session.getType())
-                        && !TYPE_DESKTOP_APP.equals(session.getType())) {
+                if (!TYPE_DESKTOP_APP.equals(session.getType())) {
                     final String status = session.getStatus();
                     if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
                             || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
@@ -532,10 +464,7 @@ public class PostAction extends SessionAction {
             SessionType type,
             String image,
             String name,
-            Integer requestCores,
-            Integer limitCores,
-            Integer requestRAM,
-            Integer limitRAM,
+            ResourceSpecification resourceSpecification,
             Integer gpus,
             String cmd,
             String args,
@@ -549,7 +478,10 @@ public class PostAction extends SessionAction {
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
 
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
+        final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
+        final boolean isLegacyCARTA = (type == SessionType.CARTA && (majorVersion == null || majorVersion < 5));
+
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath(isLegacyCARTA))
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
@@ -566,10 +498,10 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM.toString() + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
@@ -577,6 +509,18 @@ public class PostAction extends SessionAction {
 
         if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
+        } else if (type == SessionType.CARTA) {
+            final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
+            if (imageVersion.startsWith("5")) {
+                final String connectURLPrefix = SessionURLBuilder.cartaSession(
+                                K8SUtil.getSessionsHostName(), this.sessionID)
+                        .withVersion5Path(true)
+                        .withAlternateSocket(false)
+                        .build();
+                final String connectURLPath = URI.create(connectURLPrefix).getPath();
+                sessionJobBuilder = sessionJobBuilder.withParameter(
+                        PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
+            }
         }
 
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
@@ -591,7 +535,7 @@ public class PostAction extends SessionAction {
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
-        injectCredentials();
+        injectProxyCertificate();
 
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
@@ -604,10 +548,20 @@ public class PostAction extends SessionAction {
 
         log.debug("Create job result: " + createResult);
 
+        final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
+
+        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
+        // API is in place, we can swap this out with a proper Java client API.
+        // TODO: Use the Kubernetes Java client to create Service objects.
         if (type.supportsService()) {
-            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
-            final SessionServiceBuilder sessionServiceBuilder = new SessionServiceBuilder(kubernetesJob);
-            jsonLaunchFile = super.stageFile(sessionServiceBuilder.build());
+            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
+            String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
+            serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            serviceString =
+                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+            serviceString =
+                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+            jsonLaunchFile = super.stageFile(serviceString);
             final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
                     .namespace(k8sNamespace)
                     .option("-f", jsonLaunchFile);
@@ -618,9 +572,10 @@ public class PostAction extends SessionAction {
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
+        // TODO: Use the Kubernetes Gateway API to create Ingresses.
+        // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
-            final KubernetesJob kubernetesJob = CommandExecutioner.getJob(jobName);
-            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
+            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
@@ -684,15 +639,10 @@ public class PostAction extends SessionAction {
      * names.
      *
      * @param image Container image name.
-     * @param requestCores Requested number of cores.
-     * @param limitCores Max number of cores.
-     * @param requestRAM Requested amount of RAM in Gi.
-     * @param limitRAM Max amount of RAM in Gi.
+     * @param resourceSpecification The resource specification for the app.
      * @throws Exception For any unexpected errors.
      */
-    public void attachDesktopApp(
-            String image, Integer requestCores, Integer limitCores, Integer requestRAM, Integer limitRAM)
-            throws Exception {
+    public void attachDesktopApp(String image, ResourceSpecification resourceSpecification) throws Exception {
         // Get the IP address based on the session
         KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
                 .pod()
@@ -734,10 +684,10 @@ public class PostAction extends SessionAction {
         // that it becomes the xterm title
         String param = name;
         log.debug("Using parameter: " + param);
-        log.debug("Using requests.cores: " + requestCores.toString());
-        log.debug("Using limits.cores: " + limitCores.toString());
-        log.debug("Using requests.ram: " + requestRAM.toString() + "Gi");
-        log.debug("Using limits.ram: " + limitRAM.toString() + "Gi");
+        log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
+        log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
+        log.debug("Using requests.ram: " + resourceSpecification.requestRAM.toString() + "Gi");
+        log.debug("Using limits.ram: " + resourceSpecification.limitRAM.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
         String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
@@ -755,6 +705,8 @@ public class PostAction extends SessionAction {
             }
         }
 
+        final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
+        final KubernetesJob ownerKubernetesJob = SessionDAO.getJob(ownerJobName);
         final String supplementalGroups = getSupplementalGroupsList();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
@@ -771,17 +723,19 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                 .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, requestRAM + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
+                .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
                 .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
-                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
+                .withParameter(PostAction.SKAHA_JOBUID, ownerKubernetesJob.getUID())
+                .withParameter(PostAction.SKAHA_JOBNAME, ownerKubernetesJob.getName());
 
         String launchFile = super.stageFile(sessionJobBuilder.build());
         KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
@@ -793,7 +747,7 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        injectCredentials();
+        injectProxyCertificate();
     }
 
     private void validateHeadlessMembership() {
@@ -878,6 +832,75 @@ public class PostAction extends SessionAction {
             return "priorityClassName: " + skahaHeadlessPriortyClass;
         } else {
             return "";
+        }
+    }
+
+    /** DTO for resource specification parameters. */
+    public static class ResourceSpecification {
+        private static final ResourceContexts RESOURCE_CONTEXTS = new ResourceContexts();
+        private final SyncInput syncInput;
+
+        Integer requestCores;
+        Integer limitCores;
+        Integer requestRAM;
+        Integer limitRAM;
+
+        static ResourceSpecification fromSyncInput(final SyncInput input) {
+            return new ResourceSpecification(input);
+        }
+
+        private ResourceSpecification(SyncInput syncInput) {
+            this.syncInput = syncInput;
+
+            this.requestCores = getCoresParam();
+            this.limitCores = this.requestCores;
+            if (this.requestCores == null) {
+                this.requestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
+                this.limitCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
+            }
+
+            this.requestRAM = getRamParam();
+            this.limitRAM = this.requestRAM;
+            if (this.requestRAM == null) {
+                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
+                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+            }
+        }
+
+        private Integer getCoresParam() {
+            Integer cores = null;
+            String coresParam = syncInput.getParameter("cores");
+            if (StringUtil.hasText(coresParam)) {
+                try {
+                    cores = Integer.valueOf(coresParam);
+                    final ResourceContexts rc = new ResourceContexts();
+                    if (!rc.isCoreCountAvailable(cores)) {
+                        throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
+                }
+            }
+
+            return cores;
+        }
+
+        private Integer getRamParam() {
+            Integer ram = null;
+            String ramParam = syncInput.getParameter("ram");
+            if (StringUtil.hasText(ramParam)) {
+                try {
+                    ram = Integer.valueOf(ramParam);
+                    ResourceContexts rc = new ResourceContexts();
+                    if (!rc.getAvailableRAM().contains(ram)) {
+                        throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
+                }
+            }
+
+            return ram;
         }
     }
 }

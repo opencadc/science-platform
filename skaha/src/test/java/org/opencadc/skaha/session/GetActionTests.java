@@ -67,11 +67,13 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
+import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -142,27 +144,21 @@ public class GetActionTests {
     }
 
     @Test
-    public void testListSessions() {
-        try {
-            GetAction get = new TestGetAction();
-            String json = get.listSessions(null, null, false);
-            log.info("json: \n" + json);
-            List<Session> sessions1 = get.getAllSessions(null);
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<Session>>() {}.getType();
-            List<Session> sessions2 = gson.fromJson(json, listType);
-            Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
-            Assert.assertEquals("session count", sessions1.size(), sessions2.size());
-            for (Session s : sessions1) {
-                Assert.assertTrue(s.getId(), sessions2.contains(s));
+    public void testListSessions() throws Exception {
+        GetAction get = new TestGetAction();
+        String json = get.listSessions(null, null, false);
+        log.info("json: \n" + json);
+        List<Session> sessions1 = get.getAllSessions(null);
+        Gson gson = new Gson();
+        Type listType = new TypeToken<List<Session>>() {}.getType();
+        List<Session> sessions2 = gson.fromJson(json, listType);
+        Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+        Assert.assertEquals("session count", sessions1.size(), sessions2.size());
+        for (Session s : sessions1) {
+            Assert.assertTrue(s.getId(), sessions2.contains(s));
 
-                // All start times should be parsable.
-                Instant.parse(s.getStartTime());
-            }
-
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+            // All start times should be parsable.
+            log.info("Parsed start time: " + Instant.parse(s.getStartTime()));
         }
     }
 
@@ -217,10 +213,83 @@ public class GetActionTests {
             List<Session> sessions = new ArrayList<>();
             String[] lines = K8S_LIST.split("\n");
             for (String line : lines) {
-                Session session = SessionDAO.constructSession("host.example.org", line, this.skahaTld);
+                Session session = constructSession(line);
                 sessions.add(session);
             }
             return sessions;
+        }
+
+        Session constructSession(String k8sOutput) {
+            final List<SessionDAO.CustomColumns> allColumns = Arrays.asList(SessionDAO.CustomColumns.values());
+
+            // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
+            // are in a space-delimited array.
+            final String[] parts = k8sOutput.trim().split(" {3,}");
+
+            String id = parts[allColumns.indexOf(SessionDAO.CustomColumns.SESSION_ID)];
+            String userid = parts[allColumns.indexOf(SessionDAO.CustomColumns.USERID)];
+            String image = parts[allColumns.indexOf(SessionDAO.CustomColumns.IMAGE)];
+            SessionType type =
+                    SessionType.fromApplicationStringType(parts[allColumns.indexOf(SessionDAO.CustomColumns.TYPE)]);
+            String deletionTimestamp = parts[allColumns.indexOf(SessionDAO.CustomColumns.DELETION)];
+            final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
+                    ? Session.STATUS_TERMINATING
+                    : parts[allColumns.indexOf(SessionDAO.CustomColumns.STATUS)];
+            final String connectURL = String.format("https://example.org/session/test/%s", id);
+
+            final Session session = new Session(
+                    id,
+                    userid,
+                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_UID)],
+                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_GID)],
+                    fromStringArray(parts[allColumns.indexOf(SessionDAO.CustomColumns.SUPPLEMENTAL_GROUPS)]),
+                    image,
+                    type.applicationName,
+                    status,
+                    parts[allColumns.indexOf(SessionDAO.CustomColumns.NAME)],
+                    parts[allColumns.indexOf(SessionDAO.CustomColumns.STARTED)],
+                    connectURL,
+                    parts[allColumns.indexOf(SessionDAO.CustomColumns.APP_ID)]);
+
+            // Check if all columns were requested (set by forUserId)
+            final int requestedRamIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_RAM);
+            if (parts.length > requestedRamIndex) {
+                session.setRequestedRAM(toCommonUnit(parts[requestedRamIndex]));
+            }
+
+            final int requestedCPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_CPU);
+            if (parts.length > requestedCPUIndex) {
+                session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
+            }
+
+            final int requestedGPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_GPU);
+            if (parts.length > requestedGPUIndex) {
+                session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
+            }
+
+            return session;
+        }
+
+        /**
+         * Example input is [4444 5555 6666]. Convert to an actual integer array.
+         *
+         * @param inputArray Kubernetes output of an array of integers.
+         * @return integer array, never null.
+         */
+        private static Integer[] fromStringArray(final String inputArray) {
+            if (inputArray.equals(SessionDAO.NONE)) {
+                return new Integer[0];
+            } else {
+                final Object[] parsedArray = Arrays.stream(inputArray
+                                .replace("[", "")
+                                .replace("]", "")
+                                .trim()
+                                .split(" "))
+                        .filter(StringUtil::hasText)
+                        .map(Integer::parseInt)
+                        .toArray();
+                return Arrays.copyOf(parsedArray, parsedArray.length, Integer[].class);
+            }
         }
 
         @Override

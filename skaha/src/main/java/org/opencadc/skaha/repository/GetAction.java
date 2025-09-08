@@ -17,6 +17,7 @@ public class GetAction extends SkahaAction {
     @Override
     public void doAction() throws Exception {
         initRequest();
+
         final Writer writer = initWriter();
         final JSONWriter jsonWriter = new JSONWriter(writer).array();
         try {
@@ -25,11 +26,6 @@ public class GetAction extends SkahaAction {
             jsonWriter.endArray();
             writer.flush();
         }
-    }
-
-    @Override
-    protected void initRequest() throws Exception {
-        super.initRequest();
     }
 
     Writer initWriter() throws IOException {

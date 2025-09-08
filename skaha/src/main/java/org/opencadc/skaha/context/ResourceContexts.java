@@ -73,7 +73,6 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.SessionType;
 
 /**
  * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.
@@ -86,15 +85,11 @@ public class ResourceContexts {
 
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
-    private final Integer defaultCores;
-    private final Integer defaultCoresHeadless;
     private final List<Integer> availableCores = new ArrayList<>();
 
     // units in GB
     private final Integer defaultRequestRAM;
     private final Integer defaultLimitRAM;
-    private final Integer defaultRAM;
-    private final Integer defaultRAMHeadless;
     private final List<Integer> availableRAM = new ArrayList<>();
 
     private final List<Integer> availableGPUs = new ArrayList<>();
@@ -108,16 +103,12 @@ public class ResourceContexts {
             JsonObject cores = jsonObject.getAsJsonObject("cores");
             defaultRequestCores = cores.get("defaultRequest").getAsInt();
             defaultLimitCores = cores.get("defaultLimit").getAsInt();
-            defaultCores = cores.get("default").getAsInt();
-            defaultCoresHeadless = cores.get("defaultHeadless").getAsInt();
             JsonArray coresOptions = cores.getAsJsonArray("options");
             coresOptions.asList().forEach(coreOption -> availableCores.add(coreOption.getAsInt()));
 
             JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
             defaultRequestRAM = memory.get("defaultRequest").getAsInt();
             defaultLimitRAM = memory.get("defaultLimit").getAsInt();
-            defaultRAM = memory.get("default").getAsInt();
-            defaultRAMHeadless = memory.get("defaultHeadless").getAsInt();
             JsonArray ramOptions = memory.getAsJsonArray("options");
             ramOptions.asList().forEach(ramOption -> availableRAM.add(ramOption.getAsInt()));
 
@@ -147,10 +138,6 @@ public class ResourceContexts {
         return defaultLimitCores;
     }
 
-    public Integer getDefaultCores(SessionType sessionType) {
-        return sessionType.isHeadless() ? defaultCoresHeadless : defaultCores;
-    }
-
     public boolean isCoreCountAvailable(final Integer coreCount) {
         return this.availableCores.contains(coreCount);
     }
@@ -161,10 +148,6 @@ public class ResourceContexts {
 
     public Integer getDefaultLimitRAM() {
         return defaultLimitRAM;
-    }
-
-    public Integer getDefaultRAM(SessionType sessionType) {
-        return sessionType.isHeadless() ? defaultRAMHeadless : defaultRAM;
     }
 
     public List<Integer> getAvailableRAM() {

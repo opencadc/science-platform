@@ -15,8 +15,6 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.KubernetesJob;
-import org.opencadc.skaha.SessionType;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 
 public class CommandExecutioner {
@@ -185,30 +183,5 @@ public class CommandExecutioner {
     public static void changeOwnership(String path, int posixId, int groupId) throws IOException, InterruptedException {
         String[] chown = new String[] {"chown", posixId + ":" + groupId, path};
         CommandExecutioner.execute(chown);
-    }
-
-    /**
-     * Get the UID of a job by name.
-     *
-     * @param jobName The job to look up.
-     * @return Job instance.
-     * @throws IOException If there is an error executing the command.
-     * @throws InterruptedException If the command is interrupted.
-     */
-    public static KubernetesJob getJob(String jobName) throws IOException, InterruptedException {
-        final String[] getJobCommand = CommandExecutioner.getJobCommand(jobName, K8SUtil.getWorkloadNamespace());
-        final String[] parts = CommandExecutioner.execute(getJobCommand)
-                .replaceAll("^'|'$", "")
-                .split("\t");
-        return new KubernetesJob(jobName, parts[0], parts[1], SessionType.fromApplicationStringType(parts[2]));
-    }
-
-    static String[] getJobCommand(final String jobName, final String namespace) {
-        return KubectlCommandBuilder.command("get")
-                .namespace(namespace)
-                .option("job", jobName)
-                .outputFormat(
-                        "jsonpath='{.metadata.uid}{\"\\t\"}{.metadata.labels.canfar-net-sessionID}{\"\\t\"}{.metadata.labels.canfar-net-sessionType}'")
-                .build();
     }
 }

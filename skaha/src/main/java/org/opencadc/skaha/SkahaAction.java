@@ -76,6 +76,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
+import ca.nrc.cadc.util.InvalidConfigException;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.IOException;
@@ -273,7 +274,7 @@ public abstract class SkahaAction extends RestAction {
             final String callbackSessionId =
                     SkahaAction.getTokenTool().validateToken(xAuthTokenSkaha, skahaUsersUri, WriteGrant.class);
 
-            final Session session = SessionDAO.getSession(null, callbackSessionId, skahaTld);
+            final Session session = SessionDAO.getSession(null, callbackSessionId);
             this.posixPrincipal = session.getPosixPrincipal();
             currentSubject.getPrincipals().add(posixPrincipal);
 
@@ -318,6 +319,11 @@ public abstract class SkahaAction extends RestAction {
 
         // ensure user is a part of the skaha group
         final URI gmsSearchURI = CommonUtils.firstLocalServiceURI(Standards.GMS_SEARCH_10);
+        if (gmsSearchURI == null) {
+            throw new InvalidConfigException("GMS Search service not configured in the registry.  Ensure that the "
+                    + Standards.GMS_SEARCH_10 + " standard is registered in the local cadc-registry.properties.");
+        }
+
         IvoaGroupClient ivoaGroupClient = new IvoaGroupClient();
         Set<GroupURI> skahaUsersGroupUriSet = ivoaGroupClient.getMemberships(gmsSearchURI);
 

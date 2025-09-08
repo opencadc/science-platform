@@ -64,22 +64,4 @@ public class CommandExecutionerTest {
                 },
                 createCommand);
     }
-
-    @Test
-    public void testGetJob() {
-        final String[] getJobCommand = CommandExecutioner.getJobCommand("my-job", "mynamespace");
-        Assert.assertArrayEquals(
-                "Wrong get job command.",
-                new String[] {
-                    "kubectl",
-                    "get",
-                    "--namespace",
-                    "mynamespace",
-                    "job",
-                    "my-job",
-                    "-o",
-                    "jsonpath='{.metadata.uid}{\"\\t\"}{.metadata.labels.canfar-net-sessionID}{\"\\t\"}{.metadata.labels.canfar-net-sessionType}'"
-                },
-                getJobCommand);
-    }
 }

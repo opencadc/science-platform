@@ -34,7 +34,7 @@ public class SessionJobBuilderTest {
 
         for (final String param : parametersToReplace) {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
 
         SessionJobBuilder testSubject =
@@ -49,22 +49,27 @@ public class SessionJobBuilderTest {
         V1Job job = (V1Job) Yaml.load(output);
         V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
-        Assert.assertNull("PodSpec should have image pull secrets", podSpec.getImagePullSecrets());
+        Assert.assertTrue(
+                "PodSpec should not have image pull secrets",
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).isEmpty());
+        Assert.assertFalse(
+                "Wrong GPU limit.",
+                job.getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources()
+                        .getLimits()
+                        .containsKey("nvidia.com/gpu"));
     }
 
     private V1Job getTestBaseValuesAffinityJob() throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
-        }
+        commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withGPUEnabled(true)
@@ -77,6 +82,27 @@ public class SessionJobBuilderTest {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
+
+        final V1Job job = (V1Job) Yaml.load(output);
+        Assert.assertEquals(
+                "Wrong GPU limit.",
+                2,
+                job.getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources()
+                        .getLimits()
+                        .get("nvidia.com/gpu")
+                        .getNumber()
+                        .intValue());
+
+        Assert.assertEquals(
+                "Wrong fixed label",
+                Boolean.TRUE.toString(),
+                Objects.requireNonNull(job.getMetadata().getLabels())
+                        .get(SessionJobBuilder.JOB_RESOURCE_FIXED_LABEL_KEY));
 
         return (V1Job) Yaml.load(output);
     }
@@ -114,15 +140,8 @@ public class SessionJobBuilderTest {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-queue.yaml", SessionJobBuilderTest.class)
                 .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
-
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.randomAlphanumeric(12));
-        }
+        commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
@@ -147,6 +166,10 @@ public class SessionJobBuilderTest {
                 "Wrong priority class.",
                 "high",
                 Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY));
+        Assert.assertEquals(
+                "Wrong flex label",
+                Boolean.TRUE.toString(),
+                Objects.requireNonNull(metadata.getLabels()).get(SessionJobBuilder.JOB_RESOURCE_FLEXIBLE_LABEL_KEY));
     }
 
     @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {
@@ -166,5 +189,16 @@ public class SessionJobBuilderTest {
             testMatchExpressions.addAll(matchExpressions);
         }
         return testMatchExpressions;
+    }
+
+    private void commonValues(final Path testBaseValuesPath, final Map<String, String> parametersToReplaceValues)
+            throws Exception {
+        final String fileContent = Files.readString(testBaseValuesPath);
+        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
+
+        for (final String param : parametersToReplace) {
+            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
+        }
     }
 }

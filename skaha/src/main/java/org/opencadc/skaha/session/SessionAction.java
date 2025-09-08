@@ -142,11 +142,7 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("userID: " + posixPrincipal);
     }
 
-    protected void injectCredentials() {
-        injectProxyCertificate();
-    }
-
-    private void injectProxyCertificate() {
+    protected void injectProxyCertificate() {
         log.debug("injectProxyCertificate()");
 
         // inject a delegated proxy certificate if available
@@ -288,7 +284,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
-        List<Session> sessions = SessionDAO.getSessions(posixPrincipal.username, sessionID, skahaTld);
+        List<Session> sessions = SessionDAO.getUserSessions(posixPrincipal.username, sessionID, true);
         if (!sessions.isEmpty()) {
             for (Session session : sessions) {
                 // only include 'desktop-app'
@@ -305,7 +301,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
-        for (final Session session : SessionDAO.getSessions(forUserID, sessionID, skahaTld)) {
+        for (final Session session : SessionDAO.getUserSessions(forUserID, sessionID, false)) {
             // exclude 'desktop-app'
             if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
                 return session;
@@ -315,8 +311,8 @@ public abstract class SessionAction extends SkahaAction {
         throw new ResourceNotFoundException("session " + sessionID + " not found");
     }
 
-    public List<Session> getAllSessions(String forUserID) throws Exception {
-        return SessionDAO.getSessions(forUserID, null, skahaTld);
+    List<Session> getAllSessions(final String forUserID) throws Exception {
+        return SessionDAO.getUserSessions(forUserID, null, false);
     }
 
     protected String toCoreUnit(String cores) {
@@ -375,32 +371,5 @@ public abstract class SessionAction extends SkahaAction {
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
 
         return getSessionJobCmd.build();
-    }
-
-    protected String getAppJobName(String sessionID, String userID, String appID)
-            throws IOException, InterruptedException {
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        String[] getAppJobNameCMD = getAppJobNameCMD(k8sNamespace, userID, sessionID, appID);
-        return CommandExecutioner.execute(getAppJobNameCMD);
-    }
-
-    private String[] getAppJobNameCMD(String k8sNamespace, String userID, String sessionID, String appID) {
-        String labels = "canfar-net-sessionType=" + TYPE_DESKTOP_APP;
-        labels = labels + ",canfar-net-userid=" + userID;
-        if (sessionID != null) {
-            labels = labels + ",canfar-net-sessionID=" + sessionID;
-        }
-        if (appID != null) {
-            labels = labels + ",canfar-net-appID=" + appID;
-        }
-
-        KubectlCommandBuilder.KubectlCommand getAppJobNameCmd = KubectlCommandBuilder.command("get")
-                .namespace(k8sNamespace)
-                .job()
-                .label(labels)
-                .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        return getAppJobNameCmd.build();
     }
 }

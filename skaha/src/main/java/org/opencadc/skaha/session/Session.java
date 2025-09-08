@@ -103,6 +103,7 @@ public class Session {
     private String gpuRAMInUse;
     private String cpuCoresInUse;
     private String gpuUtilization;
+    private boolean isFixedResources;
 
     public Session(
             String id,
@@ -235,6 +236,10 @@ public class Session {
         this.expiryTime = timeInSeconds;
     }
 
+    public void setFixedResources(boolean isFixedResources) {
+        this.isFixedResources = isFixedResources;
+    }
+
     public String getAppId() {
         return appid;
     }
@@ -269,7 +274,7 @@ public class Session {
     @Override
     public String toString() {
         return String.format(
-                "Session[id=%s,userid=%s,image=%s,type=%s,status=%s,name=%s,startTime=%s,connectURL=%s]",
-                id, userid, image, type, status, name, startTime, connectURL);
+                "Session[id=%s,userid=%s,image=%s,type=%s,status=%s,name=%s,startTime=%s,connectURL=%s,isFixedResources=%b]",
+                id, userid, image, type, status, name, startTime, connectURL, isFixedResources);
     }
 }
