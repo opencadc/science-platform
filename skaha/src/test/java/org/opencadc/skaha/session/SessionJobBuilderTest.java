@@ -200,6 +200,5 @@ public class SessionJobBuilderTest {
             Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
             parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
         }
-
     }
 }
