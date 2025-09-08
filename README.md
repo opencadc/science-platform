@@ -1,4 +1,4 @@
-# Skaha
+# Skaha (1.0.0)
 
 *A container based science platform in CANFAR.*
 
