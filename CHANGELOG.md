@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.0](https://github.com/opencadc/science-platform/compare/0.30.1...1.0.0) (2025-09-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* CSP2025.1
+
+### Features
+
+* force version update ([aad77fe](https://github.com/opencadc/science-platform/commit/aad77fed67b80c566c36804842fef330d0b82b76))
+
+
+### Bug Fixes
+
+* add ownership to desktop apps to attach for removal when desktop deleted ([cd97620](https://github.com/opencadc/science-platform/commit/cd97620c982634ad6f35844f0def25497d055cbb))
+* cleanup and fix output of resources ([f80d22a](https://github.com/opencadc/science-platform/commit/f80d22a3bc358b9a464e070a3ec1a090d1a4658f))
+* code coverage for repetitive code ([1e40686](https://github.com/opencadc/science-platform/commit/1e40686df94991f88f682d1e2769fcf188701e16))
+* code rework and modify resource usage based on flex or fixed ([4c16def](https://github.com/opencadc/science-platform/commit/4c16def41a35db8c61e506908f8282a1fcb50537))
+* efficient type load from job ([27ad6c4](https://github.com/opencadc/science-platform/commit/27ad6c4cc31ef563311ac40f5ee92e4d9a65fa87))
+* improvements for delete action and availability ([b8a0daf](https://github.com/opencadc/science-platform/commit/b8a0dafc0552f678d164bb277831d4634ee5dbe2))
+* remove local dockerfile ([fd984f2](https://github.com/opencadc/science-platform/commit/fd984f2273a6fe473298dff0ccb611ebcde40416))
+* spotless linter changes ([b305310](https://github.com/opencadc/science-platform/commit/b30531089a25fb75d35dfa1623ecd3b09b82b92a))
+* updates for job deletions and unused code ([8306978](https://github.com/opencadc/science-platform/commit/83069788974167ef7651662012fa9fa92d890ee7))
+
 ## [0.30.1](https://github.com/opencadc/science-platform/compare/0.30.0...0.30.1) (2025-08-15)
 
 
