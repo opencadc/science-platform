@@ -173,13 +173,16 @@ public class SessionDAO {
 
         final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, omitHeadless);
         final List<V1Job> userJobs = jobListRequest.execute().getItems();
-        LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector);
-        return userJobs.stream()
+        LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector
+                + " before filtering.");
+        final List<Session> sessions = userJobs.stream()
                 .filter(job -> job.getStatus() != null
-                        && 1 == Objects.requireNonNullElse(job.getStatus().getActive(), 0)
-                        && 0 == Objects.requireNonNullElse(job.getStatus().getFailed(), 0))
+                        && 0 < Objects.requireNonNullElse(job.getStatus().getActive(), 0))
                 .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
+        LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
+                + " after filtering.");
+        return sessions;
     }
 
     static String getConnectURL(
