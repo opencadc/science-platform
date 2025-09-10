@@ -64,18 +64,21 @@ public class SessionJobBuilderTest {
                         .containsKey("nvidia.com/gpu"));
     }
 
-    private V1Job getTestBaseValuesAffinityJob() throws Exception {
+    private V1Job getTestBaseValuesAffinityJob(final int gpuCount) throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
         commonValues(testBaseValuesPath, parametersToReplaceValues);
 
-        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withGPUEnabled(true)
+        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
-                .withImageSecret("my-secret")
-                .withGPUCount(2);
+                .withImageSecret("my-secret");
+
+        if (gpuCount > 0) {
+            testSubject = testSubject.withGPUEnabled(true).withGPUCount(gpuCount);
+        }
+
         final String output = testSubject.build();
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
@@ -84,19 +87,32 @@ public class SessionJobBuilderTest {
         }
 
         final V1Job job = (V1Job) Yaml.load(output);
-        Assert.assertEquals(
-                "Wrong GPU limit.",
-                2,
-                job.getSpec()
-                        .getTemplate()
-                        .getSpec()
-                        .getContainers()
-                        .get(0)
-                        .getResources()
-                        .getLimits()
-                        .get("nvidia.com/gpu")
-                        .getNumber()
-                        .intValue());
+        if (gpuCount > 0) {
+            Assert.assertEquals(
+                    "Wrong GPU limit.",
+                    gpuCount,
+                    job.getSpec()
+                            .getTemplate()
+                            .getSpec()
+                            .getContainers()
+                            .get(0)
+                            .getResources()
+                            .getLimits()
+                            .get("nvidia.com/gpu")
+                            .getNumber()
+                            .intValue());
+        } else {
+            Assert.assertNull(
+                    "GPU limit should be null.",
+                    job.getSpec()
+                            .getTemplate()
+                            .getSpec()
+                            .getContainers()
+                            .get(0)
+                            .getResources()
+                            .getLimits()
+                            .get("nvidia.com/gpu"));
+        }
 
         Assert.assertEquals(
                 "Wrong fixed label",
@@ -108,8 +124,36 @@ public class SessionJobBuilderTest {
     }
 
     @Test
+    public void testWithAffinityMergingNoGPUs() throws Exception {
+        final V1Job job = getTestBaseValuesAffinityJob(0);
+        final V1PodSpec podSpec =
+                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
+
+        Assert.assertEquals(
+                "Wrong pull secret.",
+                "my-secret",
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
+
+        final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
+        gpuRequirement.setKey("nvidia.com/gpu.count");
+        gpuRequirement.setOperator("Gt");
+        gpuRequirement.setValues(Collections.singletonList("0"));
+
+        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
+        providedRequirement.setKey("my-node-please");
+        providedRequirement.setOperator("Exists");
+
+        Assert.assertFalse("GPU should be missing.", testMatchExpressions.contains(gpuRequirement));
+        Assert.assertTrue(
+                "Missing provided (custom) required match expression.",
+                testMatchExpressions.contains(providedRequirement));
+    }
+
+    @Test
     public void testWithAffinityMerging() throws Exception {
-        final V1Job job = getTestBaseValuesAffinityJob();
+        final V1Job job = getTestBaseValuesAffinityJob(2);
         final V1PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);

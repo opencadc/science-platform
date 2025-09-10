@@ -33,7 +33,7 @@ public class SessionJobBuilder {
 
     // Options
     private boolean gpuEnabled;
-    private Integer gpuCount;
+    private int gpuCount = 0;
     private QueueConfiguration queueConfiguration;
     private String imageRegistrySecretName;
 
@@ -377,7 +377,7 @@ public class SessionJobBuilder {
         final V1NodeSelectorRequirement nodeSelectorRequirement = new V1NodeSelectorRequirement();
         nodeSelectorRequirement.setKey("nvidia.com/gpu.count");
 
-        if (this.gpuCount == null || this.gpuCount <= 0) {
+        if (this.gpuCount <= 0) {
             nodeSelectorRequirement.setOperator("DoesNotExist");
         } else {
             nodeSelectorRequirement.setOperator("Gt");
