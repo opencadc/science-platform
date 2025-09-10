@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/opencadc/science-platform/compare/1.0.1...1.0.2) (2025-09-10)
+
+
+### Bug Fixes
+
+* fix imports ([fcea0e7](https://github.com/opencadc/science-platform/commit/fcea0e7f9d1e654c9bdcd7d8f906f1030ac1d981))
+* fix to report requested gpus ([1f7ec51](https://github.com/opencadc/science-platform/commit/1f7ec51182c32e970c324b8d453f8ea22e6a7ae8))
+
 ## [1.0.1](https://github.com/opencadc/science-platform/compare/1.0.0...1.0.1) (2025-09-10)
 
 
