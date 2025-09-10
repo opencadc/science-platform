@@ -11,11 +11,7 @@ import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -365,31 +361,31 @@ public class SessionDAO {
                     final V1Container podContainer = podContainers.get(0);
                     this.image = podContainer.getImage();
 
-                    final V1ResourceRequirements resourceRequirements = podContainer.getResources();
+                    final V1ResourceRequirements resourceRequirements =
+                            Objects.requireNonNullElse(podContainer.getResources(), new V1ResourceRequirements());
 
-                    if (resourceRequirements != null) {
-                        final Map<String, Quantity> resourceRequests = resourceRequirements.getRequests();
-                        if (resourceRequests != null) {
-                            if (this.isFixedResources) {
-                                if (resourceRequests.containsKey("memory")) {
-                                    this.requestedMemory = PodResourceUsage.toCommonMemoryUnit(
-                                            resourceRequests.get("memory").toSuffixedString());
-                                }
-
-                                if (resourceRequests.containsKey("cpu")) {
-                                    this.requestedCPUCores = PodResourceUsage.toCoreUnit(
-                                            resourceRequests.get("cpu").toSuffixedString());
-                                }
-                            }
-
-                            if (resourceRequests.containsKey("nvidia\\.com/gpu")) {
-                                this.requestedGPUCores =
-                                        resourceRequests.get("nvidia\\.com/gpu").toSuffixedString();
-                            } else {
-                                // Set to zero to satisfy UI conditions.
-                                this.requestedGPUCores = "0";
-                            }
+                    final Map<String, Quantity> resourceRequests =
+                            Objects.requireNonNullElse(resourceRequirements.getRequests(), Collections.emptyMap());
+                    if (this.isFixedResources) {
+                        if (resourceRequests.containsKey("memory")) {
+                            this.requestedMemory = PodResourceUsage.toCommonMemoryUnit(
+                                    resourceRequests.get("memory").toSuffixedString());
                         }
+
+                        if (resourceRequests.containsKey("cpu")) {
+                            this.requestedCPUCores = PodResourceUsage.toCoreUnit(
+                                    resourceRequests.get("cpu").toSuffixedString());
+                        }
+                    }
+
+                    final Map<String, Quantity> resourceLimits =
+                            Objects.requireNonNullElse(resourceRequirements.getLimits(), Collections.emptyMap());
+                    if (resourceLimits.containsKey("nvidia.com/gpu")) {
+                        this.requestedGPUCores =
+                                resourceLimits.get("nvidia.com/gpu").toSuffixedString();
+                    } else {
+                        // Set to zero to satisfy UI conditions.
+                        this.requestedGPUCores = "0";
                     }
                 }
 
