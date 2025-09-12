@@ -75,6 +75,7 @@ import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
+    private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
@@ -170,7 +171,7 @@ public class K8SUtil {
     }
 
     public static String getSkahaHeadlessPriorityClass() {
-        return System.getenv("skaha.headlesspriortyclass");
+        return System.getenv(K8SUtil.SKAHA_HEADLESS_PRIORITY_CLASS_NAME);
     }
 
     public static Integer getMaxUserSessions() {
