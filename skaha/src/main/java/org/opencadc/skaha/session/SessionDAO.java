@@ -186,8 +186,6 @@ public class SessionDAO {
         LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector
                 + " before filtering.");
         final List<Session> sessions = userJobs.stream()
-                .filter(job -> job.getStatus() != null
-                        && 0 < Objects.requireNonNullElse(job.getStatus().getActive(), 0))
                 .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector

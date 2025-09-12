@@ -153,6 +153,7 @@ public class PodResourceUsage {
                 throw new IllegalArgumentException("Memory string cannot be null or empty");
             }
 
+            LOGGER.debug("Converting memory string: " + memory);
             final String unit = memory.replaceAll("[^a-zA-Z]", "");
             final String numberStr = memory.replaceAll("[^0-9.]", "");
 

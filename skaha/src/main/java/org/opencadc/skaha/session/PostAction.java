@@ -824,12 +824,12 @@ public class PostAction extends SessionAction {
         if (skahaPriorityHeadlessGroup == null) {
             return "";
         }
-        if (skahaHeadlessPriortyClass == null) {
+        if (skahaHeadlessPriorityClass == null) {
             log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
             return "";
         }
         if (priorityHeadlessUser) {
-            return "priorityClassName: " + skahaHeadlessPriortyClass;
+            return "priorityClassName: " + skahaHeadlessPriorityClass;
         } else {
             return "";
         }
