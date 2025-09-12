@@ -301,14 +301,7 @@ public abstract class SessionAction extends SkahaAction {
     }
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
-        for (final Session session : SessionDAO.getUserSessions(forUserID, sessionID, false)) {
-            // exclude 'desktop-app'
-            if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
-                return session;
-            }
-        }
-
-        throw new ResourceNotFoundException("session " + sessionID + " not found");
+        return SessionDAO.getSession(forUserID, sessionID);
     }
 
     List<Session> getAllSessions(final String forUserID) throws Exception {
