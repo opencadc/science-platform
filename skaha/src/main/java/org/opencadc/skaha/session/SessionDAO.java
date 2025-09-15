@@ -351,7 +351,7 @@ public class SessionDAO {
                     if (supplementalGroupGIDs != null && !supplementalGroupGIDs.isEmpty()) {
                         this.supplementalGroups.addAll(supplementalGroupGIDs.stream()
                                 .map(Long::intValue)
-                                .collect(Collectors.toList()));
+                                .toList());
                     }
                 }
 
@@ -456,7 +456,7 @@ public class SessionDAO {
                         }
                     });
 
-                    final V1JobCondition jobCondition = conditions.get(0);
+                    final V1JobCondition jobCondition = conditions.getFirst();
 
                     // Suspended and then resumed.
                     if ("JobResumed".equals(jobCondition.getReason())) {
