@@ -64,11 +64,26 @@ public class SessionJobBuilderTest {
                         .containsKey("nvidia.com/gpu"));
     }
 
-    private V1Job getTestBaseValuesAffinityJob(final int gpuCount) throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
-                .toPath();
+    private Map<String, String> loadParametersFromFile(final Path testBaseValuesPath) throws Exception {
+        final String fileContent = Files.readString(testBaseValuesPath);
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
+        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
+        for (final String param : parametersToReplace) {
+            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
+            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
+        }
+
+        return parametersToReplaceValues;
+    }
+
+    private Path getTestFilePath(final String jobFileName) {
+        return FileUtil.getFileFromResource(jobFileName, SessionJobBuilderTest.class)
+                .toPath();
+    }
+
+    private V1Job getTestBaseValuesAffinityJob(final int gpuCount) throws Exception {
+        final Path testBaseValuesPath = getTestFilePath("test-base-values-affinity.yaml");
+        final Map<String, String> parametersToReplaceValues = loadParametersFromFile(testBaseValuesPath);
         commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -181,10 +196,8 @@ public class SessionJobBuilderTest {
 
     @Test
     public void testWithQueueMerging() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
+        final Path testBaseValuesPath = getTestFilePath("test-base-values-queue.yaml");
+        final Map<String, String> parametersToReplaceValues = loadParametersFromFile(testBaseValuesPath);
         commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -226,7 +239,7 @@ public class SessionJobBuilderTest {
         final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
                         Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
-                .get(0)
+                .getFirst()
                 .getMatchExpressions();
 
         if (matchExpressions != null) {

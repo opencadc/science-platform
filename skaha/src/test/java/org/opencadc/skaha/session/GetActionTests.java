@@ -67,7 +67,6 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
-import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -77,7 +76,9 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -112,16 +113,120 @@ public class GetActionTests {
     private static final String T_VALUE_STR = 5 + "T";
     private static final String INVALID_VALUE_STR = 5 + "A";
 
-    private static final String K8S_LIST =
-            "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n"
-                    + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
-                    + "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
-                    + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
+    private static final List<Session> SESSIONS_LIST = new ArrayList<>(Arrays.asList(
+            new Session(
+                    "pud05npw",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "carta",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "e37lmx4m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "desktop",
+                    "Terminating",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "gspc0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "abcd0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 25},
+                    "imageID",
+                    "notebook",
+                    "Terminating",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "defg0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {1992},
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "shd89sfg",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[0],
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "bbn3829s",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    null,
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null)));
 
     public GetActionTests() {}
+
+    @Before
+    public void setupHomePath() {
+        System.setProperty("SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY", "/tmp");
+        System.setProperty("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY", "/tmp/skaha-test");
+        System.setProperty("SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY", "/tmp/skaha-test-projects");
+        System.setProperty("SKAHA_USER_STORAGE_SERVICE_URI", "ivo://example.org/skaha/userStorage");
+        System.setProperty("SKAHA_USER_STORAGE_USER_HOME_URI", "vos://example.org~skaha/home");
+        System.setProperty("SKAHA_USER_STORAGE_USER_PROJECTS_URI", "vos://example.org~skaha/projects");
+    }
+
+    @After
+    public void removeHomePath() {
+        System.getProperties().remove("SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY ");
+        System.getProperties().remove("SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY");
+        System.getProperties().remove("SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY");
+        System.getProperties().remove("SKAHA_USER_STORAGE_SERVICE_URI");
+        System.getProperties().remove("SKAHA_USER_STORAGE_USER_HOME_URI");
+        System.getProperties().remove("SKAHA_USER_STORAGE_USER_PROJECTS_URI");
+    }
 
     @Test
     public void testNormalizeToLong() {
@@ -152,7 +257,7 @@ public class GetActionTests {
         Gson gson = new Gson();
         Type listType = new TypeToken<List<Session>>() {}.getType();
         List<Session> sessions2 = gson.fromJson(json, listType);
-        Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+        Assert.assertEquals("Wrong session size.", sessions1.size(), GetActionTests.SESSIONS_LIST.size());
         Assert.assertEquals("session count", sessions1.size(), sessions2.size());
         for (Session s : sessions1) {
             Assert.assertTrue(s.getId(), sessions2.contains(s));
@@ -185,6 +290,8 @@ public class GetActionTests {
         for (Session s : filtered) {
             Assert.assertEquals(s.getId(), "Running", s.getStatus());
         }
+
+        System.getProperties().remove("SKAHA_USER_STORAGE_HOME_DIRECTORY");
     }
 
     @Test
@@ -206,100 +313,13 @@ public class GetActionTests {
     static class TestGetAction extends GetAction {
 
         @Override
-        public List<Session> getAllSessions(String forUserID) throws Exception {
-            // A bit of a hack to emulate the state.
-            this.skahaTld = "/cavern-vospace";
-
-            List<Session> sessions = new ArrayList<>();
-            String[] lines = K8S_LIST.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                sessions.add(session);
-            }
-            return sessions;
-        }
-
-        Session constructSession(String k8sOutput) {
-            final List<SessionDAO.CustomColumns> allColumns = Arrays.asList(SessionDAO.CustomColumns.values());
-
-            // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
-            // are in a space-delimited array.
-            final String[] parts = k8sOutput.trim().split(" {3,}");
-
-            String id = parts[allColumns.indexOf(SessionDAO.CustomColumns.SESSION_ID)];
-            String userid = parts[allColumns.indexOf(SessionDAO.CustomColumns.USERID)];
-            String image = parts[allColumns.indexOf(SessionDAO.CustomColumns.IMAGE)];
-            SessionType type =
-                    SessionType.fromApplicationStringType(parts[allColumns.indexOf(SessionDAO.CustomColumns.TYPE)]);
-            String deletionTimestamp = parts[allColumns.indexOf(SessionDAO.CustomColumns.DELETION)];
-            final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
-                    ? Session.STATUS_TERMINATING
-                    : parts[allColumns.indexOf(SessionDAO.CustomColumns.STATUS)];
-            final String connectURL = String.format("https://example.org/session/test/%s", id);
-
-            final Session session = new Session(
-                    id,
-                    userid,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_UID)],
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_GID)],
-                    fromStringArray(parts[allColumns.indexOf(SessionDAO.CustomColumns.SUPPLEMENTAL_GROUPS)]),
-                    image,
-                    type.applicationName,
-                    status,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.NAME)],
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.STARTED)],
-                    connectURL,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.APP_ID)]);
-
-            // Check if all columns were requested (set by forUserId)
-            final int requestedRamIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_RAM);
-            if (parts.length > requestedRamIndex) {
-                session.setRequestedRAM(toCommonUnit(parts[requestedRamIndex]));
-            }
-
-            final int requestedCPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_CPU);
-            if (parts.length > requestedCPUIndex) {
-                session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
-            }
-
-            final int requestedGPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_GPU);
-            if (parts.length > requestedGPUIndex) {
-                session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
-            }
-
-            return session;
-        }
-
-        /**
-         * Example input is [4444 5555 6666]. Convert to an actual integer array.
-         *
-         * @param inputArray Kubernetes output of an array of integers.
-         * @return integer array, never null.
-         */
-        private static Integer[] fromStringArray(final String inputArray) {
-            if (inputArray.equals(SessionDAO.NONE)) {
-                return new Integer[0];
-            } else {
-                final Object[] parsedArray = Arrays.stream(inputArray
-                                .replace("[", "")
-                                .replace("]", "")
-                                .trim()
-                                .split(" "))
-                        .filter(StringUtil::hasText)
-                        .map(Integer::parseInt)
-                        .toArray();
-                return Arrays.copyOf(parsedArray, parsedArray.length, Integer[].class);
-            }
+        public List<Session> getAllSessions(String forUserID) {
+            return GetActionTests.SESSIONS_LIST;
         }
 
         @Override
         protected String getUsername() {
             return null;
-        }
-
-        @Override
-        protected int getUID() {
-            return 997;
         }
     }
 }
