@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 
 public class SessionDAO {
@@ -198,7 +199,7 @@ public class SessionDAO {
             final SessionType type,
             final String id,
             final String image,
-            final String topLevelDirectory,
+            final String absoluteHomeDirectory,
             final String userid)
             throws URISyntaxException {
         final String connectURL;
@@ -215,7 +216,7 @@ public class SessionDAO {
                     .build();
         } else if (SessionType.NOTEBOOK == type) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
-                    .withTopLevelDirectory(topLevelDirectory)
+                    .withAbsoluteHomeDirectory(absoluteHomeDirectory)
                     .withUserName(userid)
                     .build();
         } else if (SessionType.CONTRIBUTED == type) {
@@ -402,12 +403,13 @@ public class SessionDAO {
                 }
 
                 try {
+                    final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
                     this.connectURL = SessionDAO.getConnectURL(
                             K8SUtil.getSessionsHostName(),
                             SessionType.fromApplicationStringType(this.type),
                             this.id,
                             this.image,
-                            K8SUtil.getSkahaTld(),
+                            userStorageConfiguration.homeBaseDirectory.toString(),
                             this.userID);
                 } catch (URISyntaxException e) {
                     LOGGER.warn("Invalid URI for connect URL: " + this);
