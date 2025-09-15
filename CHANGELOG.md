@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.3](https://github.com/opencadc/science-platform/compare/1.0.2...1.0.3) (2025-09-15)
+
+
+### Bug Fixes
+
+* fix typo in field member and method name ([faaa5bd](https://github.com/opencadc/science-platform/commit/faaa5bde8a0ebac8c8c62008c3d33c40d7cb0cfa))
+* fix typo in field member and method name ([299657b](https://github.com/opencadc/science-platform/commit/299657bc85228adccb4c637eacc5db2fe465e360))
+* remove filter for active jobs ([9e1b1e3](https://github.com/opencadc/science-platform/commit/9e1b1e360c5c908bd93c5552aaba739cecddf5fe))
+
 ## [1.0.2](https://github.com/opencadc/science-platform/compare/1.0.1...1.0.2) (2025-09-10)
 
 
