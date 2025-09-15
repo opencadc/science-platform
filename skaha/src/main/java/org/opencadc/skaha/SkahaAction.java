@@ -138,7 +138,7 @@ public abstract class SkahaAction extends RestAction {
     protected String skahaHeadlessGroup;
     protected String skahaPriorityHeadlessGroup;
     protected String skahaAdminsGroup;
-    protected String skahaHeadlessPriortyClass;
+    protected String skahaHeadlessPriorityClass;
     protected int maxUserSessions;
     protected String skahaPosixCacheURL;
     protected boolean skahaCallbackFlow = false;
@@ -154,7 +154,7 @@ public abstract class SkahaAction extends RestAction {
         skahaHeadlessGroup = K8SUtil.getSkahaHeadlessGroup();
         skahaPriorityHeadlessGroup = K8SUtil.getSkahaHeadlessPriorityGroup();
         skahaAdminsGroup = K8SUtil.getSkahaAdminsGroup();
-        skahaHeadlessPriortyClass = K8SUtil.getSkahaHeadlessPriorityClass();
+        skahaHeadlessPriorityClass = K8SUtil.getSkahaHeadlessPriorityClass();
         maxUserSessions = K8SUtil.getMaxUserSessions();
 
         // Check the catalina.properties for this setting.
@@ -172,7 +172,7 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.headlessgroup=" + skahaHeadlessGroup);
         log.debug("skaha.priorityheadlessgroup=" + skahaPriorityHeadlessGroup);
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
-        log.debug("skaha.skahaheadlesspriorityclass=" + skahaHeadlessPriortyClass);
+        log.debug("SKAHA_HEADLESS_PRIORITY_CLASS=" + skahaHeadlessPriorityClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
         log.debug("skaha.posixmapper.resourceid" + "=" + configuredPosixMapperResourceID);
 
