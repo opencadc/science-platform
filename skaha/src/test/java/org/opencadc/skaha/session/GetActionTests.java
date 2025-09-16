@@ -117,8 +117,10 @@ public class GetActionTests {
                     + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
                     + "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
                     + "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
+                    + "shsjkd88   majorb   1001   1001   []   imageID   desktop-app   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
                     + "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n"
                     + "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
+                    + "yy7sk3ie   majorb   1001   1001   []   imageID   headless   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
                     + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
     public GetActionTests() {}
@@ -163,17 +165,20 @@ public class GetActionTests {
     }
 
     @Test
-    public void testFilterType() {
-        try {
-            GetAction get = new TestGetAction();
-            List<Session> sessions = get.getAllSessions(null);
-            List<Session> filtered = get.filter(sessions, "notebook", null);
-            for (Session s : filtered) {
-                Assert.assertEquals(s.getId(), "notebook", s.getType());
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
+    public void testFilterType() throws Exception {
+        GetAction get = new TestGetAction();
+        List<Session> sessions = get.getAllSessions(null);
+        List<Session> filtered = get.filter(sessions, "notebook", null);
+        for (Session s : filtered) {
+            Assert.assertEquals(s.getId(), "notebook", s.getType());
+        }
+
+        List<Session> interactiveFiltered = get.filter(sessions, "interactive", null);
+        Assert.assertEquals("Wrong size of interactive sessions", 7, interactiveFiltered.size());
+
+        for (Session s : interactiveFiltered) {
+            Assert.assertTrue(
+                    s.getId(), !s.getType().equals("headless") && !s.getType().equals("desktop-app"));
         }
     }
 

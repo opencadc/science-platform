@@ -452,8 +452,19 @@ public class GetAction extends SessionAction {
     public List<Session> filter(List<Session> sessions, String typeFilter, String statusFilter) {
         List<Session> ret = new ArrayList<>();
         for (Session session : sessions) {
-            if ((typeFilter == null || session.getType().equalsIgnoreCase(typeFilter))
-                    && (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
+            final SessionType sessionType = SessionType.fromApplicationStringType(session.getType());
+            final boolean acceptedType;
+            if (typeFilter != null) {
+                if (typeFilter.equalsIgnoreCase("interactive")) {
+                    acceptedType = sessionType.isInteractive();
+                } else {
+                    acceptedType = sessionType.applicationName.equalsIgnoreCase(typeFilter);
+                }
+            } else {
+                acceptedType = true;
+            }
+
+            if (acceptedType && (statusFilter == null || session.getStatus().equalsIgnoreCase(statusFilter))) {
                 ret.add(session);
             }
         }

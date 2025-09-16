@@ -101,12 +101,11 @@ public class DesktopAppLifecycleTest {
     public DesktopAppLifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL sessionServiceURL = regClient.getServiceURL(
-                    SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
-            sessionURL = new URL(sessionServiceURL.toString() + "/session");
+            this.sessionURL = regClient.getServiceURL(
+                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
             log.info("sessions URL: " + sessionURL);
 
-            this.userSubject = SessionUtil.getCurrentUser(sessionURL, false);
+            this.userSubject = TestConfiguration.getCurrentUser(sessionURL, false);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
             log.error("init exception", e);
@@ -124,8 +123,7 @@ public class DesktopAppLifecycleTest {
             final String desktopSessionID = SessionUtil.createSession(
                     this.sessionURL,
                     "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP)
-                            .getId(),
+                    TestConfiguration.getDesktopImageID(),
                     SessionAction.SESSION_TYPE_DESKTOP);
 
             final Session desktopSession =
@@ -165,7 +163,7 @@ public class DesktopAppLifecycleTest {
                     SessionUtil.waitForDesktopApplicationSession(desktopAppURL, desktopAppID, Session.STATUS_RUNNING);
 
             Assert.assertEquals("wrong number of cores", cores, Integer.parseInt(appSession.getRequestedCPUCores()));
-            Assert.assertEquals("wrong amount of ram", ram + "G", appSession.getRequestedRAM());
+            Assert.assertEquals("wrong amount of ram", ram, (int) Double.parseDouble(appSession.getRequestedRAM()));
 
             // delete desktop-app
             SessionUtil.deleteDesktopApplicationSession(desktopAppURL, desktopAppID);

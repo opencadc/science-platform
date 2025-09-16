@@ -99,12 +99,11 @@ public class SessionLifecycleTest {
 
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
-        final URL sessionServiceURL =
-                regClient.getServiceURL(SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
-        sessionURL = new URL(sessionServiceURL.toString() + "/session");
+        this.sessionURL = regClient.getServiceURL(
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
         log.info("sessions URL: " + sessionURL);
 
-        this.userSubject = SessionUtil.getCurrentUser(sessionURL, false);
+        this.userSubject = TestConfiguration.getCurrentUser(sessionURL, false);
         log.debug("userSubject: " + userSubject);
     }
 
@@ -119,8 +118,7 @@ public class SessionLifecycleTest {
             final String desktopSessionID = SessionUtil.createSession(
                     this.sessionURL,
                     "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                    SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_DESKTOP)
-                            .getId(),
+                    TestConfiguration.getDesktopImageID(),
                     SessionAction.SESSION_TYPE_DESKTOP);
 
             final Session desktopSession =

@@ -73,4 +73,17 @@ public enum SessionType {
     public boolean isHeadless() {
         return this == HEADLESS;
     }
+
+    public boolean isDesktopApp() {
+        return this == DESKTOP_APP;
+    }
+
+    /**
+     * Supports listing interactive sessions.
+     *
+     * @return True if the session is interactive (not headless or desktop app), False otherwise.
+     */
+    public boolean isInteractive() {
+        return !isHeadless() && !isDesktopApp();
+    }
 }
