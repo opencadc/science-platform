@@ -96,6 +96,7 @@ import org.junit.Assert;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
+import org.opencadc.skaha.session.SessionType;
 
 public class SessionUtil {
     private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
@@ -291,8 +292,9 @@ public class SessionUtil {
     private static Session getSessionWithoutWait(
             final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
         return SessionUtil.getAllSessions(sessionURL).stream()
-                .filter(session ->
-                        session.getId().equals(sessionID) && session.getStatus().equals(expectedState))
+                .filter(session -> session.getId().equals(sessionID)
+                        && session.getStatus().equals(expectedState)
+                        && SessionType.fromApplicationStringType(session.getType()) != SessionType.DESKTOP_APP)
                 .findFirst()
                 .orElse(null);
     }
@@ -316,8 +318,8 @@ public class SessionUtil {
         LOGGER.info("Session " + sessionID + " terminated.");
     }
 
-    static Session waitForSession(final URL sessionURL, final String sessionID, final String expectedState)
-            throws Exception {
+    static Session waitForSession(final URL sessionURL, final String sessionID) throws Exception {
+        final String expectedState = Session.STATUS_RUNNING;
         Session requestedSession = SessionUtil.getSessionWithoutWait(sessionURL, sessionID, expectedState);
         long currentWaitTime = 0L;
         while (requestedSession == null) {

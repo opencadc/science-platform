@@ -94,7 +94,6 @@ import org.opencadc.skaha.session.SessionAction;
  */
 public class ExpiryTimeRenewalTest {
 
-    public static final String CARTA_IMAGE_SUFFIX = "/skaha/carta";
     public static final int SLEEP_TIME_SECONDS = 15;
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
 
@@ -127,7 +126,7 @@ public class ExpiryTimeRenewalTest {
                     "inttest-" + SessionAction.SESSION_TYPE_CARTA,
                     TestConfiguration.getCARTAImageID(),
                     SessionAction.SESSION_TYPE_CARTA);
-            Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID, Session.STATUS_RUNNING);
+            Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
 
             // Sleep to force time to pass before renewal
             TimeUnit.SECONDS.sleep(SLEEP_TIME_SECONDS);
@@ -139,7 +138,7 @@ public class ExpiryTimeRenewalTest {
             // renew session
             renewSession(sessionURL, cartaSessionID);
 
-            cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID, Session.STATUS_RUNNING);
+            cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
             final Instant expiryTimeAfterRenewal = Instant.parse(cartaSession.getExpiryTime());
             final Instant startTimeAfterRenewal = Instant.parse(cartaSession.getStartTime());
             final long timeToLiveAfterRenewal = startTimeAfterRenewal.until(expiryTimeAfterRenewal, ChronoUnit.SECONDS);
@@ -169,14 +168,13 @@ public class ExpiryTimeRenewalTest {
             // create headless session
             final String headlessSessionID = SessionUtil.createHeadlessSession(
                     SessionUtil.getDesktopAppImageOfType("/skaha/terminal").getId(), this.sessionURL);
-            Session headlessSession =
-                    SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
+            Session headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID);
             final Instant headlessExpiryTime = Instant.parse(headlessSession.getExpiryTime());
 
             // renew session
             renewSession(sessionURL, headlessSessionID);
 
-            headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID, Session.STATUS_RUNNING);
+            headlessSession = SessionUtil.waitForSession(this.sessionURL, headlessSessionID);
             final Instant headlessExpiryTimeAfterRenewal = Instant.parse(headlessSession.getExpiryTime());
 
             // Pre-condition: activeDeadlineSeconds > skaha.sessionexpiry
@@ -202,8 +200,7 @@ public class ExpiryTimeRenewalTest {
                     "inttest-" + SessionAction.SESSION_TYPE_DESKTOP,
                     TestConfiguration.getDesktopImageID(),
                     SessionAction.SESSION_TYPE_DESKTOP);
-            Session desktopSession =
-                    SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID);
             Instant desktopAppTimeToLiveStartTime = Instant.parse(desktopSession.getStartTime());
             Instant desktopAppTimeToLiveExpiryTime = Instant.parse(desktopSession.getExpiryTime());
             final long desktopAppTimeToLive =
@@ -214,7 +211,7 @@ public class ExpiryTimeRenewalTest {
             // renew desktop session, the associated desktop-app should also be renewed
             renewSession(this.sessionURL, desktopSessionID);
 
-            desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID);
             Instant appStartTimeAfterRenewal = Instant.parse(desktopSession.getStartTime());
             Instant appExpiryTimeAfterRenewal = Instant.parse(desktopSession.getExpiryTime());
             final long desktopAppTimeToLiveAfterRenewal =

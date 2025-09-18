@@ -126,8 +126,7 @@ public class DesktopAppLifecycleTest {
                     TestConfiguration.getDesktopImageID(),
                     SessionAction.SESSION_TYPE_DESKTOP);
 
-            final Session desktopSession =
-                    SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID);
             SessionUtil.verifySession(
                     desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 

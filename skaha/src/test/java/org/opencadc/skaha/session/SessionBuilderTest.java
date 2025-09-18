@@ -4,10 +4,10 @@ import io.kubernetes.client.openapi.models.V1JobStatus;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class SessionDAOTest {
+public class SessionBuilderTest {
     @Test
     public void testStatus() {
-        final SessionDAO.SessionBuilder testSubject = new SessionDAO.SessionBuilder("sessionID", "userID", "notebook");
+        final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");
 
         testStatus(testSubject, false, false, false, false, Session.STATUS_PENDING);
         testStatus(testSubject, false, true, false, false, Session.STATUS_COMPLETED);
@@ -18,7 +18,7 @@ public class SessionDAOTest {
     }
 
     private void testStatus(
-            final SessionDAO.SessionBuilder testSubject,
+            final SessionBuilder testSubject,
             final boolean failed,
             final boolean succeeded,
             final boolean ready,
@@ -37,7 +37,7 @@ public class SessionDAOTest {
         if (active) {
             status.setActive(1);
         }
-        final SessionDAO.SessionBuilder testSubjectWithStatus = testSubject.withStatus(status, false);
+        final SessionBuilder testSubjectWithStatus = testSubject.withStatus(status, false);
         Assert.assertEquals(
                 "Wrong status", expectedStatus, testSubjectWithStatus.build().getStatus());
     }

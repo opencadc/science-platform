@@ -121,8 +121,7 @@ public class SessionLifecycleTest {
                     TestConfiguration.getDesktopImageID(),
                     SessionAction.SESSION_TYPE_DESKTOP);
 
-            final Session desktopSession =
-                    SessionUtil.waitForSession(this.sessionURL, desktopSessionID, Session.STATUS_RUNNING);
+            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID);
             SessionUtil.verifySession(
                     desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 
@@ -132,7 +131,7 @@ public class SessionLifecycleTest {
                     "inttest" + SessionAction.SESSION_TYPE_CARTA,
                     SessionUtil.getImageOfType(SessionAction.SESSION_TYPE_CARTA).getId(),
                     SessionAction.SESSION_TYPE_CARTA);
-            Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID, Session.STATUS_RUNNING);
+            Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID);
             SessionUtil.verifySession(
                     desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
 
@@ -152,7 +151,7 @@ public class SessionLifecycleTest {
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, desktopSessionID);
 
-            cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID, Session.STATUS_RUNNING);
+            cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID);
             // verify remaining carta session
             Assert.assertNotNull("CARTA Session should still be running.", cartaSession);
 
