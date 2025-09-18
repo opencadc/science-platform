@@ -8,7 +8,6 @@ import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
@@ -19,7 +18,6 @@ import io.kubernetes.client.openapi.models.V1Status;
 import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -260,7 +258,7 @@ public class SessionDAO {
         }
     }
 
-    private static class SessionBuilder {
+    static class SessionBuilder {
         private final String id;
         private final String userID;
         private final String type;
@@ -283,7 +281,7 @@ public class SessionDAO {
         private String jobName; // used to match up resource usages (metrics)
         private boolean isFixedResources;
 
-        private SessionBuilder(final String id, final String userID, final String type) {
+        SessionBuilder(final String id, final String userID, final String type) {
             Objects.requireNonNull(id, "Session ID cannot be null");
             Objects.requireNonNull(userID, "Session UserID cannot be null");
             Objects.requireNonNull(type, "Session Type cannot be null");
@@ -319,7 +317,7 @@ public class SessionDAO {
 
             return sessionBuilder
                     .withJobSpec(jobSpec, podResourceUsage)
-                    .withStatus(job.getStatus())
+                    .withStatus(job.getStatus(), Objects.requireNonNullElse(jobSpec.getSuspend(), false))
                     .build();
         }
 
@@ -418,7 +416,7 @@ public class SessionDAO {
             return this;
         }
 
-        SessionBuilder withStatus(final V1JobStatus jobStatus) {
+        SessionBuilder withStatus(final V1JobStatus jobStatus, final boolean suspended) {
             Objects.requireNonNull(jobStatus, "Invalid JobStatus");
 
             if (jobStatus.getStartTime() != null) {
@@ -429,47 +427,34 @@ public class SessionDAO {
                 this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
             }
 
-            final Integer failure = jobStatus.getFailed();
-            final Integer success = jobStatus.getSucceeded();
-            final Integer running = jobStatus.getReady();
-            if (failure != null && failure > 0) {
-                final List<V1JobCondition> conditions = jobStatus.getConditions();
-                if (conditions == null || conditions.isEmpty()) {
-                    LOGGER.warn("No Pod Status Conditions found.");
-                    this.status = "Failed";
+            final int success = Objects.requireNonNullElse(jobStatus.getSucceeded(), 0);
+            final int failed = Objects.requireNonNullElse(jobStatus.getFailed(), 0);
+            final int active = Objects.requireNonNullElse(jobStatus.getActive(), 0);
+            final int ready = Objects.requireNonNullElse(jobStatus.getReady(), 0);
+            final int terminating = Objects.requireNonNullElse(jobStatus.getTerminating(), 0);
+
+            if (active > 0) {
+                if (ready > 0) {
+                    this.status = Session.STATUS_RUNNING;
                 } else {
-                    // Sort, then reverse it to get the latest.
-                    conditions.sort((condition1, condition2) -> {
-                        final OffsetDateTime conditionOneDateTime = condition1.getLastTransitionTime();
-                        final OffsetDateTime conditionTwoDateTime = condition2.getLastTransitionTime();
-
-                        if (conditionOneDateTime == null && conditionTwoDateTime == null) {
-                            return 0;
-                        } else if (conditionOneDateTime == null) {
-                            return 1;
-                        } else if (conditionTwoDateTime == null) {
-                            return -1;
-                        } else {
-                            return conditionTwoDateTime.compareTo(conditionOneDateTime);
-                        }
-                    });
-
-                    final V1JobCondition jobCondition = conditions.get(0);
-
-                    // Suspended and then resumed.
-                    if ("JobResumed".equals(jobCondition.getReason())) {
-                        this.status = "Running";
-                    } else {
-                        this.status = String.format("%s (%s)", jobCondition.getType(), jobCondition.getReason());
-                    }
+                    this.status = Session.STATUS_PENDING;
                 }
-            } else if (success != null && success > 0) {
-                this.status = "Completed";
-            } else if (running != null && running > 0) {
-                this.status = "Running";
+            } else if (suspended) {
+                // Suspended likely means it went to be scheduled but, Kueue has not picked it up yet.
+                this.status = Session.STATUS_PENDING;
+            } else if (success > 0) {
+                this.status = Session.STATUS_COMPLETED;
+            } else if (failed > 0) {
+                this.status = Session.STATUS_FAILED;
+            } else if (terminating > 0) {
+                this.status = Session.STATUS_TERMINATING;
             } else {
-                this.status = "Pending";
+                this.status = Session.STATUS_PENDING;
             }
+
+            LOGGER.debug("Session Status: " + this.status + " (success=" + success + ", failed=" + failed + ", active="
+                    + active + ", ready=" + ready + ", terminating=" + terminating + ", suspended=" + suspended
+                    + ") for " + this.id);
 
             return this;
         }

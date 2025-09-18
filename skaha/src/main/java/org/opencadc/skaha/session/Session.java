@@ -80,8 +80,10 @@ public class Session {
     private static final Logger log = Logger.getLogger(Session.class);
 
     public static final String STATUS_TERMINATING = "Terminating";
-    public static final String STATUS_SUCCEEDED = "Succeeded";
+    public static final String STATUS_COMPLETED = "Completed";
     public static final String STATUS_RUNNING = "Running";
+    public static final String STATUS_PENDING = "Pending";
+    public static final String STATUS_FAILED = "Failed";
 
     private final String id;
     private final String userid;
