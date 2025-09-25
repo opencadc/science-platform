@@ -16,8 +16,6 @@ import io.kubernetes.client.openapi.models.V1PodSecurityContext;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.openapi.models.V1Status;
-import io.kubernetes.client.util.Config;
-import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -31,6 +29,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.utils.CommonUtils;
 
 public class SessionDAO {
@@ -42,15 +41,6 @@ public class SessionDAO {
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
 
     static final String NONE = "<none>";
-
-    static {
-        try {
-            final ApiClient client = Config.fromCluster();
-            Configuration.setDefaultApiClient(client);
-        } catch (IOException e) {
-            LOGGER.error("Failed to configure k8s client from cluster: " + e.getMessage(), e);
-        }
-    }
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
@@ -392,9 +382,10 @@ public class SessionDAO {
 
                     final Map<String, Quantity> resourceLimits =
                             Objects.requireNonNullElse(resourceRequirements.getLimits(), Collections.emptyMap());
-                    if (resourceLimits.containsKey("nvidia.com/gpu")) {
-                        this.requestedGPUCores =
-                                resourceLimits.get("nvidia.com/gpu").toSuffixedString();
+                    if (resourceLimits.containsKey(ResourceContexts.NVIDIA_GPU_LABEL)) {
+                        this.requestedGPUCores = resourceLimits
+                                .get(ResourceContexts.NVIDIA_GPU_LABEL)
+                                .toSuffixedString();
                     } else {
                         // Set to zero to satisfy UI conditions.
                         this.requestedGPUCores = "0";

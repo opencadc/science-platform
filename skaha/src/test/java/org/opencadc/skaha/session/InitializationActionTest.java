@@ -68,14 +68,12 @@
 
 package org.opencadc.skaha.session;
 
-import java.io.IOException;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class InitializationActionTest {
     @Test
     public void testInitializationActionErrorWrongQueueName() throws Exception {
-        final boolean[] setupCalled = new boolean[] {false};
         final InitializationAction testSubject = new InitializationAction() {
             @Override
             String getWorkloadNamespace() {
@@ -86,17 +84,11 @@ public class InitializationActionTest {
             boolean localQueueMissing(QueueConfiguration queueConfiguration) {
                 return true;
             }
-
-            @Override
-            void setupKubernetesAPIConfiguration() {
-                setupCalled[0] = true;
-            }
         };
 
         try {
             testSubject.ensureLocalQueuesValid(
                     new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.assertTrue("Setup was not called", setupCalled[0]);
             Assert.fail("Expected IllegalStateException");
         } catch (IllegalStateException illegalStateException) {
             // Expected
@@ -104,31 +96,7 @@ public class InitializationActionTest {
     }
 
     @Test
-    public void testUnusableConfig() {
-        final InitializationAction testSubject = new InitializationAction() {
-            @Override
-            String getWorkloadNamespace() {
-                return "test-workload";
-            }
-
-            @Override
-            void setupKubernetesAPIConfiguration() throws IOException {
-                throw new IOException("Test exception");
-            }
-        };
-
-        try {
-            testSubject.ensureLocalQueuesValid(
-                    new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.fail("Expected IOException");
-        } catch (IOException ioException) {
-            // Expected
-        }
-    }
-
-    @Test
     public void testInitializationAction() throws Exception {
-        final boolean[] setupCalled = new boolean[] {false};
         final InitializationAction testSubject = new InitializationAction() {
             @Override
             String getWorkloadNamespace() {
@@ -139,15 +107,9 @@ public class InitializationActionTest {
             boolean localQueueMissing(QueueConfiguration queueConfiguration) {
                 return false;
             }
-
-            @Override
-            void setupKubernetesAPIConfiguration() {
-                setupCalled[0] = true;
-            }
         };
 
         testSubject.ensureLocalQueuesValid(
                 new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-        Assert.assertTrue("Setup was not called", setupCalled[0]);
     }
 }

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.opencadc.skaha.context.ResourceContexts;
 
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
@@ -229,7 +230,7 @@ public class SessionJobBuilder {
                                 SessionJobBuilder.getResourceRequirements(podTemplateSpec);
                         final Map<String, Quantity> limits =
                                 Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
-                        limits.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+                        limits.put(ResourceContexts.NVIDIA_GPU_LABEL, new Quantity(Integer.toString(this.gpuCount)));
                         resourceRequirements.setLimits(limits);
                     }
 

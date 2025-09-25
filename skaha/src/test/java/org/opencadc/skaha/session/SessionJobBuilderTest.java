@@ -15,6 +15,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.context.ResourceContexts;
 
 public class SessionJobBuilderTest {
     @Test
@@ -61,7 +62,7 @@ public class SessionJobBuilderTest {
                         .get(0)
                         .getResources()
                         .getLimits()
-                        .containsKey("nvidia.com/gpu"));
+                        .containsKey(ResourceContexts.NVIDIA_GPU_LABEL));
     }
 
     private V1Job getTestBaseValuesAffinityJob(final int gpuCount) throws Exception {
@@ -98,7 +99,7 @@ public class SessionJobBuilderTest {
                             .get(0)
                             .getResources()
                             .getLimits()
-                            .get("nvidia.com/gpu")
+                            .get(ResourceContexts.NVIDIA_GPU_LABEL)
                             .getNumber()
                             .intValue());
         } else {
@@ -111,7 +112,7 @@ public class SessionJobBuilderTest {
                             .get(0)
                             .getResources()
                             .getLimits()
-                            .get("nvidia.com/gpu"));
+                            .get(ResourceContexts.NVIDIA_GPU_LABEL));
         }
 
         Assert.assertEquals(

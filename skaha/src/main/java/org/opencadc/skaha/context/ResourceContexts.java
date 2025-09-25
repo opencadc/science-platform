@@ -66,13 +66,11 @@
  */
 package org.opencadc.skaha.context;
 
-import ca.nrc.cadc.util.PropertiesReader;
-import com.google.gson.*;
-import java.io.File;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.List;
+import ca.nrc.cadc.util.StringUtil;
+import java.io.IOException;
+import java.io.OutputStream;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 /**
  * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.
@@ -80,81 +78,71 @@ import org.apache.log4j.Logger;
  * @author majorb
  */
 public class ResourceContexts {
+    private static final Logger LOGGER = Logger.getLogger(ResourceContexts.class);
 
-    private static final Logger log = Logger.getLogger(ResourceContexts.class);
+    // Identify the GPU resources.
+    public static final String NVIDIA_GPU_LABEL = "nvidia.com/gpu";
 
-    private final Integer defaultRequestCores;
-    private final Integer defaultLimitCores;
-    private final List<Integer> availableCores = new ArrayList<>();
-
-    // units in GB
-    private final Integer defaultRequestRAM;
-    private final Integer defaultLimitRAM;
-    private final List<Integer> availableRAM = new ArrayList<>();
-
-    private final List<Integer> availableGPUs = new ArrayList<>();
+    private final ResourceContext resourceContext;
 
     public ResourceContexts() {
-        try (final FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"))) {
-            JsonElement jsonElement = JsonParser.parseReader(reader);
-            JsonObject jsonObject = jsonElement.getAsJsonObject();
-
-            // Extract fields into variables
-            JsonObject cores = jsonObject.getAsJsonObject("cores");
-            defaultRequestCores = cores.get("defaultRequest").getAsInt();
-            defaultLimitCores = cores.get("defaultLimit").getAsInt();
-            JsonArray coresOptions = cores.getAsJsonArray("options");
-            coresOptions.asList().forEach(coreOption -> availableCores.add(coreOption.getAsInt()));
-
-            JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
-            defaultRequestRAM = memory.get("defaultRequest").getAsInt();
-            defaultLimitRAM = memory.get("defaultLimit").getAsInt();
-            JsonArray ramOptions = memory.getAsJsonArray("options");
-            ramOptions.asList().forEach(ramOption -> availableRAM.add(ramOption.getAsInt()));
-
-            JsonObject gpus = jsonObject.getAsJsonObject("gpus");
-            JsonArray gpuOptions = gpus.getAsJsonArray("options");
-            gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
-        } catch (Exception e) {
-            log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.json", e);
+        final K8SUtil.ExperimentalFeatures experimentalFeatures = K8SUtil.getExperimentalFeatures();
+        if (StringUtil.hasText(experimentalFeatures.sessionLimitRangeName)) {
+            try {
+                LOGGER.info("Initializing LimitRangeResourceContext for " + experimentalFeatures.sessionLimitRangeName);
+                this.resourceContext = new LimitRangeResourceContext(experimentalFeatures.sessionLimitRangeName);
+            } catch (final Exception ioException) {
+                throw new IllegalStateException(
+                        "Error reading LimitRange " + experimentalFeatures.sessionLimitRangeName, ioException);
+            }
+        } else {
+            LOGGER.info("Initializing StaticResourceContext (default)");
+            try {
+                this.resourceContext = new StaticResourceContext();
+            } catch (IOException ioException) {
+                throw new IllegalStateException("Error reading static k8s-resources.json", ioException);
+            }
         }
     }
 
-    public static File getResourcesFile(String fileName) {
-        String configDir = System.getProperty("user.home") + "/config";
-        String configDirSystemProperty = PropertiesReader.class.getName() + ".dir";
-        if (System.getProperty(configDirSystemProperty) != null) {
-            configDir = System.getProperty(configDirSystemProperty);
+    public void validateCores(final int coreCount) {
+        if (this.resourceContext.coreOutOfRange(coreCount)) {
+            throw new IllegalArgumentException("Unavailable option for 'cores': " + coreCount + ".  Not in range "
+                    + this.resourceContext.getCoreCounts());
         }
-        return new File(new File(configDir), fileName);
     }
 
-    public Integer getDefaultRequestCores() {
-        return defaultRequestCores;
+    public void validateMemoryGB(final int memoryGB) {
+        if (this.resourceContext.memoryOutOfRange(memoryGB)) {
+            throw new IllegalArgumentException("Unavailable option for 'ram': " + memoryGB + ".  Not in range "
+                    + this.resourceContext.getMemoryCounts());
+        }
     }
 
-    public Integer getDefaultLimitCores() {
-        return defaultLimitCores;
+    public void validateGPUs(final int gpuCount) {
+        if (this.resourceContext.gpusOutOfRange(gpuCount)) {
+            throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpuCount + ".  Not in range "
+                    + this.resourceContext.getGPUCounts());
+        }
     }
 
-    public boolean isCoreCountAvailable(final Integer coreCount) {
-        return this.availableCores.contains(coreCount);
+    public int getDefaultRequestCores() {
+        return this.resourceContext.getDefaultCoreCounts().minimum;
     }
 
-    public Integer getDefaultRequestRAM() {
-        return defaultRequestRAM;
+    public int getDefaultLimitCores() {
+        return this.resourceContext.getDefaultCoreCounts().maximum;
     }
 
-    public Integer getDefaultLimitRAM() {
-        return defaultLimitRAM;
+    public int getDefaultRequestMemoryGB() {
+        return this.resourceContext.getDefaultMemoryCounts().minimum;
     }
 
-    public List<Integer> getAvailableRAM() {
-        return availableRAM;
+    public int getDefaultLimitMemoryGB() {
+        return this.resourceContext.getDefaultMemoryCounts().maximum;
     }
 
-    public List<Integer> getAvailableGPUs() {
-        return availableGPUs;
+    public void writeOut(final OutputStream outputStream) throws IOException {
+        resourceContext.write(outputStream);
     }
 }

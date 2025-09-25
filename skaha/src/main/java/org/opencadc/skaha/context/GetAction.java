@@ -67,9 +67,6 @@
 
 package org.opencadc.skaha.context;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import org.opencadc.skaha.SkahaAction;
 
 /**
@@ -86,22 +83,9 @@ public class GetAction extends SkahaAction {
     @Override
     public void doAction() throws Exception {
         super.initRequest();
-
-        File propertiesFile = ResourceContexts.getResourcesFile("k8s-resources.json");
-        byte[] bytes = GetAction.getBytes(propertiesFile);
         syncOutput.setHeader("Content-Type", "application/json");
-        syncOutput.getOutputStream().write(bytes);
-    }
 
-    private static byte[] getBytes(File propertiesFile) throws IOException {
-        byte[] bytes = new byte[(int) propertiesFile.length()];
-
-        try (FileInputStream fileInputStream = new FileInputStream(propertiesFile)) {
-            int bytesRead = fileInputStream.read(bytes);
-            if (bytesRead != bytes.length) {
-                throw new IOException("Could not read the entire file: " + propertiesFile.getAbsolutePath());
-            }
-        }
-        return bytes;
+        final ResourceContexts resourceContexts = new ResourceContexts();
+        resourceContexts.writeOut(this.syncOutput.getOutputStream());
     }
 }

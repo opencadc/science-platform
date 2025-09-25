@@ -7,6 +7,7 @@ FROM eclipse-temurin:21-alpine AS base
 FROM base AS builder
 COPY . /src
 WORKDIR /src/skaha
+
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
 FROM images.opencadc.org/library/cadc-tomcat:1.4 AS production

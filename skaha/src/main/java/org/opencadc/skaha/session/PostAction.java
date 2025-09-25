@@ -164,7 +164,6 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
 
-        ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
             if (requestType.equals(REQUEST_TYPE_APP)
@@ -200,25 +199,12 @@ public class PostAction extends SessionAction {
                 // (VNC passwords are only good up to 8 characters)
                 this.sessionID = new RandomStringGenerator(8).getID();
 
-                int gpus = 0;
-                final String gpusParam = syncInput.getParameter("gpus");
-                if (StringUtil.hasText(gpusParam)) {
-                    try {
-                        gpus = Integer.parseInt(gpusParam);
-                        if (!rc.getAvailableGPUs().contains(gpus)) {
-                            throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
-                        }
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException("Invalid value for 'gpus': " + gpusParam);
-                    }
-                }
-
                 ensureUserBase();
 
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
+                createSession(validatedType, image, name, resourceSpecification, cmd, args, envs);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -465,7 +451,6 @@ public class PostAction extends SessionAction {
             String image,
             String name,
             ResourceSpecification resourceSpecification,
-            Integer gpus,
             String cmd,
             String args,
             List<String> envs)
@@ -483,7 +468,7 @@ public class PostAction extends SessionAction {
 
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath(isLegacyCARTA))
                 .withGPUEnabled(this.gpuEnabled)
-                .withGPUCount(gpus)
+                .withGPUCount(resourceSpecification.gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
@@ -844,6 +829,7 @@ public class PostAction extends SessionAction {
         Integer limitCores;
         Integer requestRAM;
         Integer limitRAM;
+        int gpus = 0;
 
         static ResourceSpecification fromSyncInput(final SyncInput input) {
             return new ResourceSpecification(input);
@@ -862,9 +848,11 @@ public class PostAction extends SessionAction {
             this.requestRAM = getRamParam();
             this.limitRAM = this.requestRAM;
             if (this.requestRAM == null) {
-                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
-                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestMemoryGB();
+                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitMemoryGB();
             }
+
+            this.gpus = getGPUParam();
         }
 
         private Integer getCoresParam() {
@@ -873,10 +861,7 @@ public class PostAction extends SessionAction {
             if (StringUtil.hasText(coresParam)) {
                 try {
                     cores = Integer.valueOf(coresParam);
-                    final ResourceContexts rc = new ResourceContexts();
-                    if (!rc.isCoreCountAvailable(cores)) {
-                        throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
-                    }
+                    ResourceSpecification.RESOURCE_CONTEXTS.validateCores(cores);
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
                 }
@@ -891,16 +876,27 @@ public class PostAction extends SessionAction {
             if (StringUtil.hasText(ramParam)) {
                 try {
                     ram = Integer.valueOf(ramParam);
-                    ResourceContexts rc = new ResourceContexts();
-                    if (!rc.getAvailableRAM().contains(ram)) {
-                        throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
-                    }
+                    ResourceSpecification.RESOURCE_CONTEXTS.validateMemoryGB(ram);
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
                 }
             }
 
             return ram;
+        }
+
+        private int getGPUParam() {
+            final String gpusParam = syncInput.getParameter("gpus");
+            if (StringUtil.hasText(gpusParam)) {
+                try {
+                    final int gpus = Integer.parseInt(gpusParam);
+                    ResourceSpecification.RESOURCE_CONTEXTS.validateGPUs(gpus);
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Invalid value for 'gpus': " + gpusParam);
+                }
+            }
+
+            return 0;
         }
     }
 }

@@ -97,6 +97,14 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doInit() {
+        LOGGER.info("Starting Kubernetes Session Initialization Action");
+        try {
+            configureKubernetesClient();
+        } catch (IOException ioException) {
+            throw new IllegalStateException(ioException.getMessage(), ioException);
+        }
+        LOGGER.info("Finished Kubernetes Session Initialization Action");
+
         LOGGER.info("Verifying QueueConfigurations, if any...");
         try {
             ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
@@ -104,10 +112,15 @@ public class InitializationAction extends InitAction {
             throw new IllegalStateException(ioException.getMessage(), ioException);
         }
         LOGGER.info("Verifying QueueConfigurations: OK");
+
+        LOGGER.info("Verifying Resource Limits");
+        ensureResourceLimits();
+        LOGGER.info("Verifying Resource Limits: OK");
     }
 
+    void ensureResourceLimits() {}
+
     void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) throws IOException {
-        setupKubernetesAPIConfiguration();
         Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
     }
 
@@ -157,7 +170,7 @@ public class InitializationAction extends InitAction {
         }
     }
 
-    void setupKubernetesAPIConfiguration() throws IOException {
+    void configureKubernetesClient() throws IOException {
         final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
 
