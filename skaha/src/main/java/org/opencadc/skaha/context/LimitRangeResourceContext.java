@@ -39,11 +39,10 @@ public class LimitRangeResourceContext {
     /**
      * Constructor that initializes the resource context from a Kubernetes LimitRange object.
      *
-     * @param sessionLimitRangeName Name of the LimitRange in the Kubernetes cluster.
      * @throws Exception If there is an error retrieving the LimitRange from the cluster.
      */
-    public LimitRangeResourceContext(@NotNull final String sessionLimitRangeName) throws Exception {
-        this(ResourceContextDAO.getLimitRange(sessionLimitRangeName));
+    public LimitRangeResourceContext() throws Exception {
+        this(ResourceContextDAO.lookupLimitRange());
     }
 
     /**

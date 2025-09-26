@@ -60,16 +60,9 @@ public class LimitRangeResourceContextTest {
     }
 
     @Test
-    public void testErrors() throws Exception {
+    public void testErrors() {
         try {
-            new LimitRangeResourceContext((String) null);
-            Assert.fail("Expected NullPointerException");
-        } catch (NullPointerException npe) {
-            // no-op
-        }
-
-        try {
-            new LimitRangeResourceContext((V1LimitRangeItem) null);
+            new LimitRangeResourceContext(null);
             Assert.fail("Expected NullPointerException");
         } catch (NullPointerException npe) {
             // no-op

@@ -67,7 +67,6 @@
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.PropertiesReader;
-import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.*;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -88,6 +87,7 @@ import org.opencadc.skaha.K8SUtil;
 public class ResourceContexts {
 
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
+    static final String SESSION_LIMIT_RANGE_FEATURE_GATE = "sessionLimitRange";
 
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
@@ -129,10 +129,11 @@ public class ResourceContexts {
 
     private Reader getJSONReader() {
         try {
-            final String limitRangeFeatureGateName = K8SUtil.getExperimentalFeatures().sessionLimitRangeName;
-            if (StringUtil.hasText(limitRangeFeatureGateName)) {
-                final LimitRangeResourceContext limitRangeResourceContext =
-                        new LimitRangeResourceContext(limitRangeFeatureGateName);
+            final K8SUtil.ExperimentalFeatures experimentalFeatures = K8SUtil.getExperimentalFeatures();
+            final boolean sessionLimitRangeEnabled =
+                    experimentalFeatures.isEnabled(ResourceContexts.SESSION_LIMIT_RANGE_FEATURE_GATE);
+            if (sessionLimitRangeEnabled) {
+                final LimitRangeResourceContext limitRangeResourceContext = new LimitRangeResourceContext();
                 try (final OutputStream outputStream = new ByteArrayOutputStream()) {
                     limitRangeResourceContext.write(outputStream);
                     outputStream.flush();
