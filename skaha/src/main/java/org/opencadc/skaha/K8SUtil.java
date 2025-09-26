@@ -232,8 +232,12 @@ public class K8SUtil {
     }
 
     /**
-     * Experimental features that can be toggled on/off via configuration. These are unreleased features behind a
-     * feature flag set in the Environment.
+     * Experimental features that can be toggled on/off via configuration. These are beta features behind a feature flag
+     * set in the Environment.
+     *
+     * <p>Setting the environment variable SKAHA_EXPERIMENTAL_FEATURE_GATES to a comma-separated list of key=value pairs
+     * will enable/disable the feature. For example: <code>
+     * SKAHA_EXPERIMENTAL_FEATURE_GATES="featureOne=true,featureTwo=false"</code>
      */
     public static class ExperimentalFeatures {
         private static final Logger LOGGER = Logger.getLogger(ExperimentalFeatures.class.getName());
