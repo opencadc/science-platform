@@ -1,9 +1,9 @@
-openapi: 3.0.0
+openapi: 3.1.0
 info:
-  version: 0.23.0
+  version: 1.0.3
   title: skaha
   description: >
-    skaha API Documentation.  This API allows authorized users to create and
+    This API allows authorized users to create and
     interact with desktop (NoVNC), CARTA Visualization, and Jupyter Notebook
     sessions in the skaha processing environment.  Desktop apps can also be
     launched and attached to skaha desktop sessions through this
@@ -15,7 +15,7 @@ info:
     on using Skaha can be found
     here:  https://www.opencadc.org/science-containers/
 paths:
-  /v0/session:
+  /v1/session:
     get:
       description: >
         List the sessions for the calling user, returned as a JSON
@@ -74,14 +74,14 @@ paths:
       parameters:
         - name: name
           in: query
-          description: |
+          description: >
             The name for the session (for user informational purposes only).
           required: true
           schema:
             type: string
         - name: image
           in: query
-          description: |
+          description: >
             The image ID of the session.  For example:
             ```
             images.canfar.net/skaha/notebook-scipy:0.2
@@ -179,9 +179,9 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  "/v0/session/{sessionID}":
+  "/v1/session/{sessionID}":
     get:
-      description: |
+      description: >
         Get the session identified by sessionID as a JSON object.
       tags:
         - Session Management
@@ -234,7 +234,7 @@ paths:
           in: query
           description: The action to be applied to the session. Currently the applicable
             action is 'renew' which sets the session expiry time in
-            activeDeadlineseconds based on the configured expiry time in
+            activeDeadlineSeconds based on the configured expiry time in
             skaha.sessionexpiry.
           required: true
           schema:
@@ -253,7 +253,7 @@ paths:
         default:
           description: Unexpected error
     delete:
-      description: |
+      description: >
         Delete the session identified by sessionID.
       tags:
         - Session Management
@@ -277,7 +277,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  "/session/{sessionID}/app":
+  "/v1/session/{sessionID}/app":
     get:
       description: >
         List the desktop apps for the calling user, returned as a JSON
@@ -331,7 +331,7 @@ paths:
           in: query
           description: >
             Request this many cores for the desktop app.  This value must match
-            a value retruned from the /context endpoint.  The default value
+            a value returned from the /context endpoint.  The default value
             returned from /context will be used if this parameter is not
             provided.
           required: false
@@ -341,7 +341,7 @@ paths:
           in: query
           description: >
             Request this much RAM (GB) for the desktop app.  This value must
-            match a value retruned from the /context endpoint.  The default
+            match a value returned from the /context endpoint.  The default
             value returned from /context will be used if this parameter is not
             provided.
           required: false
@@ -360,9 +360,9 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  "/session/{sessionID}/app/{appID}":
+  "/v1/session/{sessionID}/app/{appID}":
     get:
-      description: |
+      description: >
         Get the desktop app identified by sessionID and appID as a JSON object.
       tags:
         - Session Management
@@ -395,7 +395,7 @@ paths:
         default:
           description: Unexpected error
     delete:
-      description: |
+      description: >
         Delete the desktop app identified by sessionID and appID.
       tags:
         - Session Management
@@ -425,7 +425,7 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/image:
+  /v1/image:
     get:
       description: >
         List the images available for launching to the calling user, returned as
@@ -453,7 +453,7 @@ paths:
           required: false
           schema:
             type: string
-  /v0/context:
+  /v1/context:
     get:
       description: >
         List the CPU cores and Random Access Memory available for launching to
@@ -474,9 +474,9 @@ paths:
           description: Service busy
         default:
           description: Unexpected error
-  /v0/repository:
+  /v1/repository:
     get:
-      description: |
+      description: >
         List the Image Repository hosts configured as a JSON Array.
       tags:
         - Harbor, Image, Repository
