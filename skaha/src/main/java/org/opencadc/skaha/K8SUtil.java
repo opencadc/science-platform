@@ -222,4 +222,27 @@ public class K8SUtil {
             return null;
         }
     }
+
+    public static ExperimentalFeatures getExperimentalFeatures() {
+        return ExperimentalFeatures.fromEnv();
+    }
+
+    /**
+     * Experimental features that can be toggled on/off via configuration. These are unreleased features behind a
+     * feature flag set in the Environment.
+     */
+    public static class ExperimentalFeatures {
+        private static final String SKAHA_EXPERIMENTAL_FEATURES_PREFIX = "SKAHA_EXPERIMENTAL_";
+        public final String sessionLimitRangeName;
+
+        static ExperimentalFeatures fromEnv() {
+            final String sessionLimitRangeName =
+                    System.getenv(ExperimentalFeatures.SKAHA_EXPERIMENTAL_FEATURES_PREFIX + "SESSION_LIMIT_RANGE_NAME");
+            return new ExperimentalFeatures(sessionLimitRangeName);
+        }
+
+        private ExperimentalFeatures(final String sessionLimitRangeName) {
+            this.sessionLimitRangeName = sessionLimitRangeName;
+        }
+    }
 }
