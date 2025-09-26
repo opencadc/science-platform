@@ -116,7 +116,7 @@ public abstract class SessionURLBuilder {
 
     /** Construct a URL for a Notebook session. Used to redirect the end user to the Jupyter Notebook. */
     static final class NotebookSessionURLBuilder extends SessionURLBuilder {
-        private String topLevelDirectory;
+        private String absoluteHomeDirectory;
         private String userName;
 
         NotebookSessionURLBuilder(String host, String sessionID) {
@@ -126,11 +126,11 @@ public abstract class SessionURLBuilder {
         /**
          * Set the top-level directory in the Jupyter Notebook session.
          *
-         * @param topLevelDirectory The top-level directory in the Jupyter Notebook session.
+         * @param absoluteHomeDirectory The absolute Home directory in the Jupyter Notebook session.
          * @return This builder.
          */
-        NotebookSessionURLBuilder withTopLevelDirectory(String topLevelDirectory) {
-            this.topLevelDirectory = topLevelDirectory;
+        NotebookSessionURLBuilder withAbsoluteHomeDirectory(String absoluteHomeDirectory) {
+            this.absoluteHomeDirectory = absoluteHomeDirectory;
             return this;
         }
 
@@ -151,29 +151,26 @@ public abstract class SessionURLBuilder {
          * </code>
          *
          * @return URL string in format <code>
-         *     https://${host}/session/notebook/${sessionID}/lab/tree/${topLevelDirInSkaha}/home/username?token=${sessionID}
+         *     https://${host}/session/notebook/${sessionID}/lab/tree/${absoluteHomeDirectory}/username?token=${sessionID}
          *     </code>
          * @throws URISyntaxException If the URI cannot be created.
          */
         @Override
         String build() throws URISyntaxException {
-            final Path topLevelDirectoryPath = Path.of(Objects.requireNonNull(this.topLevelDirectory));
-            final List<String> topLevelDirectoryPathSegments = new ArrayList<>();
-            topLevelDirectoryPathSegments.add("session");
-            topLevelDirectoryPathSegments.add("notebook");
-            topLevelDirectoryPathSegments.add(this.sessionID);
-            topLevelDirectoryPathSegments.add("lab");
-            topLevelDirectoryPathSegments.add("tree");
-            topLevelDirectoryPath
-                    .iterator()
-                    .forEachRemaining(name -> topLevelDirectoryPathSegments.add(name.toString()));
-            topLevelDirectoryPathSegments.add("home");
-            topLevelDirectoryPathSegments.add(Objects.requireNonNull(this.userName));
+            final Path absoluteHomeDirectoryPath = Path.of(Objects.requireNonNull(this.absoluteHomeDirectory));
+            final List<String> urlPathSegments = new ArrayList<>();
+            urlPathSegments.add("session");
+            urlPathSegments.add("notebook");
+            urlPathSegments.add(this.sessionID);
+            urlPathSegments.add("lab");
+            urlPathSegments.add("tree");
+            absoluteHomeDirectoryPath.iterator().forEachRemaining(name -> urlPathSegments.add(name.toString()));
+            urlPathSegments.add(Objects.requireNonNull(this.userName));
 
             return new URIBuilder()
                     .setScheme("https")
                     .setHost(this.host)
-                    .setPathSegments(topLevelDirectoryPathSegments)
+                    .setPathSegments(urlPathSegments)
                     .setParameter("token", this.sessionID)
                     .build()
                     .toString();
