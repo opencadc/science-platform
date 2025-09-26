@@ -2,6 +2,7 @@ package org.opencadc.skaha.context;
 
 import java.util.Iterator;
 
+/** Represents a range of integer values with a minimum and maximum. */
 public class IntegerRange {
     final int minimum;
     final int maximum;
@@ -9,10 +10,6 @@ public class IntegerRange {
     public IntegerRange(int minimum, int maximum) {
         this.minimum = minimum;
         this.maximum = maximum;
-    }
-
-    public boolean valueOutside(int value) {
-        return value < minimum || value > maximum;
     }
 
     public Iterator<Integer> iterator() {
