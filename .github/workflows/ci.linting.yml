@@ -25,8 +25,17 @@ jobs:
             fetch-depth: 0
       - name: Setup Python
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      -
-        name: Run Pre-Commit
+      - name: Setup Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+      - name: Clear Gradle Cache
+        run: rm -rf ~/.gradle/caches
+      - name: Show JAVA_HOME
+        run: echo "${JAVA_HOME}"
+      - name: Run Pre-Commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
   spotless:
     runs-on: ubuntu-latest
