@@ -26,11 +26,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
       - name: Run Tests
         run: |
             cd skaha
-            ./gradlew clean check
+            ./gradlew clean check --no-daemon
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -44,8 +44,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
       - name: Run Spotless
         run: |
             cd skaha
-            ./gradlew clean spotlessCheck
+            ./gradlew clean spotlessCheck --no-daemon
