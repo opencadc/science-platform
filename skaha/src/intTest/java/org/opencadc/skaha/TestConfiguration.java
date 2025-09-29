@@ -1,7 +1,6 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
@@ -16,10 +15,12 @@ import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.PasswordAuthentication;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,17 +87,28 @@ public class TestConfiguration {
 
     private static String getCookieValue(URL loginURL) throws Exception {
         final NetrcFile netrcFile = new NetrcFile();
-        final PasswordAuthentication passwordAuthentication = netrcFile.getCredentials(loginURL.getHost(), true);
-        final Map<String, Object> loginPayload = new HashMap<>();
-        loginPayload.put("username", passwordAuthentication.getUserName());
-        loginPayload.put("password", String.valueOf(passwordAuthentication.getPassword()));
+        if (netrcFile.exists()) {
+            final PasswordAuthentication passwordAuthentication = netrcFile.getCredentials(loginURL.getHost(), true);
+            if (passwordAuthentication == null) {
+                throw new MissingResourceException(
+                        "No credentials found for " + loginURL.getHost() + " in .netrc.",
+                        NetrcFile.class.getName(),
+                        loginURL.getHost());
+            }
+            final Map<String, Object> loginPayload = new HashMap<>();
+            loginPayload.put("username", passwordAuthentication.getUserName());
+            loginPayload.put("password", String.valueOf(passwordAuthentication.getPassword()));
 
-        try (final ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            final HttpPost httpPost = new HttpPost(loginURL, loginPayload, outputStream);
-            httpPost.run();
+            try (final ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                final HttpPost httpPost = new HttpPost(loginURL, loginPayload, outputStream);
+                httpPost.run();
 
-            outputStream.flush();
-            return outputStream.toString();
+                outputStream.flush();
+                return outputStream.toString();
+            }
+        } else {
+            throw new FileNotFoundException(
+                    "No .netrc found at " + Path.of(System.getProperty("user.home"), ".netrc") + ".");
         }
     }
 
@@ -129,20 +141,22 @@ public class TestConfiguration {
             LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
         }
 
-        final RegistryClient registryClient = new RegistryClient();
-        final URL loginURL = registryClient.getServiceURL(
-                TestConfiguration.getGMSServiceID(), Standards.UMS_LOGIN_10, AuthMethod.ANON);
-        final String cookieValue = TestConfiguration.getCookieValue(loginURL);
-        LOGGER.info("Using cookie value: " + cookieValue);
-        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
-        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "cadc-ccda.hia-iha.nrc-cnrc.gc.ca"));
-        subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
-        subject.getPublicCredentials().add(AuthMethod.COOKIE);
-
-        if (AuthenticationUtil.getAuthMethod(subject) == AuthMethod.ANON) {
-            throw new NotAuthenticatedException("No credentials supplied and anonymous not allowed.");
+        try {
+            final RegistryClient registryClient = new RegistryClient();
+            final URL loginURL = registryClient.getServiceURL(
+                    TestConfiguration.getGMSServiceID(), Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            final String cookieValue = TestConfiguration.getCookieValue(loginURL);
+            LOGGER.info("Using cookie value: " + cookieValue);
+            subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
+            subject.getPublicCredentials()
+                    .add(new SSOCookieCredential(cookieValue, "cadc-ccda.hia-iha.nrc-cnrc.gc.ca"));
+            subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
+            subject.getPublicCredentials().add(AuthMethod.COOKIE);
+            return subject;
+        } catch (Exception ex) {
+            LOGGER.warn("Could not get Cookie login: " + ex.getMessage());
         }
 
-        return subject;
+        throw new NotAuthenticatedException("No credentials supplied and anonymous not allowed.");
     }
 }
