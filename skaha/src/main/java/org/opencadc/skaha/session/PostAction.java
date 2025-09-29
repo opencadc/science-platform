@@ -396,7 +396,7 @@ public class PostAction extends SessionAction {
                 if (!TYPE_DESKTOP_APP.equals(session.getType())) {
                     final String status = session.getStatus();
                     if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
-                            || status.equalsIgnoreCase(Session.STATUS_SUCCEEDED))) {
+                            || status.equalsIgnoreCase(Session.STATUS_COMPLETED))) {
                         count++;
                     }
                 }

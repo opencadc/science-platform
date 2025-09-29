@@ -105,12 +105,11 @@ public class ImagesTest {
     public ImagesTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            final URL imageServiceURL = regClient.getServiceURL(
-                    SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
-            imageURL = new URL(imageServiceURL.toExternalForm() + "/image");
+            this.imageURL = regClient.getServiceURL(
+                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1, AuthMethod.TOKEN);
             log.info("sessions URL: " + imageURL);
 
-            this.userSubject = SessionUtil.getCurrentUser(imageURL, false);
+            this.userSubject = TestConfiguration.getCurrentUser(imageURL, false);
         } catch (Exception e) {
             log.error("init exception", e);
             throw new RuntimeException("init exception", e);
