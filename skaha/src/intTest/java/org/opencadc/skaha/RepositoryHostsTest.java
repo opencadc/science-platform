@@ -7,6 +7,7 @@ import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
@@ -30,7 +31,7 @@ public class RepositoryHostsTest {
     public RepositoryHostsTest() throws Exception {
         final String configuredServiceEndpoint = System.getProperty("SKAHA_SERVICE_ENDPOINT");
         if (StringUtil.hasText(configuredServiceEndpoint)) {
-            repositoryURL = new URL(configuredServiceEndpoint);
+            repositoryURL = URI.create(configuredServiceEndpoint).toURL();
         } else {
             final RegistryClient regClient = new RegistryClient();
             this.repositoryURL = regClient.getServiceURL(
@@ -38,7 +39,7 @@ public class RepositoryHostsTest {
         }
         log.info("sessions URL: " + repositoryURL);
 
-        this.userSubject = TestConfiguration.getCurrentUser(repositoryURL, false);
+        this.userSubject = TestConfiguration.getCurrentUser(repositoryURL);
     }
 
     protected static String[] getRepositoryHosts(final URL serviceURLEndpoint) {

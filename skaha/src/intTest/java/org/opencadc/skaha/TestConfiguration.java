@@ -106,13 +106,14 @@ public class TestConfiguration {
      * @param sessionURL The current URL to use to deduce a domain.
      * @return Subject instance, never null.
      */
-    static Subject getCurrentUser(final URL sessionURL, final boolean allowAnonymous) throws Exception {
+    static Subject getCurrentUser(final URL sessionURL) throws Exception {
         final Subject subject = new Subject();
 
         try {
             final AuthorizationToken bearerToken = TestConfiguration.getBearerToken(sessionURL);
             subject.getPublicCredentials().add(bearerToken);
             subject.getPublicCredentials().add(AuthMethod.TOKEN);
+            LOGGER.info("Bearer Token found in path.");
             return subject;
         } catch (MissingResourceException noTokenFile) {
             LOGGER.warn("No bearer token (skaha-test.token) found in path.");
@@ -122,6 +123,7 @@ public class TestConfiguration {
             final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
             subject.getPublicCredentials().add(proxyCertificate);
             subject.getPublicCredentials().add(AuthMethod.CERT);
+            LOGGER.info("PEM Certificate found in path.");
             return subject;
         } catch (MissingResourceException noProxyCertificate) {
             LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
@@ -137,7 +139,7 @@ public class TestConfiguration {
         subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
         subject.getPublicCredentials().add(AuthMethod.COOKIE);
 
-        if (AuthenticationUtil.getAuthMethod(subject) == AuthMethod.ANON && !allowAnonymous) {
+        if (AuthenticationUtil.getAuthMethod(subject) == AuthMethod.ANON) {
             throw new NotAuthenticatedException("No credentials supplied and anonymous not allowed.");
         }
 
