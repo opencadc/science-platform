@@ -6,6 +6,17 @@ import org.junit.Test;
 
 public class SessionBuilderTest {
     @Test
+    public void testStatusNull() {
+        final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");
+        final SessionBuilder testSubjectFromNull = testSubject.withStatus(null, true);
+
+        Assert.assertEquals(
+                "Wrong status",
+                Session.STATUS_PENDING,
+                testSubjectFromNull.build().getStatus());
+    }
+
+    @Test
     public void testStatus() {
         final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");
 

@@ -186,44 +186,47 @@ class SessionBuilder {
     }
 
     SessionBuilder withStatus(final V1JobStatus jobStatus, final boolean suspended) {
-        Objects.requireNonNull(jobStatus, "Invalid JobStatus");
+        if (jobStatus == null) {
+            LOGGER.debug("No JobStatus found for " + this.id);
+            this.status = Session.STATUS_PENDING;
+        } else {
+            if (jobStatus.getStartTime() != null) {
+                this.startTime = jobStatus.getStartTime().toString();
+            }
 
-        if (jobStatus.getStartTime() != null) {
-            this.startTime = jobStatus.getStartTime().toString();
-        }
+            if (this.activeExpirySeconds != null && this.startTime != null) {
+                this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
+            }
 
-        if (this.activeExpirySeconds != null && this.startTime != null) {
-            this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
-        }
+            final int success = Objects.requireNonNullElse(jobStatus.getSucceeded(), 0);
+            final int failed = Objects.requireNonNullElse(jobStatus.getFailed(), 0);
+            final int active = Objects.requireNonNullElse(jobStatus.getActive(), 0);
+            final int ready = Objects.requireNonNullElse(jobStatus.getReady(), 0);
+            final int terminating = Objects.requireNonNullElse(jobStatus.getTerminating(), 0);
 
-        final int success = Objects.requireNonNullElse(jobStatus.getSucceeded(), 0);
-        final int failed = Objects.requireNonNullElse(jobStatus.getFailed(), 0);
-        final int active = Objects.requireNonNullElse(jobStatus.getActive(), 0);
-        final int ready = Objects.requireNonNullElse(jobStatus.getReady(), 0);
-        final int terminating = Objects.requireNonNullElse(jobStatus.getTerminating(), 0);
-
-        if (active > 0) {
-            if (ready > 0) {
-                this.status = Session.STATUS_RUNNING;
+            if (active > 0) {
+                if (ready > 0) {
+                    this.status = Session.STATUS_RUNNING;
+                } else {
+                    this.status = Session.STATUS_PENDING;
+                }
+            } else if (suspended) {
+                // Suspended likely means it went to be scheduled but, Kueue has not picked it up yet.
+                this.status = Session.STATUS_PENDING;
+            } else if (success > 0) {
+                this.status = Session.STATUS_COMPLETED;
+            } else if (failed > 0) {
+                this.status = Session.STATUS_FAILED;
+            } else if (terminating > 0) {
+                this.status = Session.STATUS_TERMINATING;
             } else {
                 this.status = Session.STATUS_PENDING;
             }
-        } else if (suspended) {
-            // Suspended likely means it went to be scheduled but, Kueue has not picked it up yet.
-            this.status = Session.STATUS_PENDING;
-        } else if (success > 0) {
-            this.status = Session.STATUS_COMPLETED;
-        } else if (failed > 0) {
-            this.status = Session.STATUS_FAILED;
-        } else if (terminating > 0) {
-            this.status = Session.STATUS_TERMINATING;
-        } else {
-            this.status = Session.STATUS_PENDING;
-        }
 
-        LOGGER.debug("Session Status: " + this.status + " (success=" + success + ", failed=" + failed + ", active="
-                + active + ", ready=" + ready + ", terminating=" + terminating + ", suspended=" + suspended
-                + ") for " + this.id);
+            LOGGER.debug("Session Status: " + this.status + " (success=" + success + ", failed=" + failed + ", active="
+                    + active + ", ready=" + ready + ", terminating=" + terminating + ", suspended=" + suspended
+                    + ") for " + this.id);
+        }
 
         return this;
     }
