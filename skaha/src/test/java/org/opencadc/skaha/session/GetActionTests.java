@@ -220,49 +220,49 @@ public class GetActionTests {
         }
 
         Session constructSession(String k8sOutput) {
-            final List<SessionDAO.CustomColumns> allColumns = Arrays.asList(SessionDAO.CustomColumns.values());
+            final List<SessionBuilder.CustomColumns> allColumns = Arrays.asList(SessionBuilder.CustomColumns.values());
 
             // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
             // are in a space-delimited array.
             final String[] parts = k8sOutput.trim().split(" {3,}");
 
-            String id = parts[allColumns.indexOf(SessionDAO.CustomColumns.SESSION_ID)];
-            String userid = parts[allColumns.indexOf(SessionDAO.CustomColumns.USERID)];
-            String image = parts[allColumns.indexOf(SessionDAO.CustomColumns.IMAGE)];
+            String id = parts[allColumns.indexOf(SessionBuilder.CustomColumns.SESSION_ID)];
+            String userid = parts[allColumns.indexOf(SessionBuilder.CustomColumns.USERID)];
+            String image = parts[allColumns.indexOf(SessionBuilder.CustomColumns.IMAGE)];
             SessionType type =
-                    SessionType.fromApplicationStringType(parts[allColumns.indexOf(SessionDAO.CustomColumns.TYPE)]);
-            String deletionTimestamp = parts[allColumns.indexOf(SessionDAO.CustomColumns.DELETION)];
+                    SessionType.fromApplicationStringType(parts[allColumns.indexOf(SessionBuilder.CustomColumns.TYPE)]);
+            String deletionTimestamp = parts[allColumns.indexOf(SessionBuilder.CustomColumns.DELETION)];
             final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
                     ? Session.STATUS_TERMINATING
-                    : parts[allColumns.indexOf(SessionDAO.CustomColumns.STATUS)];
+                    : parts[allColumns.indexOf(SessionBuilder.CustomColumns.STATUS)];
             final String connectURL = String.format("https://example.org/session/test/%s", id);
 
             final Session session = new Session(
                     id,
                     userid,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_UID)],
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.RUN_AS_GID)],
-                    fromStringArray(parts[allColumns.indexOf(SessionDAO.CustomColumns.SUPPLEMENTAL_GROUPS)]),
+                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.RUN_AS_UID)],
+                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.RUN_AS_GID)],
+                    fromStringArray(parts[allColumns.indexOf(SessionBuilder.CustomColumns.SUPPLEMENTAL_GROUPS)]),
                     image,
                     type.applicationName,
                     status,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.NAME)],
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.STARTED)],
+                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.NAME)],
+                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.STARTED)],
                     connectURL,
-                    parts[allColumns.indexOf(SessionDAO.CustomColumns.APP_ID)]);
+                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.APP_ID)]);
 
             // Check if all columns were requested (set by forUserId)
-            final int requestedRamIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_RAM);
+            final int requestedRamIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_RAM);
             if (parts.length > requestedRamIndex) {
                 session.setRequestedRAM(toCommonUnit(parts[requestedRamIndex]));
             }
 
-            final int requestedCPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_CPU);
+            final int requestedCPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_CPU);
             if (parts.length > requestedCPUIndex) {
                 session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
             }
 
-            final int requestedGPUIndex = allColumns.indexOf(SessionDAO.CustomColumns.REQUESTED_GPU);
+            final int requestedGPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_GPU);
             if (parts.length > requestedGPUIndex) {
                 session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
             }
