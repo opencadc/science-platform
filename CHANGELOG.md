@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.4](https://github.com/opencadc/science-platform/compare/1.0.3...1.0.4) (2025-09-29)
+
+
+### Bug Fixes
+
+* fix integration tests and correct status returned ([9fe4a9d](https://github.com/opencadc/science-platform/commit/9fe4a9d76b532b0208b7a116927e30d737b490df))
+* more int test fixes and refactoring ([3074767](https://github.com/opencadc/science-platform/commit/30747674471c6babf00c642873edf5b8aae0df9d))
+* some null rework ([0b6e648](https://github.com/opencadc/science-platform/commit/0b6e64878942b5292f62288bc62f8a9364f31f96))
+
 ## [1.0.3](https://github.com/opencadc/science-platform/compare/1.0.2...1.0.3) (2025-09-15)
 
 
