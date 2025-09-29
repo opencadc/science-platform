@@ -15,7 +15,10 @@ repositories {
 
 apply from: 'opencadc.gradle'
 
-sourceCompatibility = '11'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
 
 war {
     archiveFileName = 'skaha.war'
@@ -122,7 +125,7 @@ tasks.dokkaHtml.configure {
             sourceRoots.from(file("src/main/java"))
         }
         configureEach {
-            jdkVersion.set(11)
+            jdkVersion.set(21)
             sourceLink {
                 localDirectory.set(file("src/main/java"))
                 remoteUrl.set("https://github.com/opencadc/science-platform/tree/main/skaha/src/main/java")
