@@ -25,12 +25,16 @@ jobs:
         uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '21'
           cache: 'gradle'
+      - name: Clear Gradle Cache
+        run: rm -rf ~/.gradle/caches
+      - name: Show JAVA_HOME
+        run: echo "${JAVA_HOME}"
       - name: Run Tests
         run: |
             cd skaha
-            ./gradlew clean check
+            ./gradlew clean check --no-daemon
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
