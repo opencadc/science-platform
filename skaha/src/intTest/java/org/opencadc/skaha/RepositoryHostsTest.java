@@ -33,13 +33,12 @@ public class RepositoryHostsTest {
             repositoryURL = new URL(configuredServiceEndpoint);
         } else {
             final RegistryClient regClient = new RegistryClient();
-            final URL imageServiceURL = regClient.getServiceURL(
-                    SessionUtil.getSkahaServiceID(), Standards.PROC_SESSIONS_10, AuthMethod.TOKEN);
-            repositoryURL = new URL(imageServiceURL.toExternalForm() + "/repository");
+            this.repositoryURL = regClient.getServiceURL(
+                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_REPO_1, AuthMethod.TOKEN);
         }
         log.info("sessions URL: " + repositoryURL);
 
-        this.userSubject = SessionUtil.getCurrentUser(repositoryURL, false);
+        this.userSubject = TestConfiguration.getCurrentUser(repositoryURL, false);
     }
 
     protected static String[] getRepositoryHosts(final URL serviceURLEndpoint) {
