@@ -91,6 +91,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.opencadc.skaha.image.Image;
@@ -100,9 +101,9 @@ import org.opencadc.skaha.session.SessionType;
 
 public class SessionUtil {
     private static final Logger LOGGER = Logger.getLogger(SessionUtil.class);
-    private static final long ONE_SECOND = 1000L;
-    private static final long TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 180L * SessionUtil.ONE_SECOND;
-    private static final long TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS = 180L * SessionUtil.ONE_SECOND;
+    private static final long ONE_SECOND_MS = 1000L;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS = 180L * SessionUtil.ONE_SECOND_MS;
+    private static final long TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS = 180L * SessionUtil.ONE_SECOND_MS;
 
     static void initializeCleanup(final URL sessionURL) throws Exception {
         for (Session session : SessionUtil.getSessions(sessionURL, Session.STATUS_TERMINATING)) {
@@ -211,8 +212,8 @@ public class SessionUtil {
         long currentWaitTime = 0L;
         while (requestedSession == null) {
             LOGGER.info("Waiting for Desktop Application Session " + desktopAppID + " to reach " + expectedState);
-            Thread.sleep(SessionUtil.ONE_SECOND);
-            currentWaitTime += SessionUtil.ONE_SECOND;
+            Thread.sleep(SessionUtil.ONE_SECOND_MS);
+            currentWaitTime += SessionUtil.ONE_SECOND_MS;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
                 throw new TimeoutException("Timed out waiting for Desktop Application session " + desktopAppID
@@ -304,8 +305,8 @@ public class SessionUtil {
         long currentWaitTime = 0L;
         while (requestedSession != null) {
             LOGGER.info("Waiting for Session " + sessionID + " to terminate.");
-            Thread.sleep(SessionUtil.ONE_SECOND);
-            currentWaitTime += SessionUtil.ONE_SECOND;
+            Thread.sleep(SessionUtil.ONE_SECOND_MS);
+            currentWaitTime += SessionUtil.ONE_SECOND_MS;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_TERMINATE_MS) {
                 throw new TimeoutException("Timed out waiting for session " + sessionID + " and status "
@@ -324,8 +325,8 @@ public class SessionUtil {
         long currentWaitTime = 0L;
         while (requestedSession == null) {
             LOGGER.info("Waiting for Session " + sessionID + " to reach " + expectedState);
-            Thread.sleep(SessionUtil.ONE_SECOND);
-            currentWaitTime += SessionUtil.ONE_SECOND;
+            Thread.sleep(SessionUtil.ONE_SECOND_MS);
+            currentWaitTime += SessionUtil.ONE_SECOND_MS;
 
             if (currentWaitTime > SessionUtil.TIMEOUT_WAIT_FOR_SESSION_STARTUP_MS) {
                 throw new TimeoutException("Timed out waiting for session " + sessionID + " and status " + expectedState
@@ -337,7 +338,34 @@ public class SessionUtil {
 
         LOGGER.info("Session " + sessionID + " reached " + expectedState);
 
+        // Completely ensure the Session is accessible.
+        if (!SessionType.fromApplicationStringType(requestedSession.getType()).equals(SessionType.HEADLESS)) {
+            final String connectURL = requestedSession.getConnectURL();
+            LOGGER.info("Waiting for session connect URL to become available: " + connectURL);
+            int responseCode = SessionUtil.getSessionIngressResponseCode(connectURL);
+            while (responseCode != HttpServletResponse.SC_OK) {
+                LOGGER.info("Waiting three seconds for session connect URL to become available: " + connectURL);
+                try {
+                    Thread.sleep(SessionUtil.ONE_SECOND_MS * 3);
+                } catch (final InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+
+                try {
+                    responseCode = SessionUtil.getSessionIngressResponseCode(connectURL);
+                } catch (final Exception e) {
+                    LOGGER.warn("Error connecting to session connect URL: " + connectURL, e);
+                }
+            }
+        }
+
         return requestedSession;
+    }
+
+    private static int getSessionIngressResponseCode(final String connectURL) throws Exception {
+        final HttpGet get = new HttpGet(new URL(connectURL), true);
+        get.run();
+        return get.getResponseCode();
     }
 
     static void verifySession(final Session session, final String expectedSessionType, final String expectedName) {

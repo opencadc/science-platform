@@ -68,11 +68,16 @@ package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.PropertiesReader;
 import com.google.gson.*;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
 
 /**
  * Describes the JSON file that contains the default and available resources for the Kubernetes cluster.
@@ -82,6 +87,7 @@ import org.apache.log4j.Logger;
 public class ResourceContexts {
 
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
+    static final String SESSION_LIMIT_RANGE_FEATURE_GATE = "sessionLimitRange";
 
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
@@ -95,7 +101,7 @@ public class ResourceContexts {
     private final List<Integer> availableGPUs = new ArrayList<>();
 
     public ResourceContexts() {
-        try (final FileReader reader = new FileReader(getResourcesFile("k8s-resources.json"))) {
+        try (final Reader reader = getJSONReader()) {
             JsonElement jsonElement = JsonParser.parseReader(reader);
             JsonObject jsonObject = jsonElement.getAsJsonObject();
 
@@ -115,6 +121,27 @@ public class ResourceContexts {
             JsonObject gpus = jsonObject.getAsJsonObject("gpus");
             JsonArray gpuOptions = gpus.getAsJsonArray("options");
             gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
+        } catch (Exception e) {
+            log.error(e);
+            throw new IllegalStateException("failed reading k8s-resources.json", e);
+        }
+    }
+
+    private Reader getJSONReader() {
+        try {
+            final K8SUtil.ExperimentalFeatures experimentalFeatures = K8SUtil.getExperimentalFeatures();
+            final boolean sessionLimitRangeEnabled =
+                    experimentalFeatures.isEnabled(ResourceContexts.SESSION_LIMIT_RANGE_FEATURE_GATE);
+            if (sessionLimitRangeEnabled) {
+                final LimitRangeResourceContext limitRangeResourceContext = new LimitRangeResourceContext();
+                try (final OutputStream outputStream = new ByteArrayOutputStream()) {
+                    limitRangeResourceContext.write(outputStream);
+                    outputStream.flush();
+                    return new StringReader(outputStream.toString());
+                }
+            } else {
+                return new FileReader(getResourcesFile("k8s-resources.json"));
+            }
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed reading k8s-resources.json", e);
