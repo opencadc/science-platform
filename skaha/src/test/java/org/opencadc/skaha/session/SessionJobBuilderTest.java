@@ -64,26 +64,11 @@ public class SessionJobBuilderTest {
                         .containsKey("nvidia.com/gpu"));
     }
 
-    private Map<String, String> loadParametersFromFile(final Path testBaseValuesPath) throws Exception {
-        final String fileContent = Files.readString(testBaseValuesPath);
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
-        }
-
-        return parametersToReplaceValues;
-    }
-
-    private Path getTestFilePath(final String jobFileName) {
-        return FileUtil.getFileFromResource(jobFileName, SessionJobBuilderTest.class)
+    private void testBaseValuesAffinityJob(final int gpuCount) throws Exception {
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
                 .toPath();
-    }
-
-    private V1Job getTestBaseValuesAffinityJob(final int gpuCount) throws Exception {
-        final Path testBaseValuesPath = getTestFilePath("test-base-values-affinity.yaml");
-        final Map<String, String> parametersToReplaceValues = loadParametersFromFile(testBaseValuesPath);
+        final Map<String, String> parametersToReplaceValues = new HashMap<>();
         commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -135,69 +120,51 @@ public class SessionJobBuilderTest {
                 Objects.requireNonNull(job.getMetadata().getLabels())
                         .get(SessionJobBuilder.JOB_RESOURCE_FIXED_LABEL_KEY));
 
-        return (V1Job) Yaml.load(output);
+        final V1PodSpec podSpec =
+                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        Assert.assertNotNull("PodSpec should not be null", podSpec);
+        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
+
+        Assert.assertEquals(
+                "Wrong pull secret.",
+                "my-secret",
+                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
+
+        final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
+        gpuRequirement.setKey("nvidia.com/gpu.count");
+        gpuRequirement.setOperator("Gt");
+        gpuRequirement.setValues(Collections.singletonList("0"));
+
+        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
+        providedRequirement.setKey("my-node-please");
+        providedRequirement.setOperator("Exists");
+
+        if (gpuCount > 0) {
+            Assert.assertTrue("Missing GPU required match expression.", testMatchExpressions.contains(gpuRequirement));
+        } else {
+            Assert.assertFalse("GPU should be missing.", testMatchExpressions.contains(gpuRequirement));
+        }
+        Assert.assertTrue(
+                "Missing provided (custom) required match expression.",
+                testMatchExpressions.contains(providedRequirement));
     }
 
     @Test
     public void testWithAffinityMergingNoGPUs() throws Exception {
-        final V1Job job = getTestBaseValuesAffinityJob(0);
-        final V1PodSpec podSpec =
-                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        Assert.assertNotNull("PodSpec should not be null", podSpec);
-        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
-
-        Assert.assertEquals(
-                "Wrong pull secret.",
-                "my-secret",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
-
-        final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
-        gpuRequirement.setKey("nvidia.com/gpu.count");
-        gpuRequirement.setOperator("Gt");
-        gpuRequirement.setValues(Collections.singletonList("0"));
-
-        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
-        providedRequirement.setKey("my-node-please");
-        providedRequirement.setOperator("Exists");
-
-        Assert.assertFalse("GPU should be missing.", testMatchExpressions.contains(gpuRequirement));
-        Assert.assertTrue(
-                "Missing provided (custom) required match expression.",
-                testMatchExpressions.contains(providedRequirement));
+        testBaseValuesAffinityJob(0);
     }
 
     @Test
     public void testWithAffinityMerging() throws Exception {
-        final V1Job job = getTestBaseValuesAffinityJob(2);
-        final V1PodSpec podSpec =
-                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        Assert.assertNotNull("PodSpec should not be null", podSpec);
-        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
-
-        Assert.assertEquals(
-                "Wrong pull secret.",
-                "my-secret",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
-
-        final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
-        gpuRequirement.setKey("nvidia.com/gpu.count");
-        gpuRequirement.setOperator("Gt");
-        gpuRequirement.setValues(Collections.singletonList("0"));
-
-        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
-        providedRequirement.setKey("my-node-please");
-        providedRequirement.setOperator("Exists");
-
-        Assert.assertTrue("Missing GPU required match expression.", testMatchExpressions.contains(gpuRequirement));
-        Assert.assertTrue(
-                "Missing provided (custom) required match expression.",
-                testMatchExpressions.contains(providedRequirement));
+        testBaseValuesAffinityJob(2);
     }
 
     @Test
     public void testWithQueueMerging() throws Exception {
-        final Path testBaseValuesPath = getTestFilePath("test-base-values-queue.yaml");
-        final Map<String, String> parametersToReplaceValues = loadParametersFromFile(testBaseValuesPath);
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
+                .toPath();
+        final Map<String, String> parametersToReplaceValues = new HashMap<>();
         commonValues(testBaseValuesPath, parametersToReplaceValues);
 
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
@@ -239,7 +206,7 @@ public class SessionJobBuilderTest {
         final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
                         Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
-                .getFirst()
+                .get(0)
                 .getMatchExpressions();
 
         if (matchExpressions != null) {
