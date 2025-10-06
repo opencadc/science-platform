@@ -77,6 +77,7 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.opencadc.skaha.K8SUtil;
 
 /**
@@ -88,6 +89,7 @@ public class ResourceContexts {
 
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
     static final String SESSION_LIMIT_RANGE_FEATURE_GATE = "sessionLimitRange";
+    private static final String SESSION_LIMIT_FILE_NAME = "k8s-resources.json";
 
     private final Integer defaultRequestCores;
     private final Integer defaultLimitCores;
@@ -100,8 +102,9 @@ public class ResourceContexts {
 
     private final List<Integer> availableGPUs = new ArrayList<>();
 
+    /** Default constructor reads the resources from the k8s-resources.json file and objectifies them locally. */
     public ResourceContexts() {
-        try (final Reader reader = getJSONReader()) {
+        try (final Reader reader = ResourceContexts.getJSONReader()) {
             JsonElement jsonElement = JsonParser.parseReader(reader);
             JsonObject jsonObject = jsonElement.getAsJsonObject();
 
@@ -123,11 +126,18 @@ public class ResourceContexts {
             gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.json", e);
+            throw new IllegalStateException("failed reading " + ResourceContexts.SESSION_LIMIT_FILE_NAME, e);
         }
     }
 
-    private Reader getJSONReader() {
+    /**
+     * Obtain the current JSON reader for the resources output. If the sessionLimitRange feature gate is enabled, the
+     * resources will be read from the Kubernetes LimitRange. Otherwise, the resources will be read from the
+     * k8s-resources.json file.
+     *
+     * @return Reader for the resources in JSON format. Never null.
+     */
+    @NotNull static Reader getJSONReader() {
         try {
             final K8SUtil.ExperimentalFeatures experimentalFeatures = K8SUtil.getExperimentalFeatures();
             final boolean sessionLimitRangeEnabled =
@@ -140,21 +150,21 @@ public class ResourceContexts {
                     return new StringReader(outputStream.toString());
                 }
             } else {
-                return new FileReader(getResourcesFile("k8s-resources.json"));
+                return new FileReader(getResourcesFile());
             }
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading k8s-resources.json", e);
+            throw new IllegalStateException("Failed reading Resources as JSON", e);
         }
     }
 
-    public static File getResourcesFile(String fileName) {
+    @NotNull private static File getResourcesFile() {
         String configDir = System.getProperty("user.home") + "/config";
         String configDirSystemProperty = PropertiesReader.class.getName() + ".dir";
         if (System.getProperty(configDirSystemProperty) != null) {
             configDir = System.getProperty(configDirSystemProperty);
         }
-        return new File(new File(configDir), fileName);
+        return new File(new File(configDir), ResourceContexts.SESSION_LIMIT_FILE_NAME);
     }
 
     public Integer getDefaultRequestCores() {
@@ -177,11 +187,11 @@ public class ResourceContexts {
         return defaultLimitRAM;
     }
 
-    public List<Integer> getAvailableRAM() {
+    @NotNull public List<Integer> getAvailableRAM() {
         return availableRAM;
     }
 
-    public List<Integer> getAvailableGPUs() {
+    @NotNull public List<Integer> getAvailableGPUs() {
         return availableGPUs;
     }
 }

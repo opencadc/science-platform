@@ -151,6 +151,7 @@ public class TestConfiguration {
             subject.getPublicCredentials()
                     .add(new SSOCookieCredential(cookieValue, "cadc-ccda.hia-iha.nrc-cnrc.gc.ca"));
             subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
+            subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "cadc.dao.nrc.ca"));
             subject.getPublicCredentials().add(AuthMethod.COOKIE);
             return subject;
         } catch (Exception ex) {
