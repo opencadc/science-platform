@@ -39,7 +39,7 @@
         "options": {
           "type": "array",
           "items": { "type": "integer" },
-          "minItems": 1
+          "minItems": 0
         }
       },
       "required": ["options"],

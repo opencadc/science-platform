@@ -31,7 +31,6 @@ public class LimitRangeResourceContext {
             LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY,
             "gpus");
 
-    private final Map<String, Quantity> minimumValues = new HashMap<>();
     private final Map<String, Quantity> maximumValues = new HashMap<>();
     private final Map<String, Quantity> defaultRequestValues = new HashMap<>();
     private final Map<String, Quantity> defaultLimitValues = new HashMap<>();
@@ -51,15 +50,7 @@ public class LimitRangeResourceContext {
      * @param containerLimitRange A configured LimitRangeItem from Kubernetes.
      */
     LimitRangeResourceContext(@NotNull final V1LimitRangeItem containerLimitRange) {
-        final Map<String, Quantity> configuredMin =
-                Objects.requireNonNullElse(containerLimitRange.getMin(), new HashMap<>());
-        if (configuredMin.isEmpty()) {
-            throw new IllegalArgumentException("Minimum values for "
-                    + LimitRangeResourceContext.RESOURCE_KEY_MAP.keySet() + " must be specified in the LimitRange.");
-        } else {
-            this.minimumValues.putAll(configuredMin);
-        }
-
+        LOGGER.info("Initializing LimitRangeResourceContext with " + containerLimitRange);
         final Map<String, Quantity> configuredMax =
                 Objects.requireNonNullElse(containerLimitRange.getMax(), new HashMap<>());
         if (configuredMax.isEmpty()) {
@@ -118,17 +109,19 @@ public class LimitRangeResourceContext {
             jsonWriter.endArray();
             jsonWriter.endObject();
 
+            // GPUs will be an empty array if no GPU limits are defined in the LimitRange.
+            jsonWriter
+                    .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY))
+                    .object();
+            jsonWriter.key("options").array();
+
             if (hasGPULimits()) {
-                jsonWriter
-                        .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(
-                                LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY))
-                        .object();
                 final IntegerRange totalGPUCounts = getTotalGPUCounts();
-                jsonWriter.key("options").array();
                 totalGPUCounts.iterator().forEachRemaining(jsonWriter::value);
-                jsonWriter.endArray();
-                jsonWriter.endObject();
             }
+
+            jsonWriter.endArray();
+            jsonWriter.endObject();
 
             jsonWriter.key("maxInteractiveSessions").value(K8SUtil.getMaxUserSessions());
             jsonWriter.endObject();
@@ -141,7 +134,7 @@ public class LimitRangeResourceContext {
     IntegerRange getTotalCoreCounts() {
         final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.minimumValues, limitRangeKey),
+                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
                 LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
     }
 
@@ -155,7 +148,7 @@ public class LimitRangeResourceContext {
     IntegerRange getTotalMemoryCounts() {
         final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.minimumValues, limitRangeKey),
+                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
                 LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
     }
 
@@ -169,13 +162,12 @@ public class LimitRangeResourceContext {
     private IntegerRange getTotalGPUCounts() {
         final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.minimumValues, limitRangeKey),
+                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
                 LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
     }
 
     private boolean hasGPULimits() {
-        return this.minimumValues.containsKey(LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY)
-                && this.maximumValues.containsKey(LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY);
+        return this.maximumValues.containsKey(LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY);
     }
 
     private static int quantityAsInt(final Map<String, Quantity> map, final String limitRangeKey) {

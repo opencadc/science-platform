@@ -126,7 +126,7 @@ public class ResourceContexts {
             gpuOptions.asList().forEach(gpuOption -> availableGPUs.add(gpuOption.getAsInt()));
         } catch (Exception e) {
             log.error(e);
-            throw new IllegalStateException("failed reading " + ResourceContexts.SESSION_LIMIT_FILE_NAME, e);
+            throw new IllegalStateException("Failed reading Resource Context data.", e);
         }
     }
 
@@ -150,7 +150,7 @@ public class ResourceContexts {
                     return new StringReader(outputStream.toString());
                 }
             } else {
-                return new FileReader(getResourcesFile());
+                return new FileReader(ResourceContexts.getResourcesFile());
             }
         } catch (Exception e) {
             log.error(e);

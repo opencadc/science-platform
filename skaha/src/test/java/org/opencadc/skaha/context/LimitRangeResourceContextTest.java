@@ -26,24 +26,26 @@ public class LimitRangeResourceContextTest {
 
     @Test
     public void testJSONOutput() throws Exception {
-        final OutputStream outputStream = new ByteArrayOutputStream();
-        final V1LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
+        try (final OutputStream outputStream = new ByteArrayOutputStream()) {
+            final V1LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
 
-        final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
+            final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
 
-        try {
-            resourceContext.write(outputStream);
-        } catch (JSONException jsonException) {
-            throw new AssertionFailedError(jsonException.getMessage() + "\nDocument:\n" + outputStream);
+            try {
+                resourceContext.write(outputStream);
+            } catch (JSONException jsonException) {
+                throw new AssertionFailedError(jsonException.getMessage() + "\nDocument:\n" + outputStream);
+            }
+
+            final String jsonOutput = outputStream.toString();
+
+            final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
+            final JsonSchema jsonSchema =
+                    factory.getSchema(GetAction.class.getResourceAsStream("/context-schema.json"));
+            final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonOutput, InputFormat.JSON);
+
+            Assert.assertTrue("JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
         }
-
-        final String jsonOutput = outputStream.toString();
-
-        final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
-        final JsonSchema jsonSchema = factory.getSchema(GetAction.class.getResourceAsStream("/context-schema.json"));
-        final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonOutput, InputFormat.JSON);
-
-        Assert.assertTrue("JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
     }
 
     @Test
@@ -52,11 +54,29 @@ public class LimitRangeResourceContextTest {
 
         final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
         Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 8), resourceContext.getTotalCoreCounts());
-        Assert.assertEquals("Wrong CPU count", new IntegerRange(4, 24), resourceContext.getTotalMemoryCounts());
+        Assert.assertEquals("Wrong Memory count", new IntegerRange(2, 24), resourceContext.getTotalMemoryCounts());
         Assert.assertEquals(
                 "Wrong default request core count", new IntegerRange(1, 4), resourceContext.getDefaultCoreCounts());
         Assert.assertEquals(
-                "Wrong default request core count", new IntegerRange(2, 16), resourceContext.getDefaultMemoryCounts());
+                "Wrong default request memory count",
+                new IntegerRange(2, 16),
+                resourceContext.getDefaultMemoryCounts());
+    }
+
+    @Test
+    public void testCountEnsureUnitless() {
+        final V1LimitRangeItem containerLimitRange =
+                LimitRangeResourceContextTest.getContainerLimitRangeDefaultMinimum();
+
+        final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
+        Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 3), resourceContext.getTotalCoreCounts());
+        Assert.assertEquals("Wrong Memory count", new IntegerRange(2, 24), resourceContext.getTotalMemoryCounts());
+        Assert.assertEquals(
+                "Wrong default request core count", new IntegerRange(1, 4), resourceContext.getDefaultCoreCounts());
+        Assert.assertEquals(
+                "Wrong default request memory count",
+                new IntegerRange(2, 16),
+                resourceContext.getDefaultMemoryCounts());
     }
 
     @Test
@@ -76,15 +96,6 @@ public class LimitRangeResourceContextTest {
         }
 
         final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-
-        containerLimitRange.setMin(Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("4Gi")));
-        try {
-            new LimitRangeResourceContext(containerLimitRange);
-            Assert.fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException iae) {
-            // no-op
-        }
-
         containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
         try {
             new LimitRangeResourceContext(containerLimitRange);
@@ -108,8 +119,17 @@ public class LimitRangeResourceContextTest {
 
     private static V1LimitRangeItem getContainerLimitRange() {
         final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-        containerLimitRange.setMin(Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("4Gi")));
         containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
+        containerLimitRange.setDefaultRequest(
+                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
+        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+
+        return containerLimitRange;
+    }
+
+    private static V1LimitRangeItem getContainerLimitRangeDefaultMinimum() {
+        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
+        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("3"), "memory", Quantity.fromString("24Gi")));
         containerLimitRange.setDefaultRequest(
                 Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
         containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
