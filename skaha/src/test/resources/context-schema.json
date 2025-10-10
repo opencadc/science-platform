@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResourceConfiguration",
+  "type": "object",
+  "properties": {
+    "cores": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "integer", "description": "Default selection on the Science Portal form." },
+        "defaultRequest": { "type": "integer" },
+        "defaultLimit": { "type": "integer" },
+        "options": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 1
+        }
+      },
+      "required": ["defaultRequest", "defaultLimit", "options"],
+      "additionalProperties": false
+    },
+    "memoryGB": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "integer", "description": "Default selection on the Science Portal form." },
+        "defaultRequest": { "type": "integer" },
+        "defaultLimit": { "type": "integer" },
+        "options": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 1
+        }
+      },
+      "required": ["defaultRequest", "defaultLimit", "options"],
+      "additionalProperties": false
+    },
+    "gpus": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 0
+        }
+      },
+      "required": ["options"],
+      "additionalProperties": false
+    },
+    "maxInteractiveSessions": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": ["cores", "memoryGB"],
+  "additionalProperties": false
+}
