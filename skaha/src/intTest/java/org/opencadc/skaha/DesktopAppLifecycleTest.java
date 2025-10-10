@@ -105,7 +105,7 @@ public class DesktopAppLifecycleTest {
                     TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
             log.info("sessions URL: " + sessionURL);
 
-            this.userSubject = TestConfiguration.getCurrentUser(sessionURL, false);
+            this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
             log.debug("userSubject: " + userSubject);
         } catch (Exception e) {
             log.error("init exception", e);

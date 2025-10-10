@@ -67,8 +67,12 @@
 
 package org.opencadc.skaha;
 
+import ca.nrc.cadc.util.StringUtil;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.session.SessionType;
@@ -94,12 +98,12 @@ public class K8SUtil {
     /**
      * Filter out anything not in the alphanumeric or hyphen character set.
      *
-     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object
-     *     names</a>
      * @param sessionID The provided session ID.
      * @param type The defined type (desktop, notebook, etc.)
      * @param userID The running User's ID.
      * @return String sanitized name. Never null.
+     * @see <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/">Kubernetes Object
+     *     names</a>
      */
     public static String getJobName(String sessionID, SessionType type, String userID) {
         // Replace values that are NOT alphanumeric or a hyphen.
@@ -220,6 +224,59 @@ public class K8SUtil {
             return Integer.parseInt(imageVersion.substring(0, 1));
         } catch (NumberFormatException nfe) {
             return null;
+        }
+    }
+
+    public static ExperimentalFeatures getExperimentalFeatures() {
+        return ExperimentalFeatures.fromEnv();
+    }
+
+    /**
+     * Experimental features that can be toggled on/off via configuration. These are beta features behind a feature flag
+     * set in the Environment.
+     *
+     * <p>Setting the environment variable SKAHA_EXPERIMENTAL_FEATURE_GATES to a comma-separated list of key=value pairs
+     * will enable/disable the feature. For example: <code>
+     * SKAHA_EXPERIMENTAL_FEATURE_GATES="featureOne=true,featureTwo=false"</code>
+     */
+    public static class ExperimentalFeatures {
+        private static final Logger LOGGER = Logger.getLogger(ExperimentalFeatures.class.getName());
+        private static final String FEATURE_GATE_DELIMITER = ",";
+        private static final String SKAHA_EXPERIMENTAL_FEATURES_PREFIX = "SKAHA_EXPERIMENTAL_FEATURE_GATES";
+        private final Map<String, Boolean> featureGates = new HashMap<>();
+
+        public boolean isEnabled(final String featureGateName) {
+            if (this.featureGates.containsKey(featureGateName)) {
+                return this.featureGates.get(featureGateName);
+            }
+            throw new IllegalArgumentException("Feature gate " + featureGateName + " not found.");
+        }
+
+        @Override
+        public String toString() {
+            return "ExperimentalFeatures{" + "featureGates=" + featureGates + '}';
+        }
+
+        private static ExperimentalFeatures fromEnv() {
+            final String featureGates = System.getenv(ExperimentalFeatures.SKAHA_EXPERIMENTAL_FEATURES_PREFIX);
+            final Map<String, Boolean> configuredFeatureGates = new HashMap<>();
+            if (StringUtil.hasText(featureGates)) {
+                Arrays.stream(featureGates.split(ExperimentalFeatures.FEATURE_GATE_DELIMITER))
+                        .map(String::trim)
+                        .forEach(gate -> {
+                            if (StringUtil.hasText(gate)) {
+                                final String[] gateEnable = gate.split("=");
+                                LOGGER.debug("Experimental feature gate: " + gateEnable[0] + " = " + gateEnable[1]);
+                                configuredFeatureGates.put(gateEnable[0], Boolean.parseBoolean(gateEnable[1]));
+                            }
+                        });
+            }
+            return new ExperimentalFeatures(configuredFeatureGates);
+        }
+
+        private ExperimentalFeatures(final Map<String, Boolean> configuredFeatureGates) {
+            Objects.requireNonNull(configuredFeatureGates, "configuredFeatureGates cannot be null");
+            this.featureGates.putAll(configuredFeatureGates);
         }
     }
 }

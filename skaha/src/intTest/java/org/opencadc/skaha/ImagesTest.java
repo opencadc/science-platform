@@ -109,7 +109,7 @@ public class ImagesTest {
                     TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1, AuthMethod.TOKEN);
             log.info("sessions URL: " + imageURL);
 
-            this.userSubject = TestConfiguration.getCurrentUser(imageURL, false);
+            this.userSubject = TestConfiguration.getCurrentUser(imageURL);
         } catch (Exception e) {
             log.error("init exception", e);
             throw new RuntimeException("init exception", e);

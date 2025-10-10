@@ -67,9 +67,12 @@
 
 package org.opencadc.skaha.context;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.BufferedWriter;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.opencadc.skaha.SkahaAction;
 
 /**
@@ -87,21 +90,13 @@ public class GetAction extends SkahaAction {
     public void doAction() throws Exception {
         super.initRequest();
 
-        File propertiesFile = ResourceContexts.getResourcesFile("k8s-resources.json");
-        byte[] bytes = GetAction.getBytes(propertiesFile);
-        syncOutput.setHeader("Content-Type", "application/json");
-        syncOutput.getOutputStream().write(bytes);
-    }
+        try (final Reader reader = ResourceContexts.getJSONReader()) {
+            final JSONObject jsonObject = new JSONObject(new JSONTokener(reader));
 
-    private static byte[] getBytes(File propertiesFile) throws IOException {
-        byte[] bytes = new byte[(int) propertiesFile.length()];
-
-        try (FileInputStream fileInputStream = new FileInputStream(propertiesFile)) {
-            int bytesRead = fileInputStream.read(bytes);
-            if (bytesRead != bytes.length) {
-                throw new IOException("Could not read the entire file: " + propertiesFile.getAbsolutePath());
-            }
+            syncOutput.setHeader("Content-Type", "application/json");
+            final Writer writer = new BufferedWriter(new OutputStreamWriter(this.syncOutput.getOutputStream()));
+            jsonObject.write(writer);
+            writer.flush();
         }
-        return bytes;
     }
 }
