@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/opencadc/science-platform/compare/1.0.4...1.1.0) (2025-10-10)
+
+
+### Features
+
+* final test pass for limit range ([d7388db](https://github.com/opencadc/science-platform/commit/d7388dbe1c4ec77197d7a37c2c3cd3869dccc00e))
+* remove minimum values from limit range ([6f92e4d](https://github.com/opencadc/science-platform/commit/6f92e4d4a6e1e83d5d8889a7b028cdc58e4019bc))
+
+
+### Bug Fixes
+
+* fix auto build and jdk versions ([8979b5d](https://github.com/opencadc/science-platform/commit/8979b5d2b4be399d6b146d17b303ff5c2e8b6668))
+
 ## [1.0.4](https://github.com/opencadc/science-platform/compare/1.0.3...1.0.4) (2025-09-29)
 
 
