@@ -1,10 +1,22 @@
 package org.opencadc.skaha.session;
 
 import io.kubernetes.client.openapi.models.V1JobStatus;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 public class SessionBuilderTest {
+    @Before
+    public void setupHomePath() {
+        TestUtil.setupUserStorageEnvironment();
+    }
+
+    @After
+    public void removeHomePath() {
+        TestUtil.tearDownUserStorageEnvironment();
+    }
+
     @Test
     public void testStatusNull() {
         final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");

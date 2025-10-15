@@ -16,9 +16,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 
 /**
@@ -29,6 +29,8 @@ import org.opencadc.skaha.utils.CommonUtils;
 class SessionBuilder {
 
     private static final Logger LOGGER = Logger.getLogger(SessionBuilder.class.getName());
+
+    private final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
 
     private final String id;
     private final String userID;
@@ -117,7 +119,7 @@ class SessionBuilder {
                 final List<Long> supplementalGroupGIDs = podSecurityContext.getSupplementalGroups();
                 if (supplementalGroupGIDs != null && !supplementalGroupGIDs.isEmpty()) {
                     this.supplementalGroups.addAll(
-                            supplementalGroupGIDs.stream().map(Long::intValue).collect(Collectors.toList()));
+                            supplementalGroupGIDs.stream().map(Long::intValue).toList());
                 }
             }
 
@@ -137,7 +139,7 @@ class SessionBuilder {
             if (podContainers.isEmpty()) {
                 SessionDAO.LOGGER.warn("No Container found.");
             } else {
-                final V1Container podContainer = podContainers.get(0);
+                final V1Container podContainer = podContainers.getFirst();
                 this.image = podContainer.getImage();
 
                 final V1ResourceRequirements resourceRequirements =
@@ -174,7 +176,7 @@ class SessionBuilder {
                         SessionType.fromApplicationStringType(this.type),
                         this.id,
                         this.image,
-                        K8SUtil.getSkahaTld(),
+                        userStorageConfiguration.homeBaseDirectory.toString(),
                         this.userID);
             } catch (URISyntaxException e) {
                 SessionDAO.LOGGER.warn("Invalid URI for connect URL: " + this);

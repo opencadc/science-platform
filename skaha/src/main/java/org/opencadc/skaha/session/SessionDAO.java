@@ -187,7 +187,7 @@ public class SessionDAO {
             final SessionType type,
             final String id,
             final String image,
-            final String topLevelDirectory,
+            final String absoluteHomeDirectory,
             final String userid)
             throws URISyntaxException {
         final String connectURL;
@@ -204,7 +204,7 @@ public class SessionDAO {
                     .build();
         } else if (SessionType.NOTEBOOK == type) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
-                    .withTopLevelDirectory(topLevelDirectory)
+                    .withAbsoluteHomeDirectory(absoluteHomeDirectory)
                     .withUserName(userid)
                     .build();
         } else if (SessionType.CONTRIBUTED == type) {
