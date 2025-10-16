@@ -54,7 +54,7 @@ public class LimitRangeResourceContextTest {
 
         final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
         Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 8), resourceContext.getTotalCoreCounts());
-        Assert.assertEquals("Wrong Memory count", new IntegerRange(2, 24), resourceContext.getTotalMemoryCounts());
+        Assert.assertEquals("Wrong Memory count", new IntegerRange(1, 24), resourceContext.getTotalMemoryCounts());
         Assert.assertEquals(
                 "Wrong default request core count", new IntegerRange(1, 4), resourceContext.getDefaultCoreCounts());
         Assert.assertEquals(
@@ -70,7 +70,7 @@ public class LimitRangeResourceContextTest {
 
         final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
         Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 3), resourceContext.getTotalCoreCounts());
-        Assert.assertEquals("Wrong Memory count", new IntegerRange(2, 24), resourceContext.getTotalMemoryCounts());
+        Assert.assertEquals("Wrong Memory count", new IntegerRange(1, 24), resourceContext.getTotalMemoryCounts());
         Assert.assertEquals(
                 "Wrong default request core count", new IntegerRange(1, 4), resourceContext.getDefaultCoreCounts());
         Assert.assertEquals(
