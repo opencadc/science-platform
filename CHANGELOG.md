@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/opencadc/science-platform/compare/1.1.0...1.1.1) (2025-10-16)
+
+
+### Bug Fixes
+
+* fix to start minimum values at 1 ([f6dd34c](https://github.com/opencadc/science-platform/commit/f6dd34c85c5bbc6298a98297d102950fda73f03f))
+* fix to start minimum values at 1 ([c653b7f](https://github.com/opencadc/science-platform/commit/c653b7f8c7e134b0283a6fbc592a3748d941cddc))
+
 ## [1.1.0](https://github.com/opencadc/science-platform/compare/1.0.4...1.1.0) (2025-10-10)
 
 
