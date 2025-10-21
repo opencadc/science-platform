@@ -132,10 +132,10 @@ public class LimitRangeResourceContext {
     }
 
     IntegerRange getTotalCoreCounts() {
-        final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
-                LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
+                1,
+                LimitRangeResourceContext.quantityAsInt(
+                        this.maximumValues, LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY));
     }
 
     IntegerRange getDefaultCoreCounts() {
@@ -146,10 +146,10 @@ public class LimitRangeResourceContext {
     }
 
     IntegerRange getTotalMemoryCounts() {
-        final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
-                LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
+                1,
+                LimitRangeResourceContext.quantityAsInt(
+                        this.maximumValues, LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY));
     }
 
     IntegerRange getDefaultMemoryCounts() {
@@ -160,10 +160,10 @@ public class LimitRangeResourceContext {
     }
 
     private IntegerRange getTotalGPUCounts() {
-        final String limitRangeKey = LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY;
         return new IntegerRange(
-                LimitRangeResourceContext.quantityAsInt(this.defaultRequestValues, limitRangeKey),
-                LimitRangeResourceContext.quantityAsInt(this.maximumValues, limitRangeKey));
+                1,
+                LimitRangeResourceContext.quantityAsInt(
+                        this.maximumValues, LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY));
     }
 
     private boolean hasGPULimits() {
