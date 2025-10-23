@@ -1,34 +1,24 @@
 package org.opencadc.skaha.utils;
 
-import java.lang.reflect.Field;
-import java.util.Map;
+import org.jetbrains.annotations.NotNull;
+import org.opencadc.skaha.session.Session;
+import org.opencadc.skaha.session.SessionType;
 
 public class TestUtils {
-    public static <T> void set(T object, String propertyName, Object value) {
-        set(object, object.getClass(), propertyName, value);
-    }
-
-    public static <T> void set(T object, Class<?> className, String propertyName, Object value) {
-        try {
-            // Get the field by name
-            Field field = className.getDeclaredField(propertyName);
-            // Make the field accessible if it's private
-            field.setAccessible(true);
-            // Set the value of the field
-            field.set(object, value);
-        } catch (NoSuchFieldException e) {
-            System.err.println("No such field: " + propertyName);
-        } catch (IllegalAccessException e) {
-            System.err.println("Cannot access field: " + propertyName);
-        }
-    }
-
-    public static void setEnv(String key, String value) throws Exception {
-        Map<String, String> env = System.getenv();
-        Class<?> clazz = env.getClass();
-        Field field = clazz.getDeclaredField("m");
-        field.setAccessible(true);
-        Map<String, String> writableEnv = (Map<String, String>) field.get(env);
-        writableEnv.put(key, value);
+    public static Session createSession(
+            @NotNull final String id, @NotNull final SessionType type, @NotNull final String status) {
+        return new Session(
+                id,
+                "owner",
+                "88",
+                "88",
+                new Integer[0],
+                "example.org/image",
+                type.applicationName,
+                status,
+                "name-" + id,
+                null,
+                "https://example.org/connect",
+                null);
     }
 }

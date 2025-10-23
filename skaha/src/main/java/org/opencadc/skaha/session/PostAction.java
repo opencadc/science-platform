@@ -437,24 +437,30 @@ public class PostAction extends SessionAction {
         throw new IllegalArgumentException("image not in a trusted repository");
     }
 
-    public void checkExistingSessions(SessionType type) throws Exception {
-        // multiple
+    private void checkExistingSessions(final SessionType type) throws Exception {
+        checkExistingSessions(type, SessionDAO.getUserSessions(this.posixPrincipal.username, null, true));
+    }
+
+    /**
+     * Check the count of existing non-headless and non desktop-app sessions for the user.
+     *
+     * @param type The type of desired session to ensure not headless.
+     * @param sessions The list of existing Session objects for the user.
+     */
+    void checkExistingSessions(final SessionType type, final List<Session> sessions) {
+        Objects.requireNonNull(type, "type must not be null");
+        Objects.requireNonNull(sessions, "sessions must not be null");
+
         if (!type.isHeadless()) {
-            final List<Session> sessions = SessionDAO.getUserSessions(this.posixPrincipal.username, null, true);
-            int count = 0;
-            for (Session session : sessions) {
-                log.debug("checking session: " + session);
-                if (!TYPE_DESKTOP_APP.equals(session.getType())) {
-                    final String status = session.getStatus();
-                    if (!(status.equalsIgnoreCase(Session.STATUS_TERMINATING)
-                            || status.equalsIgnoreCase(Session.STATUS_COMPLETED))) {
-                        count++;
-                    }
-                }
-            }
+            final long count = sessions.stream()
+                    .filter(session -> !TYPE_DESKTOP_APP.equals(session.getType()))
+                    .filter(session -> session.getStatus().equalsIgnoreCase(Session.STATUS_RUNNING)
+                            || session.getStatus().equalsIgnoreCase(Session.STATUS_PENDING))
+                    .count();
+
             log.debug("active interactive sessions: " + count);
             if (count >= maxUserSessions) {
-                throw new IllegalArgumentException("User " + posixPrincipal.username + " has reached the maximum of "
+                throw new IllegalArgumentException("User " + getUsername() + " has reached the maximum of "
                         + maxUserSessions + " active sessions.");
             }
         }

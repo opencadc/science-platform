@@ -14,7 +14,7 @@ public enum SessionType {
 
     private final boolean supportsIngress;
     private final boolean supportsService;
-    final String applicationName;
+    public final String applicationName;
 
     SessionType(final boolean supportsIngress, final boolean supportsService, final String applicationName) {
         this.supportsIngress = supportsIngress;
