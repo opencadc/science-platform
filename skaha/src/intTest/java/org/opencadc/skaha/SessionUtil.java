@@ -112,7 +112,8 @@ public class SessionUtil {
             if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                 // delete desktop-app
                 String sessionID = session.getId();
-                final URL desktopAppURL = URI.create(sessionURL.toString() + "/" + sessionID + "/app").toURL();
+                final URL desktopAppURL = URI.create(sessionURL.toString() + "/" + sessionID + "/app")
+                        .toURL();
                 SessionUtil.deleteDesktopApplicationSession(desktopAppURL, session.getAppId());
             } else {
                 // delete session
@@ -235,7 +236,9 @@ public class SessionUtil {
             throws Exception {
         LOGGER.info("Deleting desktop application session " + desktopApplicationSessionID);
         HttpDelete delete = new HttpDelete(
-                new URL(desktopApplicationSessionURL.toString() + "/" + desktopApplicationSessionID), true);
+                URI.create(desktopApplicationSessionURL.toString() + "/" + desktopApplicationSessionID)
+                        .toURL(),
+                true);
         delete.run();
 
         SessionUtil.waitForSessionToTerminate(desktopApplicationSessionURL, desktopApplicationSessionID);
@@ -244,7 +247,8 @@ public class SessionUtil {
 
     static void deleteSession(URL sessionURL, String sessionID) throws Exception {
         LOGGER.info("Deleting session " + sessionID);
-        HttpDelete delete = new HttpDelete(new URL(sessionURL.toString() + "/" + sessionID), true);
+        HttpDelete delete = new HttpDelete(
+                URI.create(sessionURL.toString() + "/" + sessionID).toURL(), true);
         delete.run();
 
         SessionUtil.waitForSessionToTerminate(sessionURL, sessionID);
@@ -265,7 +269,8 @@ public class SessionUtil {
 
     static JSONObject getStats(final URL sessionURL) throws Exception {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        HttpGet get = new HttpGet(URI.create(sessionURL.toString() + "?view=stats").toURL(), out);
+        HttpGet get =
+                new HttpGet(URI.create(sessionURL.toString() + "?view=stats").toURL(), out);
         get.run();
         out.flush();
         Assert.assertNull("get stats error", get.getThrowable());
@@ -376,7 +381,7 @@ public class SessionUtil {
     }
 
     private static int getSessionIngressResponseCode(final String connectURL) throws Exception {
-        final HttpGet get = new HttpGet(new URL(connectURL), true);
+        final HttpGet get = new HttpGet(URI.create(connectURL).toURL(), true);
         get.run();
         return get.getResponseCode();
     }
