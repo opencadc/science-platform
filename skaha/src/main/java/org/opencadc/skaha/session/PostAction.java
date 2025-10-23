@@ -88,7 +88,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -448,7 +447,10 @@ public class PostAction extends SessionAction {
      * @param type The type of desired session to ensure not headless.
      * @param sessions The list of existing Session objects for the user.
      */
-    void checkExistingSessions(@NotNull final SessionType type, @NotNull final List<Session> sessions) {
+    void checkExistingSessions(final SessionType type, final List<Session> sessions) {
+        Objects.requireNonNull(type, "type must not be null");
+        Objects.requireNonNull(sessions, "sessions must not be null");
+
         if (!type.isHeadless()) {
             final long count = sessions.stream()
                     .filter(session -> !TYPE_DESKTOP_APP.equals(session.getType()))
