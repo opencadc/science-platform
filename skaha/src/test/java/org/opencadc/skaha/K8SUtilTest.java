@@ -96,4 +96,11 @@ public class K8SUtilTest {
         Assert.assertEquals(
                 "Wrong hosts.", List.of("localhost,anotherhost"), K8SUtil.getHarborHosts("localhost,anotherhost"));
     }
+
+    @Test
+    public void getWorkerNodeSelector() {
+        // Handle if happens to be set.
+        final String original = System.getenv().getOrDefault(K8SUtil.SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV, "");
+        Assert.assertEquals("Should be empty when not set.", original, K8SUtil.getWorkerNodeLabelSelector());
+    }
 }

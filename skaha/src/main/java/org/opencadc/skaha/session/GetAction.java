@@ -78,6 +78,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 /**
  * Process the GET request on the session(s) or app(s).
@@ -173,13 +174,13 @@ public class GetAction extends SessionAction {
             double requestedCPUCores = 0.0;
             double coresAvailable = 0.0;
             double requestedRAM = 0.0;
-            double ramAvailable = 0.0;
+            long ramAvailable = 0;
             double maxCores = 0.0;
             long maxRAM = 0;
             double withCores = 0.0;
             String withRAM = "0G";
             Map<String, Map<String, Double>> nodeResourcesMap = getNodeResources(k8sNamespace);
-            Map<String, String[]> aResourceMap = getAvailableResources();
+            Map<String, String[]> aResourceMap = NodeDAO.getAvailableResources();
             List<String> nodeNames = new ArrayList<>(aResourceMap.keySet());
             for (String nodeName : nodeNames) {
                 String[] aResources = aResourceMap.get(nodeName);
@@ -187,10 +188,13 @@ public class GetAction extends SessionAction {
                     final double aCPUCores = Double.parseDouble(aResources[0]);
                     if (aCPUCores > maxCores) {
                         maxCores = aCPUCores;
-                        withRAM = toCommonUnit(aResources[1]);
+                        //                        withRAM = toCommonUnit(aResources[1]);
+                        withRAM = MemoryUnitConverter.formatHumanReadable(
+                                Long.parseLong(aResources[1]), MemoryUnitConverter.MemoryUnit.G);
                     }
 
-                    long aRAM = normalizeToLong(toCommonUnit(aResources[1]));
+                    //                    long aRAM = normalizeToLong(toCommonUnit(aResources[1]));
+                    long aRAM = Long.parseLong(aResources[1]);
                     if (aRAM > maxRAM) {
                         maxRAM = aRAM;
                         withCores = aCPUCores;
@@ -213,11 +217,20 @@ public class GetAction extends SessionAction {
             String withRAMStr = String.valueOf(formatter.format(Double.valueOf(normalizeToLong(withRAM))/(1024 * 1024 * 1024))) + "G";
             String maxRAMStr = String.valueOf(formatter.format(Double.valueOf(maxRAM)/(1024 * 1024 * 1024))) + "G";
             */
-            String withRAMStr =
-                    formatter.format(Double.valueOf((double) (normalizeToLong(withRAM)) / (1024 * 1024 * 1024))) + "G";
-            String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024))) + "G";
-            String requestedRAMStr = formatter.format(requestedRAM) + "G";
-            String ramAvailableStr = formatter.format(Double.valueOf(ramAvailable / (1024 * 1024 * 1024))) + "G";
+
+            //            String withRAMStr =
+            //                    formatter.format(Double.valueOf((double) (normalizeToLong(withRAM)) / (1024 * 1024 *
+            // 1024))) + "G";
+            //            String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024)))
+            // + "G";
+            final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(maxRAM, MemoryUnitConverter.MemoryUnit.G);
+            //            String requestedRAMStr = formatter.format(requestedRAM) + "G";
+            final String requestedRAMStr =
+                    MemoryUnitConverter.formatHumanReadable(requestedRAM, MemoryUnitConverter.MemoryUnit.G);
+            //            String ramAvailableStr = formatter.format(Double.valueOf(ramAvailable / (1024 * 1024 * 1024)))
+            // + "G";
+            final String ramAvailableStr =
+                    MemoryUnitConverter.formatHumanReadable(ramAvailable, MemoryUnitConverter.MemoryUnit.G);
             return new ResourceStats(
                     desktopCount,
                     headlessCount,
@@ -227,7 +240,7 @@ public class GetAction extends SessionAction {
                     coresAvailable,
                     ramAvailableStr,
                     maxCores,
-                    withRAMStr,
+                    withRAM,
                     maxRAMStr,
                     withCores);
         } catch (Exception e) {
@@ -237,7 +250,7 @@ public class GetAction extends SessionAction {
     }
 
     protected long normalizeToLong(String ramString) {
-        long value = 0;
+        long value;
         char unit = ramString.charAt(ramString.length() - 1);
         if (VALID_RAM_UNITS.contains(unit)) {
             value = Integer.parseInt(ramString.substring(0, ramString.length() - 1));
@@ -252,7 +265,7 @@ public class GetAction extends SessionAction {
                 value = value * 1024 * 1024 * 1024 * 1024;
             }
         } else if (Character.isDigit(unit)) {
-            value = Integer.parseInt(ramString);
+            value = Long.parseLong(ramString);
         } else {
             throw new IllegalStateException("unknown RAM unit: " + unit);
         }
@@ -315,7 +328,7 @@ public class GetAction extends SessionAction {
         if (!NONE.equalsIgnoreCase(resources[2])) {
             resourcesMap.put(
                     REQ_CPU_CORES_KEY,
-                    resourcesMap.get(REQ_CPU_CORES_KEY) + Double.parseDouble(toCoreUnit(resources[2])));
+                    resourcesMap.get(REQ_CPU_CORES_KEY) + Double.parseDouble(NodeDAO.toCoreUnit(resources[2])));
             log.debug("Node: " + resources[0] + " " + REQ_CPU_CORES_KEY + ": " + resourcesMap.get(REQ_CPU_CORES_KEY));
         }
 
@@ -326,88 +339,6 @@ public class GetAction extends SessionAction {
                             + (double) (normalizeToLong(toCommonUnit(resources[3]))) / (1024 * 1024 * 1024));
             log.debug("Node: " + resources[0] + " " + REQ_RAM_KEY + ": " + resourcesMap.get(REQ_RAM_KEY));
         }
-    }
-
-    private Map<String, String[]> getAvailableResources() throws Exception {
-        KubectlCommandBuilder.KubectlCommand getAvailableResourcesCmd =
-                KubectlCommandBuilder.command("describe").argument("nodes");
-        String rawResources = CommandExecutioner.execute(getAvailableResourcesCmd.build());
-
-        Map<String, String[]> nodeToResourcesMap = new HashMap<>();
-        if (StringUtil.hasLength(rawResources)) {
-            String[] lines = rawResources.split("\n");
-            if (lines.length > 0) {
-                List<String> keywords =
-                        Arrays.asList("Name:", "Capacity:", "cpu:", "memory:", "nvidia.com/gpu:", "Allocatable:");
-                String nodeName = "";
-                boolean hasName = false;
-                boolean hasCapacity = false;
-                boolean hasAllocatable = false;
-                boolean hasCores = false;
-                boolean hasRAM = false;
-                boolean hasGPU = false;
-                String[] resources = null;
-                for (String line : lines) {
-                    String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                    if (keywords.stream().anyMatch(parts[0]::equals)) {
-                        if ("Name:".equals(parts[0])) {
-                            // start processing a new node
-                            hasName = true;
-                            hasCapacity = false;
-                            hasAllocatable = false;
-                            hasCores = false;
-                            hasRAM = false;
-                            hasGPU = false;
-                            resources = new String[2];
-                            nodeName = parts[1];
-                        } else if (!hasAllocatable && !hasGPU && hasName) {
-                            if ("Capacity:".equals(parts[0])) {
-                                if (!hasCapacity && !hasCores && !hasRAM) {
-                                    hasCapacity = true;
-                                } else {
-                                    throw new IllegalStateException("Unexpected 'Capabity:' line");
-                                }
-                            } else if (hasCapacity) {
-                                if ("cpu:".equals(parts[0])) {
-                                    if (!hasCores) {
-                                        // number of cores from "Capability.cpu",
-                                        String cores = toCoreUnit(parts[1]);
-                                        resources[0] = cores;
-                                        hasCores = true;
-                                    } else {
-                                        throw new IllegalStateException("Unexpected 'cpu:' line");
-                                    }
-                                } else if ("memory:".equals(parts[0])) {
-                                    if (!hasRAM) {
-                                        // amount of RAM from "Capability.memory" is in Ki
-                                        String ram = parts[1];
-                                        resources[1] = ram;
-
-                                        hasRAM = true;
-                                    } else {
-                                        throw new IllegalStateException("Unexpected 'memory:' line");
-                                    }
-                                } else if ("nvidia.com/gpu:".equals(parts[0])) {
-                                    if (Integer.parseInt(parts[1]) > 0) {
-                                        // we do not count resources on a node with nvidia gpu
-                                        hasGPU = true;
-                                    }
-                                } else if ("Allocatable:".equals(parts[0]) && hasCores && hasRAM) {
-                                    // finish processing the resources of a node
-                                    nodeToResourcesMap.put(nodeName, resources);
-                                    hasAllocatable = true;
-                                    // TODO: add RAM unit to debug message
-                                    log.debug(
-                                            "node: " + nodeName + ", cores=" + resources[0] + ", RAM=" + resources[1]);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return nodeToResourcesMap;
     }
 
     public String getSingleDesktopApp(String sessionID, String appID) throws Exception {

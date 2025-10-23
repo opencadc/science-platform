@@ -71,13 +71,21 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
+import java.util.Set;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.context.GetAction;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
@@ -147,6 +155,22 @@ public class SessionLifecycleTest {
             // verify both desktop and carta sessions
             Assert.assertNotNull("no desktop session", desktopSessionID);
             Assert.assertNotNull("no carta session", cartaSessionID);
+
+            final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
+
+            final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
+            final JsonSchema jsonSchema = factory.getSchema(GetAction.class.getResourceAsStream("/stats-schema.json"));
+            final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonObject.toString(), InputFormat.JSON);
+            Assert.assertTrue("Stats JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
+
+            Assert.assertEquals(
+                    "Wrong total session count.",
+                    2,
+                    jsonObject.getJSONObject("instances").getInt("total"));
+            Assert.assertEquals(
+                    "Wrong session count.",
+                    2,
+                    jsonObject.getJSONObject("instances").getInt("session"));
 
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, desktopSessionID);

@@ -83,6 +83,7 @@ import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Type;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,6 +94,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.junit.Assert;
 import org.opencadc.skaha.image.Image;
 import org.opencadc.skaha.session.Session;
@@ -110,7 +112,7 @@ public class SessionUtil {
             if (session.getType().equals(SessionAction.TYPE_DESKTOP_APP)) {
                 // delete desktop-app
                 String sessionID = session.getId();
-                final URL desktopAppURL = new URL(sessionURL.toString() + "/" + sessionID + "/app");
+                final URL desktopAppURL = URI.create(sessionURL.toString() + "/" + sessionID + "/app").toURL();
                 SessionUtil.deleteDesktopApplicationSession(desktopAppURL, session.getAppId());
             } else {
                 // delete session
@@ -259,6 +261,17 @@ public class SessionUtil {
         }
 
         return active;
+    }
+
+    static JSONObject getStats(final URL sessionURL) throws Exception {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        HttpGet get = new HttpGet(URI.create(sessionURL.toString() + "?view=stats").toURL(), out);
+        get.run();
+        out.flush();
+        Assert.assertNull("get stats error", get.getThrowable());
+        Assert.assertEquals("content-type", "application/json", get.getContentType());
+        final String json = out.toString();
+        return new JSONObject(json);
     }
 
     private static Session getDesktopApplicationSessionWithoutWait(
