@@ -258,11 +258,20 @@ public class K8SUtil {
         private static final String SKAHA_EXPERIMENTAL_FEATURES_PREFIX = "SKAHA_EXPERIMENTAL_FEATURE_GATES";
         private final Map<String, Boolean> featureGates = new HashMap<>();
 
+        /**
+         * Check if the given feature gate is enabled. This will not enforce the existence of the feature gate, so if it
+         * is not defined, it will return false.
+         *
+         * @param featureGateName The name of the feature gate to check.
+         * @return True if the feature gate exists and is enabled, false otherwise.
+         */
         public boolean isEnabled(final String featureGateName) {
             if (this.featureGates.containsKey(featureGateName)) {
                 return this.featureGates.get(featureGateName);
+            } else {
+                LOGGER.warn(String.format("Feature gate %s not found.  Returning false.", featureGateName));
+                return false;
             }
-            throw new IllegalArgumentException("Feature gate " + featureGateName + " not found.");
         }
 
         @Override
