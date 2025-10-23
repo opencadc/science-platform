@@ -71,9 +71,13 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.util.Log4jInit;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.utils.TestUtils;
 
 public class PostActionTest {
     static {
@@ -146,5 +150,43 @@ public class PostActionTest {
         };
 
         testSubject.allocateUser();
+    }
+
+    @Test
+    public void testCheckExistingSessions() {
+        final PostAction testSubject = new PostAction() {
+            @Override
+            protected String getUsername() {
+                return "owner";
+            }
+        };
+
+        // Should pass
+        testSubject.checkExistingSessions(SessionType.HEADLESS, Collections.emptyList());
+
+        // Should pass
+        final List<Session> sessions = new ArrayList<>();
+        testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+
+        // Should pass
+        sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_FAILED));
+        testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+
+        sessions.clear();
+
+        // Should pass
+        sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_TERMINATING));
+        testSubject.checkExistingSessions(SessionType.DESKTOP, sessions);
+
+        sessions.clear();
+
+        // Should fail (max 1 session by default)
+        sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_PENDING));
+        try {
+            testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+            Assert.fail("Should throw IllegalArgumentException");
+        } catch (IllegalArgumentException exception) {
+            // Good.
+        }
     }
 }
