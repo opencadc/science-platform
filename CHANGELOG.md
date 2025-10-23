@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2](https://github.com/opencadc/science-platform/compare/1.1.1...1.1.2) (2025-10-23)
+
+
+### Bug Fixes
+
+* fix for properly querying sessions from status ([5d5dc09](https://github.com/opencadc/science-platform/commit/5d5dc097a4962c6d406a6ca2be3cd6880d469d46))
+* fix for properly querying sessions from status ([a15ff96](https://github.com/opencadc/science-platform/commit/a15ff965193816d1799c6ee7d01df6ef1e6d0b6a))
+* remove notnull dependency ([8a424f0](https://github.com/opencadc/science-platform/commit/8a424f060a8ccb83e4c67bee95a19f51c13444be))
+
 ## [1.1.1](https://github.com/opencadc/science-platform/compare/1.1.0...1.1.1) (2025-10-16)
 
 
