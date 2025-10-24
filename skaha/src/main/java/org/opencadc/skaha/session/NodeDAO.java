@@ -36,7 +36,8 @@ public class NodeDAO {
             listNodeRequest.labelSelector(workerNodeLabelSelector);
             LOGGER.debug("Using worker node label selector: " + workerNodeLabelSelector);
         } else {
-            LOGGER.warn("Worker node label selector is empty - selecting all schedulable Nodes");
+            LOGGER.debug(
+                    "Worker node label selector is empty - selecting all schedulable Nodes which is less efficient.");
         }
 
         return NodeDAO.getAvailableResources(listNodeRequest.execute());
@@ -72,16 +73,31 @@ public class NodeDAO {
                 .collect(Collectors.toUnmodifiableMap(arr -> arr[0], arr -> new String[] {arr[1], arr[2], arr[3]}));
     }
 
+    /**
+     * Convert supplied cores string to standard core unit.
+     *
+     * @param cores String cores as reported by K8S API, possibly with unit suffix.
+     * @return String cores in standard core unit.
+     */
     protected static String toCoreUnit(String cores) {
         String ret = "<none>";
         if (StringUtil.hasLength(cores)) {
-            if ("m".equals(cores.substring(cores.length() - 1))) {
-                // in "m" (millicore) unit, covert to cores
-                int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
-                ret = ((Double) (milliCores / Math.pow(10, 3))).toString();
-            } else {
-                // use value as is, can be '<none>' or some value
-                ret = cores;
+            final String potentialUnit = cores.substring(cores.length() - 1);
+            switch (potentialUnit) {
+                case "m" -> {
+                    // in "m" (millicore) unit, covert to cores
+                    int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
+                    return ((Double) (milliCores / Math.pow(10, 3))).toString();
+                }
+                case "n" -> {
+                    // in "n" (nanocore) unit, covert to cores
+                    int nanoCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
+                    return ((Double) (nanoCores / Math.pow(10, 9))).toString();
+                }
+                default -> {
+                    // no unit, assume cores
+                    return cores;
+                }
             }
         }
 

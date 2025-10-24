@@ -66,4 +66,13 @@ public class NodeDAOTest {
         Assert.assertArrayEquals("Wrong values for node1.", expectedOutput1.get("node1"), actualOutput1.get("node1"));
         Assert.assertArrayEquals("Wrong values for node2.", expectedOutput1.get("node2"), actualOutput1.get("node2"));
     }
+
+    @Test
+    public void testToCoreUnit() {
+        Assert.assertEquals("4", NodeDAO.toCoreUnit("4"));
+        Assert.assertEquals(Double.valueOf(0.004D).toString(), NodeDAO.toCoreUnit("4m"));
+        Assert.assertEquals(Double.valueOf(0.000000004D).toString(), NodeDAO.toCoreUnit("4n"));
+        Assert.assertEquals("<none>", NodeDAO.toCoreUnit(""));
+        Assert.assertEquals("<none>", NodeDAO.toCoreUnit(null));
+    }
 }
