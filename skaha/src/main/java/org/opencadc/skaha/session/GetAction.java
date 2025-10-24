@@ -188,12 +188,10 @@ public class GetAction extends SessionAction {
                     final double aCPUCores = Double.parseDouble(aResources[0]);
                     if (aCPUCores > maxCores) {
                         maxCores = aCPUCores;
-                        //                        withRAM = toCommonUnit(aResources[1]);
                         withRAM = MemoryUnitConverter.formatHumanReadable(
                                 Long.parseLong(aResources[1]), MemoryUnitConverter.MemoryUnit.G);
                     }
 
-                    //                    long aRAM = normalizeToLong(toCommonUnit(aResources[1]));
                     long aRAM = Long.parseLong(aResources[1]);
                     if (aRAM > maxRAM) {
                         maxRAM = aRAM;
@@ -212,23 +210,9 @@ public class GetAction extends SessionAction {
                 }
             }
 
-            // amount of RAM is in 'Ki' unit, use the commonly accepted 'K' unit
-            /*
-            String withRAMStr = String.valueOf(formatter.format(Double.valueOf(normalizeToLong(withRAM))/(1024 * 1024 * 1024))) + "G";
-            String maxRAMStr = String.valueOf(formatter.format(Double.valueOf(maxRAM)/(1024 * 1024 * 1024))) + "G";
-            */
-
-            //            String withRAMStr =
-            //                    formatter.format(Double.valueOf((double) (normalizeToLong(withRAM)) / (1024 * 1024 *
-            // 1024))) + "G";
-            //            String maxRAMStr = formatter.format(Double.valueOf((double) (maxRAM) / (1024 * 1024 * 1024)))
-            // + "G";
             final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(maxRAM, MemoryUnitConverter.MemoryUnit.G);
-            //            String requestedRAMStr = formatter.format(requestedRAM) + "G";
             final String requestedRAMStr =
                     MemoryUnitConverter.formatHumanReadable(requestedRAM, MemoryUnitConverter.MemoryUnit.G);
-            //            String ramAvailableStr = formatter.format(Double.valueOf(ramAvailable / (1024 * 1024 * 1024)))
-            // + "G";
             final String ramAvailableStr =
                     MemoryUnitConverter.formatHumanReadable(ramAvailable, MemoryUnitConverter.MemoryUnit.G);
             return new ResourceStats(
