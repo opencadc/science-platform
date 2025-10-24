@@ -8,8 +8,6 @@ import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Status;
-import io.kubernetes.client.util.Config;
-import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,15 +29,6 @@ public class SessionDAO {
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
 
     static final String NONE = "<none>";
-
-    static {
-        try {
-            final ApiClient client = Config.fromCluster();
-            Configuration.setDefaultApiClient(client);
-        } catch (IOException e) {
-            LOGGER.error("Failed to configure k8s client from cluster: " + e.getMessage(), e);
-        }
-    }
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);

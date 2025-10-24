@@ -104,6 +104,16 @@ public class InitializationAction extends InitAction {
             throw new IllegalStateException(ioException.getMessage(), ioException);
         }
         LOGGER.info("Verifying QueueConfigurations: OK");
+
+        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster...");
+        try {
+            final ApiClient client = Config.fromCluster();
+            Configuration.setDefaultApiClient(client);
+            LOGGER.info("Initialized Kubernetes API client for cluster with base path: {}", client.getBasePath());
+        } catch (IOException e) {
+            LOGGER.error("Failed to configure k8s client from cluster: {}", e.getMessage(), e);
+        }
+        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster: OK");
     }
 
     void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) throws IOException {

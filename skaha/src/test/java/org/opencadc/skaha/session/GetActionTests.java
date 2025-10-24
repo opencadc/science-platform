@@ -206,7 +206,7 @@ public class GetActionTests {
     static class TestGetAction extends GetAction {
 
         @Override
-        public List<Session> getAllSessions(String forUserID) throws Exception {
+        public List<Session> getAllSessions(String forUserID) {
             // A bit of a hack to emulate the state.
             this.skahaTld = "/cavern-vospace";
 
@@ -259,12 +259,12 @@ public class GetActionTests {
 
             final int requestedCPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_CPU);
             if (parts.length > requestedCPUIndex) {
-                session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
+                session.setRequestedCPUCores(NodeDAO.toCoreUnit(parts[requestedCPUIndex]));
             }
 
             final int requestedGPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_GPU);
             if (parts.length > requestedGPUIndex) {
-                session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
+                session.setRequestedGPUCores(NodeDAO.toCoreUnit(parts[requestedGPUIndex]));
             }
 
             return session;

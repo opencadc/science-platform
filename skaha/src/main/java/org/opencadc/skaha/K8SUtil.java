@@ -75,11 +75,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
     private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
+
+    static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
@@ -210,6 +213,16 @@ public class K8SUtil {
      */
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
+    }
+
+    /**
+     * Optional label selector to identify worker nodes. Used when aggregating available resources for worker nodes.
+     *
+     * @return String label selector or empty String. Never null.
+     */
+    @NotNull public static String getWorkerNodeLabelSelector() {
+        final String configuredWorkerNodeLabelSelector = System.getenv(K8SUtil.SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV);
+        return StringUtil.hasText(configuredWorkerNodeLabelSelector) ? configuredWorkerNodeLabelSelector : "";
     }
 
     /**
