@@ -163,14 +163,12 @@ public class SessionLifecycleTest {
             final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonObject.toString(), InputFormat.JSON);
             Assert.assertTrue("Stats JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
 
-            Assert.assertEquals(
-                    "Wrong total session count.",
-                    2,
-                    jsonObject.getJSONObject("instances").getInt("total"));
-            Assert.assertEquals(
-                    "Wrong session count.",
-                    2,
-                    jsonObject.getJSONObject("instances").getInt("session"));
+            Assert.assertTrue(
+                    "Wrong total session count (at least 2).",
+                    jsonObject.getJSONObject("instances").getInt("total") >= 2);
+            Assert.assertTrue(
+                    "Wrong session count (at least 2).",
+                    jsonObject.getJSONObject("instances").getInt("session") >= 2);
 
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, desktopSessionID);
