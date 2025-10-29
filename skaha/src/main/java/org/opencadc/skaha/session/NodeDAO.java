@@ -11,6 +11,7 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -19,13 +20,49 @@ public class NodeDAO {
     private static final Logger LOGGER = Logger.getLogger(NodeDAO.class.getName());
 
     /**
+     * Get the aggregated capacity across all Nodes.
+     *
+     * @return AggregatedCapacity object representing total and max capacities.
+     * @throws Exception If there is an error retrieving node capacities.
+     */
+    static AggregatedCapacity getCapacity() throws Exception {
+        final Set<Capacity> capacities = NodeDAO.getCapacities();
+
+        double totalCores = 0.0;
+        long totalMemoryBytes = 0L;
+        int totalGpuCount = 0;
+
+        Map.Entry<Double, Long> maxCorePairing = null;
+        Map.Entry<Long, Double> maxMemoryPairing = null;
+
+        for (final Capacity capacity : capacities) {
+            final double cpuCores = Double.parseDouble(capacity.cpuCores());
+            final long memoryBytes = Long.parseLong(capacity.memoryBytes());
+            final int gpuCount = Integer.parseInt(capacity.gpuCount());
+
+            totalCores += cpuCores;
+            totalMemoryBytes += memoryBytes;
+            totalGpuCount += gpuCount;
+
+            if (maxCorePairing == null || cpuCores > maxCorePairing.getKey()) {
+                maxCorePairing = Map.entry(cpuCores, memoryBytes);
+            }
+
+            if (maxMemoryPairing == null || memoryBytes > maxMemoryPairing.getKey()) {
+                maxMemoryPairing = Map.entry(memoryBytes, cpuCores);
+            }
+        }
+
+        return new AggregatedCapacity(totalCores, totalMemoryBytes, totalGpuCount, maxCorePairing, maxMemoryPairing);
+    }
+
+    /**
      * Query the API for the current available resources on all worker nodes, optionally filtered by label selector.
      *
-     * @return Map where the key is the node name and the value is an array of strings representing CPU, memory, and GPU
-     *     resources.
+     * @return Set of Capacity objects representing available resources on each node for CPU, memory, and GPU.
      * @throws Exception If there is an error communicating with the Kubernetes API.
      */
-    static Map<String, String[]> getAvailableResources() throws Exception {
+    static Set<Capacity> getCapacities() throws Exception {
         final ApiClient client = Configuration.getDefaultApiClient();
         final CoreV1Api api = new CoreV1Api(client);
 
@@ -40,17 +77,17 @@ public class NodeDAO {
                     "Worker node label selector is empty - selecting all schedulable Nodes which is less efficient.");
         }
 
-        return NodeDAO.getAvailableResources(listNodeRequest.execute());
+        return NodeDAO.getCapacities(listNodeRequest.execute());
     }
 
     /**
      * Process the given NodeList to extract available resources. Mainly used for testing.
      *
      * @param nodeList The list of nodes to process.
-     * @return A map where the key is the node name and the value is an array of strings representing CPU, memory, and
-     *     GPU resources.
+     * @return A Set of Capacity objects containing node name and the value is an array of strings representing CPU,
+     *     memory, and GPU resources.
      */
-    static Map<String, String[]> getAvailableResources(final V1NodeList nodeList) {
+    static Set<Capacity> getCapacities(final V1NodeList nodeList) {
         return nodeList.getItems().stream()
                 .map(node -> {
                     final String nodeName = Objects.requireNonNullElse(node.getMetadata(), new V1ObjectMeta())
@@ -65,12 +102,12 @@ public class NodeDAO {
                     final String memory = Objects.requireNonNullElse(capacity.get("memory"), new Quantity("0"))
                             .getNumber()
                             .toString();
-                    final String gpu = capacity.get("nvidia.com/gpu") != null
-                            ? capacity.get("nvidia.com/gpu").getNumber().toString()
+                    final String gpu = capacity.get("nvidia.com/gpu.count") != null
+                            ? capacity.get("nvidia.com/gpu.count").getNumber().toString()
                             : "0";
-                    return new String[] {nodeName, cpu, memory, gpu};
+                    return new Capacity(nodeName, cpu, memory, gpu);
                 })
-                .collect(Collectors.toUnmodifiableMap(arr -> arr[0], arr -> new String[] {arr[1], arr[2], arr[3]}));
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -80,18 +117,17 @@ public class NodeDAO {
      * @return String cores in standard core unit.
      */
     protected static String toCoreUnit(String cores) {
-        String ret = "<none>";
         if (StringUtil.hasLength(cores)) {
             final String potentialUnit = cores.substring(cores.length() - 1);
             switch (potentialUnit) {
                 case "m" -> {
                     // in "m" (millicore) unit, covert to cores
-                    int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
+                    final int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
                     return ((Double) (milliCores / Math.pow(10, 3))).toString();
                 }
                 case "n" -> {
                     // in "n" (nanocore) unit, covert to cores
-                    int nanoCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
+                    final long nanoCores = Long.parseLong(cores.substring(0, cores.length() - 1));
                     return ((Double) (nanoCores / Math.pow(10, 9))).toString();
                 }
                 default -> {
@@ -101,6 +137,15 @@ public class NodeDAO {
             }
         }
 
-        return ret;
+        return "<none>";
     }
+
+    public record Capacity(String name, String cpuCores, String memoryBytes, String gpuCount) {}
+
+    public record AggregatedCapacity(
+            double totalCores,
+            long totalMemoryBytes,
+            int totalGpuCount,
+            Map.Entry<Double, Long> maxCorePairing,
+            Map.Entry<Long, Double> maxMemoryPairing) {}
 }

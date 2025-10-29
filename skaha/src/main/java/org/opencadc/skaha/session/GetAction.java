@@ -71,13 +71,14 @@ import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.OutputStream;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.*;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 /**
@@ -88,12 +89,6 @@ import org.opencadc.skaha.utils.MemoryUnitConverter;
 public class GetAction extends SessionAction {
 
     private static final Logger log = Logger.getLogger(GetAction.class);
-    private static final Set<Character> VALID_RAM_UNITS =
-            new HashSet<>(Arrays.asList('T', 't', 'G', 'g', 'M', 'm', 'K', 'k'));
-    private static final DecimalFormat formatter =
-            new DecimalFormat("#.###", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-    private static final String REQ_CPU_CORES_KEY = "reqCPUCoresKey";
-    private static final String REQ_RAM_KEY = "reqRAMKey";
 
     public GetAction() {
         super();
@@ -163,58 +158,36 @@ public class GetAction extends SessionAction {
         }
     }
 
-    private ResourceStats getResourceStats() throws Exception {
-        // report stats on sessions and resources
-        List<Session> sessions = getAllSessions(null);
-        int desktopCount = filter(sessions, "desktop-app", "Running").size();
-        int headlessCount = filter(sessions, "headless", "Running").size();
-        int totalCount = filter(sessions, null, "Running").size();
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        try {
-            double requestedCPUCores = 0.0;
-            double coresAvailable = 0.0;
-            double requestedRAM = 0.0;
-            long ramAvailable = 0;
-            double maxCores = 0.0;
-            long maxRAM = 0;
-            double withCores = 0.0;
-            String withRAM = "0G";
-            Map<String, Map<String, Double>> nodeResourcesMap = getNodeResources(k8sNamespace);
-            Map<String, String[]> aResourceMap = NodeDAO.getAvailableResources();
-            List<String> nodeNames = new ArrayList<>(aResourceMap.keySet());
-            for (String nodeName : nodeNames) {
-                String[] aResources = aResourceMap.get(nodeName);
-                if (aResources != null) {
-                    final double aCPUCores = Double.parseDouble(aResources[0]);
-                    if (aCPUCores > maxCores) {
-                        maxCores = aCPUCores;
-                        withRAM = MemoryUnitConverter.formatHumanReadable(
-                                Long.parseLong(aResources[1]), MemoryUnitConverter.MemoryUnit.G);
-                    }
+    private ResourceStats getResourceStats() {
+        try (final ExecutorService executor = Executors.newFixedThreadPool(3)) {
+            final Future<List<Session>> sessionListFuture = executor.submit(() -> getAllSessions(null));
+            final Future<Map<String, BigDecimal>> podAllocationResourcesFuture =
+                    executor.submit(SessionDAO::getAllocatedPodResources);
+            final Future<NodeDAO.AggregatedCapacity> aggregatedNodeCapacityFuture =
+                    executor.submit(NodeDAO::getCapacity);
 
-                    long aRAM = Long.parseLong(aResources[1]);
-                    if (aRAM > maxRAM) {
-                        maxRAM = aRAM;
-                        withCores = aCPUCores;
-                    }
+            // report stats on sessions and resources
+            final List<Session> sessions = sessionListFuture.get();
+            final int desktopCount = filter(sessions, "desktop-app", "Running").size();
+            final int headlessCount = filter(sessions, "headless", "Running").size();
+            final int totalCount = filter(sessions, null, "Running").size();
 
-                    Map<String, Double> resourcesMap = nodeResourcesMap.get(nodeName);
-                    // There may not be anything running.
-                    if (resourcesMap != null) {
-                        requestedCPUCores += resourcesMap.get(REQ_CPU_CORES_KEY);
-                        requestedRAM += resourcesMap.get(REQ_RAM_KEY);
-                    }
+            final Map<String, BigDecimal> podAllocations = podAllocationResourcesFuture.get();
+            double requestedCPUCores = podAllocations.get("cpu").doubleValue();
+            long requestedRAM = podAllocations.get("memory").longValue();
+            final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = aggregatedNodeCapacityFuture.get();
 
-                    coresAvailable = coresAvailable + aCPUCores;
-                    ramAvailable = ramAvailable + aRAM;
-                }
-            }
-
-            final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(maxRAM, MemoryUnitConverter.MemoryUnit.G);
+            final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(
+                    aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
             final String requestedRAMStr =
                     MemoryUnitConverter.formatHumanReadable(requestedRAM, MemoryUnitConverter.MemoryUnit.G);
-            final String ramAvailableStr =
-                    MemoryUnitConverter.formatHumanReadable(ramAvailable, MemoryUnitConverter.MemoryUnit.G);
+            final String ramAvailableStr = MemoryUnitConverter.formatHumanReadable(
+                    aggregatedNodeCapacity.totalMemoryBytes(), MemoryUnitConverter.MemoryUnit.G);
+            final String withRAM = MemoryUnitConverter.formatHumanReadable(
+                    aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
+            final double maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
+            final double withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
+            final double coresAvailable = aggregatedNodeCapacity.totalCores();
             return new ResourceStats(
                     desktopCount,
                     headlessCount,
@@ -230,98 +203,6 @@ public class GetAction extends SessionAction {
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
-        }
-    }
-
-    protected long normalizeToLong(String ramString) {
-        long value;
-        char unit = ramString.charAt(ramString.length() - 1);
-        if (VALID_RAM_UNITS.contains(unit)) {
-            value = Integer.parseInt(ramString.substring(0, ramString.length() - 1));
-            unit = Character.toUpperCase(unit);
-            if ('K' == unit) {
-                value = value * 1024;
-            } else if ('M' == unit) {
-                value = value * 1024 * 1024;
-            } else if ('G' == unit) {
-                value = value * 1024 * 1024 * 1024;
-            } else if ('T' == unit) {
-                value = value * 1024 * 1024 * 1024 * 1024;
-            }
-        } else if (Character.isDigit(unit)) {
-            value = Long.parseLong(ramString);
-        } else {
-            throw new IllegalStateException("unknown RAM unit: " + unit);
-        }
-
-        return value;
-    }
-
-    private Map<String, Map<String, Double>> getNodeResources(String k8sNamespace) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getCPUCoresCmd = KubectlCommandBuilder.command("get")
-                .pod()
-                .namespace(k8sNamespace)
-                .noHeaders()
-                .outputFormat("custom-columns=NODENAME:.spec.nodeName,PODNAME:.metadata.name,"
-                        + "REQCPUCORES:.spec.containers[].resources.requests.cpu,"
-                        + "REQRAM:.spec.containers[].resources.requests.memory")
-                .argument("--field-selector=status.phase=Running")
-                .argument("--sort-by=.spec.nodeName");
-
-        final String cpuCores = CommandExecutioner.execute(getCPUCoresCmd.build());
-        final Map<String, Map<String, Double>> nodeToResourcesMap = new HashMap<>();
-
-        if (StringUtil.hasLength(cpuCores)) {
-            String[] lines = cpuCores.split("\n");
-            if (lines.length > 0) {
-                final Map<String, Double> resourcesMap = initResourcesMap();
-                String nodeName = "";
-                for (String line : lines) {
-                    String[] parts = line.split("\\s+");
-                    if (nodeName.equals(parts[0])) {
-                        setResources(resourcesMap, parts);
-                    } else {
-                        if (!nodeName.isEmpty()) {
-                            // processing the first line of a subsequent nodeName
-                            nodeToResourcesMap.put(nodeName, resourcesMap);
-                            resourcesMap.clear();
-                            resourcesMap.putAll(initResourcesMap());
-                        }
-
-                        nodeName = parts[0];
-                        setResources(resourcesMap, parts);
-                    }
-                }
-
-                // processing last line of the last nodeName
-                nodeToResourcesMap.put(nodeName, resourcesMap);
-            }
-        }
-
-        return nodeToResourcesMap;
-    }
-
-    private Map<String, Double> initResourcesMap() {
-        final Map<String, Double> rMap = new HashMap<>();
-        rMap.put(REQ_CPU_CORES_KEY, 0D);
-        rMap.put(REQ_RAM_KEY, 0D);
-        return rMap;
-    }
-
-    private void setResources(Map<String, Double> resourcesMap, String[] resources) {
-        if (!NONE.equalsIgnoreCase(resources[2])) {
-            resourcesMap.put(
-                    REQ_CPU_CORES_KEY,
-                    resourcesMap.get(REQ_CPU_CORES_KEY) + Double.parseDouble(NodeDAO.toCoreUnit(resources[2])));
-            log.debug("Node: " + resources[0] + " " + REQ_CPU_CORES_KEY + ": " + resourcesMap.get(REQ_CPU_CORES_KEY));
-        }
-
-        if (!NONE.equalsIgnoreCase(resources[3])) {
-            resourcesMap.put(
-                    REQ_RAM_KEY,
-                    resourcesMap.get(REQ_RAM_KEY)
-                            + (double) (normalizeToLong(toCommonUnit(resources[3]))) / (1024 * 1024 * 1024));
-            log.debug("Node: " + resources[0] + " " + REQ_RAM_KEY + ": " + resourcesMap.get(REQ_RAM_KEY));
         }
     }
 

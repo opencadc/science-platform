@@ -49,6 +49,52 @@ public final class MemoryUnitConverter {
         return MemoryUnitConverter.formatHumanReadable(MemoryUnitConverter.format(bytes, unit), unit);
     }
 
+    /**
+     * Convert memory string with unit to bytes.
+     *
+     * @param memory Common memory string, e.g. "512Mi", "2Gi", "6420K", "1536M", etc.
+     * @return long byte value
+     */
+    public static long toBytes(final String memory) {
+        if (memory == null || memory.isEmpty()) {
+            throw new IllegalArgumentException("Memory string cannot be null or empty");
+        }
+
+        LOGGER.debug("Converting memory string: " + memory);
+        final String unit = memory.replaceAll("[^a-zA-Z]", "");
+        final String numberStr = memory.replaceAll("[^0-9.]", "");
+
+        // It's just bytes.
+        if (unit.isEmpty()) {
+            return Long.parseLong(numberStr);
+        }
+
+        try {
+            final long multiplier = MemoryUnit.valueOf(unit).multiplier;
+
+            final double number = Double.parseDouble(numberStr);
+            return (long) (number * multiplier);
+        } catch (IllegalArgumentException e) {
+            LOGGER.error("Unknown memory unit: " + unit);
+            try {
+                return Long.parseLong(numberStr);
+            } catch (NumberFormatException ex) {
+                return 0L;
+            }
+        }
+    }
+
+    /**
+     * Convenience method to convert bytes to gigabytes.
+     *
+     * @param bytes byte value
+     * @return double gigabyte value
+     */
+    public static double toGigabytes(final long bytes) {
+        final long divider = MemoryUnit.G.multiplier;
+        return (double) bytes / divider;
+    }
+
     public enum MemoryUnit {
         Ki(1024L),
         Mi(1024L * 1024L),

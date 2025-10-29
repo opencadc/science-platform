@@ -2,12 +2,20 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodList;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.openapi.models.V1Status;
+import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +27,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -169,6 +178,76 @@ public class SessionDAO {
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
                 + " after filtering.");
         return sessions;
+    }
+
+    /**
+     * Aggregate the allocated CPU and memory resources for all running pods in the workload namespace. This will also
+     * take into account the current Pod usages (Actual usage) as it may exceed the requested allocation.
+     *
+     * @return Map with keys "cpu" and "memory" and their allocated values as BigDecimals.
+     * @throws Exception If the Kubernetes API call fails.
+     */
+    static Map<String, BigDecimal> getAllocatedPodResources() throws Exception {
+        final ApiClient client = Configuration.getDefaultApiClient();
+        final CoreV1Api api = new CoreV1Api(client);
+        final V1PodList podList = api.listNamespacedPod(K8SUtil.getWorkloadNamespace())
+                .fieldSelector("status.phase=Running")
+                .execute();
+        final PodResourceUsage podResourceUsage = PodResourceUsage.getAll();
+
+        final Map<String, BigDecimal> resources = new HashMap<>();
+        resources.put("cpu", BigDecimal.ZERO);
+        resources.put("memory", BigDecimal.ZERO);
+        for (final V1Pod pod : podList.getItems()) {
+            final String podName = Objects.requireNonNullElse(pod.getMetadata(), new V1ObjectMeta())
+                    .getName();
+            final List<V1Container> containers =
+                    Objects.requireNonNullElse(pod.getSpec(), new V1PodSpec()).getContainers();
+            for (final V1Container container : containers) {
+                final V1ResourceRequirements containerResourceRequirements =
+                        Objects.requireNonNullElse(container.getResources(), new V1ResourceRequirements());
+                final Map<String, Quantity> containerResourceRequests =
+                        Objects.requireNonNullElse(containerResourceRequirements.getRequests(), new HashMap<>());
+                final BigDecimal cpu = Objects.requireNonNullElse(
+                        containerResourceRequests
+                                .getOrDefault("cpu", new Quantity("0"))
+                                .getNumber(),
+                        BigDecimal.ZERO);
+                final String currentPodCoreUsage = podResourceUsage.cpu().get(podName);
+                // Pod resource usage reported as decimal cores, e.g. "0.5"
+                if (StringUtil.hasLength(currentPodCoreUsage)
+                        && Double.parseDouble(currentPodCoreUsage) > cpu.doubleValue()) {
+                    LOGGER.debug("Pod " + podName + " memory usage " + currentPodCoreUsage + " cores exceeds requested "
+                            + cpu.doubleValue() + " cores, using actual usage.");
+                    resources.put("cpu", resources.get("cpu").add(new BigDecimal(currentPodCoreUsage)));
+                } else {
+                    resources.put("cpu", resources.get("cpu").add(cpu));
+                }
+
+                final BigDecimal memory = Objects.requireNonNullElse(
+                        containerResourceRequests
+                                .getOrDefault("memory", new Quantity("0"))
+                                .getNumber(),
+                        BigDecimal.ZERO);
+                final String currentPodMemoryUsage = podResourceUsage.memory().get(podName);
+                // Pod resource usage reported as double Gigabytes, e.g. "1.5"
+                if (StringUtil.hasLength(currentPodMemoryUsage)) {
+                    final long bytes = MemoryUnitConverter.toBytes(
+                            currentPodMemoryUsage + MemoryUnitConverter.MemoryUnit.G.name());
+                    if (bytes > memory.longValue()) {
+                        LOGGER.debug("Pod " + podName + " memory usage " + bytes + " bytes exceeds requested "
+                                + memory.longValue() + " bytes, using actual usage.");
+                        resources.put("memory", resources.get("memory").add(new BigDecimal(bytes)));
+                    } else {
+                        resources.put("memory", resources.get("memory").add(memory));
+                    }
+                } else {
+                    resources.put("memory", resources.get("memory").add(memory));
+                }
+            }
+        }
+
+        return resources;
     }
 
     static String getConnectURL(

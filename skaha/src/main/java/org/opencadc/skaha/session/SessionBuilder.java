@@ -122,12 +122,12 @@ class SessionBuilder {
             }
 
             // The Pod Name starts with the Job Name.  Is this reliable?
-            this.memoryInUse = podResourceUsage.memory.entrySet().stream()
+            this.memoryInUse = podResourceUsage.memory().entrySet().stream()
                     .filter(entry -> entry.getKey().startsWith(this.jobName))
                     .map(Map.Entry::getValue)
                     .findFirst()
                     .orElse(null);
-            this.cpuCoresInUse = podResourceUsage.cpu.entrySet().stream()
+            this.cpuCoresInUse = podResourceUsage.cpu().entrySet().stream()
                     .filter(entry -> entry.getKey().startsWith(this.jobName))
                     .map(Map.Entry::getValue)
                     .findFirst()

@@ -32,6 +32,19 @@ public class MemoryUnitConverterTest {
     }
 
     @Test
+    public void testToBytes() {
+        Assert.assertEquals("Wrong bytes.", 1536L * 1024L * 1024L, MemoryUnitConverter.toBytes("1536Mi"));
+        Assert.assertEquals("Wrong bytes.", 512L * 1024L * 1024L, MemoryUnitConverter.toBytes("512Mi"));
+        Assert.assertEquals("Wrong bytes.", 512L * 1000L * 1000L, MemoryUnitConverter.toBytes("512M"));
+        Assert.assertEquals("Wrong bytes.", 1024L, MemoryUnitConverter.toBytes("1Ki"));
+        Assert.assertEquals("Wrong bytes.", 6420L * 1000L, MemoryUnitConverter.toBytes("6420K"));
+        Assert.assertEquals(
+                "Wrong bytes.", (long) (2.34 * 1024L * 1024L * 1024L), MemoryUnitConverter.toBytes("2.34Gi"));
+        Assert.assertEquals(
+                "Wrong bytes.", (long) (2.34 * 1000L * 1000L * 1000L), MemoryUnitConverter.toBytes("2.34G"));
+    }
+
+    @Test
     public void testHumanReadableFormat() {
         Assert.assertEquals(
                 "Wrong human readable format.",

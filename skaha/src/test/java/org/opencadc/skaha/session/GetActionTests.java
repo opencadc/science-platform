@@ -93,25 +93,6 @@ public class GetActionTests {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-    private static final long K_UNIT = 1024;
-    private static final long M_UNIT = K_UNIT * K_UNIT;
-    private static final long G_UNIT = K_UNIT * M_UNIT;
-    private static final long T_UNIT = K_UNIT * G_UNIT;
-
-    private static final long NO_UNIT_VALUE = 100;
-    private static final long K_VALUE = 2 * K_UNIT;
-    private static final long M_VALUE = 3 * M_UNIT;
-    private static final long G_VALUE = 4 * G_UNIT;
-    private static final long T_VALUE = 5 * T_UNIT;
-    private static final long INVALID_VALUE = 6;
-
-    private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
-    private static final String K_VALUE_STR = 2 + "K";
-    private static final String M_VALUE_STR = 3 + "M";
-    private static final String G_VALUE_STR = 4 + "G";
-    private static final String T_VALUE_STR = 5 + "T";
-    private static final String INVALID_VALUE_STR = 5 + "A";
-
     private static final String K8S_LIST =
             "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n"
                     + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
@@ -122,26 +103,6 @@ public class GetActionTests {
                     + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
 
     public GetActionTests() {}
-
-    @Test
-    public void testNormalizeToLong() {
-        try {
-            GetAction get = new TestGetAction();
-            Assert.assertEquals(NO_UNIT_VALUE, get.normalizeToLong(NO_UNIT_VALUE_STR));
-            Assert.assertEquals(K_VALUE, get.normalizeToLong(K_VALUE_STR));
-            Assert.assertEquals(M_VALUE, get.normalizeToLong(M_VALUE_STR));
-            Assert.assertEquals(G_VALUE, get.normalizeToLong(G_VALUE_STR));
-            Assert.assertEquals(T_VALUE, get.normalizeToLong(T_VALUE_STR));
-            Assert.assertEquals(INVALID_VALUE, get.normalizeToLong(INVALID_VALUE_STR));
-        } catch (IllegalStateException ex) {
-            if (!ex.getMessage().contains("unknown RAM unit")) {
-                Assert.fail("Unexpected: " + ex.getMessage());
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
 
     @Test
     public void testListSessions() throws Exception {
