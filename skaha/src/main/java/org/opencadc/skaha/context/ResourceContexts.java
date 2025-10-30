@@ -115,7 +115,7 @@ public class ResourceContexts {
             JsonArray coresOptions = cores.getAsJsonArray("options");
             coresOptions.asList().forEach(coreOption -> availableCores.add(coreOption.getAsInt()));
 
-            JsonObject memory = jsonObject.getAsJsonObject("memoryBytes");
+            JsonObject memory = jsonObject.getAsJsonObject("memoryGB");
             defaultRequestRAM = memory.get("defaultRequest").getAsInt();
             defaultLimitRAM = memory.get("defaultLimit").getAsInt();
             JsonArray ramOptions = memory.getAsJsonArray("options");
