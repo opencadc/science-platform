@@ -32,8 +32,7 @@ public class CommonUtils {
      * @return A single URI (first matching). Never null.
      */
     public static URI firstLocalServiceURI(final URI baseStandardID) {
-        final Set<URI> serviceURIs = new LocalAuthority().getResourceIDs(baseStandardID);
-        return serviceURIs.stream().findFirst().orElse(null);
+        return new LocalAuthority().getResourceID(baseStandardID);
     }
 
     /**
