@@ -6,16 +6,15 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.*;
 import org.apache.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONWriter;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
+import org.opencadc.skaha.utils.MemoryUnitConverter;
 
-public class PodResourceUsage {
+public record PodResourceUsage(Map<String, String> cpu, Map<String, String> memory) {
     private static final Logger LOGGER = Logger.getLogger(PodResourceUsage.class);
-
-    final Map<String, String> cpu;
-    final Map<String, String> memory;
 
     private static final Map<String, Integer> CORE_DIVIDENDS = new HashMap<>();
 
@@ -24,11 +23,29 @@ public class PodResourceUsage {
         PodResourceUsage.CORE_DIVIDENDS.put("n", 9);
     }
 
-    private PodResourceUsage(final Map<String, String> cpu, final Map<String, String> memory) {
+    public PodResourceUsage(final Map<String, String> cpu, final Map<String, String> memory) {
         this.cpu = Collections.unmodifiableMap(cpu);
         this.memory = Collections.unmodifiableMap(memory);
     }
 
+    /**
+     * Convenience method to return pod resource usage for all pods.
+     *
+     * @return PodResourceUsage object containing CPU and memory usage. Never null.
+     * @throws Exception For any execution or parsing errors.
+     */
+    public static PodResourceUsage getAll() throws Exception {
+        return PodResourceUsage.get(null, false);
+    }
+
+    /**
+     * Return a pod resource usage object containing CPU and memory usage, mapped by Pod name.
+     *
+     * @param userID Constrain by user ID if given, otherwise return for all users.
+     * @param omitHeadless Constrain to omit headless sessions if true, otherwise include all session types.
+     * @return PodResourceUsage object containing CPU (Cores) and memory (GB) usage. Never null.
+     * @throws Exception For any execution or parsing errors.
+     */
     public static PodResourceUsage get(final String userID, final boolean omitHeadless) throws Exception {
         final Map<String, String> cpuMetrics = new HashMap<>();
         final Map<String, String> memoryMetrics = new HashMap<>();
@@ -67,7 +84,7 @@ public class PodResourceUsage {
         return new PodResourceUsage(cpuMetrics, memoryMetrics);
     }
 
-    @Override
+    @NotNull @Override
     public String toString() {
         final Writer stringWriter = new StringWriter();
         final JSONWriter jsonWriter = new JSONWriter(stringWriter);
@@ -76,7 +93,7 @@ public class PodResourceUsage {
             jsonWriter.object();
             jsonWriter.key("podName").value(podName);
             jsonWriter.key("cpuCores").value(cpu.get(podName));
-            jsonWriter.key("memoryGB").value(memory.get(podName));
+            jsonWriter.key("memoryBytes").value(memory.get(podName));
             jsonWriter.endObject();
         });
         jsonWriter.endArray();
@@ -126,59 +143,5 @@ public class PodResourceUsage {
         }
 
         return ret;
-    }
-
-    /** Simple memory unit converter to convert k8s memory units to bytes or GB. */
-    static final class MemoryUnitConverter {
-        private static final Map<String, Long> MEMORY_UNIT_MAP = new HashMap<>();
-
-        static {
-            MEMORY_UNIT_MAP.put("Ki", 1024L);
-            MEMORY_UNIT_MAP.put("Mi", 1024L * 1024L);
-            MEMORY_UNIT_MAP.put("Gi", 1024L * 1024L * 1024L);
-            MEMORY_UNIT_MAP.put("Ti", 1024L * 1024L * 1024L * 1024L);
-            MEMORY_UNIT_MAP.put("Pi", 1024L * 1024L * 1024L * 1024L * 1024L);
-            MEMORY_UNIT_MAP.put("Ei", 1024L * 1024L * 1024L * 1024L * 1024L * 1024L);
-            MEMORY_UNIT_MAP.put("k", 1000L);
-            MEMORY_UNIT_MAP.put("K", 1000L);
-            MEMORY_UNIT_MAP.put("M", 1000L * 1000L);
-            MEMORY_UNIT_MAP.put("G", 1000L * 1000L * 1000L);
-            MEMORY_UNIT_MAP.put("T", 1000L * 1000L * 1000L * 1000L);
-            MEMORY_UNIT_MAP.put("P", 1000L * 1000L * 1000L * 1000L * 1000L);
-            MEMORY_UNIT_MAP.put("E", 1000L * 1000L * 1000L * 1000L * 1000L * 1000L);
-        }
-
-        static long toBytes(final String memory) {
-            if (memory == null || memory.isEmpty()) {
-                throw new IllegalArgumentException("Memory string cannot be null or empty");
-            }
-
-            LOGGER.debug("Converting memory string: " + memory);
-            final String unit = memory.replaceAll("[^a-zA-Z]", "");
-            final String numberStr = memory.replaceAll("[^0-9.]", "");
-
-            // It's just bytes.
-            if (unit.isEmpty()) {
-                return Long.parseLong(numberStr);
-            }
-
-            final Long multiplier = MemoryUnitConverter.MEMORY_UNIT_MAP.get(unit);
-            if (multiplier == null) {
-                LOGGER.error("Unknown memory unit: " + unit);
-                try {
-                    return Long.parseLong(numberStr);
-                } catch (NumberFormatException e) {
-                    return 0L;
-                }
-            }
-
-            final double number = Double.parseDouble(numberStr);
-            return (long) (number * multiplier);
-        }
-
-        static double toGigabytes(final long bytes) {
-            final long divider = MemoryUnitConverter.MEMORY_UNIT_MAP.get("G");
-            return (double) bytes / divider;
-        }
     }
 }

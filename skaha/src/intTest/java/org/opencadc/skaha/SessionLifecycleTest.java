@@ -71,13 +71,22 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
+import java.util.Set;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opencadc.skaha.context.GetAction;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
@@ -114,16 +123,19 @@ public class SessionLifecycleTest {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 
-            // create desktop session
-            final String desktopSessionID = SessionUtil.createSession(
+            // create Notebook session
+            // Use a Notebook session so that the minimum resource requests are honoured (Desktop has defaults).
+            final String notebookSessionID = SessionUtil.createSession(
                     this.sessionURL,
-                    "inttest" + SessionAction.SESSION_TYPE_DESKTOP,
-                    TestConfiguration.getDesktopImageID(),
-                    SessionAction.SESSION_TYPE_DESKTOP);
+                    "inttest" + SessionAction.SESSION_TYPE_NOTEBOOK,
+                    TestConfiguration.getNotebookImageID(),
+                    SessionAction.SESSION_TYPE_NOTEBOOK);
 
-            final Session desktopSession = SessionUtil.waitForSession(this.sessionURL, desktopSessionID);
+            final Session notebookSession = SessionUtil.waitForSession(this.sessionURL, notebookSessionID);
             SessionUtil.verifySession(
-                    desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
+                    notebookSession,
+                    SessionAction.SESSION_TYPE_NOTEBOOK,
+                    "inttest" + SessionAction.SESSION_TYPE_NOTEBOOK);
 
             // create carta session
             final String cartaSessionID = SessionUtil.createSession(
@@ -133,7 +145,7 @@ public class SessionLifecycleTest {
                     SessionAction.SESSION_TYPE_CARTA);
             Session cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID);
             SessionUtil.verifySession(
-                    desktopSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
+                    cartaSession, SessionAction.SESSION_TYPE_CARTA, "inttest" + SessionAction.SESSION_TYPE_CARTA);
 
             Assert.assertNotNull("CARTA session not running.", cartaSession);
             Assert.assertEquals(
@@ -145,11 +157,35 @@ public class SessionLifecycleTest {
             Assert.assertNotNull("CARTA up since is null", cartaSession.getStartTime());
 
             // verify both desktop and carta sessions
-            Assert.assertNotNull("no desktop session", desktopSessionID);
+            Assert.assertNotNull("no desktop session", notebookSessionID);
             Assert.assertNotNull("no carta session", cartaSessionID);
 
+            final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
+
+            final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
+            final JsonSchema jsonSchema = factory.getSchema(GetAction.class.getResourceAsStream("/stats-schema.json"));
+            final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonObject.toString(), InputFormat.JSON);
+            Assert.assertTrue("Stats JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
+
+            Assert.assertTrue(
+                    "Wrong total session count (at least 2).",
+                    jsonObject.getJSONObject("instances").getInt("total") >= 2);
+            Assert.assertTrue(
+                    "Wrong session count (at least 2).",
+                    jsonObject.getJSONObject("instances").getInt("session") >= 2);
+
+            final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
+            Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));
+            final double requestedRAMInGB = Double.parseDouble(requestedRAM.substring(0, requestedRAM.length() - 2));
+            Assert.assertTrue("Wrong requested RAM number", requestedRAMInGB >= 2.0D);
+
+            final BigDecimal requestedCores = jsonObject.getJSONObject("cores").getBigDecimal("requestedCPUCores");
+            Assert.assertTrue(
+                    "Wrong requested Cores number (" + requestedCores.doubleValue() + ")",
+                    requestedCores.doubleValue() >= 2.0D);
+
             // delete desktop session
-            SessionUtil.deleteSession(sessionURL, desktopSessionID);
+            SessionUtil.deleteSession(sessionURL, notebookSessionID);
 
             cartaSession = SessionUtil.waitForSession(sessionURL, cartaSessionID);
             // verify remaining carta session

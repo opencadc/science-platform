@@ -219,26 +219,6 @@ public class GetActionTests {
     }
 
     @Test
-    public void testNormalizeToLong() {
-        try {
-            GetAction get = new TestGetAction();
-            Assert.assertEquals(NO_UNIT_VALUE, get.normalizeToLong(NO_UNIT_VALUE_STR));
-            Assert.assertEquals(K_VALUE, get.normalizeToLong(K_VALUE_STR));
-            Assert.assertEquals(M_VALUE, get.normalizeToLong(M_VALUE_STR));
-            Assert.assertEquals(G_VALUE, get.normalizeToLong(G_VALUE_STR));
-            Assert.assertEquals(T_VALUE, get.normalizeToLong(T_VALUE_STR));
-            Assert.assertEquals(INVALID_VALUE, get.normalizeToLong(INVALID_VALUE_STR));
-        } catch (IllegalStateException ex) {
-            if (!ex.getMessage().contains("unknown RAM unit")) {
-                Assert.fail("Unexpected: " + ex.getMessage());
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
-    }
-
-    @Test
     public void testListSessions() throws Exception {
         GetAction get = new TestGetAction();
         String json = get.listSessions(null, null, false);

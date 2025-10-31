@@ -233,22 +233,6 @@ public abstract class SessionAction extends SkahaAction {
         return SessionDAO.getUserSessions(forUserID, null, false);
     }
 
-    protected String toCoreUnit(String cores) {
-        String ret = NONE;
-        if (StringUtil.hasLength(cores)) {
-            if ("m".equals(cores.substring(cores.length() - 1))) {
-                // in "m" (millicore) unit, covert to cores
-                int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
-                ret = ((Double) (milliCores / Math.pow(10, 3))).toString();
-            } else {
-                // use value as is, can be '<none>' or some value
-                ret = cores;
-            }
-        }
-
-        return ret;
-    }
-
     protected String toCommonUnit(String inK8sUnit) {
         String ret = NONE;
         if (StringUtil.hasLength(inK8sUnit)) {
