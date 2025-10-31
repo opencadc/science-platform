@@ -9,7 +9,7 @@ COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
-FROM images.opencadc.org/library/cadc-tomcat:1.4 AS production
+FROM images.opencadc.org/library/cadc-tomcat:1.5 AS production
 
 RUN set -eux \
     && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core \
