@@ -92,7 +92,7 @@ public class SkahaAvailability implements AvailabilityPlugin {
                     true,
                     "Skaha Service Available.\n\n"
                             + "Current Pods in " + K8SUtil.getWorkloadNamespace() + ":\n"
-                            + PodResourceUsage.get(null, false) + "\n\n"
+                            + PodResourceUsage.getAll() + "\n\n"
                             + "Enabled Experimental Features:\n " + K8SUtil.getExperimentalFeatures());
         } catch (Exception e) {
             return new Availability(false, "failed to access cluster: " + e.getMessage());
