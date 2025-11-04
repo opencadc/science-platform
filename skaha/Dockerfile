@@ -25,4 +25,3 @@ RUN set -eux \
     && dnf clean all
 
 COPY --from=builder /src/skaha/build/libs/skaha.war /usr/share/tomcat/webapps/
-COPY --from=builder /src/skaha/src/scripts/* /usr/local/bin/

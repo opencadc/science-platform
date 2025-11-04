@@ -89,6 +89,7 @@ public class LimitRangeResourceContext {
             jsonWriter
                     .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY))
                     .object();
+            jsonWriter.key("default").value(defaultCoreCounts.minimum);
             jsonWriter.key("defaultRequest").value(defaultCoreCounts.minimum);
             jsonWriter.key("defaultLimit").value(defaultCoreCounts.maximum);
             jsonWriter.key("options").array();
@@ -102,6 +103,7 @@ public class LimitRangeResourceContext {
                     .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(
                             LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY))
                     .object();
+            jsonWriter.key("default").value(defaultMemoryCounts.minimum);
             jsonWriter.key("defaultRequest").value(defaultMemoryCounts.minimum);
             jsonWriter.key("defaultLimit").value(defaultMemoryCounts.maximum);
             jsonWriter.key("options").array();

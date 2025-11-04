@@ -85,6 +85,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
@@ -151,10 +152,21 @@ public class PostAction extends SessionAction {
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
-    private final UserStorageClient userStorageClient = new UserStorageClient();
+    private final UserStorageClient userStorageClient;
 
+    /** Default constructor. */
     public PostAction() {
+        this(new UserStorageClient());
+    }
+
+    /**
+     * Constructor used for testing.
+     *
+     * @param userStorageClient A UserStorageClient instance.
+     */
+    PostAction(UserStorageClient userStorageClient) {
         super();
+        this.userStorageClient = userStorageClient;
     }
 
     private static Set<List<Group>> getCachedGroupsFromSubject() {

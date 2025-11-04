@@ -32,10 +32,10 @@ import org.opencadc.vospace.VOS;
  */
 public class UserStorageAdminConfiguration {
     // User Storage access control.
-    private static final String SKAHA_USER_STORAGE_ADMIN_API_KEY = "SKAHA_USER_STORAGE_ADMIN_API_KEY";
+    public static final String SKAHA_USER_STORAGE_ADMIN_API_KEY = "SKAHA_USER_STORAGE_ADMIN_API_KEY";
 
     // For Certificate-based authentication.
-    private static final String SKAHA_USER_STORAGE_ADMIN_CERTIFICATE = "SKAHA_USER_STORAGE_ADMIN_CERTIFICATE";
+    public static final String SKAHA_USER_STORAGE_ADMIN_CERTIFICATE = "SKAHA_USER_STORAGE_ADMIN_CERTIFICATE";
 
     public final UserStorageAdministrator owner;
 

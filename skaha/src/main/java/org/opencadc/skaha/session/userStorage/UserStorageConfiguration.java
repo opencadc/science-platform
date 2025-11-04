@@ -14,12 +14,12 @@ import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
 import org.apache.commons.configuration2.tree.MergeCombiner;
 
 public class UserStorageConfiguration {
-    private static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY = "SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY";
-    private static final String SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY = "SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY";
-    private static final String SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY =
+    public static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY = "SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY";
+    public static final String SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY = "SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY";
+    public static final String SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY =
             "SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY";
-    private static final String SKAHA_USER_STORAGE_SERVICE_URI = "SKAHA_USER_STORAGE_SERVICE_URI";
-    private static final String SKAHA_USER_STORAGE_USER_HOME_URI = "SKAHA_USER_STORAGE_USER_HOME_URI";
+    public static final String SKAHA_USER_STORAGE_SERVICE_URI = "SKAHA_USER_STORAGE_SERVICE_URI";
+    public static final String SKAHA_USER_STORAGE_USER_HOME_URI = "SKAHA_USER_STORAGE_USER_HOME_URI";
 
     public final URI serviceURI;
     public final URI userHomeBaseURI;
