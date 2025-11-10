@@ -50,7 +50,7 @@ public class LimitRangeResourceContext {
      * @param containerLimitRange A configured LimitRangeItem from Kubernetes.
      */
     LimitRangeResourceContext(@NotNull final V1LimitRangeItem containerLimitRange) {
-        LOGGER.info("Initializing LimitRangeResourceContext with " + containerLimitRange);
+        LOGGER.debug("Initializing LimitRangeResourceContext with " + containerLimitRange);
         final Map<String, Quantity> configuredMax =
                 Objects.requireNonNullElse(containerLimitRange.getMax(), new HashMap<>());
         if (configuredMax.isEmpty()) {

@@ -69,8 +69,15 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.*;
-import java.util.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
@@ -88,7 +95,6 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String NONE = "<none>";
 
     private static final Logger log = Logger.getLogger(SessionAction.class);
-    private static final double ONE_WEEK_DAYS = 7.0D;
 
     protected String requestType;
     protected String sessionID;
@@ -231,21 +237,6 @@ public abstract class SessionAction extends SkahaAction {
 
     List<Session> getAllSessions(final String forUserID) throws Exception {
         return SessionDAO.getUserSessions(forUserID, null, false);
-    }
-
-    protected String toCommonUnit(String inK8sUnit) {
-        String ret = NONE;
-        if (StringUtil.hasLength(inK8sUnit)) {
-            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1))) {
-                // unit is in Ki, Mi, Gi, etc., remove the i
-                ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
-            } else {
-                // use value as is, can be '<none>' or some value
-                ret = inK8sUnit;
-            }
-        }
-
-        return ret;
     }
 
     protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {

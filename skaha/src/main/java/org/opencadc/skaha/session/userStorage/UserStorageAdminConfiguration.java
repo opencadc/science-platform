@@ -115,7 +115,7 @@ public class UserStorageAdminConfiguration {
                         "No HTTP Principal found in Subject. Cannot determine creator username.  Ensure the Subject has been properly authenticated and augmented.");
             } else {
                 // Take the first username.
-                final String creatorUserID = httpPrincipals.toArray(new HttpPrincipal[0])[0].getProxyUser();
+                final String creatorUserID = httpPrincipals.toArray(new HttpPrincipal[0])[0].getName();
                 userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR, creatorUserID));
             }
         }

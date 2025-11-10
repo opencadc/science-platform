@@ -75,9 +75,11 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
@@ -227,6 +229,14 @@ public class GetAction extends SessionAction {
         log.debug("statusFilter=" + statusFilter);
 
         final List<Session> filteredSessions = filter(sessions, typeFilter, statusFilter);
+        // Unless specified by the type filter, remove desktop-app sessions from the returned list
+        if (!SessionType.DESKTOP_APP.applicationName.equalsIgnoreCase(typeFilter)) {
+            final Set<Session> unwantedDesktopAppSessions = filteredSessions.stream()
+                    .filter(session -> SessionType.DESKTOP_APP.applicationName.equalsIgnoreCase(session.getType()))
+                    .collect(Collectors.toSet());
+            log.debug("Removing desktop app sessions from listing: \n" + unwantedDesktopAppSessions);
+            filteredSessions.removeAll(unwantedDesktopAppSessions);
+        }
 
         // if for all users, only show public information
         String json;

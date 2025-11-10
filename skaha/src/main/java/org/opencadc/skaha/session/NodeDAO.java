@@ -28,12 +28,12 @@ public class NodeDAO {
     static AggregatedCapacity getCapacity() throws Exception {
         final Set<Capacity> capacities = NodeDAO.getCapacities();
 
-        double totalCores = 0.0;
+        double totalCores = 0.0D;
         long totalMemoryBytes = 0L;
         int totalGpuCount = 0;
 
-        Map.Entry<Double, Long> maxCorePairing = null;
-        Map.Entry<Long, Double> maxMemoryPairing = null;
+        Map.Entry<Double, Long> maxCorePairing = Map.entry(totalCores, totalMemoryBytes);
+        Map.Entry<Long, Double> maxMemoryPairing = Map.entry(totalMemoryBytes, totalCores);
 
         for (final Capacity capacity : capacities) {
             final double cpuCores = Double.parseDouble(capacity.cpuCores());
@@ -44,11 +44,11 @@ public class NodeDAO {
             totalMemoryBytes += memoryBytes;
             totalGpuCount += gpuCount;
 
-            if (maxCorePairing == null || cpuCores > maxCorePairing.getKey()) {
+            if (cpuCores > maxCorePairing.getKey()) {
                 maxCorePairing = Map.entry(cpuCores, memoryBytes);
             }
 
-            if (maxMemoryPairing == null || memoryBytes > maxMemoryPairing.getKey()) {
+            if (memoryBytes > maxMemoryPairing.getKey()) {
                 maxMemoryPairing = Map.entry(memoryBytes, cpuCores);
             }
         }

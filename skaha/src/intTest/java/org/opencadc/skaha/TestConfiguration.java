@@ -1,6 +1,7 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
@@ -128,10 +129,17 @@ public class TestConfiguration {
      * @return Subject instance, never null.
      */
     static Subject getCurrentUser(final URL sessionURL) throws Exception {
-        final Subject subject = new Subject();
+        try {
+            final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
+            LOGGER.info("PEM Certificate found in path.");
+            return AuthenticationUtil.getSubject(proxyCertificate);
+        } catch (MissingResourceException noProxyCertificate) {
+            LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
+        }
 
         try {
             final AuthorizationToken bearerToken = TestConfiguration.getBearerToken(sessionURL);
+            final Subject subject = new Subject();
             subject.getPublicCredentials().add(bearerToken);
             subject.getPublicCredentials().add(AuthMethod.TOKEN);
             LOGGER.info("Bearer Token found in path.");
@@ -141,20 +149,20 @@ public class TestConfiguration {
         }
 
         try {
-            final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
-            subject.getPublicCredentials().add(proxyCertificate);
-            subject.getPublicCredentials().add(AuthMethod.CERT);
-            LOGGER.info("PEM Certificate found in path.");
-            return subject;
-        } catch (MissingResourceException noProxyCertificate) {
-            LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
-        }
-
-        try {
             final RegistryClient registryClient = new RegistryClient();
-            final URL loginURL = registryClient.getServiceURL(
-                    TestConfiguration.getGMSServiceID(), Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            final URI loginServiceID = TestConfiguration.getGMSServiceID();
+            final URL loginURL;
+            final URL newLoginURL =
+                    registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            if (newLoginURL == null) {
+                LOGGER.info("No login service URL found.  Trying older login Resource ID...");
+                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01, AuthMethod.ANON);
+            } else {
+                loginURL = newLoginURL;
+            }
+            LOGGER.info("Login URL from: " + loginURL);
             final String cookieValue = TestConfiguration.getCookieValue(loginURL);
+            final Subject subject = new Subject();
             LOGGER.info("Using cookie value: " + cookieValue);
             subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
             subject.getPublicCredentials()

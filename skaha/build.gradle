@@ -47,6 +47,8 @@ dependencies {
     implementation 'commons-io:commons-io:[2.14.0,3.0.0)'
 
     // Used to merge YAML sections to fully configure Job files.
+    // Ensure the Snake YAML version is 2.5 to prevent unnecessary logging of WARNING messages.
+    implementation 'org.yaml:snakeyaml:2.5'
     implementation 'io.kubernetes:client-java:24.0.0'
 
     // Used to read configuration from the environment and property files.
