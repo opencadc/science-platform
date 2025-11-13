@@ -85,7 +85,7 @@ public class K8SUtil {
     static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
 
     // Environment variable for POSIX mapper cache TTL in seconds before it expires.
-    static final String SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_MAPPER_CACHE_TTL";
+    static final String SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS";
     static final long SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT = 86400L; // 1 day
 
     private static final Logger log = Logger.getLogger(K8SUtil.class);
