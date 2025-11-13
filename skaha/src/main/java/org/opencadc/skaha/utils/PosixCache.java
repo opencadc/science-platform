@@ -17,6 +17,7 @@ import redis.clients.jedis.Response;
  * A simple Redis Cache for POSIX information. This will update the underlying Redis Set in a transaction to ensure
  * single access. BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to
  * properly reset it.
+ * This version will expire the cache after a configurable TTL.  On expiration, the next access will refresh the cache.
  */
 public class PosixCache {
     private static final Logger LOGGER = Logger.getLogger(PosixCache.class);
