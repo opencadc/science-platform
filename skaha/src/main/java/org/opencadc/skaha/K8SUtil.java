@@ -81,6 +81,10 @@ public class K8SUtil {
     static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
     private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
 
+    // Environment variable for POSIX mapper cache TTL in seconds before it expires.
+    static final String SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS";
+    static final long SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT = 86400L; // 1 day
+
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
     public static String getSessionsHostName() {
@@ -210,6 +214,24 @@ public class K8SUtil {
      */
     public static String getWorkingDirectory() {
         return System.getProperty("user.home");
+    }
+
+    /**
+     * Obtain the POSIX mapper cache TTL in seconds. Configurable via the SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS
+     * environment variable.
+     *
+     * @return long of seconds for the POSIX mapper cache TTL. Default is 86400 seconds (1 day).
+     */
+    public static long getPosixMapperCacheTTLSeconds() {
+        final String ttlString = System.getenv(K8SUtil.SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV);
+        if (StringUtil.hasText(ttlString)) {
+            try {
+                return Long.parseLong(ttlString);
+            } catch (NumberFormatException nfe) {
+                log.warn("Invalid POSIX mapper cache TTL seconds: " + ttlString + ". Using default of 86400 seconds.");
+            }
+        }
+        return K8SUtil.SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT; // Default to 1 day
     }
 
     /**
