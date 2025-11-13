@@ -5,6 +5,8 @@ import ca.nrc.cadc.io.ResourceIterator;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.log4j.Logger;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
@@ -16,8 +18,8 @@ import redis.clients.jedis.Response;
 /**
  * A simple Redis Cache for POSIX information. This will update the underlying Redis Set in a transaction to ensure
  * single access. BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to
- * properly reset it.
- * This version will expire the cache after a configurable TTL.  On expiration, the next access will refresh the cache.
+ * properly reset it. This version will expire the cache after a configurable TTL. On expiration, the next access will
+ * refresh the cache.
  */
 public class PosixCache {
     private static final Logger LOGGER = Logger.getLogger(PosixCache.class);
@@ -67,9 +69,41 @@ public class PosixCache {
         return String.format("%s:x:%d:", posixGroup.getGroupURI().getURI().getQuery(), posixGroup.getGID());
     }
 
+    /**
+     * Write out the POSIX entries to the cache. This will use two threads to write user and group entries concurrently.
+     * This method does not use the try-with-resources construct for the ExecutorService to allow a better timeout.
+     *
+     * @throws Exception If an error occurs writing to the cache, or thread submission fails.
+     */
     public void writePOSIXEntries() throws Exception {
-        writeUserEntries();
-        writeGroupEntries();
+        final ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            executor.submit(() -> {
+                try {
+                    writeUserEntries();
+                } catch (Exception e) {
+                    LOGGER.error("Error writing user entries to POSIX cache", e);
+                    throw new RuntimeException(e.getMessage(), e);
+                }
+            });
+
+            executor.submit(() -> {
+                try {
+                    writeGroupEntries();
+                } catch (Exception e) {
+                    LOGGER.error("Error writing group entries to POSIX cache", e);
+                    throw new RuntimeException(e.getMessage(), e);
+                }
+            });
+        } finally {
+            executor.shutdown();
+            if (!executor.awaitTermination(1, java.util.concurrent.TimeUnit.MINUTES)) {
+                LOGGER.warn("POSIX Mapper Cache update did not complete under a minute");
+                executor.shutdownNow();
+            } else {
+                LOGGER.debug("POSIX Mapper Cache update completed");
+            }
+        }
     }
 
     private void writeUserEntries() throws Exception {
@@ -84,6 +118,8 @@ public class PosixCache {
         // Redis will return -1 if the key exists but has no associated expire, and -2 if the key does not exist.
         // Either way, refresh the cache with an expiry.
         if (currentTTLSeconds < 0) {
+            final long currTimeMillis = System.currentTimeMillis();
+            final long expirationSeconds = K8SUtil.getPosixMapperCacheTTLSeconds();
             try (final Pipeline pipeline = this.jedisPool.pipelined();
                     final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
                             this.posixMapperClient.getUserMap()) {
@@ -98,9 +134,11 @@ public class PosixCache {
                                             .toString()))));
                 }
 
-                pipeline.expire(PosixCache.UID_MAP_KEY, K8SUtil.getPosixMapperCacheTTLSeconds());
+                pipeline.expire(PosixCache.UID_MAP_KEY, expirationSeconds);
                 pipeline.sync();
-                LOGGER.debug("writeUserEntries(): OK " + responses.size() + " user entries");
+                LOGGER.debug("writeUserEntries(): OK " + responses.size() + " user entries (TTL = "
+                        + expirationSeconds + "s) in "
+                        + (System.currentTimeMillis() - currTimeMillis) + " ms");
             }
         } else {
             LOGGER.debug("writeUserEntries(): OK using existing user entries (TTL=" + currentTTLSeconds + "s)");
@@ -120,6 +158,7 @@ public class PosixCache {
         // Either way, refresh the cache with an expiry.
         if (currentTTLSeconds < 0) {
             final long currTimeMillis = System.currentTimeMillis();
+            final long expirationSeconds = K8SUtil.getPosixMapperCacheTTLSeconds();
             try (final Pipeline pipeline = this.jedisPool.pipelined();
                     final ResourceIterator<PosixGroup> posixGroupIterator = this.posixMapperClient.getGroupMap()) {
                 final Set<Response<Long>> responses = new HashSet<>();
@@ -128,10 +167,10 @@ public class PosixCache {
                     responses.add(pipeline.sadd(PosixCache.GID_MAP_FIELD, PosixCache.gidMapping(posixGroup)));
                 }
 
-                pipeline.expire(PosixCache.GID_MAP_FIELD, K8SUtil.getPosixMapperCacheTTLSeconds());
+                pipeline.expire(PosixCache.GID_MAP_FIELD, expirationSeconds);
                 pipeline.sync();
                 LOGGER.debug("writeGroupEntries(): OK " + responses.size() + " group entries (TTL = "
-                        + K8SUtil.getPosixMapperCacheTTLSeconds() + "s) in "
+                        + expirationSeconds + "s) in "
                         + (System.currentTimeMillis() - currTimeMillis) + " ms");
             }
         } else {
