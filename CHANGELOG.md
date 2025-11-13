@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/opencadc/science-platform/compare/1.1.2...1.1.3) (2025-11-13)
+
+
+### Bug Fixes
+
+* use redis expiration cache for uids and gids ([9d270e7](https://github.com/opencadc/science-platform/commit/9d270e7a53a97c54f6903564ad41aa26ef43ad15))
+* use redis expiration cache for uids and gids ([dc1c936](https://github.com/opencadc/science-platform/commit/dc1c936eee97dd3ba642f7116623c483c7a699ab))
+
 ## [1.1.2](https://github.com/opencadc/science-platform/compare/1.1.1...1.1.2) (2025-10-23)
 
 
