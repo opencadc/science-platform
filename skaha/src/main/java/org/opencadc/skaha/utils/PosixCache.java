@@ -20,6 +20,15 @@ import redis.clients.jedis.Response;
  * single access. BEWARE - Changes to the items in the Set (i.e. the POSIX entries) will require a purge of the cache to
  * properly reset it. This version will expire the cache after a configurable TTL. On expiration, the next access will
  * refresh the cache.
+ *
+ * <p>This cache will use keys as follows:
+ *
+ * <ul>
+ *   <li>"users:posix" : Set of POSIX user entries
+ *   <li>"groups:posix" : Set of POSIX group entries
+ *   <li>"users:posix:cache" : Key to track user cache expiration (see with ttl command)
+ *   <li>"groups:posix:cache" : Key to track group cache expiration (see with ttl command)
+ * </ul>
  */
 public class PosixCache {
     private static final Logger LOGGER = Logger.getLogger(PosixCache.class);
@@ -27,6 +36,8 @@ public class PosixCache {
     // Default path to the no-login shell.  This could be risky, but most distributions should support it.
     private static final String NO_LOGIN_SHELL = "/sbin/nologin";
 
+    private static final String UID_MAP_CACHE_KEY = "users:posix:cache";
+    private static final String GID_MAP_CACHE_KEY = "groups:posix:cache";
     private static final String UID_MAP_KEY = "users:posix";
     private static final String GID_MAP_FIELD = "groups:posix";
 
@@ -110,7 +121,7 @@ public class PosixCache {
         LOGGER.debug("writeUserEntries()");
         final long currentTTLSeconds;
         try (final Pipeline pipeline = this.jedisPool.pipelined()) {
-            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.UID_MAP_KEY);
+            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.UID_MAP_CACHE_KEY);
             pipeline.sync();
             currentTTLSeconds = existingTTLSeconds.get();
         }
@@ -134,7 +145,8 @@ public class PosixCache {
                                             .toString()))));
                 }
 
-                pipeline.expire(PosixCache.UID_MAP_KEY, expirationSeconds);
+                pipeline.set(PosixCache.UID_MAP_CACHE_KEY, "UID_CACHE_EXPIRATION");
+                pipeline.expire(PosixCache.UID_MAP_CACHE_KEY, expirationSeconds);
                 pipeline.sync();
                 LOGGER.debug("writeUserEntries(): OK " + responses.size() + " user entries (TTL = "
                         + expirationSeconds + "s) in "
@@ -149,7 +161,7 @@ public class PosixCache {
         LOGGER.debug("writeGroupEntries()");
         final long currentTTLSeconds;
         try (final Pipeline pipeline = this.jedisPool.pipelined()) {
-            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.GID_MAP_FIELD);
+            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.GID_MAP_CACHE_KEY);
             pipeline.sync();
             currentTTLSeconds = existingTTLSeconds.get();
         }
@@ -167,7 +179,8 @@ public class PosixCache {
                     responses.add(pipeline.sadd(PosixCache.GID_MAP_FIELD, PosixCache.gidMapping(posixGroup)));
                 }
 
-                pipeline.expire(PosixCache.GID_MAP_FIELD, expirationSeconds);
+                pipeline.set(PosixCache.GID_MAP_CACHE_KEY, "GID_CACHE_EXPIRATION");
+                pipeline.expire(PosixCache.GID_MAP_CACHE_KEY, expirationSeconds);
                 pipeline.sync();
                 LOGGER.debug("writeGroupEntries(): OK " + responses.size() + " group entries (TTL = "
                         + expirationSeconds + "s) in "
