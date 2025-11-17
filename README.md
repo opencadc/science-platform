@@ -22,7 +22,7 @@
 
 ## CANFAR Science Portal Documentation
 
-User documentation for the CANFAR Science Portal and Platform can be found here:  [Official CANFAR Science Platform Documentation](https://www.opencadc.org/science-containers/)
+User documentation for the CANFAR Science Portal and Platform can be found here:  [Official CANFAR Science Platform Documentation](https://www.opencadc.org/canfar/latest/)
 
 ## Acknowledgements
 This project has been funded in part by:
