@@ -104,26 +104,28 @@ public class GetAction extends SessionAction {
         String view = syncInput.getParameter("view");
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
+                final String json;
                 if (SESSION_VIEW_STATS.equals(view)) {
                     ResourceStats resourceStats = getResourceStats();
                     Gson gson = new GsonBuilder()
                             .disableHtmlEscaping()
                             .setPrettyPrinting()
                             .create();
-                    String json = gson.toJson(resourceStats);
-                    syncOutput.setHeader("Content-Type", "application/json");
-                    syncOutput.getOutputStream().write(json.getBytes());
+                    json = gson.toJson(resourceStats);
+                } else if (SessionAction.SESSION_VIEW_INTERACTIVE.equalsIgnoreCase(view)) {
+                    String statusFilter = syncInput.getParameter("status");
+                    json = listInteractiveSessions(statusFilter);
                 } else {
                     // List the sessions
                     String typeFilter = syncInput.getParameter("type");
                     String statusFilter = syncInput.getParameter("status");
                     boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
 
-                    String json = listSessions(typeFilter, statusFilter, allUsers);
-
-                    syncOutput.setHeader("Content-Type", "application/json");
-                    syncOutput.getOutputStream().write(json.getBytes());
+                    json = listSessions(typeFilter, statusFilter, allUsers);
                 }
+
+                syncOutput.setHeader("Content-Type", "application/json");
+                syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 if (SESSION_VIEW_LOGS.equals(view)) {
                     // return the container log
@@ -164,10 +166,13 @@ public class GetAction extends SessionAction {
 
     private ResourceStats getResourceStats() throws Exception {
         // report stats on sessions and resources
-        List<Session> sessions = getAllSessions(null);
-        int desktopCount = filter(sessions, "desktop-app", "Running").size();
-        int headlessCount = filter(sessions, "headless", "Running").size();
-        int totalCount = filter(sessions, null, "Running").size();
+        //        List<Session> sessions = getAllSessions(null);
+        //        int desktopCount = filter(sessions, "desktop-app", "Running").size();
+        //        int headlessCount = filter(sessions, "headless", "Running").size();
+        //        int totalCount = filter(sessions, null, "Running").size();
+        int desktopCount = -1;
+        int headlessCount = -1;
+        int totalCount = -1;
         String k8sNamespace = K8SUtil.getWorkloadNamespace();
         try {
             double requestedCPUCores = 0.0;
@@ -422,7 +427,27 @@ public class GetAction extends SessionAction {
         return gson.toJson(session);
     }
 
-    public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
+    /**
+     * List the interactive sessions (non-headless) for the user.
+     *
+     * @param statusFilter To further reduce by status.
+     * @return String JSON representation of the sessions. Never null.
+     * @throws Exception If session querying fails.
+     */
+    String listInteractiveSessions(String statusFilter) throws Exception {
+        final List<Session> sessions = getInteractiveSessions(getUsername());
+
+        log.debug("statusFilter=" + statusFilter);
+
+        final List<Session> filteredSessions = filter(sessions, null, statusFilter);
+
+        final Gson gson =
+                new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+
+        return gson.toJson(filteredSessions);
+    }
+
+    String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
         final String forUser = allUsers ? null : getUsername();
         final List<Session> sessions = getAllSessions(forUser);

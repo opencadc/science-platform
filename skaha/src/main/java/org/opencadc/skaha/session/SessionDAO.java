@@ -161,7 +161,7 @@ public class SessionDAO {
 
         final BatchV1Api api = new BatchV1Api(client);
         final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
-                api.listNamespacedJob(K8SUtil.getWorkloadNamespace()).allowWatchBookmarks(Boolean.TRUE);
+                api.listNamespacedJob(K8SUtil.getWorkloadNamespace());
 
         if (StringUtil.hasLength(forUserID)) {
             labelSelectors.add("canfar-net-userid=" + forUserID);
