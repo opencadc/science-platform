@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/opencadc/science-platform/compare/1.1.3...1.1.4) (2025-11-17)
+
+
+### Bug Fixes
+
+* add interactive view and remove running instances ([6116eea](https://github.com/opencadc/science-platform/commit/6116eeaf5d87306d3bc2fcdb34e628650e0d0095))
+* add interactive view and remove running instances ([17819fd](https://github.com/opencadc/science-platform/commit/17819fdd9b50f649184ded0cce55034a58b66d8a))
+
 ## [1.1.3](https://github.com/opencadc/science-platform/compare/1.1.2...1.1.3) (2025-11-13)
 
 

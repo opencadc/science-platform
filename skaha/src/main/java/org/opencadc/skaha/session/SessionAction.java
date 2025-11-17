@@ -92,6 +92,7 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_VIEW_EVENTS = "events";
     protected static final String SESSION_VIEW_LOGS = "logs";
     protected static final String SESSION_VIEW_STATS = "stats";
+    protected static final String SESSION_VIEW_INTERACTIVE = "interactive";
     protected static final String NONE = "<none>";
 
     private static final Logger log = Logger.getLogger(SessionAction.class);
@@ -233,6 +234,10 @@ public abstract class SessionAction extends SkahaAction {
 
     public Session getSession(String forUserID, String sessionID) throws Exception {
         return SessionDAO.getSession(forUserID, sessionID);
+    }
+
+    List<Session> getInteractiveSessions(final String forUserID) throws Exception {
+        return SessionDAO.getUserSessions(forUserID, null, true);
     }
 
     List<Session> getAllSessions(final String forUserID) throws Exception {

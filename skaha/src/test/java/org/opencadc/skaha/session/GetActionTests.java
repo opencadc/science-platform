@@ -94,25 +94,6 @@ public class GetActionTests {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-    private static final long K_UNIT = 1024;
-    private static final long M_UNIT = K_UNIT * K_UNIT;
-    private static final long G_UNIT = K_UNIT * M_UNIT;
-    private static final long T_UNIT = K_UNIT * G_UNIT;
-
-    private static final long NO_UNIT_VALUE = 100;
-    private static final long K_VALUE = 2 * K_UNIT;
-    private static final long M_VALUE = 3 * M_UNIT;
-    private static final long G_VALUE = 4 * G_UNIT;
-    private static final long T_VALUE = 5 * T_UNIT;
-    private static final long INVALID_VALUE = 6;
-
-    private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
-    private static final String K_VALUE_STR = 2 + "K";
-    private static final String M_VALUE_STR = 3 + "M";
-    private static final String G_VALUE_STR = 4 + "G";
-    private static final String T_VALUE_STR = 5 + "T";
-    private static final String INVALID_VALUE_STR = 5 + "A";
-
     private static final List<Session> SESSIONS_LIST = new ArrayList<>(Arrays.asList(
             new Session(
                     "pud05npw",

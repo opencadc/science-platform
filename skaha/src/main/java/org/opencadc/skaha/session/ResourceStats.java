@@ -66,8 +66,6 @@
  */
 package org.opencadc.skaha.session;
 
-import org.apache.log4j.Logger;
-
 /**
  * Current resource usage within the Kubernetes cluster, based on the number of sessions and the resources requested by
  * the sessions.
@@ -75,17 +73,10 @@ import org.apache.log4j.Logger;
  * @author yeunga
  */
 public class ResourceStats {
-
-    private static final Logger log = Logger.getLogger(ResourceStats.class);
-
-    private final JobInstances instances;
-    private final Core cores;
-    private final Ram ram;
+    private final Core cores = new Core();
+    private final Ram ram = new Ram();
 
     public ResourceStats(
-            int desktopCount,
-            int headlessCount,
-            int totalCount,
             Double requestedCPUCores,
             String requestedRAM,
             Double coresAvailable,
@@ -94,12 +85,9 @@ public class ResourceStats {
             String withRAM,
             String mRAM,
             Double withCores) {
-        instances = new JobInstances(desktopCount, headlessCount, totalCount);
-
         MaxCoreResource maxCores = new MaxCoreResource();
         maxCores.cpuCores = mCores;
         maxCores.withRam = withRAM;
-        cores = new Core();
         cores.maxCPUCores = maxCores;
         cores.cpuCoresAvailable = coresAvailable;
         cores.requestedCPUCores = requestedCPUCores;
@@ -107,44 +95,29 @@ public class ResourceStats {
         MaxRamResource maxRAM = new MaxRamResource();
         maxRAM.ram = mRAM;
         maxRAM.withCPUCores = withCores;
-        ram = new Ram();
         ram.maxRAM = maxRAM;
         ram.ramAvailable = ramAvailable;
         ram.requestedRAM = requestedRAM;
     }
 
-    class JobInstances {
-        private int session;
-        private int desktopApp;
-        private int headless;
-        private int total;
-
-        public JobInstances(int desktopCount, int headlessCount, int totalCount) {
-            desktopApp = desktopCount;
-            headless = headlessCount;
-            total = totalCount;
-            session = totalCount - desktopCount - headlessCount;
-        }
-    }
-
-    class Core {
+    static class Core {
         Double requestedCPUCores = 0.0;
         Double cpuCoresAvailable = 0.0;
         MaxCoreResource maxCPUCores;
     }
 
-    class Ram {
+    static class Ram {
         String requestedRAM = "0G";
         String ramAvailable = "0G";
         MaxRamResource maxRAM;
     }
 
-    class MaxCoreResource {
+    static class MaxCoreResource {
         public Double cpuCores = 0.0;
         public String withRam = "0G";
     }
 
-    class MaxRamResource {
+    static class MaxRamResource {
         public String ram = "0G";
 
         public Double withCPUCores = 0.0;

@@ -102,26 +102,28 @@ public class GetAction extends SessionAction {
         String view = syncInput.getParameter("view");
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
+                final String json;
                 if (SESSION_VIEW_STATS.equals(view)) {
                     ResourceStats resourceStats = getResourceStats();
                     Gson gson = new GsonBuilder()
                             .disableHtmlEscaping()
                             .setPrettyPrinting()
                             .create();
-                    String json = gson.toJson(resourceStats);
-                    syncOutput.setHeader("Content-Type", "application/json");
-                    syncOutput.getOutputStream().write(json.getBytes());
+                    json = gson.toJson(resourceStats);
+                } else if (SessionAction.SESSION_VIEW_INTERACTIVE.equalsIgnoreCase(view)) {
+                    String statusFilter = syncInput.getParameter("status");
+                    json = listInteractiveSessions(statusFilter);
                 } else {
                     // List the sessions
                     String typeFilter = syncInput.getParameter("type");
                     String statusFilter = syncInput.getParameter("status");
                     boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
 
-                    String json = listSessions(typeFilter, statusFilter, allUsers);
-
-                    syncOutput.setHeader("Content-Type", "application/json");
-                    syncOutput.getOutputStream().write(json.getBytes());
+                    json = listSessions(typeFilter, statusFilter, allUsers);
                 }
+
+                syncOutput.setHeader("Content-Type", "application/json");
+                syncOutput.getOutputStream().write(json.getBytes());
             } else {
                 if (SESSION_VIEW_LOGS.equals(view)) {
                     // return the container log
@@ -162,17 +164,10 @@ public class GetAction extends SessionAction {
 
     private ResourceStats getResourceStats() {
         try (final ExecutorService executor = Executors.newFixedThreadPool(3)) {
-            final Future<List<Session>> sessionListFuture = executor.submit(() -> getAllSessions(null));
             final Future<Map<String, BigDecimal>> podAllocationResourcesFuture =
                     executor.submit(SessionDAO::getAllocatedPodResources);
             final Future<NodeDAO.AggregatedCapacity> aggregatedNodeCapacityFuture =
                     executor.submit(NodeDAO::getCapacity);
-
-            // report stats on sessions and resources
-            final List<Session> sessions = sessionListFuture.get();
-            final int desktopCount = filter(sessions, "desktop-app", "Running").size();
-            final int headlessCount = filter(sessions, "headless", "Running").size();
-            final int totalCount = filter(sessions, null, "Running").size();
 
             final Map<String, BigDecimal> podAllocations = podAllocationResourcesFuture.get();
             double requestedCPUCores = podAllocations.get("cpu").doubleValue();
@@ -191,9 +186,6 @@ public class GetAction extends SessionAction {
             final double withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
             final double coresAvailable = aggregatedNodeCapacity.totalCores();
             return new ResourceStats(
-                    desktopCount,
-                    headlessCount,
-                    totalCount,
                     requestedCPUCores,
                     requestedRAMStr,
                     coresAvailable,
@@ -220,7 +212,27 @@ public class GetAction extends SessionAction {
         return gson.toJson(session);
     }
 
-    public String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
+    /**
+     * List the interactive sessions (non-headless) for the user.
+     *
+     * @param statusFilter To further reduce by status.
+     * @return String JSON representation of the sessions. Never null.
+     * @throws Exception If session querying fails.
+     */
+    String listInteractiveSessions(String statusFilter) throws Exception {
+        final List<Session> sessions = getInteractiveSessions(getUsername());
+
+        log.debug("statusFilter=" + statusFilter);
+
+        final List<Session> filteredSessions = filter(sessions, null, statusFilter);
+
+        final Gson gson =
+                new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+
+        return gson.toJson(filteredSessions);
+    }
+
+    String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
 
         final String forUser = allUsers ? null : getUsername();
         final List<Session> sessions = getAllSessions(forUser);
