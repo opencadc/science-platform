@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/system-stats.schema.json",
+  "title": "SystemStats",
+  "type": "object",
+  "properties": {
+    "instances": {
+      "type": "object",
+      "properties": {
+        "session": { "type": "integer" },
+        "desktopApp": { "type": "integer" },
+        "headless": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "required": ["session", "desktopApp", "headless", "total"],
+      "additionalProperties": false
+    },
+    "cores": {
+      "type": "object",
+      "properties": {
+        "requestedCPUCores": { "type": "number" },
+        "cpuCoresAvailable": { "type": "number" },
+        "maxCPUCores": {
+          "type": "object",
+          "properties": {
+            "cpuCores": { "type": "number" },
+            "withRam": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$" }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ram": {
+      "type": "object",
+      "properties": {
+        "requestedRAM": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$" },
+        "ramAvailable": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$" },
+        "maxRAM": {
+          "type": "object",
+          "properties": {
+            "ram": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$" },
+            "withCPUCores": { "type": "number" }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": ["instances"],
+  "additionalProperties": false
+}
