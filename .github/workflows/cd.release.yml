@@ -27,7 +27,7 @@ jobs:
       - name: Dispatch Edge Build
         # Run this step only if the release-please completes successfully
         if: steps.release-please.outcome == 'success' && github.event_name == 'push'
-        uses: peter-evans/repository-dispatch@5fc4efd1a4797ddb68ffd0714a238564e4cc0e6f # v4.0.0
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           repository: opencadc/science-platform
           event-type: edge-build
@@ -43,7 +43,7 @@ jobs:
           echo "minor: ${{ steps.release-please.outputs.minor }}"
           echo "patch: ${{ steps.release-please.outputs.patch }}"
       - name: Dispatch Skaha Release Build
-        uses: peter-evans/repository-dispatch@5fc4efd1a4797ddb68ffd0714a238564e4cc0e6f # v4.0.0
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         if: ${{ steps.release-please.outputs.release_created == 'true' }}
         with:
           repository: opencadc/science-platform
