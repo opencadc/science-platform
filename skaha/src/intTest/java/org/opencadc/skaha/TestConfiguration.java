@@ -36,7 +36,7 @@ public class TestConfiguration {
     public static final URI DEFAULT_SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final URI DEFAULT_GMS_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/gms");
     public static final String DEFAULT_DESKTOP_IMAGE_ID = "images.canfar.net/skaha/desktop:latest";
-    public static final String DEFAULT_NOTEBOOK_IMAGE_ID = "images.canfar.net/skaha/base-notebook:latest";
+    public static final String DEFAULT_NOTEBOOK_IMAGE_ID = "images.canfar.net/skaha/astroml:latest";
     public static final String DEFAULT_CARTA_IMAGE_ID = "images.canfar.net/skaha/carta:5.0.3";
 
     static URI getSkahaServiceID() {
