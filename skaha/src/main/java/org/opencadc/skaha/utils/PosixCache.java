@@ -83,12 +83,14 @@ public class PosixCache {
     /**
      * Write out the POSIX entries to the cache. This will use two threads to write user and group entries concurrently.
      * This method does not use the try-with-resources construct for the ExecutorService to allow a better timeout.
-     *
-     * @throws Exception If an error occurs writing to the cache, or thread submission fails.
      */
-    public void writePOSIXEntries() throws Exception {
+    public void writePOSIXEntries() {
+        /*
+        The try-with-resources construct will still call the close() method in the end, but it's used as a variable
+        here to allow better control of the timeout, and catch a (unlikely) InterruptedException.
+         */
         final ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
+        try (executor) {
             executor.submit(() -> {
                 try {
                     writeUserEntries();
@@ -106,14 +108,19 @@ public class PosixCache {
                     throw new RuntimeException(e.getMessage(), e);
                 }
             });
-        } finally {
+
             executor.shutdown();
+
             if (!executor.awaitTermination(1, java.util.concurrent.TimeUnit.MINUTES)) {
                 LOGGER.warn("POSIX Mapper Cache update did not complete under a minute");
                 executor.shutdownNow();
             } else {
                 LOGGER.debug("POSIX Mapper Cache update completed");
             }
+        } catch (InterruptedException interruptedException) {
+            LOGGER.error("POSIX Mapper Cache update interrupted", interruptedException);
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 
