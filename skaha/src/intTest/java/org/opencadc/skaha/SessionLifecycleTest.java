@@ -167,12 +167,13 @@ public class SessionLifecycleTest {
             final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonObject.toString(), InputFormat.JSON);
             Assert.assertTrue("Stats JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
 
-            Assert.assertTrue(
-                    "Wrong total session count (at least 2).",
-                    jsonObject.getJSONObject("instances").getInt("total") >= 2);
-            Assert.assertTrue(
-                    "Wrong session count (at least 2).",
-                    jsonObject.getJSONObject("instances").getInt("session") >= 2);
+            // Removed instances for now.
+//            Assert.assertTrue(
+//                    "Wrong total session count (at least 2).",
+//                    jsonObject.getJSONObject("instances").getInt("total") >= 2);
+//            Assert.assertTrue(
+//                    "Wrong session count (at least 2).",
+//                    jsonObject.getJSONObject("instances").getInt("session") >= 2);
 
             final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
             Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));

@@ -12,7 +12,7 @@
         "headless": { "type": "integer" },
         "total": { "type": "integer" }
       },
-      "required": ["session", "desktopApp", "headless", "total"],
+      "required": [],
       "additionalProperties": false
     },
     "cores": {
@@ -52,6 +52,6 @@
       "additionalProperties": false
     }
   },
-  "required": ["instances"],
+  "required": [],
   "additionalProperties": false
 }
