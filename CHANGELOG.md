@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.6](https://github.com/opencadc/science-platform/compare/1.1.5...1.1.6) (2025-11-25)
+
+
+### Bug Fixes
+
+* fix for ssl cert upload ([b7c35bc](https://github.com/opencadc/science-platform/commit/b7c35bc690cfc3e1286cf2e095b1a81e3e535609))
+* fix for ssl cert upload ([e189cc5](https://github.com/opencadc/science-platform/commit/e189cc559ff99af97d7fb11f46d3b3356f6dfaaf))
+
 ## [1.1.5](https://github.com/opencadc/science-platform/compare/1.1.4...1.1.5) (2025-11-25)
 
 
