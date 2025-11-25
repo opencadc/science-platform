@@ -73,18 +73,20 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
@@ -96,6 +98,7 @@ import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
@@ -126,6 +129,9 @@ public class PostAction extends SessionAction {
     public static final String SKAHA_SESSIONEXPIRY = "skaha.sessionexpiry";
     public static final String SKAHA_JOBNAME = "skaha.jobname";
     public static final String SKAHA_JOBUID = "skaha.jobuid";
+    public static final String SKAHA_TOP_LEVEL_DIR = "SKAHA_TOP_LEVEL_DIR";
+    public static final String SKAHA_USER_HOME_DIR = "SKAHA_USER_HOME_DIR";
+    public static final String SKAHA_PROJECTS_DIR = "SKAHA_PROJECTS_DIR";
     public static final String SOFTWARE_JOBNAME = "software.jobname";
     public static final String SOFTWARE_HOSTNAME = "software.hostname";
     public static final String SOFTWARE_APPID = "software.appid";
@@ -143,14 +149,24 @@ public class PostAction extends SessionAction {
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
-    private static final String CREATE_USER_BASE_COMMAND = "/usr/local/bin/add-user";
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
-    private static final String SKAHA_TLD = "SKAHA_TLD";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
+    private final UserStorageClient userStorageClient;
 
+    /** Default constructor. */
     public PostAction() {
+        this(new UserStorageClient());
+    }
+
+    /**
+     * Constructor used for testing.
+     *
+     * @param userStorageClient A UserStorageClient instance.
+     */
+    PostAction(UserStorageClient userStorageClient) {
         super();
+        this.userStorageClient = userStorageClient;
     }
 
     private static Set<List<Group>> getCachedGroupsFromSubject() {
@@ -213,7 +229,7 @@ public class PostAction extends SessionAction {
                     }
                 }
 
-                ensureUserBase();
+                this.userStorageClient.ensureUserBase(getUsername());
 
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
@@ -256,61 +272,6 @@ public class PostAction extends SessionAction {
         }
     }
 
-    void ensureUserBase() throws Exception {
-        final Path homeDir = getUserHomeDirectory();
-
-        if (Files.notExists(homeDir)) {
-            log.debug("Allocating new user home to " + homeDir);
-            allocateUser();
-            log.debug("Allocating new user home to " + homeDir + ": OK");
-        }
-    }
-
-    void allocateUser() throws Exception {
-        log.debug("PostAction.makeUserBase()");
-        final Path userHomePath = getUserHomeDirectory();
-        final String[] allocateUserCommand = new String[] {
-            PostAction.CREATE_USER_BASE_COMMAND,
-            getUsername(),
-            Integer.toString(getUID()),
-            getDefaultQuota(),
-            userHomePath.toAbsolutePath().toString()
-        };
-
-        log.debug("Executing " + Arrays.toString(allocateUserCommand));
-        try (final ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
-                final ByteArrayOutputStream standardError = new ByteArrayOutputStream()) {
-            executeCommand(allocateUserCommand, standardOutput, standardError);
-
-            final String errorOutput = standardError.toString();
-            final String commandOutput = standardOutput.toString();
-
-            if (StringUtil.hasText(errorOutput)) {
-                throw new IOException("Unable to create user home."
-                        + "\nError message from server: " + errorOutput
-                        + "\nOutput from command: " + commandOutput);
-            } else {
-                log.debug("PostAction.makeUserBase() success creating: " + commandOutput);
-            }
-        }
-
-        log.debug("PostAction.makeUserBase(): OK");
-    }
-
-    void executeCommand(final String[] command, final OutputStream standardOut, final OutputStream standardErr)
-            throws IOException, InterruptedException {
-        CommandExecutioner.execute(command, standardOut, standardErr);
-    }
-
-    /**
-     * Override to test injected quota value without processing an entire Request.
-     *
-     * @return String quota number in GB, or null if not configured.
-     */
-    String getDefaultQuota() {
-        return K8SUtil.getDefaultQuota();
-    }
-
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
         Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
@@ -327,7 +288,7 @@ public class PostAction extends SessionAction {
             CommandExecutioner.execute(renewExpiryTimeCmd.build());
         }
 
-        injectProxyCertificate();
+        this.userStorageClient.injectProxyCertificate(getUsername());
     }
 
     private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
@@ -483,6 +444,12 @@ public class PostAction extends SessionAction {
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
+        final String owner = getUsername();
+
+        if (type.isDesktop()) {
+            this.userStorageClient.ensureDesktopUserHomePreparation(owner);
+        }
 
         final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
         final boolean isLegacyCARTA = (type == SessionType.CARTA && (majorVersion == null || majorVersion < 5));
@@ -497,18 +464,22 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, getUsername())
+                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
                 .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
+                .withParameter(
+                        PostAction.SKAHA_USER_HOME_DIR,
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
+                .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
+                .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -541,7 +512,7 @@ public class PostAction extends SessionAction {
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
-        injectProxyCertificate();
+        this.userStorageClient.injectProxyCertificate(owner);
 
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
@@ -601,8 +572,11 @@ public class PostAction extends SessionAction {
     }
 
     private void injectPOSIXDetails() throws Exception {
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
-                this.skahaPosixCacheURL, this.homedir, this.posixMapperConfiguration.getPosixMapperClient());
+                this.skahaPosixCacheURL,
+                userStorageConfiguration.homeBaseDirectory.toString(),
+                this.posixMapperConfiguration.getPosixMapperClient());
         posixCache.writePOSIXEntries();
     }
 
@@ -713,7 +687,9 @@ public class PostAction extends SessionAction {
 
         final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
         final KubernetesJob ownerKubernetesJob = SessionDAO.getJob(ownerJobName);
+        final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String supplementalGroups = getSupplementalGroupsList();
+        final String owner = getUsername();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
@@ -723,7 +699,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, getUsername())
+                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
@@ -736,7 +712,11 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
-                .withParameter(PostAction.SKAHA_TLD, this.skahaTld)
+                .withParameter(
+                        PostAction.SKAHA_USER_HOME_DIR,
+                        userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
+                .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
+                .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
@@ -753,7 +733,7 @@ public class PostAction extends SessionAction {
         log.debug("Create result: " + createResult);
 
         // refresh the user's proxy cert
-        injectProxyCertificate();
+        this.userStorageClient.injectProxyCertificate(owner);
     }
 
     private void validateHeadlessMembership() {

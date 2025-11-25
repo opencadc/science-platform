@@ -22,23 +22,4 @@ public class PodResourceUsageTest {
         Assert.assertEquals("Wrong memory unit.", "2.51", PodResourceUsage.toCommonMemoryUnit("2.34Gi"));
         Assert.assertEquals("Wrong memory unit.", "2.34", PodResourceUsage.toCommonMemoryUnit("2.34G"));
     }
-
-    @Test
-    public void testToBytes() {
-        Assert.assertEquals(
-                "Wrong bytes.", 1536L * 1024L * 1024L, PodResourceUsage.MemoryUnitConverter.toBytes("1536Mi"));
-        Assert.assertEquals(
-                "Wrong bytes.", 512L * 1024L * 1024L, PodResourceUsage.MemoryUnitConverter.toBytes("512Mi"));
-        Assert.assertEquals("Wrong bytes.", 512L * 1000L * 1000L, PodResourceUsage.MemoryUnitConverter.toBytes("512M"));
-        Assert.assertEquals("Wrong bytes.", 1024L, PodResourceUsage.MemoryUnitConverter.toBytes("1Ki"));
-        Assert.assertEquals("Wrong bytes.", 6420L * 1000L, PodResourceUsage.MemoryUnitConverter.toBytes("6420K"));
-        Assert.assertEquals(
-                "Wrong bytes.",
-                (long) (2.34 * 1024L * 1024L * 1024L),
-                PodResourceUsage.MemoryUnitConverter.toBytes("2.34Gi"));
-        Assert.assertEquals(
-                "Wrong bytes.",
-                (long) (2.34 * 1000L * 1000L * 1000L),
-                PodResourceUsage.MemoryUnitConverter.toBytes("2.34G"));
-    }
 }

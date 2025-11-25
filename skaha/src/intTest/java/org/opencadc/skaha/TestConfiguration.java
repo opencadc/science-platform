@@ -1,6 +1,7 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.NotAuthenticatedException;
 import ca.nrc.cadc.auth.SSLUtil;
@@ -35,6 +36,7 @@ public class TestConfiguration {
     public static final URI DEFAULT_SKAHA_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/skaha");
     public static final URI DEFAULT_GMS_SERVICE_ID = URI.create("ivo://cadc.nrc.ca/gms");
     public static final String DEFAULT_DESKTOP_IMAGE_ID = "images.canfar.net/skaha/desktop:latest";
+    public static final String DEFAULT_NOTEBOOK_IMAGE_ID = "images.canfar.net/skaha/astroml:latest";
     public static final String DEFAULT_CARTA_IMAGE_ID = "images.canfar.net/skaha/carta:5.0.3";
 
     static URI getSkahaServiceID() {
@@ -62,6 +64,14 @@ public class TestConfiguration {
         LOGGER.info("Desktop Image ID: " + desktopImageID);
 
         return desktopImageID;
+    }
+
+    static String getNotebookImageID() {
+        final String configuredImageID = System.getenv("NOTEBOOK_IMAGE_ID");
+        final String notebookImageID =
+                StringUtil.hasText(configuredImageID) ? configuredImageID : TestConfiguration.DEFAULT_NOTEBOOK_IMAGE_ID;
+        LOGGER.info("Notebook Image ID: " + notebookImageID);
+        return notebookImageID;
     }
 
     static String getCARTAImageID() {
@@ -119,10 +129,17 @@ public class TestConfiguration {
      * @return Subject instance, never null.
      */
     static Subject getCurrentUser(final URL sessionURL) throws Exception {
-        final Subject subject = new Subject();
+        try {
+            final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
+            LOGGER.info("PEM Certificate found in path.");
+            return AuthenticationUtil.getSubject(proxyCertificate);
+        } catch (MissingResourceException noProxyCertificate) {
+            LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
+        }
 
         try {
             final AuthorizationToken bearerToken = TestConfiguration.getBearerToken(sessionURL);
+            final Subject subject = new Subject();
             subject.getPublicCredentials().add(bearerToken);
             subject.getPublicCredentials().add(AuthMethod.TOKEN);
             LOGGER.info("Bearer Token found in path.");
@@ -132,20 +149,20 @@ public class TestConfiguration {
         }
 
         try {
-            final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
-            subject.getPublicCredentials().add(proxyCertificate);
-            subject.getPublicCredentials().add(AuthMethod.CERT);
-            LOGGER.info("PEM Certificate found in path.");
-            return subject;
-        } catch (MissingResourceException noProxyCertificate) {
-            LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
-        }
-
-        try {
             final RegistryClient registryClient = new RegistryClient();
-            final URL loginURL = registryClient.getServiceURL(
-                    TestConfiguration.getGMSServiceID(), Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            final URI loginServiceID = TestConfiguration.getGMSServiceID();
+            final URL loginURL;
+            final URL newLoginURL =
+                    registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            if (newLoginURL == null) {
+                LOGGER.info("No login service URL found.  Trying older login Resource ID...");
+                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01, AuthMethod.ANON);
+            } else {
+                loginURL = newLoginURL;
+            }
+            LOGGER.info("Login URL from: " + loginURL);
             final String cookieValue = TestConfiguration.getCookieValue(loginURL);
+            final Subject subject = new Subject();
             LOGGER.info("Using cookie value: " + cookieValue);
             subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
             subject.getPublicCredentials()

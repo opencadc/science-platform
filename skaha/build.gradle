@@ -38,7 +38,6 @@ tasks.withType(Copy).configureEach {
 dependencies {
     providedCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 
-    // https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5
     // Used to assemble URIs programmatically
     implementation 'org.apache.httpcomponents.client5:httpclient5:[5.4.1,5.5)'
 

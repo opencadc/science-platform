@@ -35,7 +35,7 @@ public class SessionURLBuilderTest {
         }
 
         final SessionURLBuilder.NotebookSessionURLBuilder testSubjectWithTLD =
-                testSubject.withTopLevelDirectory("/top-level-dir/sub-dir");
+                testSubject.withAbsoluteHomeDirectory("/top-level-dir/sub-dir/home");
 
         try {
             testSubjectWithTLD.build();

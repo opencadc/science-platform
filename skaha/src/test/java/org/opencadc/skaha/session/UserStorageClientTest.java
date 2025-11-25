@@ -68,93 +68,78 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.FileUtil;
 import ca.nrc.cadc.util.Log4jInit;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.File;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.log4j.Level;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
+import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.TestUtils;
 
-public class PostActionTest {
+public class UserStorageClientTest {
     static {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-    @Test
-    public void allocateUserError() throws Exception {
-        final PostAction testSubject = new PostAction() {
-            @Override
-            protected String getUsername() {
-                return "TESTUSER";
-            }
-
-            @Override
-            protected int getUID() {
-                return 997;
-            }
-
-            @Override
-            String getDefaultQuota() {
-                return "14";
-            }
-
-            @Override
-            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
-                    throws IOException {
-                standardOut.write("".getBytes());
-                standardErr.write("Forbidden to write.".getBytes());
-            }
-        };
-
-        try {
-            testSubject.allocateUser();
-            Assert.fail("Should throw IOException");
-        } catch (IOException exception) {
-            // Good.
-            Assert.assertEquals(
-                    "Wrong message.",
-                    "Unable to create user home."
-                            + "\nError message from server: Forbidden to write."
-                            + "\nOutput from command: ",
-                    exception.getMessage());
-        }
+    @BeforeClass
+    public static void setUpBeforeClass() {
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_SERVICE_URI, "ivo://example.org/storage");
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI, "vos://storage/home/");
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY, "/data");
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY, "home");
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY, "projects");
+        System.setProperty(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY, "secret-admin-key");
     }
 
     @Test
-    public void allocateUser() throws Exception {
-        final PostAction testSubject = new PostAction() {
-            @Override
-            protected String getUsername() {
-                return "TESTUSER";
-            }
+    public void extractDesktopSetupFiles() throws Exception {
+        final File testTARFile = FileUtil.getFileFromResource("test-file.tar", UserStorageClientTest.class);
+        final Path outputPath = UserStorageClient.extractDesktopSetupFiles(testTARFile);
 
-            @Override
-            protected int getUID() {
-                return 997;
-            }
-
-            @Override
-            String getDefaultQuota() {
-                return "14";
-            }
-
-            @Override
-            void executeCommand(String[] command, OutputStream standardOut, OutputStream standardErr)
-                    throws IOException {
-                standardOut.write("Created /home/dir".getBytes());
-            }
+        final Path[] expectedFiles = {
+            outputPath.resolve("a/b/.ab"),
+            outputPath.resolve("a/b2/b2.file"),
+            outputPath.resolve("x/y/.xyfile"),
+            outputPath.resolve("x/zz/8/file.txt"),
+            outputPath.resolve("x/zz/9/file.txt"),
+            outputPath.resolve("x/.xhidden"),
+            outputPath.resolve("x2/anotherfile.txt"),
         };
 
-        testSubject.allocateUser();
+        final List<Path> files = new ArrayList<>();
+        Files.walkFileTree(outputPath, new SimpleFileVisitor<>() {
+            /** Invoked for a file in a directory. */
+            @NotNull @Override
+            public FileVisitResult visitFile(@NotNull Path file, @NotNull BasicFileAttributes attrs) {
+                if (attrs.isRegularFile()) {
+                    files.add(file);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+
+        Arrays.sort(expectedFiles);
+        files.sort(Path::compareTo);
+
+        Assert.assertArrayEquals("Wrong paths.", expectedFiles, files.toArray(new Path[0]));
     }
 
     @Test
     public void testCheckExistingSessions() {
-        final PostAction testSubject = new PostAction() {
+        final PostAction testSubject = new PostAction(null) {
             @Override
             protected String getUsername() {
                 return "owner";

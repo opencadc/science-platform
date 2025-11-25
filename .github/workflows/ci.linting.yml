@@ -54,7 +54,11 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'gradle'
+      - name: Clear Gradle Cache
+        run: rm -rf ~/.gradle/caches
+      - name: Show JAVA_HOME
+        run: echo "${JAVA_HOME}"
       - name: Run Spotless
         run: |
             cd skaha
-            ./gradlew clean spotlessCheck
+            ./gradlew clean spotlessCheck --no-daemon

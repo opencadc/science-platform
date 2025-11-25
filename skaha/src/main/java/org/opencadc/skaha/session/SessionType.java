@@ -73,4 +73,8 @@ public enum SessionType {
     public boolean isHeadless() {
         return this == HEADLESS;
     }
+
+    public boolean isDesktop() {
+        return this == DESKTOP;
+    }
 }

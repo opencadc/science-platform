@@ -15,7 +15,7 @@
           "minItems": 1
         }
       },
-      "required": ["defaultRequest", "defaultLimit", "options"],
+      "required": ["default", "defaultRequest", "defaultLimit", "options"],
       "additionalProperties": false
     },
     "memoryGB": {
@@ -30,7 +30,7 @@
           "minItems": 1
         }
       },
-      "required": ["defaultRequest", "defaultLimit", "options"],
+      "required": ["default", "defaultRequest", "defaultLimit", "options"],
       "additionalProperties": false
     },
     "gpus": {

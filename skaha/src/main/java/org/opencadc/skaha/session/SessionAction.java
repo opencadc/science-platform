@@ -67,28 +67,21 @@
 
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthMethod;
-import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.auth.X509CertificateChain;
-import ca.nrc.cadc.cred.CertUtil;
-import ca.nrc.cadc.cred.client.CredClient;
-import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.reg.Standards;
-import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.*;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.security.PrivilegedExceptionAction;
-import java.util.*;
-import javax.security.auth.Subject;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public abstract class SessionAction extends SkahaAction {
@@ -103,7 +96,6 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String NONE = "<none>";
 
     private static final Logger log = Logger.getLogger(SessionAction.class);
-    private static final double ONE_WEEK_DAYS = 7.0D;
 
     protected String requestType;
     protected String sessionID;
@@ -141,67 +133,6 @@ public abstract class SessionAction extends SkahaAction {
         log.debug("sessionID: " + sessionID);
         log.debug("appID: " + appID);
         log.debug("userID: " + posixPrincipal);
-    }
-
-    protected void injectProxyCertificate() {
-        log.debug("injectProxyCertificate()");
-
-        // inject a delegated proxy certificate if available
-        try {
-            final URI credServiceID = CommonUtils.firstLocalServiceURI(Standards.CRED_PROXY_10);
-
-            // Should throw a NoSuchElementException if it's missing, but check here anyway.
-            if (credServiceID != null) {
-                final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL =
-                        registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
-
-                if (credServiceURL != null) {
-                    final CredClient credClient = new CredClient(credServiceID);
-                    final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-                    final X509CertificateChain proxyCert =
-                            Subject.doAs(CredUtil.createOpsSubject(), (PrivilegedExceptionAction<X509CertificateChain>)
-                                    () -> credClient.getProxyCertificate(currentSubject, SessionAction.ONE_WEEK_DAYS));
-
-                    log.debug("Proxy cert: " + proxyCert);
-                    // inject the proxy cert
-                    log.debug("Running docker exec to insert cert");
-
-                    writeClientCertificate(
-                            proxyCert,
-                            Path.of(homedir, this.posixPrincipal.username, ".ssl", "cadcproxy.pem")
-                                    .toString());
-                    log.debug("injectProxyCertificate(): OK");
-                }
-            }
-        } catch (NoSuchElementException noSuchElementException) {
-            log.debug("Not using proxy certificates");
-            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
-        } catch (Exception e) {
-            log.warn("failed to inject cert: " + e.getMessage(), e);
-            log.debug("injectProxyCertificate(): UNSUCCESSFUL");
-        }
-    }
-
-    private void writeClientCertificate(X509CertificateChain clientCertificateChain, String path)
-            throws IOException, InterruptedException {
-        final int uid = posixPrincipal.getUidNumber();
-        // stage file
-
-        final String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        final Writer writer = new BufferedWriter(new FileWriter(file));
-        CertUtil.writePEMCertificateAndKey(clientCertificateChain, writer);
-
-        // update file permissions
-        CommandExecutioner.changeOwnership(tmpFileName, uid, uid);
-
-        // inject file
-        String[] inject = new String[] {"mv", "-f", tmpFileName, path};
-        CommandExecutioner.execute(inject);
     }
 
     protected String getImageName(String image) {
@@ -311,37 +242,6 @@ public abstract class SessionAction extends SkahaAction {
 
     List<Session> getAllSessions(final String forUserID) throws Exception {
         return SessionDAO.getUserSessions(forUserID, null, false);
-    }
-
-    protected String toCoreUnit(String cores) {
-        String ret = NONE;
-        if (StringUtil.hasLength(cores)) {
-            if ("m".equals(cores.substring(cores.length() - 1))) {
-                // in "m" (millicore) unit, covert to cores
-                int milliCores = Integer.parseInt(cores.substring(0, cores.length() - 1));
-                ret = ((Double) (milliCores / Math.pow(10, 3))).toString();
-            } else {
-                // use value as is, can be '<none>' or some value
-                ret = cores;
-            }
-        }
-
-        return ret;
-    }
-
-    protected String toCommonUnit(String inK8sUnit) {
-        String ret = NONE;
-        if (StringUtil.hasLength(inK8sUnit)) {
-            if ("i".equals(inK8sUnit.substring(inK8sUnit.length() - 1))) {
-                // unit is in Ki, Mi, Gi, etc., remove the i
-                ret = inK8sUnit.substring(0, inK8sUnit.length() - 1);
-            } else {
-                // use value as is, can be '<none>' or some value
-                ret = inK8sUnit;
-            }
-        }
-
-        return ret;
     }
 
     protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {

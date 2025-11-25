@@ -67,7 +67,6 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.Log4jInit;
-import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -77,7 +76,9 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -93,54 +94,109 @@ public class GetActionTests {
         Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
-    private static final long K_UNIT = 1024;
-    private static final long M_UNIT = K_UNIT * K_UNIT;
-    private static final long G_UNIT = K_UNIT * M_UNIT;
-    private static final long T_UNIT = K_UNIT * G_UNIT;
-
-    private static final long NO_UNIT_VALUE = 100;
-    private static final long K_VALUE = 2 * K_UNIT;
-    private static final long M_VALUE = 3 * M_UNIT;
-    private static final long G_VALUE = 4 * G_UNIT;
-    private static final long T_VALUE = 5 * T_UNIT;
-    private static final long INVALID_VALUE = 6;
-
-    private static final String NO_UNIT_VALUE_STR = String.valueOf(NO_UNIT_VALUE);
-    private static final String K_VALUE_STR = 2 + "K";
-    private static final String M_VALUE_STR = 3 + "M";
-    private static final String G_VALUE_STR = 4 + "G";
-    private static final String T_VALUE_STR = 5 + "T";
-    private static final String INVALID_VALUE_STR = 5 + "A";
-
-    private static final String K8S_LIST =
-            "pud05npw   majorb   1001   1001   [23 24 25]   imageID   carta   Running   brian   2021-02-02T17:49:55Z   <none>   <none>\n"
-                    + "e37lmx4m   majorb   1001   1001   [23 24 25]   imageID   desktop    Terminating   brian   2021-01-28T21:52:51Z   <none>   <none>\n"
-                    + "gspc0n8m   majorb   1001   1001   [23 24 25]   imageID   notebook   Running   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "abcd0n8m   majorb   1001   1001   [23 25]   imageID   notebook   Terminating   brian   2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "defg0n8m   majorb   1001   1001   [1992]   imageID   notebook   Running   brian    2021-01-29T22:56:21Z   <none>   <none>\n"
-                    + "shd89sfg   majorb   1001   1001   []   imageID   notebook   Running   brian    2021-02-09T22:56:21Z   <none>   <none>\n"
-                    + "bbn3829s   majorb   1001   1001   <none>   imageID   notebook   Running   brian    2021-02-27T22:56:21Z   <none>   <none>\n";
+    private static final List<Session> SESSIONS_LIST = new ArrayList<>(Arrays.asList(
+            new Session(
+                    "pud05npw",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "carta",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "e37lmx4m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "desktop",
+                    "Terminating",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "gspc0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 24, 25},
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "abcd0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {23, 25},
+                    "imageID",
+                    "notebook",
+                    "Terminating",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "defg0n8m",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[] {1992},
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "shd89sfg",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    new Integer[0],
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null),
+            new Session(
+                    "bbn3829s",
+                    "owner-1",
+                    "1001",
+                    "1001",
+                    null,
+                    "imageID",
+                    "notebook",
+                    "Running",
+                    "brian",
+                    "2021-02-02T17:49:55Z",
+                    null,
+                    null)));
 
     public GetActionTests() {}
 
-    @Test
-    public void testNormalizeToLong() {
-        try {
-            GetAction get = new TestGetAction();
-            Assert.assertEquals(NO_UNIT_VALUE, get.normalizeToLong(NO_UNIT_VALUE_STR));
-            Assert.assertEquals(K_VALUE, get.normalizeToLong(K_VALUE_STR));
-            Assert.assertEquals(M_VALUE, get.normalizeToLong(M_VALUE_STR));
-            Assert.assertEquals(G_VALUE, get.normalizeToLong(G_VALUE_STR));
-            Assert.assertEquals(T_VALUE, get.normalizeToLong(T_VALUE_STR));
-            Assert.assertEquals(INVALID_VALUE, get.normalizeToLong(INVALID_VALUE_STR));
-        } catch (IllegalStateException ex) {
-            if (!ex.getMessage().contains("unknown RAM unit")) {
-                Assert.fail("Unexpected: " + ex.getMessage());
-            }
-        } catch (Throwable t) {
-            log.error("Unexpected", t);
-            Assert.fail("Unexpected: " + t.getMessage());
-        }
+    @Before
+    public void setupHomePath() {
+        TestUtil.setupUserStorageEnvironment();
+    }
+
+    @After
+    public void removeHomePath() {
+        TestUtil.tearDownUserStorageEnvironment();
     }
 
     @Test
@@ -152,7 +208,7 @@ public class GetActionTests {
         Gson gson = new Gson();
         Type listType = new TypeToken<List<Session>>() {}.getType();
         List<Session> sessions2 = gson.fromJson(json, listType);
-        Assert.assertEquals(sessions1.size(), K8S_LIST.split("\n").length);
+        Assert.assertEquals("Wrong session size.", sessions1.size(), GetActionTests.SESSIONS_LIST.size());
         Assert.assertEquals("session count", sessions1.size(), sessions2.size());
         for (Session s : sessions1) {
             Assert.assertTrue(s.getId(), sessions2.contains(s));
@@ -185,6 +241,8 @@ public class GetActionTests {
         for (Session s : filtered) {
             Assert.assertEquals(s.getId(), "Running", s.getStatus());
         }
+
+        System.getProperties().remove("SKAHA_USER_STORAGE_HOME_DIRECTORY");
     }
 
     @Test
@@ -207,99 +265,12 @@ public class GetActionTests {
 
         @Override
         public List<Session> getAllSessions(String forUserID) {
-            // A bit of a hack to emulate the state.
-            this.skahaTld = "/cavern-vospace";
-
-            List<Session> sessions = new ArrayList<>();
-            String[] lines = K8S_LIST.split("\n");
-            for (String line : lines) {
-                Session session = constructSession(line);
-                sessions.add(session);
-            }
-            return sessions;
-        }
-
-        Session constructSession(String k8sOutput) {
-            final List<SessionBuilder.CustomColumns> allColumns = Arrays.asList(SessionBuilder.CustomColumns.values());
-
-            // Items are separated by 3 or more spaces.  We can't separate on all spaces because the supplemental groups
-            // are in a space-delimited array.
-            final String[] parts = k8sOutput.trim().split(" {3,}");
-
-            String id = parts[allColumns.indexOf(SessionBuilder.CustomColumns.SESSION_ID)];
-            String userid = parts[allColumns.indexOf(SessionBuilder.CustomColumns.USERID)];
-            String image = parts[allColumns.indexOf(SessionBuilder.CustomColumns.IMAGE)];
-            SessionType type =
-                    SessionType.fromApplicationStringType(parts[allColumns.indexOf(SessionBuilder.CustomColumns.TYPE)]);
-            String deletionTimestamp = parts[allColumns.indexOf(SessionBuilder.CustomColumns.DELETION)];
-            final String status = (deletionTimestamp != null && !NONE.equals(deletionTimestamp))
-                    ? Session.STATUS_TERMINATING
-                    : parts[allColumns.indexOf(SessionBuilder.CustomColumns.STATUS)];
-            final String connectURL = String.format("https://example.org/session/test/%s", id);
-
-            final Session session = new Session(
-                    id,
-                    userid,
-                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.RUN_AS_UID)],
-                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.RUN_AS_GID)],
-                    fromStringArray(parts[allColumns.indexOf(SessionBuilder.CustomColumns.SUPPLEMENTAL_GROUPS)]),
-                    image,
-                    type.applicationName,
-                    status,
-                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.NAME)],
-                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.STARTED)],
-                    connectURL,
-                    parts[allColumns.indexOf(SessionBuilder.CustomColumns.APP_ID)]);
-
-            // Check if all columns were requested (set by forUserId)
-            final int requestedRamIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_RAM);
-            if (parts.length > requestedRamIndex) {
-                session.setRequestedRAM(toCommonUnit(parts[requestedRamIndex]));
-            }
-
-            final int requestedCPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_CPU);
-            if (parts.length > requestedCPUIndex) {
-                session.setRequestedCPUCores(toCoreUnit(parts[requestedCPUIndex]));
-            }
-
-            final int requestedGPUIndex = allColumns.indexOf(SessionBuilder.CustomColumns.REQUESTED_GPU);
-            if (parts.length > requestedGPUIndex) {
-                session.setRequestedGPUCores(toCoreUnit(parts[requestedGPUIndex]));
-            }
-
-            return session;
-        }
-
-        /**
-         * Example input is [4444 5555 6666]. Convert to an actual integer array.
-         *
-         * @param inputArray Kubernetes output of an array of integers.
-         * @return integer array, never null.
-         */
-        private static Integer[] fromStringArray(final String inputArray) {
-            if (inputArray.equals(SessionDAO.NONE)) {
-                return new Integer[0];
-            } else {
-                final Object[] parsedArray = Arrays.stream(inputArray
-                                .replace("[", "")
-                                .replace("]", "")
-                                .trim()
-                                .split(" "))
-                        .filter(StringUtil::hasText)
-                        .map(Integer::parseInt)
-                        .toArray();
-                return Arrays.copyOf(parsedArray, parsedArray.length, Integer[].class);
-            }
+            return GetActionTests.SESSIONS_LIST;
         }
 
         @Override
         protected String getUsername() {
             return null;
-        }
-
-        @Override
-        protected int getUID() {
-            return 997;
         }
     }
 }

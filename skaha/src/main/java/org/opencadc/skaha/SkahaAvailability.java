@@ -69,7 +69,6 @@ package org.opencadc.skaha;
 
 import ca.nrc.cadc.vosi.Availability;
 import ca.nrc.cadc.vosi.AvailabilityPlugin;
-import org.opencadc.skaha.session.PodResourceUsage;
 
 public class SkahaAvailability implements AvailabilityPlugin {
     public SkahaAvailability() {}
@@ -90,10 +89,8 @@ public class SkahaAvailability implements AvailabilityPlugin {
         try {
             return new Availability(
                     true,
-                    "Skaha Service Available.\n\n"
-                            + "Current Pods in " + K8SUtil.getWorkloadNamespace() + ":\n"
-                            + PodResourceUsage.get(null, false) + "\n\n"
-                            + "Enabled Experimental Features:\n " + K8SUtil.getExperimentalFeatures());
+                    "Skaha Service Available.\n\nEnabled Experimental Features:\n "
+                            + K8SUtil.getExperimentalFeatures());
         } catch (Exception e) {
             return new Availability(false, "failed to access cluster: " + e.getMessage());
         }
