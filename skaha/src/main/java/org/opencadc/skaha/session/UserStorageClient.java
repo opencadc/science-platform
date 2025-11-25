@@ -31,7 +31,6 @@ import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.vospace.ContainerNode;
-import org.opencadc.vospace.DataNode;
 import org.opencadc.vospace.Node;
 import org.opencadc.vospace.NodeProperty;
 import org.opencadc.vospace.VOS;
@@ -122,9 +121,10 @@ public class UserStorageClient {
                         LOGGER.debug("SSL folder already exists: " + sslHomeFolder.toAbsolutePath());
                     } catch (ResourceNotFoundException resourceNotFoundException) {
                         // Create the folder if not already present.
-                        final ContainerNode sslHiddenFolderNode = new ContainerNode(".ssl");
-                        final URI sslFolderURI = URI.create(userStorageConfiguration.userHomeBaseURI
-                                + sslHomeFolder.toAbsolutePath().toString());
+                        final ContainerNode sslHiddenFolderNode =
+                                new ContainerNode(UserStorageClient.PROXY_CERTIFICATE_FOLDER_NAME);
+                        final URI sslFolderURI = URI.create(userStorageConfiguration.userHomeBaseURI + "/"
+                                + Path.of(owner, UserStorageClient.PROXY_CERTIFICATE_FOLDER_NAME));
                         final Node createdNode = cavernClient.createNode(new VOSURI(sslFolderURI), sslHiddenFolderNode);
                         if (!(createdNode instanceof ContainerNode)) {
                             throw new IllegalStateException("BADNESS: Created Node is not a ContainerNode: "
@@ -137,7 +137,6 @@ public class UserStorageClient {
                     }
 
                     final String certificateFileName = "cadcproxy.pem";
-                    final DataNode certificateNode = new DataNode(certificateFileName);
                     final CredClient credClient = new CredClient(credServiceID);
                     final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
                     final X509CertificateChain proxyCert = Subject.callAs(
@@ -145,26 +144,23 @@ public class UserStorageClient {
                             () -> credClient.getProxyCertificate(currentSubject, UserStorageClient.ONE_WEEK_DAYS));
 
                     LOGGER.debug("Proxy cert: " + proxyCert);
-                    final Path userCertPath =
-                            Path.of(owner, UserStorageClient.PROXY_CERTIFICATE_FOLDER_NAME, certificateFileName);
-                    final URI certificateNodeURI =
-                            URI.create(userStorageConfiguration.userHomeBaseURI + "/" + userCertPath);
-                    final VOSURI targetVOSURI = new VOSURI(certificateNodeURI);
-                    final Node injectedCertificateNode = cavernClient.createNode(targetVOSURI, certificateNode);
-                    final File certificateFile =
-                            new File(Path.of(UserStorageClient.PROXY_CERTIFICATE_FOLDER_NAME, certificateFileName)
-                                    .toString());
+                    final URI nodeURI = URI.create(this.userStorageConfiguration.userHomeBaseURI + "/" + owner + "/"
+                            + Path.of(UserStorageClient.PROXY_CERTIFICATE_FOLDER_NAME, certificateFileName));
+                    final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
+                    transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
 
-                    try (final FileOutputStream fileOutputStream = new FileOutputStream(certificateFile);
-                            final InputStream certificateInputStream = new ByteArrayInputStream(
-                                    proxyCert.certificateString().getBytes())) {
-                        IOUtils.copy(certificateInputStream, fileOutputStream);
-                        fileOutputStream.flush();
-                    }
+                    final ClientTransfer clientTransfer = cavernClient.createTransfer(transfer);
+                    clientTransfer.setOutputStreamWrapper(out -> {
+                        try (final InputStream certificateInputStream = new ByteArrayInputStream(
+                                proxyCert.certificateString().getBytes())) {
+                            IOUtils.copy(certificateInputStream, out);
+                            out.flush();
+                        }
+                    });
+                    clientTransfer.setMonitor(true);
+                    clientTransfer.runTransfer();
 
-                    upload(cavernClient, certificateFile, owner);
-
-                    LOGGER.debug("injectProxyCertificate(): OK -> " + injectedCertificateNode.getName());
+                    LOGGER.debug("injectProxyCertificate(): OK -> ");
                 } else {
                     LOGGER.debug("Not using proxy certificates");
                     LOGGER.debug("injectProxyCertificate(): SKIPPED");
@@ -241,27 +237,19 @@ public class UserStorageClient {
         }
     }
 
-    private void upload(final VOSpaceClient voSpaceClient, final File file, final String owner) throws Exception {
-        upload(voSpaceClient, file, null, owner);
-    }
-
     private void upload(final VOSpaceClient voSpaceClient, final File file, final Path root, final String owner)
             throws Exception {
         LOGGER.debug("UserStorageClient.upload() - Uploading file: " + file.getName());
-        final DataNode node = new DataNode(file.getName());
         final Path relativePath = root == null ? file.toPath() : root.relativize(file.toPath());
         final URI nodeURI =
                 URI.create(this.userStorageConfiguration.userHomeBaseURI + "/" + owner + "/" + relativePath);
-        final Node createdNode = voSpaceClient.createNode(new VOSURI(nodeURI), node, false);
-        if (createdNode instanceof DataNode) {
-            final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
-            transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
+        final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
+        transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
 
-            final ClientTransfer clientTransfer = voSpaceClient.createTransfer(transfer);
-            clientTransfer.setFile(file);
-            clientTransfer.setMonitor(true);
-            clientTransfer.runTransfer();
-        }
+        final ClientTransfer clientTransfer = voSpaceClient.createTransfer(transfer);
+        clientTransfer.setFile(file);
+        clientTransfer.setMonitor(true);
+        clientTransfer.runTransfer();
         LOGGER.debug("UserStorageClient.upload() - Uploading file: " + file.getName() + ": OK");
     }
 
