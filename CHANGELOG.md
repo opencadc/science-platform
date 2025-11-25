@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.5](https://github.com/opencadc/science-platform/compare/1.1.4...1.1.5) (2025-11-25)
+
+
+### Bug Fixes
+
+* change default notebook image in int test ([879b215](https://github.com/opencadc/science-platform/commit/879b215b4c3b1c4495e7e2cb0b20a9107218ced0))
+* ensure executor service is closed and remove heavy check in availability ([f83fb88](https://github.com/opencadc/science-platform/commit/f83fb88ccb0156382ed79d5bfc7bba2f911041ef))
+* not rely on instances from the stats ([36739ff](https://github.com/opencadc/science-platform/commit/36739ff1217de41cf94cdee528598e5667c30a75))
+* restore stats schema for context endpoint ([593b7f3](https://github.com/opencadc/science-platform/commit/593b7f3591fe883bf70369d2d6e13803958a3b38))
+
 ## [1.1.4](https://github.com/opencadc/science-platform/compare/1.1.3...1.1.4) (2025-11-17)
 
 
