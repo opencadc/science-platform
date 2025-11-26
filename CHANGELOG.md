@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.7](https://github.com/opencadc/science-platform/compare/1.1.6...1.1.7) (2025-11-26)
+
+
+### Bug Fixes
+
+* proper writing of client cert ([d6da0c4](https://github.com/opencadc/science-platform/commit/d6da0c4046ff19ce5b103e897cad505d3b5f529f))
+* proper writing of client cert ([4e7e9db](https://github.com/opencadc/science-platform/commit/4e7e9dbb1e8d25b2c64ab7651473b84ac5b620d2))
+
 ## [1.1.6](https://github.com/opencadc/science-platform/compare/1.1.5...1.1.6) (2025-11-25)
 
 
