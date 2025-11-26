@@ -3,6 +3,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
+import ca.nrc.cadc.cred.CertUtil;
 import ca.nrc.cadc.cred.client.CredClient;
 import ca.nrc.cadc.cred.client.CredUtil;
 import ca.nrc.cadc.net.ResourceAlreadyExistsException;
@@ -10,12 +11,11 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import com.amazonaws.util.IOUtils;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileAlreadyExistsException;
@@ -151,11 +151,8 @@ public class UserStorageClient {
 
                     final ClientTransfer clientTransfer = cavernClient.createTransfer(transfer);
                     clientTransfer.setOutputStreamWrapper(out -> {
-                        try (final InputStream certificateInputStream = new ByteArrayInputStream(
-                                proxyCert.certificateString().getBytes())) {
-                            IOUtils.copy(certificateInputStream, out);
-                            out.flush();
-                        }
+                        CertUtil.writePEMCertificateAndKey(proxyCert, new OutputStreamWriter(out));
+                        out.flush();
                     });
                     clientTransfer.setMonitor(true);
                     clientTransfer.runTransfer();
