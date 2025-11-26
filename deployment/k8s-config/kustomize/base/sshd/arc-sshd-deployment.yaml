@@ -16,7 +16,15 @@ spec:
         run: arc-sshd
     spec:
       affinity:
-        nodeAffinity:
+        nodeAffinity:          
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: skaha.opencadc.org/node-type
+                operator: In
+                values:
+                - service-node
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
