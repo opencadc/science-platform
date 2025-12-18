@@ -7,14 +7,20 @@ import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api;
 import io.kubernetes.client.openapi.models.V1Container;
+import io.kubernetes.client.openapi.models.V1Ingress;
+import io.kubernetes.client.openapi.models.V1IngressStatus;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1ResourceRequirements;
+import io.kubernetes.client.openapi.models.V1Service;
+import io.kubernetes.client.openapi.models.V1ServiceStatus;
 import io.kubernetes.client.openapi.models.V1Status;
+import io.kubernetes.client.util.Yaml;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -24,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
@@ -33,6 +40,7 @@ public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
 
     private static final String SESSION_ID_LABEL = "canfar-net-sessionID";
+    private static final String SESSION_NAME_LABEL = "canfar-net-sessionName";
     private static final String DESKTOP_APP_ID_LABEL = "canfar-net-appID";
     private static final String USER_ID_LABEL = "canfar-net-userid";
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
@@ -50,7 +58,7 @@ public class SessionDAO {
             }
         }
 
-        throw new ResourceNotFoundException("session " + sessionID + " not found");
+        throw new ResourceNotFoundException("getSession(" + forUserID + ", " + sessionID + ") not found");
     }
 
     static void deleteDesktopApplicationJob(final String sessionID, final String username, final String appID)
@@ -132,11 +140,15 @@ public class SessionDAO {
 
         final V1Job job =
                 api.readNamespacedJob(jobName, K8SUtil.getWorkloadNamespace()).execute();
+        return SessionDAO.getJob(job);
+    }
+
+    static KubernetesJob getJob(final V1Job job) {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
 
         return new KubernetesJob(
-                jobName,
+                labels.get(SessionDAO.SESSION_NAME_LABEL),
                 jobMetadata.getUid(),
                 labels.get(SessionDAO.SESSION_ID_LABEL),
                 SessionType.fromApplicationStringType(Objects.requireNonNullElse(
@@ -178,6 +190,32 @@ public class SessionDAO {
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
                 + " after filtering.");
         return sessions;
+    }
+
+    static KubernetesJob createKubernetesJob(final SessionJobBuilder sessionJobBuilder) throws Exception {
+        final V1Job job = (V1Job) Yaml.load(sessionJobBuilder.build());
+        final BatchV1Api api = new BatchV1Api(Configuration.getDefaultApiClient());
+        final V1Job kubernetesJob =
+                api.createNamespacedJob(K8SUtil.getWorkloadNamespace(), job).execute();
+        return SessionDAO.getJob(kubernetesJob);
+    }
+
+    static JSONObject createKubernetesService(final String serviceYAML) throws Exception {
+        final V1Service service = (V1Service) Yaml.load(serviceYAML);
+        final CoreV1Api api = new CoreV1Api(Configuration.getDefaultApiClient());
+        final V1Service kubernetesService = api.createNamespacedService(K8SUtil.getWorkloadNamespace(), service)
+                .execute();
+        return new JSONObject(Objects.requireNonNullElse(kubernetesService.getStatus(), new V1ServiceStatus())
+                .toJson());
+    }
+
+    static JSONObject createKubernetesIngress(final String ingressYAML) throws Exception {
+        final V1Ingress ingress = (V1Ingress) Yaml.load(ingressYAML);
+        final NetworkingV1Api api = new NetworkingV1Api(Configuration.getDefaultApiClient());
+        final V1Ingress kubernetesIngress = api.createNamespacedIngress(K8SUtil.getWorkloadNamespace(), ingress)
+                .execute();
+        return new JSONObject(Objects.requireNonNullElse(kubernetesIngress.getStatus(), new V1IngressStatus())
+                .toJson());
     }
 
     /**

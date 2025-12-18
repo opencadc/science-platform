@@ -90,6 +90,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -212,10 +213,6 @@ public class PostAction extends SessionAction {
                 // (rule: only 1 session of same type per user allowed)
                 checkExistingSessions(validatedType);
 
-                // create a new session id
-                // (VNC passwords are only good up to 8 characters)
-                this.sessionID = new RandomStringGenerator(8).getID();
-
                 int gpus = 0;
                 final String gpusParam = syncInput.getParameter("gpus");
                 if (StringUtil.hasText(gpusParam)) {
@@ -234,7 +231,9 @@ public class PostAction extends SessionAction {
                 final String cmd = syncInput.getParameter("cmd");
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
+
+                this.sessionID = createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
+
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -427,7 +426,7 @@ public class PostAction extends SessionAction {
         }
     }
 
-    public void createSession(
+    public String createSession(
             SessionType type,
             String image,
             String name,
@@ -441,9 +440,11 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
+        final String newSessionID = new RandomStringGenerator(8).getID();
+
         final String headlessPriority = getHeadlessPriority();
         final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
-        final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final String jobName = K8SUtil.getJobName(newSessionID, type, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String owner = getUsername();
 
@@ -458,7 +459,7 @@ public class PostAction extends SessionAction {
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
-                .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
+                .withParameter(PostAction.SKAHA_SESSIONID, newSessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
@@ -490,7 +491,7 @@ public class PostAction extends SessionAction {
             final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
             if (imageVersion.startsWith("5")) {
                 final String connectURLPrefix = SessionURLBuilder.cartaSession(
-                                K8SUtil.getSessionsHostName(), this.sessionID)
+                                K8SUtil.getSessionsHostName(), newSessionID)
                         .withVersion5Path(true)
                         .withAlternateSocket(false)
                         .build();
@@ -507,8 +508,8 @@ public class PostAction extends SessionAction {
             sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
         }
 
-        String jobLaunchString = sessionJobBuilder.build();
-        String jsonLaunchFile = super.stageFile(jobLaunchString);
+//        String jobLaunchString = sessionJobBuilder.build();
+//        String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -517,61 +518,40 @@ public class PostAction extends SessionAction {
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
 
-        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
+        final KubernetesJob kubernetesJob = SessionDAO.createKubernetesJob(sessionJobBuilder);
 
-        final KubectlCommandBuilder.KubectlCommand launchCmd =
-                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        String createResult = CommandExecutioner.execute(launchCmd.build());
-
-        log.debug("Create job result: " + createResult);
-
-        final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
-
-        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
-        // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Java client to create Service objects.
         if (type.supportsService()) {
-            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
+            final byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
-            serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, newSessionID);
             serviceString =
                     SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
             serviceString =
                     SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(serviceString);
-            final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
+            final JSONObject createStatus = SessionDAO.createKubernetesService(serviceString);
 
-            log.debug("Create service result: " + createResult);
+            log.debug("Create service result: " + createStatus);
         }
 
-        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
-        // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Gateway API to create Ingresses.
-        // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
-            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
+            final byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
-            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, newSessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
             ingressString =
                     SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
             ingressString =
                     SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(ingressString);
-            final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(ingressLaunchCommand.build());
+            final JSONObject createStatus = SessionDAO.createKubernetesIngress(ingressString);
 
-            log.debug("Create ingress result: " + createResult);
+            log.debug("Create ingress result: " + createStatus);
         }
+
+        return sessionID;
     }
 
-    private void injectPOSIXDetails() throws Exception {
+    private void injectPOSIXDetails() {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
@@ -657,13 +637,10 @@ public class PostAction extends SessionAction {
 
         log.debug("attaching desktop app: " + image + " to " + targetIP);
 
-        String name = getImageName(image);
+        final String name = getImageName(image);
         log.debug("name: " + name);
 
-        // incoming params ignored for the time being.  set to the 'name' so
-        // that it becomes the xterm title
-        String param = name;
-        log.debug("Using parameter: " + param);
+        log.debug("Using parameter: " + name);
         log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
         log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
         log.debug("Using requests.ram: " + resourceSpecification.requestRAM.toString() + "Gi");
@@ -711,7 +688,11 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
-                .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
+
+                // Incoming params are ignored for the time being, so set it to the 'name' so
+                // that it becomes the xterm title.  This is used for Desktop sessions only.
+                .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, name)
+
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
                         userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
