@@ -71,7 +71,11 @@ import static java.util.stream.Collectors.toList;
 import static org.opencadc.skaha.utils.CommonUtils.isNotEmpty;
 
 import ca.nrc.cadc.ac.Group;
-import ca.nrc.cadc.auth.*;
+import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.HttpPrincipal;
+import ca.nrc.cadc.auth.NotAuthenticatedException;
+import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.rest.InlineContentHandler;
@@ -81,15 +85,12 @@ import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URL;
-import java.security.AccessControlException;
 import java.security.KeyPair;
 import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
-import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
 import org.opencadc.permissions.TokenTool;
@@ -123,7 +124,6 @@ public abstract class SkahaAction extends RestAction {
             SESSION_TYPE_HEADLESS,
             SESSION_TYPE_FIREFLY,
             TYPE_DESKTOP_APP);
-    protected final PosixMapperConfiguration posixMapperConfiguration;
     public List<String> harborHosts;
     protected PosixPrincipal posixPrincipal;
     protected boolean headlessUser = false;
@@ -154,8 +154,6 @@ public abstract class SkahaAction extends RestAction {
         // Check the catalina.properties for this setting.
         skahaPosixCacheURL = K8SUtil.getPosixCacheUrl(SkahaAction.class.getPackageName());
 
-        final String configuredPosixMapperResourceID = K8SUtil.getPosixMapperResourceId();
-
         log.debug("skaha.hostname=" + K8SUtil.getSkahaHostName());
         log.debug("skaha.sessions.hostname=" + K8SUtil.getSessionsHostName());
         log.debug("skaha.scratchdir=" + scratchdir);
@@ -166,18 +164,6 @@ public abstract class SkahaAction extends RestAction {
         log.debug("skaha.adminsgroup=" + skahaAdminsGroup);
         log.debug("SKAHA_HEADLESS_PRIORITY_CLASS=" + skahaHeadlessPriorityClass);
         log.debug("skaha.maxusersessions=" + maxUserSessions);
-        log.debug("skaha.posixmapper.resourceid" + "=" + configuredPosixMapperResourceID);
-
-        try {
-            if (StringUtil.hasText(configuredPosixMapperResourceID)) {
-                final URI configuredPosixMapperResourceURI = URI.create(configuredPosixMapperResourceID);
-                posixMapperConfiguration = new PosixMapperConfiguration(configuredPosixMapperResourceURI);
-            } else {
-                posixMapperConfiguration = null;
-            }
-        } catch (IOException ioException) {
-            throw new IllegalArgumentException(ioException.getMessage(), ioException);
-        }
     }
 
     protected static TokenTool getTokenTool() throws Exception {
@@ -290,7 +276,7 @@ public abstract class SkahaAction extends RestAction {
         }
         Set<PosixPrincipal> posixPrincipals = currentSubject.getPrincipals(PosixPrincipal.class);
         if (posixPrincipals.isEmpty()) {
-            throw new AccessControlException("No POSIX Principal");
+            throw new NotAuthenticatedException("No POSIX Principal");
         }
         posixPrincipal = posixPrincipals.iterator().next();
 
@@ -304,7 +290,7 @@ public abstract class SkahaAction extends RestAction {
 
         // The username is necessary.
         if (posixPrincipal.username == null) {
-            throw new AccessControlException("POSIX Principal is incomplete (no username).");
+            throw new NotAuthenticatedException("POSIX Principal is incomplete (no username).");
         }
 
         log.debug("userID: " + posixPrincipal + " (" + posixPrincipal.username + ")");
@@ -337,7 +323,7 @@ public abstract class SkahaAction extends RestAction {
         final GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
-            throw new AccessControlException("Not authorized to use the skaha system");
+            throw new AccessDeniedException("Not authorized to use the skaha system");
         }
 
         log.debug("user is a member of skaha user group ");
@@ -365,36 +351,6 @@ public abstract class SkahaAction extends RestAction {
                 .filter(image -> image.getId().equals(imageID))
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * It's important to use the correct constructor for the PosixMapperClient, this class will wrap the logic based on
-     * how the Resource ID of the POSIX mapper was set (URI or URL).
-     */
-    protected static class PosixMapperConfiguration {
-        final URI resourceID;
-        final URL baseURL;
-
-        protected PosixMapperConfiguration(final URI configuredPosixMapperID) throws IOException {
-            if ("ivo".equals(configuredPosixMapperID.getScheme())) {
-                resourceID = configuredPosixMapperID;
-                baseURL = null;
-            } else if ("https".equals(configuredPosixMapperID.getScheme())) {
-                resourceID = null;
-                baseURL = configuredPosixMapperID.toURL();
-            } else {
-                throw new IllegalStateException("Incorrect configuration for specified posix mapper service ("
-                        + configuredPosixMapperID + ").");
-            }
-        }
-
-        public PosixMapperClient getPosixMapperClient() {
-            if (resourceID == null) {
-                return new PosixMapperClient(baseURL);
-            } else {
-                return new PosixMapperClient(resourceID);
-            }
-        }
     }
 
     protected static class EncodedKeyPair {

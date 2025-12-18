@@ -1,8 +1,3 @@
-configurations {
-    // Configuration for integration tests
-    intTestRuntime.extendsFrom testRuntime
-}
-
 sourceSets {
     test {
         resources.srcDirs += 'src/test/resources'
@@ -12,11 +7,14 @@ sourceSets {
             compileClasspath += main.output + test.output
             runtimeClasspath += main.output + test.output
         }
-        resources.srcDir file('src/intTest/resources')
-        resources.srcDirs += new File(System.getenv('A') + '/test-certificates/')
-
         resources.srcDirs += 'src/intTest/resources'
     }
+}
+
+configurations {
+    // Configuration for integration tests
+    intTestRuntime.extendsFrom testRuntime
+    intTestImplementation.extendsFrom(testImplementation)
 }
 
 tasks.withType(Test).configureEach {

@@ -215,10 +215,6 @@ public class K8SUtil {
         return System.getProperty(packageName + ".posixCache.url");
     }
 
-    public static String getPosixMapperResourceId() {
-        return System.getenv("skaha.posixmapper.resourceid");
-    }
-
     public static String getRedisHost() {
         return System.getenv("REDIS_HOST");
     }

@@ -94,7 +94,7 @@ spotless {
     // Checks for javadoc formatting
     checkstyle {
       // Point to the same checkstyle.xml file as the checkstyle task
-      configFile file("$rootDir/checkstyle.xml")
+      configFile file("${layout.projectDirectory}/checkstyle.xml")
     }
   }
 }
@@ -111,12 +111,12 @@ check.dependsOn jacocoTestReport
 
 // Create JavaDoc
 javadoc {
-    destinationDir = file("${buildDir}/docs/javadoc")
+    destinationDir = file("${layout.buildDirectory}/docs/javadoc")
 }
 
 // Create Java Documentation using Dokka for Github Markdown and HTML
 tasks.dokkaGfm.configure {
-    outputDirectory.set(file("${buildDir}/docs/dokka/gfm"))
+    outputDirectory.set(file("${layout.buildDirectory}/docs/dokka/gfm"))
     dokkaSourceSets {
         register("main") {
             sourceRoots.from(file("src/main/java"))
@@ -124,7 +124,7 @@ tasks.dokkaGfm.configure {
     }
 }
 tasks.dokkaHtml.configure {
-    outputDirectory.set(file("${buildDir}/docs/dokka/html"))
+    outputDirectory.set(file("${layout.buildDirectory}/docs/dokka/html"))
     dokkaSourceSets {
         register("main") {
             sourceRoots.from(file("src/main/java"))

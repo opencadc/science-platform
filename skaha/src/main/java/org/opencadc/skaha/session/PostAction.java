@@ -73,11 +73,11 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -94,6 +94,7 @@ import org.json.JSONObject;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
+import org.opencadc.skaha.AccessDeniedException;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
@@ -232,7 +233,8 @@ public class PostAction extends SessionAction {
                 final String args = syncInput.getParameter("args");
                 final List<String> envs = syncInput.getParameters("env");
 
-                this.sessionID = createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
+                this.sessionID =
+                        createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
 
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
@@ -508,8 +510,8 @@ public class PostAction extends SessionAction {
             sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
         }
 
-//        String jobLaunchString = sessionJobBuilder.build();
-//        String jsonLaunchFile = super.stageFile(jobLaunchString);
+        //        String jobLaunchString = sessionJobBuilder.build();
+        //        String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -548,15 +550,16 @@ public class PostAction extends SessionAction {
             log.debug("Create ingress result: " + createStatus);
         }
 
-        return sessionID;
+        return newSessionID;
     }
 
-    private void injectPOSIXDetails() {
+    private void injectPOSIXDetails() throws IOException {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
+        final PosixMapperConfiguration posixMapperConfiguration = PosixMapperConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
                 userStorageConfiguration.homeBaseDirectory.toString(),
-                this.posixMapperConfiguration.getPosixMapperClient());
+                posixMapperConfiguration.getPosixMapperClient());
         posixCache.writePOSIXEntries();
     }
 
@@ -692,7 +695,6 @@ public class PostAction extends SessionAction {
                 // Incoming params are ignored for the time being, so set it to the 'name' so
                 // that it becomes the xterm title.  This is used for Desktop sessions only.
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, name)
-
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
                         userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
@@ -721,7 +723,7 @@ public class PostAction extends SessionAction {
         if (skahaHeadlessGroup == null) {
             log.warn("skaha.headlessgroup not defined in system properties");
         } else if (!headlessUser) {
-            throw new AccessControlException("Not authorized to create a headless session");
+            throw new AccessDeniedException("Not authorized to create a headless session");
         }
     }
 
@@ -740,16 +742,14 @@ public class PostAction extends SessionAction {
     }
 
     private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
-        return toGIDs(
-                groupCredentials.iterator().next().stream().map(Group::getID).collect(Collectors.toList()));
-    }
-
-    List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
-        return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIS);
+        final PosixMapperConfiguration posixMapperConfiguration = PosixMapperConfiguration.fromEnv();
+        final List<GroupURI> groupURIs =
+                groupCredentials.iterator().next().stream().map(Group::getID).collect(Collectors.toList());
+        return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIs);
     }
 
     /**
-     * Create the image, command, args, and env sections of the job launch yaml. Example:
+     * Create the image, command, args, and env sections of the job launch YAML. Example:
      *
      * <p>image: "${software.imageid}" command: ["/skaha-system/start-desktop-software.sh"] args: [arg1, arg2] env: -
      * name: HOME value: "/cavern/home/${skaha.userid}" - name: SHELL value: "/bin/bash"
