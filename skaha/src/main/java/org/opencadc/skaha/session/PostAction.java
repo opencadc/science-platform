@@ -78,6 +78,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.AccessControlException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -94,7 +95,6 @@ import org.json.JSONObject;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
-import org.opencadc.skaha.AccessDeniedException;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
@@ -113,7 +113,7 @@ import org.opencadc.skaha.utils.PosixCache;
  */
 public class PostAction extends SessionAction {
 
-    // variables replaced in kubernetes yaml config files for
+    // variables replaced in kubernetes YAML config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
@@ -723,7 +723,7 @@ public class PostAction extends SessionAction {
         if (skahaHeadlessGroup == null) {
             log.warn("skaha.headlessgroup not defined in system properties");
         } else if (!headlessUser) {
-            throw new AccessDeniedException("Not authorized to create a headless session");
+            throw new AccessControlException("Not authorized to create a headless session");
         }
     }
 

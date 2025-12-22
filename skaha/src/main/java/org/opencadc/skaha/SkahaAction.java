@@ -85,6 +85,7 @@ import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
 import java.io.IOException;
 import java.net.URI;
+import java.security.AccessControlException;
 import java.security.KeyPair;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -323,7 +324,7 @@ public abstract class SkahaAction extends RestAction {
         final GroupURI skahaUsersGroupUri = new GroupURI(skahaUsersUri);
         if (!skahaUsersGroupUriSet.contains(skahaUsersGroupUri)) {
             log.debug("user is not a member of skaha user group ");
-            throw new AccessDeniedException("Not authorized to use the skaha system");
+            throw new AccessControlException("Not authorized to use the skaha system");
         }
 
         log.debug("user is a member of skaha user group ");
