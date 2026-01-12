@@ -49,7 +49,7 @@ dependencies {
     // Used to merge YAML sections to fully configure Job files.
     // Ensure the Snake YAML version is 2.5 to prevent unnecessary logging of WARNING messages.
     implementation 'org.yaml:snakeyaml:2.5'
-    implementation 'io.kubernetes:client-java:24.0.0'
+    implementation 'io.kubernetes:client-java:25.0.0'
 
     // Used to read configuration from the environment and property files.
     implementation 'org.apache.commons:commons-configuration2:[2.11.0,3.0.0)'
@@ -69,10 +69,10 @@ dependencies {
     implementation 'redis.clients:jedis:[5.0.2,6.0.0)'
 
     // JSON schema validator
-    testImplementation 'com.networknt:json-schema-validator:1.5.9'
+    testImplementation 'com.github.erosb:everit-json-schema:1.14.6'
     testImplementation 'junit:junit:[4.13,)'
-    testImplementation 'org.json:json:20250517'
-    testImplementation 'org.mockito:mockito-core:5.12.0'
+    testImplementation 'org.json:json:20251224'
+    testImplementation 'org.mockito:mockito-core:5.21.0'
 }
 
 spotless {
@@ -93,7 +93,7 @@ spotless {
     // Checks for javadoc formatting
     checkstyle {
       // Point to the same checkstyle.xml file as the checkstyle task
-      configFile file("$rootDir/checkstyle.xml")
+      configFile file("$projectDir/checkstyle.xml")
     }
   }
 }

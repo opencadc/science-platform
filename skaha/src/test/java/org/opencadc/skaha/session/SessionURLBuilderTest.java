@@ -11,7 +11,7 @@ public class SessionURLBuilderTest {
 
         Assert.assertEquals(
                 "Wrong URL",
-                "https://host.example.org/session/desktop/8675309/?password=8675309&path=session/desktop/8675309/",
+                "https://host.example.org/session/desktop/8675309/?password=8675309&path=session/desktop/8675309/&scale=remote",
                 vncURL);
 
         try {

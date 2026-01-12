@@ -108,7 +108,8 @@ public abstract class SessionURLBuilder {
                     .setScheme("https")
                     .setHost(this.host)
                     .setPathSegments("session", "desktop", this.sessionID, "") // Extra empty string to append slash
-                    .setCustomQuery("password=" + this.sessionID + "&path=session/desktop/" + this.sessionID + "/")
+                    .setCustomQuery(
+                            "password=" + this.sessionID + "&path=session/desktop/" + this.sessionID + "/&scale=remote")
                     .build()
                     .toString();
         }

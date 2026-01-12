@@ -1,34 +1,32 @@
+sourceSets {
+    intTest {
+        java {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+        }
+        resources {
+            srcDirs = ['src/intTest/resources']
+        }
+    }
+}
+
 configurations {
     // Configuration for integration tests
     intTestRuntime.extendsFrom testRuntime
     intTestImplementation.extendsFrom testImplementation
 }
 
-sourceSets {
-    test {
-        resources.srcDirs += 'src/test/resources'
-    }
-    intTest {
-        java {
-            compileClasspath += main.output + test.output
-            runtimeClasspath += main.output + test.output
-        }
-        resources.srcDir file('src/intTest/resources')
-        resources.srcDirs += new File(System.getenv('A') + '/test-certificates/')
-    }
-}
-
-tasks.withType(Test) {
+tasks.withType(Test).configureEach {
     // reset the report destinations so that intTests go to their own page
-    //reports.html.destination = file("${reporting.baseDir}/${name}")
-    reports.html.destination = file(reporting.baseDir.getAbsolutePath() + '/' + name)
+//    reports.html.destination = file(reporting.baseDirectory + '/' + name)
+    reports.html.outputLocation = layout.buildDirectory.dir("reports/" + name)
 
     // Assign all Java system properties from
     // the command line to the tests
-    systemProperties System.properties
+    systemProperties System.properties as Map<String, ? extends Object>
 }
 
-task intTest(type: Test) {
+tasks.register('intTest', Test) {
     // set the configuration context
     testClassesDirs = sourceSets.intTest.output.classesDirs
     classpath = sourceSets.intTest.runtimeClasspath
