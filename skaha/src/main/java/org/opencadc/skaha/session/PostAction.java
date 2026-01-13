@@ -73,6 +73,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -90,6 +91,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
+import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -111,7 +113,7 @@ import org.opencadc.skaha.utils.PosixCache;
  */
 public class PostAction extends SessionAction {
 
-    // variables replaced in kubernetes yaml config files for
+    // variables replaced in kubernetes YAML config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
@@ -180,7 +182,6 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
 
-        ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
             if (requestType.equals(REQUEST_TYPE_APP)
@@ -221,7 +222,8 @@ public class PostAction extends SessionAction {
                 if (StringUtil.hasText(gpusParam)) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
-                        if (!rc.getAvailableGPUs().contains(gpus)) {
+                        final ResourceContexts resourceContexts = new ResourceContexts();
+                        if (!resourceContexts.getAvailableGPUs().contains(gpus)) {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
                     } catch (Exception e) {
@@ -336,11 +338,15 @@ public class PostAction extends SessionAction {
 
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
 
-        Map<String, List<String>> renewJobMap = new HashMap<>();
+        return PostAction.getStringListMap(renewJobNamesStr);
+    }
+
+    private static @NonNull Map<String, List<String>> getStringListMap(final String renewJobNamesStr) {
+        final Map<String, List<String>> renewJobMap = new HashMap<>();
         if (StringUtil.hasLength(renewJobNamesStr)) {
             String[] lines = renewJobNamesStr.split("\n");
             for (String line : lines) {
-                List<String> renewJobAttributes = new ArrayList<>();
+                final List<String> renewJobAttributes = new ArrayList<>();
                 String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
                 String jobName = parts[0];
                 String uid = parts[1];
@@ -354,7 +360,6 @@ public class PostAction extends SessionAction {
                 }
             }
         }
-
         return renewJobMap;
     }
 
@@ -451,10 +456,7 @@ public class PostAction extends SessionAction {
             this.userStorageClient.ensureDesktopUserHomePreparation(owner);
         }
 
-        final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
-        final boolean isLegacyCARTA = (type == SessionType.CARTA && (majorVersion == null || majorVersion < 5));
-
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath(isLegacyCARTA))
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
@@ -487,17 +489,12 @@ public class PostAction extends SessionAction {
         if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         } else if (type == SessionType.CARTA) {
-            final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
-            if (imageVersion.startsWith("5")) {
-                final String connectURLPrefix = SessionURLBuilder.cartaSession(
-                                K8SUtil.getSessionsHostName(), this.sessionID)
-                        .withVersion5Path(true)
-                        .withAlternateSocket(false)
-                        .build();
-                final String connectURLPath = URI.create(connectURLPrefix).getPath();
-                sessionJobBuilder = sessionJobBuilder.withParameter(
-                        PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
-            }
+            final String connectURLPrefix = SessionURLBuilder.cartaSession(
+                            K8SUtil.getSessionsHostName(), this.sessionID)
+                    .build();
+            final String connectURLPath = URI.create(connectURLPrefix).getPath();
+            sessionJobBuilder = sessionJobBuilder.withParameter(
+                    PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
         }
 
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
@@ -521,9 +518,9 @@ public class PostAction extends SessionAction {
 
         final KubectlCommandBuilder.KubectlCommand launchCmd =
                 KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        String createResult = CommandExecutioner.execute(launchCmd.build());
+        String createJobResult = CommandExecutioner.execute(launchCmd.build());
 
-        log.debug("Create job result: " + createResult);
+        log.debug("Create job result: " + createJobResult);
 
         final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
 
@@ -531,20 +528,12 @@ public class PostAction extends SessionAction {
         // API is in place, we can swap this out with a proper Java client API.
         // TODO: Use the Kubernetes Java client to create Service objects.
         if (type.supportsService()) {
-            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
+            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            serviceString =
-                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-            serviceString =
-                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(serviceString);
-            final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
+            final String createServiceResult = setCommonConfig(k8sNamespace, kubernetesJob, serviceString);
 
-            log.debug("Create service result: " + createResult);
+            log.debug("Create service result: " + createServiceResult);
         }
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
@@ -552,26 +541,33 @@ public class PostAction extends SessionAction {
         // TODO: Use the Kubernetes Gateway API to create Ingresses.
         // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
-            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
+            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(ingressString);
-            final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(ingressLaunchCommand.build());
+            final String createIngressResult = setCommonConfig(k8sNamespace, kubernetesJob, ingressString);
 
-            log.debug("Create ingress result: " + createResult);
+            log.debug("Create ingress result: " + createIngressResult);
         }
     }
 
-    private void injectPOSIXDetails() throws Exception {
+    private String setCommonConfig(String k8sNamespace, KubernetesJob kubernetesJob, String serviceString)
+            throws IOException, InterruptedException {
+        String jsonLaunchFile;
+        String createResult;
+        serviceString =
+                SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+        serviceString =
+                SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+        jsonLaunchFile = super.stageFile(serviceString);
+        final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand =
+                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
+        createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
+        return createResult;
+    }
+
+    private void injectPOSIXDetails() {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
