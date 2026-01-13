@@ -179,6 +179,10 @@ public class ResourceContexts {
         return this.availableCores.contains(coreCount);
     }
 
+    public boolean isRAMAmountAvailable(final Integer ramAmount) {
+        return this.availableRAM.contains(ramAmount);
+    }
+
     public Integer getDefaultRequestRAM() {
         return defaultRequestRAM;
     }

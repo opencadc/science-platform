@@ -192,7 +192,7 @@ public class PostAction extends SessionAction {
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                final String requestedType = syncInput.getParameter("type");
+                final String requestedType = SessionAction.getRequestedSessionType(this.syncInput);
 
                 // Absence of type is assumed to be headless
                 final String type =
@@ -479,9 +479,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
                 .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGB.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGB + "Gi")
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -662,8 +662,8 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
         log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
-        log.debug("Using requests.ram: " + resourceSpecification.requestRAM.toString() + "Gi");
-        log.debug("Using limits.ram: " + resourceSpecification.limitRAM.toString() + "Gi");
+        log.debug("Using requests.ram: " + resourceSpecification.requestRAMGB.toString() + "Gi");
+        log.debug("Using limits.ram: " + resourceSpecification.limitRAMGB.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
         String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
@@ -703,8 +703,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGB + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGB + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
@@ -822,10 +822,10 @@ public class PostAction extends SessionAction {
         private static final ResourceContexts RESOURCE_CONTEXTS = new ResourceContexts();
         private final SyncInput syncInput;
 
-        Integer requestCores;
-        Integer limitCores;
-        Integer requestRAM;
-        Integer limitRAM;
+        Double requestCores;
+        Double limitCores;
+        Double requestRAMGB;
+        Double limitRAMGB;
 
         static ResourceSpecification fromSyncInput(final SyncInput input) {
             return new ResourceSpecification(input);
@@ -833,56 +833,64 @@ public class PostAction extends SessionAction {
 
         private ResourceSpecification(SyncInput syncInput) {
             this.syncInput = syncInput;
+            final FlexResourceRequestConfiguration flexResourceRequestConfiguration =
+                    FlexResourceRequestConfiguration.fromSessionType(
+                            SessionAction.getRequestedSessionType(this.syncInput));
 
             this.requestCores = getCoresParam();
             this.limitCores = this.requestCores;
             if (this.requestCores == null) {
-                this.requestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
-                this.limitCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
+                final int defaultRequestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
+
+                this.requestCores = flexResourceRequestConfiguration.getCPU(defaultRequestCores);
+                this.limitCores = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
             }
 
-            this.requestRAM = getRamParam();
-            this.limitRAM = this.requestRAM;
-            if (this.requestRAM == null) {
-                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
-                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+            this.requestRAMGB = getRamParam();
+            this.limitRAMGB = this.requestRAMGB;
+            if (this.requestRAMGB == null) {
+                final int defaultRequestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
+                this.requestRAMGB = flexResourceRequestConfiguration.getMemory(defaultRequestRAM);
+                this.limitRAMGB = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
             }
         }
 
-        private Integer getCoresParam() {
-            Integer cores = null;
+        private Double getCoresParam() {
             String coresParam = syncInput.getParameter("cores");
             if (StringUtil.hasText(coresParam)) {
                 try {
-                    cores = Integer.valueOf(coresParam);
+                    final Double cores = Double.valueOf(coresParam);
                     final ResourceContexts rc = new ResourceContexts();
-                    if (!rc.isCoreCountAvailable(cores)) {
+                    // Convert to integer cores for validation against available core options
+                    if (!rc.isCoreCountAvailable(cores.intValue())) {
                         throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
                     }
+                    return cores;
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
                 }
             }
 
-            return cores;
+            return null;
         }
 
-        private Integer getRamParam() {
-            Integer ram = null;
+        private Double getRamParam() {
             String ramParam = syncInput.getParameter("ram");
             if (StringUtil.hasText(ramParam)) {
                 try {
-                    ram = Integer.valueOf(ramParam);
+                    final Double ram = Double.valueOf(ramParam);
                     ResourceContexts rc = new ResourceContexts();
-                    if (!rc.getAvailableRAM().contains(ram)) {
+                    // Convert to integer GiB for validation against available RAM options
+                    if (!rc.isRAMAmountAvailable(ram.intValue())) {
                         throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
                     }
+                    return ram;
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
                 }
             }
 
-            return ram;
+            return null;
         }
     }
 }
