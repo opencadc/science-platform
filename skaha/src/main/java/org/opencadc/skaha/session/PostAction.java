@@ -479,9 +479,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
                 .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGB.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGiB.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGB + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -518,7 +518,7 @@ public class PostAction extends SessionAction {
 
         final KubectlCommandBuilder.KubectlCommand launchCmd =
                 KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        String createJobResult = CommandExecutioner.execute(launchCmd.build());
+        final String createJobResult = CommandExecutioner.execute(launchCmd.build());
 
         log.debug("Create job result: " + createJobResult);
 
@@ -531,7 +531,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            final String createServiceResult = setCommonConfig(k8sNamespace, kubernetesJob, serviceString);
+            final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
 
             log.debug("Create service result: " + createServiceResult);
         }
@@ -546,25 +546,20 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            final String createIngressResult = setCommonConfig(k8sNamespace, kubernetesJob, ingressString);
+            final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
 
             log.debug("Create ingress result: " + createIngressResult);
         }
     }
 
-    private String setCommonConfig(String k8sNamespace, KubernetesJob kubernetesJob, String serviceString)
+    private String createKubernetesObjectForJob(String k8sNamespace, KubernetesJob kubernetesJob, String yamlString)
             throws IOException, InterruptedException {
-        String jsonLaunchFile;
-        String createResult;
-        serviceString =
-                SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-        serviceString =
-                SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-        jsonLaunchFile = super.stageFile(serviceString);
+        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+        final String jsonLaunchFile = super.stageFile(yamlString);
         final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand =
                 KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
-        return createResult;
+        return CommandExecutioner.execute(serviceLaunchCommand.build());
     }
 
     private void injectPOSIXDetails() {
@@ -662,8 +657,8 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
         log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
-        log.debug("Using requests.ram: " + resourceSpecification.requestRAMGB.toString() + "Gi");
-        log.debug("Using limits.ram: " + resourceSpecification.limitRAMGB.toString() + "Gi");
+        log.debug("Using requests.ram: " + resourceSpecification.requestRAMGiB.toString() + "Gi");
+        log.debug("Using limits.ram: " + resourceSpecification.limitRAMGiB.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
         String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
@@ -703,8 +698,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGB + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGB + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGiB + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
@@ -824,8 +819,8 @@ public class PostAction extends SessionAction {
 
         Double requestCores;
         Double limitCores;
-        Double requestRAMGB;
-        Double limitRAMGB;
+        Double requestRAMGiB;
+        Double limitRAMGiB;
 
         static ResourceSpecification fromSyncInput(final SyncInput input) {
             return new ResourceSpecification(input);
@@ -846,12 +841,12 @@ public class PostAction extends SessionAction {
                 this.limitCores = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
             }
 
-            this.requestRAMGB = getRamParam();
-            this.limitRAMGB = this.requestRAMGB;
-            if (this.requestRAMGB == null) {
+            this.requestRAMGiB = getRamParam();
+            this.limitRAMGiB = this.requestRAMGiB;
+            if (this.requestRAMGiB == null) {
                 final int defaultRequestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
-                this.requestRAMGB = flexResourceRequestConfiguration.getMemory(defaultRequestRAM);
-                this.limitRAMGB = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+                this.requestRAMGiB = flexResourceRequestConfiguration.getMemory(defaultRequestRAM);
+                this.limitRAMGiB = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
             }
         }
 

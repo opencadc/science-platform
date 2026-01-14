@@ -34,7 +34,6 @@ public class FlexResourceRequestConfigurationTest {
     @Test
     public void testGetCPU() {
         final Map<String, String> testEnvironment = new HashMap<>();
-        testEnvironment.put("SKAHA_FLEX_RESOURCE_REQUEST_NOTEBOOK_MEMORY", "2.0");
         testEnvironment.put("SKAHA_FLEX_RESOURCE_REQUEST_NOTEBOOK_CPU", "1.5");
 
         Assert.assertEquals(
@@ -57,12 +56,25 @@ public class FlexResourceRequestConfigurationTest {
                 FlexResourceRequestConfiguration.fromSessionType("notebook", testEnvironment)
                         .getCPU(13.0D),
                 0.0D);
+    }
+
+    @Test
+    public void testGetMemory() {
+        final Map<String, String> testEnvironment = new HashMap<>();
+        testEnvironment.put("SKAHA_FLEX_RESOURCE_REQUEST_HEADLESS_MEMORY", "8.0");
 
         Assert.assertEquals(
                 "Wrong configured memory value.",
-                2.0D,
+                8.0D,
+                FlexResourceRequestConfiguration.fromSessionType("headless", testEnvironment)
+                        .getMemory(16.0D),
+                0.0D);
+
+        Assert.assertEquals(
+                "Values should be default.",
+                12.0D,
                 FlexResourceRequestConfiguration.fromSessionType("notebook", testEnvironment)
-                        .getMemory(13.0D),
+                        .getCPU(12.0D),
                 0.0D);
     }
 }

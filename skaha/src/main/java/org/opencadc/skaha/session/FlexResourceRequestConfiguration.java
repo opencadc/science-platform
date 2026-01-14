@@ -25,8 +25,10 @@ public class FlexResourceRequestConfiguration {
         }
 
         final String expectedTypeCase = sessionType.toUpperCase();
+
         final String cpuEnvVar = String.format(FLEX_RESOURCE_REQUEST_CPU_ENV_VAR, expectedTypeCase);
         final String memoryEnvVar = String.format(FLEX_RESOURCE_REQUEST_MEMORY_ENV_VAR_TEMPLATE, expectedTypeCase);
+
         final String cpu = env.get(cpuEnvVar);
         final String memory = env.get(memoryEnvVar);
         return new FlexResourceRequestConfiguration(cpu, memory);
