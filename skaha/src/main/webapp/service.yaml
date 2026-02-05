@@ -68,13 +68,13 @@ paths:
           in: query
           type: string
           description: |
-              Request this many cores for the session.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+              Request this many cores for the session.  This value must match a value returned from the /context endpoint.
           required: false
         - name: ram
           in: query
           type: string
           description: |
-              Request this much RAM (GB) for the session.  This value must match a value retruned from the /context endpoint.  The default value returned from /context will be used if this parameter is not provided.
+              Request this much RAM (GB) for the session.  This value must match a value returned from the /context endpoint.
           required: false
         - name: type
           in: query
