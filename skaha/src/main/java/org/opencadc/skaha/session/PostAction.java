@@ -709,7 +709,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
-                .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP)
+                .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
                 .withParameter(
