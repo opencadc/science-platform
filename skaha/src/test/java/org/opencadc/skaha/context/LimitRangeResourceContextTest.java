@@ -1,20 +1,20 @@
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.Log4jInit;
-import com.networknt.schema.InputFormat;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.Map;
-import java.util.Set;
 import junit.framework.AssertionFailedError;
 import org.apache.log4j.Level;
+import org.everit.json.schema.Schema;
+import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -39,12 +39,15 @@ public class LimitRangeResourceContextTest {
 
             final String jsonOutput = outputStream.toString();
 
-            final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
-            final JsonSchema jsonSchema =
-                    factory.getSchema(GetAction.class.getResourceAsStream("/context-schema.json"));
-            final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonOutput, InputFormat.JSON);
-
-            Assert.assertTrue("JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
+            try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/context-schema.json");
+                    final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
+                    final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
+                final StringBuilder builder = new StringBuilder();
+                reader.lines().forEach(builder::append);
+                final JSONObject rawSchema = new JSONObject(builder.toString());
+                final Schema schema = SchemaLoader.load(rawSchema);
+                schema.validate(new JSONObject(jsonOutput));
+            }
         }
     }
 

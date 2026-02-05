@@ -88,7 +88,6 @@ import org.opencadc.skaha.K8SUtil;
 public class ResourceContexts {
 
     private static final Logger log = Logger.getLogger(ResourceContexts.class);
-    static final String SESSION_LIMIT_RANGE_FEATURE_GATE = "sessionLimitRange";
     private static final String SESSION_LIMIT_FILE_NAME = "k8s-resources.json";
 
     private final Integer defaultRequestCores;
@@ -139,9 +138,7 @@ public class ResourceContexts {
      */
     @NotNull static Reader getJSONReader() {
         try {
-            final K8SUtil.ExperimentalFeatures experimentalFeatures = K8SUtil.getExperimentalFeatures();
-            final boolean sessionLimitRangeEnabled =
-                    experimentalFeatures.isEnabled(ResourceContexts.SESSION_LIMIT_RANGE_FEATURE_GATE);
+            final boolean sessionLimitRangeEnabled = K8SUtil.isSessionLimitRangeEnabled();
             if (sessionLimitRangeEnabled) {
                 final LimitRangeResourceContext limitRangeResourceContext = new LimitRangeResourceContext();
                 try (final OutputStream outputStream = new ByteArrayOutputStream()) {
@@ -177,6 +174,10 @@ public class ResourceContexts {
 
     public boolean isCoreCountAvailable(final Integer coreCount) {
         return this.availableCores.contains(coreCount);
+    }
+
+    public boolean isRAMAmountAvailable(final Integer ramAmount) {
+        return this.availableRAM.contains(ramAmount);
     }
 
     public Integer getDefaultRequestRAM() {

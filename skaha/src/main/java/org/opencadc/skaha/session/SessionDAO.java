@@ -254,7 +254,6 @@ public class SessionDAO {
             final String sessionHostName,
             final SessionType type,
             final String id,
-            final String image,
             final String absoluteHomeDirectory,
             final String userid)
             throws URISyntaxException {
@@ -263,13 +262,7 @@ public class SessionDAO {
         if (SessionType.DESKTOP == type) {
             connectURL = SessionURLBuilder.vncSession(sessionHostName, id).build();
         } else if (SessionType.CARTA == type) {
-            final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
-            final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
-
-            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id)
-                    .withAlternateSocket(imageVersion.equalsIgnoreCase("1.4"))
-                    .withVersion5Path(majorVersion != null && majorVersion >= 5)
-                    .build();
+            connectURL = SessionURLBuilder.cartaSession(sessionHostName, id).build();
         } else if (SessionType.NOTEBOOK == type) {
             connectURL = SessionURLBuilder.notebookSession(sessionHostName, id)
                     .withAbsoluteHomeDirectory(absoluteHomeDirectory)

@@ -73,6 +73,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -90,6 +91,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
+import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
@@ -111,7 +113,7 @@ import org.opencadc.skaha.utils.PosixCache;
  */
 public class PostAction extends SessionAction {
 
-    // variables replaced in kubernetes yaml config files for
+    // variables replaced in kubernetes YAML config files for
     // launching desktop sessions and launching software
     // use in the form: ${var.name}
     public static final String SKAHA_HOSTNAME = "skaha.hostname";
@@ -180,7 +182,6 @@ public class PostAction extends SessionAction {
 
         super.initRequest();
 
-        ResourceContexts rc = new ResourceContexts();
         String image = syncInput.getParameter("image");
         if (image == null) {
             if (requestType.equals(REQUEST_TYPE_APP)
@@ -191,7 +192,7 @@ public class PostAction extends SessionAction {
 
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
-                final String requestedType = syncInput.getParameter("type");
+                final String requestedType = SessionAction.getRequestedSessionType(this.syncInput);
 
                 // Absence of type is assumed to be headless
                 final String type =
@@ -221,7 +222,8 @@ public class PostAction extends SessionAction {
                 if (StringUtil.hasText(gpusParam)) {
                     try {
                         gpus = Integer.parseInt(gpusParam);
-                        if (!rc.getAvailableGPUs().contains(gpus)) {
+                        final ResourceContexts resourceContexts = new ResourceContexts();
+                        if (!resourceContexts.getAvailableGPUs().contains(gpus)) {
                             throw new IllegalArgumentException("Unavailable option for 'gpus': " + gpusParam);
                         }
                     } catch (Exception e) {
@@ -336,11 +338,15 @@ public class PostAction extends SessionAction {
 
         log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
 
-        Map<String, List<String>> renewJobMap = new HashMap<>();
+        return PostAction.getStringListMap(renewJobNamesStr);
+    }
+
+    private static @NonNull Map<String, List<String>> getStringListMap(final String renewJobNamesStr) {
+        final Map<String, List<String>> renewJobMap = new HashMap<>();
         if (StringUtil.hasLength(renewJobNamesStr)) {
             String[] lines = renewJobNamesStr.split("\n");
             for (String line : lines) {
-                List<String> renewJobAttributes = new ArrayList<>();
+                final List<String> renewJobAttributes = new ArrayList<>();
                 String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
                 String jobName = parts[0];
                 String uid = parts[1];
@@ -354,7 +360,6 @@ public class PostAction extends SessionAction {
                 }
             }
         }
-
         return renewJobMap;
     }
 
@@ -451,10 +456,7 @@ public class PostAction extends SessionAction {
             this.userStorageClient.ensureDesktopUserHomePreparation(owner);
         }
 
-        final Integer majorVersion = K8SUtil.getMajorImageVersion(image);
-        final boolean isLegacyCARTA = (type == SessionType.CARTA && (majorVersion == null || majorVersion < 5));
-
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath(isLegacyCARTA))
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
@@ -477,9 +479,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_TOP_LEVEL_DIR, userStorageConfiguration.topLevelDirectory.toString())
                 .withParameter(PostAction.SKAHA_PROJECTS_DIR, userStorageConfiguration.projectsBaseDirectory.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM.toString() + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGiB.toString() + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
@@ -487,17 +489,12 @@ public class PostAction extends SessionAction {
         if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         } else if (type == SessionType.CARTA) {
-            final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
-            if (imageVersion.startsWith("5")) {
-                final String connectURLPrefix = SessionURLBuilder.cartaSession(
-                                K8SUtil.getSessionsHostName(), this.sessionID)
-                        .withVersion5Path(true)
-                        .withAlternateSocket(false)
-                        .build();
-                final String connectURLPath = URI.create(connectURLPrefix).getPath();
-                sessionJobBuilder = sessionJobBuilder.withParameter(
-                        PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
-            }
+            final String connectURLPrefix = SessionURLBuilder.cartaSession(
+                            K8SUtil.getSessionsHostName(), this.sessionID)
+                    .build();
+            final String connectURLPath = URI.create(connectURLPrefix).getPath();
+            sessionJobBuilder = sessionJobBuilder.withParameter(
+                    PostAction.SKAHA_SESSIONURLPATH, connectURLPath.replaceAll("/$", ""));
         }
 
         // In the absence of the existence of a public image, assume Private.  The validateImage() step above will have
@@ -521,9 +518,9 @@ public class PostAction extends SessionAction {
 
         final KubectlCommandBuilder.KubectlCommand launchCmd =
                 KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        String createResult = CommandExecutioner.execute(launchCmd.build());
+        final String createJobResult = CommandExecutioner.execute(launchCmd.build());
 
-        log.debug("Create job result: " + createResult);
+        log.debug("Create job result: " + createJobResult);
 
         final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
 
@@ -531,20 +528,12 @@ public class PostAction extends SessionAction {
         // API is in place, we can swap this out with a proper Java client API.
         // TODO: Use the Kubernetes Java client to create Service objects.
         if (type.supportsService()) {
-            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath(isLegacyCARTA));
+            byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            serviceString =
-                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-            serviceString =
-                    SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(serviceString);
-            final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(serviceLaunchCommand.build());
+            final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
 
-            log.debug("Create service result: " + createResult);
+            log.debug("Create service result: " + createServiceResult);
         }
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
@@ -552,26 +541,28 @@ public class PostAction extends SessionAction {
         // TODO: Use the Kubernetes Gateway API to create Ingresses.
         // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
-            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath(isLegacyCARTA));
+            byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-            ingressString =
-                    SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-            jsonLaunchFile = super.stageFile(ingressString);
-            final KubectlCommandBuilder.KubectlCommand ingressLaunchCommand = KubectlCommandBuilder.command("create")
-                    .namespace(k8sNamespace)
-                    .option("-f", jsonLaunchFile);
-            createResult = CommandExecutioner.execute(ingressLaunchCommand.build());
+            final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
 
-            log.debug("Create ingress result: " + createResult);
+            log.debug("Create ingress result: " + createIngressResult);
         }
     }
 
-    private void injectPOSIXDetails() throws Exception {
+    private String createKubernetesObjectForJob(String k8sNamespace, KubernetesJob kubernetesJob, String yamlString)
+            throws IOException, InterruptedException {
+        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+        final String jsonLaunchFile = super.stageFile(yamlString);
+        final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand =
+                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
+        return CommandExecutioner.execute(serviceLaunchCommand.build());
+    }
+
+    private void injectPOSIXDetails() {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
@@ -666,8 +657,8 @@ public class PostAction extends SessionAction {
         log.debug("Using parameter: " + param);
         log.debug("Using requests.cores: " + resourceSpecification.requestCores.toString());
         log.debug("Using limits.cores: " + resourceSpecification.limitCores.toString());
-        log.debug("Using requests.ram: " + resourceSpecification.requestRAM.toString() + "Gi");
-        log.debug("Using limits.ram: " + resourceSpecification.limitRAM.toString() + "Gi");
+        log.debug("Using requests.ram: " + resourceSpecification.requestRAMGiB.toString() + "Gi");
+        log.debug("Using limits.ram: " + resourceSpecification.limitRAMGiB.toString() + "Gi");
 
         appID = new RandomStringGenerator(3).getID();
         String userJobID = posixPrincipal.username.replaceAll("[^0-9a-zA-Z-]", "-");
@@ -707,8 +698,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_CORES, resourceSpecification.requestCores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
-                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAM + "Gi")
-                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAM + "Gi")
+                .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGiB + "Gi")
+                .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
@@ -826,10 +817,10 @@ public class PostAction extends SessionAction {
         private static final ResourceContexts RESOURCE_CONTEXTS = new ResourceContexts();
         private final SyncInput syncInput;
 
-        Integer requestCores;
-        Integer limitCores;
-        Integer requestRAM;
-        Integer limitRAM;
+        Double requestCores;
+        Double limitCores;
+        Double requestRAMGiB;
+        Double limitRAMGiB;
 
         static ResourceSpecification fromSyncInput(final SyncInput input) {
             return new ResourceSpecification(input);
@@ -837,56 +828,64 @@ public class PostAction extends SessionAction {
 
         private ResourceSpecification(SyncInput syncInput) {
             this.syncInput = syncInput;
+            final FlexResourceRequestConfiguration flexResourceRequestConfiguration =
+                    FlexResourceRequestConfiguration.fromSessionType(
+                            SessionAction.getRequestedSessionType(this.syncInput));
 
             this.requestCores = getCoresParam();
             this.limitCores = this.requestCores;
             if (this.requestCores == null) {
-                this.requestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
-                this.limitCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
+                final int defaultRequestCores = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestCores();
+
+                this.requestCores = flexResourceRequestConfiguration.getCPU(defaultRequestCores);
+                this.limitCores = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitCores();
             }
 
-            this.requestRAM = getRamParam();
-            this.limitRAM = this.requestRAM;
-            if (this.requestRAM == null) {
-                this.requestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
-                this.limitRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
+            this.requestRAMGiB = getRamParam();
+            this.limitRAMGiB = this.requestRAMGiB;
+            if (this.requestRAMGiB == null) {
+                final int defaultRequestRAM = ResourceSpecification.RESOURCE_CONTEXTS.getDefaultRequestRAM();
+                this.requestRAMGiB = flexResourceRequestConfiguration.getMemory(defaultRequestRAM);
+                this.limitRAMGiB = (double) ResourceSpecification.RESOURCE_CONTEXTS.getDefaultLimitRAM();
             }
         }
 
-        private Integer getCoresParam() {
-            Integer cores = null;
+        private Double getCoresParam() {
             String coresParam = syncInput.getParameter("cores");
             if (StringUtil.hasText(coresParam)) {
                 try {
-                    cores = Integer.valueOf(coresParam);
+                    final Double cores = Double.valueOf(coresParam);
                     final ResourceContexts rc = new ResourceContexts();
-                    if (!rc.isCoreCountAvailable(cores)) {
+                    // Convert to integer cores for validation against available core options
+                    if (!rc.isCoreCountAvailable(cores.intValue())) {
                         throw new IllegalArgumentException("Unavailable option for 'cores': " + coresParam);
                     }
+                    return cores;
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'cores': " + coresParam);
                 }
             }
 
-            return cores;
+            return null;
         }
 
-        private Integer getRamParam() {
-            Integer ram = null;
+        private Double getRamParam() {
             String ramParam = syncInput.getParameter("ram");
             if (StringUtil.hasText(ramParam)) {
                 try {
-                    ram = Integer.valueOf(ramParam);
+                    final Double ram = Double.valueOf(ramParam);
                     ResourceContexts rc = new ResourceContexts();
-                    if (!rc.getAvailableRAM().contains(ram)) {
+                    // Convert to integer GiB for validation against available RAM options
+                    if (!rc.isRAMAmountAvailable(ram.intValue())) {
                         throw new IllegalArgumentException("Unavailable option for 'ram': " + ramParam);
                     }
+                    return ram;
                 } catch (Exception e) {
                     throw new IllegalArgumentException("Invalid value for 'ram': " + ramParam);
                 }
             }
 
-            return ram;
+            return null;
         }
     }
 }
