@@ -263,7 +263,8 @@ public class PostAction extends SessionAction {
             }
         } else if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
-                final ResourceSpecification resourceSpecification = ResourceSpecification.fromSyncInput(this.syncInput);
+                final ResourceSpecification resourceSpecification =
+                        ResourceSpecification.fromSyncInput(this.syncInput, SessionType.DESKTOP_APP.applicationName);
 
                 attachDesktopApp(image, resourceSpecification);
                 syncOutput.setHeader("Content-Type", "text/plain");
@@ -822,15 +823,38 @@ public class PostAction extends SessionAction {
         Double requestRAMGiB;
         Double limitRAMGiB;
 
+        /**
+         * Create a ResourceSpecification from the SyncInput, applying defaults from the
+         * FlexResourceRequestConfiguration for the session type as needed.
+         *
+         * @param input The SyncInput containing the resource parameters and session type information to determine which
+         *     defaults to apply for any missing resource parameters. The Session Type is drawn from the request
+         *     parameters.
+         * @return ResourceSpecification with all resource parameters populated, either from the SyncInput or from
+         *     defaults based on the session type.
+         */
         static ResourceSpecification fromSyncInput(final SyncInput input) {
-            return new ResourceSpecification(input);
+            return new ResourceSpecification(
+                    input,
+                    FlexResourceRequestConfiguration.fromSessionType(SessionAction.getRequestedSessionType(input)));
         }
 
-        private ResourceSpecification(SyncInput syncInput) {
+        /**
+         * Create a ResourceSpecification from the SyncInput and session type, applying defaults from the
+         * FlexResourceRequestConfiguration for the session type as needed.
+         *
+         * @param input The SyncInput containing the resource parameters.
+         * @param sessionType The session type to determine which defaults to apply for any missing resource parameters.
+         * @return ResourceSpecification with all resource parameters populated, either from the SyncInput or from
+         *     defaults based on the session type.
+         */
+        static ResourceSpecification fromSyncInput(final SyncInput input, final String sessionType) {
+            return new ResourceSpecification(input, FlexResourceRequestConfiguration.fromSessionType(sessionType));
+        }
+
+        private ResourceSpecification(
+                SyncInput syncInput, FlexResourceRequestConfiguration flexResourceRequestConfiguration) {
             this.syncInput = syncInput;
-            final FlexResourceRequestConfiguration flexResourceRequestConfiguration =
-                    FlexResourceRequestConfiguration.fromSessionType(
-                            SessionAction.getRequestedSessionType(this.syncInput));
 
             this.requestCores = getCoresParam();
             this.limitCores = this.requestCores;
