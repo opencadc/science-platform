@@ -40,24 +40,28 @@ jobs:
           registry: images.opencadc.org
           username: ${{ secrets.SKAHA_REGISTRY_USERNAME }}
           password: ${{ secrets.SKAHA_REGISTRY_TOKEN }}
-      - name: Build and Push Docker Image
+      -
+        name: Build & Push Docker Image to GHCR
         id: build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6.10.0
         with:
           context: .
           target: production
           file: skaha/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
           labels: |
             org.opencontainers.image.title=Science Platform
+            org.opencontainers.image.version=edge
+            org.opencontainers.image.description='Science Platform Edge Build'
             org.opencontainers.image.licenses=AGPL-3.0
-            org.opencontainers.image.url=https://github.com/opencadc/science-platform
+            org.opencontainers.image.source=https://github.com/opencadc/science-platform
+          tags: |
+            ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Attest Container Image
         # See https://github.com/marketplace/actions/attest-build-provenance#container-image
         # for more information on the attest-build-provenance action
