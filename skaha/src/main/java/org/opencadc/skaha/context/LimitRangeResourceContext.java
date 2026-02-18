@@ -77,6 +77,29 @@ public class LimitRangeResourceContext {
         }
     }
 
+    private void writeResourceValues(
+            final JSONWriter jsonWriter,
+            final String key,
+            final IntegerRange resourceRange,
+            final IntegerRange totalCounts) {
+        LOGGER.debug("Writing LimitRangeResourceContext with " + key + " to " + resourceRange);
+        jsonWriter.key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(key)).object();
+        jsonWriter.key("default").value(resourceRange.minimum);
+        jsonWriter.key("defaultRequest").value(resourceRange.minimum);
+        jsonWriter.key("defaultLimit").value(resourceRange.maximum);
+
+        jsonWriter.key("options").array();
+        totalCounts.iterator().forEachRemaining(jsonWriter::value);
+        jsonWriter.endArray();
+        jsonWriter.endObject();
+    }
+
+    /**
+     * Write out a JSON representation of this LimitRange.
+     *
+     * @param outputStream The OutputStream to write to.
+     * @throws IOException For any issues writing the output.
+     */
     public void write(final OutputStream outputStream) throws IOException {
         final Writer writer = new BufferedWriter(new OutputStreamWriter(outputStream));
         final JSONWriter jsonWriter = new JSONWriter(writer);
@@ -86,30 +109,16 @@ public class LimitRangeResourceContext {
 
             final IntegerRange defaultCoreCounts = getDefaultCoreCounts();
             final IntegerRange totalCoreCounts = getTotalCoreCounts();
-            jsonWriter
-                    .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY))
-                    .object();
-            jsonWriter.key("default").value(defaultCoreCounts.minimum);
-            jsonWriter.key("defaultRequest").value(defaultCoreCounts.minimum);
-            jsonWriter.key("defaultLimit").value(defaultCoreCounts.maximum);
-            jsonWriter.key("options").array();
-            totalCoreCounts.iterator().forEachRemaining(jsonWriter::value);
-            jsonWriter.endArray();
-            jsonWriter.endObject();
+            writeResourceValues(
+                    jsonWriter, LimitRangeResourceContext.LIMIT_RANGE_CPU_KEY, defaultCoreCounts, totalCoreCounts);
 
             final IntegerRange defaultMemoryCounts = getDefaultMemoryCounts();
             final IntegerRange totalMemoryCounts = getTotalMemoryCounts();
-            jsonWriter
-                    .key(LimitRangeResourceContext.RESOURCE_KEY_MAP.get(
-                            LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY))
-                    .object();
-            jsonWriter.key("default").value(defaultMemoryCounts.minimum);
-            jsonWriter.key("defaultRequest").value(defaultMemoryCounts.minimum);
-            jsonWriter.key("defaultLimit").value(defaultMemoryCounts.maximum);
-            jsonWriter.key("options").array();
-            totalMemoryCounts.iterator().forEachRemaining(jsonWriter::value);
-            jsonWriter.endArray();
-            jsonWriter.endObject();
+            writeResourceValues(
+                    jsonWriter,
+                    LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY,
+                    defaultMemoryCounts,
+                    totalMemoryCounts);
 
             // GPUs will be an empty array if no GPU limits are defined in the LimitRange.
             jsonWriter
@@ -124,6 +133,7 @@ public class LimitRangeResourceContext {
 
             jsonWriter.endArray();
             jsonWriter.endObject();
+            // End GPU resource output
 
             jsonWriter.key("maxInteractiveSessions").value(K8SUtil.getMaxUserSessions());
             jsonWriter.endObject();

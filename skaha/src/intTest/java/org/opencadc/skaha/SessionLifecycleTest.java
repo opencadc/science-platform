@@ -71,18 +71,17 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-import com.networknt.schema.InputFormat;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.Set;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.everit.json.schema.Schema;
+import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
@@ -162,10 +161,15 @@ public class SessionLifecycleTest {
 
             final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
 
-            final JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
-            final JsonSchema jsonSchema = factory.getSchema(GetAction.class.getResourceAsStream("/stats-schema.json"));
-            final Set<ValidationMessage> errorMessages = jsonSchema.validate(jsonObject.toString(), InputFormat.JSON);
-            Assert.assertTrue("Stats JSON output did not validate: " + errorMessages, errorMessages.isEmpty());
+            try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/stats-schema.json");
+                    final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
+                    final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
+                final StringBuilder builder = new StringBuilder();
+                reader.lines().forEach(builder::append);
+                final JSONObject rawSchema = new JSONObject(builder.toString());
+                final Schema schema = SchemaLoader.load(rawSchema);
+                schema.validate(jsonObject);
+            }
 
             final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
             Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));

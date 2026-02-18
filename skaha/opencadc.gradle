@@ -18,7 +18,6 @@ configurations {
 
 tasks.withType(Test).configureEach {
     // reset the report destinations so that intTests go to their own page
-//    reports.html.destination = file(reporting.baseDirectory + '/' + name)
     reports.html.outputLocation = layout.buildDirectory.dir("reports/" + name)
 
     // Assign all Java system properties from

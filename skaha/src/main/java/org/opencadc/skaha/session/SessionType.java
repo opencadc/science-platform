@@ -38,28 +38,22 @@ public enum SessionType {
         throw new IllegalArgumentException("Invalid session type: " + applicationStringType);
     }
 
-    public Path getIngressConfigPath(final boolean isLegacyCARTA) {
+    public Path getIngressConfigPath() {
         return Path.of(String.format(
-                "%s/config/ingress-%s%s.yaml",
-                K8SUtil.getWorkingDirectory(),
-                this.name().toLowerCase(),
-                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
+                "%s/config/ingress-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
-    public Path getServiceConfigPath(final boolean isLegacyCARTA) {
+    public Path getServiceConfigPath() {
         return Path.of(String.format(
-                "%s/config/service-%s%s.yaml",
-                K8SUtil.getWorkingDirectory(),
-                this.name().toLowerCase(),
-                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
+                "%s/config/service-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
-    public Path getJobConfigPath(final boolean isLegacyCARTA) {
+    public Path getJobConfigPath() {
         return Path.of(String.format(
-                "%s/config/launch-%s%s.yaml",
-                K8SUtil.getWorkingDirectory(),
-                this.name().toLowerCase(),
-                (isLegacyCARTA && this == CARTA) ? "-legacy" : ""));
+                "%s/config/launch-%s.yaml",
+                K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
     public boolean supportsIngress() {

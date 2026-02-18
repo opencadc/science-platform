@@ -3,6 +3,8 @@ name: "CD: Edge Build"
 on:
   repository_dispatch:
     types: [edge-build]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read

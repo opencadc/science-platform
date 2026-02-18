@@ -68,7 +68,9 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
+import jakarta.annotation.Nullable;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -269,5 +271,14 @@ public abstract class SessionAction extends SkahaAction {
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
 
         return getSessionJobCmd.build();
+    }
+
+    /**
+     * Obtain the current requested session type from the input parameters.
+     *
+     * @return String representing the requested session type. Possibly null.
+     */
+    @Nullable protected static String getRequestedSessionType(final SyncInput syncInput) {
+        return syncInput.getParameter("type");
     }
 }

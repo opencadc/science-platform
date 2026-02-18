@@ -10,7 +10,6 @@ import ca.nrc.cadc.net.ResourceAlreadyExistsException;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
-import com.amazonaws.util.IOUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -25,6 +24,7 @@ import java.util.concurrent.CompletionException;
 import javax.security.auth.Subject;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
@@ -41,6 +41,10 @@ import org.opencadc.vospace.transfer.Direction;
 import org.opencadc.vospace.transfer.Protocol;
 import org.opencadc.vospace.transfer.Transfer;
 
+/**
+ * Client to manage user storage in a VOSpace service. This will also manage setting up a new User Allocation folder to
+ * ensure, for example, Desktop Sessions have what is expected in place in their home directory.
+ */
 public class UserStorageClient {
     private static final Logger LOGGER = Logger.getLogger(UserStorageClient.class);
     private static final double ONE_WEEK_DAYS = 7.0D;

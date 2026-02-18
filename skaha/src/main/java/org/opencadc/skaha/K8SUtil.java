@@ -84,6 +84,9 @@ public class K8SUtil {
 
     static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
 
+    // Environment variable to enable session limit range feature.
+    public static final String SKAHA_SESSION_LIMIT_RANGE_ENABLED_ENV = "SKAHA_SESSION_LIMIT_RANGE_ENABLED";
+
     // Environment variable for POSIX mapper cache TTL in seconds before it expires.
     static final String SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS";
     static final long SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT = 86400L; // 1 day
@@ -265,20 +268,20 @@ public class K8SUtil {
     }
 
     /**
-     * Extract the major version number from a docker image tag.
+     * Check if the session limit range feature is enabled via the environment variable.
      *
-     * @param image The docker image string, e.g. "myrepo/myimage:1.2.3"
+     * @return True if enabled, false otherwise.
      */
-    public static Integer getMajorImageVersion(final String image) {
-        final String imageVersion = image.substring(image.lastIndexOf(":") + 1);
-
-        try {
-            return Integer.parseInt(imageVersion.substring(0, 1));
-        } catch (NumberFormatException nfe) {
-            return null;
-        }
+    public static boolean isSessionLimitRangeEnabled() {
+        final String enabledValue = System.getenv(K8SUtil.SKAHA_SESSION_LIMIT_RANGE_ENABLED_ENV);
+        return Boolean.parseBoolean(enabledValue);
     }
 
+    /**
+     * Obtain the experimental features configuration from the environment.
+     *
+     * @return ExperimentalFeatures instance. Never null.
+     */
     public static ExperimentalFeatures getExperimentalFeatures() {
         return ExperimentalFeatures.fromEnv();
     }

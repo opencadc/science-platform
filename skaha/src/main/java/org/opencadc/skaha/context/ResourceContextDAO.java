@@ -23,14 +23,14 @@ public class ResourceContextDAO {
                     api.listNamespacedLimitRange(K8SUtil.getWorkloadNamespace()).execute();
             Objects.requireNonNull(
                     limitRangeList,
-                    "Limit range list cannot be null if " + ResourceContexts.SESSION_LIMIT_RANGE_FEATURE_GATE
+                    "Limit range list cannot be null if " + K8SUtil.SKAHA_SESSION_LIMIT_RANGE_ENABLED_ENV
                             + " feature gate declared.");
 
             if (limitRangeList.getItems().isEmpty()) {
                 throw new IllegalStateException("No limit ranges found in namespace: "
                         + K8SUtil.getWorkloadNamespace()
                         + ". A limit range must be defined if the "
-                        + ResourceContexts.SESSION_LIMIT_RANGE_FEATURE_GATE
+                        + K8SUtil.SKAHA_SESSION_LIMIT_RANGE_ENABLED_ENV
                         + " feature gate is declared.");
             }
 
