@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.0](https://github.com/opencadc/science-platform/compare/1.1.7...1.2.0) (2026-02-26)
+
+
+### Features
+
+* first pass to use configured resource requests ([40d7b7f](https://github.com/opencadc/science-platform/commit/40d7b7fa47ff8aa5671c61fd3decbce9c6b6f9d4))
+
+
+### Bug Fixes
+
+* add flex configuration for jobs ([d724d8a](https://github.com/opencadc/science-platform/commit/d724d8adecbe84c29a595dd1d77c85c4e9921ac8))
+* adjust fetch depth for ratchet ([f3a9dc8](https://github.com/opencadc/science-platform/commit/f3a9dc8d1e0f5d4c9784abb6b0505a172186f438))
+* build edge on ghcr ([8a495b3](https://github.com/opencadc/science-platform/commit/8a495b38812d9776eae2312825b973d040926505))
+* fix docker build ([f13ad09](https://github.com/opencadc/science-platform/commit/f13ad09a76c30b29117d5bd6afbcc75382bed312))
+* fix to handle flex desktop apps ([ab32e5c](https://github.com/opencadc/science-platform/commit/ab32e5c1b1a5144bbb0ca233906124ea92c41594))
+* limit range check fixes' ([ec2549d](https://github.com/opencadc/science-platform/commit/ec2549da081219cbc71abdce0310da54a630a782))
+* make backward compatible with existing desktop launch ([a2e9c20](https://github.com/opencadc/science-platform/commit/a2e9c20d49f1cae750dca38b2561faa185698ff3))
+* move display number to deployment ([b5cb703](https://github.com/opencadc/science-platform/commit/b5cb7032f9a892cbda769dc3e66e70e73fcdab52))
+* push edge build to ghcr ([fe60bfa](https://github.com/opencadc/science-platform/commit/fe60bfaaf1300f000737b1375ea8d17b9d22beb6))
+* remove old carta references ([9e021e6](https://github.com/opencadc/science-platform/commit/9e021e688637095207355ccdc60e3924822aae80))
+* reset edge build to harbor ([c8e9eaf](https://github.com/opencadc/science-platform/commit/c8e9eaf62492d8476b4d2de45114242551840a28))
+* run edge build on main pr ([2113e2a](https://github.com/opencadc/science-platform/commit/2113e2a16404de11a616ae4d54a9169d92552d28))
+* run the desktop image ([8307990](https://github.com/opencadc/science-platform/commit/8307990e7894e7e4be27cabbe3d2238dccc225e4))
+
 ## [1.1.7](https://github.com/opencadc/science-platform/compare/1.1.6...1.1.7) (2025-11-26)
 
 
