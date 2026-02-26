@@ -108,7 +108,8 @@ public abstract class SessionURLBuilder {
                     .setScheme("https")
                     .setHost(this.host)
                     .setPathSegments("session", "desktop", this.sessionID, "") // Extra empty string to append slash
-                    .setCustomQuery("password=" + this.sessionID + "&path=session/desktop/" + this.sessionID + "/")
+                    .setCustomQuery(
+                            String.format("password=%s&path=session/desktop/%s/", this.sessionID, this.sessionID))
                     .build()
                     .toString();
         }
@@ -179,8 +180,6 @@ public abstract class SessionURLBuilder {
 
     /** Construct a URL for a Carta session. Used to redirect the end user to the Carta viewer. */
     static final class CartaSessionURLBuilder extends SessionURLBuilder {
-        private boolean useAlternateSocketURL = false;
-        private boolean useVersion5Path = false;
 
         /**
          * Constructor.
@@ -193,63 +192,21 @@ public abstract class SessionURLBuilder {
         }
 
         /**
-         * Set the use of an alternate socket for the Carta session. This only
-         *
-         * @param useAlternateSocketURL Specify the alternate socket URL, omit it otherwise.
-         * @return This builder.
-         */
-        CartaSessionURLBuilder withAlternateSocket(boolean useAlternateSocketURL) {
-            this.useAlternateSocketURL = useAlternateSocketURL;
-            return this;
-        }
-
-        /**
-         * With CARTA 5, the path to the session has changed. This method allows that to be passed through properly.
-         *
-         * @param useVersion5Path Specify whether to use the CARTA 5 path format.
-         * @return This builder.
-         */
-        CartaSessionURLBuilder withVersion5Path(boolean useVersion5Path) {
-            this.useVersion5Path = useVersion5Path;
-            return this;
-        }
-
-        /**
          * Build the URL for a Carta session. Example output: <code>
          *     <a href="https://host.example.org/session/carta/8675309">...</a>?
-         * </code> or <code>
-         *     https://host.example.org/session/carta/8675309?socketUrl=wss://host.example.org/session/carta/ws/8675309/
          * </code>
          *
          * @return URL string in format <code>
-         *     https://${host}/session/carta/${sessionID}?token=${sessionID}
+         *     https://${host}/session/carta/${sessionID}
          * </code>
          * @throws URISyntaxException If the URI cannot be created.
          */
         @Override
         String build() throws URISyntaxException {
-            final String[] pathSegments;
-
-            if (this.useVersion5Path) {
-                // CARTA 5 path format
-                pathSegments = new String[] {"session", "carta", this.sessionID, ""};
-            } else {
-                // CARTA <5 path format
-                pathSegments = new String[] {"session", "carta", "http", this.sessionID, ""};
-            }
-
+            final String[] pathSegments = new String[] {"session", "carta", this.sessionID, ""};
             final URIBuilder builder =
                     new URIBuilder().setScheme("https").setHost(this.host).setPathSegments(pathSegments);
-            final URIBuilder uriBuilder;
-
-            if (this.useAlternateSocketURL) {
-                uriBuilder = builder.setCustomQuery(
-                        String.format("socketUrl=wss://%s/session/carta/ws/%s/", this.host, this.sessionID));
-            } else {
-                uriBuilder = builder;
-            }
-
-            return uriBuilder.build().toString();
+            return builder.build().toString();
         }
     }
 

@@ -175,7 +175,6 @@ class SessionBuilder {
                         K8SUtil.getSessionsHostName(),
                         SessionType.fromApplicationStringType(this.type),
                         this.id,
-                        this.image,
                         userStorageConfiguration.homeBaseDirectory.toString(),
                         this.userID);
             } catch (URISyntaxException e) {
