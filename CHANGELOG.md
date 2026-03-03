@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/opencadc/science-platform/compare/1.2.0...1.2.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* bug fix to use integers to represent thread counts ([98214ff](https://github.com/opencadc/science-platform/commit/98214ff9af60bc259cb92feb31b8f742d4ab0579))
+* bug fix to use integers to represent thread counts ([7fd83ad](https://github.com/opencadc/science-platform/commit/7fd83ada0d822ca29e05f239d5cc74d81fd87182))
+
 ## [1.2.0](https://github.com/opencadc/science-platform/compare/1.1.7...1.2.0) (2026-02-26)
 
 
