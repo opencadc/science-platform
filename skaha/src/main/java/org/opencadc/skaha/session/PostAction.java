@@ -147,6 +147,7 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
+    public static final String SOFTWARE_THREAD_COUNT = "software.thread.count";
 
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
     // to a job name to form a pod name, we limit the job name length to 57 characters.
@@ -484,6 +485,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
                 .withParameter(
+                        PostAction.SOFTWARE_THREAD_COUNT,
+                        Integer.toString(Math.max(1, resourceSpecification.requestCores.intValue())))
+                .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
@@ -701,6 +705,9 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SOFTWARE_LIMITS_CORES, resourceSpecification.limitCores.toString())
                 .withParameter(PostAction.SOFTWARE_REQUESTS_RAM, resourceSpecification.requestRAMGiB + "Gi")
                 .withParameter(PostAction.SOFTWARE_LIMITS_RAM, resourceSpecification.limitRAMGiB + "Gi")
+                .withParameter(
+                        PostAction.SOFTWARE_THREAD_COUNT,
+                        Integer.toString(Math.max(1, resourceSpecification.requestCores.intValue())))
                 .withParameter(PostAction.SOFTWARE_TARGETIP, targetIP + ":1")
                 .withParameter(PostAction.SOFTWARE_CONTAINERNAME, containerName)
                 .withParameter(PostAction.SOFTWARE_CONTAINERPARAM, param)
