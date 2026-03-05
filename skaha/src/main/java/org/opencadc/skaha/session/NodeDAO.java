@@ -5,15 +5,19 @@ import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeList;
+import io.kubernetes.client.openapi.models.V1NodeSpec;
 import io.kubernetes.client.openapi.models.V1NodeStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SInformerCache;
 import org.opencadc.skaha.K8SUtil;
 
 public class NodeDAO {
@@ -63,10 +67,29 @@ public class NodeDAO {
      * @throws Exception If there is an error communicating with the Kubernetes API.
      */
     static Set<Capacity> getCapacities() throws Exception {
+        if (K8SInformerCache.isRunning()) {
+            final String workerNodeLabelSelector = K8SUtil.getWorkerNodeLabelSelector();
+            final List<V1Node> filteredNodes = K8SInformerCache.listNodes().stream()
+                    .filter(node -> {
+                        final V1NodeSpec spec = node.getSpec();
+                        return spec == null || !Boolean.TRUE.equals(spec.getUnschedulable());
+                    })
+                    .filter(node -> {
+                        if (!StringUtil.hasLength(workerNodeLabelSelector)) {
+                            return true;
+                        }
+                        final Map<String, String> labels =
+                                node.getMetadata() != null ? node.getMetadata().getLabels() : null;
+                        return labels != null && matchesLabelSelector(labels, workerNodeLabelSelector);
+                    })
+                    .collect(Collectors.toList());
+            final V1NodeList nodeList = new V1NodeList();
+            nodeList.setItems(filteredNodes);
+            return NodeDAO.getCapacities(nodeList);
+        }
+
         final ApiClient client = Configuration.getDefaultApiClient();
         final CoreV1Api api = new CoreV1Api(client);
-
-        // Make
         final String workerNodeLabelSelector = K8SUtil.getWorkerNodeLabelSelector();
         final CoreV1Api.APIlistNodeRequest listNodeRequest = api.listNode().fieldSelector("spec.unschedulable=false");
         if (StringUtil.hasLength(workerNodeLabelSelector)) {
@@ -78,6 +101,35 @@ public class NodeDAO {
         }
 
         return NodeDAO.getCapacities(listNodeRequest.execute());
+    }
+
+    /**
+     * Match a set of labels against a comma-separated equality-based label selector string.
+     *
+     * @param labels The labels from the K8s object.
+     * @param selector The label selector string (e.g. "key1=value1,key2!=value2").
+     * @return true if all selector conditions are met.
+     */
+    static boolean matchesLabelSelector(final Map<String, String> labels, final String selector) {
+        for (String part : selector.split(",")) {
+            part = part.trim();
+            if (part.contains("!=")) {
+                final String[] kv = part.split("!=", 2);
+                if (kv[1].equals(labels.get(kv[0]))) {
+                    return false;
+                }
+            } else if (part.contains("=")) {
+                final String[] kv = part.split("=", 2);
+                if (!kv[1].equals(labels.get(kv[0]))) {
+                    return false;
+                }
+            } else if (!part.isEmpty()) {
+                if (!labels.containsKey(part)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
