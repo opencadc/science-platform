@@ -11,7 +11,8 @@ COPY src ./src
 
 RUN pip install --upgrade pip && pip install .
 
-RUN addgroup --system metrics && adduser --system --ingroup metrics metrics
+RUN addgroup --system --gid 65532 metrics \
+    && adduser --system --ingroup metrics --uid 65532 metrics
 USER metrics
 
 EXPOSE 8000

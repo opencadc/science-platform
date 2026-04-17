@@ -5,7 +5,8 @@
 [![CI: Linting](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.linting.yml)
 [![CI: Testing](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/ci.testing.yml)
 [![CD: Edge Build](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.edge.build.yml)
-[![CD: Release Build](https://github.com/opencadc/science-platform/actions/workflows/cd.release.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.release.build.yml)
+[![CD: Skaha Release Build](https://github.com/opencadc/science-platform/actions/workflows/cd.skaha.release.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.skaha.release.build.yml)
+[![CD: Metrics Release Image](https://github.com/opencadc/science-platform/actions/workflows/cd.metrics.release.build.yml/badge.svg)](https://github.com/opencadc/science-platform/actions/workflows/cd.metrics.release.build.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/opencadc/science-platform/badge)](https://scorecard.dev/viewer/?uri=github.com/opencadc/science-platform)
 ## Table of Contents
 - [Skaha](#skaha)

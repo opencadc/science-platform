@@ -1,0 +1,16 @@
+# Development values (kept in-repo per M1; int/staging/prod live elsewhere)
+image:
+  repository: images.opencadc.org/platform/metrics
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  METRICS_ENVIRONMENT: "dev"
+  METRICS_PROVIDER_MODE: "static"
+  METRICS_CLUSTER_NAME: "dev-cluster"
+  METRICS_CACHE_BACKEND: "redis"
+  METRICS_CACHE_TTL_SECONDS: "15"
+  METRICS_OTEL_METRICS_ENABLED: "false"
+
+redis:
+  enabled: true

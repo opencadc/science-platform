@@ -1,12 +1,13 @@
-.cursor/
-.git/
-.pytest_cache/
-.venv/
+# Build context excludes (image build uses metrics/ as context)
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.log
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.git/
+.harness/claims.jsonl
 tests/
-old-plans/
-docs/
+*.md
+!README.md

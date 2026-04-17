@@ -24,8 +24,9 @@ All runtime behavior is configured via environment variables prefixed with
 - The process remains stateless and uses TTL cache backends.
 - Structured logs are emitted to stdout through the app server runtime.
 - One service process is packaged per container image.
-- Environment overlays are provided by Helm values for `dev`, `int`, `staging`,
-  and `prod`.
+- Environment-specific settings are supplied through Helm values; this
+  repository ships `dev` values only (`./helm/metrics-api/values-dev.yaml`
+  relative to the `metrics/` directory).
 
 ## Local development
 
@@ -40,6 +41,18 @@ Run tests and linting:
 ```bash
 uv run pytest
 uv run ruff check src tests
+```
+
+Run Metrics-only pre-commit hooks (also driven from the repo root):
+
+```bash
+pre-commit run --config metrics/.pre-commit-config.yaml --all-files
+```
+
+Run the repository root pre-commit checks (includes shared governance hooks):
+
+```bash
+pre-commit run --all-files
 ```
 
 Run the API locally:
@@ -78,16 +91,15 @@ The image exposes port `8000` and includes a health check against `/healthz`.
 
 ## Helm deployment
 
-The service chart is located at
-`deployment/helm/metrics-api` in the parent `science-platform` repository.
+The Helm chart lives in `metrics/helm/metrics-api` within this workspace.
 
-Development deployment example:
+Development deployment example (run from `metrics/`):
 
 ```bash
-helm upgrade --install metrics-api ../deployment/helm/metrics-api \
+helm upgrade --install metrics-api ./helm/metrics-api \
   --namespace metrics \
   --create-namespace \
-  -f ../deployment/helm/metrics-api/values-dev.yaml
+  -f ./helm/metrics-api/values-dev.yaml
 ```
 
 You can also use the helper script:
@@ -96,9 +108,14 @@ You can also use the helper script:
 bash scripts/deploy-with-helm.sh dev
 ```
 
-## CI workflow
+## CI workflows
 
-A dedicated workflow is available at
-`.github/workflows/ci.metrics.yml` in the parent repository. It runs metrics
-lint/tests, builds the metrics container image, and supports optional kind
-smoke validation through manual dispatch.
+Lint, unit tests, Docker image validation, and Minikube smoke deployment run from
+`.github/workflows/ci.metrics.yml` in the parent repository on changes under
+`metrics/**`.
+
+Release container images (`linux/amd64`, `linux/arm64`) publish only on Git tags
+matching `metric-v*` via `.github/workflows/cd.metrics.release.build.yml`.
+
+Release notes and versioning for Metrics follow the separate Metrics package in
+root `release-please-config.json`, using tags like `metric-v0.1.0`.

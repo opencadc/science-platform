@@ -3,8 +3,12 @@ name: "CI: Linting"
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "metrics/**"
   push:
     branches: [main]
+    paths-ignore:
+      - "metrics/**"
   schedule:
     - cron: '0 0 * * *'
 

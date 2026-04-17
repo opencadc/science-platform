@@ -9,7 +9,7 @@ milestone content.
 
 ## Active milestones
 
-- `docs/plans/PLAN_M1_project_setup_and_delivery_foundation.md`
+- `docs/plans/PLAN_M1_project_setup_and_delivery_foundation.md` — outcomes: `docs/plans/PLAN_M1_outcomes.md`
 - `docs/plans/PLAN_M2_platform_metrics_initial_release.md`
 - `docs/plans/PLAN_M3_user_metrics_release.md`
 - `docs/plans/PLAN_M4_session_metrics_release.md`

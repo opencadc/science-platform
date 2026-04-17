@@ -1,4 +1,4 @@
-name: "CD: Release Build"
+name: "CD: Skaha Release Build"
 
 on:
   repository_dispatch:

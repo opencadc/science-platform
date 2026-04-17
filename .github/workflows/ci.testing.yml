@@ -3,8 +3,12 @@ name: "CI: Testing"
 on:
     pull_request:
       branches: [main]
+      paths-ignore:
+        - "metrics/**"
     push:
       branches: [main]
+      paths-ignore:
+        - "metrics/**"
 
 permissions:
   contents: read

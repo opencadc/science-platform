@@ -1,0 +1,101 @@
+name: "CI: Metrics API"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "metrics/**"
+  push:
+    branches: [main]
+    paths:
+      - "metrics/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metrics-lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: metrics
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Python
+        uses: actions/setup-python@42375524ea02e3c000ea0f8e1fce07ff6b5d0f71 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@4fbc9f63b88a9e534f5c79f5f58dcb6cf4f5f017 # v6.7.0
+      - name: Sync dependencies
+        run: uv sync --group dev
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Unit tests
+        run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80 -m "not integration"
+      - name: Harness contract tests
+        run: uv run --group harness pytest -q tests/harness/test_contracts.py
+      - name: Harness CLI check
+        run: uv run --group harness python -m harness check
+
+  metrics-minikube-smoke:
+    runs-on: ubuntu-latest
+    needs: metrics-lint-test
+    defaults:
+      run:
+        working-directory: metrics
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Python
+        uses: actions/setup-python@42375524ea02e3c000ea0f8e1fce07ff6b5d0f71 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@4fbc9f63b88a9e534f5c79f5f58dcb6cf4f5f017 # v6.7.0
+      - name: Setup Helm
+        uses: azure/setup-helm@b9b519bdd1bf6888c17efb5856e6d6a6377b7ea9 # v4.3.0
+        with:
+          version: v3.16.2
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v2.13.0
+        with:
+          minikube version: v1.35.0
+          kubernetes version: v1.30.0
+          github token: ${{ secrets.GITHUB_TOKEN }}
+          driver: docker
+      - name: Sync dependencies
+        run: uv sync --group dev
+      - name: Build and load image
+        run: |
+          docker build -t canfar-metrics-local:latest .
+          minikube image load canfar-metrics-local:latest
+      - name: Helm deploy
+        run: |
+          helm upgrade --install metrics-api ./helm/metrics-api \
+            --namespace metrics \
+            --create-namespace \
+            -f scripts/kind-values.yaml \
+            --set "image.repository=canfar-metrics-local" \
+            --set "image.tag=latest"
+      - name: Wait for Redis
+        run: kubectl -n metrics rollout status deploy/metrics-api-redis --timeout=120s
+      - name: Wait for Metrics API
+        run: kubectl -n metrics rollout status deploy/metrics-api-metrics-api --timeout=180s
+      - name: Integration smoke tests
+        run: |
+          kubectl -n metrics port-forward svc/metrics-api-metrics-api 18080:8000 >/tmp/metrics-pf.log 2>&1 &
+          echo $! > /tmp/metrics-pf.pid
+          sleep 3
+          METRICS_BASE_URL="http://127.0.0.1:18080" uv run pytest tests/integration -m integration -q
+          kill "$(cat /tmp/metrics-pf.pid)" || true
