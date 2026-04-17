@@ -36,7 +36,7 @@ repos:
       - id: check-toml
       # Attempts to load all yaml files to verify syntax.
       - id: check-yaml
-        exclude: ^skaha/src/test/resources/
+        exclude: (?x)(^skaha/src/test/resources/|^metrics/helm/.*/templates/)
       # Attempts to load all xml files to verify syntax.
       - id: check-xml
       # Check for debugger imports and py37+ breakpoint() calls in python source.
@@ -70,18 +70,6 @@ repos:
         pass_filenames: false
         always_run: true
         verbose: true
-  - repo: https://github.com/gherynos/pre-commit-java
-    rev: v0.6.23
-    hooks:
-      # - id: pmd
-      #   args: [
-      #     "--use-version=java-11",
-      #     "--dir=skaha",
-      #     "--no-fail-on-error",
-      #     "--min-priority=1",
-      #     "--format=sarif"
-      #   ]
-      - id: cpd # Copy/Paste Detector
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.16.3
     hooks:

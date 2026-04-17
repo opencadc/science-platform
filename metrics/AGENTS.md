@@ -62,3 +62,15 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - Harness runtime code: `.harness/harness/`
 - Project implementation facts: `docs/`
 - Delivery and milestones: `docs/plans/`
+
+## Learned User Preferences
+
+- Write git commits using Conventional Commits (`type(scope): subject`, with optional body and footer).
+
+## Learned Workspace Facts
+
+- Product and implementation conventions belong in `docs/learnings.md`; harness-wide notes belong in `docs/harness/learnings.md`.
+- The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
+- Local Kubernetes integration and CI smoke tests use Minikube (Kind-based scripts were removed); use `metrics/scripts/run-minikube-integration.sh` and `metrics/scripts/minikube-values.yaml`, and enable the metrics-server addon (CI does this; default in the local script) for work that depends on cluster resource metrics.
+- Root pre-commit `check-yaml` excludes `metrics/helm/*/templates/` because Helm templates embed Go syntax and are not plain YAML.
+- Java copy-paste detection via the removed `cpd` pre-commit hook is not used; Skaha Java checks run through `./gradlew clean check`.

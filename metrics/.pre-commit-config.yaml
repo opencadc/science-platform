@@ -20,6 +20,7 @@ repos:
         files: ^metrics/
       - id: check-yaml
         files: ^metrics/helm/
+        exclude: ^metrics/helm/.*/templates/
       - id: end-of-file-fixer
         files: ^metrics/
       - id: trailing-whitespace
