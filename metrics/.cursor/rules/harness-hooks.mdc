@@ -1,0 +1,5 @@
+---
+description: Apply hook policy.
+alwaysApply: false
+---
+Follow `docs/harness/hooks.md` and `docs/harness/hook-policy.yaml` when running commands or writing files.

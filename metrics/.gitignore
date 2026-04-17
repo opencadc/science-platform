@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.harness/telemetry.jsonl
+.harness/claims.jsonl
+old-harness-setup/.venv/
+old-harness-setup/**/__pycache__/
+
+.coverage
+
+# Cursor and IDE runtime state - not part of the harness contract
+.cursor/hooks/state/
+.cursor/hooks/state/**
+.cursor/.runtime/
+.codex/.runtime/
+.claude/.runtime/

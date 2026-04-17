@@ -1,0 +1,5 @@
+---
+description: Apply subagent delegation policy.
+alwaysApply: false
+---
+Follow `docs/harness/subagents.md` before dispatching parallel agents.

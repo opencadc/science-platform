@@ -1,7 +1,7 @@
 [project]
 name = "metrics"
 version = "0.1.0"
-description = "Add your description here"
+description = "CANFAR Science Platform Metrics Backend"
 readme = "README.md"
 authors = [
     { name = "Shiny Brar", email = "shiny.brar@nrc-cnrc.gc.ca" }
@@ -11,6 +11,8 @@ dependencies = [
     "fastapi>=0.136.0",
     "niquests>=3.18.6",
     "pydantic>=2.13.1",
+    "pydantic-settings>=2.13.1",
+    "redis>=7.4.0",
     "uvicorn>=0.44.0",
 ]
 
@@ -18,8 +20,23 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+# Dual-package layout: `src/metrics` is the product surface; `.harness/harness`
+# hosts the portable harness runtime so adapters (.codex, .cursor, .claude) can
+# invoke `python -m harness` and `python -m harness.hooks.bridge` without
+# exposing harness internals as a product API.
+packages = ["src/metrics", ".harness/harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.5.1",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+]
+harness = [
+    "pyyaml>=6.0.3",
+    "pydantic>=2.13.1",
 ]

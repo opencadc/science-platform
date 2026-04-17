@@ -1,0 +1,5 @@
+---
+description: Apply verification gates.
+alwaysApply: false
+---
+Follow `docs/harness/verification.md` and `project-gates.yaml` before handoff.

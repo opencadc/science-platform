@@ -1,0 +1,48 @@
+{
+  "version": "2.0",
+  "source": "docs/harness/hook-policy.yaml",
+  "bridge": "python -m harness.hooks.bridge",
+  "tool": "claude",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --group harness python -m harness.hooks.bridge session_start --tool claude"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --group harness python -m harness.hooks.bridge shell_command_start --tool claude"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --group harness python -m harness.hooks.bridge pre_file_write --tool claude"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --group harness python -m harness.hooks.bridge post_task_complete --tool claude"
+          }
+        ]
+      }
+    ]
+  }
+}
