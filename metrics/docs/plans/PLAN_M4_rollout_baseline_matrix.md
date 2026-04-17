@@ -12,7 +12,7 @@ implementation.
 - **M1 foundation**
   - Baseline: service code and unit tests only; no local cluster harness, no
     dedicated CI workflow, no service-specific chart.
-  - Implemented: kind integration script, integration smoke tests, dedicated
+  - Implemented: Minikube integration script, integration smoke tests, dedicated
     CI workflow, Helm chart, container hardening, and metrics-focused
     pre-commit hooks.
 - **M2 platform release**
@@ -48,7 +48,7 @@ The service must pass static checks and tests before release candidates.
 
 The service must pass the local Kubernetes loop.
 
-- `bash scripts/run-kind-integration.sh`
+- `bash scripts/run-minikube-integration.sh`
 - integration tests in `tests/integration` return success
 - chart deploy and rollout complete without manual intervention
 

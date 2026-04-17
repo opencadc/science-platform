@@ -74,6 +74,8 @@ jobs:
           kubernetes version: v1.30.0
           github token: ${{ secrets.GITHUB_TOKEN }}
           driver: docker
+      - name: Enable metrics-server addon
+        run: minikube addons enable metrics-server
       - name: Sync dependencies
         run: uv sync --group dev
       - name: Build and load image
@@ -85,7 +87,7 @@ jobs:
           helm upgrade --install metrics-api ./helm/metrics-api \
             --namespace metrics \
             --create-namespace \
-            -f scripts/kind-values.yaml \
+            -f scripts/minikube-values.yaml \
             --set "image.repository=canfar-metrics-local" \
             --set "image.tag=latest"
       - name: Wait for Redis

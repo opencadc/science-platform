@@ -65,19 +65,22 @@ uv run python -m metrics.main
 
 ## Local Kubernetes integration loop
 
-A complete local loop is provided through a kind-based integration script.
+Local and CI both use **Minikube** (not Kind) so the environment matches upcoming
+work that depends on cluster addons such as **metrics-server** (resource
+metrics API). Minikube can enable these with `minikube addons enable …`.
 
 ```bash
-bash scripts/run-kind-integration.sh
+bash scripts/run-minikube-integration.sh
 ```
 
 This script:
 
-1. Creates a local kind cluster.
-2. Builds and loads the local metrics container image.
-3. Deploys the Helm chart with `scripts/kind-values.yaml`.
+1. Starts a dedicated Minikube profile (`metrics-local` by default) and enables
+   the **metrics-server** addon unless `MINIKUBE_ENABLE_METRICS_SERVER=false`.
+2. Builds and loads the local metrics container image into Minikube.
+3. Deploys the Helm chart with `scripts/minikube-values.yaml`.
 4. Runs black-box integration tests in `tests/integration`.
-5. Tears down the cluster.
+5. Deletes the profile and namespace on exit (same teardown style as CI smoke).
 
 ## Container image
 

@@ -1,0 +1,15 @@
+image:
+  repository: canfar-metrics-local
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  METRICS_ENVIRONMENT: "dev"
+  METRICS_PROVIDER_MODE: "static"
+  METRICS_CLUSTER_NAME: "minikube-local"
+  METRICS_CACHE_BACKEND: "redis"
+  METRICS_CACHE_TTL_SECONDS: "15"
+  METRICS_OTEL_METRICS_ENABLED: "false"
+
+redis:
+  enabled: true
