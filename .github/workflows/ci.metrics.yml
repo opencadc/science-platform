@@ -82,6 +82,11 @@ jobs:
         run: |
           docker build -t canfar-metrics-local:latest .
           minikube image load canfar-metrics-local:latest
+      - name: Pre-load Redis image into Minikube
+        run: |
+          # Avoid slow or flaky pulls from Docker Hub inside the cluster during rollout.
+          docker pull redis:7-alpine
+          minikube image load redis:7-alpine
       - name: Helm deploy
         run: |
           helm upgrade --install metrics-api ./helm/metrics-api \
@@ -91,9 +96,9 @@ jobs:
             --set "image.repository=canfar-metrics-local" \
             --set "image.tag=latest"
       - name: Wait for Redis
-        run: kubectl -n metrics rollout status deploy/metrics-api-redis --timeout=120s
+        run: kubectl -n metrics rollout status deploy/metrics-api-redis --timeout=300s
       - name: Wait for Metrics API
-        run: kubectl -n metrics rollout status deploy/metrics-api-metrics-api --timeout=180s
+        run: kubectl -n metrics rollout status deploy/metrics-api-metrics-api --timeout=300s
       - name: Integration smoke tests
         run: |
           kubectl -n metrics port-forward svc/metrics-api-metrics-api 18080:8000 >/tmp/metrics-pf.log 2>&1 &
