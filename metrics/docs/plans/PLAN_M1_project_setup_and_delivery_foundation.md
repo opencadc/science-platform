@@ -9,20 +9,25 @@ service repeatable, testable, and deployable before adding new feature depth.
 
 This milestone establishes a baseline engineering system around the Metrics
 service. The output is a containerized service with clear developer workflows,
-automated checks, and a local Kubernetes loop that includes Redis and endpoint
-smoke tests, while preserving clean separation from existing `skaha` CI/CD.
+automated checks, and Kubernetes smoke validation in GitHub Actions, while
+preserving explicit separation between repo-wide, `skaha`, and Metrics CI/CD
+pathways.
 
 ## In scope
 
 This section lists work you execute in this milestone.
 
 - Define and document local developer commands for Metrics-only workflows.
-- Add path-aware CI routing so `skaha` jobs do not run on Metrics-only changes.
-- Add Metrics-specific CI jobs for lint, tests, and image build.
+- Partition CI/CD into repo-wide, `skaha`-specific, and Metrics-specific paths.
+- Add path-aware routing so `skaha` jobs do not run on Metrics-only changes.
+- Add Metrics-specific CI jobs for lint, tests, and minikube smoke validation.
 - Add a Metrics-specific Python pre-commit configuration.
 - Establish local Kubernetes integration test flow for Metrics.
 - Add an in-repo minimal Helm baseline under `metrics/helm` for `dev`.
-- Configure root release-please to version Metrics independently.
+- Configure root release-please to version Metrics independently with
+  `metric-v<semver>` tags.
+- Publish Metrics release images only on Metrics release tags.
+- Build and publish Metrics release images for `linux/amd64` and `linux/arm64`.
 - Confirm 12-factor runtime configuration through environment variables.
 
 ## Out of scope
@@ -45,6 +50,9 @@ This milestone depends on existing repository assets and tooling contracts.
 - Root repository release automation (`release-please-config.json` and
   `.release-please-manifest.json`).
 - Root and Metrics pre-commit integration points.
+- Existing container registry and credentials:
+  `images.opencadc.org`, `SKAHA_REGISTRY_USERNAME`, and
+  `SKAHA_REGISTRY_TOKEN`.
 - `project-gates.yaml` gate definitions.
 
 ## Constraints
@@ -62,33 +70,45 @@ This milestone must satisfy architectural and operational constraints.
 
 This section records the baseline decisions for monorepo operation.
 
-- **CI routing:** Root `skaha` jobs remain in existing workflows, but they are
-  conditionally skipped for Metrics-only changes. Metrics jobs run from
-  Metrics-scoped triggers and/or Metrics-scoped jobs in shared workflows.
+- **Three CI/CD pathways:** Workflows are split into repo-wide, `skaha`-
+  specific, and Metrics-specific pathways.
+- **Repo-wide pathway:** Governance and security workflows such as `codeql` and
+  `scorecard` remain repo-wide and do not become component-specific.
+- **Skaha pathway:** Existing `skaha` workflows are renamed to explicit `skaha`
+  names (for example `cd.skaha.release.yml` and
+  `cd.skaha.release.build.yml`) and scoped so Metrics-only changes skip them.
+- **Metrics pathway:** Metrics CI runs on Metrics-scoped pull requests and
+  pushes to `main`, including lint, tests, and minikube validation.
 - **Multiple pre-commit configs:** The repository supports more than one
   pre-commit config file. Root pre-commit remains for shared checks, and
   `metrics/.pre-commit-config.yaml` owns Python-focused hooks for Metrics.
 - **Helm ownership boundary:** Metrics keeps a minimal chart under
   `metrics/helm` with `dev` values only. Environment overlays (`int`, `staging`,
   `prod`) move to a separate deployment repository in later milestones.
-- **Release ownership:** Root `release-please-config.json` is upgraded to a
-  multi-component layout so Metrics changes do not cut a `skaha` release and can
-  produce an independent Metrics release stream.
-- **Workflow composition:** Shared workflows such as `ci.linting.yml` continue
-  to exist, but include Metrics-specific jobs with path/job filters instead of
-  forcing Java/Gradle jobs for Metrics-only pull requests.
+- **Metrics release contract:** Metrics release tags and changelog entries use
+  `metric-v0.1.1` style. `skaha` keeps its current tag style in this milestone.
+- **Metrics image publish contract:** Metrics images publish to
+  `images.opencadc.org/platform/metrics` using
+  `SKAHA_REGISTRY_USERNAME` and `SKAHA_REGISTRY_TOKEN`.
+- **Release-only image publish:** Metrics container images are built and pushed
+  only on `metric-v*` tag events. No Metrics edge image push is used.
+- **Multi-arch release images:** Metrics release publishes a single manifest
+  containing `linux/amd64` and `linux/arm64`.
 
 ## Implementation phases
 
 This section breaks work into execution phases.
 
 1. **Workflow routing and CI partitioning**
-   - Add path-aware filters in root workflows so `skaha` CI/CD does not run for
-     Metrics-only changes.
-   - Keep shared workflow files, and add Metrics-specific jobs where reuse is
-     useful (for example linting).
-   - Validate pull request check behavior for three scenarios: Metrics-only,
-     `skaha`-only, and mixed changes.
+   - Classify workflows into repo-wide, `skaha`-specific, and Metrics-specific
+     pathways.
+   - Rename `skaha` release/build workflow files to explicit `skaha` names and
+     preserve current behavior for `skaha`.
+   - Apply path/event routing so Metrics-only changes do not run `skaha`
+     workflows.
+   - Keep repo-wide governance/security workflows active repository-wide.
+   - Validate pull request behavior for Metrics-only, `skaha`-only, and mixed
+     changes.
 2. **Metrics pre-commit baseline**
    - Add `metrics/.pre-commit-config.yaml` with Python-first hooks (`ruff`,
      `pytest`, YAML/TOML hygiene as needed).
@@ -98,20 +118,26 @@ This section breaks work into execution phases.
 3. **Container and runtime baseline**
    - Harden `metrics/Dockerfile`.
    - Add `.dockerignore` and health endpoint expectations.
-4. **Local Kubernetes integration harness**
-   - Add deterministic local cluster script.
+4. **Metrics CI runtime validation**
+   - Use minikube in GitHub Actions for Metrics CI on Metrics-scoped pull
+     requests and pushes to `main`.
    - Deploy Metrics + Redis via chart assets under `metrics/helm`.
-   - Run black-box integration tests from CI-compatible scripts.
+   - Run black-box smoke checks against the minikube deployment.
 5. **Helm baseline for local and dev**
    - Create `metrics/helm/<chart>` with a minimal deployment/service/config map
      baseline.
    - Add `values-dev.yaml` only in this repository.
    - Keep higher-environment overlays out of this milestone and repository.
 6. **Release automation alignment**
-   - Extend root `release-please-config.json` with a Metrics package path.
+   - Extend root `release-please-config.json` with a Metrics package path and
+     `metric-v*` release tag semantics.
    - Update `.release-please-manifest.json` to track Metrics version state.
-   - Ensure release workflows can distinguish `skaha` and Metrics release events
-     for downstream build/publish behavior.
+   - Ensure Metrics-only commits do not trigger `skaha` version bumps.
+7. **Metrics release image publishing**
+   - Build and publish Metrics images only on `metric-v*` tag events.
+   - Configure Buildx and QEMU for `linux/amd64` and `linux/arm64` release
+     manifests.
+   - Push only release tags to `images.opencadc.org/platform/metrics`.
 
 ## Validation plan
 
@@ -120,20 +146,27 @@ This section defines gate checks and required evidence for milestone closure.
 - Run gate `harness-contracts` from `project-gates.yaml`.
 - Run gate `repository-coverage` from `project-gates.yaml`.
 - Run gate `harness-cli` from `project-gates.yaml`.
-- Run local kind integration script and confirm endpoint smoke tests.
-- Confirm Docker image build and health check behavior.
+- Confirm Metrics minikube CI runtime validation and smoke checks in GitHub
+  Actions.
+- Confirm Docker image build and health check behavior for Metrics.
 - Confirm root CI behavior:
-  - Metrics-only pull request skips `skaha` CI/CD jobs.
-  - Metrics-specific lint/test/build checks run and report status.
-  - Mixed pull request runs both `skaha` and Metrics job sets.
+  - Metrics-only pull request runs repo-wide + Metrics pathways and skips
+    `skaha`-specific workflows.
+  - `skaha`-only pull request runs repo-wide + `skaha` pathways and skips
+    Metrics-specific workflows.
+  - Mixed pull request runs all applicable pathway checks.
 - Confirm pre-commit behavior:
   - `pre-commit run --config metrics/.pre-commit-config.yaml --all-files`
     passes.
   - Root pre-commit run remains green for non-Metrics paths.
 - Confirm release-please behavior:
-  - Metrics-only conventional-commit change creates or updates a Metrics release
-    PR.
+  - Metrics-only conventional-commit change creates or updates a Metrics
+    release PR with `metric-v<semver>` tag intent.
   - Metrics-only changes do not bump the `skaha` root package.
+- Confirm Metrics image publish behavior:
+  - `metric-v*` tag push publishes `images.opencadc.org/platform/metrics`.
+  - Published release manifests contain both `linux/amd64` and `linux/arm64`.
+  - Non-tag Metrics CI does not push container images.
 - Confirm Helm behavior:
   - `helm lint` and `helm template` pass for `metrics/helm` with dev values.
 
@@ -147,6 +180,10 @@ This section captures known risks and mitigation strategy.
   test pull requests.
 - **Release coupling risk:** Validate release-please package boundaries before
   enabling automated release builds for Metrics.
+- **Minikube CI runtime cost:** Keep minikube profile minimal and smoke checks
+  deterministic.
+- **Multi-arch build instability:** Pin Buildx/QEMU actions and verify release
+  manifest contents.
 - **Chart mismatch risk:** Validate rendered chart before cluster deployment.
 - **Gate blind spots:** Keep local and CI verification commands aligned.
 
@@ -157,6 +194,8 @@ This section defines controls to keep rollout quality stable.
 - Keep root workflow ownership explicit: shared workflow file, component-scoped
   jobs.
 - Keep Metrics pre-commit hooks versioned with Metrics source changes.
+- Keep Metrics publish restricted to `metric-v*` tag events.
+- Keep Metrics release manifests dual-platform (`linux/amd64`, `linux/arm64`).
 - Keep only `dev` Helm values in this repository.
 - Require cache and health endpoint checks in smoke validation.
 - Require all mandatory gates before milestone handoff.
@@ -167,11 +206,18 @@ This section defines controls to keep rollout quality stable.
 Use this checklist when you execute and close the milestone.
 
 - [ ] Quality checks are configured and documented.
+- [ ] CI/CD pathways are split and verified as repo-wide, `skaha`, and Metrics.
+- [ ] `skaha` workflows are renamed and scoped to `skaha` change/events.
 - [ ] Root workflows skip `skaha` jobs on Metrics-only changes.
-- [ ] Metrics lint/test/build jobs run on Metrics-scoped changes.
+- [ ] Metrics lint/test/minikube jobs run on Metrics pull requests and pushes to
+  `main`.
 - [ ] Metrics pre-commit config is defined and documented.
-- [ ] Local kind integration runs complete successfully.
+- [ ] Metrics minikube smoke validation runs complete successfully.
 - [ ] Minimal `metrics/helm` chart with `dev` values is validated.
-- [ ] Root release-please config supports a Metrics component release.
+- [ ] Root release-please config supports Metrics component releases using
+  `metric-v<semver>` tags.
+- [ ] Metrics release images publish only on tags to
+  `images.opencadc.org/platform/metrics`.
+- [ ] Metrics release images are published for `linux/amd64` and `linux/arm64`.
 - [ ] Required gates from `project-gates.yaml` pass.
 - [ ] Milestone outcomes are recorded in `docs/plans`.
