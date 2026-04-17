@@ -22,17 +22,17 @@ jobs:
         working-directory: metrics
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@42375524ea02e3c000ea0f8e1fce07ff6b5d0f71 # v5.6.0
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Setup uv
-        uses: astral-sh/setup-uv@4fbc9f63b88a9e534f5c79f5f58dcb6cf4f5f017 # v6.7.0
+        uses: astral-sh/setup-uv@v6
       - name: Sync dependencies
         run: uv sync --group dev
       - name: Lint
@@ -52,19 +52,19 @@ jobs:
         working-directory: metrics
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@42375524ea02e3c000ea0f8e1fce07ff6b5d0f71 # v5.6.0
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Setup uv
-        uses: astral-sh/setup-uv@4fbc9f63b88a9e534f5c79f5f58dcb6cf4f5f017 # v6.7.0
+        uses: astral-sh/setup-uv@v6
       - name: Setup Helm
-        uses: azure/setup-helm@b9b519bdd1bf6888c17efb5856e6d6a6377b7ea9 # v4.3.0
+        uses: azure/setup-helm@v4
         with:
           version: v3.16.2
       - name: Setup Minikube
