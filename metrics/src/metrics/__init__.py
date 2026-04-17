@@ -1,2 +1,5 @@
-def hello() -> str:
-    return "Hello from metrics!"
+"""CANFAR Metrics package."""
+
+__all__ = ["__version__"]
+
+__version__ = "0.1.0"

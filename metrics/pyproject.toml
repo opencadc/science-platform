@@ -9,7 +9,12 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.136.0",
+    "httpx>=0.28.1",
     "niquests>=3.18.6",
+    "opentelemetry-exporter-otlp-proto-http>=1.41.0",
+    "opentelemetry-instrumentation-fastapi>=0.62b0",
+    "opentelemetry-instrumentation-httpx>=0.62b0",
+    "opentelemetry-sdk>=1.41.0",
     "pydantic>=2.13.1",
     "pydantic-settings>=2.13.1",
     "redis>=7.4.0",
@@ -29,12 +34,17 @@ packages = ["src/metrics", ".harness/harness"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: integration tests requiring external services",
+]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.18.2",
     "pre-commit>=4.5.1",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "ruff>=0.14.2",
 ]
 harness = [
     "pyyaml>=6.0.3",

@@ -1,0 +1,12 @@
+.cursor/
+.git/
+.pytest_cache/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+tests/
+old-plans/
+docs/
