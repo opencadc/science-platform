@@ -1,25 +1,42 @@
 {
     "packages": {
-      ".": {
-        "package-name": "skaha",
-        "changelog-path": "CHANGELOG.md",
-        "release-type": "simple",
-        "bump-minor-pre-major": false,
-        "bump-patch-for-minor-pre-major": false,
-        "draft": false,
-        "prerelease": false,
-        "include-component-in-tag": false,
-        "include-v-in-tag": false,
-        "extra-files": [
-          "skaha/gradle.properties"
-        ],
-        "exclude-paths": [
-          "docs",
-          "deployment",
-          "image-cache",
-          "integration-test"
-        ]
-      }
+        ".": {
+            "package-name": "skaha",
+            "changelog-path": "CHANGELOG.md",
+            "release-type": "simple",
+            "bump-minor-pre-major": false,
+            "bump-patch-for-minor-pre-major": false,
+            "draft": false,
+            "prerelease": false,
+            "include-component-in-tag": false,
+            "include-v-in-tag": false,
+            "extra-files": [
+                "skaha/gradle.properties"
+            ],
+            "exclude-paths": [
+                "docs",
+                "deployment",
+                "image-cache",
+                "integration-test",
+                "metrics"
+            ]
+        },
+        "metrics": {
+            "package-name": "metrics",
+            "changelog-path": "metrics/CHANGELOG.md",
+            "release-type": "python",
+            "path": "metrics",
+            "bump-minor-pre-major": true,
+            "bump-patch-for-minor-pre-major": true,
+            "draft": false,
+            "prerelease": false,
+            "include-component-in-tag": true,
+            "component": "metric",
+            "include-v-in-tag": true,
+            "extra-files": [
+                "metrics/pyproject.toml"
+            ]
+        }
     },
     "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
 }
