@@ -49,6 +49,15 @@ repos:
       - id: detect-private-key
   - repo: local
     hooks:
+      - id: metrics-pre-commit-config
+        name: Metrics pre-commit (metrics/.pre-commit-config.yaml)
+        entry: /bin/bash
+        args:
+          - -c
+          - pre-commit run --config metrics/.pre-commit-config.yaml --all-files
+        language: system
+        pass_filenames: false
+        files: ^metrics/
       - id: gradle-build
         name: Skaha Gradle Build
         entry: /bin/bash
