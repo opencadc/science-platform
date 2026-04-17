@@ -35,7 +35,9 @@ class KueueCapacityProvider:
                 verify=self._settings.kube_verify_tls,
             )
         except Exception as exc:  # pragma: no cover - exercised via monkeypatch
-            raise ProviderExecutionError(f"Failed querying Kueue ClusterQueues: {exc}") from exc
+            raise ProviderExecutionError(
+                f"Failed querying Kueue ClusterQueues: {exc}"
+            ) from exc
 
         items = payload.get("items") or []
         if not items:
@@ -50,7 +52,9 @@ class KueueCapacityProvider:
             total_memory += memory
 
         if total_cpu <= 0 and total_memory <= 0:
-            raise ProviderUnavailableError("ClusterQueue data did not include capacity values")
+            raise ProviderUnavailableError(
+                "ClusterQueue data did not include capacity values"
+            )
 
         return CapacityReading(
             cpu_cores=total_cpu,

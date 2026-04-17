@@ -45,7 +45,9 @@ class PrometheusUsageProvider:
             source=f"{self.source_name}:user",
         )
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         labels = {
             self._settings.user_label_key: user_id,
             self._settings.session_label_key: session_id,

@@ -25,7 +25,9 @@ class NodeCapacityProvider:
         if not self._settings.kube_api_url:
             raise ProviderUnavailableError("METRICS_KUBE_API_URL is not configured")
 
-        url = f"{self._settings.kube_api_url.rstrip('/')}{self._settings.kube_nodes_path}"
+        url = (
+            f"{self._settings.kube_api_url.rstrip('/')}{self._settings.kube_nodes_path}"
+        )
         params: dict[str, str] = {}
         if self._settings.node_label_selector:
             params["labelSelector"] = self._settings.node_label_selector
@@ -54,7 +56,9 @@ class NodeCapacityProvider:
             total_memory += parse_memory_to_gib(capacity.get("memory"))
 
         if total_cpu <= 0 and total_memory <= 0:
-            raise ProviderUnavailableError("No valid nodes with allocatable capacity were found")
+            raise ProviderUnavailableError(
+                "No valid nodes with allocatable capacity were found"
+            )
 
         return CapacityReading(
             cpu_cores=total_cpu,

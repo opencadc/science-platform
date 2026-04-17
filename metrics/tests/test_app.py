@@ -42,7 +42,9 @@ class UsageProvider:
             observed_at=datetime.now(UTC),
         )
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         del user_id, session_id
         return UsageReading(
             requested_cpu_cores=2,

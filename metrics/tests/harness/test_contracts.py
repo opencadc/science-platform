@@ -52,21 +52,30 @@ def test_harness_modules_carry_substantive_policy_content() -> None:
 
 
 def test_module_substance_has_coverage_for_every_canonical_module() -> None:
-    module_set = {path.name for path in (REPO_ROOT / "docs" / "harness").glob("*.md")
-                  if path.name not in {"CHANGELOG.md", "GOVERNANCE.md"}}
+    module_set = {
+        path.name
+        for path in (REPO_ROOT / "docs" / "harness").glob("*.md")
+        if path.name not in {"CHANGELOG.md", "GOVERNANCE.md"}
+    }
     assert module_set.issubset(set(MODULE_SUBSTANCE))
 
 
 def test_policy_tokens_are_present_in_target_modules() -> None:
     for module_name, tokens in REQUIRED_POLICY_TOKENS.items():
-        content = (REPO_ROOT / "docs" / "harness" / module_name).read_text(encoding="utf-8")
+        content = (REPO_ROOT / "docs" / "harness" / module_name).read_text(
+            encoding="utf-8"
+        )
         for token in tokens:
             assert token in content, f"{module_name} missing policy token {token!r}"
 
 
 def test_machine_readable_schemas_validate() -> None:
-    RouterPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/router-policy.yaml"))
-    ArtifactSchema.model_validate(load_yaml(REPO_ROOT / "docs/harness/artifact-schema.yaml"))
+    RouterPolicy.model_validate(
+        load_yaml(REPO_ROOT / "docs/harness/router-policy.yaml")
+    )
+    ArtifactSchema.model_validate(
+        load_yaml(REPO_ROOT / "docs/harness/artifact-schema.yaml")
+    )
     HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
     ProjectGates.model_validate(load_yaml(REPO_ROOT / "project-gates.yaml"))
 
@@ -79,7 +88,9 @@ def test_strict_mode_converts_ask_and_block_to_strict_block() -> None:
     raw = load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
     raw["mode"] = "strict"
     policy = HookPolicy.model_validate(raw)
-    ask_decision = evaluate_hook_decision(policy, "shell_command_start", "rm -rf /tmp/demo")
+    ask_decision = evaluate_hook_decision(
+        policy, "shell_command_start", "rm -rf /tmp/demo"
+    )
     block_decision = evaluate_hook_decision(
         policy,
         "shell_command_start",
@@ -90,7 +101,9 @@ def test_strict_mode_converts_ask_and_block_to_strict_block() -> None:
 
 
 def test_risk_priority_overrides_allow_rules_on_compound_commands() -> None:
-    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
+    policy = HookPolicy.model_validate(
+        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
+    )
     compound = "cat file && sudo rm -rf /tmp/victim"
     decision = evaluate_hook_decision(policy, "shell_command_start", compound)
     assert decision.action == "advisory_block"
@@ -124,8 +137,12 @@ def test_risk_priority_overrides_allow_rules_on_compound_commands() -> None:
         ("cp ./local.conf /etc/example.conf", "advisory_ask"),
     ],
 )
-def test_hardened_hook_patterns_cover_known_bypasses(payload: str, expected: str) -> None:
-    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
+def test_hardened_hook_patterns_cover_known_bypasses(
+    payload: str, expected: str
+) -> None:
+    policy = HookPolicy.model_validate(
+        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
+    )
     decision = evaluate_hook_decision(policy, "shell_command_start", payload)
     assert decision.action == expected, f"payload={payload!r} decision={decision}"
 
@@ -140,7 +157,9 @@ def test_hardened_hook_patterns_cover_known_bypasses(payload: str, expected: str
     ],
 )
 def test_pre_file_write_gate_catches_adapter_and_secret_targets(payload: str) -> None:
-    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
+    policy = HookPolicy.model_validate(
+        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
+    )
     decision = evaluate_hook_decision(policy, "pre_file_write", payload)
     assert decision.action == "advisory_ask"
 
@@ -180,7 +199,9 @@ def test_persona_parity_fails_when_adapter_drifts(tmp_path, monkeypatch) -> None
             (agents / reviewer).write_bytes(source.read_bytes())
 
     drifted = staging / fake_adapters[1] / "agents" / "architecture-reviewer.md"
-    drifted.write_text(drifted.read_text(encoding="utf-8") + "\ndrift\n", encoding="utf-8")
+    drifted.write_text(
+        drifted.read_text(encoding="utf-8") + "\ndrift\n", encoding="utf-8"
+    )
     with pytest.raises(ValueError):
         _parity(staging)
 
@@ -198,8 +219,12 @@ def test_adapter_manifests_reference_canonical_policy_source() -> None:
 
 def test_reviewer_personas_use_harness_owned_canonical_source() -> None:
     assert CANONICAL_PERSONA_DIR == Path("docs/harness/personas")
-    for reviewer in ("architecture-reviewer.md", "reliability-reviewer.md",
-                     "scale-reviewer.md", "token-efficiency-reviewer.md"):
+    for reviewer in (
+        "architecture-reviewer.md",
+        "reliability-reviewer.md",
+        "scale-reviewer.md",
+        "token-efficiency-reviewer.md",
+    ):
         assert (REPO_ROOT / CANONICAL_PERSONA_DIR / reviewer).exists()
 
 
@@ -305,7 +330,10 @@ def test_retired_hidden_test_layout_is_absent() -> None:
 
 
 def test_project_docs_live_under_docs_and_harness_docs_stay_under_harness() -> None:
-    assert check_docs_ownership(REPO_ROOT) == "project docs in docs/, harness docs in docs/harness/"
+    assert (
+        check_docs_ownership(REPO_ROOT)
+        == "project docs in docs/, harness docs in docs/harness/"
+    )
     for path in ("architecture.md", "design.md", "specs.md", "learnings.md"):
         assert not (REPO_ROOT / path).exists()
         assert (REPO_ROOT / "docs" / path).exists()
@@ -313,7 +341,9 @@ def test_project_docs_live_under_docs_and_harness_docs_stay_under_harness() -> N
 
 
 def test_harness_learnings_retain_historical_lessons() -> None:
-    content = (REPO_ROOT / "docs" / "harness" / "learnings.md").read_text(encoding="utf-8")
+    content = (REPO_ROOT / "docs" / "harness" / "learnings.md").read_text(
+        encoding="utf-8"
+    )
     required_markers = [
         "risk-priority",
         "Absolute paths",
@@ -326,8 +356,13 @@ def test_harness_learnings_retain_historical_lessons() -> None:
 
 def test_hook_policy_version_is_referenced_in_changelog() -> None:
     result = check_schema_version(REPO_ROOT)
-    for label in ("hook-policy", "router-policy", "artifact-schema",
-                  "metrics-schema", "project-gates"):
+    for label in (
+        "hook-policy",
+        "router-policy",
+        "artifact-schema",
+        "metrics-schema",
+        "project-gates",
+    ):
         assert label in result, f"schema-version check missing {label}"
 
 
@@ -353,16 +388,29 @@ def test_artifact_schema_defines_subagent_dispatch_stage() -> None:
     raw = load_yaml(REPO_ROOT / "docs/harness/artifact-schema.yaml")
     stage = raw.get("stage_specific", {}).get("subagent_dispatch")
     assert stage, "artifact-schema.yaml missing subagent_dispatch stage"
-    for field in ("owner", "path_globs", "mirror_sets", "expires_at",
-                  "heartbeat_cadence", "reviewer_requirement", "token_budget"):
+    for field in (
+        "owner",
+        "path_globs",
+        "mirror_sets",
+        "expires_at",
+        "heartbeat_cadence",
+        "reviewer_requirement",
+        "token_budget",
+    ):
         assert field in stage, f"subagent_dispatch missing field {field}"
 
 
 def test_bridge_emits_check_id_in_every_tool_shape() -> None:
     for tool in ("codex", "cursor", "claude", "generic"):
         result = subprocess.run(
-            [sys.executable, "-m", "harness.hooks.bridge",
-             "shell_command_start", "--tool", tool],
+            [
+                sys.executable,
+                "-m",
+                "harness.hooks.bridge",
+                "shell_command_start",
+                "--tool",
+                tool,
+            ],
             cwd=REPO_ROOT,
             input='{"command": "rm -rf /tmp/demo"}',
             capture_output=True,
@@ -372,16 +420,23 @@ def test_bridge_emits_check_id_in_every_tool_shape() -> None:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         serialized = json.dumps(payload)
-        assert "CMD-ASK-DESTRUCTIVE-RM" in serialized, \
+        assert "CMD-ASK-DESTRUCTIVE-RM" in serialized, (
             f"tool {tool} output missing check_id in {payload!r}"
+        )
 
 
 def test_bridge_treats_empty_high_risk_payload_as_warn() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "harness.hooks.bridge",
-         "shell_command_start", "--tool", "generic"],
+        [
+            sys.executable,
+            "-m",
+            "harness.hooks.bridge",
+            "shell_command_start",
+            "--tool",
+            "generic",
+        ],
         cwd=REPO_ROOT,
-        input='{}',
+        input="{}",
         capture_output=True,
         text=True,
         check=False,
@@ -394,8 +449,16 @@ def test_bridge_treats_empty_high_risk_payload_as_warn() -> None:
 
 def test_bridge_mode_override_turns_ask_into_strict_block() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "harness.hooks.bridge",
-         "shell_command_start", "--tool", "generic", "--mode", "strict"],
+        [
+            sys.executable,
+            "-m",
+            "harness.hooks.bridge",
+            "shell_command_start",
+            "--tool",
+            "generic",
+            "--mode",
+            "strict",
+        ],
         cwd=REPO_ROOT,
         input='{"command": "rm -rf /tmp/demo"}',
         capture_output=True,
@@ -411,8 +474,14 @@ def test_bridge_mode_override_turns_ask_into_strict_block() -> None:
 def test_bridge_mode_env_override_turns_ask_into_strict_block(monkeypatch) -> None:
     monkeypatch.setenv("HARNESS_HOOK_MODE", "strict")
     result = subprocess.run(
-        [sys.executable, "-m", "harness.hooks.bridge",
-         "shell_command_start", "--tool", "generic"],
+        [
+            sys.executable,
+            "-m",
+            "harness.hooks.bridge",
+            "shell_command_start",
+            "--tool",
+            "generic",
+        ],
         cwd=REPO_ROOT,
         input='{"command": "rm -rf /tmp/demo"}',
         capture_output=True,
@@ -463,10 +532,21 @@ def test_harness_cli_check_passes() -> None:
     assert "PASS persona parity" in result.stdout
 
 
-def _run_claim(claims_file: Path, *args: str, now: str = "2026-04-17T12:00:00Z") -> subprocess.CompletedProcess[str]:
+def _run_claim(
+    claims_file: Path, *args: str, now: str = "2026-04-17T12:00:00Z"
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "harness", "claim",
-         "--claims-file", str(claims_file), "--now", now, *args],
+        [
+            sys.executable,
+            "-m",
+            "harness",
+            "claim",
+            "--claims-file",
+            str(claims_file),
+            "--now",
+            now,
+            *args,
+        ],
         cwd=REPO_ROOT,
         check=False,
         text=True,
@@ -478,13 +558,21 @@ def test_claim_cli_acquires_and_releases_non_overlapping_claim(tmp_path) -> None
     claims_file = tmp_path / "claims.jsonl"
     acquired = _run_claim(
         claims_file,
-        "acquire", "--owner", "lead", "--path-glob", "src/metrics/*.py",
+        "acquire",
+        "--owner",
+        "lead",
+        "--path-glob",
+        "src/metrics/*.py",
     )
     assert acquired.returncode == 0, acquired.stderr
     claim = json.loads(acquired.stdout)
     released = _run_claim(
         claims_file,
-        "release", "--owner", "lead", "--claim-id", claim["claim_id"],
+        "release",
+        "--owner",
+        "lead",
+        "--claim-id",
+        claim["claim_id"],
     )
     assert released.returncode == 0, released.stderr
     release = json.loads(released.stdout)
@@ -495,7 +583,11 @@ def test_claim_cli_blocks_mirror_set_overlap(tmp_path) -> None:
     claims_file = tmp_path / "claims.jsonl"
     first = _run_claim(
         claims_file,
-        "acquire", "--owner", "agent-a", "--path-glob", ".codex/hooks.json",
+        "acquire",
+        "--owner",
+        "agent-a",
+        "--path-glob",
+        ".codex/hooks.json",
     )
     assert first.returncode == 0, first.stderr
     claim = json.loads(first.stdout)
@@ -503,7 +595,11 @@ def test_claim_cli_blocks_mirror_set_overlap(tmp_path) -> None:
 
     second = _run_claim(
         claims_file,
-        "acquire", "--owner", "agent-b", "--path-glob", ".cursor/hooks.json",
+        "acquire",
+        "--owner",
+        "agent-b",
+        "--path-glob",
+        ".cursor/hooks.json",
     )
     assert second.returncode == 1
     assert "overlaps active claim" in second.stderr
@@ -513,7 +609,11 @@ def test_claim_cli_requires_reclaim_before_stale_overlap_reuse(tmp_path) -> None
     claims_file = tmp_path / "claims.jsonl"
     first = _run_claim(
         claims_file,
-        "acquire", "--owner", "agent-a", "--path-glob", ".codex/agents/*.md",
+        "acquire",
+        "--owner",
+        "agent-a",
+        "--path-glob",
+        ".codex/agents/*.md",
         now="2026-04-17T12:00:00Z",
     )
     assert first.returncode == 0, first.stderr
@@ -521,7 +621,11 @@ def test_claim_cli_requires_reclaim_before_stale_overlap_reuse(tmp_path) -> None
 
     blocked = _run_claim(
         claims_file,
-        "acquire", "--owner", "agent-b", "--path-glob", ".claude/agents/*.md",
+        "acquire",
+        "--owner",
+        "agent-b",
+        "--path-glob",
+        ".claude/agents/*.md",
         now="2026-04-17T12:11:00Z",
     )
     assert blocked.returncode == 1
@@ -529,13 +633,21 @@ def test_claim_cli_requires_reclaim_before_stale_overlap_reuse(tmp_path) -> None
 
     reclaimed = _run_claim(
         claims_file,
-        "reclaim", "--owner", "lead", "--claim-id", claim_id,
+        "reclaim",
+        "--owner",
+        "lead",
+        "--claim-id",
+        claim_id,
         now="2026-04-17T12:11:00Z",
     )
     assert reclaimed.returncode == 0, reclaimed.stderr
     replacement = _run_claim(
         claims_file,
-        "acquire", "--owner", "agent-b", "--path-glob", ".claude/agents/*.md",
+        "acquire",
+        "--owner",
+        "agent-b",
+        "--path-glob",
+        ".claude/agents/*.md",
         now="2026-04-17T12:12:00Z",
     )
     assert replacement.returncode == 0, replacement.stderr
@@ -544,7 +656,11 @@ def test_claim_cli_requires_reclaim_before_stale_overlap_reuse(tmp_path) -> None
 def test_claim_cli_rejects_recursive_globs(tmp_path) -> None:
     result = _run_claim(
         tmp_path / "claims.jsonl",
-        "acquire", "--owner", "agent-a", "--path-glob", "docs/**/*.md",
+        "acquire",
+        "--owner",
+        "agent-a",
+        "--path-glob",
+        "docs/**/*.md",
     )
     assert result.returncode == 1
     assert "implicit recursion" in result.stderr
@@ -552,7 +668,9 @@ def test_claim_cli_rejects_recursive_globs(tmp_path) -> None:
 
 def test_wip_and_reviewer_quorum_constants_are_consistent() -> None:
     loop = (REPO_ROOT / "docs" / "harness" / "loop.md").read_text(encoding="utf-8")
-    review = (REPO_ROOT / "docs" / "harness" / "review-arbitration.md").read_text(encoding="utf-8")
+    review = (REPO_ROOT / "docs" / "harness" / "review-arbitration.md").read_text(
+        encoding="utf-8"
+    )
     assert re.search(r"WIP cap[^\n]*\*\*2\*\*", loop)
     assert "3 of 4" in review
     assert "30-minute" in review

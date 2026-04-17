@@ -40,7 +40,9 @@ class UsageProvider:
         del user_id
         return await self.get_usage()
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         del user_id, session_id
         return await self.get_usage()
 

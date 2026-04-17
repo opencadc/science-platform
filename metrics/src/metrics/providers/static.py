@@ -49,9 +49,13 @@ class StaticUsageProvider:
             source=f"{self.source_name}:user",
         )
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         identity = f"{user_id}:{session_id}"
-        factor = self._settings.static_session_usage_fraction * _stable_fraction(identity)
+        factor = self._settings.static_session_usage_fraction * _stable_fraction(
+            identity
+        )
         return self._usage_reading(
             requested_cpu_cores=self._settings.static_usage_cpu_cores * factor,
             requested_memory_gib=self._settings.static_usage_memory_gib * factor,

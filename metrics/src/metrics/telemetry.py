@@ -19,7 +19,9 @@ class MetricsRecorder:
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
         raise NotImplementedError
 
-    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+    def record_compute_duration(
+        self, *, seconds: float, status: str, scope: str
+    ) -> None:
         raise NotImplementedError
 
     def record_provider_duration(
@@ -32,7 +34,9 @@ class MetricsRecorder:
     ) -> None:
         raise NotImplementedError
 
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+    def record_http_request(
+        self, *, scope: str, status_code: int, cached: bool
+    ) -> None:
         raise NotImplementedError
 
 
@@ -42,7 +46,9 @@ class NoopMetricsRecorder(MetricsRecorder):
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
         return
 
-    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+    def record_compute_duration(
+        self, *, seconds: float, status: str, scope: str
+    ) -> None:
         return
 
     def record_provider_duration(
@@ -55,7 +61,9 @@ class NoopMetricsRecorder(MetricsRecorder):
     ) -> None:
         return
 
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+    def record_http_request(
+        self, *, scope: str, status_code: int, cached: bool
+    ) -> None:
         return
 
 
@@ -95,7 +103,9 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             },
         )
 
-    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+    def record_compute_duration(
+        self, *, seconds: float, status: str, scope: str
+    ) -> None:
         self._compute_duration.record(
             max(seconds, 0.0),
             attributes={
@@ -121,7 +131,9 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             },
         )
 
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+    def record_http_request(
+        self, *, scope: str, status_code: int, cached: bool
+    ) -> None:
         self._http_requests.add(
             1,
             attributes={

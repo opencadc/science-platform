@@ -41,7 +41,9 @@ class _CacheEntry(Generic[V]):
 class InMemoryTTLCache(Generic[V]):
     """Thread-safe in-memory TTL cache with monotonic clock semantics."""
 
-    def __init__(self, ttl_seconds: int, clock: Callable[[], float] | None = None) -> None:
+    def __init__(
+        self, ttl_seconds: int, clock: Callable[[], float] | None = None
+    ) -> None:
         self._ttl_seconds = max(ttl_seconds, 0)
         self._clock = clock or time.monotonic
         self._lock = threading.Lock()

@@ -65,7 +65,9 @@ async def get_platform_metrics_alias(
     response: Response,
     service: PlatformMetricsService = Depends(get_service),
 ) -> PlatformMetricsResponse:
-    return await get_platform_metrics(request=request, response=response, service=service)
+    return await get_platform_metrics(
+        request=request, response=response, service=service
+    )
 
 
 @router.get(

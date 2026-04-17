@@ -27,5 +27,7 @@ class UsageProvider(Protocol):
     async def get_usage_for_user(self, user_id: str) -> UsageReading:
         """Return requested usage scoped to one user."""
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         """Return requested usage scoped to one user session."""

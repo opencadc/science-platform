@@ -55,8 +55,8 @@ class Settings(BaseSettings):
     session_label_key: str = "canfar-sessionid"
     resource_requests_metric_name: str = "kube_pod_container_resource_requests"
     promql_requested_cpu_cores: str = (
-        "sum(kube_pod_container_resource_requests{resource=\"cpu\",unit=\"core\"})"
+        'sum(kube_pod_container_resource_requests{resource="cpu",unit="core"})'
     )
     promql_requested_memory_bytes: str = (
-        "sum(kube_pod_container_resource_requests{resource=\"memory\",unit=\"byte\"})"
+        'sum(kube_pod_container_resource_requests{resource="memory",unit="byte"})'
     )

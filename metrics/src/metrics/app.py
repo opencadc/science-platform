@@ -166,7 +166,9 @@ def create_app(
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    async def unhandled_exception_handler(
+        _request: Request, exc: Exception
+    ) -> JSONResponse:
         body = ErrorResponse(
             version=app.state.api_version,
             metadata=ResponseMetadata(ttl=settings.cache_ttl_seconds),

@@ -38,7 +38,9 @@ class DummyUsageProvider:
         self.calls += 1
         return self._reading
 
-    async def get_usage_for_session(self, user_id: str, session_id: str) -> UsageReading:
+    async def get_usage_for_session(
+        self, user_id: str, session_id: str
+    ) -> UsageReading:
         del user_id, session_id
         self.calls += 1
         return self._reading
