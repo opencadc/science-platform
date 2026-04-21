@@ -11,33 +11,34 @@ from metrics.providers.prometheus import PrometheusUsageProvider
 
 @pytest.mark.anyio
 async def test_kueue_provider_reads_capacity(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
-        "items": [
-            {
-                "spec": {
-                    "resourceGroups": [
+    doc = {
+        "spec": {
+            "resourceGroups": [
+                {
+                    "flavors": [
                         {
-                            "flavors": [
-                                {
-                                    "resources": [
-                                        {"name": "cpu", "nominalQuota": "100"},
-                                        {"name": "memory", "nominalQuota": "512Gi"},
-                                    ]
-                                }
+                            "resources": [
+                                {"name": "cpu", "nominalQuota": "100"},
+                                {"name": "memory", "nominalQuota": "512Gi"},
                             ]
                         }
                     ]
                 }
-            }
-        ]
+            ]
+        }
     }
 
-    async def fake_request_json(*args, **kwargs):
-        return payload
+    async def fake_parallel(urls: list[str], **kwargs):
+        assert len(urls) == 1
+        assert "/clusterqueues/cq-test" in urls[0]
+        return [doc]
 
-    monkeypatch.setattr("metrics.providers.kueue._request_json", fake_request_json)
+    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
 
-    settings = Settings(kube_api_url="https://kube.local")
+    settings = Settings(
+        kube_api_url="https://kube.local",
+        kueue_cluster_queues=["cq-test"],
+    )
     provider = KueueCapacityProvider(settings)
 
     reading = await provider.get_capacity()

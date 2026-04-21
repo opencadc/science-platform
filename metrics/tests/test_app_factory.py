@@ -155,4 +155,4 @@ def test_create_app_static_provider_mode_without_live_dependencies() -> None:
     with TestClient(app) as client:
         response = client.get("/api/v1/metrics/platform")
         assert response.status_code == 200
-        assert response.json()["data"]["sources"][0] == "static-capacity"
+        assert "capacity" in response.json()["data"]

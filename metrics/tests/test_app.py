@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import time
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
@@ -54,6 +56,12 @@ class UsageProvider:
         )
 
 
+def _max_age(cache_control: str) -> int:
+    m = re.search(r"max-age=(\d+)", cache_control.lower())
+    assert m is not None
+    return int(m.group(1))
+
+
 def test_platform_endpoint_and_alias() -> None:
     service = PlatformMetricsService(
         cluster_name="prod",
@@ -65,30 +73,30 @@ def test_platform_endpoint_and_alias() -> None:
 
     response = client.get("/api/v1/metrics/platform")
     assert response.status_code == 200
-    assert response.headers["cache-control"] == "public, max-age=30"
-    assert response.headers["x-metrics-cached"] == "false"
+    cc1 = response.headers["cache-control"]
+    assert "public" in cc1
+    ma1 = _max_age(cc1)
+    assert 25 <= ma1 <= 30
+    assert response.headers.get("date")
+    assert response.headers.get("last-modified")
+    assert response.headers.get("expires")
+    assert "x-metrics-cached" not in {h.lower() for h in response.headers}
     payload = response.json()
     assert payload["version"] == "metrics.canfar.net/v1"
     assert payload["kind"] == "PlatformMetrics"
     assert payload["metadata"]["created"] is not None
-    assert payload["metadata"]["cached"] is False
-    assert payload["metadata"]["ttl"] == 30
+    assert "cached" not in payload["metadata"]
+    assert "ttl" not in payload["metadata"]
     assert payload["data"]["cluster"] == "prod"
     assert payload["data"]["capacity"]["cpu"] == "100"
-    assert payload["data"]["capacity"]["memory"] == "200 GiB"
-    assert payload["data"]["capacity"]["ephemeral-memory"] == "0 GiB"
-    assert payload["data"]["capacity"]["gpu"] == "0"
-    assert payload["data"]["usage"]["requested"]["cpu"] == "25"
-    assert payload["data"]["usage"]["requested"]["ephemeral-memory"] == "0 GiB"
-    assert payload["data"]["usage"]["requested"]["gpu"] == "0"
-    assert payload["data"]["usage"]["utilization"]["cpu"] == 0.25
-    assert payload["data"]["usage"]["utilization"]["memory"] == 0.25
-    assert payload["data"]["usage"]["utilization"]["ephemeral-memory"] == 0.0
-    assert payload["data"]["usage"]["utilization"]["gpu"] == 0.0
-    assert payload["data"]["sources"] == ["kueue", "prometheus"]
+    assert payload["data"]["capacity"]["memory"] == "200Gi"
+    assert payload["data"]["allocated"]["cpu"] == "25"
+    assert payload["data"]["allocated"]["memory"] == "50Gi"
 
+    time.sleep(1.1)
     cached_response = client.get("/api/v1/metrics/platform")
-    assert cached_response.headers["x-metrics-cached"] == "true"
+    ma2 = _max_age(cached_response.headers["cache-control"])
+    assert ma2 < ma1
 
     alias_response = client.get("/metrics")
     assert alias_response.status_code == 200
@@ -109,12 +117,14 @@ def test_user_and_session_routes() -> None:
     assert user_payload["kind"] == "UserMetrics"
     assert user_payload["status"] == "Success"
     assert user_payload["metadata"]["created"] is not None
-    assert user_payload["metadata"]["cached"] is False
-    assert user_payload["metadata"]["ttl"] == 30
+    assert "cached" not in user_payload["metadata"]
+    assert "ttl" not in user_payload["metadata"]
     assert user_payload["data"]["user_id"] == "user-123"
     assert user_payload["data"]["capacity"]["cpu"] == "100"
     assert user_payload["data"]["usage"]["requested"]["cpu"] == "5"
-    assert user_response.headers["cache-control"] == "public, max-age=30"
+    ucc = user_response.headers["cache-control"]
+    assert "private" in ucc
+    assert 25 <= _max_age(ucc) <= 30
 
     session_response = client.get("/api/v1/metrics/users/user-123/sessions/session-456")
     assert session_response.status_code == 200
@@ -122,7 +132,10 @@ def test_user_and_session_routes() -> None:
     assert session_payload["kind"] == "SessionMetrics"
     assert session_payload["status"] == "Success"
     assert session_payload["metadata"]["created"] is not None
-    assert session_payload["metadata"]["cached"] is False
-    assert session_payload["metadata"]["ttl"] == 30
+    assert "cached" not in session_payload["metadata"]
+    assert "ttl" not in session_payload["metadata"]
     assert session_payload["data"]["session_id"] == "session-456"
     assert session_payload["data"]["usage"]["requested"]["cpu"] == "2"
+    scc = session_response.headers["cache-control"]
+    assert "private" in scc
+    assert 25 <= _max_age(scc) <= 30
