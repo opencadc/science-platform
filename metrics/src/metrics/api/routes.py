@@ -1,9 +1,18 @@
-"""API routes for metrics endpoints."""
+"""Versioned HTTP routes for platform, user, and session metrics.
+
+Routes delegate computation to :class:`metrics.service.PlatformMetricsService`
+resolved from ``request.app.state`` (wired in :mod:`metrics.app`). Caching uses
+standard HTTP headers (``Cache-Control``, ``Date``, ``Expires``, ``Last-Modified``)
+aligned with the configured TTL and snapshot age.
+"""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, Request, Response
 
+from metrics.http_cache import metrics_success_cache_headers
 from metrics.models import (
     PlatformMetricsResponse,
     ResponseMetadata,
@@ -16,10 +25,12 @@ router = APIRouter(tags=["metrics"])
 
 
 def get_service(request: Request) -> PlatformMetricsService:
+    """FastAPI dependency that returns the process-wide metrics service instance."""
     return request.app.state.platform_service
 
 
 def _version(request: Request) -> str:
+    """API group/version string embedded in JSON envelopes (for example ``metrics.canfar.net/v1``)."""
     return request.app.state.api_version
 
 
@@ -28,8 +39,9 @@ def _version(request: Request) -> str:
     response_model=PlatformMetricsResponse,
     summary="Get cluster-level platform metrics",
     description=(
-        "Returns platform capacity and requested utilization, including "
-        "provider source provenance and metric creation metadata."
+        "Returns platform capacity and allocated resource maps (Kueue mode) "
+        "or static maps for development. HTTP caching (freshness, shared vs private "
+        "caches) is expressed via response headers, not JSON metadata fields."
     ),
 )
 async def get_platform_metrics(
@@ -38,19 +50,19 @@ async def get_platform_metrics(
     service: PlatformMetricsService = Depends(get_service),
 ) -> PlatformMetricsResponse:
     result = await service.get_platform_metrics()
-    _apply_cache_headers(
-        response=response,
-        ttl=service.cache_ttl_seconds,
-        cached=result.cached,
-        public=request.app.state.cache_control_public,
-    )
+    request.state.metrics_cache_hit = result.cached
+    now = datetime.now(UTC)
+    for key, value in metrics_success_cache_headers(
+        snapshot_created=result.created,
+        configured_ttl=service.cache_ttl_seconds,
+        shared_cache_public=request.app.state.cache_control_public,
+        user_scoped=False,
+        now=now,
+    ).items():
+        response.headers[key] = value
     return PlatformMetricsResponse(
         version=_version(request),
-        metadata=ResponseMetadata(
-            created=result.created,
-            cached=result.cached,
-            ttl=service.cache_ttl_seconds,
-        ),
+        metadata=ResponseMetadata(created=result.created),
         data=result.data,
     )
 
@@ -74,7 +86,10 @@ async def get_platform_metrics_alias(
     "/api/v1/metrics/users/{user}",
     response_model=UserMetricsResponse,
     summary="Get user-level metrics",
-    description="Returns user-scoped requested resource usage and utilization.",
+    description=(
+        "Returns user-scoped requested resource usage and utilization. "
+        "Responses use ``Cache-Control: private`` (not for shared caches)."
+    ),
 )
 async def get_user_metrics(
     request: Request,
@@ -83,19 +98,19 @@ async def get_user_metrics(
     service: PlatformMetricsService = Depends(get_service),
 ) -> UserMetricsResponse:
     result = await service.get_user_metrics(user_id=user)
-    _apply_cache_headers(
-        response=response,
-        ttl=service.cache_ttl_seconds,
-        cached=result.cached,
-        public=request.app.state.cache_control_public,
-    )
+    request.state.metrics_cache_hit = result.cached
+    now = datetime.now(UTC)
+    for key, value in metrics_success_cache_headers(
+        snapshot_created=result.created,
+        configured_ttl=service.cache_ttl_seconds,
+        shared_cache_public=request.app.state.cache_control_public,
+        user_scoped=True,
+        now=now,
+    ).items():
+        response.headers[key] = value
     return UserMetricsResponse(
         version=_version(request),
-        metadata=ResponseMetadata(
-            created=result.created,
-            ttl=service.cache_ttl_seconds,
-            cached=result.cached,
-        ),
+        metadata=ResponseMetadata(created=result.created),
         data=result.data,
     )
 
@@ -104,7 +119,10 @@ async def get_user_metrics(
     "/api/v1/metrics/users/{user}/sessions/{uuid}",
     response_model=SessionMetricsResponse,
     summary="Get session-level metrics",
-    description="Returns session-scoped requested resource usage and utilization.",
+    description=(
+        "Returns session-scoped requested resource usage and utilization. "
+        "Responses use ``Cache-Control: private`` (not for shared caches)."
+    ),
 )
 async def get_session_metrics(
     request: Request,
@@ -114,19 +132,19 @@ async def get_session_metrics(
     service: PlatformMetricsService = Depends(get_service),
 ) -> SessionMetricsResponse:
     result = await service.get_session_metrics(user_id=user, session_id=uuid)
-    _apply_cache_headers(
-        response=response,
-        ttl=service.cache_ttl_seconds,
-        cached=result.cached,
-        public=request.app.state.cache_control_public,
-    )
+    request.state.metrics_cache_hit = result.cached
+    now = datetime.now(UTC)
+    for key, value in metrics_success_cache_headers(
+        snapshot_created=result.created,
+        configured_ttl=service.cache_ttl_seconds,
+        shared_cache_public=request.app.state.cache_control_public,
+        user_scoped=True,
+        now=now,
+    ).items():
+        response.headers[key] = value
     return SessionMetricsResponse(
         version=_version(request),
-        metadata=ResponseMetadata(
-            created=result.created,
-            ttl=service.cache_ttl_seconds,
-            cached=result.cached,
-        ),
+        metadata=ResponseMetadata(created=result.created),
         data=result.data,
     )
 
@@ -161,15 +179,3 @@ async def get_session_metrics_alias(
         uuid=session_id,
         service=service,
     )
-
-
-def _apply_cache_headers(
-    *,
-    response: Response,
-    ttl: int,
-    cached: bool,
-    public: bool,
-) -> None:
-    visibility = "public" if public else "private"
-    response.headers["Cache-Control"] = f"{visibility}, max-age={max(ttl, 0)}"
-    response.headers["X-Metrics-Cached"] = "true" if cached else "false"

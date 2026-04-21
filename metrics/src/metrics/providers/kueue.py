@@ -1,20 +1,38 @@
-"""Kueue ClusterQueue-based platform capacity provider."""
+"""Capacity provider that reads nominal CPU/memory from configured ClusterQueues.
+
+Intent
+------
+User and session metrics still use :class:`metrics.models.CapacityReading`
+(two floats + source). This provider answers that contract by summing **only**
+``cpu`` and ``memory`` nominal quotas from the same configured queue list as
+the platform engine, using shared parsing from :mod:`metrics.kueue_spec`.
+
+Platform **maps** use :class:`metrics.providers.kueue_platform.KueuePlatformEngine`
+instead; do not extend this class with arbitrary-resource logic—keep that in
+``kueue_platform`` to avoid duplicating the cohort aggregation rules.
+"""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
 import httpx
 
 from metrics.config import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
+from metrics.kueue_api import cluster_queue_object_url
+from metrics.kueue_spec import sum_nominal_quotas_by_resource
 from metrics.models import CapacityReading
-from metrics.quantity import parse_cpu_to_cores, parse_memory_to_gib
+from metrics.providers.kube_http import (
+    kube_auth_headers,
+    kube_parallel_get_json,
+    resolve_kube_tls_verify,
+    resolve_kube_token,
+)
 
 
 class KueueCapacityProvider:
-    """Read platform capacity from Kueue ClusterQueue objects."""
+    """Aggregate nominal ``cpu`` and ``memory`` from selected ``ClusterQueue`` specs."""
 
     source_name = "kueue"
 
@@ -22,38 +40,56 @@ class KueueCapacityProvider:
         self._settings = settings
 
     async def get_capacity(self) -> CapacityReading:
+        """Return summed CPU cores and memory GiB across configured queues.
+
+        Raises:
+            ProviderUnavailableError: Missing API URL, empty queue list, or no
+                cpu/memory nominal quota on any queue.
+            ProviderExecutionError: HTTP or transport failures talking to the API.
+        """
         if not self._settings.kube_api_url:
             raise ProviderUnavailableError("METRICS_KUBE_API_URL is not configured")
 
-        url = f"{self._settings.kube_api_url.rstrip('/')}{self._settings.kube_clusterqueue_path}"
-
-        try:
-            payload = await _request_json(
-                url,
-                headers=self._auth_headers(),
-                timeout=self._settings.kube_request_timeout_seconds,
-                verify=self._settings.kube_verify_tls,
+        queues = self._settings.kueue_cluster_queues
+        if not queues:
+            raise ProviderUnavailableError(
+                "No ClusterQueues are configured for Kueue capacity aggregation"
             )
-        except Exception as exc:  # pragma: no cover - exercised via monkeypatch
-            raise ProviderExecutionError(
-                f"Failed querying Kueue ClusterQueues: {exc}"
-            ) from exc
 
-        items = payload.get("items") or []
-        if not items:
-            raise ProviderUnavailableError("No ClusterQueue objects were returned")
+        token = resolve_kube_token(self._settings.kube_api_token)
+        headers = kube_auth_headers(token)
+        verify = resolve_kube_tls_verify(self._settings.kube_verify_tls)
+        timeout = self._settings.kube_request_timeout_seconds
+
+        urls = [cluster_queue_object_url(self._settings, q) for q in queues]
 
         total_cpu = 0.0
         total_memory = 0.0
 
+        try:
+            items = await kube_parallel_get_json(
+                urls, headers=headers, timeout=timeout, verify=verify
+            )
+        except httpx.HTTPStatusError as exc:
+            raise ProviderExecutionError(
+                f"Failed querying Kueue ClusterQueues: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise ProviderExecutionError(
+                f"Failed querying Kueue ClusterQueues: {exc}"
+            ) from exc
+
         for item in items:
-            cpu, memory = self._extract_queue_capacity(item)
-            total_cpu += cpu
-            total_memory += memory
+            for name, val in sum_nominal_quotas_by_resource(item).items():
+                lowered = name.lower()
+                if lowered == "cpu":
+                    total_cpu += val
+                elif lowered == "memory":
+                    total_memory += val
 
         if total_cpu <= 0 and total_memory <= 0:
             raise ProviderUnavailableError(
-                "ClusterQueue data did not include capacity values"
+                "ClusterQueue data did not include cpu or memory nominal quota values"
             )
 
         return CapacityReading(
@@ -62,49 +98,3 @@ class KueueCapacityProvider:
             source=self.source_name,
             observed_at=datetime.now(UTC),
         )
-
-    def _auth_headers(self) -> dict[str, str]:
-        token = self._settings.kube_api_token
-        if token:
-            return {"Authorization": f"Bearer {token}"}
-        return {}
-
-    def _extract_queue_capacity(self, item: dict[str, object]) -> tuple[float, float]:
-        cpu = 0.0
-        memory = 0.0
-
-        spec_resources = item.get("spec", {}).get("resourceGroups", [])
-        for group in spec_resources:
-            for flavor in group.get("flavors", []):
-                for resource in flavor.get("resources", []):
-                    name = str(resource.get("name", "")).lower()
-                    quota = resource.get("nominalQuota")
-                    if name == "cpu":
-                        cpu += parse_cpu_to_cores(quota)
-                    elif name == "memory":
-                        memory += parse_memory_to_gib(quota)
-
-        status_resources = item.get("status", {}).get("flavorsReservation", [])
-        for flavor in status_resources:
-            for resource in flavor.get("resources", []):
-                name = str(resource.get("name", "")).lower()
-                total = resource.get("total")
-                if name == "cpu":
-                    cpu += parse_cpu_to_cores(total)
-                elif name == "memory":
-                    memory += parse_memory_to_gib(total)
-
-        return cpu, memory
-
-
-async def _request_json(
-    url: str,
-    *,
-    headers: dict[str, str],
-    timeout: float,
-    verify: bool,
-) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=timeout, verify=verify) as client:
-        response = await client.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
