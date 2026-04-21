@@ -15,10 +15,11 @@ sources, and automated checks that preserve explicit separation between
 repo-wide, `skaha`, and Metrics CI/CD pathways.
 
 The local `dev` workflow for this roadmap is `docker compose` for the app and
-its local dependencies, such as Redis. A Kubernetes system such as Minikube is
-an external prerequisite that provides live data sources for later milestones.
-The `integration`, `staging`, and `production` environments run the service in
-Kubernetes, but their deployment overlays remain outside this repository.
+its local dependencies, such as Redis. An already running Kubernetes cluster
+that is reachable through `kubectl` is an external prerequisite that provides
+live data sources for later milestones. The `integration`, `staging`, and
+`production` environments run the service in Kubernetes, but their deployment
+overlays remain outside this repository.
 
 ## How to read this milestone after the roadmap review
 
@@ -28,11 +29,12 @@ checked-in artifact or be explicitly labeled as a planned deliverable with a
 clear acceptance check.
 
 The **local app + Redis** workflow is implemented as `compose.yaml` under
-`metrics/` (see `README.md`). The **cluster-backed** loop remains Helm plus
-Minikube, as implemented in `.github/workflows/ci.metrics.yml` and
-`scripts/run-minikube-integration.sh`. Treat Kubernetes data sources as
-external to Compose; use Minikube or another cluster when you need live cluster
-metrics.
+`metrics/` (see `README.md`). The **cluster-backed** loop remains Helm plus the
+existing Kubernetes harness, currently implemented in
+`.github/workflows/ci.metrics.yml` and `scripts/run-minikube-integration.sh`.
+Treat Kubernetes data sources as external to Compose. Existing artifact names
+may still mention Minikube, but the roadmap contract is "already running dev
+cluster reachable through `kubectl`," not "create a cluster in-repo."
 
 ## In scope
 
@@ -42,12 +44,12 @@ This section lists work you execute in this milestone.
 - Partition CI/CD into repo-wide, `skaha`-specific, and Metrics-specific paths.
 - Add path-aware routing so `skaha` jobs do not run on Metrics-only changes.
 - Add Metrics-specific CI jobs for lint, tests, prerequisite checks, and
-  Minikube smoke validation.
+  cluster-backed smoke validation.
 - Add a Metrics-specific Python pre-commit configuration.
 - Establish a local `dev` workflow where the app and Redis run via
   `docker compose`.
-- Establish a local Kubernetes integration path where Minikube or another
-  Kubernetes system is treated as an external prerequisite for data sources.
+- Establish a local Kubernetes integration path where an already running
+  Kubernetes cluster is treated as an external prerequisite for data sources.
 - Keep an in-repo minimal Helm baseline under `metrics/helm` for cluster
   deployment contracts, with `dev` values only.
 - Document environment contracts for `dev`, `integration`, `staging`, and
@@ -85,8 +87,8 @@ This milestone depends on existing repository assets and tooling contracts.
   `images.opencadc.org`, `SKAHA_REGISTRY_USERNAME`, and
   `SKAHA_REGISTRY_TOKEN`.
 - `project-gates.yaml` gate definitions.
-- Local prerequisites for the developer and CI loops: `docker`, `helm`, and
-  `minikube`.
+- Local prerequisites for the developer and CI loops: `docker`, `helm`,
+  `kubectl`, and access to an already running cluster.
 
 ## Constraints
 
@@ -98,8 +100,8 @@ This milestone must satisfy architectural and operational constraints.
 - Keep the local `dev` loop efficient on small runners and laptops.
 - Treat Kubernetes data sources as external dependencies rather than embedding
   them into the local app container stack.
-- Fail early when required tools such as `docker`, `helm`, or `minikube` are
-  unavailable.
+- Fail early when required tools such as `docker`, `helm`, or `kubectl` are
+  unavailable, or when the intended cluster context is not reachable.
 - Keep only `dev` runtime artifacts in this repository.
 - Do not require backwards compatibility before first deployment.
 - Keep branch protection-compatible check names stable while adding Metrics
@@ -116,22 +118,19 @@ This section records the baseline decisions for monorepo operation.
 - **Skaha pathway:** Existing `skaha` workflows are renamed to explicit `skaha`
   names and scoped so Metrics-only changes skip them.
 - **Metrics pathway:** Metrics CI runs on Metrics-scoped pull requests and
-  pushes to `main`, including lint, tests, prerequisite checks, and Minikube
-  validation.
+  pushes to `main`, including lint, tests, prerequisite checks, and
+  cluster-backed validation.
 - **Multiple pre-commit configs:** The repository supports more than one
   pre-commit config file. Root pre-commit remains for shared checks, and
   `metrics/.pre-commit-config.yaml` owns Python-focused hooks for Metrics.
 - **Local workflow split:** Local `dev` runs the FastAPI app and Redis through
   `docker compose`, while Kubernetes-backed data sources are provided by an
   already running cluster outside the compose stack.
-- **Environment contract:** `dev`, `integration`, `staging`, and `production`
+- **Environment contract:** `dev`, `staging`, `integration`, and `production`
   are the canonical environment names for roadmap and deployment planning.
-- **Environment token alignment:** The service settings layer currently uses
-  `METRICS_ENVIRONMENT` values `dev`, `staging`, `int`, and `prod`. Until the
-  settings model is renamed, treat `integration` as the roadmap name for `int`,
-  and `production` as the roadmap name for `prod`. M2 must either update the
-  settings literals or document the mapping as an explicit compatibility
-  contract for operators and charts.
+- **Environment token alignment:** Runtime settings, roadmap docs, and charts
+  must converge on the canonical names `dev`, `staging`, `integration`, and
+  `production`.
 - **Deployment ownership boundary:** This repository owns local `dev` artifacts
   and cluster deployment contracts. Higher-environment overlays live in a
   separate deployment repository.
@@ -139,8 +138,8 @@ This section records the baseline decisions for monorepo operation.
   `metrics/helm` with `dev` values only. The chart documents the cluster
   deployment contract that higher environments consume elsewhere.
 - **Fail-fast tool contract:** Local scripts and CI checks must stop
-  immediately, with actionable feedback, when `docker`, `helm`, or `minikube`
-  are missing.
+  immediately, with actionable feedback, when `docker`, `helm`, or `kubectl`
+  are missing, or when the active cluster context is wrong.
 - **Metrics release contract:** Metrics release tags and changelog entries use
   `metric-v0.1.1` style. `skaha` keeps its current tag style in this milestone.
 - **Metrics image publish contract:** Metrics images publish to
@@ -170,7 +169,7 @@ This section breaks work into execution phases.
      `pytest`, YAML and TOML hygiene as needed).
    - Keep root `.pre-commit-config.yaml` as the monorepo entrypoint, with an
      explicit integration strategy for running Metrics hooks.
-   - Add prerequisite checks for `docker`, `helm`, and `minikube` to local
+   - Add prerequisite checks for `docker`, `helm`, and `kubectl` to local
      scripts and CI entrypoints.
    - Document local commands for running root and Metrics configs separately.
 3. **Container and local `dev` runtime baseline**
@@ -180,18 +179,18 @@ This section breaks work into execution phases.
      and Redis, including documented ports, env file conventions, and a single
      command entrypoint for local onboarding. **Delivered:** `compose.yaml`,
      `env.example`, README instructions.
-   - Keep the Helm and Minikube loop as the supported **cluster integration**
-     path and document both Compose (app stack) and Minikube (cluster data
-     sources) without conflating them.
+   - Keep the Helm and existing-cluster loop as the supported **cluster
+     integration** path and document both Compose (app stack) and Kubernetes
+     data sources without conflating them.
    - Document how later mode-specific milestones connect the compose workflow
      to an externally managed Kubernetes cluster.
 4. **Metrics CI runtime validation**
-   - Use Minikube in GitHub Actions for Metrics CI on Metrics-scoped pull
-     requests and pushes to `main`.
-   - Treat Minikube as an external prerequisite for cluster-backed data
-     sources.
+   - Use the cluster-backed Kubernetes harness in GitHub Actions for Metrics CI
+     on Metrics-scoped pull requests and pushes to `main`.
+   - Treat the Kubernetes cluster as an external prerequisite for cluster-backed
+     data sources.
    - Deploy Metrics through chart assets under `metrics/helm`.
-   - Run black-box smoke checks against the Minikube deployment.
+   - Run black-box smoke checks against the cluster-backed deployment.
 5. **Helm baseline and environment contracts**
    - Keep `metrics/helm/<chart>` as the minimal cluster deployment contract.
    - Keep `values-dev.yaml` only in this repository.
@@ -218,13 +217,14 @@ This section defines gate checks and required evidence for milestone closure.
 - Run gate `repository-coverage` from `project-gates.yaml`.
 - Run gate `harness-cli` from `project-gates.yaml`.
 - Confirm local scripts and CI fail immediately, with actionable feedback, when
-  `docker`, `helm`, or `minikube` are unavailable.
+  `docker`, `helm`, or `kubectl` are unavailable, or when the intended cluster
+  context is unreachable.
 - Confirm the local `dev` workflow starts the FastAPI app and Redis through
   `docker compose` once the compose specification is checked in.
-- Confirm the Helm and Minikube workflow remains green while the compose path is
-  still in flight.
-- Confirm Metrics Minikube CI runtime validation and smoke checks in GitHub
-  Actions.
+- Confirm the Helm and cluster-backed workflow remains green while the compose
+  path is still in flight.
+- Confirm Metrics cluster-backed CI runtime validation and smoke checks in
+  GitHub Actions.
 - Confirm Docker image build and health check behavior for Metrics.
 - Confirm root CI behavior:
   - Metrics-only pull request runs repo-wide and Metrics pathways and skips
@@ -266,8 +266,8 @@ This section captures known risks and mitigation strategy.
 - **Higher-environment ambiguity:** `integration`, `staging`, and `production`
   overlays live outside this repository. Mitigate this by documenting the
   deployment contract and review checkpoint before mode work starts.
-- **Minikube CI runtime cost:** Keep Minikube profile minimal and smoke checks
-  deterministic.
+- **Cluster CI runtime cost:** Keep the cluster-backed profile minimal and smoke
+  checks deterministic.
 - **Multi-arch build instability:** Pin Buildx and QEMU actions and verify
   release manifest contents.
 - **Chart mismatch risk:** Validate the rendered chart before cluster
@@ -299,13 +299,13 @@ Use this checklist when you execute and close the milestone.
 - [ ] CI/CD pathways are split and verified as repo-wide, `skaha`, and Metrics.
 - [ ] `skaha` workflows are renamed and scoped to `skaha` change and events.
 - [ ] Root workflows skip `skaha` jobs on Metrics-only changes.
-- [ ] Metrics lint, test, prerequisite-check, and Minikube jobs run on Metrics
+- [ ] Metrics lint, test, prerequisite-check, and cluster-backed jobs run on Metrics
   pull requests and pushes to `main`.
 - [ ] Metrics pre-commit config is defined and documented.
-- [ ] Local scripts fail early when `docker`, `helm`, or `minikube` are
-  missing.
+- [ ] Local scripts fail early when `docker`, `helm`, or `kubectl` are
+  missing, or when the intended cluster context is unreachable.
 - [ ] The local `dev` workflow runs the app and Redis through `docker compose`.
-- [ ] Metrics Minikube smoke validation runs complete successfully.
+- [ ] Metrics cluster-backed smoke validation runs complete successfully.
 - [ ] Minimal `metrics/helm` chart with `dev` values is validated.
 - [ ] The `integration`, `staging`, and `production` deployment contract is
   documented for the external deployment repository.

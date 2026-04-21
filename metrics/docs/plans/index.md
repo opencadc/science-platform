@@ -19,7 +19,9 @@ This section lists the milestone sequence that is currently active for the
 metrics roadmap.
 
 - `docs/plans/PLAN_M1_project_setup_and_delivery_foundation.md` — outcomes: `docs/plans/PLAN_M1_outcomes.md`
-- `docs/plans/PLAN_M2_platform_metrics_initial_release.md`
+- `docs/plans/PLAN_M2_platform_metrics_initial_release.md` — outcomes: `docs/plans/PLAN_M2_outcomes.md`
+- `docs/plans/PLAN_M2_post_review_feedback.md` — M2 closure checklist
+  (post-review operator and contract hardening)
 - `docs/plans/PLAN_M2b_kube_metrics_mode_platform_release.md`
 - `docs/plans/PLAN_M3_user_metrics_release.md`
 - `docs/plans/PLAN_M4_session_metrics_release.md`

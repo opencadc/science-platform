@@ -21,14 +21,13 @@ before the app serves traffic, open-ended generic resource maps, and no runtime
 fallback behavior.
 
 The local `dev` workflow remains `docker compose` for the app and Redis against
-an already running Kubernetes cluster such as Minikube. `integration`,
-`staging`, and `production` run the service in Kubernetes. Kube-metrics
+an already running Kubernetes cluster that is reachable through `kubectl`.
+Helm is assumed to be installed and configured already. `staging`,
+`integration`, and `production` run the service in Kubernetes. Kube-metrics
 dependencies must be present and reachable before the service starts.
 
-Roadmap environment names use `integration` and `production`, while the current
-settings model still accepts `int` and `prod` for `METRICS_ENVIRONMENT`. Until that
-is reconciled in code, treat those pairs as aliases and document the mapping for
-operators.
+Use the canonical service mode names `dev`, `staging`, `integration`, and
+`production` consistently in milestone docs, charts, and operator guidance.
 
 ## In scope
 
@@ -78,11 +77,13 @@ and the cluster-backed test path.
 - `metrics/tests/test_app.py`.
 - `metrics/tests/test_app_factory.py`.
 - `metrics/tests/integration/test_k8s_smoke.py`.
-- `metrics/scripts/run-minikube-integration.sh`.
+- `metrics/scripts/run-minikube-integration.sh` (current script name retained as
+  a historical artifact while the dev-cluster contract becomes cluster-agnostic).
 - `metrics/scripts/minikube-values.yaml`.
 - `metrics/helm/metrics-api/`.
-- Local prerequisites for bring-up and smoke validation: `docker`, `helm`, and
-  `minikube`.
+- Local prerequisites for bring-up and smoke validation: `helm`, `kubectl`, and
+  an already running cluster. `docker` remains part of the local compose
+  workflow only when you choose to run the app and Redis that way.
 
 ## Kube-metrics dependency contract draft
 
@@ -116,8 +117,8 @@ in live cluster resource metrics.
   vendor-specific resources do not require a contract redesign.
 - Use `FastAPI TestClient` for startup and API contract tests in this
   milestone.
-- Fail early when `docker`, `helm`, or `minikube` are unavailable for local or
-  CI bring-up.
+- Require an active cluster context reachable through `kubectl`; do not depend
+  on in-repo cluster provisioning code for local or CI bring-up.
 
 ## Core decisions
 
@@ -155,8 +156,8 @@ This section sequences the kube-metrics release work.
 1. **Kube-metrics environment bring-up**
    - Define the required kube-metrics dependency set for local and CI
      environments.
-   - Add prerequisite checks so local and CI loops stop immediately when
-     `docker`, `helm`, or `minikube` are unavailable.
+   - Assume Helm and `kubectl` already target the intended cluster.
+   - Keep cluster provisioning out of milestone workflows.
    - Keep kube-metrics setup assets under `tests/fixtures/kube-metrics`.
 2. **Source contract characterization**
    - Query the selected kube-metrics data source through the cluster-facing
@@ -190,8 +191,8 @@ This section defines milestone verification.
 - Run gate `harness-contracts`.
 - Run gate `repository-coverage`.
 - Run gate `harness-cli`.
-- Validate that local and CI bring-up fail immediately, with actionable
-  feedback, if `docker`, `helm`, or `minikube` are unavailable.
+- Validate that the active dev or CI cluster context is reachable through
+  `kubectl` before cluster-backed checks begin.
 - Validate that the kube-metrics dependency set is installed and reachable
   before integration tests run.
 - Validate that startup fails when kube-metrics dependencies are missing,

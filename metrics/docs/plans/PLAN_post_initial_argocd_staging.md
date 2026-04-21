@@ -22,9 +22,8 @@ Complete these conditions before starting:
 The post-initial work includes:
 
 - ArgoCD application manifests for staging deployment.
-- Environment promotion policy from `integration` to `staging`, noting that the
-  runtime setting may still use `METRICS_ENVIRONMENT=int` until naming is
-  reconciled in code.
+- Environment promotion policy from `integration` to `staging`, using the
+  canonical service mode names established in the milestone roadmap.
 - Secret and credential delivery model for staging values.
 - Promotion verification and rollback procedures.
 

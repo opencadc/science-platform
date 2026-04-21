@@ -18,8 +18,9 @@ explicitly.
   - Baseline: service code and unit tests only; no local cluster harness, no
     dedicated CI workflow, no service-specific chart.
   - Target: dedicated CI workflow, prerequisite checks, `docker compose`
-    local app and Redis workflow, Minikube integration script, Helm chart,
-    container hardening, environment contracts, and metrics-focused
+    local app and Redis workflow, a general-purpose cluster integration script
+    for an already running dev cluster, Helm chart, container hardening,
+    environment contracts, and metrics-focused
     pre-commit hooks.
 - **M2 platform release**
   - Baseline: platform endpoint with generic `live` or `static` provider
@@ -75,9 +76,10 @@ The service must pass static checks and tests before release candidates.
 
 The service must pass the local Kubernetes loop.
 
-- local scripts fail immediately if `minikube`, `docker`, or `helm` are
-  unavailable
-- `bash scripts/run-minikube-integration.sh`
+- local scripts fail immediately if `kubectl`, `docker`, or `helm` are
+  unavailable, or if the intended cluster context is unreachable
+- `bash scripts/run-minikube-integration.sh` (historical script name; the
+  updated roadmap contract assumes the cluster already exists)
 - cluster-backed smoke tests in `tests/integration` return success against a
   deployed endpoint using `METRICS_BASE_URL`
 - chart deploy and rollout complete without manual intervention
@@ -96,7 +98,7 @@ The container must build and expose healthy runtime behavior.
 
 The release must expose cache and telemetry signals for operational debugging.
 
-- `Cache-Control` and `X-Metrics-Cached` headers appear on metrics responses
+- `Cache-Control`, `Date`, `Expires`, and `Last-Modified` headers appear on metrics responses
 - OTel metrics include request, provider, cache, and compute signals
 - debug checklist is attached to rollout review
 

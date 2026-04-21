@@ -16,7 +16,8 @@ This note records closure evidence for milestone M1
   `non_metrics`.
 - **Metrics CI:** `.github/workflows/ci.metrics.yml` runs lint, unit tests,
   harness contracts and CLI check, validates `docker compose -f compose.yaml
-  config`, builds and loads an image into Minikube, deploys with
+  config`, builds and loads an image into the cluster-backed CI harness
+  (Minikube in the original implementation), deploys with
   `metrics/helm/metrics-api`, and runs integration smoke tests.
 - **Pre-commit:** `metrics/.pre-commit-config.yaml` owns Python-first checks;
   root `.pre-commit-config.yaml` invokes it when paths under `metrics/` change.
@@ -27,10 +28,11 @@ This note records closure evidence for milestone M1
   Redis with static provider defaults; `env.example` documents substitution into
   `.env`; `.gitignore` excludes local `.env` and `compose.override.yaml`.
 - **Fail-fast prerequisites:** `metrics/scripts/check-prerequisites.sh` plus
-  sourcing from `run-minikube-integration.sh` (docker, minikube, helm, kubectl)
-  and `deploy-with-helm.sh` (helm, kubectl); scripts `cd` to `metrics/` so paths
-  resolve regardless of caller cwd; optional `KUBE_CONTEXT` passes through to
-  Helm and kubectl.
+  sourcing from `run-minikube-integration.sh` (historical script name; current
+  roadmap contract is an already running cluster reachable through `kubectl`)
+  and `deploy-with-helm.sh` (helm, kubectl); scripts `cd` to `metrics/` so
+  paths resolve regardless of caller cwd; optional `KUBE_CONTEXT` passes
+  through to Helm and kubectl.
 - **Helm:** Minimal chart under `metrics/helm/metrics-api` with `values-dev.yaml`
   only; `deploy-with-helm.sh` defaults to `helm/metrics-api` from `metrics/`.
 - **Release automation:** Root `release-please-config.json` includes a `metrics`
@@ -39,9 +41,9 @@ This note records closure evidence for milestone M1
 - **Image publishing:** `.github/workflows/cd.metrics.release.build.yml` builds and
   pushes multi-arch images to `images.opencadc.org/platform/metrics` only on
   `metric-v*` tag pushes.
-- **Environment contracts:** `metrics/docs/environment-contracts.md` maps roadmap
-  names (`integration`, `production`) to runtime `METRICS_ENVIRONMENT` values
-  (`int`, `prod`) and records ownership boundaries.
+- **Environment contracts:** `metrics/docs/environment-contracts.md` records
+  ownership boundaries and the canonical service mode names `dev`, `staging`,
+  `integration`, and `production`.
 
 ## Verification commands (local)
 
@@ -103,4 +105,4 @@ documentation.
 The M1 milestone plan text and this outcomes note distinguish **repository
 facts** from **later milestone targets**. Treat this file as closure evidence for
 what shipped in M1; later milestones cover mode-specific validation and naming
-alignment for `METRICS_ENVIRONMENT` if needed.
+refinement for `METRICS_ENVIRONMENT` if needed.

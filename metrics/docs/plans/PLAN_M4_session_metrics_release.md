@@ -39,12 +39,11 @@ This milestone depends on earlier milestone outputs.
 - M3 user attribution and scoped query behavior.
 - Existing model envelope and error contract.
 
-## Roadmap and settings naming
+## Service mode naming
 
-Roadmap environment names use `integration` and `production`, while the current
-settings model still accepts `int` and `prod` for `METRICS_ENVIRONMENT`. Keep
-session rollout documentation aligned with the mapping and reconciliation plan
-from milestone M2.
+Use the canonical service mode names `dev`, `staging`, `integration`, and
+`production` consistently in session rollout documentation, charts, and
+operator guidance, following the contract locked in milestone M2.
 
 ## Constraints
 

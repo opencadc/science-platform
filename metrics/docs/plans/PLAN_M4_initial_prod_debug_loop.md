@@ -17,7 +17,7 @@ Start this loop after:
 Use this sequence for every deployment candidate.
 
 1. Verify health and route readiness.
-2. Verify `Cache-Control` and `X-Metrics-Cached` headers.
+2. Verify `Cache-Control`, `Date`, `Expires`, and `Last-Modified` headers.
 3. Verify OTel request and provider signals are emitting.
 4. Compare payload values against expected source snapshots.
 5. Review latency and error rate trends for the first rollout window.
@@ -37,8 +37,8 @@ Track these checks throughout the stabilization window.
   validation behavior and the absence of unintended fallback paths.
 - **Cache semantics:** first request misses cache and subsequent request hits
   cache within TTL window.
-- **TTL policy:** confirm `Cache-Control` max-age and JSON metadata TTL match the
-  active milestone default and the configured `METRICS_CACHE_TTL_SECONDS` value.
+- **TTL policy:** confirm `Cache-Control` `max-age` (remaining freshness) aligns
+  with the configured `METRICS_CACHE_TTL_SECONDS` value and snapshot age.
 - **Error semantics:** provider failures map to deterministic API errors.
 
 ## Exit criteria

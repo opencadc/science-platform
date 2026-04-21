@@ -38,12 +38,11 @@ This milestone relies on foundational and platform release outputs.
 - Provider query paths and service cache primitives.
 - Existing route and model envelope structure.
 
-## Roadmap and settings naming
+## Service mode naming
 
-Roadmap environment names use `integration` and `production`, while the current
-settings model still accepts `int` and `prod` for `METRICS_ENVIRONMENT`. Keep
-user-facing documentation aligned with the mapping and reconciliation plan
-from milestone M2.
+Use the canonical service mode names `dev`, `staging`, `integration`, and
+`production` consistently in user-facing documentation, charts, and rollout
+guidance, following the contract locked in milestone M2.
 
 ## Constraints
 

@@ -68,6 +68,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - Write git commits using Conventional Commits (`type(scope): subject`, with optional body and footer).
 - When the user requests a staged-only commit (for example from a diff-tab flow), treat their staged file list as authoritative: commit only what is already staged and do not stage additional files.
 - Before local cluster-backed or kubectl-driven checks (for example Minikube integration), confirm the intended Kubernetes context is selected (such as `kubectl config use-context minikube` when using the default Minikube profile) and that Minikube, Helm, and kubectl are installed.
+- For substantial milestone or feature work, run multiple reviewer personas or aspect-focused reviews, synthesize a consensus, incorporate the feedback, and ask for human arbitration if reviewer disagreement deadlocks.
 
 ## Learned Workspace Facts
 
@@ -75,5 +76,6 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke tests use Minikube (Kind-based scripts were removed); use `metrics/scripts/run-minikube-integration.sh` and `metrics/scripts/minikube-values.yaml`, and enable the metrics-server addon (CI does this; default in the local script) for work that depends on cluster resource metrics.
 - In **`dev`**, `metrics/compose.yaml` runs the Metrics API and Redis; cluster-backed data sources and Helm smoke validation use Minikube (or another cluster) separately. See `docs/environment-contracts.md` and `README.md`.
+- Canonical `METRICS_ENVIRONMENT` values are `dev`, `integration`, `staging`, and `production`; legacy `int` and `prod` inputs are still accepted and normalized during settings validation.
 - Root pre-commit `check-yaml` excludes `metrics/helm/*/templates/` because Helm templates embed Go syntax and are not plain YAML.
 - Java copy-paste detection via the removed `cpd` pre-commit hook is not used; Skaha Java checks run through `./gradlew clean check`.

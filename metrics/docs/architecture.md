@@ -13,6 +13,9 @@ policy belongs in `docs/harness/`.
 
 - Deployment and environment naming contracts for Metrics are summarized in
   `environment-contracts.md` (same directory as this file).
+- **Kueue platform mode** (queue subset, cohort dedupe, startup validation) is
+  described for implementers in `kueue-platform.md` with a module map and
+  request-flow summary.
 - `src/metrics/` is the Python package root.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
