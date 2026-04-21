@@ -4,6 +4,15 @@ This service collects and serves CANFAR platform metrics through a versioned
 REST API. It is built as a 12-factor FastAPI service and packaged as a single
 container process.
 
+## Kueue mode and RBAC
+
+When running with `METRICS_PROVIDER_MODE=kueue`, the workload needs read access
+to `clusterqueues` and `cohorts` in the `kueue.x-k8s.io` API group. Prefer
+creating a dedicated Kubernetes `ServiceAccount` via the chart
+(`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
+permissions are not bound to the namespace `default` ServiceAccount. See
+`docs/environment-contracts.md` for env var contracts and alias precedence.
+
 ## API routes
 
 The canonical routes are:
@@ -84,24 +93,47 @@ baked-in port.
 For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 `dev`, integration, staging, and production, see `docs/environment-contracts.md`.
 
+### Kueue-backed platform metrics
+
+For **mode wiring**, **module responsibilities**, and the **startup vs request**
+flow when `METRICS_PROVIDER_MODE=kueue`, see `docs/kueue-platform.md`. That
+guide is the canonical developer-oriented supplement to milestone M2 plans.
+
+**Cluster dev setup** (preflight → Helm Kueue → fixtures → Metrics/Redis Helm →
+`kubectl port-forward`) is step-by-step in `docs/dev-kueue-cluster-setup.md`.
+
 ## Local Kubernetes integration loop
 
 Local and CI both use **Minikube** (not Kind) so the environment matches upcoming
 work that depends on cluster addons such as **metrics-server** (resource
 metrics API). Minikube can enable these with `minikube addons enable …`.
 
+### Iterative dev (keep your cluster)
+
+Follow `docs/dev-kueue-cluster-setup.md` for preflight checks, Kueue (Helm),
+fixture apply, image build + Helm deploy, and a **local port** to reach the API
+via `kubectl port-forward`. That guide targets your **existing** Minikube
+(usually kubectl context `minikube`); it does not create a second profile.
+
+### One-shot verification (CI-style)
+
 ```bash
 bash scripts/run-minikube-integration.sh
 ```
 
-This script:
+This script is meant for **automated smoke / CI**, not day-to-day dev on your
+default cluster. By default it uses a **separate** Minikube profile
+(`metrics-local`) so cleanup can delete that profile without wiping your usual
+`minikube` install. It:
 
-1. Starts a dedicated Minikube profile (`metrics-local` by default) and enables
-   the **metrics-server** addon unless `MINIKUBE_ENABLE_METRICS_SERVER=false`.
-2. Builds and loads the local metrics container image into Minikube.
-3. Deploys the Helm chart with `scripts/minikube-values.yaml`.
-4. Runs black-box integration tests in `tests/integration`.
-5. Deletes the profile and namespace on exit (same teardown style as CI smoke).
+1. Starts that dedicated profile and enables the **metrics-server** addon unless
+   `MINIKUBE_ENABLE_METRICS_SERVER=false`.
+2. Installs Kueue via Helm (`scripts/install-kueue-minikube.sh`) and applies
+   `tests/fixtures/kueue/`.
+3. Builds and loads the local metrics container image into Minikube.
+4. Deploys the Helm chart with `scripts/minikube-values.yaml`.
+5. Runs black-box integration tests in `tests/integration`.
+6. Deletes the profile and namespace on exit (same teardown style as CI smoke).
 
 ## Container image
 

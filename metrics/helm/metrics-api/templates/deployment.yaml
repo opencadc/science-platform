@@ -16,6 +16,10 @@ spec:
         {{- include "metrics-api.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "metrics-api.serviceAccountName" . }}
+      automountServiceAccountToken: true
+      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -41,20 +45,31 @@ spec:
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+          # Uvicorn does not accept connections until Kueue startup validation
+          # (lifespan) finishes. Without a startupProbe, liveness hits :8000 while
+          # the port is still closed → connection refused → restarts even when the
+          # cluster is healthy. Startup probe gates liveness/readiness until /healthz works.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 5
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

@@ -80,6 +80,11 @@ jobs:
           driver: docker
       - name: Enable metrics-server addon
         run: minikube addons enable metrics-server
+      - name: Install Kueue and apply M2 fixtures
+        working-directory: metrics
+        run: |
+          bash scripts/install-kueue-minikube.sh
+          kubectl apply -f tests/fixtures/kueue/
       - name: Sync dependencies
         run: uv sync --group dev
       - name: Build and load image

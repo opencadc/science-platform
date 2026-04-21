@@ -69,6 +69,9 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - When the user requests a staged-only commit (for example from a diff-tab flow), treat their staged file list as authoritative: commit only what is already staged and do not stage additional files.
 - Before local cluster-backed or kubectl-driven checks (for example Minikube integration), confirm the intended Kubernetes context is selected (such as `kubectl config use-context minikube` when using the default Minikube profile) and that Minikube, Helm, and kubectl are installed.
 - For substantial milestone or feature work, run multiple reviewer personas or aspect-focused reviews, synthesize a consensus, incorporate the feedback, and ask for human arbitration if reviewer disagreement deadlocks.
+- For local Minikube workflows, use the existing cluster and profile (typically the default `minikube` profile); do not create a separate dedicated Minikube profile or cluster (for example `metrics-minikube`) unless the user asks for it.
+- When executing an attached implementation plan, carry out the steps but do not edit the plan file itself unless the user explicitly requests plan updates.
+- For user-facing HTTP APIs, avoid internal implementation details in JSON bodies; prefer standard HTTP caching headers (`Cache-Control`, `Expires`, `Date`, `Last-Modified`, and related headers) over embedding cache metadata in JSON for shared cacheable resources.
 
 ## Learned Workspace Facts
 
@@ -77,5 +80,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - Local Kubernetes integration and CI smoke tests use Minikube (Kind-based scripts were removed); use `metrics/scripts/run-minikube-integration.sh` and `metrics/scripts/minikube-values.yaml`, and enable the metrics-server addon (CI does this; default in the local script) for work that depends on cluster resource metrics.
 - In **`dev`**, `metrics/compose.yaml` runs the Metrics API and Redis; cluster-backed data sources and Helm smoke validation use Minikube (or another cluster) separately. See `docs/environment-contracts.md` and `README.md`.
 - Canonical `METRICS_ENVIRONMENT` values are `dev`, `integration`, `staging`, and `production`; legacy `int` and `prod` inputs are still accepted and normalized during settings validation.
+- Kueue manifests and clients should target the **v1beta2** API; **v1beta1** is deprecated.
+- End-to-end local dev with Kueue (preflight, Helm install, ClusterQueue setup, Metrics/Redis, access via port-forward or proxy, teardown) is documented in `docs/dev-kueue-cluster-setup.md`.
 - Root pre-commit `check-yaml` excludes `metrics/helm/*/templates/` because Helm templates embed Go syntax and are not plain YAML.
 - Java copy-paste detection via the removed `cpd` pre-commit hook is not used; Skaha Java checks run through `./gradlew clean check`.
