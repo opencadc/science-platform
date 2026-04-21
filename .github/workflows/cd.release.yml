@@ -23,7 +23,7 @@ jobs:
           egress-policy: audit
       - name: Create release
         id: release-please
-        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
       - name: Dispatch Edge Build
         # Run this step only if the release-please completes successfully
         if: steps.release-please.outcome == 'success' && github.event_name == 'push'
