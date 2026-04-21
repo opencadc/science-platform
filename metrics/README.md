@@ -63,6 +63,27 @@ METRICS_PROVIDER_MODE=static \
 uv run python -m metrics.main
 ```
 
+### Docker Compose (FastAPI + Redis)
+
+For the local **dev** stack described in milestone M1, run the containerized API
+with Redis using Compose from `metrics/`:
+
+```bash
+docker compose up --build
+```
+
+Defaults bind **8000** on the host for the API and **6379** for Redis. Compose
+runs the API with `METRICS_PROVIDER_MODE=static` so no in-cluster Prometheus or
+Kubernetes API is required. Copy `env.example` to `.env` in `metrics/` to adjust
+defaults (the template ships uncommented safe values). Compose reads `.env` for
+substitution; you can also export variables in your shell before
+`docker compose up`. If you change `METRICS_PORT` inside the container, align the
+image `HEALTHCHECK` in `Dockerfile` or accept that the probe still targets the
+baked-in port.
+
+For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
+`dev`, integration, staging, and production, see `docs/environment-contracts.md`.
+
 ## Local Kubernetes integration loop
 
 Local and CI both use **Minikube** (not Kind) so the environment matches upcoming

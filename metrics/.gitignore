@@ -9,6 +9,10 @@ old-harness-setup/**/__pycache__/
 
 .coverage
 
+# Local compose overrides (secrets / developer-specific)
+.env
+compose.override.yaml
+
 # Cursor and IDE runtime state - not part of the harness contract
 .cursor/hooks/state/
 .cursor/hooks/state/**

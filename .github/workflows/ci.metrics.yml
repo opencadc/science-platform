@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "metrics/**"
+      - ".github/workflows/ci.metrics.yml"
   push:
     branches: [main]
     paths:
       - "metrics/**"
+      - ".github/workflows/ci.metrics.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,6 +37,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
       - name: Sync dependencies
         run: uv sync --group dev
+      - name: Validate Docker Compose specification
+        run: docker compose -f compose.yaml config >/dev/null
       - name: Lint
         run: uv run ruff check src tests
       - name: Unit tests

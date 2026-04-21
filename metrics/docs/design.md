@@ -3,6 +3,11 @@
 This file captures repository-specific design decisions and tradeoffs. It is
 not used for generic harness instructions.
 
+## Environment naming
+
+Operational environment contracts and roadmap-to-runtime mappings for Metrics
+live in `environment-contracts.md` in this directory.
+
 ## Ownership
 
 - Record why key decisions were made.

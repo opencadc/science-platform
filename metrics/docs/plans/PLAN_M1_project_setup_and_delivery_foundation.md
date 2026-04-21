@@ -27,11 +27,12 @@ snapshot**. Anything described as a local workflow must either exist as a
 checked-in artifact or be explicitly labeled as a planned deliverable with a
 clear acceptance check.
 
-Today, the supported local and CI cluster loop is Helm plus Minikube, as
-implemented in `.github/workflows/ci.metrics.yml` and
-`scripts/run-minikube-integration.sh`. A `docker compose` workflow is still a
-planned M1 deliverable and must land as a real compose file under `metrics/`
-before you can treat that workflow as complete.
+The **local app + Redis** workflow is implemented as `compose.yaml` under
+`metrics/` (see `README.md`). The **cluster-backed** loop remains Helm plus
+Minikube, as implemented in `.github/workflows/ci.metrics.yml` and
+`scripts/run-minikube-integration.sh`. Treat Kubernetes data sources as
+external to Compose; use Minikube or another cluster when you need live cluster
+metrics.
 
 ## In scope
 
@@ -177,10 +178,11 @@ This section breaks work into execution phases.
    - Add `.dockerignore` and health endpoint expectations.
    - Add a `docker compose` specification under `metrics/` for the FastAPI app
      and Redis, including documented ports, env file conventions, and a single
-     command entrypoint for local onboarding.
-   - Until the compose file lands, keep the Helm and Minikube loop as the
-     supported local cluster path and document both paths without implying the
-     compose path already exists.
+     command entrypoint for local onboarding. **Delivered:** `compose.yaml`,
+     `env.example`, README instructions.
+   - Keep the Helm and Minikube loop as the supported **cluster integration**
+     path and document both Compose (app stack) and Minikube (cluster data
+     sources) without conflating them.
    - Document how later mode-specific milestones connect the compose workflow
      to an externally managed Kubernetes cluster.
 4. **Metrics CI runtime validation**

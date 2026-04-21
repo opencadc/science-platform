@@ -11,6 +11,17 @@
 
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/check-prerequisites.sh"
+require_docker
+require_minikube
+require_helm
+require_kubectl
+
+METRICS_ROOT="$(cd "${_SCRIPT_DIR}/.." && pwd)"
+cd "${METRICS_ROOT}"
+
 MINIKUBE_PROFILE="${MINIKUBE_PROFILE:-metrics-local}"
 NAMESPACE="${NAMESPACE:-metrics}"
 RELEASE_NAME="${RELEASE_NAME:-metrics-api}"
