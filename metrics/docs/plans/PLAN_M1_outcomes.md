@@ -28,3 +28,11 @@ helm template metrics-api helm/metrics-api -f helm/metrics-api/values-dev.yaml >
 ## Gates
 
 See `metrics/project-gates.yaml` for required gate ids (`harness-contracts`, `repository-coverage`, `harness-cli`). The Metrics CI workflow runs coverage plus harness contract tests and `python -m harness check`; record evidence from CI logs or local runs before handoff.
+
+## Roadmap review follow-ups
+
+The M1 milestone plan was revised after roadmap review to separate **repository
+facts** from **planned deliverables** and to document environment naming drift
+between roadmap language and runtime settings. Treat this outcomes note as
+closure evidence for what shipped in M1, not as a statement that later milestone
+targets are already implemented.

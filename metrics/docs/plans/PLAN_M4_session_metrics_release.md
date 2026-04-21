@@ -39,6 +39,13 @@ This milestone depends on earlier milestone outputs.
 - M3 user attribution and scoped query behavior.
 - Existing model envelope and error contract.
 
+## Roadmap and settings naming
+
+Roadmap environment names use `integration` and `production`, while the current
+settings model still accepts `int` and `prod` for `METRICS_ENVIRONMENT`. Keep
+session rollout documentation aligned with the mapping and reconciliation plan
+from milestone M2.
+
 ## Constraints
 
 This milestone must preserve stability and resource efficiency.
@@ -47,6 +54,15 @@ This milestone must preserve stability and resource efficiency.
 - Keep identity mapping deterministic.
 - Keep query and cache behavior explicit for operational debugging.
 - Keep all runtime behavior configurable via environment variables.
+- Align default cache TTL behavior with the M2 platform decision, including any
+  change from the current short default used in unit tests.
+
+## Alignment with platform mode work
+
+Session metrics build on the same service runtime model as platform and user
+metrics. Keep session work aligned with the single-mode contract, startup
+validation rules, and provider boundaries from the M2 and M2b milestones so the
+session route does not accidentally reintroduce cross-mode behavior.
 
 ## Implementation phases
 
@@ -59,7 +75,8 @@ This section defines execution sequencing.
    - Add session-scoped provider queries.
    - Add session-scoped compute and cache orchestration.
 3. **Route and payload completion**
-   - Replace placeholder session endpoint behavior.
+   - Harden the session route beyond the current contract-level behavior,
+     including identity validation and failure semantics.
    - Align metadata, cache headers, and status semantics.
 4. **Cardinality and safety checks**
    - Add tests that cover bounded high-cardinality scenarios.
@@ -75,6 +92,11 @@ This section defines mandatory verification.
 - Run gate `harness-contracts`.
 - Run gate `repository-coverage`.
 - Run gate `harness-cli`.
+- Use `FastAPI TestClient` for session-route contract tests that do not require a
+  live cluster.
+- When `METRICS_BASE_URL` is configured, run cluster-backed smoke tests in
+  `tests/integration` against the deployed service the same way platform smoke
+  tests do today.
 - Validate
   `GET /api/v1/metrics/users/{user}/sessions/{uuid}` response contract.
 - Validate session cache and telemetry behavior.

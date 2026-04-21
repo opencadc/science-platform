@@ -32,8 +32,13 @@ Track these checks throughout the stabilization window.
   `PlatformMetrics` envelope.
 - **Source provenance:** `data.sources` records capacity and usage provider
   source path.
+- **Mode alignment:** confirm the deployed configuration matches the intended
+  single-mode contract from the active milestone plan, including startup
+  validation behavior and the absence of unintended fallback paths.
 - **Cache semantics:** first request misses cache and subsequent request hits
   cache within TTL window.
+- **TTL policy:** confirm `Cache-Control` max-age and JSON metadata TTL match the
+  active milestone default and the configured `METRICS_CACHE_TTL_SECONDS` value.
 - **Error semantics:** provider failures map to deterministic API errors.
 
 ## Exit criteria

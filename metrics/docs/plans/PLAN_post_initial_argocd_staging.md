@@ -22,7 +22,9 @@ Complete these conditions before starting:
 The post-initial work includes:
 
 - ArgoCD application manifests for staging deployment.
-- Environment promotion policy from `int` to `staging`.
+- Environment promotion policy from `integration` to `staging`, noting that the
+  runtime setting may still use `METRICS_ENVIRONMENT=int` until naming is
+  reconciled in code.
 - Secret and credential delivery model for staging values.
 - Promotion verification and rollback procedures.
 
