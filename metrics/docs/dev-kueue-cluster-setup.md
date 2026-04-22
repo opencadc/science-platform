@@ -1,7 +1,7 @@
 # Dev setup: Kueue + Metrics API on a local cluster
 
-Use this flow when you want **Kueue-backed** platform metrics
-(`METRICS_PROVIDER_MODE=kueue`) against a local Minikube cluster.
+Use this flow when you want **Kueue-backed** platform metrics against a local
+Minikube cluster (with Prometheus configured for usage queries).
 
 This guide assumes you reuse your existing Minikube (the usual default
 profile/context name is `minikube`). It does not create a separate profile such
@@ -133,7 +133,9 @@ kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" \
   rollout status deploy/"${RELEASE_NAME}-metrics-api" --timeout=180s
 ```
 
-`scripts/minikube-values.yaml` sets `METRICS_PROVIDER_MODE=kueue`, in-cluster `METRICS_KUBE_API_URL`, queue list, cohort name, Redis, and RBAC as required for Kueue mode.
+`scripts/minikube-values.yaml` sets in-cluster Kubernetes URL, Kueue queue list
+and cohort, Prometheus URL, Redis, and RBAC as required for the composed
+runtime.
 
 **Stale image on the node:** Minikube’s image store is separate from your host Docker. After `docker build` + `minikube image load`, if you keep the tag `latest`, the running Deployment may not pick up the new bits until you change the tag (for example `tag: dev-$(date +%s)` in `--set`) or run `kubectl rollout restart -n metrics deploy/metrics-api-metrics-api`. The values file uses `pullPolicy: Never` so the cluster uses the image you loaded, not a registry pull.
 
@@ -246,9 +248,11 @@ bash scripts/run-minikube-integration.sh
 
 ## 8. Troubleshooting
 
-### Pod `CrashLoopBackOff` (API container) with `METRICS_PROVIDER_MODE=kueue`
+### Pod `CrashLoopBackOff` (API container) during startup validation
 
-In Kueue mode the process **must** pass `validate_kueue_mode_startup` before Uvicorn binds port 8000 and serves `/healthz`. If that fails, the container exits and Kubernetes restarts it.
+The process **must** pass `validate_application_startup` (Kueue and Prometheus
+checks) before Uvicorn binds port 8000 and serves `/healthz`. If that fails, the
+container exits and Kubernetes restarts it.
 
 The Helm chart uses a `startupProbe` on `/healthz` so liveness does not probe
 the port while the lifespan is still running (otherwise you can see connection

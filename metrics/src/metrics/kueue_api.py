@@ -12,7 +12,7 @@ Kueue project for ``ClusterQueue`` and ``Cohort`` resources.
 
 from __future__ import annotations
 
-from metrics.config import Settings
+from metrics.core.settings import Settings
 
 
 def kueue_clusterqueues_list_url(settings: Settings) -> str:
@@ -28,7 +28,8 @@ def kueue_clusterqueues_list_url(settings: Settings) -> str:
     Returns:
         Full URL to ``GET .../apis/kueue.x-k8s.io/v1beta2/clusterqueues`` (list).
     """
-    return f"{settings.kube_api_url.rstrip('/')}{settings.kube_clusterqueue_path}"
+    k = settings.platform.kueue
+    return f"{k.kube_api_url.rstrip('/')}{k.kube_clusterqueue_path}"
 
 
 def cluster_queue_object_url(settings: Settings, name: str) -> str:
@@ -44,8 +45,9 @@ def cluster_queue_object_url(settings: Settings, name: str) -> str:
     Returns:
         Full URL for ``GET .../clusterqueues/{name}``.
     """
-    base = settings.kube_api_url.rstrip("/")
-    return f"{base}{settings.kube_clusterqueue_path}/{name}"
+    k = settings.platform.kueue
+    base = k.kube_api_url.rstrip("/")
+    return f"{base}{k.kube_clusterqueue_path}/{name}"
 
 
 def cohort_object_url(settings: Settings, name: str) -> str:
@@ -63,5 +65,6 @@ def cohort_object_url(settings: Settings, name: str) -> str:
     Returns:
         Full URL for ``GET .../cohorts/{name}``.
     """
-    base = settings.kube_api_url.rstrip("/")
-    return f"{base}{settings.kube_cohort_path}/{name}"
+    k = settings.platform.kueue
+    base = k.kube_api_url.rstrip("/")
+    return f"{base}{k.kube_cohort_path}/{name}"

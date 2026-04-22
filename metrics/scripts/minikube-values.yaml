@@ -13,7 +13,6 @@ rbac:
 
 env:
   METRICS_ENVIRONMENT: "dev"
-  METRICS_PROVIDER_MODE: "kueue"
   METRICS_CLUSTER_NAME: "minikube-local"
   METRICS_CACHE_BACKEND: "redis"
   METRICS_CACHE_TTL_SECONDS: "300"
@@ -22,6 +21,7 @@ env:
   METRICS_KUBE_VERIFY_TLS: "true"
   METRICS_KUEUE_CLUSTER_QUEUES: "cq-proton,cq-neutron,cq-electron"
   METRICS_KUEUE_COHORT: "cohort-atom"
+  METRICS_PLATFORM__PROMETHEUS__URL: "http://prometheus.monitoring.svc:9090"
 
 redis:
   enabled: true

@@ -19,6 +19,16 @@ process lessons belong in `docs/harness/learnings.md`.
 
 ## Current entries
 
+- Date: April 22, 2026
+- Context: M3 nested `pydantic-settings` with legacy flat env merge.
+- Lesson: A single `model_validator(mode="after")` that returns
+  `self.model_copy(...)` is not reliable under `BaseSettings.__init__`; use
+  `mode="before"` on a plain dict (including `model_dump()` for nested
+  `BaseModel` fragments) when folding operator aliases from `os.environ`.
+- Evidence: `src/metrics/core/settings.py` (`_merge_legacy_environment`,
+  `_as_dict`), pytest warnings before the fix.
+- Action taken: Documented here; implementation uses `before` merge only.
+
 - Date: 2026-04-17
 - Context: Git history and release tooling.
 - Lesson: Always write commit messages using the Conventional Commits

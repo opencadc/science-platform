@@ -26,7 +26,7 @@ parent milestone and are not separate sequence ids.
 - `docs/plans/PLAN_M2_platform_metrics_initial_release.md` — outcomes: `docs/plans/PLAN_M2_outcomes.md`
 - `docs/plans/PLAN_M2_post_review_feedback.md` — M2 closure checklist
   (post-review operator and contract hardening)
-- `docs/plans/PLAN_M3_app_structure_and_platform_sources.md`
+- `docs/plans/PLAN_M3_app_structure_and_platform_sources.md` — outcomes: `docs/plans/PLAN_M3_outcomes.md`
 - `docs/plans/PLAN_M4_kube_metrics_mode_platform_release.md`
 - `docs/plans/PLAN_M5_user_metrics_release.md`
 - `docs/plans/PLAN_M6_session_metrics_release.md`

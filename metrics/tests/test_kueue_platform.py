@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from metrics.config import Settings
+from metrics.core.settings import (
+    PlatformKueueSettings,
+    PlatformSettings,
+    Settings,
+)
 from metrics.providers.kueue_platform import KueuePlatformEngine
 
 
@@ -11,9 +15,13 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(
-        kube_api_url="https://kube.test",
-        kueue_cluster_queues=["cq-a", "cq-b"],
-        kueue_cohort="cohort-atom",
+        platform=PlatformSettings(
+            kueue=PlatformKueueSettings(
+                kube_api_url="https://kube.test",
+                cluster_queues=["cq-a", "cq-b"],
+                cohort="cohort-atom",
+            ),
+        ),
     )
 
     cq_a = {
@@ -110,9 +118,13 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
 ) -> None:
     """No admitted workloads → Kueue often omits usage rows; API still keys allocated like capacity."""
     settings = Settings(
-        kube_api_url="https://kube.test",
-        kueue_cluster_queues=["cq-a"],
-        kueue_cohort="cohort-atom",
+        platform=PlatformSettings(
+            kueue=PlatformKueueSettings(
+                kube_api_url="https://kube.test",
+                cluster_queues=["cq-a"],
+                cohort="cohort-atom",
+            ),
+        ),
     )
     cq = {
         "spec": {

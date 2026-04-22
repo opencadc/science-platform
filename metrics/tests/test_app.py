@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
-from metrics.app import create_app
 from metrics.cache import InMemoryTTLCache
-from metrics.models import CapacityReading, UsageReading
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.core.factory import create_app
+from metrics.schemas.metrics import CapacityReading, UsageReading
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 
 
 class CapacityProvider:

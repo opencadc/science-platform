@@ -1,10 +1,4 @@
-"""Versioned HTTP routes for platform, user, and session metrics.
-
-Routes delegate computation to :class:`metrics.service.PlatformMetricsService`
-resolved from ``request.app.state`` (wired in :mod:`metrics.app`). Caching uses
-standard HTTP headers (``Cache-Control``, ``Date``, ``Expires``, ``Last-Modified``)
-aligned with the configured TTL and snapshot age.
-"""
+"""Versioned HTTP routes for platform, user, and session metrics."""
 
 from __future__ import annotations
 
@@ -13,13 +7,13 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, Request, Response
 
 from metrics.http_cache import metrics_success_cache_headers
-from metrics.models import (
+from metrics.schemas.metrics import (
     PlatformMetricsResponse,
     ResponseMetadata,
     SessionMetricsResponse,
     UserMetricsResponse,
 )
-from metrics.service import PlatformMetricsService
+from metrics.services.platform_metrics import PlatformMetricsService
 
 router = APIRouter(tags=["metrics"])
 
@@ -30,7 +24,7 @@ def get_service(request: Request) -> PlatformMetricsService:
 
 
 def _version(request: Request) -> str:
-    """API group/version string embedded in JSON envelopes (for example ``metrics.canfar.net/v1``)."""
+    """API group/version string embedded in JSON envelopes."""
     return request.app.state.api_version
 
 
@@ -39,9 +33,8 @@ def _version(request: Request) -> str:
     response_model=PlatformMetricsResponse,
     summary="Get cluster-level platform metrics",
     description=(
-        "Returns platform capacity and allocated resource maps (Kueue mode) "
-        "or static maps for development. HTTP caching (freshness, shared vs private "
-        "caches) is expressed via response headers, not JSON metadata fields."
+        "Returns platform capacity and allocated resource maps from configured "
+        "Kueue sources. HTTP caching is expressed via response headers, not JSON."
     ),
 )
 async def get_platform_metrics(

@@ -10,7 +10,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 
-from metrics.config import Settings
+from metrics.core.settings import Settings
 
 
 class MetricsRecorder:

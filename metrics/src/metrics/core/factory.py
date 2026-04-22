@@ -1,10 +1,4 @@
-"""FastAPI application factory and dependency wiring for the Metrics API.
-
-This module is the **composition root**: it reads :class:`metrics.config.Settings`,
-constructs cache backends and provider implementations, attaches telemetry, and
-registers routes. Kueue mode additionally runs :func:`metrics.kueue_startup.validate_kueue_mode_startup`
-during lifespan startup so misconfiguration fails before traffic is served.
-"""
+"""FastAPI application factory and dependency wiring for the Metrics API."""
 
 from __future__ import annotations
 
@@ -19,50 +13,31 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from pydantic import TypeAdapter
 from redis.asyncio import Redis
 
-from metrics.api.routes import router
+from metrics.api.v1.routes import router
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.config import Settings
+from metrics.core.settings import Settings
+from metrics.core.startup import KueueStartupError, validate_application_startup
 from metrics.errors import AppError
-from metrics.models import ErrorDetail, ErrorResponse, ResponseMetadata
-from metrics.kueue_startup import KueueStartupError, validate_kueue_mode_startup
+from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
 from metrics.providers.kueue import KueueCapacityProvider
 from metrics.providers.kueue_platform import KueuePlatformEngine
 from metrics.providers.prometheus import PrometheusUsageProvider
-from metrics.providers.static import StaticCapacityProvider, StaticUsageProvider
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import setup_telemetry
 
 _logger = logging.getLogger(__name__)
 
 
-def _platform_cache_fingerprint(settings: Settings) -> str | None:
-    """Return a short stable token for Redis keys when Kueue scope changes.
-
-    Without this, operators who change ``METRICS_KUEUE_CLUSTER_QUEUES`` or
-    ``METRICS_KUEUE_COHORT`` but keep the same ``METRICS_CLUSTER_NAME`` could see
-    **stale platform payloads** until the TTL expires. The fingerprint is mixed
-    into the platform cache key inside :class:`metrics.service.PlatformMetricsService`.
-
-    Returns:
-        Hex digest prefix for ``kueue`` mode, or ``None`` for ``static`` mode
-        where the platform cache key remains ``platform:{cluster}`` only.
-    """
-    if settings.provider_mode != "kueue":
-        return None
-    raw = "|".join(sorted(settings.kueue_cluster_queues)) + "|" + settings.kueue_cohort
+def _platform_cache_fingerprint(settings: Settings) -> str:
+    """Stable token for Redis keys when Kueue scope changes."""
+    k = settings.platform.kueue
+    raw = "|".join(sorted(k.cluster_queues)) + "|" + k.cohort
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
 def _build_cache_backend(
     settings: Settings,
 ) -> tuple[TTLCacheBackend[CachedMetrics], Redis | None]:
-    """Construct the TTL cache implementation backing :class:`PlatformMetricsService`.
-
-    Returns:
-        A tuple of ``(cache_backend, optional_redis_client)``. When Redis is
-        selected, the caller must close the client during application shutdown
-        (handled in the FastAPI lifespan ``finally`` block in :func:`create_app`).
-    """
     if settings.cache_backend == "memory":
         return (
             InMemoryTTLCache[CachedMetrics](ttl_seconds=settings.cache_ttl_seconds),
@@ -88,18 +63,7 @@ def create_app(
     settings: Settings | None = None,
     platform_service: PlatformMetricsService | None = None,
 ) -> FastAPI:
-    """Create and configure the metrics API application.
-
-    Args:
-        settings: Optional explicit settings (defaults to environment-derived
-            :class:`metrics.config.Settings`).
-        platform_service: Optional pre-built service for tests; when omitted, a
-            service is constructed from ``settings`` (``static`` or ``kueue`` mode).
-
-    Returns:
-        Configured ``FastAPI`` instance with routes, exception handlers, and
-        optional OpenTelemetry instrumentation.
-    """
+    """Create and configure the metrics API application."""
     settings = settings or Settings()
     telemetry = setup_telemetry(settings)
     redis_client: Redis | None = None
@@ -110,15 +74,14 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_app_instance: FastAPI):
         try:
-            if settings.provider_mode == "kueue":
-                try:
-                    await validate_kueue_mode_startup(settings)
-                except KueueStartupError:
-                    _logger.exception(
-                        "Kueue mode startup validation failed; fix cluster config "
-                        "or see docs/dev-kueue-cluster-setup.md#troubleshooting"
-                    )
-                    raise
+            try:
+                await validate_application_startup(settings)
+            except KueueStartupError:
+                _logger.exception(
+                    "Application startup validation failed; fix cluster or Prometheus "
+                    "configuration or see docs/dev-kueue-cluster-setup.md#troubleshooting"
+                )
+                raise
             yield
         finally:
             if fastapi_instrumented:
@@ -135,8 +98,8 @@ def create_app(
         version=settings.app_version,
         summary="CANFAR Science Platform Metrics API",
         description=(
-            "API for platform size and utilization metrics with explicit "
-            "Kueue or static provider modes."
+            "API for platform size and utilization metrics composed from "
+            "configured Kueue, Prometheus, and reserved kube-metrics sources."
         ),
         lifespan=lifespan,
     )
@@ -176,15 +139,9 @@ def create_app(
     app.state.cache_control_public = settings.cache_control_public
 
     if platform_service is None:
-        if settings.provider_mode == "static":
-            capacity_provider = StaticCapacityProvider(settings=settings)
-            usage_provider = StaticUsageProvider(settings=settings)
-            platform_loader = None
-        else:
-            engine = KueuePlatformEngine(settings)
-            capacity_provider = KueueCapacityProvider(settings=settings)
-            usage_provider = PrometheusUsageProvider(settings=settings)
-            platform_loader = engine.collect
+        engine = KueuePlatformEngine(settings)
+        capacity_provider = KueueCapacityProvider(settings=settings)
+        usage_provider = PrometheusUsageProvider(settings=settings)
         cache, redis_client = _build_cache_backend(settings)
         platform_service = PlatformMetricsService(
             cluster_name=settings.cluster_name,
@@ -192,7 +149,7 @@ def create_app(
             usage_provider=usage_provider,
             cache=cache,
             metrics_recorder=telemetry.recorder,
-            platform_resource_loader=platform_loader,
+            platform_resource_loader=engine.collect,
             platform_cache_fingerprint=_platform_cache_fingerprint(settings),
         )
 

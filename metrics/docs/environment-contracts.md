@@ -41,22 +41,25 @@ Docker Compose is no longer part of the supported development contract.
 
 ## 12-factor configuration model
 
-All runtime behavior remains environment-driven. Current settings are supplied
-through `METRICS_*` variables. M3 introduces the roadmap direction for nested
-Pydantic configuration domains (`metrics.platform.*`, `metrics.user.*`) while
-keeping deployment wiring environment-based through Helm values and env vars.
+All runtime behavior remains environment-driven. Settings use nested Pydantic
+models under `platform` and `user` (for example `platform.kueue.cluster_queues`).
+`pydantic-settings` reads nested keys using the delimiter `__`, for example
+`METRICS_PLATFORM__KUEUE__CLUSTER_QUEUES`. Legacy flat variables such as
+`METRICS_KUEUE_CLUSTER_QUEUES`, `METRICS_KUBE_API_URL`, and `METRICS_PROMETHEUS_URL`
+are merged at load time when nested values are absent (see
+`Settings._merge_legacy_environment` in `src/metrics/core/settings.py`).
 
 ## Operator alias precedence (`KUEUE_METRICS_*` versus `METRICS_*`)
 
-The application loads `METRICS_*` fields first, then applies fill-only aliases
-from process environment in
-`Settings._apply_operator_kueue_env_aliases` in `src/metrics/config.py`.
+The application loads nested `METRICS_*` fields, then applies fill-only aliases
+from process environment in `Settings._merge_legacy_environment` in
+`src/metrics/core/settings.py`.
 
-| If this field is empty | And this env var is set | Then |
+| If this nested field is empty | And this env var is set | Then |
 | --- | --- | --- |
-| `kube_api_url` | `KUEUE_METRICS_URL` | `kube_api_url` is set from `KUEUE_METRICS_URL`. |
-| `kueue_cluster_queues` | `KUEUE_METRICS_CLUSTER_QUEUES` | Queue list parsed from comma-separated value. |
-| `kueue_cohort` | `KUEUE_METRICS_COHORT` | Cohort name copied. |
+| `platform.kueue.kube_api_url` | `KUEUE_METRICS_URL` | `kube_api_url` is set from `KUEUE_METRICS_URL`. |
+| `platform.kueue.cluster_queues` | `KUEUE_METRICS_CLUSTER_QUEUES` | Queue list parsed from comma-separated value. |
+| `platform.kueue.cohort` | `KUEUE_METRICS_COHORT` | Cohort name copied. |
 
 Aliases do not override non-empty primary fields.
 
@@ -78,11 +81,11 @@ specific deployment overlays.
   `metric-v*`, multi-arch `linux/amd64` and `linux/arm64`.
 - Non-tag CI does not publish release images.
 
-## Kueue mode note
+## Platform sources note
 
-With `METRICS_PROVIDER_MODE=kueue`, platform metrics read Kubernetes/Kueue APIs.
-User and session paths still rely on Prometheus configuration when those routes
-are used.
+Platform metrics always use the Kueue HTTP collectors plus Prometheus-backed
+usage for user and session routes. Startup validation requires both Kubernetes
+(Kueue scope) and Prometheus endpoints to be configured.
 
 ## Cluster RBAC (Helm)
 

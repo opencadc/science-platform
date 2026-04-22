@@ -19,8 +19,9 @@ This file stores repository-specific behavioral specifications.
   with health at `/healthz`.
 - Runtime configuration is environment-driven through `METRICS_*` settings and
   validated through Pydantic models.
-- Current runtime provider-mode contract is `static` or `kueue` until M3
-  implementation is complete.
+- Runtime configuration uses nested platform and user settings; legacy flat
+  `METRICS_*` keys are merged when nested values are unset (see
+  `environment-contracts.md`).
 - Startup must fail fast when required source dependencies are unavailable.
 - Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
   `Expires`, and `Last-Modified`) for cacheable routes.
@@ -32,7 +33,5 @@ This file stores repository-specific behavioral specifications.
 
 ## Planned target behavior (roadmap)
 
-- After M3 cutover, supported platform sources are Kueue, Prometheus, and
-  kube-metrics.
-- Static and node provider runtime behavior is removed as part of M3
-  implementation.
+- Kube-metrics becomes an active source once M4 implements runtime depth behind
+  `platform.kube_metrics`.

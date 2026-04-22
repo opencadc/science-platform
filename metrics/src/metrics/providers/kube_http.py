@@ -2,8 +2,8 @@
 
 Intent
 ------
-Metrics reads **cluster-scoped** Kueue objects and (elsewhere) node or
-Prometheus endpoints. Every call must respect ``METRICS_KUBE_REQUEST_TIMEOUT_SECONDS``,
+Metrics reads **cluster-scoped** Kueue objects and (elsewhere) Prometheus
+endpoints. Every call must respect ``METRICS_KUBE_REQUEST_TIMEOUT_SECONDS``,
 TLS policy, and bearer token rules without duplicating ``httpx`` setup.
 
 **Parallel GETs** (:func:`kube_parallel_get_json`) reuse a single ``AsyncClient``

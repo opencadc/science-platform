@@ -21,7 +21,7 @@ FastAPI layering while keeping implementation lean:
 
 - `api/` for versioned route modules and API composition.
 - `core/` for settings, app factory, startup checks, and shared runtime
-  wiring.
+wiring.
 - `schemas/` for Pydantic request, response, and internal transfer models.
 - `services/` for orchestration and cache-aware computation.
 - `providers/` for external-system adapters.
@@ -37,18 +37,18 @@ This section lists milestone deliverables you execute.
 
 - Move modules into the layered FastAPI package structure listed above.
 - Remove `static` provider runtime mode from settings, app wiring, tests, and
-  docs.
+docs.
 - Remove `node` provider code and tests.
 - Remove fallback/provider-composite logic that only existed to support
-  deprecated providers.
+deprecated providers.
 - Define a nested, 12-factor configuration model for source composition using
-  Pydantic models and `pydantic-settings`.
+Pydantic models and `pydantic-settings`.
 - Ensure all schema/config contracts use Pydantic models only; do not introduce
-  dataclasses for runtime contracts.
+dataclasses for runtime contracts.
 - Document a clear extension path for future scopes such as user metrics source
-  config.
+config.
 - Keep route and response contracts stable unless a separate milestone
-  explicitly changes wire format.
+explicitly changes wire format.
 
 ## Out of scope
 
@@ -124,38 +124,40 @@ platformService --> kubeMetricsAdapter[KubeMetricsProvider_M4]
 platformService --> apiRoutes[ApiV1Routes]
 ```
 
+
+
 - **Layered ownership:** API, core, schemas, services, and providers each own a
-  distinct boundary.
+distinct boundary.
 - **Pydantic-only contracts:** Runtime config and schema models remain Pydantic
-  across all layers.
+across all layers.
 - **Three-source platform model:** Kueue, Prometheus, and kube-metrics are the
-  only supported platform sources after cutover.
+only supported platform sources after cutover.
 - **No legacy providers:** Static and node are removed, not hidden behind
-  compatibility aliases.
+compatibility aliases.
 - **M4 dependency:** Kube-metrics implementation depth is intentionally deferred
-  to M4 while M3 establishes architecture and config contracts.
+to M4 while M3 establishes architecture and config contracts.
 
 ## Implementation phases
 
 This section sequences M3 execution.
 
 1. **Package reorganization**
-   - Define the target module map and move files physically into layered
-     packages.
-   - Update imports and route composition to the new structure.
+  - Define the target module map and move files physically into layered
+   packages.
+  - Update imports and route composition to the new structure.
 2. **Provider and runtime cleanup**
-   - Remove static and node provider code paths.
-   - Remove fallback logic tied to deprecated providers.
+  - Remove static and node provider code paths.
+  - Remove fallback logic tied to deprecated providers.
 3. **Configuration remodel**
-   - Replace flat provider-mode switching with nested source configuration.
-   - Keep environment-driven parsing through `pydantic-settings`.
+  - Replace flat provider-mode switching with nested source configuration.
+  - Keep environment-driven parsing through `pydantic-settings`.
 4. **Service composition hardening**
-   - Wire platform service composition to configured source set.
-   - Preserve deterministic startup validation and request error mapping.
+  - Wire platform service composition to configured source set.
+  - Preserve deterministic startup validation and request error mapping.
 5. **Tests and docs alignment**
-   - Replace legacy-provider tests with new architecture coverage.
-   - Align architecture, design, specs, and environment docs with the new model.
-   - Run review arbitration before milestone closure.
+  - Replace legacy-provider tests with new architecture coverage.
+  - Align architecture, design, specs, and environment docs with the new model.
+  - Run review arbitration before milestone closure.
 
 ## Validation plan
 
@@ -166,10 +168,10 @@ This section defines milestone verification.
 - Run gate `harness-cli`.
 - Validate no runtime path references static or node providers.
 - Validate startup fails when required configured source dependencies are
-  missing.
+missing.
 - Validate route contracts still return deterministic payload and error models.
 - Validate settings parsing supports nested source configuration through
-  environment-derived values.
+environment-derived values.
 - Validate import graph and package boundaries match the target module map.
 
 ## Risks
@@ -177,15 +179,15 @@ This section defines milestone verification.
 This section lists milestone risks and mitigations.
 
 - **Scope creep risk:** M3 can absorb M4 behavior if boundaries are vague.
-  Mitigate by keeping kube-metrics runtime depth explicitly out of scope.
+Mitigate by keeping kube-metrics runtime depth explicitly out of scope.
 - **Boilerplate risk:** A new package layout can introduce empty wrappers.
-  Mitigate by requiring each moved module to own clear behavior.
+Mitigate by requiring each moved module to own clear behavior.
 - **Migration risk:** Bulk import rewrites can break startup paths. Mitigate with
-  app-factory and route tests before merge.
+app-factory and route tests before merge.
 - **Config ambiguity risk:** Nested model migration can drift from Helm/env
-  reality. Mitigate with explicit environment contract tests.
+reality. Mitigate with explicit environment contract tests.
 - **Review drift risk:** Architecture intent can diverge between docs and code.
-  Mitigate with multi-reviewer arbitration before closure.
+Mitigate with multi-reviewer arbitration before closure.
 
 ## Operational controls
 
@@ -201,12 +203,13 @@ This section defines rollout controls for stable operation.
 
 Use this checklist to close M3 execution.
 
-- [ ] Files are physically moved into layered FastAPI package boundaries.
-- [ ] Static provider mode is removed from runtime settings and app wiring.
-- [ ] Node provider code and tests are removed.
-- [ ] Legacy fallback logic tied to removed providers is removed.
-- [ ] Nested Pydantic settings model for source composition is implemented.
-- [ ] No dataclasses are used for runtime config or API/schema models.
-- [ ] Platform source support is limited to Kueue, Prometheus, and kube-metrics.
-- [ ] M4 remains the implementation milestone for kube-metrics runtime depth.
-- [ ] Required gates pass.
+- Files are physically moved into layered FastAPI package boundaries.
+- Static provider mode is removed from runtime settings and app wiring.
+- Node provider code and tests are removed.
+- Legacy fallback logic tied to removed providers is removed.
+- Nested Pydantic settings model for source composition is implemented.
+- No dataclasses are used for runtime config or API/schema models.
+- Platform source support is limited to Kueue, Prometheus, and kube-metrics.
+- M4 remains the implementation milestone for kube-metrics runtime depth.
+- Required gates pass.
+

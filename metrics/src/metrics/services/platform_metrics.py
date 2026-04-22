@@ -1,15 +1,4 @@
-"""Business logic for computing metrics payloads and coordinating providers.
-
-The service owns **caching**, **telemetry timing**, and **error translation**
-from provider exceptions to stable HTTP-facing :class:`metrics.errors.AppError`
-codes. Platform metrics have two shapes:
-
-* **Kueue mode:** ``platform_resource_loader`` returns open-ended maps; cache
-  keys may include a ``platform_cache_fingerprint`` when queue/cohort scope
-  changes independently of cluster name.
-* **Static mode:** legacy capacity + usage providers populate fixed cpu/memory
-  entries in the same map-based ``PlatformMetricsData`` envelope.
-"""
+"""Business logic for computing metrics payloads and coordinating providers."""
 
 from __future__ import annotations
 
@@ -21,7 +10,10 @@ from typing import Awaitable, Callable, cast
 
 from metrics.cache import TTLCacheBackend
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
-from metrics.models import (
+from metrics.providers.base import CapacityProvider, UsageProvider
+from metrics.providers.kueue_platform import PlatformResourceMaps
+from metrics.quantity import format_resource_amount
+from metrics.schemas.metrics import (
     PlatformMetricsData,
     ResourceSnapshot,
     SessionMetricsData,
@@ -29,15 +21,10 @@ from metrics.models import (
     UsageSnapshot,
     UtilizationSnapshot,
 )
-from metrics.providers.base import CapacityProvider, UsageProvider
-from metrics.providers.kueue_platform import PlatformResourceMaps
-from metrics.quantity import format_resource_amount
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 type MetricsData = PlatformMetricsData | UserMetricsData | SessionMetricsData
 
-# Bump when platform JSON shape changes so Redis TTL caches are not reused across
-# incompatible payloads (e.g. empty allocated vs zero-filled, removed data.sources).
 _PLATFORM_CACHE_SCHEMA_VERSION = "2"
 
 
@@ -73,20 +60,6 @@ class PlatformMetricsService:
         | None = None,
         platform_cache_fingerprint: str | None = None,
     ) -> None:
-        """Wire providers and optional Kueue-only platform loader.
-
-        Args:
-            cluster_name: Cluster label embedded in API payloads and cache keys.
-            capacity_provider: Source for user/session capacity snapshots.
-            usage_provider: Prometheus (or static) usage for user/session scopes.
-            cache: TTL backend shared across scopes.
-            metrics_recorder: Optional telemetry sink.
-            platform_resource_loader: When set, :meth:`get_platform_metrics` uses
-                Kueue map collection instead of ``capacity_provider`` /
-                ``usage_provider``.
-            platform_cache_fingerprint: Optional suffix for platform cache keys
-                (see :func:`metrics.app._platform_cache_fingerprint`).
-        """
         self._cluster_name = cluster_name
         self._capacity_provider = capacity_provider
         self._usage_provider = usage_provider
@@ -104,17 +77,7 @@ class PlatformMetricsService:
         return self._cache.ttl_seconds
 
     async def get_platform_metrics(self) -> ServiceResult[PlatformMetricsData]:
-        """Return cached or freshly computed platform metrics.
-
-        Cache key strategy:
-        * Static: ``platform:{schema}:{cluster_name}``.
-        * Kueue: ``platform:{schema}:{cluster_name}:{fingerprint}`` when a non-empty
-          fingerprint is configured. ``schema`` increments when the platform payload
-          contract changes so stale Redis entries are not served after upgrades.
-
-        Raises:
-            AppError: Translated provider failures (see ``_resolve_provider_result``).
-        """
+        """Return cached or freshly computed platform metrics."""
         fp = self._platform_cache_fingerprint
         schema = _PLATFORM_CACHE_SCHEMA_VERSION
         cache_key = (

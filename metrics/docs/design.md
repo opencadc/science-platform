@@ -8,23 +8,20 @@ not used for generic harness instructions.
 Operational environment contracts and roadmap-to-runtime mappings for Metrics
 live in `environment-contracts.md` in this directory.
 
-## Current versus target design
-
-Current implementation details live in `docs/architecture.md` and code under
-`src/metrics/`. The bullets below describe target design direction from M3
-onward.
+## Current design (post M3)
 
 - **Kubernetes-first service contract:** Dev, integration, staging, and
-  production all run through Kubernetes deployment paths. Docker Compose is not
-  part of the supported service contract.
-- **Single service process with configured source composition:** The service
-  composes metrics from configured source adapters instead of maintaining
-  mutually exclusive provider modes.
-- **Supported source set after cutover:** Kueue, Prometheus, and kube-metrics
-  are the supported providers. Static and node providers are removed in M3 code
-  scope.
-- **Pydantic-first contracts:** Settings and data contracts use Pydantic models
-  and `pydantic-settings`; dataclasses are not used for runtime/API contracts.
+  production run through Kubernetes deployment paths. Docker Compose is not
+  part of the supported service contract (see `environment-contracts.md`).
+- **Single service process with source composition:** The FastAPI factory wires
+  `KueuePlatformEngine` for platform maps, `KueueCapacityProvider` for user/session
+  capacity, and `PrometheusUsageProvider` for usage. There is no `static` or
+  `node` adapter path.
+- **Supported platform sources:** Kueue and Prometheus are active; kube-metrics
+  is configuration-only until M4.
+- **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
+  nested `platform` / `user` domains and `pydantic-settings` env parsing (including
+  legacy flat env merge for operators).
 
 ## Milestone design mapping
 

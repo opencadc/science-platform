@@ -26,9 +26,12 @@ services:
     environment:
       METRICS_REDIS_URL: ${METRICS_REDIS_URL:-redis://redis:6379/0}
       METRICS_CACHE_BACKEND: ${METRICS_CACHE_BACKEND:-redis}
-      # Compose stack does not bundle Kubernetes/Prometheus backends; static mode avoids startup failures.
-      METRICS_PROVIDER_MODE: ${METRICS_PROVIDER_MODE:-static}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-dev}
+      # Required for the composed runtime (set in .env); see env.example.
+      METRICS_PLATFORM__PROMETHEUS__URL: ${METRICS_PLATFORM__PROMETHEUS__URL:-}
+      METRICS_PLATFORM__KUEUE__KUBE_API_URL: ${METRICS_PLATFORM__KUEUE__KUBE_API_URL:-}
+      METRICS_KUEUE_CLUSTER_QUEUES: ${METRICS_KUEUE_CLUSTER_QUEUES:-}
+      METRICS_KUEUE_COHORT: ${METRICS_KUEUE_COHORT:-}
     depends_on:
       redis:
         condition: service_healthy

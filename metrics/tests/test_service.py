@@ -6,8 +6,8 @@ import pytest
 
 from metrics.cache import InMemoryTTLCache
 from metrics.errors import AppError, ProviderUnavailableError
-from metrics.models import CapacityReading, UsageReading
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.schemas.metrics import CapacityReading, UsageReading
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 
 
 class DummyCapacityProvider:

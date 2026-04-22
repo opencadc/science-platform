@@ -1,15 +1,16 @@
-# Kueue platform mode (developer guide)
+# Kueue platform metrics (developer guide)
 
 This document explains **why** the Kueue integration is structured the way it
 is and **which modules** participate. It complements milestone plans under
 `docs/plans/` and operator-facing notes in `docs/environment-contracts.md`.
 
-## Goals (M2)
+## Goals (M2 + M3)
 
-- **Single mode per process:** `METRICS_PROVIDER_MODE=kueue` means platform data
-  comes from Kueue only—no node fallback or static downgrade.
+- **Composed platform sources:** Platform maps always come from
+  `KueuePlatformEngine` (Kueue API reads). There is no static or node fallback.
 - **Fail fast:** Misconfiguration or a missing API is detected at **startup**
-  (`metrics.kueue_startup`) so the deployment never serves contradictory metrics.
+  (`metrics.core.startup.validate_application_startup`), including Prometheus URL
+  requirements, so the deployment never serves contradictory metrics.
 - **Honest aggregation:** Per-queue nominal quota is summed, cohort nominal
   quota is added **once**, and ``allocated`` reflects admitted usage from
   ``status.flavorsUsage`` (see milestone outcomes for the semantic choice).
@@ -21,16 +22,16 @@ is and **which modules** participate. It complements milestone plans under
 | `metrics.kueue_api` | Build Kubernetes URLs for `ClusterQueue` list/get and `Cohort` get. |
 | `metrics.providers.kube_http` | Shared TLS/token handling and parallel `httpx` GET helper. |
 | `metrics.kueue_spec` | Parse `spec.resourceGroups` nominal quotas into numeric maps. |
-| `metrics.kueue_startup` | Lifespan validation before traffic. |
+| `metrics.core.startup` | Lifespan validation before traffic. |
 | `metrics.providers.kueue_platform` | Platform map aggregation for the API contract. |
 | `metrics.providers.kueue` | Narrow CPU/memory `CapacityReading` for user/session scopes. |
-| `metrics.app` | Wire settings → engine + fingerprint + service. |
-| `metrics.service` | TTL cache, telemetry, and error mapping for `/platform`. |
+| `metrics.core.factory` | Wire settings → engine + fingerprint + service. |
+| `metrics.services.platform_metrics` | TTL cache, telemetry, and error mapping for `/platform`. |
 
-## Request flow (Kueue)
+## Request flow
 
 1. **Startup:** `create_app` registers a lifespan that awaits
-   `validate_kueue_mode_startup` when mode is `kueue`.
+   `validate_application_startup` (Kueue plus Prometheus checks).
 2. **HTTP GET** `/api/v1/metrics/platform`:
    `PlatformMetricsService.get_platform_metrics` checks Redis/memory cache.
 3. **Miss:** `KueuePlatformEngine.collect` parallel-fetches all configured
@@ -56,4 +57,5 @@ same contract. For a **manual** dev loop (port-forward, no teardown), see
 
 - `docs/plans/PLAN_M2_platform_metrics_initial_release.md` — milestone scope.
 - `docs/plans/PLAN_M2_outcomes.md` — closure evidence and review notes.
-- `docs/environment-contracts.md` — `METRICS_ENVIRONMENT` and Prometheus note.
+- `docs/plans/PLAN_M3_app_structure_and_platform_sources.md` — package layout.
+- `docs/environment-contracts.md` — environment variables and alias precedence.

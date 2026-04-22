@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from metrics.config import Settings
+from metrics.core.settings import (
+    PlatformKubeMetricsSettings,
+    PlatformSettings,
+    Settings,
+)
 
 
 def test_environment_accepts_canonical_values() -> None:
@@ -24,24 +28,31 @@ def test_environment_rejects_unknown_tokens() -> None:
         Settings(environment="qa")
 
 
-def test_provider_mode_legacy_live_maps_to_kueue() -> None:
-    assert Settings(provider_mode="live").provider_mode == "kueue"
-
-
-def test_provider_mode_legacy_live_case_insensitive() -> None:
-    assert Settings(provider_mode="LIVE").provider_mode == "kueue"
+def test_kube_metrics_enabled_rejected_until_m4() -> None:
+    with pytest.raises(ValidationError, match="M4"):
+        Settings(
+            platform=PlatformSettings(
+                kube_metrics=PlatformKubeMetricsSettings(enabled=True),
+            ),
+        )
 
 
 def test_kueue_cluster_queues_accepts_comma_separated_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Helm/charts pass comma-separated METRICS_KUEUE_CLUSTER_QUEUES (not JSON)."""
     monkeypatch.setenv("METRICS_KUEUE_CLUSTER_QUEUES", "cq-a,cq-b")
-    assert Settings().kueue_cluster_queues == ["cq-a", "cq-b"]
+    assert Settings().platform.kueue.cluster_queues == ["cq-a", "cq-b"]
 
 
 def test_kueue_cluster_queues_accepts_json_array_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("METRICS_KUEUE_CLUSTER_QUEUES", '["cq-a","cq-b"]')
-    assert Settings().kueue_cluster_queues == ["cq-a", "cq-b"]
+    assert Settings().platform.kueue.cluster_queues == ["cq-a", "cq-b"]
+
+
+def test_legacy_prometheus_url_env_merges_into_nested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METRICS_PROMETHEUS_URL", "http://prom.example:9090")
+    assert Settings().platform.prometheus.url == "http://prom.example:9090"

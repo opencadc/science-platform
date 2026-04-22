@@ -26,7 +26,7 @@ from typing import Any
 
 import httpx
 
-from metrics.config import Settings
+from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
 from metrics.kueue_api import cluster_queue_object_url, cohort_object_url
 from metrics.kueue_spec import sum_nominal_quotas_by_resource
@@ -134,22 +134,24 @@ class KueuePlatformEngine:
             ProviderUnavailableError: Missing API URL or empty nominal quota sums.
             ProviderExecutionError: Transport or non-success HTTP responses.
         """
-        if not self._settings.kube_api_url:
-            raise ProviderUnavailableError("METRICS_KUBE_API_URL is not configured")
+        k = self._settings.platform.kueue
+        if not k.kube_api_url:
+            raise ProviderUnavailableError(
+                "METRICS_PLATFORM__KUEUE__KUBE_API_URL is not configured"
+            )
 
-        token = resolve_kube_token(self._settings.kube_api_token)
+        token = resolve_kube_token(k.kube_api_token)
         headers = kube_auth_headers(token)
-        verify = resolve_kube_tls_verify(self._settings.kube_verify_tls)
-        timeout = self._settings.kube_request_timeout_seconds
+        verify = resolve_kube_tls_verify(k.kube_verify_tls)
+        timeout = k.kube_request_timeout_seconds
 
         queue_totals: dict[str, float] = {}
         allocated_totals: dict[str, float] = {}
 
         queue_urls = [
-            cluster_queue_object_url(self._settings, q)
-            for q in self._settings.kueue_cluster_queues
+            cluster_queue_object_url(self._settings, q) for q in k.cluster_queues
         ]
-        cohort_url = cohort_object_url(self._settings, self._settings.kueue_cohort)
+        cohort_url = cohort_object_url(self._settings, k.cohort)
 
         try:
             docs = await kube_parallel_get_json(

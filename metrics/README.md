@@ -6,7 +6,7 @@ container process.
 
 ## Kueue mode and RBAC
 
-When running with `METRICS_PROVIDER_MODE=kueue`, the workload needs read access
+When running in-cluster, the workload needs read access
 to `clusterqueues` and `cohorts` in the `kueue.x-k8s.io` API group. Prefer
 creating a dedicated Kubernetes `ServiceAccount` via the chart
 (`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
@@ -68,7 +68,10 @@ Run the API locally:
 
 ```bash
 METRICS_CACHE_BACKEND=memory \
-METRICS_PROVIDER_MODE=kueue \
+METRICS_PLATFORM__PROMETHEUS__URL=http://127.0.0.1:9090 \
+METRICS_PLATFORM__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
+METRICS_KUEUE_CLUSTER_QUEUES=cq-proton \
+METRICS_KUEUE_COHORT=cohort-atom \
 uv run python -m metrics.main
 ```
 
@@ -81,9 +84,9 @@ For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 
 ### Kueue-backed platform metrics
 
-For **mode wiring**, **module responsibilities**, and the **startup vs request**
-flow when `METRICS_PROVIDER_MODE=kueue`, see `docs/kueue-platform.md`. That
-guide is the canonical developer-oriented supplement to milestone M2 plans.
+For **module responsibilities** and the **startup vs request** flow for
+Kueue-backed platform metrics, see `docs/kueue-platform.md`. That guide is the
+canonical developer-oriented supplement to milestones M2 and M3.
 
 **Cluster dev setup** (preflight → Helm Kueue → fixtures → Metrics/Redis Helm →
 `kubectl port-forward`) is step-by-step in `docs/dev-kueue-cluster-setup.md`.
