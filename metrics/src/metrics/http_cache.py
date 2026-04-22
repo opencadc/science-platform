@@ -50,7 +50,10 @@ def metrics_success_cache_headers(
     now = _ensure_utc(now or datetime.now(UTC))
     created = _ensure_utc(snapshot_created)
 
-    headers: dict[str, str] = {"Date": http_date(now), "Last-Modified": http_date(created)}
+    headers: dict[str, str] = {
+        "Date": http_date(now),
+        "Last-Modified": http_date(created),
+    }
 
     if configured_ttl <= 0:
         headers["Cache-Control"] = "no-store"

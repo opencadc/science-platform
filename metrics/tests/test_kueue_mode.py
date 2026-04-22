@@ -26,7 +26,9 @@ async def test_validate_kueue_mode_requires_kube_url() -> None:
         )
 
 
-def test_kueue_app_lifespan_invokes_startup_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_kueue_app_lifespan_invokes_startup_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     called = 0
 
     async def fake_validate(settings: Settings) -> None:

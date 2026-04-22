@@ -79,19 +79,25 @@ def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
             total = resource.get("total")
             borrowed = resource.get("borrowed")
             merge_resource_totals(
-                totals, name, parse_resource_amount(name, str(total) if total is not None else "")
+                totals,
+                name,
+                parse_resource_amount(name, str(total) if total is not None else ""),
             )
             merge_resource_totals(
                 totals,
                 name,
-                parse_resource_amount(name, str(borrowed) if borrowed is not None else ""),
+                parse_resource_amount(
+                    name, str(borrowed) if borrowed is not None else ""
+                ),
             )
     return totals
 
 
 def _float_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
     """Convert internal floats to stable Kubernetes-style quantity strings."""
-    return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
+    return {
+        name: format_resource_amount(name, val) for name, val in sorted(values.items())
+    }
 
 
 def _align_allocated_with_capacity(
@@ -157,7 +163,9 @@ class KueuePlatformEngine:
                 f"Kubernetes returned HTTP {exc.response.status_code} querying Kueue objects"
             ) from exc
         except httpx.RequestError as exc:
-            raise ProviderExecutionError(f"Failed querying Kueue objects: {exc}") from exc
+            raise ProviderExecutionError(
+                f"Failed querying Kueue objects: {exc}"
+            ) from exc
 
         queue_docs = docs[:-1]
         cohort_doc = docs[-1]

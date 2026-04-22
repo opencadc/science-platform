@@ -19,7 +19,11 @@ from __future__ import annotations
 import httpx
 
 from metrics.config import Settings
-from metrics.kueue_api import cluster_queue_object_url, cohort_object_url, kueue_clusterqueues_list_url
+from metrics.kueue_api import (
+    cluster_queue_object_url,
+    cohort_object_url,
+    kueue_clusterqueues_list_url,
+)
 from metrics.providers.kube_http import (
     kube_auth_headers,
     kube_get_json,
@@ -106,10 +110,14 @@ async def _validate_kueue_mode_startup_impl(settings: Settings) -> None:
             ) from exc
         raise KueueStartupError(f"Kubernetes request failed: {exc}") from exc
     except httpx.RequestError as exc:
-        raise KueueStartupError(f"Cannot reach Kubernetes API for Kueue checks: {exc}") from exc
+        raise KueueStartupError(
+            f"Cannot reach Kubernetes API for Kueue checks: {exc}"
+        ) from exc
 
     cohort_url = cohort_object_url(settings, settings.kueue_cohort)
-    queue_urls = [cluster_queue_object_url(settings, q) for q in settings.kueue_cluster_queues]
+    queue_urls = [
+        cluster_queue_object_url(settings, q) for q in settings.kueue_cluster_queues
+    ]
 
     try:
         docs = await kube_parallel_get_json(
@@ -123,9 +131,13 @@ async def _validate_kueue_mode_startup_impl(settings: Settings) -> None:
             raise KueueStartupError(
                 "Configured cohort or a ClusterQueue was not found in the cluster"
             ) from exc
-        raise KueueStartupError(f"Kubernetes request failed during Kueue validation: {exc}") from exc
+        raise KueueStartupError(
+            f"Kubernetes request failed during Kueue validation: {exc}"
+        ) from exc
     except httpx.RequestError as exc:
-        raise KueueStartupError(f"Cannot reach Kubernetes API for Kueue checks: {exc}") from exc
+        raise KueueStartupError(
+            f"Cannot reach Kubernetes API for Kueue checks: {exc}"
+        ) from exc
 
     cohort_doc = docs[0]
     cqs = docs[1:]
@@ -134,7 +146,9 @@ async def _validate_kueue_mode_startup_impl(settings: Settings) -> None:
         raise KueueStartupError("Unexpected response when loading Cohort object")
     meta = cohort_doc.get("metadata") or {}
     if meta.get("name") != settings.kueue_cohort:
-        raise KueueStartupError("Cohort response metadata did not match requested cohort name")
+        raise KueueStartupError(
+            "Cohort response metadata did not match requested cohort name"
+        )
 
     for cq, queue_name in zip(cqs, settings.kueue_cluster_queues, strict=True):
         if not isinstance(cq, dict):
@@ -150,5 +164,3 @@ async def _validate_kueue_mode_startup_impl(settings: Settings) -> None:
                 f"ClusterQueue {queue_name!r} has cohort {cohort_ref!r}, "
                 f"expected {settings.kueue_cohort!r}"
             )
-
-
