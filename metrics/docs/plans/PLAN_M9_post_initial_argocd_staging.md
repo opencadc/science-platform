@@ -1,8 +1,8 @@
-# Post-initial ArgoCD staging plan
+# Milestone M9: post-initial ArgoCD staging plan
 
-This plan is intentionally deferred until Milestones 1 through 4 are stable in
-production. It captures the next GitOps steps without blocking the initial
-rollout.
+This plan is intentionally deferred until the preceding delivery milestones are
+stable in production. It captures GitOps staging promotion work without
+blocking the core API roadmap.
 
 ## Objective
 
@@ -13,29 +13,27 @@ using Helm values overlays and repository-driven deployment workflows.
 
 Complete these conditions before starting:
 
-- M1 through M4 acceptance gates are satisfied.
-- Production debug loop has no open severity-1 or severity-2 issues.
+- M1 through M7 acceptance gates are satisfied, and M8 stabilization exit
+  criteria are met and recorded.
+- The initial production debug loop has no open severity-1 or severity-2
+  issues.
 - Chart defaults and environment overlays are stable.
 
 ## Scope
 
-The post-initial work includes:
+This post-initial work includes:
 
 - ArgoCD application manifests for staging deployment.
-- Environment promotion policy from `integration` to `staging`, noting that the
-  runtime setting may still use `METRICS_ENVIRONMENT=int` until naming is
-  reconciled in code.
+- Environment promotion policy from `integration` to `staging`.
 - Secret and credential delivery model for staging values.
 - Promotion verification and rollback procedures.
 
-The post-initial work excludes:
+This post-initial work excludes:
 
 - Feature-level API contract changes.
-- New provider logic beyond existing milestone scope.
+- New provider logic beyond established milestone scope.
 
 ## Implementation phases
-
-Use these phases to execute GitOps staging integration.
 
 1. Add ArgoCD application manifests for `metrics-api`.
 2. Map Helm `values-staging.yaml` into ArgoCD application configuration.
@@ -45,8 +43,6 @@ Use these phases to execute GitOps staging integration.
 
 ## Success criteria
 
-Treat this effort complete when:
-
-- ArgoCD can reconcile the metrics service chart to staging.
+- ArgoCD reconciles the metrics service chart to staging.
 - Promotion flow and rollback are documented and rehearsed.
 - Staging telemetry mirrors production observability expectations.

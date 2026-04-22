@@ -7,9 +7,9 @@ from typing import Any
 
 import httpx
 
-from metrics.config import Settings
+from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
-from metrics.models import UsageReading
+from metrics.schemas.metrics import UsageReading
 
 
 class PrometheusUsageProvider:
@@ -21,26 +21,31 @@ class PrometheusUsageProvider:
         self._settings = settings
 
     async def get_usage(self) -> UsageReading:
-        if not self._settings.prometheus_url:
-            raise ProviderUnavailableError("METRICS_PROMETHEUS_URL is not configured")
+        p = self._settings.platform.prometheus
+        if not p.url:
+            raise ProviderUnavailableError(
+                "METRICS_PLATFORM__PROMETHEUS__URL (or legacy METRICS_PROMETHEUS_URL) "
+                "is not configured"
+            )
 
         return await self._build_usage_reading(
-            cpu_query=self._settings.promql_requested_cpu_cores,
-            memory_query=self._settings.promql_requested_memory_bytes,
+            cpu_query=p.promql_requested_cpu_cores,
+            memory_query=p.promql_requested_memory_bytes,
             source=self.source_name,
         )
 
     async def get_usage_for_user(self, user_id: str) -> UsageReading:
+        ul = self._settings.user.prometheus.user_label_key
         return await self._build_usage_reading(
             cpu_query=self._resource_request_query(
                 resource="cpu",
                 unit="core",
-                labels={self._settings.user_label_key: user_id},
+                labels={ul: user_id},
             ),
             memory_query=self._resource_request_query(
                 resource="memory",
                 unit="byte",
-                labels={self._settings.user_label_key: user_id},
+                labels={ul: user_id},
             ),
             source=f"{self.source_name}:user",
         )
@@ -48,9 +53,10 @@ class PrometheusUsageProvider:
     async def get_usage_for_session(
         self, user_id: str, session_id: str
     ) -> UsageReading:
+        up = self._settings.user.prometheus
         labels = {
-            self._settings.user_label_key: user_id,
-            self._settings.session_label_key: session_id,
+            up.user_label_key: user_id,
+            up.session_label_key: session_id,
         }
         return await self._build_usage_reading(
             cpu_query=self._resource_request_query(
@@ -83,14 +89,15 @@ class PrometheusUsageProvider:
         )
 
     async def _query_scalar(self, query: str) -> float:
-        endpoint = f"{self._settings.prometheus_url.rstrip('/')}/api/v1/query"
+        p = self._settings.platform.prometheus
+        endpoint = f"{p.url.rstrip('/')}/api/v1/query"
 
         try:
             payload = await _request_json(
                 endpoint,
                 params={"query": query},
-                timeout=self._settings.prometheus_timeout_seconds,
-                verify=self._settings.prometheus_verify_tls,
+                timeout=p.timeout_seconds,
+                verify=p.verify_tls,
             )
         except Exception as exc:  # pragma: no cover - exercised via monkeypatch
             raise ProviderExecutionError(f"Prometheus query failed: {exc}") from exc
@@ -124,7 +131,8 @@ class PrometheusUsageProvider:
             f'{key}="{_escape_label_value(value)}"'
             for key, value in labels_with_resource.items()
         )
-        return f"sum({self._settings.resource_requests_metric_name}{{{selector}}})"
+        name = self._settings.platform.prometheus.resource_requests_metric_name
+        return f"sum({name}{{{selector}}})"
 
 
 async def _request_json(

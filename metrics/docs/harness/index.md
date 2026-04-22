@@ -29,6 +29,11 @@ Good: update `docs/harness/hook-policy.yaml` and regenerate adapter mirrors. Bad
 
 This file does not define project-specific product behavior.
 
+## Roadmap naming pointer
+
+For milestone naming, renumbering, and incremental stage rules, use
+`docs/plans/milestone-process.md` as the canonical source.
+
 
 ## Precedence
 

@@ -9,20 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResponseMetadata(BaseModel):
-    """Common metadata for all API responses."""
+    """Common metadata for all API responses.
+
+    Freshness and cache visibility are expressed via HTTP headers
+    (``Cache-Control``, ``Date``, ``Expires``, ``Last-Modified``), not JSON fields.
+    """
 
     created: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        description="Timestamp when this metric payload instance was created.",
-    )
-    cached: bool = Field(
-        default=False,
-        description="Indicates whether data was served from the configured TTL cache.",
-    )
-    ttl: int = Field(
-        default=0,
-        ge=0,
-        description="TTL in seconds used by the cache key for this payload.",
+        description="Timestamp when this metric snapshot was produced (also ``Last-Modified``).",
     )
 
 
@@ -106,12 +101,19 @@ class PlatformMetricsData(BaseModel):
 
     scope: Literal["platform"] = "platform"
     cluster: str = Field(description="Cluster identifier for this metric scope.")
-    capacity: ResourceSnapshot
-    usage: UsageSnapshot
-    sources: list[str] = Field(
-        min_length=1,
-        description="Ordered provider source path used to compute this metric.",
-        examples=[["kueue", "prometheus"]],
+    capacity: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Aggregated nominal quota keyed by Kubernetes resource name "
+            "(for example cpu, memory, nvidia.com/gpu)."
+        ),
+    )
+    allocated: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Aggregated admitted usage from Kueue ClusterQueue status.flavorsUsage "
+            "(total plus borrowed per resource), keyed by resource name."
+        ),
     )
 
 
@@ -123,11 +125,6 @@ class UserMetricsData(BaseModel):
     user_id: str
     capacity: ResourceSnapshot
     usage: UsageSnapshot
-    sources: list[str] = Field(
-        min_length=1,
-        description="Ordered provider source path used to compute this metric.",
-        examples=[["kueue", "prometheus"]],
-    )
 
 
 class SessionMetricsData(BaseModel):
@@ -139,11 +136,6 @@ class SessionMetricsData(BaseModel):
     session_id: str
     capacity: ResourceSnapshot
     usage: UsageSnapshot
-    sources: list[str] = Field(
-        min_length=1,
-        description="Ordered provider source path used to compute this metric.",
-        examples=[["kueue", "prometheus"]],
-    )
 
 
 class PlatformMetricsResponse(BaseModel):

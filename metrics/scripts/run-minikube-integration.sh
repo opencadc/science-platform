@@ -4,7 +4,10 @@
 # addons such as metrics-server, which we rely on for upcoming kube-metrics work.
 #
 # Environment:
-#   MINIKUBE_PROFILE          — cluster profile (default: metrics-local)
+#   MINIKUBE_PROFILE          — Minikube profile (default: metrics-local). Kept
+#                               separate from the default "minikube" profile so
+#                               trap cleanup can delete this profile without
+#                               wiping the developer's usual local cluster.
 #   MINIKUBE_DRIVER           — vm driver (default: docker)
 #   MINIKUBE_ENABLE_METRICS_SERVER — "true"|"false" (default: true)
 #
@@ -51,6 +54,10 @@ if [[ "${MINIKUBE_ENABLE_METRICS_SERVER}" == "true" ]]; then
   echo "Enabling metrics-server addon (resource metrics API; aligns with upcoming milestones)"
   minikube addons enable metrics-server -p "${MINIKUBE_PROFILE}"
 fi
+
+echo "Installing Kueue and M2 test fixtures (ClusterQueues + Cohort)"
+bash "${_SCRIPT_DIR}/install-kueue-minikube.sh"
+kubectl --context "${KCTX}" apply -f "${METRICS_ROOT}/tests/fixtures/kueue/"
 
 echo "Building local metrics image: ${LOCAL_IMAGE}"
 docker build -t "${LOCAL_IMAGE}" .

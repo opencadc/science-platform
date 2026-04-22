@@ -1,7 +1,9 @@
-"""FastAPI application factory."""
+"""FastAPI application factory and dependency wiring for the Metrics API."""
 
 from __future__ import annotations
 
+import hashlib
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,18 +13,26 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from pydantic import TypeAdapter
 from redis.asyncio import Redis
 
-from metrics.api.routes import router
+from metrics.api.v1.routes import router
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.config import Settings
+from metrics.core.settings import Settings
+from metrics.core.startup import KueueStartupError, validate_application_startup
 from metrics.errors import AppError
-from metrics.models import ErrorDetail, ErrorResponse, ResponseMetadata
-from metrics.providers.composite import FallbackCapacityProvider
+from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
 from metrics.providers.kueue import KueueCapacityProvider
-from metrics.providers.node import NodeCapacityProvider
+from metrics.providers.kueue_platform import KueuePlatformEngine
 from metrics.providers.prometheus import PrometheusUsageProvider
-from metrics.providers.static import StaticCapacityProvider, StaticUsageProvider
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import setup_telemetry
+
+_logger = logging.getLogger(__name__)
+
+
+def _platform_cache_fingerprint(settings: Settings) -> str:
+    """Stable token for Redis keys when Kueue scope changes."""
+    k = settings.platform.kueue
+    raw = "|".join(sorted(k.cluster_queues)) + "|" + k.cohort
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
 def _build_cache_backend(
@@ -64,6 +74,14 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_app_instance: FastAPI):
         try:
+            try:
+                await validate_application_startup(settings)
+            except KueueStartupError:
+                _logger.exception(
+                    "Application startup validation failed; fix cluster or Prometheus "
+                    "configuration or see docs/dev-kueue-cluster-setup.md#troubleshooting"
+                )
+                raise
             yield
         finally:
             if fastapi_instrumented:
@@ -80,8 +98,8 @@ def create_app(
         version=settings.app_version,
         summary="CANFAR Science Platform Metrics API",
         description=(
-            "API for platform size and utilization metrics with Kueue-first"
-            "capacity sourcing, node fallback, and Prometheus-backed usage."
+            "API for platform size and utilization metrics composed from "
+            "configured Kueue, Prometheus, and reserved kube-metrics sources."
         ),
         lifespan=lifespan,
     )
@@ -104,8 +122,7 @@ def create_app(
             telemetry.recorder.record_http_request(
                 scope=scope,
                 status_code=response.status_code,
-                cached=response.headers.get("X-Metrics-Cached", "false").lower()
-                == "true",
+                cached=getattr(request.state, "metrics_cache_hit", False),
             )
         return response
 
@@ -122,17 +139,9 @@ def create_app(
     app.state.cache_control_public = settings.cache_control_public
 
     if platform_service is None:
-        if settings.provider_mode == "static":
-            capacity_provider = StaticCapacityProvider(settings=settings)
-            usage_provider = StaticUsageProvider(settings=settings)
-        else:
-            capacity_provider = FallbackCapacityProvider(
-                providers=[
-                    KueueCapacityProvider(settings=settings),
-                    NodeCapacityProvider(settings=settings),
-                ]
-            )
-            usage_provider = PrometheusUsageProvider(settings=settings)
+        engine = KueuePlatformEngine(settings)
+        capacity_provider = KueueCapacityProvider(settings=settings)
+        usage_provider = PrometheusUsageProvider(settings=settings)
         cache, redis_client = _build_cache_backend(settings)
         platform_service = PlatformMetricsService(
             cluster_name=settings.cluster_name,
@@ -140,6 +149,8 @@ def create_app(
             usage_provider=usage_provider,
             cache=cache,
             metrics_recorder=telemetry.recorder,
+            platform_resource_loader=engine.collect,
+            platform_cache_fingerprint=_platform_cache_fingerprint(settings),
         )
 
     app.state.platform_service = platform_service
@@ -153,7 +164,7 @@ def create_app(
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
         body = ErrorResponse(
             version=app.state.api_version,
-            metadata=ResponseMetadata(ttl=settings.cache_ttl_seconds),
+            metadata=ResponseMetadata(),
             error=ErrorDetail(
                 code=exc.code,
                 message=exc.message,
@@ -163,6 +174,7 @@ def create_app(
         return JSONResponse(
             status_code=exc.status_code,
             content=body.model_dump(mode="json", by_alias=True),
+            headers={"Cache-Control": "no-store"},
         )
 
     @app.exception_handler(Exception)
@@ -171,7 +183,7 @@ def create_app(
     ) -> JSONResponse:
         body = ErrorResponse(
             version=app.state.api_version,
-            metadata=ResponseMetadata(ttl=settings.cache_ttl_seconds),
+            metadata=ResponseMetadata(),
             error=ErrorDetail(
                 code="internal_error",
                 message="Unexpected internal server error",
@@ -181,6 +193,7 @@ def create_app(
         return JSONResponse(
             status_code=500,
             content=body.model_dump(mode="json", by_alias=True),
+            headers={"Cache-Control": "no-store"},
         )
 
     return app

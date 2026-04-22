@@ -33,4 +33,12 @@ def test_platform_endpoint_shape() -> None:
     payload = response.json()
     assert payload["kind"] == "PlatformMetrics"
     assert payload["data"]["scope"] == "platform"
+    assert isinstance(payload["data"]["capacity"], dict)
+    assert isinstance(payload["data"]["allocated"], dict)
+    assert "cpu" in payload["data"]["capacity"]
+    assert "memory" in payload["data"]["capacity"]
+    assert "created" in payload["metadata"]
+    assert "ttl" not in payload["metadata"]
+    assert "cached" not in payload["metadata"]
     assert "Cache-Control" in response.headers
+    assert "Date" in response.headers or "date" in response.headers

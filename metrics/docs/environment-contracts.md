@@ -1,51 +1,94 @@
 # Environment contracts (Metrics service)
 
-This document records how **roadmap environment names** map to **runtime
-settings** and what this repository owns versus external deployment
-repositories.
+This document records how environment names map to runtime behavior and what
+this repository owns for local and delivery workflows.
 
-## Canonical names (roadmap / operations)
+## Canonical `METRICS_ENVIRONMENT` values
 
-| Roadmap / handoff | `METRICS_ENVIRONMENT` (current) | Notes |
+The application accepts exactly these runtime tokens (case-insensitive input is
+normalized):
+
+| Value | Use |
+| --- | --- |
+| `dev` | Local Kubernetes-first development and integration setup. |
+| `integration` | CI-backed or shared integration clusters. |
+| `staging` | Pre-production cluster rollout. |
+| `production` | Production cluster rollout. |
+
+Legacy aliases remain accepted for now:
+
+| Legacy input | Normalized to |
+| --- | --- |
+| `int` | `integration` |
+| `prod` | `production` |
+
+Any other value is rejected at settings validation time.
+
+## Environment runtime contract
+
+The service is Kubernetes-first in every environment.
+
+- `dev` requires Minikube, Helm, and `kubectl`. Test and verification flows
+  assume you can create or use a Minikube cluster, install Kueue charts, apply
+  ClusterQueue/Cohort objects, deploy the metrics chart, and run Redis in the
+  cluster deployment path.
+- `integration`, `staging`, and `production` use an already operating
+  Kubernetes cluster. This repository deploys the service via Helm with
+  environment-specific values such as queue configuration and Redis endpoint.
+  These environments do not assume local Minikube provisioning.
+
+Docker Compose is no longer part of the supported development contract.
+
+## 12-factor configuration model
+
+All runtime behavior remains environment-driven. Settings use nested Pydantic
+models under `platform` and `user` (for example `platform.kueue.cluster_queues`).
+`pydantic-settings` reads nested keys using the delimiter `__`, for example
+`METRICS_PLATFORM__KUEUE__CLUSTER_QUEUES`. Legacy flat variables such as
+`METRICS_KUEUE_CLUSTER_QUEUES`, `METRICS_KUBE_API_URL`, and `METRICS_PROMETHEUS_URL`
+are merged at load time when nested values are absent (see
+`Settings._merge_legacy_environment` in `src/metrics/core/settings.py`).
+
+## Operator alias precedence (`KUEUE_METRICS_*` versus `METRICS_*`)
+
+The application loads nested `METRICS_*` fields, then applies fill-only aliases
+from process environment in `Settings._merge_legacy_environment` in
+`src/metrics/core/settings.py`.
+
+| If this nested field is empty | And this env var is set | Then |
 | --- | --- | --- |
-| `dev` | `dev` | Local `docker compose` and in-repo `values-dev.yaml` only. |
-| `integration` | `int` | Roadmap name is `integration`; the app uses `int` today. |
-| `staging` | `staging` | Overlays live outside this repository. |
-| `production` | `prod` | Roadmap name is `production`; the app uses `prod` today. |
+| `platform.kueue.kube_api_url` | `KUEUE_METRICS_URL` | `kube_api_url` is set from `KUEUE_METRICS_URL`. |
+| `platform.kueue.cluster_queues` | `KUEUE_METRICS_CLUSTER_QUEUES` | Queue list parsed from comma-separated value. |
+| `platform.kueue.cohort` | `KUEUE_METRICS_COHORT` | Cohort name copied. |
 
-M2 may align naming (rename settings literals) or keep this mapping as a
-documented operator contract. Until then, operators and charts should set
-`METRICS_ENVIRONMENT` to the **runtime** value in the right column.
+Aliases do not override non-empty primary fields.
 
-## What this repository provides
+## Repository ownership boundaries
 
-- **Local `dev` app + Redis:** `compose.yaml` in `metrics/`; optional `.env` for
-  variable substitution (see `env.example`). This stack is for fast API
-  iteration; it does not embed a full Kubernetes control plane.
-- **Local / CI cluster contract:** `helm/metrics-api` with `values-dev.yaml`
-  only. Minikube (or another cluster) is an **external** prerequisite for
-  production-like data sources and integration smoke tests.
-- **12-factor configuration:** all behavior through `METRICS_*` environment
-  variables; no config files required in the container.
+This repository owns:
 
-## What lives elsewhere
+- application code and tests,
+- Helm chart contract for the metrics service,
+- local dev and CI scripts for Kubernetes-backed validation, and
+- milestone and architecture docs for service behavior.
 
-- `integration`, `staging`, and `production` **value overlays** and GitOps
-  promotion for those environments are owned by a separate deployment
-  repository. This repo documents the **handoff** (chart contract, image
-  reference, required env vars) so those overlays can pin versions and
-  wire secrets.
+Higher-environment overlay repositories own promotion pipelines and environment
+specific deployment overlays.
 
 ## Image and release contract
 
 - Release images: `images.opencadc.org/platform/metrics` on Git tags
-  `metric-v*`, multi-arch `linux/amd64` and `linux/arm64` (see
-  `../README.md` and root release-please config).
+  `metric-v*`, multi-arch `linux/amd64` and `linux/arm64`.
 - Non-tag CI does not publish release images.
 
-## Review checkpoint (M1)
+## Platform sources note
 
-Before mode-specific feature work, confirm with stakeholders that the
-**environment ownership** model above (in-repo `dev` only, higher envs
-elsewhere) matches org process. Record agreement in milestone outcomes or
-`docs/plans/PLAN_M1_outcomes.md`.
+Platform metrics always use the Kueue HTTP collectors plus Prometheus-backed
+usage for user and session routes. Startup validation requires both Kubernetes
+(Kueue scope) and Prometheus endpoints to be configured.
+
+## Cluster RBAC (Helm)
+
+When `rbac.create` is true, the chart installs a release-scoped `ClusterRole`
+and `ClusterRoleBinding`. Treat leftover cluster-scoped RBAC after uninstall as
+an operational cleanup task.

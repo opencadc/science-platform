@@ -6,8 +6,8 @@ import pytest
 
 from metrics.cache import InMemoryTTLCache
 from metrics.errors import AppError, ProviderUnavailableError
-from metrics.models import CapacityReading, UsageReading
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.schemas.metrics import CapacityReading, UsageReading
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 
 
 class DummyCapacityProvider:
@@ -74,20 +74,16 @@ async def test_service_returns_metrics_and_uses_cache() -> None:
     assert first.cached is False
     assert second.cached is True
     assert first.created == second.created
-    assert first.data.usage.utilization.cpu == 0.5
-    assert first.data.usage.utilization.memory == 0.5
-    assert first.data.usage.utilization.ephemeral_memory == 0.0
-    assert first.data.usage.utilization.gpu == 0.0
-    assert first.data.capacity.cpu == "10"
-    assert first.data.capacity.memory == "20 GiB"
-    assert first.data.capacity.ephemeral_memory == "0 GiB"
-    assert first.data.capacity.gpu == "0"
+    assert first.data.capacity["cpu"] == "10"
+    assert first.data.capacity["memory"] == "20Gi"
+    assert first.data.allocated["cpu"] == "5"
+    assert first.data.allocated["memory"] == "10Gi"
     assert capacity.calls == 1
     assert usage.calls == 1
 
 
 @pytest.mark.anyio
-async def test_service_clamps_utilization_ratio_to_one() -> None:
+async def test_platform_static_allocated_reflects_usage_without_clamping() -> None:
     now = datetime.now(UTC)
     capacity = DummyCapacityProvider(
         CapacityReading(cpu_cores=10, memory_gib=20, source="kueue", observed_at=now)
@@ -109,8 +105,8 @@ async def test_service_clamps_utilization_ratio_to_one() -> None:
     )
 
     result = await service.get_platform_metrics()
-    assert result.data.usage.utilization.cpu == 1.0
-    assert result.data.usage.utilization.memory == 1.0
+    assert result.data.allocated["cpu"] == "50"
+    assert result.data.allocated["memory"] == "40Gi"
 
 
 @pytest.mark.anyio
@@ -181,5 +177,4 @@ async def test_service_returns_user_and_session_metrics() -> None:
 
     assert session_result.data.user_id == "alice"
     assert session_result.data.session_id == "sess-1"
-    assert session_result.data.sources == ["kueue", "prometheus"]
     assert session_result.cached is False

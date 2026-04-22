@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import uvicorn
 
-from metrics.app import app
-from metrics.config import Settings
+from metrics.core.factory import app
+from metrics.core.settings import Settings
 
 
 def run() -> None:

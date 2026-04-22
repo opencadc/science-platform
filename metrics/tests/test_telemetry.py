@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from metrics.config import Settings
+from metrics.core.settings import Settings
 from metrics.telemetry import NoopMetricsRecorder, setup_telemetry
 
 

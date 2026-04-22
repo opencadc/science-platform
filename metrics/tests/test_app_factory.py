@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
-import metrics.app as app_module
-from metrics.app import _build_cache_backend, create_app
+import metrics.core.factory as factory_module
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache
-from metrics.config import Settings
-from metrics.models import CapacityReading, UsageReading
-from metrics.service import CachedMetrics, PlatformMetricsService
+from metrics.core.factory import _build_cache_backend, create_app
+from metrics.core.settings import Settings
+from metrics.schemas.metrics import CapacityReading, UsageReading
+from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder, TelemetrySetup
 
 
@@ -119,10 +119,10 @@ def test_create_app_configures_otel_and_shutdown_hooks(monkeypatch) -> None:
         def uninstrument(self):
             calls["httpx_uninstrument"] += 1
 
-    monkeypatch.setattr(app_module, "setup_telemetry", fake_setup_telemetry)
-    monkeypatch.setattr(app_module, "FastAPIInstrumentor", FakeFastAPIInstrumentor)
+    monkeypatch.setattr(factory_module, "setup_telemetry", fake_setup_telemetry)
+    monkeypatch.setattr(factory_module, "FastAPIInstrumentor", FakeFastAPIInstrumentor)
     monkeypatch.setattr(
-        app_module,
+        factory_module,
         "HTTPXClientInstrumentor",
         FakeHTTPXClientInstrumentor,
     )
@@ -143,16 +143,12 @@ def test_create_app_configures_otel_and_shutdown_hooks(monkeypatch) -> None:
     assert meter_provider.shutdown_calls == 1
 
 
-def test_create_app_static_provider_mode_without_live_dependencies() -> None:
+def test_create_app_uses_injected_platform_service_for_platform_route() -> None:
     app = create_app(
-        settings=Settings(
-            provider_mode="static",
-            cache_backend="memory",
-            prometheus_url=None,
-            kube_api_url=None,
-        )
+        settings=Settings(cache_backend="memory"),
+        platform_service=_service(),
     )
     with TestClient(app) as client:
         response = client.get("/api/v1/metrics/platform")
         assert response.status_code == 200
-        assert response.json()["data"]["sources"][0] == "static-capacity"
+        assert "capacity" in response.json()["data"]

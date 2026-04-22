@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from metrics.models import CapacityReading, UsageReading
+from metrics.schemas.metrics import CapacityReading, UsageReading
 
 
 class CapacityProvider(Protocol):

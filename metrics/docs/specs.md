@@ -12,3 +12,26 @@ This file stores repository-specific behavioral specifications.
 
 - Ensure every factual claim is verifiable from code.
 - Use concrete examples and acceptance checks.
+
+## Service behavior specifications
+
+- The API exposes platform, user, and session routes under `/api/v1/metrics`
+  with health at `/healthz`.
+- Runtime configuration is environment-driven through `METRICS_*` settings and
+  validated through Pydantic models.
+- Runtime configuration uses nested platform and user settings; legacy flat
+  `METRICS_*` keys are merged when nested values are unset (see
+  `environment-contracts.md`).
+- Startup must fail fast when required source dependencies are unavailable.
+- Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
+  `Expires`, and `Last-Modified`) for cacheable routes.
+
+## Milestone linkage
+
+- Architecture realignment and provider cleanup: `docs/plans/PLAN_M3_app_structure_and_platform_sources.md`
+- Kube-metrics runtime implementation: `docs/plans/PLAN_M4_kube_metrics_mode_platform_release.md`
+
+## Planned target behavior (roadmap)
+
+- Kube-metrics becomes an active source once M4 implements runtime depth behind
+  `platform.kube_metrics`.
