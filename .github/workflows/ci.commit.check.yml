@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           egress-policy: audit
       - name: Checkout code
@@ -27,7 +27,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}  # checkout PR HEAD commit
           fetch-depth: 0  # required for merge-base check
       - name: Run Commit Check
-        uses: commit-check/commit-check-action@v2
+        uses: commit-check/commit-check-action@7c158d4541309c5952de3343151750882b036d10 # v2.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
         with:

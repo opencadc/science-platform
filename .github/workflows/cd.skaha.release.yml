@@ -18,7 +18,7 @@ jobs:
     if: github.repository == 'opencadc/science-platform'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           egress-policy: audit
       - name: Checkout
@@ -37,7 +37,7 @@ jobs:
               - '!metrics/**'
       - name: Create release
         id: release-please
-        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
       - name: Dispatch Edge Build
         # Skaha edge image: skip when this push only changes Metrics paths
         if: >-
