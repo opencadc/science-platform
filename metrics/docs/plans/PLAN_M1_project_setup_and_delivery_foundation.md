@@ -6,6 +6,10 @@ environment contracts in a shared monorepo. You use this milestone to make the
 service repeatable, testable, and deployable before adding mode-specific
 feature depth.
 
+> Note: This document captures historical M1 scope. Docker Compose references in
+> this file are superseded by the Kubernetes-first environment contract recorded
+> in `docs/environment-contracts.md` and M3+ roadmap plans.
+
 ## Summary
 
 This milestone establishes the delivery baseline for the Metrics service. The

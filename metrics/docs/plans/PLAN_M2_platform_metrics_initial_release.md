@@ -116,9 +116,9 @@ the live cluster test path.
 `/apis/kueue.x-k8s.io/v1beta2/clusterqueues` and
 `/apis/kueue.x-k8s.io/v1beta2/cohorts`.
 - Local prerequisites for cluster-backed bring-up and smoke validation:
-  `helm`, `kubectl`, and an already running Kubernetes cluster. `docker`
-  remains part of the local compose workflow only when you choose to run the
-  app and Redis that way.
+  `helm`, `kubectl`, and an already running Kubernetes cluster (Minikube in
+  local dev). Docker Compose references from early milestones are historical
+  and not part of the active environment contract.
 
 ## Configuration naming draft
 

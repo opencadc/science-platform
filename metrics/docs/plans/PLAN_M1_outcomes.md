@@ -3,6 +3,10 @@
 This note records closure evidence for milestone M1
 (`PLAN_M1_project_setup_and_delivery_foundation.md`).
 
+> Note: M1 outcomes include historical Docker Compose artifacts. The current
+> runtime contract is Kubernetes-first as documented in
+> `docs/environment-contracts.md` and the M3 roadmap sequence.
+
 ## Delivered
 
 - **CI/CD pathways:** Repo-wide workflows remain global; Skaha workflows use

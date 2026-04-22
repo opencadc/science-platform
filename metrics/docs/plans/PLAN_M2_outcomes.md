@@ -140,7 +140,7 @@ explicitly widened.
   utilization analytics remain out of scope per the plan.
 - Prometheus error-path hardening (`_query_scalar` / `_build_usage_reading`) and
   import-surface cleanup (`metrics.providers` exports, unused dependencies) are
-  **M2b or later** unless pulled into scope by a new plan.
+  **M4 or later** unless pulled into scope by a new plan.
 - If webhook validation requires additional Cohort fields for your Kueue
   configuration, extend `tests/fixtures/kueue/` and re-run the cluster-backed
   smoke validation.

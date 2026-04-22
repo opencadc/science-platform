@@ -22,7 +22,7 @@
 | `metrics/tests/test_quantity.py` | New module: caplog assertion for parse failure logging (create if absent; else extend). |
 | `metrics/CHANGELOG.md` | Document breaking env and platform JSON changes + `live` alias policy. |
 | `metrics/docs/environment-contracts.md` | Document `KUEUE_METRICS_*` vs `METRICS_*` merge precedence. |
-| `metrics/docs/plans/PLAN_M2_platform_metrics_initial_release.md` | Verify snapshot accuracy and closure checklist pointers. |
+| `docs/plans/PLAN_M2_platform_metrics_initial_release.md` | Verify snapshot accuracy and closure checklist pointers. |
 | `metrics/helm/metrics-api/templates/rbac.yaml` | Remove `watch` verb (app uses GET only). |
 | `metrics/helm/metrics-api/values.yaml` | Comment: enable dedicated SA when `rbac.create` is true. |
 | `metrics/README.md` | One paragraph: Kueue RBAC + SA recommendation and link to environment-contracts. |
@@ -327,7 +327,7 @@ git add metrics/README.md && git commit -m "docs(metrics): point operators to Ku
 ## Self-review (author checklist)
 
 1. **Spec coverage:** Every consensus M2 item except performance and deferred
-   M2b items maps to a task above (`live`, changelog, env precedence, quantity
+   M4 items maps to a task above (`live`, changelog, env precedence, quantity
    logging, RBAC, README).
 2. **Placeholder scan:** No TBD steps; code blocks are complete.
 3. **Type consistency:** `Settings(provider_mode=...)` matches Pydantic field
@@ -337,7 +337,7 @@ git add metrics/README.md && git commit -m "docs(metrics): point operators to Ku
 
 ## Execution handoff
 
-**Plan complete and saved to** `metrics/docs/plans/PLAN_M2_post_review_feedback.md`.
+**Plan complete and saved to** `docs/plans/PLAN_M2_post_review_feedback.md`.
 
 **Two execution options:**
 

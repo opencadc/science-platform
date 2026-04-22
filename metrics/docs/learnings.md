@@ -34,3 +34,23 @@ process lessons belong in `docs/harness/learnings.md`.
 - Lesson: Path-based workflow filters (`paths` / `paths-ignore`) and tag-prefix guards (`metric-v*`) are the primary levers for keeping Skaha and Metrics pipelines independent in a shared monorepo.
 - Evidence: `.github/workflows/ci.*.yml`, `cd.skaha.release.yml`, `release-please-config.json`.
 - Action taken: Documented in `docs/plans/PLAN_M1_outcomes.md` and `metrics/README.md`.
+
+- Date: April 22, 2026
+- Context: M3 documentation realignment and roadmap cleanup.
+- Lesson: Milestones stay readable and executable when roadmap stages are
+  strictly incremental (`PLAN_M<n>_<topic>`), and inserting a stage requires
+  immediate renumbering of later plan files and references.
+- Evidence: `docs/plans/milestone-process.md`, `docs/plans/index.md`, and
+  plans renamed to M3-M9 during this update.
+- Action taken: Added milestone naming rules and updated all roadmap filenames
+  and cross-links.
+
+- Date: April 22, 2026
+- Context: Environment contract review after roadmap realignment.
+- Lesson: Metrics service development must be Kubernetes-first; Docker Compose
+  introduces drift from real runtime dependencies and is no longer a supported
+  contract.
+- Evidence: `docs/environment-contracts.md`, `README.md`,
+  `docs/dev-kueue-cluster-setup.md`, and `AGENTS.md`.
+- Action taken: Updated documentation to require Minikube + Helm + kubectl in
+  `dev` and clarified higher-environment cluster ownership.

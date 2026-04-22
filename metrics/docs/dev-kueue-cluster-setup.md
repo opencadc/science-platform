@@ -1,10 +1,15 @@
 # Dev setup: Kueue + Metrics API on a local cluster
 
-Use this flow when you want **Kueue-backed** platform metrics (`METRICS_PROVIDER_MODE=kueue`) against a **local Kubernetes** cluster (Minikube is the default in this repo; any 1.29+ cluster with `kubectl` works).
+Use this flow when you want **Kueue-backed** platform metrics
+(`METRICS_PROVIDER_MODE=kueue`) against a local Minikube cluster.
 
-This guide assumes you **reuse your existing Minikube** (the usual default profile/context name is `**minikube`**). It does **not** create a separate profile such as `metrics-local`; you install Kueue and the metrics chart into whatever cluster your `kubectl` context points at.
+This guide assumes you reuse your existing Minikube (the usual default
+profile/context name is `minikube`). It does not create a separate profile such
+as `metrics-local`; you install Kueue and the metrics chart into the active
+Minikube context.
 
-All commands assume the `**metrics/`** directory as the current working directory unless noted.
+All commands assume the `metrics/` directory as the current working directory
+unless noted.
 
 Optional: set `KUBE_CONTEXT` if your Minikube context is not the default (examples below use `minikube`):
 
@@ -19,7 +24,7 @@ export KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
 Confirm tooling and cluster reachability:
 
 ```bash
-bash scripts/check-prerequisites.sh docker helm kubectl minikube
+bash scripts/check-prerequisites.sh helm kubectl minikube
 ```
 
 Use the **running** Minikube control plane (do not create a new cluster for this flow unless you have none):
@@ -194,8 +199,10 @@ bash scripts/teardown-dev-kube-setup.sh
 
 The script:
 
-1. Uninstalls the **metrics** Helm release (`RELEASE_NAME` / `NAMESPACE`, same defaults as [section 4](#4-build-and-deploy-metrics--redis-helm)).
-2. Deletes the `**metrics` namespace** by default (removes the API Deployment, Redis, and any remaining objects in that namespace).
+1. Uninstalls the metrics Helm release (`RELEASE_NAME` / `NAMESPACE`, same
+   defaults as [section 4](#4-build-and-deploy-metrics--redis-helm)).
+2. Deletes the `metrics` namespace by default (removes the API Deployment,
+   Redis, and any remaining objects in that namespace).
 3. Deletes the **Kueue fixtures** under `tests/fixtures/kueue/` in reverse order (ClusterQueues, then cohort, then resource flavor).
 4. Uninstalls the **Kueue** Helm release in `kueue-system` (same install as [section 2](#2-install-kueue-helm)).
 
@@ -225,7 +232,9 @@ helm uninstall "${KUEUE_RELEASE_NAME:-kueue}" -n "${KUEUE_NAMESPACE:-kueue-syste
 
 ## 7. One-shot automation (CI-style)
 
-`scripts/run-minikube-integration.sh` is for **CI / smoke verification**. By default it creates a **separate** Minikube profile (`metrics-local`) so teardown can delete that profile **without** touching your everyday `**minikube`** cluster. It starts the profile, installs Kueue, applies fixtures, deploys the chart, runs integration tests, and deletes the profile on exit.
+`scripts/run-minikube-integration.sh` is for **CI / smoke verification**. Run
+it against your active Minikube context when you need a one-shot local
+validation loop.
 
 For normal development on your **existing** default cluster, follow sections 1–5 above instead of this script; use [section 6](#6-teardown) to tear that stack down.
 
@@ -241,7 +250,10 @@ bash scripts/run-minikube-integration.sh
 
 In Kueue mode the process **must** pass `validate_kueue_mode_startup` before Uvicorn binds port 8000 and serves `/healthz`. If that fails, the container exits and Kubernetes restarts it.
 
-The Helm chart uses a `**startupProbe`** on `/healthz` so **liveness** does not probe the port while the lifespan is still running (otherwise you can see connection refused and extra restarts even when the cluster is fine). After pulling chart changes, `**helm upgrade --install` again** so the new probes apply.
+The Helm chart uses a `startupProbe` on `/healthz` so liveness does not probe
+the port while the lifespan is still running (otherwise you can see connection
+refused and extra restarts even when the cluster is fine). After pulling chart
+changes, run `helm upgrade --install` again so the new probes apply.
 
 **1. Read the API logs (source of truth)**
 
@@ -250,7 +262,9 @@ kubectl -n metrics logs deploy/metrics-api-metrics-api --tail=200
 kubectl -n metrics logs deploy/metrics-api-metrics-api --previous --tail=200   # last crashed instance
 ```
 
-You should see a `**KueueStartupError**` or `httpx` error describing the failure (for example missing ClusterQueue, 403 on the Kueue API, or TLS to the Kubernetes API).
+You should see a `KueueStartupError` or `httpx` error describing the failure
+(for example missing ClusterQueue, 403 on the Kueue API, or TLS to the
+Kubernetes API).
 
 **2. Confirm fixtures exist on this cluster**
 
@@ -293,13 +307,15 @@ kubectl -n metrics exec deploy/metrics-api-metrics-api -- printenv METRICS_REDIS
 
 **6. Service account token**
 
-The API must read `/var/run/secrets/kubernetes.io/serviceaccount/token` (or `METRICS_KUBE_API_TOKEN`). If `serviceAccount.create` is false and you bind RBAC to the wrong identity, or tokens are not mounted, logs will show a `**KueueStartupError`** about a missing bearer token.
+The API must read `/var/run/secrets/kubernetes.io/serviceaccount/token` (or
+`METRICS_KUBE_API_TOKEN`). If `serviceAccount.create` is false and you bind
+RBAC to the wrong identity, or tokens are not mounted, logs will show a
+`KueueStartupError` about a missing bearer token.
 
 ---
 
 ## Related docs
 
-- `docs/kueue-platform.md` — Kueue mode behavior and module map  
-- `docs/environment-contracts.md` — `METRICS_*` and `KUEUE_METRICS_*` aliases  
-- `README.md` — Compose-based **static** dev stack vs cluster-backed Kueue
-
+- `docs/kueue-platform.md` — Kueue mode behavior and module map
+- `docs/environment-contracts.md` — `METRICS_*` and `KUEUE_METRICS_*` aliases
+- `README.md` — Kubernetes-first dev and cluster-backed Kueue workflows

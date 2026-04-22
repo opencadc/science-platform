@@ -78,7 +78,10 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - Product and implementation conventions belong in `docs/learnings.md`; harness-wide notes belong in `docs/harness/learnings.md`.
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke tests use Minikube (Kind-based scripts were removed); use `metrics/scripts/run-minikube-integration.sh` and `metrics/scripts/minikube-values.yaml`, and enable the metrics-server addon (CI does this; default in the local script) for work that depends on cluster resource metrics.
-- In **`dev`**, `metrics/compose.yaml` runs the Metrics API and Redis; cluster-backed data sources and Helm smoke validation use Minikube (or another cluster) separately. See `docs/environment-contracts.md` and `README.md`.
+- In **`dev`**, the supported workflow is Kubernetes-first: use Minikube,
+  Helm, and `kubectl` to deploy Metrics and Redis into the cluster. Docker
+  Compose is not part of the active environment contract. See
+  `docs/environment-contracts.md` and `README.md`.
 - Canonical `METRICS_ENVIRONMENT` values are `dev`, `integration`, `staging`, and `production`; legacy `int` and `prod` inputs are still accepted and normalized during settings validation.
 - Kueue manifests and clients should target the **v1beta2** API; **v1beta1** is deprecated.
 - End-to-end local dev with Kueue (preflight, Helm install, ClusterQueue setup, Metrics/Redis, access via port-forward or proxy, teardown) is documented in `docs/dev-kueue-cluster-setup.md`.

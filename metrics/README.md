@@ -68,27 +68,13 @@ Run the API locally:
 
 ```bash
 METRICS_CACHE_BACKEND=memory \
-METRICS_PROVIDER_MODE=static \
+METRICS_PROVIDER_MODE=kueue \
 uv run python -m metrics.main
 ```
 
-### Docker Compose (FastAPI + Redis)
-
-For the local **dev** stack described in milestone M1, run the containerized API
-with Redis using Compose from `metrics/`:
-
-```bash
-docker compose up --build
-```
-
-Defaults bind **8000** on the host for the API and **6379** for Redis. Compose
-runs the API with `METRICS_PROVIDER_MODE=static` so no in-cluster Prometheus or
-Kubernetes API is required. Copy `env.example` to `.env` in `metrics/` to adjust
-defaults (the template ships uncommented safe values). Compose reads `.env` for
-substitution; you can also export variables in your shell before
-`docker compose up`. If you change `METRICS_PORT` inside the container, align the
-image `HEALTHCHECK` in `Dockerfile` or accept that the probe still targets the
-baked-in port.
+Use this command for process-level debugging. For supported `dev` operation
+with Kueue dependencies, follow the Kubernetes-first setup in
+`docs/dev-kueue-cluster-setup.md`.
 
 For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 `dev`, integration, staging, and production, see `docs/environment-contracts.md`.
@@ -122,18 +108,16 @@ bash scripts/run-minikube-integration.sh
 ```
 
 This script is meant for **automated smoke / CI**, not day-to-day dev on your
-default cluster. By default it uses a **separate** Minikube profile
-(`metrics-local`) so cleanup can delete that profile without wiping your usual
-`minikube` install. It:
+default cluster. Use your active Minikube context for this workflow. It:
 
-1. Starts that dedicated profile and enables the **metrics-server** addon unless
-   `MINIKUBE_ENABLE_METRICS_SERVER=false`.
+1. Uses the current Minikube profile and enables the **metrics-server** addon
+   unless `MINIKUBE_ENABLE_METRICS_SERVER=false`.
 2. Installs Kueue via Helm (`scripts/install-kueue-minikube.sh`) and applies
    `tests/fixtures/kueue/`.
 3. Builds and loads the local metrics container image into Minikube.
 4. Deploys the Helm chart with `scripts/minikube-values.yaml`.
 5. Runs black-box integration tests in `tests/integration`.
-6. Deletes the profile and namespace on exit (same teardown style as CI smoke).
+6. Cleans up the release namespace according to script teardown behavior.
 
 ## Container image
 
