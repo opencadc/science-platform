@@ -30,6 +30,8 @@ jobs:
         uses: commit-check/commit-check-action@7c158d4541309c5952de3343151750882b036d10 # v2.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
+          # Default subject max is 80; allow longer conventional-commit subjects in PR history.
+          CCHK_SUBJECT_MAX_LENGTH: "120"
         with:
           # Conventional Commits Check
           message: true
