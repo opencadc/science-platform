@@ -212,4 +212,3 @@ Use this checklist to close M3 execution.
 - Platform source support is limited to Kueue, Prometheus, and kube-metrics.
 - M4 remains the implementation milestone for kube-metrics runtime depth.
 - Required gates pass.
-
