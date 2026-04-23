@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Shared utilities for minikube-smoke.sh and minikube-smoke-teardown.sh (source only).
+# Shared utilities for kind-smoke.sh and kind-smoke-teardown.sh (source only).
 # shellcheck shell=bash
 
 # Read a numeric PORT_FORWARD_PID= line; never source the file.
-metrics_smoke_read_port_forward_pid() {
+metrics_kind_smoke_read_port_forward_pid() {
   local _f="${1:-}" _p
   [[ -n "${_f}" && -f "${_f}" ]] || return 1
   _p="$(awk -F= '/^PORT_FORWARD_PID=/{p=$2; gsub(/[^0-9].*/,"",p); if (p+0>0) {print p; exit}}' "${_f}")"
@@ -12,7 +12,7 @@ metrics_smoke_read_port_forward_pid() {
 }
 
 # Best-effort stop a process (may not be a child of this shell).
-metrics_smoke_stop_pid() {
+metrics_kind_smoke_stop_pid() {
   local _p="${1:-}"
   [[ -n "${_p}" ]] && [[ "${_p}" =~ ^[0-9]+$ ]] || return 0
   kill "${_p}" 2>/dev/null || return 0

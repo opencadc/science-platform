@@ -7,7 +7,7 @@
 # Does NOT delete your Minikube profile/cluster, host Docker images, or stop Minikube.
 #
 # Environment (same defaults as the dev doc):
-#   KUBE_CONTEXT          — kubectl context (default: minikube)
+#   KUBE_CONTEXT          — kubectl context (default: kind-metrics)
 #   NAMESPACE             — Metrics Helm namespace (default: metrics)
 #   RELEASE_NAME          — Metrics Helm release name (default: metrics-api)
 #   KUEUE_RELEASE_NAME    — Kueue Helm release (default: kueue)
@@ -29,7 +29,7 @@ source "${_SCRIPT_DIR}/check-prerequisites.sh"
 require_helm
 require_kubectl
 
-KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
+KUBE_CONTEXT="${KUBE_CONTEXT:-kind-metrics}"
 NAMESPACE="${NAMESPACE:-metrics}"
 RELEASE_NAME="${RELEASE_NAME:-metrics-api}"
 KUEUE_RELEASE_NAME="${KUEUE_RELEASE_NAME:-kueue}"

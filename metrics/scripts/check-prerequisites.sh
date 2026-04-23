@@ -2,7 +2,7 @@
 #
 # Fail-fast checks for Metrics local and CI helper scripts.
 # Usage: source this file and call require_* helpers, or:
-#   bash scripts/check-prerequisites.sh docker helm minikube
+#   bash scripts/check-prerequisites.sh docker helm kind
 #
 set -euo pipefail
 
@@ -47,14 +47,14 @@ require_kubectl() {
     _die "kubectl CLI not found in PATH" "Install kubectl from your Kubernetes distribution."
 }
 
-require_minikube() {
-  command -v minikube >/dev/null 2>&1 ||
-    _die "minikube CLI not found in PATH" "Install Minikube: https://minikube.sigs.k8s.io/docs/start/"
+require_kind() {
+  command -v kind >/dev/null 2>&1 ||
+    _die "kind CLI not found in PATH" "Install kind: https://kind.sigs.k8s.io/docs/user/quick-start/"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   if [[ $# -eq 0 ]]; then
-    set -- docker helm minikube
+    set -- docker helm kind
   fi
   for arg in "$@"; do
     case "${arg}" in
@@ -62,10 +62,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       compose) require_compose ;;
       helm) require_helm ;;
       kubectl) require_kubectl ;;
-      minikube) require_minikube ;;
+      kind) require_kind ;;
       *)
         echo "unknown prerequisite: ${arg}" >&2
-        echo "usage: $0 [docker|compose|helm|kubectl|minikube] ..." >&2
+        echo "usage: $0 [docker|compose|helm|kubectl|kind] ..." >&2
         exit 2
         ;;
     esac

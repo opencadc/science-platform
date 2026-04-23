@@ -1,5 +1,6 @@
 # Kueue smoke: cluster objects, metrics namespace, LocalQueue, sample Workload.
-# Keep names aligned with scripts/minikube-values.yaml. Apply after Kueue controller is installed.
+# Keep names aligned with scripts/kind-values.yaml (and any local smoke values file).
+# Apply after Kueue controller is installed.
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor

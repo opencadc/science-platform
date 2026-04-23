@@ -1,8 +1,7 @@
 image:
   repository: canfar-metrics-local
-  # Default tag for values-only installs. CI and scripts/minikube-smoke.sh
-  # override with a unique tag (run id / timestamp) and `minikube image rm` before
-  # load so the node does not keep an older image when pullPolicy is Never.
+  # Default tag for values-only installs. scripts/kind-smoke.sh overrides this
+  # with a unique tag unless KIND_SMOKE_SKIP_BUILD=1.
   tag: latest
   pullPolicy: Never
 
@@ -14,9 +13,9 @@ rbac:
 
 env:
   METRICS_ENVIRONMENT: "dev"
-  METRICS_CLUSTER_NAME: "minikube"
+  METRICS_CLUSTER_NAME: "kind-metrics"
   METRICS_CACHE_BACKEND: "redis"
-  # Short TTL for CI and local Minikube integration so platform snapshots refresh quickly.
+  # Short TTL for CI and local integration so platform snapshots refresh quickly.
   METRICS_CACHE_TTL_SECONDS: "1"
   METRICS_OTEL_METRICS_ENABLED: "false"
   METRICS_KUBE_API_URL: "https://kubernetes.default.svc"
