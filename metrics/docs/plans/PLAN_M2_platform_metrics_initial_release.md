@@ -70,7 +70,7 @@ list of `ClusterQueues`.
 - Set the milestone default cache TTL to five minutes before the service
 re-queries Kueue state.
 - Preserve cache metadata in the platform response.
-- Keep all Kueue setup assets under `tests/fixtures/kueue`.
+- Keep all Kueue setup assets under `helm/metrics-api/charts/metrics-test-infra`.
 - Use one general-purpose bring-up script that installs Kueue via Helm and
 applies the shared `ClusterQueue` / `Cohort` fixtures before the metrics
 service starts.
@@ -103,11 +103,10 @@ the live cluster test path.
 - `metrics/src/metrics/service.py`.
 - `metrics/src/metrics/models.py`.
 - `metrics/src/metrics/api/routes.py`.
-- `metrics/tests/test_app.py`.
-- `metrics/tests/test_app_factory.py`.
+- `metrics/tests/test_create_app.py` (app factory and HTTP route tests).
 - `metrics/tests/test_providers.py`.
 - `metrics/tests/integration/test_k8s_smoke.py`.
-- `metrics/scripts/run-minikube-integration.sh` (simplify this existing flow
+- `metrics/scripts/minikube-smoke.sh` (simplify this existing flow
   into the general-purpose Kueue Helm bring-up path for an already running
   cluster).
 - `metrics/scripts/minikube-values.yaml`.
@@ -191,7 +190,7 @@ connectivity and raw field mapping.
 bring-up flow starts. Scripts may install Kueue and fixtures into that cluster,
 but they do not create or provision the cluster itself.
 - **Fixture ownership:** Kueue manifests, chart values, and helper assets for
-this milestone live under `tests/fixtures/kueue`.
+this milestone live under `helm/metrics-api/charts/metrics-test-infra`.
 - **Test strategy:** Use `FastAPI TestClient` for API-level tests and keep the
 cluster-backed smoke loop as a separate validation layer.
 
@@ -261,7 +260,7 @@ This section sequences the Kueue-mode release work.
   - Add `FastAPI TestClient` coverage for valid Kueue-mode startup.
   - Add `FastAPI TestClient` coverage for invalid Kueue-mode startup and for
   requests that target invalid configured `ClusterQueues`.
-  - Keep Kueue setup assets in `tests/fixtures/kueue`.
+  - Keep Kueue setup assets in `helm/metrics-api/charts/metrics-test-infra`.
   - Run live integration validation against the Kueue-backed test setup.
   - Add a review checkpoint after this phase to confirm the Kueue-mode runtime
   contract and `0.17.0+` support scope before broader implementation starts.
@@ -318,7 +317,7 @@ weaken fail-fast behavior. Mitigate this by requiring startup-failure tests
 and review checkpoints.
 - **Fixture sprawl:** Kueue manifests can become scattered across tests and
 scripts. Mitigate this by keeping all milestone assets under
-`tests/fixtures/kueue`.
+`helm/metrics-api/charts/metrics-test-infra`.
 - **Resource schema churn:** A fixed response model can block future resources
 such as `ephemeral-storage` or `nvidia.com/gpu`. Mitigate this by locking the
 contract around generic resource-name keys now.
@@ -333,7 +332,7 @@ This section defines release controls for stable operation.
 - Require `allocated` semantics to match `docs/plans/PLAN_M2_outcomes.md` whenever
 aggregation logic changes (capture new evidence if the contract shifts).
 - Require recorded Kueue fixture manifests and values files under
-`tests/fixtures/kueue`.
+`helm/metrics-api/charts/metrics-test-infra`.
 - Require startup validation evidence for valid and invalid queue
 configurations.
 - Require milestone-facing documentation to use explicit mode naming such as
@@ -349,7 +348,7 @@ Use this checklist to close M2 execution.
 bring-up path for local and CI-backed live tests.
 - The seeded environment includes `cq-proton`, `cq-neutron`,
 `cq-electron`, and `cohort-atom`.
-- Kueue setup assets live under `tests/fixtures/kueue`.
+- Kueue setup assets live under `helm/metrics-api/charts/metrics-test-infra`.
 - Raw `ClusterQueue` and `Cohort` fields used by the contract are validated
 against live responses.
 - The service runs in a single configured `Kueue` mode per process.

@@ -79,7 +79,7 @@ def create_app(
             except KueueStartupError:
                 _logger.exception(
                     "Application startup validation failed; fix cluster or Prometheus "
-                    "configuration or see docs/dev-kueue-cluster-setup.md#troubleshooting"
+                    "configuration or see docs/dev-setup.md#troubleshooting"
                 )
                 raise
             yield

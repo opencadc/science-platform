@@ -98,14 +98,13 @@ def parse_resource_amount(resource_name: str, raw: str | int | float | None) -> 
 def format_resource_amount(resource_name: str, value: float) -> str:
     """Format an aggregated float back to a Kubernetes-friendly quantity string.
 
-    Output shape matches common API conventions: fractional CPU as ``m`` suffix,
-    memory as ``Gi`` binary strings, integral non-standard resources without
-    trailing zeros.
+    **CPU** is always written as a decimal *core* count (never millicores) so
+    ``capacity`` and ``allocated`` strings for the same resource use the same
+    unit. Memory uses ``Gi`` binary strings; integral non-standard resources
+    omit unnecessary trailing zeros.
     """
     name = str(resource_name).lower()
     if name == "cpu":
-        if 0 < value < 1:
-            return f"{max(int(round(value * 1000)), 1)}m"
         text = f"{value:.6f}".rstrip("0").rstrip(".")
         return text or "0"
     if name in ("memory", "ephemeral-storage"):

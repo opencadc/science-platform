@@ -1,7 +1,8 @@
 image:
   repository: canfar-metrics-local
-  # Bump tag (e.g. dev-1) after each `minikube image load` if you reuse the same
-  # name; otherwise the node can keep an older `latest` layer.
+  # Default tag for values-only installs. CI and scripts/minikube-smoke.sh
+  # override with a unique tag (run id / timestamp) and `minikube image rm` before
+  # load so the node does not keep an older image when pullPolicy is Never.
   tag: latest
   pullPolicy: Never
 
@@ -13,9 +14,10 @@ rbac:
 
 env:
   METRICS_ENVIRONMENT: "dev"
-  METRICS_CLUSTER_NAME: "minikube-local"
+  METRICS_CLUSTER_NAME: "minikube"
   METRICS_CACHE_BACKEND: "redis"
-  METRICS_CACHE_TTL_SECONDS: "300"
+  # Short TTL for CI and local Minikube integration so platform snapshots refresh quickly.
+  METRICS_CACHE_TTL_SECONDS: "1"
   METRICS_OTEL_METRICS_ENABLED: "false"
   METRICS_KUBE_API_URL: "https://kubernetes.default.svc"
   METRICS_KUBE_VERIFY_TLS: "true"

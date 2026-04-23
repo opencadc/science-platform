@@ -25,6 +25,11 @@ This file stores repository-specific behavioral specifications.
 - Startup must fail fast when required source dependencies are unavailable.
 - Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
   `Expires`, and `Last-Modified`) for cacheable routes.
+- For `GET /api/v1/metrics/platform`, each key present in `data.capacity` is
+  also present in `data.allocated`, and the **same resource name must use the
+  same unit in both maps** (CPU as decimal core counts, memory as `Gi` binary
+  quantities, other resources with the same formatting rules in both). Callers
+  can compare the two without converting between millicores and cores.
 
 ## Milestone linkage
 

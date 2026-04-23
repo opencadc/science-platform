@@ -31,12 +31,9 @@ This note records closure evidence for milestone M1
 - **Local dev (`docker compose`):** `metrics/compose.yaml` runs FastAPI plus
   Redis with static provider defaults; `env.example` documents substitution into
   `.env`; `.gitignore` excludes local `.env` and `compose.override.yaml`.
-- **Fail-fast prerequisites:** `metrics/scripts/check-prerequisites.sh` plus
-  sourcing from `run-minikube-integration.sh` (historical script name; current
-  roadmap contract is an already running cluster reachable through `kubectl`)
-  and `deploy-with-helm.sh` (helm, kubectl); scripts `cd` to `metrics/` so
-  paths resolve regardless of caller cwd; optional `KUBE_CONTEXT` passes
-  through to Helm and kubectl.
+- **Fail-fast prerequisites:** `metrics/scripts/check-prerequisites.sh` (sourced from
+  `minikube-smoke.sh`, `deploy-with-helm.sh`, and teardown). Those scripts `cd` to
+  `metrics/` so paths resolve; optional `KUBE_CONTEXT` for Helm and kubectl.
 - **Helm:** Minimal chart under `metrics/helm/metrics-api` with `values-dev.yaml`
   only; `deploy-with-helm.sh` defaults to `helm/metrics-api` from `metrics/`.
 - **Release automation:** Root `release-please-config.json` includes a `metrics`

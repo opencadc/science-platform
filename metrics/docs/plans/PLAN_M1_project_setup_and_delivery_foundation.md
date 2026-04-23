@@ -35,7 +35,7 @@ clear acceptance check.
 The **local app + Redis** workflow is implemented as `compose.yaml` under
 `metrics/` (see `README.md`). The **cluster-backed** loop remains Helm plus the
 existing Kubernetes harness, currently implemented in
-`.github/workflows/ci.metrics.yml` and `scripts/run-minikube-integration.sh`.
+`.github/workflows/ci.metrics.yml` and `scripts/minikube-smoke.sh`.
 Treat Kubernetes data sources as external to Compose. Existing artifact names
 may still mention Minikube, but the roadmap contract is "already running dev
 cluster reachable through `kubectl`," not "create a cluster in-repo."

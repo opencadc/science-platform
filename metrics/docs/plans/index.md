@@ -18,7 +18,7 @@ repository.
 This section lists the milestone sequence that is currently active for the
 metrics roadmap.
 
-Primary delivery milestones use unique monotonic ids (`M1`..`M9`). Checklist
+Primary delivery milestones use unique monotonic ids (`M1`..`M10`). Checklist
 plans such as `PLAN_M2_post_review_feedback.md` are closure satellites for their
 parent milestone and are not separate sequence ids.
 
@@ -39,3 +39,4 @@ core feature milestones. They are still part of the numbered roadmap sequence.
 - `docs/plans/PLAN_M7_rollout_baseline_matrix.md`
 - `docs/plans/PLAN_M8_initial_prod_debug_loop.md`
 - `docs/plans/PLAN_M9_post_initial_argocd_staging.md`
+- `docs/plans/PLAN_M10_local_k8s_workflow_simplification.md` — outcomes: `docs/plans/PLAN_M10_outcomes.md`

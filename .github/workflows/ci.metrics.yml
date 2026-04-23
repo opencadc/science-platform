@@ -52,11 +52,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: metrics-lint-test
     env:
-      # Stable paths under the workspace so actions/cache can persist Minikube binaries/preloads and Helm OCI metadata between runs.
+      # Stable paths: cache Minikube/Helm; Skaffold is a single pinned binary (no separate cache dir).
       MINIKUBE_HOME: ${{ github.workspace }}/.ci-minikube
       HELM_CACHE_HOME: ${{ github.workspace }}/.ci-helm-cache
       KUEUE_CHART_VERSION: "0.17.0"
-      # Must match the image pulled by `minikube addons enable metrics-server` for the configured Minikube/Kubernetes versions.
+      SKAFFOLD_VERSION: "2.18.3"
+      # Quieter Skaffold in CI; must match the image used when metrics-server addon is enabled.
+      SKAFFOLD_UPDATE_CHECK: "false"
       METRICS_SERVER_IMAGE: registry.k8s.io/metrics-server/metrics-server:v0.7.2
     defaults:
       run:
@@ -74,7 +76,7 @@ jobs:
           path: |
             .ci-minikube/cache
             .ci-helm-cache
-          key: metrics-minikube-ci-${{ runner.os }}-mk-v1.35.0-k8s-v1.30.0-kueue-${{ env.KUEUE_CHART_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml', 'metrics/scripts/install-kueue-minikube.sh') }}
+          key: metrics-minikube-ci-${{ runner.os }}-mk-v1.35.0-k8s-v1.30.0-kueue-${{ env.KUEUE_CHART_VERSION }}-skaffold-${{ env.SKAFFOLD_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml', 'metrics/scripts/minikube-smoke.sh', 'metrics/scripts/lib-minikube-smoke.sh', 'metrics/scripts/test-setup.yaml', 'metrics/helm/metrics-api/Chart.yaml', 'metrics/helm/metrics-api/values.yaml', 'metrics/helm/metrics-api/templates/**', 'metrics/scripts/minikube-values.yaml', 'metrics/skaffold.yaml') }}
       - name: Ensure Minikube and Helm cache directories exist
         working-directory: ${{ github.workspace }}
         run: mkdir -p "${MINIKUBE_HOME}/cache" "${HELM_CACHE_HOME}"
@@ -88,6 +90,12 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: v3.16.2
+      - name: Install Skaffold
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/GoogleContainerTools/skaffold/releases/download/v${{ env.SKAFFOLD_VERSION }}/skaffold-linux-amd64" -o /tmp/skaffold
+          sudo install -m 0755 /tmp/skaffold /usr/local/bin/skaffold
+          skaffold version | grep -q "v${{ env.SKAFFOLD_VERSION }}"
       - name: Setup Minikube
         uses: manusa/actions-setup-minikube@v2.13.0
         with:
@@ -103,38 +111,22 @@ jobs:
           minikube image load "${METRICS_SERVER_IMAGE}"
       - name: Enable metrics-server addon
         run: minikube addons enable metrics-server
-      - name: Install Kueue and apply M2 fixtures
-        working-directory: metrics
+      - name: Pre-load Alpine image for Kueue smoke workload
         run: |
-          bash scripts/install-kueue-minikube.sh
-          kubectl apply -f tests/fixtures/kueue/
+          docker pull alpine:3.20
+          minikube image load alpine:3.20
       - name: Sync dependencies
         run: uv sync --group dev
-      - name: Build and load image
-        run: |
-          docker build -t canfar-metrics-local:latest .
-          minikube image load canfar-metrics-local:latest
       - name: Pre-load Redis image into Minikube
         run: |
-          # Avoid slow or flaky pulls from Docker Hub inside the cluster during rollout.
           docker pull redis:7-alpine
           minikube image load redis:7-alpine
-      - name: Helm deploy
+      - name: Minikube smoke (Kueue, test-setup, Skaffold, integration tests)
+        working-directory: metrics
+        env:
+          KUBE_CONTEXT: minikube
+          MINIKUBE_PROFILE: minikube
+          MINIKUBE_SMOKE_CI: "1"
         run: |
-          helm upgrade --install metrics-api ./helm/metrics-api \
-            --namespace metrics \
-            --create-namespace \
-            -f scripts/minikube-values.yaml \
-            --set "image.repository=canfar-metrics-local" \
-            --set "image.tag=latest"
-      - name: Wait for Redis
-        run: kubectl -n metrics rollout status deploy/metrics-api-redis --timeout=300s
-      - name: Wait for Metrics API
-        run: kubectl -n metrics rollout status deploy/metrics-api-metrics-api --timeout=300s
-      - name: Integration smoke tests
-        run: |
-          kubectl -n metrics port-forward svc/metrics-api-metrics-api 18080:8000 >/tmp/metrics-pf.log 2>&1 &
-          echo $! > /tmp/metrics-pf.pid
-          sleep 3
-          METRICS_BASE_URL="http://127.0.0.1:18080" uv run pytest tests/integration -m integration -q
-          kill "$(cat /tmp/metrics-pf.pid)" || true
+          set -euo pipefail
+          bash scripts/minikube-smoke.sh

@@ -41,7 +41,7 @@ post-M6 rollout sequence.
 ### Gate B: local deployment gate
 
 - prerequisites check requires `kubectl`, `helm`, and Minikube tooling
-- `bash scripts/run-minikube-integration.sh`
+- `bash scripts/minikube-smoke.sh`
 - integration tests pass against deployed endpoint using `METRICS_BASE_URL`
 
 ### Gate C: container and runtime gate

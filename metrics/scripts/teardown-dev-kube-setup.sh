@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Tear down the local dev stack from docs/dev-kueue-cluster-setup.md:
-#   Metrics API Helm release (+ optional metrics namespace), Kueue test fixtures,
-#   and optionally the Kueue controller Helm release.
+# Tear down the local dev stack (see docs/dev-setup.md):
+#   Metrics API Helm release (+ optional metrics namespace), leftover Kueue
+#   test objects by name, and optionally the Kueue controller Helm release.
 #
 # Does NOT delete your Minikube profile/cluster, host Docker images, or stop Minikube.
 #
@@ -14,17 +14,16 @@
 #   KUEUE_NAMESPACE       — Kueue namespace (default: kueue-system)
 #   DELETE_METRICS_NS     — after uninstall, delete the metrics namespace (default: true)
 #   UNINSTALL_KUEUE       — helm uninstall Kueue release (default: true)
-#   DELETE_FIXTURES       — kubectl delete M2 fixtures (default: true)
+#   DELETE_FIXTURES       — kubectl delete known Kueue test objects (default: true)
 #
 # Flags:
 #   --skip-kueue          — do not uninstall the Kueue Helm release
-#   --skip-fixtures       — do not delete tests/fixtures/kueue resources
+#   --skip-fixtures       — do not delete leftover Kueue objects by name
 #   --keep-metrics-ns     — do not delete the metrics namespace after helm uninstall
 #
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-METRICS_ROOT="$(cd "${_SCRIPT_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/check-prerequisites.sh"
 require_helm
@@ -48,8 +47,8 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: bash scripts/teardown-dev-kube-setup.sh [options]
 
-  --skip-kueue       Leave the Kueue Helm release installed (fixtures still removed unless --skip-fixtures).
-  --skip-fixtures    Do not delete tests/fixtures/kueue ClusterQueues / Cohort / ResourceFlavor.
+  --skip-kueue       Leave the Kueue Helm release installed.
+  --skip-fixtures    Do not delete leftover Kueue ClusterQueues / Cohort / ResourceFlavor / namespaced test objects.
   --keep-metrics-ns  Do not delete the metrics namespace after uninstalling the chart.
 
 Environment: KUBE_CONTEXT, NAMESPACE, RELEASE_NAME, KUEUE_RELEASE_NAME, KUEUE_NAMESPACE,
@@ -87,19 +86,14 @@ if [[ "${DELETE_METRICS_NS}" == "true" ]]; then
 fi
 
 if [[ "${DELETE_FIXTURES}" == "true" ]]; then
-  echo "Deleting Kueue fixtures (reverse apply order)"
-  shopt -s nullglob
-  _fixture_files=("${METRICS_ROOT}/tests/fixtures/kueue/"*.yaml)
-  shopt -u nullglob
-  if [[ "${#_fixture_files[@]}" -eq 0 ]]; then
-    echo "No fixture YAML files under tests/fixtures/kueue/"
-  else
-    for ((i = ${#_fixture_files[@]} - 1; i >= 0; i--)); do
-      _f="${_fixture_files[i]}"
-      echo "  kubectl delete -f ${_f##*/}"
-      "${KUBECTL[@]}" delete -f "${_f}" --ignore-not-found --wait --timeout=60s || true
-    done
+  echo "Deleting leftover Kueue test fixtures (by known object names)"
+  if "${KUBECTL[@]}" get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    "${KUBECTL[@]}" delete workloads.kueue.x-k8s.io integration-idle -n "${NAMESPACE}" --ignore-not-found --wait=false || true
+    "${KUBECTL[@]}" delete localqueues.kueue.x-k8s.io lq-smoke -n "${NAMESPACE}" --ignore-not-found --wait=false || true
   fi
+  "${KUBECTL[@]}" delete clusterqueues.kueue.x-k8s.io cq-electron cq-neutron cq-proton --ignore-not-found --wait=false || true
+  "${KUBECTL[@]}" delete cohorts.kueue.x-k8s.io cohort-atom --ignore-not-found --wait=false || true
+  "${KUBECTL[@]}" delete resourceflavors.kueue.x-k8s.io default-flavor --ignore-not-found --wait=false || true
 fi
 
 if [[ "${UNINSTALL_KUEUE}" == "true" ]]; then

@@ -1,0 +1,32 @@
+# Minikube: deploy via helm/metrics-api. Run from `minikube-smoke.sh` so the
+# build uses `minikube docker-env` (image must exist on the node when pullPolicy is Never).
+# See docs/dev-setup.md.
+#
+# Usage: `skaffold run -p minikube` (or `skaffold dev -p minikube` by hand for live reload)
+# CI pins Skaffold 2.18.x; use at least 2.16 locally.
+apiVersion: skaffold/v2beta29
+kind: Config
+metadata:
+  name: metrics-api
+profiles:
+  - name: minikube
+    build:
+      local:
+        push: false
+      tagPolicy:
+        inputDigest: {}
+      artifacts:
+        - image: canfar-metrics-local
+          context: .
+    deploy:
+      helm:
+        releases:
+          - name: metrics-api
+            chartPath: helm/metrics-api
+            namespace: metrics
+            createNamespace: true
+            valuesFiles:
+              - scripts/minikube-values.yaml
+            setValueTemplates:
+              image.tag: "{{.IMAGE_TAG}}"
+            # `image.repository` is set in scripts/minikube-values.yaml (canfar-metrics-local)

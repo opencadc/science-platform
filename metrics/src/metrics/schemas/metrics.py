@@ -105,14 +105,16 @@ class PlatformMetricsData(BaseModel):
         default_factory=dict,
         description=(
             "Aggregated nominal quota keyed by Kubernetes resource name "
-            "(for example cpu, memory, nvidia.com/gpu)."
+            "(for example cpu, memory, nvidia.com/gpu). Per-resource units match "
+            "`allocated` (CPU in cores, memory in Gi, etc.)."
         ),
     )
     allocated: dict[str, str] = Field(
         default_factory=dict,
         description=(
             "Aggregated admitted usage from Kueue ClusterQueue status.flavorsUsage "
-            "(total plus borrowed per resource), keyed by resource name."
+            "(total plus borrowed per resource), keyed by resource name. Per-resource "
+            "units match `capacity` (CPU in cores, memory in Gi, etc.)."
         ),
     )
 

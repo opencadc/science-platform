@@ -41,17 +41,13 @@ is and **which modules** participate. It complements milestone plans under
    JSON metadata includes `created` (snapshot time). HTTP caching uses
    `Cache-Control`, `Date`, `Expires`, and `Last-Modified` (see `metrics.http_cache`).
    Keys in `allocated` match those in `capacity` (zeros are filled when Kueue has no
-   `flavorsUsage` yet).
+   `flavorsUsage` yet). Quantity strings for the same resource use the same unit
+   in both maps (for example CPU is always reported in cores, not a mix of cores
+   and millicores).
 
 ## Fixtures and local testing
 
-Cluster-scoped manifests live under `tests/fixtures/kueue/`. The helper
-`scripts/install-kueue-minikube.sh` installs Kueue with Helm; apply fixtures with
-`kubectl apply -f tests/fixtures/kueue/`. The Minikube script
-`scripts/run-minikube-integration.sh` runs that path end-to-end and deploys Helm
-values from `scripts/minikube-values.yaml` so CI and developers exercise the
-same contract. For a **manual** dev loop (port-forward, no teardown), see
-`docs/dev-kueue-cluster-setup.md`.
+Kueue test objects live in **`scripts/test-setup.yaml`**. The **`scripts/minikube-smoke.sh`** path installs the upstream Kueue controller, applies that file, and deploys the app with Skaffold (see `docs/dev-setup.md`).
 
 ## Related reading
 

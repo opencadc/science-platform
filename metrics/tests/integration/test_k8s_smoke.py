@@ -5,6 +5,8 @@ import os
 import httpx
 import pytest
 
+from metrics.quantity import parse_cpu_to_cores, parse_memory_to_gib
+
 
 pytestmark = pytest.mark.integration
 
@@ -42,3 +44,19 @@ def test_platform_endpoint_shape() -> None:
     assert "cached" not in payload["metadata"]
     assert "Cache-Control" in response.headers
     assert "Date" in response.headers or "date" in response.headers
+
+
+def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
+    """Allocated map reflects the sample Workload from scripts/test-setup.yaml (Kueue smoke)."""
+    base_url = _base_url()
+    if not base_url:
+        pytest.skip("METRICS_BASE_URL not configured")
+
+    response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=30.0)
+    assert response.status_code == 200
+    allocated = response.json()["data"]["allocated"]
+    cpu_cores = parse_cpu_to_cores(allocated.get("cpu", "0"))
+    mem_gib = parse_memory_to_gib(allocated.get("memory", "0"))
+    # scripts/test-setup.yaml: 100m CPU, 100Mi memory → cq-proton.
+    assert cpu_cores >= 0.09, f"expected >=100m CPU in allocated, got {allocated!r}"
+    assert mem_gib > 0.0, f"expected positive memory from smoke workload in allocated, got {allocated!r}"

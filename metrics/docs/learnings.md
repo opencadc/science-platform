@@ -61,6 +61,6 @@ process lessons belong in `docs/harness/learnings.md`.
   introduces drift from real runtime dependencies and is no longer a supported
   contract.
 - Evidence: `docs/environment-contracts.md`, `README.md`,
-  `docs/dev-kueue-cluster-setup.md`, and `AGENTS.md`.
+  `docs/dev-setup.md`, and `AGENTS.md`.
 - Action taken: Updated documentation to require Minikube + Helm + kubectl in
   `dev` and clarified higher-environment cluster ownership.

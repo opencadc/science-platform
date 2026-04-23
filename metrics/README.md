@@ -77,7 +77,7 @@ uv run python -m metrics.main
 
 Use this command for process-level debugging. For supported `dev` operation
 with Kueue dependencies, follow the Kubernetes-first setup in
-`docs/dev-kueue-cluster-setup.md`.
+`docs/dev-setup.md`.
 
 For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 `dev`, integration, staging, and production, see `docs/environment-contracts.md`.
@@ -88,8 +88,7 @@ For **module responsibilities** and the **startup vs request** flow for
 Kueue-backed platform metrics, see `docs/kueue-platform.md`. That guide is the
 canonical developer-oriented supplement to milestones M2 and M3.
 
-**Cluster dev setup** (preflight → Helm Kueue → fixtures → Metrics/Redis Helm →
-`kubectl port-forward`) is step-by-step in `docs/dev-kueue-cluster-setup.md`.
+**Cluster dev setup** — one script, `docs/dev-setup.md`.
 
 ## Local Kubernetes integration loop
 
@@ -99,28 +98,22 @@ metrics API). Minikube can enable these with `minikube addons enable …`.
 
 ### Iterative dev (keep your cluster)
 
-Follow `docs/dev-kueue-cluster-setup.md` for preflight checks, Kueue (Helm),
-fixture apply, image build + Helm deploy, and a **local port** to reach the API
-via `kubectl port-forward`. That guide targets your **existing** Minikube
-(usually kubectl context `minikube`); it does not create a second profile.
+See `docs/dev-setup.md`. The supported flow is **`bash scripts/minikube-smoke.sh`**
+(Helm Kueue, `scripts/test-setup.yaml`, Skaffold build + Helm, integration tests) or the same
+phases by hand if you are debugging.
 
 ### One-shot verification (CI-style)
 
 ```bash
-bash scripts/run-minikube-integration.sh
+bash scripts/minikube-smoke.sh
 ```
 
-This script is meant for **automated smoke / CI**, not day-to-day dev on your
-default cluster. Use your active Minikube context for this workflow. It:
+**`scripts/minikube-smoke.sh`** runs the full Minikube smoke (starts the cluster and preloads only if the profile is not already running, then
+Kueue + **`scripts/test-setup.yaml`**, Skaffold, wait, `tests/integration`). The API port-forward can stay up after the run; stop it with **`scripts/minikube-smoke-teardown.sh`**.
 
-1. Uses the current Minikube profile and enables the **metrics-server** addon
-   unless `MINIKUBE_ENABLE_METRICS_SERVER=false`.
-2. Installs Kueue via Helm (`scripts/install-kueue-minikube.sh`) and applies
-   `tests/fixtures/kueue/`.
-3. Builds and loads the local metrics container image into Minikube.
-4. Deploys the Helm chart with `scripts/minikube-values.yaml`.
-5. Runs black-box integration tests in `tests/integration`.
-6. Cleans up the release namespace according to script teardown behavior.
+CI sets `MINIKUBE_SMOKE_CI=1` and uses the same script after image preloads. For
+a disposable local profile, `MINIKUBE_DELETE_ON_EXIT=true` (use with care on the
+default `minikube` profile).
 
 ## Container image
 

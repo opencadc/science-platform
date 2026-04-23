@@ -28,14 +28,10 @@ This note records closure evidence for milestone M2
   `KUEUE_METRICS_COHORT`, `METRICS_KUBE_SA_TOKEN_PATH` / `METRICS_KUBE_SA_CA_PATH`
   for in-cluster auth, and `METRICS_ENVIRONMENT` aligned with the canonical
   service modes `dev` / `staging` / `integration` / `production`.
-- **Fixtures and automation:** Kueue manifests under `tests/fixtures/kueue/`
-  (`cohort-atom`, `cq-proton`, `cq-neutron`, `cq-electron`, asymmetric CPU/memory),
-  `scripts/install-kueue-minikube.sh` (Helm chart default `KUEUE_CHART_VERSION=0.17.0`), and
-  `scripts/run-minikube-integration.sh`, which installs Kueue and applies
-  fixtures before Helm deploy. Existing script names retain `minikube` for
-  historical reasons, but the updated dev contract assumes an already running
-  cluster reachable through `kubectl` and does not rely on in-repo cluster
-  provisioning code.
+- **Fixtures and automation (M2 closure):** Kueue smoke objects originally lived in the
+  `metrics-test-infra` Helm subchart. **Superseded in M10:** fixtures are now
+  (Superseded) Smoke YAML now **`scripts/test-setup.yaml`**, run via **`scripts/minikube-smoke.sh`**
+  and Skaffold; see `docs/dev-setup.md`.
 - **Helm:** Optional `serviceAccount.create` and `rbac.create` install a
   namespace `ServiceAccount` plus `ClusterRole` / `ClusterRoleBinding` for
   read-only `kueue.x-k8s.io` `clusterqueues` and `cohorts`;
@@ -69,7 +65,7 @@ uv run --group harness python -m harness check
 helm lint helm/metrics-api
 helm template metrics-api helm/metrics-api -f scripts/minikube-values.yaml >/dev/null
 bash scripts/check-prerequisites.sh docker helm kubectl minikube
-bash scripts/run-minikube-integration.sh
+bash scripts/minikube-smoke.sh
 ```
 
 Gates in `project-gates.yaml` remain `harness-contracts`, `repository-coverage`,
@@ -142,5 +138,5 @@ explicitly widened.
   import-surface cleanup (`metrics.providers` exports, unused dependencies) are
   **M4 or later** unless pulled into scope by a new plan.
 - If webhook validation requires additional Cohort fields for your Kueue
-  configuration, extend `tests/fixtures/kueue/` and re-run the cluster-backed
-  smoke validation.
+  configuration, edit `scripts/test-setup.yaml` (and values/docs) and re-run
+  `scripts/minikube-smoke.sh` or the CI workflow.
