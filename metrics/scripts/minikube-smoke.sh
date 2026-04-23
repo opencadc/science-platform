@@ -3,7 +3,8 @@
 # Minikube integration smoke: Kueue + test-setup.yaml + skaffold build + Helm + pytest -m integration.
 # Uses `skaffold build` + `helm upgrade` (not `skaffold run` / `skaffold dev`) to avoid a broken skaffold Helm plugin
 # and to keep the flow deterministic and CI-aligned.
-# CI (MINIKUBE_SMOKE_CI=1): build on the host Docker daemon, then `minikube image load` (Minikube Docker DNS is unreliable).
+# CI (MINIKUBE_SMOKE_CI=1): `skaffold build --detect-minikube=false` uses the host Docker daemon, then `minikube image load`
+# (Skaffold otherwise calls `minikube docker-env` and hits broken cluster DNS for registry pulls).
 # Local: build inside Minikube via `minikube docker-env` so the image is on the node without a load step.
 #
 # Local: start Minikube only if the profile is not running; on success, leave a nohup port-forward
@@ -192,9 +193,9 @@ build_and_deploy_app() {
   local _art _tag _full_tag
   _art="$(mktemp "${TMPDIR:-/tmp}/minikube-smoke-art.XXXXXX.json")"
   if [[ "${MINIKUBE_SMOKE_CI}" == "1" ]]; then
-    # Minikube's Docker daemon often cannot resolve external registries (broken DNS to 192.168.49.1:53).
-    # Build on the host daemon (same as `docker` on GitHub Actions), then load into the cluster.
-    skaffold build -p minikube --file-output="${_art}"
+    # Skaffold auto-enables Minikube's Docker when the kubectl context is minikube; that daemon often
+    # cannot resolve Docker Hub / PyPI. --detect-minikube=false keeps builds on the host daemon (CI runner).
+    skaffold build -p minikube --detect-minikube=false --file-output="${_art}"
     _full_tag="$(
       python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['builds'][0]['tag'])" "${_art}"
     )"

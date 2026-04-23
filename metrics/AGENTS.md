@@ -83,7 +83,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke: `metrics/scripts/minikube-smoke.sh` (Kueue, `scripts/test-setup.yaml`, Skaffold, integration tests) and `metrics/scripts/minikube-values.yaml`. Shared bash helpers: `metrics/scripts/lib-minikube-smoke.sh` (port-forward state parsing). A local success may leave a background port-forward; stop with `metrics/scripts/minikube-smoke-teardown.sh` (optional `--all` for Kubernetes teardown).
   With `pullPolicy: Never`, Skaffold’s build tags avoid stale layers. Short `METRICS_CACHE_TTL_SECONDS` in `minikube-values.yaml` for integration. If port-forward fails, change `PORT_FORWARD_PORT`. If Kueue allocation is wrong, try Redis `FLUSHDB` or wait for cache TTL.
-- In CI (`MINIKUBE_SMOKE_CI=1`), the smoke script builds the app image on the host Docker daemon and runs `minikube image load` so pulls use working DNS; Minikube’s Docker daemon is unreliable for `registry-1.docker.io` and similar. Local runs still build via `minikube docker-env` unless you set `MINIKUBE_SMOKE_CI=1`.
+- In CI (`MINIKUBE_SMOKE_CI=1`), the smoke script runs `skaffold build --detect-minikube=false` (Skaffold otherwise uses `minikube docker-env` even without `eval`), builds on the host Docker daemon, then `minikube image load`; Minikube’s Docker DNS is unreliable for `registry-1.docker.io` and PyPI. Local runs still use `minikube docker-env` unless you set `MINIKUBE_SMOKE_CI=1`.
 - In **`dev`**, the supported workflow is Kubernetes-first: use Minikube,
   Helm, and `kubectl` to deploy Metrics and Redis into the cluster. Docker
   Compose is not part of the active environment contract. See
