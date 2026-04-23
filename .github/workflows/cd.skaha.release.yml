@@ -26,7 +26,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Path filter for non-Metrics changes
-        uses: dorny/paths-filter@de90cc6fb38f096f23361c8902006fdbf2397172 # v3.0.2
+        uses: dorny/paths-filter@v4.0.1
         id: path-filter
         with:
           base: ${{ github.event.before }}
