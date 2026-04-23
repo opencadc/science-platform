@@ -47,7 +47,10 @@ is and **which modules** participate. It complements milestone plans under
 
 ## Fixtures and local testing
 
-Kueue test objects live in **`scripts/test-setup.yaml`**. The **`scripts/minikube-smoke.sh`** path installs the upstream Kueue controller, applies that file, and deploys the app with Skaffold (see `docs/dev-setup.md`).
+Kueue test objects live in **`scripts/test-setup.yaml`**. The
+**`scripts/kind-smoke.sh`** path installs the upstream Kueue controller,
+applies that file, and deploys the app with Helm after loading the locally
+built image into kind (see `docs/dev-setup.md`).
 
 ## Related reading
 

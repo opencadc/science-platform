@@ -92,28 +92,23 @@ canonical developer-oriented supplement to milestones M2 and M3.
 
 ## Local Kubernetes integration loop
 
-Local and CI both use **Minikube** (not Kind) so the environment matches upcoming
-work that depends on cluster addons such as **metrics-server** (resource
-metrics API). Minikube can enable these with `minikube addons enable …`.
+Local and CI both use a one-node **kind** cluster for smoke validation.
 
 ### Iterative dev (keep your cluster)
 
-See `docs/dev-setup.md`. The supported flow is **`bash scripts/minikube-smoke.sh`**
-(Helm Kueue, `scripts/test-setup.yaml`, Skaffold build + Helm, integration tests) or the same
-phases by hand if you are debugging.
+See `docs/dev-setup.md`. The supported flow is
+**`bash scripts/kind-smoke.sh`** (Helm Kueue, `scripts/test-setup.yaml`,
+Docker build + `kind load`, Helm deploy, integration tests).
 
 ### One-shot verification (CI-style)
 
 ```bash
-bash scripts/minikube-smoke.sh
+KIND_SMOKE_CI=1 KIND_SMOKE_EXIT_AFTER_TESTS=1 bash scripts/kind-smoke.sh
 ```
 
-**`scripts/minikube-smoke.sh`** runs the full Minikube smoke (starts the cluster and preloads only if the profile is not already running, then
-Kueue + **`scripts/test-setup.yaml`**, Skaffold, wait, `tests/integration`). The API port-forward can stay up after the run; stop it with **`scripts/minikube-smoke-teardown.sh`**.
-
-CI sets `MINIKUBE_SMOKE_CI=1` and uses the same script after image preloads. For
-a disposable local profile, `MINIKUBE_DELETE_ON_EXIT=true` (use with care on the
-default `minikube` profile).
+`scripts/kind-smoke.sh` runs the full kind smoke and can leave the API
+port-forward up for local debugging. Stop it with
+`bash scripts/kind-smoke-teardown.sh`.
 
 ## Container image
 
@@ -146,7 +141,7 @@ bash scripts/deploy-with-helm.sh dev
 
 ## CI workflows
 
-Lint, unit tests, Docker image validation, and Minikube smoke deployment run from
+Lint, unit tests, Docker image validation, and kind smoke deployment run from
 `.github/workflows/ci.metrics.yml` in the parent repository on changes under
 `metrics/**`.
 

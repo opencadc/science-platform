@@ -1,26 +1,106 @@
-# Minikube: Metrics API development and testing
+# Kind: Metrics API development and testing
 
-Single entry for the full stack: **`bash scripts/minikube-smoke.sh`**. It starts Minikube (local only) when the profile is not already running, installs Kueue (upstream Helm chart), applies **`scripts/test-setup.yaml`** (Kueue smoke objects + sample workload), deploys with **`skaffold build`** and **`helm upgrade`** (same one-shot flow as CI), waits for admission, runs integration tests.
+Use `bash scripts/kind-smoke.sh` for the full local smoke path. The script
+creates a one-node kind cluster when needed, installs Kueue, applies
+`scripts/test-setup.yaml`, builds and loads the Metrics API image, deploys with
+Helm, waits for admission and rollouts, and runs integration tests.
 
-**Prerequisites:** Docker, Minikube, kubectl, Helm, Skaffold (≥ 2.16 locally; CI pins 2.18.x). Working directory: **`metrics/`**.
+## Prerequisites
 
-**Environment:** `KUBE_CONTEXT` / `MINIKUBE_PROFILE` default to `minikube`. `METRICS_CLUSTER_NAME` in `scripts/minikube-values.yaml` matches. For **CI**, the workflow sets `MINIKUBE_SMOKE_CI=1` and runs the same script after the cluster and image preloads.
+Install these tools before running the smoke flow.
 
-**Debug-only manual steps:** with a running cluster, you can mirror the script (Helm for Kueue, `kubectl apply -f scripts/test-setup.yaml`, then `skaffold build -p minikube` and `helm upgrade` as in `minikube-smoke.sh`). The supported path is the single script.
+- Docker
+- kind
+- kubectl
+- Helm
+- Python 3.13 and `uv`
 
-**Contract names** in `scripts/test-setup.yaml` and `scripts/minikube-values.yaml`: `default-flavor`, `cohort-atom`, `cq-proton`, `cq-neutron`, `cq-electron`, `lq-smoke`, `integration-idle`. Sample workload requests: `100m` CPU, `100Mi` memory.
+Run from the `metrics/` directory.
 
-**Teardown:** **`bash scripts/minikube-smoke-teardown.sh`** ends the port-forward (default, non-destructive). Add **`--all`** to run **`scripts/teardown-dev-kube-setup.sh`**, and **`--minikube`** to delete the Minikube profile. Kubernetes-only cleanup: **`bash scripts/teardown-dev-kube-setup.sh`**
+## Recommended local run
 
-**Troubleshooting**
+Run the full smoke path with a single command:
 
-- **`ErrImageNeverPull` / image missing on node:** the chart uses `imagePullPolicy: Never`. The image must be built in Minikube’s Docker (see `minikube-smoke.sh`, which runs Skaffold after `eval $(minikube docker-env)`). If you built only on the host, load the same tag:
+```bash
+bash scripts/kind-smoke.sh
+```
+
+Default runtime values:
+
+- `KIND_CLUSTER_NAME=metrics`
+- `KUBE_CONTEXT=kind-metrics`
+- `NAMESPACE=metrics`
+- `PORT_FORWARD_PORT=18080`
+
+After a successful local run, the API port-forward stays up for debugging.
+Stop it with:
+
+```bash
+bash scripts/kind-smoke-teardown.sh
+```
+
+## CI-parity run
+
+To mirror CI behavior locally (no persistent port-forward):
+
+```bash
+KIND_SMOKE_CI=1 KIND_SMOKE_EXIT_AFTER_TESTS=1 KIND_PRELOAD_IMAGES=false \
+  bash scripts/kind-smoke.sh
+```
+
+If you prebuild the image and want to skip the build step:
+
+```bash
+docker build -t canfar-metrics-local:dev-local .
+KIND_SMOKE_SKIP_BUILD=1 METRICS_IMAGE_TAG=dev-local bash scripts/kind-smoke.sh
+```
+
+## Teardown options
+
+Non-destructive (stop only the background port-forward):
+
+```bash
+bash scripts/kind-smoke-teardown.sh
+```
+
+Delete Helm releases, fixtures, and the kind cluster:
+
+```bash
+bash scripts/kind-smoke-teardown.sh --all --kind
+```
+
+## Contract fixtures
+
+The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
+
+- `default-flavor`
+- `cohort-atom`
+- `cq-proton`
+- `cq-neutron`
+- `cq-electron`
+- `lq-smoke`
+- `integration-idle`
+
+Sample workload requests remain `100m` CPU and `100Mi` memory.
+
+## Troubleshooting
+
+- Image not found (`ErrImageNeverPull`): re-run `bash scripts/kind-smoke.sh`, or
+  rebuild and load explicitly:
   `docker build -t canfar-metrics-local:TAG .` then
-  `minikube image load canfar-metrics-local:TAG -p minikube` then
-  `kubectl -n metrics rollout restart deploy/metrics-api-metrics-api`.
-- API fails startup: `kubectl -n metrics logs deploy/metrics-api-metrics-api --tail=200`
-- Empty ClusterQueues: re-run `bash scripts/minikube-smoke.sh` or re-apply `scripts/test-setup.yaml` after Kueue is healthy
-- Stale image with `pullPolicy: Never`: use Skaffold builds (unique tags) or unique tags + `minikube image rm`
-- Cache: short TTL in minikube values; `kubectl exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`
+  `kind load docker-image canfar-metrics-local:TAG --name metrics`.
+- API startup failure: check logs with
+  `kubectl --context kind-metrics -n metrics logs deploy/metrics-api-metrics-api --tail=200`.
+- Workload not admitted: check Kueue status and fixture objects:
+  `kubectl --context kind-metrics get clusterqueue,cohort` and
+  `kubectl --context kind-metrics -n metrics get localqueue,workload`.
+- Redis cache data stale during iterative tests:
+  `kubectl --context kind-metrics exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`.
 
-**See also:** `docs/kueue-platform.md`, `docs/environment-contracts.md`, `README.md`
+## Related files
+
+- `scripts/kind-smoke.sh`
+- `scripts/kind-smoke-teardown.sh`
+- `scripts/kind-values.yaml`
+- `scripts/test-setup.yaml`
+- `../.github/workflows/ci.metrics.yml`

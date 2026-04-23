@@ -28,14 +28,14 @@ Any other value is rejected at settings validation time.
 
 The service is Kubernetes-first in every environment.
 
-- `dev` requires Minikube, Helm, and `kubectl`. Test and verification flows
-  assume you can create or use a Minikube cluster, install Kueue charts, apply
+- `dev` requires kind, Helm, and `kubectl`. Test and verification flows assume
+  you can create or use a one-node kind cluster, install Kueue charts, apply
   ClusterQueue/Cohort objects, deploy the metrics chart, and run Redis in the
   cluster deployment path.
 - `integration`, `staging`, and `production` use an already operating
   Kubernetes cluster. This repository deploys the service via Helm with
   environment-specific values such as queue configuration and Redis endpoint.
-  These environments do not assume local Minikube provisioning.
+  These environments do not assume local kind provisioning.
 
 Docker Compose is no longer part of the supported development contract.
 

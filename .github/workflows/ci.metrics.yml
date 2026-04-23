@@ -45,8 +45,6 @@ jobs:
           working-directory: metrics
       - name: Sync dependencies
         run: uv sync --group dev
-      - name: Validate Docker Compose specification
-        run: docker compose -f compose.yaml config >/dev/null
       - name: Lint
         run: uv run ruff check src tests
       - name: Unit tests
@@ -56,19 +54,15 @@ jobs:
       - name: Harness CLI check
         run: uv run --group harness python -m harness check
 
-  metrics-minikube-smoke:
+  metrics-kind-smoke:
     runs-on: ubuntu-latest
     needs: metrics-lint-test
     timeout-minutes: 60
     env:
-      # Stable paths: cache Minikube/Helm; Skaffold binary cached under .ci-cache/skaffold (see workflow steps).
-      MINIKUBE_HOME: ${{ github.workspace }}/.ci-minikube
-      HELM_CACHE_HOME: ${{ github.workspace }}/.ci-helm-cache
       KUEUE_CHART_VERSION: "0.17.0"
-      SKAFFOLD_VERSION: "2.18.3"
-      # Quieter Skaffold in CI; must match the image used when metrics-server addon is enabled.
-      SKAFFOLD_UPDATE_CHECK: "false"
-      METRICS_SERVER_IMAGE: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+      HELM_CACHE_HOME: ${{ github.workspace }}/.ci-helm-cache
+      METRICS_IMAGE_REPOSITORY: canfar-metrics-local
+      METRICS_IMAGE_TAG: ${{ github.sha }}
     defaults:
       run:
         working-directory: metrics
@@ -79,16 +73,14 @@ jobs:
           egress-policy: audit
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Cache Minikube and Helm data
+      - name: Cache Helm data
         uses: actions/cache@v4
         with:
-          path: |
-            .ci-minikube/cache
-            .ci-helm-cache
-          key: metrics-minikube-ci-${{ runner.os }}-mk-v1.35.0-k8s-v1.30.0-kueue-${{ env.KUEUE_CHART_VERSION }}-skaffold-${{ env.SKAFFOLD_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml', 'metrics/scripts/minikube-smoke.sh', 'metrics/scripts/lib-minikube-smoke.sh', 'metrics/scripts/test-setup.yaml', 'metrics/helm/metrics-api/Chart.yaml', 'metrics/helm/metrics-api/values.yaml', 'metrics/helm/metrics-api/templates/**', 'metrics/scripts/minikube-values.yaml', 'metrics/skaffold.yaml') }}
-      - name: Ensure Minikube and Helm cache directories exist
+          path: .ci-helm-cache
+          key: metrics-kind-helm-${{ runner.os }}-kueue-${{ env.KUEUE_CHART_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml') }}
+      - name: Ensure Helm cache directory exists
         working-directory: ${{ github.workspace }}
-        run: mkdir -p "${MINIKUBE_HOME}/cache" "${HELM_CACHE_HOME}"
+        run: mkdir -p "${HELM_CACHE_HOME}"
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -98,76 +90,58 @@ jobs:
         with:
           enable-cache: true
           working-directory: metrics
+      - name: Sync dependencies
+        run: uv sync --group dev
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
       - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
           version: v3.16.2
-      - name: Cache Skaffold CLI
-        uses: actions/cache@v4
+      - name: Setup kind cluster
+        uses: helm/kind-action@v1.12.0
         with:
-          path: ${{ github.workspace }}/.ci-cache/skaffold/skaffold-linux-amd64
-          key: metrics-ci-skaffold-${{ runner.os }}-v${{ env.SKAFFOLD_VERSION }}
-      - name: Install Skaffold
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          _bin="${GITHUB_WORKSPACE}/.ci-cache/skaffold/skaffold-linux-amd64"
-          mkdir -p "$(dirname "${_bin}")"
-          if [[ ! -f "${_bin}" ]]; then
-            curl -fsSL "https://github.com/GoogleContainerTools/skaffold/releases/download/v${SKAFFOLD_VERSION}/skaffold-linux-amd64" -o "${_bin}"
-            chmod +x "${_bin}"
-          fi
-          sudo install -m 0755 "${_bin}" /usr/local/bin/skaffold
-          skaffold version | grep -q "v${SKAFFOLD_VERSION}"
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.13.0
+          version: v0.30.0
+          kubectl_version: v1.30.0
+          cluster_name: metrics
+          wait: 120s
+      - name: Build Metrics image (cache-enabled)
+        uses: docker/build-push-action@v6
         with:
-          minikube version: v1.35.0
-          kubernetes version: v1.30.0
-          github token: ${{ secrets.GITHUB_TOKEN }}
-          driver: docker
-      - name: Pre-load metrics-server image into Minikube
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          timeout 15m docker pull "${METRICS_SERVER_IMAGE}"
-          timeout 15m minikube image load "${METRICS_SERVER_IMAGE}" --overwrite
-      - name: Enable metrics-server addon
-        run: minikube addons enable metrics-server
-      - name: Pre-load Alpine image for Kueue smoke workload
-        run: |
-          set -euo pipefail
-          timeout 10m docker pull alpine:3.20
-          timeout 10m minikube image load alpine:3.20 --overwrite
-      - name: Sync dependencies
-        run: uv sync --group dev
-      - name: Pre-load Redis image into Minikube
-        run: |
-          set -euo pipefail
-          timeout 10m docker pull redis:7-alpine
-          timeout 10m minikube image load redis:7-alpine --overwrite
-      - name: Minikube smoke (Kueue, test-setup, Skaffold, integration tests)
-        working-directory: metrics
+          context: ./metrics
+          file: ./metrics/Dockerfile
+          load: true
+          tags: ${{ env.METRICS_IMAGE_REPOSITORY }}:${{ env.METRICS_IMAGE_TAG }}
+          cache-from: type=gha,scope=metrics-kind-image
+          cache-to: type=gha,mode=max,scope=metrics-kind-image
+      - name: Kind smoke (Kueue, test-setup, Helm, integration tests)
         env:
-          KUBE_CONTEXT: minikube
-          MINIKUBE_PROFILE: minikube
-          MINIKUBE_SMOKE_CI: "1"
-          MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS: "900"
+          KIND_CLUSTER_NAME: metrics
+          KUBE_CONTEXT: kind-metrics
+          KIND_SMOKE_CI: "1"
+          KIND_SMOKE_EXIT_AFTER_TESTS: "1"
+          KIND_SMOKE_SKIP_BUILD: "1"
+          KIND_IMAGE_LOAD_TIMEOUT_SECONDS: "900"
+          KIND_PRELOAD_IMAGES: "false"
+          METRICS_IMAGE_REPOSITORY: ${{ env.METRICS_IMAGE_REPOSITORY }}
+          METRICS_IMAGE_TAG: ${{ env.METRICS_IMAGE_TAG }}
         run: |
           set -euo pipefail
-          # Hard cap so a stuck image transfer or kubectl wait cannot burn the full job budget silently.
-          timeout 55m bash scripts/minikube-smoke.sh
-      - name: Teardown Minikube smoke (Helm/Kueue fixtures + cluster)
+          timeout 55m bash scripts/kind-smoke.sh
+      - name: Teardown kind smoke (Helm/Kueue fixtures + cluster)
         if: always()
-        working-directory: metrics
         env:
-          KUBE_CONTEXT: minikube
-          MINIKUBE_PROFILE: minikube
+          KIND_CLUSTER_NAME: metrics
+          KUBE_CONTEXT: kind-metrics
           NAMESPACE: metrics
         run: |
           set +e
-          bash scripts/minikube-smoke-teardown.sh --all --minikube
-          if command -v minikube >/dev/null 2>&1; then
-            minikube delete -p "${MINIKUBE_PROFILE}" 2>/dev/null || true
+          bash scripts/kind-smoke-teardown.sh --all --kind
+          if command -v kind >/dev/null 2>&1; then
+            kind delete cluster --name "${KIND_CLUSTER_NAME}" 2>/dev/null || true
           fi
           exit 0

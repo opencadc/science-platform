@@ -19,6 +19,18 @@ process lessons belong in `docs/harness/learnings.md`.
 
 ## Current entries
 
+- Date: April 23, 2026
+- Context: M10 local and CI smoke workflow simplification follow-up.
+- Lesson: A one-node kind cluster plus Helm and direct Docker build/load
+  provides a smaller and easier smoke path than the previous Minikube plus
+  Skaffold flow, while keeping the Kueue fixture and chart deployment contracts
+  unchanged.
+- Evidence: `scripts/kind-smoke.sh`, `scripts/kind-smoke-teardown.sh`,
+  `scripts/kind-values.yaml`, `docs/dev-setup.md`, and
+  `.github/workflows/ci.metrics.yml`.
+- Action taken: Switched the active local/CI smoke workflow to kind and removed
+  Minikube/Skaffold smoke-path artifacts.
+
 - Date: April 22, 2026
 - Context: M3 nested `pydantic-settings` with legacy flat env merge.
 - Lesson: A single `model_validator(mode="after")` that returns
