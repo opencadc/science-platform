@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/opencadc/science-platform/compare/1.2.1...1.3.0) (2026-04-23)
+
+
+### Features
+
+* **metrics:** add configuration for metrics package with changelog and release settings ([954afb2](https://github.com/opencadc/science-platform/commit/954afb25f3cb0aea9b7641187f310d470d2da476))
+* **metrics:** add Helm chart, Minikube scripts, and CI updates ([4af37e3](https://github.com/opencadc/science-platform/commit/4af37e31bc98db5df73b809bea1e9dddd930de06))
+* **metrics:** add metrics pre-commit hook for automated checks ([7564d2d](https://github.com/opencadc/science-platform/commit/7564d2d710b0ab2e67a805c115b4e8e45eee4b69))
+* **metrics:** implement CI/CD workflows for Metrics API, including linting, testing, and release automation ([38432e0](https://github.com/opencadc/science-platform/commit/38432e020d2081e4e43f30ea80dcc856ac7e92b4))
+* **metrics:** Kueue Helm RBAC, Minikube helpers, and CI ([5b18b8d](https://github.com/opencadc/science-platform/commit/5b18b8d4718fa2544f53e0789800b3a9011f4842))
+* **metrics:** M1 compose stack, prerequisites, CI and docs ([de0226d](https://github.com/opencadc/science-platform/commit/de0226ddea97b48d972a06389c06c2d2c1d47ea9))
+* **metrics:** minikube smoke, Skaffold, and platform metrics cleanup ([90bb692](https://github.com/opencadc/science-platform/commit/90bb6920ff4c60fced228b7453138382040cfdab))
+
+
+### Bug Fixes
+
+* **ci:** bound minikube smoke waits and image loads ([754b23c](https://github.com/opencadc/science-platform/commit/754b23ca824241ef76cc31372e620d6a0bad036d))
+* **ci:** updated paths-filter action ([88e4b0b](https://github.com/opencadc/science-platform/commit/88e4b0baaa8b5a054b2168663ccdafa1ef709ba3))
+* use sha value for images ([0765e62](https://github.com/opencadc/science-platform/commit/0765e623b9b8020497113b35ace73a8a235d1d21))
+
 ## [1.2.1](https://github.com/opencadc/science-platform/compare/1.2.0...1.2.1) (2026-03-03)
 
 
