@@ -3,6 +3,8 @@
 # Minikube integration smoke: Kueue + test-setup.yaml + skaffold build + Helm + pytest -m integration.
 # Uses `skaffold build` + `helm upgrade` (not `skaffold run` / `skaffold dev`) to avoid a broken skaffold Helm plugin
 # and to keep the flow deterministic and CI-aligned.
+# CI (MINIKUBE_SMOKE_CI=1): build on the host Docker daemon, then `minikube image load` (Minikube Docker DNS is unreliable).
+# Local: build inside Minikube via `minikube docker-env` so the image is on the node without a load step.
 #
 # Local: start Minikube only if the profile is not running; on success, leave a nohup port-forward
 #   (state under METRICS_MINIKUBE_SMOKE_STATE_DIR) until `scripts/minikube-smoke-teardown.sh`.
@@ -54,6 +56,11 @@ MINIKUBE_ENABLE_METRICS_SERVER="${MINIKUBE_ENABLE_METRICS_SERVER:-true}"
 MINIKUBE_DELETE_ON_EXIT="${MINIKUBE_DELETE_ON_EXIT:-false}"
 # Local: 0 = leave port-forward running (see minikube-smoke-teardown.sh). 1 = kill on script exit.
 MINIKUBE_SMOKE_EXIT_AFTER_TESTS="${MINIKUBE_SMOKE_EXIT_AFTER_TESTS:-0}"
+# When set (seconds) and `timeout` is on PATH, cap `minikube image load` so transfers cannot hang forever (typical in CI).
+MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS="${MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS:-}"
+if [[ "${MINIKUBE_SMOKE_CI}" == "1" && -z "${MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS}" ]]; then
+  MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS="${MINIKUBE_IMAGE_LOAD_TIMEOUT_CI_DEFAULT:-900}"
+fi
 KUEUE_CHART_VERSION="${KUEUE_CHART_VERSION:-0.17.0}"
 KUEUE_RELEASE_NAME="${KUEUE_RELEASE_NAME:-kueue}"
 KUEUE_NAMESPACE="${KUEUE_NAMESPACE:-kueue-system}"
@@ -82,12 +89,24 @@ if [[ -n "${KUBE_CONTEXT}" ]]; then
   helm_kctx=(--kube-context "${KUBE_CONTEXT}")
 fi
 
+# Load an image from the host Docker daemon into the Minikube node (can be slow; optional timeout in CI).
+_minikube_image_load() {
+  local _img="${1:?}"
+  echo "minikube image load: ${_img}"
+  if [[ -n "${MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS:-}" ]] && command -v timeout >/dev/null 2>&1; then
+    timeout "${MINIKUBE_IMAGE_LOAD_TIMEOUT_SECONDS}" \
+      minikube image load "${_img}" -p "${MINIKUBE_PROFILE}" --overwrite
+  else
+    minikube image load "${_img}" -p "${MINIKUBE_PROFILE}" --overwrite
+  fi
+}
+
 # docker pull + minikube image load (alpine, redis, Kueue image).
 _preload_to_minikube() {
   require_docker
   local _img="${1:?}"
   docker pull "${_img}"
-  minikube image load "${_img}" -p "${MINIKUBE_PROFILE}"
+  _minikube_image_load "${_img}"
 }
 
 # kubectl … port-forward … (no shell arrays exported to child except via "${_KPF[@]}").
@@ -170,12 +189,22 @@ install_kueue_and_fixtures() {
 
 # Build in Minikube docker (see eval); deploy with plain Helm to avoid skaffold's Helm plugin.
 build_and_deploy_app() {
-  local _art _tag
+  local _art _tag _full_tag
   _art="$(mktemp "${TMPDIR:-/tmp}/minikube-smoke-art.XXXXXX.json")"
-  (
-    eval "$(minikube -p "${MINIKUBE_PROFILE}" docker-env)"
+  if [[ "${MINIKUBE_SMOKE_CI}" == "1" ]]; then
+    # Minikube's Docker daemon often cannot resolve external registries (broken DNS to 192.168.49.1:53).
+    # Build on the host daemon (same as `docker` on GitHub Actions), then load into the cluster.
     skaffold build -p minikube --file-output="${_art}"
-  )
+    _full_tag="$(
+      python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['builds'][0]['tag'])" "${_art}"
+    )"
+    _minikube_image_load "${_full_tag}"
+  else
+    (
+      eval "$(minikube -p "${MINIKUBE_PROFILE}" docker-env)"
+      skaffold build -p minikube --file-output="${_art}"
+    )
+  fi
   _tag="$(
     python3 -c "import json,sys; t=json.load(open(sys.argv[1]))['builds'][0]['tag']; print(t.split(':',1)[1])" "${_art}"
   )"
@@ -281,7 +310,28 @@ else
   "${_KPF[@]}" > "${METRICS_SMOKE_PF_LOG}" 2>&1 &
 fi
 PORT_FORWARD_PID=$!
-sleep 3
+echo "Wait for metrics API on 127.0.0.1:${PORT_FORWARD_PORT} (port-forward log: ${METRICS_SMOKE_PF_LOG})"
+_api_deadline=$((SECONDS + 120))
+_api_ok=0
+while ((SECONDS < _api_deadline)); do
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsS --max-time 2 "http://127.0.0.1:${PORT_FORWARD_PORT}/healthz" >/dev/null 2>&1; then
+      _api_ok=1
+      break
+    fi
+  else
+    if python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${PORT_FORWARD_PORT}/healthz', timeout=2).read()" 2>/dev/null; then
+      _api_ok=1
+      break
+    fi
+  fi
+  sleep 2
+done
+if [[ "${_api_ok}" -ne 1 ]]; then
+  echo "error: metrics API did not respond on /healthz within 120s (port-forward PID ${PORT_FORWARD_PID})" >&2
+  [[ -f "${METRICS_SMOKE_PF_LOG}" ]] && tail -n 80 "${METRICS_SMOKE_PF_LOG}" >&2 || true
+  exit 1
+fi
 METRICS_BASE_URL="http://127.0.0.1:${PORT_FORWARD_PORT}" uv run pytest tests/integration -m integration -q
 echo "OK"
 if [[ "${_PERSIST}" -eq 1 ]]; then
