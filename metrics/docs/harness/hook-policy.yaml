@@ -1,0 +1,110 @@
+version: "2.2"
+mode: advisory
+source: docs/harness/hook-policy.yaml
+events:
+  - session_start
+  - shell_command_start
+  - pre_file_write
+  - post_task_complete
+session_start_message: Start at AGENTS.md then docs/harness/index.md.
+checks:
+  - id: CMD-BLOCK-PIPE-TO-SHELL
+    event: shell_command_start
+    pattern: "((curl|wget|invoke-webrequest|invoke-restmethod|iwr|irm)[^\n|;]*\\|\\s*(sh|bash|zsh|dash|ksh|fish|pwsh|python|ruby|perl|node|lua|iex))|((sh|bash|zsh|dash|ksh|fish|pwsh)\\s+-c\\s+['\"]?.*(curl|wget|iwr|irm))|((bash|sh|zsh|dash|ksh)\\s+<\\(\\s*(curl|wget|iwr|irm))|(\\b(eval|source|\\.)\\s+[\"']?\\$\\(\\s*(curl|wget|iwr|irm))|((curl|wget|iwr|irm)[^\\n]+(&&|;)\\s*(bash|sh|zsh|dash|ksh|fish|pwsh|python|ruby|perl|node|lua)\\b)"
+    action: advisory_block
+    message: Remote bootstrap piping or shell execution is blocked.
+  - id: CMD-ASK-GIT-RESET-HARD
+    event: shell_command_start
+    pattern: "\\bgit\\s+reset\\s+--hard\\b"
+    action: advisory_ask
+    message: git reset --hard is destructive. Request approval.
+  - id: CMD-ASK-GIT-CLEAN
+    event: shell_command_start
+    pattern: "\\bgit\\s+clean\\b(?=[^\\n]*(--force|--directory|-[A-Za-z]*[dfx][A-Za-z]*\\b))"
+    action: advisory_ask
+    message: git clean can delete untracked work. Request approval.
+  - id: CMD-ASK-DESTRUCTIVE-RM
+    event: shell_command_start
+    pattern: "\\brm\\b(?=[^\\n]*\\s(--force|--recursive|-[A-Za-z]*[rRf][A-Za-z]*\\b))"
+    action: advisory_ask
+    message: Potentially destructive delete detected. Request approval.
+  - id: CMD-BLOCK-SUDO-RM-RF
+    event: shell_command_start
+    pattern: "\\bsudo\\s+rm\\b(?=[^\\n]*(--recursive|--force|-[A-Za-z]*[rRf][A-Za-z]*\\b))(?=[^\\n]*(--force|--recursive|-[A-Za-z]*[rRf][A-Za-z]*\\b))"
+    action: advisory_block
+    message: sudo recursive or forced delete is blocked.
+  - id: CMD-ASK-FIND-DELETE
+    event: shell_command_start
+    pattern: "\\bfind\\b[^\\n]*\\s(-delete\\b|-(exec|execdir|ok|okdir)\\s+rm\\b)"
+    action: advisory_ask
+    message: find with -delete or -exec(dir) rm is destructive. Request approval.
+  - id: CMD-ASK-SED-IN-PLACE
+    event: shell_command_start
+    pattern: "\\bsed\\s+(-[A-Za-z]*i[A-Za-z]*\\b|--in-place\\b)"
+    action: advisory_ask
+    message: sed in-place mutation requested. Request approval.
+  - id: CMD-ASK-SYSTEM-WRITE
+    event: shell_command_start
+    pattern: "\\b(sudo\\s+)?(tee(\\s+-a)?|install\\s+[-A-Za-z0-9=/\\. ]*|cp|mv)\\b[^\\n]*\\s+/(etc|boot|bin|sbin|usr|var|opt|root|lib|lib64)(/|\\b)"
+    action: advisory_ask
+    message: Write via tee/install/cp/mv into a system path. Request approval.
+  - id: CMD-ASK-DD-TO-DEVICE
+    event: shell_command_start
+    pattern: "\\bdd\\b[^\\n]*\\sof=/dev/"
+    action: advisory_ask
+    message: dd writes directly to a device. Request approval.
+  - id: CMD-ASK-CHMOD-WORLD-WRITABLE-ROOT
+    event: shell_command_start
+    pattern: "\\bchmod\\b[^\\n]*\\s(-R\\s+)?[0-7]?7{2,3}\\s+/"
+    action: advisory_ask
+    message: chmod to world-writable on a root path. Request approval.
+  - id: CMD-ASK-CHOWN-ROOT-PATH
+    event: shell_command_start
+    pattern: "\\bchown\\b[^\\n]*\\s-R\\b[^\\n]*\\s/"
+    action: advisory_ask
+    message: Recursive chown on a root path. Request approval.
+  - id: CMD-ASK-REDIRECT-SYSTEM-PATH
+    event: shell_command_start
+    pattern: ":?>\\s*/(etc|boot|bin|sbin|dev|usr)/"
+    action: advisory_ask
+    message: Redirection targeting a system path. Request approval.
+  - id: CMD-WARN-SHELL-C
+    event: shell_command_start
+    pattern: "\\b(sh|bash|zsh|pwsh)\\s+-c\\b"
+    action: advisory_warn
+    message: Shell -c execution detected. Confirm quoting and command origin.
+  - id: CMD-WARN-SECRETS
+    event: shell_command_start
+    pattern: "(?i)(api[_-]?key|token|secret|password)\\s*=|--(token|password|api-key)\\b"
+    action: advisory_warn
+    message: Possible secret material in command text.
+  - id: CMD-WARN-SECRET-FILES
+    event: shell_command_start
+    pattern: "(^|[\\s/])(\\.env(\\.[A-Za-z0-9_-]+)?|credentials[^\\s]*|secrets?\\.[A-Za-z0-9_-]+|id_(rsa|ed25519|ecdsa|dsa)|[^\\s]+\\.(pem|pfx|p12|key)|kubeconfig|\\.npmrc|\\.pypirc|\\.aws/credentials)(\\s|$)"
+    action: advisory_warn
+    message: Command references a likely secret file. Confirm it is safe.
+  - id: WRITE-ASK-HARNESS-ADAPTER
+    event: pre_file_write
+    pattern: "(^|/)(\\.codex|\\.cursor|\\.claude)/"
+    action: advisory_ask
+    message: Writing adapter files requires explicit confirmation.
+  - id: WRITE-ASK-HARNESS-CODE
+    event: pre_file_write
+    pattern: "(^|/)\\.harness/"
+    action: advisory_ask
+    message: Writing harness runtime code requires explicit confirmation.
+  - id: WRITE-ASK-SECRET-FILE
+    event: pre_file_write
+    pattern: "(^|/)(\\.env(\\.[A-Za-z0-9_-]+)?|credentials[^\\s]*|secrets?\\.[A-Za-z0-9_-]+|id_(rsa|ed25519|ecdsa|dsa)|[^/]+\\.(pem|pfx|p12|key)|kubeconfig|\\.npmrc|\\.pypirc|\\.aws/credentials)$"
+    action: advisory_ask
+    message: Writing a likely secret file requires explicit confirmation.
+  - id: CMD-ALLOW-READONLY
+    event: shell_command_start
+    pattern: "^(ls|pwd|cat|rg)(\\s+[A-Za-z0-9_@%+=:,./-]+)*\\s*$"
+    action: advisory_allow
+    message: Read-only command allowed.
+  - id: TASK-WARN-MISSING-VERIFY
+    event: post_task_complete
+    pattern: ".*"
+    action: advisory_warn
+    message: Confirm verification evidence is present before handoff.

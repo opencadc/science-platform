@@ -1,0 +1,5 @@
+---
+description: Apply capability routing policy.
+alwaysApply: false
+---
+Follow `docs/harness/routing.md` and `docs/harness/router-policy.yaml` before assigning work.

@@ -1,0 +1,61 @@
+# Default chart values (override with values-dev.yaml for local/dev flows)
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: images.opencadc.org/platform/metrics
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Flat env map -> container env (METRICS_* keys)
+env: {}
+
+serviceAccount:
+  create: false
+  name: ""
+
+rbac:
+  create: false
+
+# When enabling rbac.create, set serviceAccount.create: true (and optionally
+# serviceAccount.name) so the ClusterRoleBinding does not attach read access to
+# the namespace default ServiceAccount by accident.
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  resources: {}
+
+# HTTP probes (API listens only after Kueue lifespan validation in kueue mode).
+probes:
+  startup:
+    failureThreshold: 40
+    periodSeconds: 3
+    timeoutSeconds: 3
+  liveness:
+    initialDelaySeconds: 0
+    periodSeconds: 20
+    timeoutSeconds: 5
+  readiness:
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 3

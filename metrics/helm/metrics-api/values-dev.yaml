@@ -1,0 +1,19 @@
+# Development values (kept in-repo per M1; int/staging/prod live elsewhere)
+image:
+  repository: images.opencadc.org/platform/metrics
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  METRICS_ENVIRONMENT: "dev"
+  METRICS_CLUSTER_NAME: "dev-cluster"
+  METRICS_CACHE_BACKEND: "redis"
+  METRICS_CACHE_TTL_SECONDS: "15"
+  METRICS_OTEL_METRICS_ENABLED: "false"
+  METRICS_PLATFORM__PROMETHEUS__URL: "http://prometheus.monitoring.svc:9090"
+  METRICS_PLATFORM__KUEUE__KUBE_API_URL: "https://kubernetes.default.svc"
+  METRICS_PLATFORM__KUEUE__CLUSTER_QUEUES: "cq-example"
+  METRICS_PLATFORM__KUEUE__COHORT: "cohort-example"
+
+redis:
+  enabled: true

@@ -1,0 +1,37 @@
+# Local dev stack: Metrics API + Redis (see README "Docker Compose").
+# Kubernetes-backed data sources are out-of-stack; use Minikube separately.
+#
+# Usage (from metrics/):
+#   docker compose up --build
+# Optional overrides: copy env.example to .env in this directory; Compose reads
+# .env for variable substitution (${METRICS_*:-defaults} below).
+#
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  metrics-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      METRICS_REDIS_URL: ${METRICS_REDIS_URL:-redis://redis:6379/0}
+      METRICS_CACHE_BACKEND: ${METRICS_CACHE_BACKEND:-redis}
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-dev}
+      # Required for the composed runtime (set in .env); see env.example.
+      METRICS_PLATFORM__PROMETHEUS__URL: ${METRICS_PLATFORM__PROMETHEUS__URL:-}
+      METRICS_PLATFORM__KUEUE__KUBE_API_URL: ${METRICS_PLATFORM__KUEUE__KUBE_API_URL:-}
+      METRICS_KUEUE_CLUSTER_QUEUES: ${METRICS_KUEUE_CLUSTER_QUEUES:-}
+      METRICS_KUEUE_COHORT: ${METRICS_KUEUE_COHORT:-}
+    depends_on:
+      redis:
+        condition: service_healthy

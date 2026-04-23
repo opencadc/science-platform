@@ -1,0 +1,13 @@
+# Build context excludes (image build uses metrics/ as context)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.git/
+.harness/claims.jsonl
+tests/
+*.md
+!README.md

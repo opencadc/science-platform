@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "source": "docs/harness/hook-policy.yaml",
+  "bridge": "python -m harness.hooks.bridge",
+  "tool": "cursor",
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "uv run --group harness python -m harness.hooks.bridge session_start --tool cursor",
+        "description": "Loading harness context"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "uv run --group harness python -m harness.hooks.bridge shell_command_start --tool cursor",
+        "description": "Running harness command policy checks"
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "Write|Delete",
+        "command": "uv run --group harness python -m harness.hooks.bridge pre_file_write --tool cursor",
+        "description": "Running harness write policy checks"
+      }
+    ],
+    "stop": [
+      {
+        "command": "uv run --group harness python -m harness.hooks.bridge post_task_complete --tool cursor",
+        "description": "Applying harness verification guidance"
+      }
+    ]
+  }
+}

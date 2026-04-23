@@ -1,0 +1,28 @@
+image:
+  repository: canfar-metrics-local
+  # Default tag for values-only installs. scripts/kind-smoke.sh overrides this
+  # with a unique tag unless KIND_SMOKE_SKIP_BUILD=1.
+  tag: latest
+  pullPolicy: Never
+
+serviceAccount:
+  create: true
+
+rbac:
+  create: true
+
+env:
+  METRICS_ENVIRONMENT: "dev"
+  METRICS_CLUSTER_NAME: "kind-metrics"
+  METRICS_CACHE_BACKEND: "redis"
+  # Short TTL for CI and local integration so platform snapshots refresh quickly.
+  METRICS_CACHE_TTL_SECONDS: "1"
+  METRICS_OTEL_METRICS_ENABLED: "false"
+  METRICS_KUBE_API_URL: "https://kubernetes.default.svc"
+  METRICS_KUBE_VERIFY_TLS: "true"
+  METRICS_KUEUE_CLUSTER_QUEUES: "cq-proton,cq-neutron,cq-electron"
+  METRICS_KUEUE_COHORT: "cohort-atom"
+  METRICS_PLATFORM__PROMETHEUS__URL: "http://prometheus.monitoring.svc:9090"
+
+redis:
+  enabled: true

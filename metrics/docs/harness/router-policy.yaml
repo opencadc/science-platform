@@ -1,0 +1,80 @@
+version: 2
+routing:
+  plan:
+    model_class: large_reasoning
+    effort: high
+    hot_path: false
+    use_for:
+      - problem_framing
+      - decomposition
+      - tradeoff_analysis
+      - checkpoints
+  implement:
+    model_class: mid_size_code
+    effort_default: medium
+    effort_fallback: low
+    use_for:
+      - coding
+      - patching
+      - refactoring
+      - test_fix_loops
+  verify:
+    model_class: verifier
+    effort_default: medium
+    use_for:
+      - tests
+      - coverage
+      - regression_checks
+      - evidence_capture
+  research:
+    model_class: search_grounded_synthesis
+    effort_default: medium
+    precompression_model_class: small_summarizer
+    use_for:
+      - retrieval
+      - source_comparison
+      - citation_summaries
+  arbitrate:
+    model_class: most_capable_reasoning
+    effort: high
+    reserved_for:
+      - architecture_pivots
+      - failure_recovery
+      - final_arbitration
+    use_for:
+      - conflict_resolution
+      - final_decision
+escalation:
+  start_class: cheapest_reliable
+  triggers:
+    - ambiguity
+    - repeated_retries
+    - inconsistent_outputs
+    - high_stakes_architecture
+    - repeated_verification_failure
+affordances:
+  context:
+    forbid_raw_repo_to_expensive_models: true
+    required_summary_fields:
+      - goals
+      - constraints
+      - relevant_files
+      - diffs
+      - open_questions
+      - acceptance_criteria
+metrics:
+  optimize_for: tokens_per_accepted_outcome
+  track:
+    - retry_count
+    - retry_rate
+    - tool_calls
+    - latency
+    - human_rework
+    - cost_per_completed_task
+    - reviewer_sla
+    - review_to_decision
+    - arbitration_latency
+    - reopen_rate
+    - parallel_workers_max
+    - claim_stale_count
+    - dispatch_blocked_overlap

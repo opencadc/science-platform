@@ -1,0 +1,163 @@
+# Kueue smoke: cluster objects, metrics namespace, LocalQueue, sample Workload.
+# Keep names aligned with scripts/kind-values.yaml (and any local smoke values file).
+# Apply after Kueue controller is installed.
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: cohort-atom
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: cpu
+              nominalQuota: "3"
+            - name: memory
+              nominalQuota: "8Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-proton
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  cohortName: cohort-atom
+  queueingStrategy: BestEffortFIFO
+  flavorFungibility:
+    whenCanBorrow: MayStopSearch
+    whenCanPreempt: TryNextFlavor
+  preemption:
+    reclaimWithinCohort: Never
+    withinClusterQueue: Never
+    borrowWithinCohort:
+      policy: Never
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: cpu
+              nominalQuota: "10"
+            - name: memory
+              nominalQuota: "20Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-neutron
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  cohortName: cohort-atom
+  queueingStrategy: BestEffortFIFO
+  flavorFungibility:
+    whenCanBorrow: MayStopSearch
+    whenCanPreempt: TryNextFlavor
+  preemption:
+    reclaimWithinCohort: Never
+    withinClusterQueue: Never
+    borrowWithinCohort:
+      policy: Never
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: cpu
+              nominalQuota: "5"
+            - name: memory
+              nominalQuota: "48Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-electron
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  cohortName: cohort-atom
+  queueingStrategy: BestEffortFIFO
+  flavorFungibility:
+    whenCanBorrow: MayStopSearch
+    whenCanPreempt: TryNextFlavor
+  preemption:
+    reclaimWithinCohort: Never
+    withinClusterQueue: Never
+    borrowWithinCohort:
+      policy: Never
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: cpu
+              nominalQuota: "20"
+            - name: memory
+              nominalQuota: "12Gi"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metrics
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: lq-smoke
+  namespace: metrics
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  clusterQueue: cq-proton
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Workload
+metadata:
+  name: integration-idle
+  namespace: metrics
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+spec:
+  active: true
+  queueName: lq-smoke
+  podSets:
+    - name: main
+      count: 1
+      template:
+        spec:
+          restartPolicy: Always
+          containers:
+            - name: idle
+              image: alpine:3.20
+              command: ["tail", "-f", "/dev/null"]
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "100Mi"

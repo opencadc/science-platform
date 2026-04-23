@@ -1,0 +1,5 @@
+---
+description: Apply repository execution loop.
+alwaysApply: false
+---
+Follow `docs/harness/loop.md` when executing implementation tasks.

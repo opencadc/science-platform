@@ -1,0 +1,19 @@
+version: 2
+metrics:
+  retry_count: Number of repeated attempts required to reach an accepted outcome.
+  retry_rate: retry_count divided by accepted outcomes per milestone; target under 10%.
+  tool_calls: Number of tool invocations used for a task or milestone.
+  latency: Elapsed time from task start to accepted handoff.
+  human_rework: Human-requested correction after agent handoff.
+  cost_per_completed_task: Estimated model and tool cost per accepted outcome.
+  reviewer_sla: Elapsed time between review request and reviewer output per reviewer; target under 30 minutes.
+  review_to_decision: Elapsed time from review request to published decision log; target under 4 hours.
+  arbitration_latency: Elapsed time to resolve accepted review findings after quorum or reviewer-set completion; target under 2 hours.
+  reopen_rate: Fraction of tasks reopened after completion.
+  parallel_workers_max: Peak concurrent subagents across an active milestone; compare against the computed parallelism cap.
+  claim_stale_count: Number of `.harness/claims.jsonl` records that expired or missed heartbeat and had to be reclaimed.
+  dispatch_blocked_overlap: Number of dispatches aborted because path globs or mirror sets overlapped an active claim.
+telemetry:
+  opt_in_env: HARNESS_TELEMETRY
+  output: .harness/telemetry.jsonl
+  format: jsonl

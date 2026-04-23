@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.harness/telemetry.jsonl
+.harness/claims.jsonl
+
+.coverage
+
+# Minikube smoke state (port-forward PID from scripts/minikube-smoke.sh)
+.minikube-smoke/
+
+# Local compose overrides (secrets / developer-specific)
+.env
+compose.override.yaml
+
+# Cursor and IDE runtime state - not part of the harness contract
+.cursor/hooks/state/
+.cursor/hooks/state/**
+.cursor/.runtime/
+.codex/.runtime/
+.claude/.runtime/
+
+# Legacy packaged Helm subchart tarballs (file:// deps), if reintroduced
+helm/metrics-api/charts/*.tgz

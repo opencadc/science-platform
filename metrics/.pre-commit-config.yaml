@@ -1,0 +1,32 @@
+# Metrics Python + packaging checks (run from repo root or metrics/)
+#   pre-commit run --config metrics/.pre-commit-config.yaml --all-files
+---
+default_language_version:
+  python: python3.13
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^metrics/(src|tests)/
+      - id: ruff-format
+        files: ^metrics/(src|tests)/
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-toml
+        files: ^metrics/
+      - id: end-of-file-fixer
+        files: ^metrics/
+      - id: trailing-whitespace
+        files: ^metrics/
+  - repo: local
+    hooks:
+      - id: metrics-pytest
+        name: metrics pytest (coverage gate)
+        language: system
+        entry: bash -c 'cd metrics && uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80 -m "not integration"'
+        pass_filenames: false
+        files: ^metrics/
