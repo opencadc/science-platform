@@ -46,9 +46,7 @@ class StubUsageProvider:
     session_cpu: float | None = 2.0
     session_mem: float | None = 4.0
 
-    def _usage(
-        self, cpu: float, mem: float, source: str | None = None
-    ) -> UsageReading:
+    def _usage(self, cpu: float, mem: float, source: str | None = None) -> UsageReading:
         return UsageReading(
             requested_cpu_cores=cpu,
             requested_memory_gib=mem,
@@ -64,9 +62,7 @@ class StubUsageProvider:
         if self.user_cpu is None:
             return await self.get_usage()
         assert self.user_mem is not None
-        return self._usage(
-            self.user_cpu, self.user_mem, f"{self.source_name}:user"
-        )
+        return self._usage(self.user_cpu, self.user_mem, f"{self.source_name}:user")
 
     async def get_usage_for_session(
         self, user_id: str, session_id: str

@@ -98,9 +98,7 @@ def test_user_and_session_routes() -> None:
     assert "private" in ucc
     assert 25 <= cache_control_max_age(ucc) <= 30
 
-    session_response = client.get(
-        "/api/v1/metrics/users/user-123/sessions/session-456"
-    )
+    session_response = client.get("/api/v1/metrics/users/user-123/sessions/session-456")
     assert session_response.status_code == 200
     session_payload = session_response.json()
     assert session_payload["kind"] == "SessionMetrics"

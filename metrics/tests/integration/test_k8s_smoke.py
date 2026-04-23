@@ -59,4 +59,6 @@ def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     mem_gib = parse_memory_to_gib(allocated.get("memory", "0"))
     # scripts/test-setup.yaml: 100m CPU, 100Mi memory → cq-proton.
     assert cpu_cores >= 0.09, f"expected >=100m CPU in allocated, got {allocated!r}"
-    assert mem_gib > 0.0, f"expected positive memory from smoke workload in allocated, got {allocated!r}"
+    assert mem_gib > 0.0, (
+        f"expected positive memory from smoke workload in allocated, got {allocated!r}"
+    )

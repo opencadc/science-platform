@@ -14,9 +14,9 @@ Single entry for the full stack: **`bash scripts/minikube-smoke.sh`**. It starts
 
 **Troubleshooting**
 
-- **`ErrImageNeverPull` / image missing on node:** the chart uses `imagePullPolicy: Never`. The image must be built in Minikube’s Docker (see `minikube-smoke.sh`, which runs Skaffold after `eval $(minikube docker-env)`). If you built only on the host, load the same tag:  
-  `docker build -t canfar-metrics-local:TAG .` then  
-  `minikube image load canfar-metrics-local:TAG -p minikube` then  
+- **`ErrImageNeverPull` / image missing on node:** the chart uses `imagePullPolicy: Never`. The image must be built in Minikube’s Docker (see `minikube-smoke.sh`, which runs Skaffold after `eval $(minikube docker-env)`). If you built only on the host, load the same tag:
+  `docker build -t canfar-metrics-local:TAG .` then
+  `minikube image load canfar-metrics-local:TAG -p minikube` then
   `kubectl -n metrics rollout restart deploy/metrics-api-metrics-api`.
 - API fails startup: `kubectl -n metrics logs deploy/metrics-api-metrics-api --tail=200`
 - Empty ClusterQueues: re-run `bash scripts/minikube-smoke.sh` or re-apply `scripts/test-setup.yaml` after Kueue is healthy
