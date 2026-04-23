@@ -73,6 +73,9 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - For local Minikube workflows, use the existing cluster and profile (typically the default `minikube` profile); do not create a separate dedicated Minikube profile or cluster (for example `metrics-minikube`) unless the user asks for it.
 - When executing an attached implementation plan, carry out the steps but do not edit the plan file itself unless the user explicitly requests plan updates.
 - For user-facing HTTP APIs, avoid internal implementation details in JSON bodies; prefer standard HTTP caching headers (`Cache-Control`, `Expires`, `Date`, `Last-Modified`, and related headers) over embedding cache metadata in JSON for shared cacheable resources.
+- In GitHub Actions workflows for this repository, do not pin `step-security/harden-runner` to a commit SHA; use a floating major tag (for example `step-security/harden-runner@v2`) unless the user specifies otherwise.
+- For platform metrics responses, keep `capacity` and `allocated` in consistent, comparable units (the user treats mixed or mismatched unit presentation in that API as an unacceptable defect).
+- After substantive changes to Metrics CI workflows or `metrics/scripts` automation, run `pre-commit run --all-files` at the science-platform repository root to verify hooks still pass.
 
 ## Learned Workspace Facts
 
@@ -80,6 +83,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke: `metrics/scripts/minikube-smoke.sh` (Kueue, `scripts/test-setup.yaml`, Skaffold, integration tests) and `metrics/scripts/minikube-values.yaml`. Shared bash helpers: `metrics/scripts/lib-minikube-smoke.sh` (port-forward state parsing). A local success may leave a background port-forward; stop with `metrics/scripts/minikube-smoke-teardown.sh` (optional `--all` for Kubernetes teardown).
   With `pullPolicy: Never`, Skaffold’s build tags avoid stale layers. Short `METRICS_CACHE_TTL_SECONDS` in `minikube-values.yaml` for integration. If port-forward fails, change `PORT_FORWARD_PORT`. If Kueue allocation is wrong, try Redis `FLUSHDB` or wait for cache TTL.
+- In CI (`MINIKUBE_SMOKE_CI=1`), the smoke script builds the app image on the host Docker daemon and runs `minikube image load` so pulls use working DNS; Minikube’s Docker daemon is unreliable for `registry-1.docker.io` and similar. Local runs still build via `minikube docker-env` unless you set `MINIKUBE_SMOKE_CI=1`.
 - In **`dev`**, the supported workflow is Kubernetes-first: use Minikube,
   Helm, and `kubectl` to deploy Metrics and Redis into the cluster. Docker
   Compose is not part of the active environment contract. See

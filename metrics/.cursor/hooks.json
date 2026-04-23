@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "1",
   "source": "docs/harness/hook-policy.yaml",
   "bridge": "python -m harness.hooks.bridge",
   "tool": "cursor",
@@ -16,8 +16,9 @@
         "description": "Running harness command policy checks"
       }
     ],
-    "beforeFileEdit": [
+    "preToolUse": [
       {
+        "matcher": "Write|Delete",
         "command": "uv run --group harness python -m harness.hooks.bridge pre_file_write --tool cursor",
         "description": "Running harness write policy checks"
       }
