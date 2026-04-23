@@ -110,7 +110,7 @@ jobs:
           cluster_name: metrics
           wait: 120s
       - name: Build Metrics image (cache-enabled)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./metrics
           file: ./metrics/Dockerfile
