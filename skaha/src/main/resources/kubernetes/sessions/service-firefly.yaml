@@ -1,0 +1,22 @@
+# Service YAML for a Netbook interactive session.  This will be loaded by Skaha and modified to include the session ID and job name.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skaha-firefly-svc-${skaha.sessionid}
+  labels:
+    run: skaha-firefly-svc-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    name: firefly-port
+  selector:
+    canfar-net-sessionID: ${skaha.sessionid}

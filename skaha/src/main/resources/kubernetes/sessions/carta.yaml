@@ -1,0 +1,60 @@
+# This is a Job Template YAML.  It is intended to be a partial template that is used by the Skaha Session Launcher to create a Job for launching a session.
+# It is not intended to be used directly as a Kubernetes manifest.  The Skaha Session Launcher will fill in the variables and templates before creating the Job in Kubernetes.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "${skaha.jobname}"
+spec:
+  parallelism: 1
+  completions: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      {{ template "skaha.job.nodeAffinity" . }}
+      securityContext:
+      priorityClassName: uber-user-preempt-medium
+      hostname:
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      containers:
+        - name: "${skaha.jobname}"
+          env:
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: "/skaha-system"
+              name: start-carta
+            - mountPath: "/etc/passwd"
+              name: etc-passwd
+              subPath: passwd
+            - mountPath: "/etc/group"
+              name: etc-group
+              subPath: group
+          {{ template "skaha.session.commonVolumeMounts" . }}
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: etc-group
+          emptyDir: { }
+        - name: etc-passwd
+          emptyDir: { }
+        - name: start-carta
+          configMap:
+            name: {{ .Release.Name }}-launch-scripts
+            defaultMode: 0777
+        - name: init-users-groups
+          configMap:
+            name: {{ .Release.Name }}-init-users-groups-config
+            defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

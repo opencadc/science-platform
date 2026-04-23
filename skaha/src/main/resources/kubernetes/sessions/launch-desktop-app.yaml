@@ -1,0 +1,113 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-appID: "${software.appid}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${software.jobname}"
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: false
+    kind: Job
+    # The name of the Desktop Job that owns this Job.
+    name: "${skaha.jobname}"
+    # The UID of the Desktop Job that owns this Job.
+    uid: "${skaha.jobuid}"
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-appID: "${software.appid}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${software.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      {{ template "skaha.job.nodeAffinity" . }}
+      securityContext:
+        {{ template "skaha.job.securityContext" . }}
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      containers:
+      - name: "${software.containername}"
+        command: ["/skaha-system/start-desktop-software.sh"]
+        args:
+        - ${skaha.userid}
+        - ${software.containerparam}
+        env:
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: DISPLAY
+          value: "${software.targetip}"
+        - name: GDK_SYNCHRONIZE
+          value: "1"
+        - name: SHELL
+          value: "/bin/bash"
+        - name: PWD
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: OMP_NUM_THREADS
+          value: "${software.thread.count}"
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        image: "${software.imageid}"
+        workingDir: "${SKAHA_USER_HOME_DIR}"
+        imagePullPolicy: {{ .Values.deployment.skaha.sessions.imagePullPolicy | required "deployment.skaha.sessions.imagePullPolicy must be set." }}
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
+        ports:
+        - containerPort: 6000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-desktop-software
+        {{ template "skaha.session.commonVolumeMounts" . }}
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-desktop-software
+        configMap:
+          name: {{ .Release.Name }}-launch-scripts
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: {{ .Release.Name }}-init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

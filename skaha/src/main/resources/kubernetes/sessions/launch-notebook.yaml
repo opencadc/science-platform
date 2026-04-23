@@ -1,0 +1,127 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      {{ template "skaha.job.nodeAffinity" . }}
+      securityContext:
+        {{ template "skaha.job.securityContext" . }}
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: JUPYTER_TOKEN
+          value: "${skaha.sessionid}"
+        - name: JUPYTER_CONFIG_DIR
+          value: "${SKAHA_USER_HOME_DIR}/.jupyter/"
+        - name: JUPYTER_DATA_DIR
+          value: "${SKAHA_USER_HOME_DIR}/.local/share/jupyter/"
+        - name: JUPYTER_RUNTIME_DIR
+          value: "${SKAHA_USER_HOME_DIR}/.local/share/jupyter/runtime/"
+        - name: JUPYTER_PATH
+          value: "${SKAHA_USER_HOME_DIR}/.jupyter/"
+        - name: JUPYTERLAB_WORKSPACES_DIR
+          value: "${SKAHA_USER_HOME_DIR}/.jupyter/lab/workspaces/"
+        - name: JUPYTERLAB_SETTINGS_DIR
+          value: "${SKAHA_USER_HOME_DIR}/.jupyter/lab/user-settings/"
+        - name: NB_USER
+          value: "${skaha.userid}"
+        - name: NB_UID
+          value: "${skaha.posixid}"
+        - name: HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: PWD
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: XDG_CACHE_HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: MKL_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: OMP_NUM_THREADS
+          value: "${software.thread.count}"
+        image: ${software.imageid}
+        command: ["/skaha-system/start-jupyterlab.sh"]
+        args:
+        - ${skaha.sessionid}
+        imagePullPolicy: {{ .Values.deployment.skaha.sessions.imagePullPolicy | required "deployment.skaha.sessions.imagePullPolicy must be set." }}
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+          name: notebook-port
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/skaha-system"
+          name: start-jupyterlab
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-jupyterlab
+        configMap:
+          name: {{ .Release.Name }}-launch-scripts
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: {{ .Release.Name }}-init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

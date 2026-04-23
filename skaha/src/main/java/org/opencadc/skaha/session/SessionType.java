@@ -1,6 +1,9 @@
 package org.opencadc.skaha.session;
 
+import java.io.File;
 import java.nio.file.Path;
+
+import ca.nrc.cadc.util.FileUtil;
 import org.opencadc.skaha.K8SUtil;
 
 public enum SessionType {
@@ -54,6 +57,10 @@ public enum SessionType {
         return Path.of(String.format(
                 "%s/config/launch-%s.yaml",
                 K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
+    }
+
+    public String getTemplateName() {
+        return String.format("%s.yaml", this.name().toLowerCase());
     }
 
     public boolean supportsIngress() {
