@@ -87,6 +87,6 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - Canonical `METRICS_ENVIRONMENT` values are `dev`, `integration`, `staging`, and `production`; legacy `int` and `prod` inputs are still accepted and normalized during settings validation.
 - Kueue manifests and clients should target the **v1beta2** API; **v1beta1** is deprecated.
 - End-to-end local dev with Kueue: `docs/dev-setup.md` and `bash scripts/minikube-smoke.sh` (or apply `scripts/test-setup.yaml` and `skaffold run -p minikube` by hand). `METRICS_CLUSTER_NAME` defaults to `minikube` in `minikube-values.yaml`.
-- Root pre-commit `check-yaml` excludes `metrics/helm/*/templates/` because Helm templates embed Go syntax and are not plain YAML.
+- Root pre-commit `check-yaml` skips `metrics/helm/` and `metrics/scripts/` (Helm charts, template-rendered YAML, and cluster setup manifests are not validated as plain YAML).
 - Java copy-paste detection via the removed `cpd` pre-commit hook is not used; Skaha Java checks run through `./gradlew clean check`.
 - Repository-wide PR commit-check subject line length is configured with commit-check environment variables (for example `CCHK_SUBJECT_MAX_LENGTH`) in `.github/workflows/ci.commit.check.yml` at the science-platform repository root; the upstream default is 80 characters.
