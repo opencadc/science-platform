@@ -33,8 +33,19 @@
             "include-component-in-tag": true,
             "component": "metric",
             "include-v-in-tag": true,
+            "initial-version": "0.1.0",
+            "release-as": "0.1.0",
             "extra-files": [
-                "metrics/pyproject.toml"
+                "metrics/pyproject.toml",
+                {
+                    "path": "metrics/src/metrics/__init__.py",
+                    "type": "generic"
+                },
+                {
+                    "jsonpath": "$.package[?(@.name.value=='metrics')].version",
+                    "path": "metrics/uv.lock",
+                    "type": "toml"
+                }
             ]
         }
     },
