@@ -1,4 +1,8 @@
 # Build context excludes (image build uses metrics/ as context)
+.git/
+.gitignore
+.dockerignore
+
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -6,8 +10,23 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
-.git/
-.harness/claims.jsonl
+
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+.cursor/
+.claude/
+.codex/
+.harness/
+
 tests/
+scripts/
+helm/
+docs/
+AGENTS.md
+CHANGELOG.md
 *.md
 !README.md
