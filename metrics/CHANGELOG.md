@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.2](https://github.com/opencadc/science-platform/compare/metric-v0.1.1...metric-v0.1.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **metrics:** clean kind smoke images on teardown ([c84898c](https://github.com/opencadc/science-platform/commit/c84898cde39b37b5456b29b0b6e5b778b5110e5e))
+* **metrics:** improve kind smoke workflow ([873011d](https://github.com/opencadc/science-platform/commit/873011d858800720df0b6117872382a598e0516c))
+* **metrics:** repair release CI configuration ([cebf241](https://github.com/opencadc/science-platform/commit/cebf2414079ff1856f4a71ed21fb2dc10b85f9e3))
+* **platform:** allocated now sums only status.flavorsUsage.resources[].total. It no longer adds borrowed, because Kueue total already includes borrowed quota ([8d23a77](https://github.com/opencadc/science-platform/commit/8d23a77d6b0d978bcd107f1f77ae66bd4ec8c836))
+
 ## [0.1.1](https://github.com/opencadc/science-platform/compare/metric-v0.1.0...metric-v0.1.1) (2026-04-24)
 
 
