@@ -63,7 +63,8 @@ Non-destructive (stop only the background port-forward):
 bash scripts/kind-smoke-teardown.sh
 ```
 
-Delete Helm releases, fixtures, and the kind cluster:
+Delete Helm releases, fixtures, the Metrics images loaded into the kind node,
+and the kind cluster:
 
 ```bash
 bash scripts/kind-smoke-teardown.sh --all --kind
