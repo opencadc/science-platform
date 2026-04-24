@@ -26,6 +26,9 @@
             "changelog-path": "metrics/CHANGELOG.md",
             "release-type": "python",
             "path": "metrics",
+            "exclude-paths": [
+                "skaha"
+            ],
             "bump-minor-pre-major": true,
             "bump-patch-for-minor-pre-major": true,
             "draft": false,
