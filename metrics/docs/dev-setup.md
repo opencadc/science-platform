@@ -81,7 +81,10 @@ The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
 - `lq-smoke`
 - `integration-idle`
 
-Sample workload requests remain `100m` CPU and `100Mi` memory.
+The sample workload targets `cq-electron`, which has `100m` CPU and `100Mi`
+memory nominal quota. The workload requests `200m` CPU and `200Mi` memory, so
+the smoke test exercises Kueue cohort borrowing and verifies that allocated
+metrics include borrowed usage.
 
 ## Troubleshooting
 

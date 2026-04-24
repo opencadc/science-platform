@@ -234,7 +234,7 @@ deploy_metrics_api() {
 
 wait_workload_admitted() {
   local _name="${KUEUE_SMOKE_WORKLOAD:-integration-idle}" _ns="${KUEUE_SMOKE_NAMESPACE:-metrics}"
-  local _want="${KUEUE_SMOKE_CLUSTER_QUEUE:-cq-proton}" _deadline _cq
+  local _want="${KUEUE_SMOKE_CLUSTER_QUEUE:-cq-electron}" _deadline _cq
   _deadline=$((SECONDS + KUEUE_SMOKE_WAIT_TIMEOUT))
   echo "Wait Workload ${_ns}/${_name} -> ${_want} (${KUEUE_SMOKE_WAIT_TIMEOUT}s)"
   while ((SECONDS < _deadline)); do
@@ -264,6 +264,33 @@ smoke_stop_previous_port_forward() {
 _KPF=()
 set_port_forward_cmd() {
   _KPF=(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" port-forward "svc/metrics-api-metrics-api" "${PORT_FORWARD_PORT}:8000")
+}
+
+start_port_forward() {
+  if [[ "${_PERSIST}" -eq 1 ]]; then
+    mkdir -p "${METRICS_KIND_SMOKE_STATE_DIR}"
+    PORT_FORWARD_PID="$(
+      PORT_FORWARD_LOG="${METRICS_SMOKE_PF_LOG}" python3 - "${_KPF[@]}" <<'PY'
+import os
+import subprocess
+import sys
+
+log = open(os.environ["PORT_FORWARD_LOG"], "ab", buffering=0)
+proc = subprocess.Popen(
+    sys.argv[1:],
+    stdin=subprocess.DEVNULL,
+    stdout=log,
+    stderr=subprocess.STDOUT,
+    start_new_session=True,
+    close_fds=True,
+)
+print(proc.pid)
+PY
+    )"
+  else
+    "${_KPF[@]}" > "${METRICS_SMOKE_PF_LOG}" 2>&1 &
+    PORT_FORWARD_PID=$!
+  fi
 }
 
 PORT_FORWARD_PID=""
@@ -302,13 +329,7 @@ if [[ "${KIND_SMOKE_CI}" == "0" && "${KIND_SMOKE_EXIT_AFTER_TESTS}" == "0" ]]; t
 fi
 
 set_port_forward_cmd
-if [[ "${_PERSIST}" -eq 1 ]]; then
-  mkdir -p "${METRICS_KIND_SMOKE_STATE_DIR}"
-  nohup "${_KPF[@]}" > "${METRICS_SMOKE_PF_LOG}" 2>&1 &
-else
-  "${_KPF[@]}" > "${METRICS_SMOKE_PF_LOG}" 2>&1 &
-fi
-PORT_FORWARD_PID=$!
+start_port_forward
 
 echo "Wait for metrics API on 127.0.0.1:${PORT_FORWARD_PORT} (port-forward log: ${METRICS_SMOKE_PF_LOG})"
 _api_deadline=$((SECONDS + 120))
@@ -337,6 +358,11 @@ METRICS_BASE_URL="http://127.0.0.1:${PORT_FORWARD_PORT}" uv run pytest tests/int
 echo "OK"
 
 if [[ "${_PERSIST}" -eq 1 ]]; then
+  if ! kill -0 "${PORT_FORWARD_PID}" 2>/dev/null; then
+    echo "error: persistent port-forward exited before handoff (PID ${PORT_FORWARD_PID})" >&2
+    [[ -f "${METRICS_SMOKE_PF_LOG}" ]] && tail -n 80 "${METRICS_SMOKE_PF_LOG}" >&2 || true
+    exit 1
+  fi
   {
     echo "# kind-smoke.sh"
     echo "PORT_FORWARD_PID=${PORT_FORWARD_PID}"
@@ -347,7 +373,6 @@ if [[ "${_PERSIST}" -eq 1 ]]; then
     echo "METRICS_SMOKE_PF_LOG=${METRICS_SMOKE_PF_LOG}"
   } > "${METRICS_KIND_SMOKE_STATE_DIR}/port-forward.env"
   chmod 600 "${METRICS_KIND_SMOKE_STATE_DIR}/port-forward.env" 2>/dev/null || true
-  disown -h "${PORT_FORWARD_PID}" 2>/dev/null || disown "${PORT_FORWARD_PID}" 2>/dev/null || true
   PORT_FORWARD_PID=""
   echo "Port-forward: http://127.0.0.1:${PORT_FORWARD_PORT} (log: ${METRICS_SMOKE_PF_LOG})"
   echo "Tear down: bash scripts/kind-smoke-teardown.sh"

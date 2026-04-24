@@ -10,6 +10,9 @@ __pycache__/
 # Minikube smoke state (port-forward PID from scripts/minikube-smoke.sh)
 .minikube-smoke/
 
+# Kind smoke state (port-forward PID from scripts/kind-smoke.sh)
+.kind-smoke/
+
 # Local compose overrides (secrets / developer-specific)
 .env
 compose.override.yaml
