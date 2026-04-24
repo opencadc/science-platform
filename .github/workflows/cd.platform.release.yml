@@ -58,8 +58,8 @@ jobs:
             }
       - name: Dispatch Metrics release build
         if: >-
-          steps['release-please'].outputs.release_created == 'true'
-          && startsWith(steps['release-please'].outputs.tag_name, 'metric-v')
+          steps['release-please'].outputs['metrics--release_created'] == 'true'
+          && startsWith(steps['release-please'].outputs['metrics--tag_name'], 'metric-v')
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           repository: opencadc/science-platform
@@ -67,7 +67,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           client-payload: |-
             {
-              "releases_created": "${{ steps['release-please'].outputs.release_created }}",
-              "tag_name": "${{ steps['release-please'].outputs.tag_name }}",
-              "sha": "${{ steps['release-please'].outputs.sha }}"
+              "releases_created": "${{ steps['release-please'].outputs['metrics--release_created'] }}",
+              "tag_name": "${{ steps['release-please'].outputs['metrics--tag_name'] }}",
+              "sha": "${{ steps['release-please'].outputs['metrics--sha'] }}"
             }
