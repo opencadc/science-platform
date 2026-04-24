@@ -95,7 +95,7 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
         with:
           version: v1.30.0
       - name: Setup Helm
