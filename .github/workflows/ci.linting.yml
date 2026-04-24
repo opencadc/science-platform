@@ -24,7 +24,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
             fetch-depth: 0
       - name: Setup Python
@@ -53,7 +53,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
             fetch-depth: 0
       - name: Setup Java
