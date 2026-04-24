@@ -74,7 +74,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Cache Helm data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .ci-helm-cache
           key: metrics-kind-helm-${{ runner.os }}-kueue-${{ env.KUEUE_CHART_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml') }}
