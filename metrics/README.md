@@ -146,8 +146,8 @@ Lint, unit tests, Docker image validation, and kind smoke deployment run from
 `metrics/**`.
 
 Release container images (`linux/amd64`, `linux/arm64`) publish only on Git tags
-matching `metric-v*` via `.github/workflows/cd.metrics.release.build.yml`.
+matching `metrics-v*` via `.github/workflows/cd.metrics.release.build.yml`.
 
 Release notes and versioning for Metrics follow the separate Metrics package in
-root `release-please-config.json`, using tags like `metric-v0.1.0`. See
+root `release-please-config.json`, using tags like `metrics-v0.1.0`. See
 `docs/releasing.md` for the Release Please and first-tag `0.1.0` workflow.

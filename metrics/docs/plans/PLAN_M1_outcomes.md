@@ -16,7 +16,7 @@ This note records closure evidence for milestone M1
   `.github/workflows/ci.metrics.yml` so workflow edits self-trigger.
 - **Skaha release gating:** `cd.platform.release.yml` uses bracket step ids for
   hyphenated steps and gates Skaha edge dispatch / release-build dispatches away
-  from `metric-v*` Metrics tags; edge dispatch also respects `paths-filter`
+  from `metrics-v*` Metrics tags; edge dispatch also respects `paths-filter`
   `non_metrics`.
 - **Metrics CI:** `.github/workflows/ci.metrics.yml` runs lint, unit tests,
   harness contracts and CLI check, validates `docker compose -f compose.yaml
@@ -37,11 +37,11 @@ This note records closure evidence for milestone M1
 - **Helm:** Minimal chart under `metrics/helm/metrics-api` with `values-dev.yaml`
   only; `deploy-with-helm.sh` defaults to `helm/metrics-api` from `metrics/`.
 - **Release automation:** Root `release-please-config.json` includes a `metrics`
-  package with `metric-v*` style tags; Skaha package excludes `metrics/` so
+  package with `metrics-v*` style tags; Skaha package excludes `metrics/` so
   Metrics-only commits do not bump Skaha.
 - **Image publishing:** `.github/workflows/cd.metrics.release.build.yml` builds and
   pushes multi-arch images to `images.opencadc.org/platform/metrics` only on
-  `metric-v*` tag pushes.
+  `metrics-v*` tag pushes.
 - **Environment contracts:** `metrics/docs/environment-contracts.md` records
   ownership boundaries and the canonical service mode names `dev`, `staging`,
   `integration`, and `production`.

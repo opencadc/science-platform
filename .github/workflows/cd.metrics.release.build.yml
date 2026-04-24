@@ -1,12 +1,14 @@
 name: "CD: Metrics Release Image"
 
-# release-please uses metric-v* (see release-please-config.json). Tag push works when
-# the tag is created with a non-GITHUB_TOKEN credential; repository_dispatch from
-# CD: Science Platform Release Please covers the default GITHUB_TOKEN case.
+# release-please creates a git tag like metrics-v0.1.2 (see release-please-config.json).
+# The registry image tag is v0.1.2 only: the "Set image tag" step strips the component
+# prefix; the repo tag is unchanged. Tag push works when the tag is created with a
+# non-GITHUB_TOKEN credential; repository_dispatch from CD: Science Platform Release
+# Please covers the default GITHUB_TOKEN case.
 on:
   push:
     tags:
-      - "metric-v*"
+      - "metrics-v*"
   repository_dispatch:
     types: [metrics-release-build]
 
@@ -22,7 +24,7 @@ jobs:
   metrics-release-image:
     if: >-
       github.repository == 'opencadc/science-platform'
-      && (github.event_name == 'repository_dispatch' || startsWith(github.ref_name, 'metric-v'))
+      && (github.event_name == 'repository_dispatch' || startsWith(github.ref_name, 'metrics-v'))
     concurrency:
       group: metrics-release-image-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
       cancel-in-progress: false
@@ -42,7 +44,12 @@ jobs:
           ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.ref }}
       - name: Set image tag
         id: meta
-        run: echo "tag=${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+        env:
+          RAW_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          # Strip release-please component prefix; image is v* only (e.g. v0.1.2).
+          tag="${RAW_TAG#metrics-}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.0.0
       - name: Setup Docker Buildx

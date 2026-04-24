@@ -78,7 +78,7 @@ specific deployment overlays.
 ## Image and release contract
 
 - Release images: `images.opencadc.org/platform/metrics` on Git tags
-  `metric-v*`, multi-arch `linux/amd64` and `linux/arm64`.
+  `metrics-v*`, multi-arch `linux/amd64` and `linux/arm64`.
 - Non-tag CI does not publish release images.
 
 ## Platform sources note

@@ -4,7 +4,7 @@ name: "CD: Skaha Release Build"
 #   cannot trigger downstream push workflows, see GitHub docs "triggering a workflow").
 # - repository_dispatch: used by CD: Science Platform Release Please so automated
 #   release-please tags still start this workflow when using the default GITHUB_TOKEN.
-# Metrics uses metric-v* tags and is excluded; see cd.metrics.release.build.yml
+# Metrics uses metrics-v* tags and is excluded; see cd.metrics.release.build.yml
 on:
   push:
     tags:
@@ -25,7 +25,7 @@ jobs:
   release-build:
     if: >-
       github.repository == 'opencadc/science-platform'
-      && (github.event_name == 'repository_dispatch' || !startsWith(github.ref_name, 'metric-v'))
+      && (github.event_name == 'repository_dispatch' || !startsWith(github.ref_name, 'metrics-v'))
     concurrency:
       group: skaha-release-image-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
       cancel-in-progress: false

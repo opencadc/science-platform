@@ -1,6 +1,6 @@
 # Release Please (Skaha + Metrics). Image workflows: Skaha is started via
 # repository_dispatch (GITHUB_TOKEN cannot chain push.tag workflows) and/or tag
-# push when a PAT is used; Metrics uses metric-v* tag pushes the same way.
+# push when a PAT is used; Metrics uses metrics-v* tag pushes the same way.
 name: "CD: Science Platform Release Please"
 
 on:
@@ -33,7 +33,7 @@ jobs:
       - name: Skaha Release Info
         if: >-
           steps['release-please'].outputs.release_created == 'true'
-          && !startsWith(steps['release-please'].outputs.tag_name, 'metric-v')
+          && !startsWith(steps['release-please'].outputs.tag_name, 'metrics-v')
         run: |
           echo "Releases Created: ${{ steps.release-please.outputs.release_created }}"
           echo "tag: ${{ steps.release-please.outputs.tag_name }}"
@@ -44,7 +44,7 @@ jobs:
       - name: Dispatch Skaha release build
         if: >-
           steps['release-please'].outputs.release_created == 'true'
-          && !startsWith(steps['release-please'].outputs.tag_name, 'metric-v')
+          && !startsWith(steps['release-please'].outputs.tag_name, 'metrics-v')
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           repository: opencadc/science-platform
@@ -59,7 +59,7 @@ jobs:
       - name: Dispatch Metrics release build
         if: >-
           steps['release-please'].outputs['metrics--release_created'] == 'true'
-          && startsWith(steps['release-please'].outputs['metrics--tag_name'], 'metric-v')
+          && startsWith(steps['release-please'].outputs['metrics--tag_name'], 'metrics-v')
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           repository: opencadc/science-platform

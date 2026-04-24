@@ -66,7 +66,7 @@ process lessons belong in `docs/harness/learnings.md`.
 
 - Date: 2026-04-17
 - Context: M1 delivery foundation (CI pathways, Helm, release-please, Minikube smoke).
-- Lesson: Path-based workflow filters (`paths` / `paths-ignore`) and tag-prefix guards (`metric-v*`) are the primary levers for keeping Skaha and Metrics pipelines independent in a shared monorepo.
+- Lesson: Path-based workflow filters (`paths` / `paths-ignore`) and tag-prefix guards (`metrics-v*`) are the primary levers for keeping Skaha and Metrics pipelines independent in a shared monorepo.
 - Evidence: `.github/workflows/ci.*.yml`, `cd.platform.release.yml`, `release-please-config.json`.
 - Action taken: Documented in `docs/plans/PLAN_M1_outcomes.md` and `metrics/README.md`.
 
