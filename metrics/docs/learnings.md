@@ -19,6 +19,19 @@ process lessons belong in `docs/harness/learnings.md`.
 
 ## Current entries
 
+- Date: April 24, 2026
+- Context: P1 review fixes for Kueue allocation and user/session metrics cache
+  isolation.
+- Lesson: Kueue `status.flavorsUsage.resources[].total` already includes
+  borrowed quota, so adding `borrowed` separately inflates allocated metrics.
+  Cache keys for external identifiers must use collision-resistant tokens rather
+  than lossy string replacement.
+- Evidence: `src/metrics/providers/kueue_platform.py`,
+  `src/metrics/services/platform_metrics.py`, `tests/test_kueue_platform.py`,
+  and `tests/test_service.py`.
+- Action taken: Allocated aggregation now uses `total` only, and user/session
+  cache tokens use SHA-256 over the exact identifier value.
+
 - Date: April 23, 2026
 - Context: M10 local and CI smoke workflow simplification follow-up.
 - Lesson: A one-node kind cluster plus Helm and direct Docker build/load

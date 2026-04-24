@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
@@ -25,7 +26,7 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 type MetricsData = PlatformMetricsData | UserMetricsData | SessionMetricsData
 
-_PLATFORM_CACHE_SCHEMA_VERSION = "2"
+_PLATFORM_CACHE_SCHEMA_VERSION = "3"
 
 
 @dataclass(slots=True)
@@ -415,4 +416,4 @@ def _format_decimal(value: float) -> str:
 
 
 def _cache_token(value: str) -> str:
-    return value.replace(":", "_").replace("/", "_").replace(" ", "_")
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()

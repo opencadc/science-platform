@@ -43,6 +43,8 @@ policy belongs in `docs/harness/`.
 - Startup validation remains fail-fast for required source dependencies.
 - Provider boundaries stay explicit and avoid fallback indirection to removed
   legacy providers.
+- Cache keys for externally supplied user and session identifiers preserve the
+  exact identifier value through collision-resistant tokens.
 
 ## Update rules
 

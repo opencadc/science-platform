@@ -9,10 +9,11 @@ only place that:
 1. Fetches the configured ``ClusterQueue`` objects plus the shared ``Cohort``.
 2. Sums **nominalQuota** from queue specs and adds cohort nominal quota **once**
    (deduplication across cohort members).
-3. Derives **allocated** from ``status.flavorsUsage`` (``total`` + ``borrowed``)
-   per resource, summed across queues only—cohort objects do not carry the same
-   usage shape for this milestone. Resources listed in ``capacity`` also appear
-   in ``allocated`` with formatted zeros when Kueue reports no usage rows yet.
+3. Derives **allocated** from ``status.flavorsUsage`` ``total`` per resource,
+   summed across queues only—cohort objects do not carry the same usage shape
+   for this milestone. Kueue ``total`` already includes borrowed quota.
+   Resources listed in ``capacity`` also appear in ``allocated`` with formatted
+   zeros when Kueue reports no usage rows yet.
 
 HTTP and URL concerns stay in :mod:`metrics.providers.kube_http` and
 :mod:`metrics.kueue_api`; quantity parsing stays in :mod:`metrics.quantity` and
@@ -57,7 +58,7 @@ class PlatformResourceMaps:
 
 
 def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
-    """Sum ``flavorsUsage`` ``total`` and ``borrowed`` per resource for one queue.
+    """Sum ``flavorsUsage`` ``total`` per resource for one queue.
 
     Kueue reports usage per flavor; this helper flattens all flavors into one
     map keyed by resource name for the configured queue subset aggregation.
@@ -77,18 +78,10 @@ def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
             if not name:
                 continue
             total = resource.get("total")
-            borrowed = resource.get("borrowed")
             merge_resource_totals(
                 totals,
                 name,
                 parse_resource_amount(name, str(total) if total is not None else ""),
-            )
-            merge_resource_totals(
-                totals,
-                name,
-                parse_resource_amount(
-                    name, str(borrowed) if borrowed is not None else ""
-                ),
             )
     return totals
 

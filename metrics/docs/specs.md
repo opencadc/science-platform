@@ -30,6 +30,12 @@ This file stores repository-specific behavioral specifications.
   same unit in both maps** (CPU as decimal core counts, memory as `Gi` binary
   quantities, other resources with the same formatting rules in both). Callers
   can compare the two without converting between millicores and cores.
+- Platform `data.allocated` is summed from
+  `status.flavorsUsage.resources[].total`; do not add `borrowed` separately
+  because Kueue total already includes borrowed quota.
+- User and session cache keys must preserve distinct external identifiers.
+  Identifiers such as `alice:bob`, `alice bob`, and `alice_bob` must never map
+  to the same cache entry.
 
 ## Milestone linkage
 

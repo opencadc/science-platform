@@ -113,8 +113,9 @@ class PlatformMetricsData(BaseModel):
         default_factory=dict,
         description=(
             "Aggregated admitted usage from Kueue ClusterQueue status.flavorsUsage "
-            "(total plus borrowed per resource), keyed by resource name. Per-resource "
-            "units match `capacity` (CPU in cores, memory in Gi, etc.)."
+            "total per resource, keyed by resource name. Kueue total already "
+            "includes borrowed quota. Per-resource units match `capacity` "
+            "(CPU in cores, memory in Gi, etc.)."
         ),
     )
 

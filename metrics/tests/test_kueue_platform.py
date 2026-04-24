@@ -43,8 +43,12 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
             "flavorsUsage": [
                 {
                     "resources": [
-                        {"name": "cpu", "total": "1", "borrowed": "0"},
-                        {"name": "memory", "total": "2Gi", "borrowed": "0"},
+                        {"name": "cpu", "total": "1", "borrowed": "500m"},
+                        {
+                            "name": "memory",
+                            "total": "2Gi",
+                            "borrowed": "1Gi",
+                        },
                     ]
                 }
             ]
@@ -108,6 +112,7 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
 
     assert maps.capacity["cpu"] == "18"
     assert maps.allocated["cpu"] == "1"
+    assert maps.allocated["memory"] == "2Gi"
     assert "memory" in maps.capacity
     assert "memory" in maps.allocated
 

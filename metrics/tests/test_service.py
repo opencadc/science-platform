@@ -178,3 +178,47 @@ async def test_service_returns_user_and_session_metrics() -> None:
     assert session_result.data.user_id == "alice"
     assert session_result.data.session_id == "sess-1"
     assert session_result.cached is False
+
+
+@pytest.mark.anyio
+async def test_user_and_session_cache_keys_preserve_distinct_ids() -> None:
+    now = datetime.now(UTC)
+    capacity = DummyCapacityProvider(
+        CapacityReading(cpu_cores=12, memory_gib=48, source="kueue", observed_at=now)
+    )
+    usage = DummyUsageProvider(
+        UsageReading(
+            requested_cpu_cores=3,
+            requested_memory_gib=9,
+            source="prometheus",
+            observed_at=now,
+        )
+    )
+    service = PlatformMetricsService(
+        cluster_name="prod",
+        capacity_provider=capacity,
+        usage_provider=usage,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+    )
+
+    first_user = await service.get_user_metrics("alice:bob")
+    second_user = await service.get_user_metrics("alice_bob")
+    first_session = await service.get_session_metrics(
+        user_id="alice:bob",
+        session_id="sess one",
+    )
+    second_session = await service.get_session_metrics(
+        user_id="alice_bob",
+        session_id="sess_one",
+    )
+
+    assert first_user.cached is False
+    assert second_user.cached is False
+    assert first_user.data.user_id == "alice:bob"
+    assert second_user.data.user_id == "alice_bob"
+    assert first_session.cached is False
+    assert second_session.cached is False
+    assert first_session.data.user_id == "alice:bob"
+    assert first_session.data.session_id == "sess one"
+    assert second_session.data.user_id == "alice_bob"
+    assert second_session.data.session_id == "sess_one"

@@ -12,8 +12,9 @@ is and **which modules** participate. It complements milestone plans under
   (`metrics.core.startup.validate_application_startup`), including Prometheus URL
   requirements, so the deployment never serves contradictory metrics.
 - **Honest aggregation:** Per-queue nominal quota is summed, cohort nominal
-  quota is added **once**, and ``allocated`` reflects admitted usage from
-  ``status.flavorsUsage`` (see milestone outcomes for the semantic choice).
+  quota is added **once**, and `allocated` reflects admitted usage from
+  `status.flavorsUsage.resources[].total`. Kueue total already includes
+  borrowed quota.
 
 ## Module map
 
@@ -35,8 +36,8 @@ is and **which modules** participate. It complements milestone plans under
 2. **HTTP GET** `/api/v1/metrics/platform`:
    `PlatformMetricsService.get_platform_metrics` checks Redis/memory cache.
 3. **Miss:** `KueuePlatformEngine.collect` parallel-fetches all configured
-   queues plus the cohort document, sums nominal and usage fields, formats
-   strings, and returns `PlatformResourceMaps`.
+   queues plus the cohort document, sums nominal quota and usage `total` fields,
+   formats strings, and returns `PlatformResourceMaps`.
 4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;
    JSON metadata includes `created` (snapshot time). HTTP caching uses
    `Cache-Control`, `Date`, `Expires`, and `Last-Modified` (see `metrics.http_cache`).
