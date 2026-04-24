@@ -1,6 +1,14 @@
 name: "CD: Skaha Release Build"
 
+# - Tag push: builds when a non-Metrics tag is created (PAT or manual push; GITHUB_TOKEN
+#   cannot trigger downstream push workflows, see GitHub docs "triggering a workflow").
+# - repository_dispatch: used by CD: Science Platform Release Please so automated
+#   release-please tags still start this workflow when using the default GITHUB_TOKEN.
+# Metrics uses metric-v* tags and is excluded; see cd.metrics.release.build.yml
 on:
+  push:
+    tags:
+      - "*"
   repository_dispatch:
     types: [release-build]
 
@@ -11,11 +19,16 @@ env:
   REGISTRY: images.opencadc.org
   IMAGE: platform/skaha
   TAG: latest
-  TAG_RELEASE: ${{ github.event.client_payload.tag_name }}
+  TAG_RELEASE: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
 
 jobs:
   release-build:
-    if: github.repository == 'opencadc/science-platform'
+    if: >-
+      github.repository == 'opencadc/science-platform'
+      && (github.event_name == 'repository_dispatch' || !startsWith(github.ref_name, 'metric-v'))
+    concurrency:
+      group: skaha-release-image-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       attestations: write
@@ -25,13 +38,18 @@ jobs:
         uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           egress-policy: audit
-      - name: Client Payload
-        id: client-payload
+      - name: Release context
         run: |
-          echo "Client Payload: ${{ toJson(github.event.client_payload) }}"
-      -
-        name: Checkout
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "repository_dispatch — tag: ${{ github.event.client_payload.tag_name }} sha: ${{ github.event.client_payload.sha }}"
+          else
+            echo "tag push — ref: ${{ github.ref_name }} sha: ${{ github.sha }}"
+          fi
+      - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.ref }}
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:

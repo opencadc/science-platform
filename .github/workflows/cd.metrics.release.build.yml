@@ -1,9 +1,14 @@
 name: "CD: Metrics Release Image"
 
+# release-please uses metric-v* (see release-please-config.json). Tag push works when
+# the tag is created with a non-GITHUB_TOKEN credential; repository_dispatch from
+# CD: Science Platform Release Please covers the default GITHUB_TOKEN case.
 on:
   push:
     tags:
       - "metric-v*"
+  repository_dispatch:
+    types: [metrics-release-build]
 
 permissions:
   contents: read
@@ -11,10 +16,16 @@ permissions:
 env:
   REGISTRY: images.opencadc.org
   IMAGE: platform/metrics
+  IMAGE_TAG: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
 
 jobs:
   metrics-release-image:
-    if: github.repository == 'opencadc/science-platform'
+    if: >-
+      github.repository == 'opencadc/science-platform'
+      && (github.event_name == 'repository_dispatch' || startsWith(github.ref_name, 'metric-v'))
+    concurrency:
+      group: metrics-release-image-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       attestations: write
@@ -26,9 +37,12 @@ jobs:
           egress-policy: audit
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Set image tag from git ref
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.ref }}
+      - name: Set image tag
         id: meta
-        run: echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863292 # v3.6.0
       - name: Setup Docker Buildx
