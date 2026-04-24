@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/opencadc/science-platform/compare/metric-v0.1.0...metric-v0.1.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **build:** optimizations for docker build and improvements to ignoring non-needed files ([d905d99](https://github.com/opencadc/science-platform/commit/d905d99ff28016c4020c0b8f8e9e4b9e1ad99061))
+
 ## 0.1.0 (2026-04-24)
 
 
