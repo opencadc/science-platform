@@ -34,7 +34,7 @@ jobs:
         run: |
           echo "Client Payload: ${{ toJson(github.event.client_payload) }}"
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Spotless ratchetFrom origin/main needs the remote ref; shallow clones break Docker builds.
           fetch-depth: 0
