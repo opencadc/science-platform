@@ -23,7 +23,7 @@
         },
         "metrics": {
             "package-name": "metrics",
-            "changelog-path": "metrics/CHANGELOG.md",
+            "changelog-path": "CHANGELOG.md",
             "release-type": "python",
             "path": "metrics",
             "exclude-paths": [
@@ -38,14 +38,14 @@
             "include-v-in-tag": true,
             "initial-version": "0.1.0",
             "extra-files": [
-                "metrics/pyproject.toml",
+                "pyproject.toml",
                 {
-                    "path": "metrics/src/metrics/__init__.py",
+                    "path": "src/metrics/__init__.py",
                     "type": "generic"
                 },
                 {
                     "jsonpath": "$.package[?(@.name.value=='metrics')].version",
-                    "path": "metrics/uv.lock",
+                    "path": "uv.lock",
                     "type": "toml"
                 }
             ]
