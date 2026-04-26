@@ -41,8 +41,9 @@ adding a new metrics source or provider class.
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
 - `providers/`: `kueue`, `prometheus`, `kube`, `base` (scope protocol), and
   `kube_http` (Kubernetes GETs with an injected `httpx.AsyncClient`).
-- `providers/_kueue_spec.py` holds pure Kueue nominal-quota parsing (private to
-  the Kueue provider); `cache.py` and `quantity.py` are shared supporting modules.
+- `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
+  alongside HTTP and aggregation; `cache.py` and `quantity.py` are shared
+  supporting modules.
 
 ## Architecture invariants
 

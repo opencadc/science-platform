@@ -9,7 +9,7 @@ scopes, tests), use `docs/plans/PLAN_M4_provider_runtime_architecture.md`.
 ## Goals
 
 - **Single Kueue seam:** Platform maps come only from `providers/kueue.py`
-  (URLs, startup checks, and aggregation).
+  (URLs, startup checks, nominal-quota parsing, and aggregation).
 - **Fail fast:** Misconfiguration or a missing API is detected at **startup**
   when the active platform provider runs `startup()` during app lifespan.
 - **Honest aggregation:** Per-queue nominal quota is summed, cohort nominal
@@ -36,8 +36,7 @@ scopes, tests), use `docs/plans/PLAN_M4_provider_runtime_architecture.md`.
 | `metrics.core.runtime` | `MetricsRuntime`: registry-driven provider wiring, cache backend, platform cache keys, `get_platform_metrics`. |
 | `metrics.core.provider_registry` | Maps `sources.platform` to a concrete provider + HTTP client bundle. |
 | `metrics.providers.kube_http` | Shared TLS/token handling and parallel `httpx` GET helper (injected client). |
-| `metrics.providers._kueue_spec` | Parse `spec.resourceGroups` nominal quotas into numeric maps (private to Kueue). |
-| `metrics.providers.kueue` | `KueueProvider` / `KueueMetrics`: startup, platform aggregation, fingerprinting. |
+| `metrics.providers.kueue` | URLs, startup, `sum_nominal_quotas_by_resource`, platform aggregation, fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
 | `metrics.services.platform_metrics` | TTL cache, telemetry, and error mapping for `/platform`. |
 
