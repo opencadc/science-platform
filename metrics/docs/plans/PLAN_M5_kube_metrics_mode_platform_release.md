@@ -1,14 +1,14 @@
-# Milestone M4: kube-metrics platform source release
+# Milestone M5: kube-metrics platform source release
 
-This plan defines the fourth milestone for the CANFAR Metrics API roadmap. It
+This plan defines the fifth milestone for the CANFAR Metrics API roadmap. It
 implements kube-metrics as a first-class platform source for metrics
-composition after the M3 architecture realignment.
+composition after the M4 provider runtime architecture reset.
 
 ## Repository snapshot versus milestone target
 
-M3 establishes the layered package structure, removes static and node providers,
-and locks the three-source model (Kueue, Prometheus, kube-metrics). M4 closes
-when kube-metrics is fully wired as a supported runtime source in that model.
+M4 establishes the provider runtime, complete metric source contract, and typed
+source configuration. M5 closes when kube-metrics is fully wired as a supported
+runtime source in that model.
 
 ## Summary
 
@@ -38,6 +38,7 @@ driven configuration.
 
 - M1 foundation and M2 platform contract.
 - M3 architecture realignment plan and outcomes.
+- M4 provider runtime architecture.
 - Existing Kubernetes integration workflow and Helm deployment path.
 
 ## Constraints

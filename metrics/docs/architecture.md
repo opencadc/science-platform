@@ -19,7 +19,7 @@ policy belongs in `docs/harness/`.
   `src/metrics/core/startup.py`.
 - Platform metrics are composed from **Kueue** (`providers/kueue_platform.py`)
   and **Prometheus** (`providers/prometheus.py`). A **kube-metrics** settings
-  subtree exists for M4 but rejects `enabled=true` until that milestone ships.
+  subtree exists for M5 but rejects `enabled=true` until that milestone ships.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 

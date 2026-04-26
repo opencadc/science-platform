@@ -327,7 +327,7 @@ git add metrics/README.md && git commit -m "docs(metrics): point operators to Ku
 ## Self-review (author checklist)
 
 1. **Spec coverage:** Every consensus M2 item except performance and deferred
-   M4 items maps to a task above (`live`, changelog, env precedence, quantity
+   M5 items maps to a task above (`live`, changelog, env precedence, quantity
    logging, RBAC, README).
 2. **Placeholder scan:** No TBD steps; code blocks are complete.
 3. **Type consistency:** `Settings(provider_mode=...)` matches Pydantic field

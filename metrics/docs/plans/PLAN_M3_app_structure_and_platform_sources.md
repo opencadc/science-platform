@@ -29,7 +29,7 @@ wiring.
 M3 also removes `static` and `node` provider paths and treats platform metrics
 as a composed result from configured sources. The supported source set is:
 `kueue`, `prometheus`, and `kube-metrics`. Full kube-metrics runtime depth is
-delivered in M4.
+delivered in M5.
 
 ## In scope
 
@@ -54,9 +54,9 @@ explicitly changes wire format.
 
 This section lists deferred work.
 
-- Full kube-metrics runtime implementation details (M4 milestone scope).
-- User and session behavior redesign (M5 and M6 scopes).
-- ArgoCD staging rollout implementation (M9 scope).
+- Full kube-metrics runtime implementation details (M5 milestone scope).
+- User and session behavior redesign (M6 and M7 scopes).
+- ArgoCD staging rollout implementation (M10 scope).
 - Dashboard or analytics slice expansion.
 - Multi-process federation redesign.
 
@@ -120,7 +120,7 @@ config[MetricsSettings_Pydantic] --> appFactory[AppFactory_Core]
 appFactory --> platformService[PlatformMetricsService]
 platformService --> kueueAdapter[KueueProvider]
 platformService --> promAdapter[PrometheusProvider]
-platformService --> kubeMetricsAdapter[KubeMetricsProvider_M4]
+platformService --> kubeMetricsAdapter[KubeMetricsProvider_M5]
 platformService --> apiRoutes[ApiV1Routes]
 ```
 
@@ -134,8 +134,8 @@ across all layers.
 only supported platform sources after cutover.
 - **No legacy providers:** Static and node are removed, not hidden behind
 compatibility aliases.
-- **M4 dependency:** Kube-metrics implementation depth is intentionally deferred
-to M4 while M3 establishes architecture and config contracts.
+- **M5 dependency:** Kube-metrics implementation depth is intentionally deferred
+to M5 while M3 establishes architecture and config contracts.
 
 ## Implementation phases
 
@@ -178,7 +178,7 @@ environment-derived values.
 
 This section lists milestone risks and mitigations.
 
-- **Scope creep risk:** M3 can absorb M4 behavior if boundaries are vague.
+- **Scope creep risk:** M3 can absorb M5 behavior if boundaries are vague.
 Mitigate by keeping kube-metrics runtime depth explicitly out of scope.
 - **Boilerplate risk:** A new package layout can introduce empty wrappers.
 Mitigate by requiring each moved module to own clear behavior.
@@ -197,7 +197,7 @@ This section defines rollout controls for stable operation.
 - Require explicit evidence that static and node paths are fully removed.
 - Require startup validation evidence for each supported source combination.
 - Require docs and plans index updates in the same change as milestone renaming.
-- Require follow-on M4 kickoff to confirm kube-metrics implementation scope.
+- Require follow-on M5 kickoff to confirm kube-metrics implementation scope.
 
 ## Implementer handoff checklist
 
@@ -210,5 +210,5 @@ Use this checklist to close M3 execution.
 - Nested Pydantic settings model for source composition is implemented.
 - No dataclasses are used for runtime config or API/schema models.
 - Platform source support is limited to Kueue, Prometheus, and kube-metrics.
-- M4 remains the implementation milestone for kube-metrics runtime depth.
+- M5 remains the implementation milestone for kube-metrics runtime depth.
 - Required gates pass.

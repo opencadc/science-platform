@@ -18,7 +18,7 @@ live in `environment-contracts.md` in this directory.
   capacity, and `PrometheusUsageProvider` for usage. There is no `static` or
   `node` adapter path.
 - **Supported platform sources:** Kueue and Prometheus are active; kube-metrics
-  is configuration-only until M4.
+  is configuration-only until M5.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.
@@ -32,11 +32,13 @@ live in `environment-contracts.md` in this directory.
 ## Milestone design mapping
 
 - M3: package realignment and provider cleanup.
-- M4: kube-metrics runtime depth.
-- M5: user metrics hardening.
-- M6: session metrics hardening.
-- M7-M8: rollout baseline and stabilization runbook.
-- M9: deferred ArgoCD staging integration.
+- M4: provider runtime architecture and platform-only source contract.
+- M5: kube-metrics runtime depth.
+- M6: user metrics hardening.
+- M7: session metrics hardening.
+- M8-M9: rollout baseline and stabilization runbook.
+- M10: deferred ArgoCD staging integration.
+- M11: local Kubernetes workflow simplification.
 
 ## Ownership
 

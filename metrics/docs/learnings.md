@@ -33,7 +33,7 @@ process lessons belong in `docs/harness/learnings.md`.
   cache tokens use SHA-256 over the exact identifier value.
 
 - Date: April 23, 2026
-- Context: M10 local and CI smoke workflow simplification follow-up.
+- Context: M11 local and CI smoke workflow simplification follow-up.
 - Lesson: A one-node kind cluster plus Helm and direct Docker build/load
   provides a smaller and easier smoke path than the previous Minikube plus
   Skaffold flow, while keeping the Kueue fixture and chart deployment contracts
@@ -76,7 +76,7 @@ process lessons belong in `docs/harness/learnings.md`.
   strictly incremental (`PLAN_M<n>_<topic>`), and inserting a stage requires
   immediate renumbering of later plan files and references.
 - Evidence: `docs/plans/milestone-process.md`, `docs/plans/index.md`, and
-  plans renamed to M3-M9 during this update.
+  plans renamed to M3-M10 during this update.
 - Action taken: Added milestone naming rules and updated all roadmap filenames
   and cross-links.
 
