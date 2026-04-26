@@ -39,9 +39,9 @@ This file stores repository-specific behavioral specifications.
 
 - Architecture realignment and provider cleanup: `docs/plans/PLAN_M3_app_structure_and_platform_sources.md`
 - Provider runtime architecture: `docs/plans/PLAN_M4_provider_runtime_architecture.md`
-- Kube-metrics runtime implementation: `docs/plans/PLAN_M5_kube_metrics_mode_platform_release.md`
+- Interactive quota release: `docs/plans/PLAN_M5_interactive_quota_release.md`
 
 ## Planned target behavior (roadmap)
 
-- Kube-metrics becomes an active source once M5 implements runtime depth behind
-  the configured kube provider and `sources.platform`.
+- Interactive quota becomes an active source once M5 implements runtime depth
+  behind the configured `kube` provider and `sources.quotas.interactive`.

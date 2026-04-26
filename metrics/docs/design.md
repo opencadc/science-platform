@@ -31,8 +31,8 @@ live in `environment-contracts.md` in this directory.
 
 - M3: package realignment and provider cleanup.
 - M4: provider runtime architecture and platform-only source contract.
-- M5: kube-metrics runtime depth.
-- M6: user metrics hardening.
+- M5: interactive quota release backed by the `kube` provider.
+- M6: broader user metrics hardening.
 - M7: session metrics hardening.
 - M8-M9: rollout baseline and stabilization runbook.
 - M10: deferred ArgoCD staging integration.

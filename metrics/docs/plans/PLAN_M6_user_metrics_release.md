@@ -34,13 +34,14 @@ bounded query behavior, and stable operational controls.
 - M2 platform route contract and observability controls.
 - M3 architecture realignment.
 - M4 provider runtime architecture.
-- M5 kube-metrics provider milestone outputs where applicable.
+- M5 interactive quota outputs where applicable.
 
 ## Constraints
 
 - Keep user query behavior bounded.
 - Keep error semantics deterministic.
 - Keep all runtime configuration environment-driven and Pydantic validated.
+- Do not redefine the interactive quota route delivered in M5.
 
 ## Implementation phases
 

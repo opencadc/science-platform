@@ -67,7 +67,8 @@ composition paths.
 
 This milestone is an architecture reset, not a feature expansion.
 
-- Kube-metrics runtime implementation. That remains M5.
+- Kubernetes-backed quota and workload metric implementation. The first
+  follow-on scope is M5 interactive quota.
 - User, session, or capacity metric APIs. Future milestones add complete metric
   contracts when a provider can return the full model.
 - External plugin loading for arbitrary provider packages.
@@ -126,7 +127,7 @@ semantics local to the Kueue source module.
 - `src/metrics/providers/prometheus.py`: `PrometheusProviderConfig`,
   `PrometheusProvider`, and `PrometheusMetrics` with no supported scopes in M4.
 - `src/metrics/providers/kube.py`: `KubeProviderConfig`, `KubeProvider`, and
-  `KubeMetrics` reserved for M5.
+  `KubeMetrics` reserved for follow-on Kubernetes-backed scopes.
 - `src/metrics/api/v1/routes.py`: platform route only, depending on
   `MetricsRuntime`.
 

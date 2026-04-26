@@ -134,4 +134,5 @@ Compose empty-env footgun, default `main` import behavior.
 - Optional Prometheus TCP/HTTP readiness check at startup.
 - Rename startup exception type for mixed Kueue/Prometheus failures.
 - Declarative env-alias table or smaller validators if `_merge_legacy_environment` grows.
-- M5: implement `kube_metrics` runtime behind `platform.kube_metrics`.
+- Follow-on milestones: implement Kubernetes-backed provider scopes after the
+  M4 runtime reset.

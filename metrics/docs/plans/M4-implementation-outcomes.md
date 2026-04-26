@@ -82,6 +82,6 @@ failures are **logged** in `PlatformMetricsService` instead. Kueue
 
 ## Follow-ups (not M4)
 
-- Deeper Kueue API fan-in limits and M5 kube-metrics.
+- Deeper Kueue API fan-in limits and M5 interactive quota work.
 - If HTTP/2 is required in all environments, add the `h2` dependency explicitly
   and default `http2: true` in `HttpClientConfig` once policy allows.

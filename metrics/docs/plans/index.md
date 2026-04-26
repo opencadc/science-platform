@@ -28,7 +28,7 @@ parent milestone and are not separate sequence ids.
   (post-review operator and contract hardening)
 - `docs/plans/PLAN_M3_app_structure_and_platform_sources.md` — outcomes: `docs/plans/PLAN_M3_outcomes.md`
 - `docs/plans/PLAN_M4_provider_runtime_architecture.md`
-- `docs/plans/PLAN_M5_kube_metrics_mode_platform_release.md`
+- `docs/plans/PLAN_M5_interactive_quota_release.md`
 - `docs/plans/PLAN_M6_user_metrics_release.md`
 - `docs/plans/PLAN_M7_session_metrics_release.md`
 

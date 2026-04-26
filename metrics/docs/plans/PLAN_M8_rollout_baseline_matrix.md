@@ -19,9 +19,9 @@ post-M7 rollout sequence.
 - **M4 provider runtime architecture**
   - Baseline: partial provider composition and inactive user/session routes.
   - Target: complete provider metric contracts and platform-only active API.
-- **M5 kube-metrics release**
-  - Baseline: kube-metrics not fully wired as runtime source.
-  - Target: kube-metrics runtime implementation with startup validation.
+- **M5 interactive quota release**
+  - Baseline: no active quota API after the M4 route surface reset.
+  - Target: `kube` provider-backed interactive quota route with private cache.
 - **M6 user release**
   - Baseline: user route exists but lacks production attribution controls.
   - Target: canonical user attribution and bounded query behavior.
@@ -66,7 +66,7 @@ post-M7 rollout sequence.
 - M2 confirms Kueue runtime contract and version scope.
 - M3 confirms architecture cleanup and provider cutover.
 - M4 confirms provider runtime architecture and route surface reset.
-- M5 confirms kube-metrics implementation depth remains in-scope.
+- M5 confirms interactive quota implementation depth and label contracts.
 - M6 confirms user-attribution contract hardening.
 - M7 confirms session identity and cardinality guardrails.
 - M9 confirms stabilization exit criteria before M10 GitOps staging kickoff.
