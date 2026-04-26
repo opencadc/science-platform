@@ -62,20 +62,14 @@ def test_module_substance_has_coverage_for_every_canonical_module() -> None:
 
 def test_policy_tokens_are_present_in_target_modules() -> None:
     for module_name, tokens in REQUIRED_POLICY_TOKENS.items():
-        content = (REPO_ROOT / "docs" / "harness" / module_name).read_text(
-            encoding="utf-8"
-        )
+        content = (REPO_ROOT / "docs" / "harness" / module_name).read_text(encoding="utf-8")
         for token in tokens:
             assert token in content, f"{module_name} missing policy token {token!r}"
 
 
 def test_machine_readable_schemas_validate() -> None:
-    RouterPolicy.model_validate(
-        load_yaml(REPO_ROOT / "docs/harness/router-policy.yaml")
-    )
-    ArtifactSchema.model_validate(
-        load_yaml(REPO_ROOT / "docs/harness/artifact-schema.yaml")
-    )
+    RouterPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/router-policy.yaml"))
+    ArtifactSchema.model_validate(load_yaml(REPO_ROOT / "docs/harness/artifact-schema.yaml"))
     HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
     ProjectGates.model_validate(load_yaml(REPO_ROOT / "project-gates.yaml"))
 
@@ -88,9 +82,7 @@ def test_strict_mode_converts_ask_and_block_to_strict_block() -> None:
     raw = load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
     raw["mode"] = "strict"
     policy = HookPolicy.model_validate(raw)
-    ask_decision = evaluate_hook_decision(
-        policy, "shell_command_start", "rm -rf /tmp/demo"
-    )
+    ask_decision = evaluate_hook_decision(policy, "shell_command_start", "rm -rf /tmp/demo")
     block_decision = evaluate_hook_decision(
         policy,
         "shell_command_start",
@@ -101,9 +93,7 @@ def test_strict_mode_converts_ask_and_block_to_strict_block() -> None:
 
 
 def test_risk_priority_overrides_allow_rules_on_compound_commands() -> None:
-    policy = HookPolicy.model_validate(
-        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
-    )
+    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
     compound = "cat file && sudo rm -rf /tmp/victim"
     decision = evaluate_hook_decision(policy, "shell_command_start", compound)
     assert decision.action == "advisory_block"
@@ -137,12 +127,8 @@ def test_risk_priority_overrides_allow_rules_on_compound_commands() -> None:
         ("cp ./local.conf /etc/example.conf", "advisory_ask"),
     ],
 )
-def test_hardened_hook_patterns_cover_known_bypasses(
-    payload: str, expected: str
-) -> None:
-    policy = HookPolicy.model_validate(
-        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
-    )
+def test_hardened_hook_patterns_cover_known_bypasses(payload: str, expected: str) -> None:
+    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
     decision = evaluate_hook_decision(policy, "shell_command_start", payload)
     assert decision.action == expected, f"payload={payload!r} decision={decision}"
 
@@ -157,9 +143,7 @@ def test_hardened_hook_patterns_cover_known_bypasses(
     ],
 )
 def test_pre_file_write_gate_catches_adapter_and_secret_targets(payload: str) -> None:
-    policy = HookPolicy.model_validate(
-        load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml")
-    )
+    policy = HookPolicy.model_validate(load_yaml(REPO_ROOT / "docs/harness/hook-policy.yaml"))
     decision = evaluate_hook_decision(policy, "pre_file_write", payload)
     assert decision.action == "advisory_ask"
 
@@ -199,9 +183,7 @@ def test_persona_parity_fails_when_adapter_drifts(tmp_path, monkeypatch) -> None
             (agents / reviewer).write_bytes(source.read_bytes())
 
     drifted = staging / fake_adapters[1] / "agents" / "architecture-reviewer.md"
-    drifted.write_text(
-        drifted.read_text(encoding="utf-8") + "\ndrift\n", encoding="utf-8"
-    )
+    drifted.write_text(drifted.read_text(encoding="utf-8") + "\ndrift\n", encoding="utf-8")
     with pytest.raises(ValueError):
         _parity(staging)
 
@@ -330,10 +312,7 @@ def test_retired_hidden_test_layout_is_absent() -> None:
 
 
 def test_project_docs_live_under_docs_and_harness_docs_stay_under_harness() -> None:
-    assert (
-        check_docs_ownership(REPO_ROOT)
-        == "project docs in docs/, harness docs in docs/harness/"
-    )
+    assert check_docs_ownership(REPO_ROOT) == "project docs in docs/, harness docs in docs/harness/"
     for path in ("architecture.md", "design.md", "specs.md", "learnings.md"):
         assert not (REPO_ROOT / path).exists()
         assert (REPO_ROOT / "docs" / path).exists()
@@ -341,9 +320,7 @@ def test_project_docs_live_under_docs_and_harness_docs_stay_under_harness() -> N
 
 
 def test_harness_learnings_retain_historical_lessons() -> None:
-    content = (REPO_ROOT / "docs" / "harness" / "learnings.md").read_text(
-        encoding="utf-8"
-    )
+    content = (REPO_ROOT / "docs" / "harness" / "learnings.md").read_text(encoding="utf-8")
     required_markers = [
         "risk-priority",
         "Absolute paths",
@@ -668,9 +645,7 @@ def test_claim_cli_rejects_recursive_globs(tmp_path) -> None:
 
 def test_wip_and_reviewer_quorum_constants_are_consistent() -> None:
     loop = (REPO_ROOT / "docs" / "harness" / "loop.md").read_text(encoding="utf-8")
-    review = (REPO_ROOT / "docs" / "harness" / "review-arbitration.md").read_text(
-        encoding="utf-8"
-    )
+    review = (REPO_ROOT / "docs" / "harness" / "review-arbitration.md").read_text(encoding="utf-8")
     assert re.search(r"WIP cap[^\n]*\*\*2\*\*", loop)
     assert "3 of 4" in review
     assert "30-minute" in review

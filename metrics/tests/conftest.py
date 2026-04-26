@@ -4,19 +4,18 @@ from __future__ import annotations
 
 import pytest
 
+from metrics.core.runtime import MetricsRuntime
+
 
 @pytest.fixture(autouse=True)
 def _noop_application_startup_for_unit_tests(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Avoid real cluster and Prometheus calls when constructing FastAPI apps."""
+    """Avoid real cluster calls when constructing FastAPI apps in unit tests."""
     if request.node.get_closest_marker("integration"):
         return
 
-    async def _noop(_settings):
-        return None
+    async def _async_noop(self: MetricsRuntime) -> None:  # noqa: ARG001
+        return
 
-    monkeypatch.setattr(
-        "metrics.core.factory.validate_application_startup",
-        _noop,
-    )
+    monkeypatch.setattr(MetricsRuntime, "start", _async_noop)
