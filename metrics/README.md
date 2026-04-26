@@ -11,25 +11,26 @@ to `clusterqueues` and `cohorts` in the `kueue.x-k8s.io` API group. Prefer
 creating a dedicated Kubernetes `ServiceAccount` via the chart
 (`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
 permissions are not bound to the namespace `default` ServiceAccount. See
-`docs/environment-contracts.md` for env var contracts and alias precedence.
+`docs/environment-contracts.md` for environment naming and nested
+`METRICS_*` configuration.
 
 ## API routes
 
-The canonical routes are:
+The API exposes:
 
 - `GET /api/v1/metrics/platform`
-- `GET /api/v1/metrics/users/{user}`
-- `GET /api/v1/metrics/users/{user}/sessions/{uuid}`
-
-Compatibility aliases also exist under `/metrics` for transition and smoke
-testing workflows.
+- `GET /healthz`
 
 ## 12-factor runtime model
 
 All runtime behavior is configured via environment variables prefixed with
-`METRICS_`.
+`METRICS_`, merged with optional YAML (see `docs/environment-contracts.md`).
 
-- Configuration and credentials come from environment variables only.
+- Configuration and credentials come from environment variables and optional
+  `METRICS_CONFIG_FILE` (default `/etc/canfar/metrics/config.yaml`). A missing
+  file is allowed unless `METRICS_REQUIRE_CONFIG_FILE` is set to a true value.
+- Pydantic `Settings` groups options under `providers`, `sources`, and `cache`
+  (nested env keys use `__`; see `docs/environment-contracts.md`).
 - The process remains stateless and uses TTL cache backends.
 - Structured logs are emitted to stdout through the app server runtime.
 - One service process is packaged per container image.
@@ -67,17 +68,17 @@ pre-commit run --all-files
 Run the API locally:
 
 ```bash
-METRICS_CACHE_BACKEND=memory \
-METRICS_PLATFORM__PROMETHEUS__URL=http://127.0.0.1:9090 \
-METRICS_PLATFORM__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
-METRICS_KUEUE_CLUSTER_QUEUES=cq-proton \
-METRICS_KUEUE_COHORT=cohort-atom \
+METRICS_CACHE__BACKEND=memory \
+METRICS_PROVIDERS__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
+METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-proton"]' \
+METRICS_PROVIDERS__KUEUE__COHORT=cohort-atom \
 uv run python -m metrics.main
 ```
 
-Use this command for process-level debugging. For supported `dev` operation
-with Kueue dependencies, follow the Kubernetes-first setup in
-`docs/dev-setup.md`.
+`METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` must be a JSON array string (not a
+comma-separated list). Use this command for process-level debugging. For
+supported `dev` operation with Kueue dependencies, follow the
+Kubernetes-first setup in `docs/dev-setup.md`.
 
 For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 `dev`, integration, staging, and production, see `docs/environment-contracts.md`.
@@ -85,8 +86,8 @@ For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 ### Kueue-backed platform metrics
 
 For **module responsibilities** and the **startup vs request** flow for
-Kueue-backed platform metrics, see `docs/kueue-platform.md`. That guide is the
-canonical developer-oriented supplement to milestones M2 and M3.
+Kueue-backed platform metrics, see `docs/kueue-platform.md` (aligned with M4
+provider runtime behavior).
 
 **Cluster dev setup** — one script, `docs/dev-setup.md`.
 

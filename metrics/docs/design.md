@@ -8,26 +8,24 @@ not used for generic harness instructions.
 Operational environment contracts and roadmap-to-runtime mappings for Metrics
 live in `environment-contracts.md` in this directory.
 
-## Current design (post M3)
+## Current design (post M4)
 
 - **Kubernetes-first service contract:** Dev, integration, staging, and
   production run through Kubernetes deployment paths. Docker Compose is not
   part of the supported service contract (see `environment-contracts.md`).
-- **Single service process with source composition:** The FastAPI factory wires
-  `KueuePlatformEngine` for platform maps, `KueueCapacityProvider` for user/session
-  capacity, and `PrometheusUsageProvider` for usage. There is no `static` or
-  `node` adapter path.
-- **Supported platform sources:** Kueue and Prometheus are active; kube-metrics
-  is configuration-only until M5.
+- **Single service process, platform-only HTTP:** `MetricsRuntime` composes the
+  active platform source from `core/provider_registry.py`, owns upstream
+  `httpx.AsyncClient` instances and cache backends, and exposes platform reads
+  to versioned routes. M4 serves only `GET /api/v1/metrics/platform` and
+  `GET /healthz`; user/session metrics are out of scope until later milestones.
+- **Reserved providers:** Prometheus and kube provider types exist for typed
+  configuration; M4 does not open unused upstream HTTP clients for them.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.
 - **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
-  nested `platform` / `user` domains and `pydantic-settings` env parsing (including
-  legacy flat env merge for operators).
-- **Cache isolation:** User and session cache keys hash the exact external
-  identifier values instead of normalizing punctuation, which keeps distinct
-  principals and sessions isolated.
+  `pydantic-settings` env parsing (nested `METRICS_*` keys) and optional YAML
+  under `/etc/canfar/metrics/config.yaml` (see `core/yaml_config.py`).
 
 ## Milestone design mapping
 

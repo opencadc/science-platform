@@ -37,31 +37,54 @@ The service is Kubernetes-first in every environment.
   environment-specific values such as queue configuration and Redis endpoint.
   These environments do not assume local kind provisioning.
 
-Docker Compose is no longer part of the supported development contract.
+Docker Compose is not part of the supported development contract.
 
 ## 12-factor configuration model
 
-All runtime behavior remains environment-driven. Settings use nested Pydantic
-models under `platform` and `user` (for example `platform.kueue.cluster_queues`).
-`pydantic-settings` reads nested keys using the delimiter `__`, for example
-`METRICS_PLATFORM__KUEUE__CLUSTER_QUEUES`. Legacy flat variables such as
-`METRICS_KUEUE_CLUSTER_QUEUES`, `METRICS_KUBE_API_URL`, and `METRICS_PROMETHEUS_URL`
-are merged at load time when nested values are absent (see
-`Settings._merge_legacy_environment` in `src/metrics/core/settings.py`).
+Runtime behavior is driven by `METRICS_*` environment variables, optional YAML
+from `METRICS_CONFIG_FILE`, and (when present) Kubernetes secret file sources,
+in the order `Settings` defines. For the same field, `METRICS_*` **wins** over
+both the optional YAML file and secret-file values (environment is applied
+before those lower-priority `Settings` sources).
 
-## Operator alias precedence (`KUEUE_METRICS_*` versus `METRICS_*`)
+**Default file path:** `/etc/canfar/metrics/config.yaml`. If the file is
+absent, settings fall back to defaults and env unless
+`METRICS_REQUIRE_CONFIG_FILE` is set to a true value, in which case startup
+fails when the file is missing.
 
-The application loads nested `METRICS_*` fields, then applies fill-only aliases
-from process environment in `Settings._merge_legacy_environment` in
-`src/metrics/core/settings.py`.
+**YAML shape:** When the file exists and the document is non-empty, the top
+level must include a `metrics:` mapping (see `docs/examples/metrics.config.yaml`).
 
-| If this nested field is empty | And this env var is set | Then |
-| --- | --- | --- |
-| `platform.kueue.kube_api_url` | `KUEUE_METRICS_URL` | `kube_api_url` is set from `KUEUE_METRICS_URL`. |
-| `platform.kueue.cluster_queues` | `KUEUE_METRICS_CLUSTER_QUEUES` | Queue list parsed from comma-separated value. |
-| `platform.kueue.cohort` | `KUEUE_METRICS_COHORT` | Cohort name copied. |
+**Settings model:** The root model exposes `providers`, `sources`, and `cache`
+(not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with
+`METRICS_` + the nested name using `__` as the delimiter, for example:
 
-Aliases do not override non-empty primary fields.
+- `METRICS_PROVIDERS__KUEUE__COHORT` → `providers.kueue.cohort`
+- `METRICS_PROVIDERS__KUEUE__KUBE_API_URL` → `providers.kueue.kube_api_url`
+- `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` → must be a **JSON array of
+  strings** (for example `'["cq-proton","cq-neutron"]'`), not a comma-separated
+  plain string
+- `METRICS_SOURCES__PLATFORM` → `sources.platform` (which provider key backs
+  platform metrics; M4 uses `kueue`)
+- `METRICS_CACHE__SCOPE_TTL_SECONDS` → must be a **JSON object** mapping scope
+  names to integers (for example `'{"platform":300}'`); the `platform` entry
+  overrides the default cache TTL for `GET /api/v1/metrics/platform`
+- `METRICS_CACHE__BACKEND` / `METRICS_CACHE__TTL_SECONDS` → `cache` fields
+
+`METRICS_REDIS_URL` and other top-level `Settings` fields use the `METRICS_`
+prefix without extra nesting. Legacy flat aliases such as `METRICS_KUEUE_*` and
+`KUEUE_METRICS_*` are **not** part of the M4 settings surface; configure Kueue
+through `METRICS_PROVIDERS__KUEUE__*`.
+
+`providers.prometheus` and `providers.kube` may be present in YAML and pass
+validation, but M4 does not open HTTP clients to them; only the active
+platform source (Kueue) runs startup checks and platform aggregation.
+
+## Cluster RBAC (Helm)
+
+When `rbac.create` is true, the chart installs a release-scoped `ClusterRole`
+and `ClusterRoleBinding`. Treat leftover cluster-scoped RBAC after uninstall as
+an operational cleanup task.
 
 ## Repository ownership boundaries
 
@@ -80,15 +103,3 @@ specific deployment overlays.
 - Release images: `images.opencadc.org/platform/metrics` on Git tags
   `metrics-v*`, multi-arch `linux/amd64` and `linux/arm64`.
 - Non-tag CI does not publish release images.
-
-## Platform sources note
-
-Platform metrics always use the Kueue HTTP collectors plus Prometheus-backed
-usage for user and session routes. Startup validation requires both Kubernetes
-(Kueue scope) and Prometheus endpoints to be configured.
-
-## Cluster RBAC (Helm)
-
-When `rbac.create` is true, the chart installs a release-scoped `ClusterRole`
-and `ClusterRoleBinding`. Treat leftover cluster-scoped RBAC after uninstall as
-an operational cleanup task.
