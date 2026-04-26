@@ -42,8 +42,11 @@ def metrics_success_cache_headers(
 ) -> dict[str, str]:
     """Build Date, Cache-Control, Expires, and Last-Modified for a successful metrics GET.
 
-    * **User/session routes** always use ``private`` (not shared-cache safe).
-    * **Platform** uses ``public`` when ``shared_cache_public`` is true, else ``private``.
+    Platform metrics GETs are ``public`` when ``shared_cache_public`` is true and
+    ``user_scoped`` is false; otherwise they are ``private``. When ``user_scoped``
+    is true, responses stay ``private`` even if ``shared_cache_public`` is true, so
+    user-scoped or other private snapshot policies never opt into shared public caches.
+
     * ``max-age`` is **remaining** freshness (configured TTL minus snapshot age).
     * When ``configured_ttl == 0``, sends ``Cache-Control: no-store``.
     """
