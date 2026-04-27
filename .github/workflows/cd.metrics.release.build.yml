@@ -53,7 +53,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.0.0
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v4.0.0
+        uses: docker/setup-buildx-action@v4
         with:
           install: true
       - name: Perform Container Registry Login
