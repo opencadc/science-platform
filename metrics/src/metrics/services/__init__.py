@@ -1,6 +1,6 @@
 """Orchestration and cache-aware metric computation."""
 
-from metrics.services.platform_metrics import (
+from metrics.services.platform import (
     CachedMetrics,
     PlatformMetricsService,
     ServiceResult,

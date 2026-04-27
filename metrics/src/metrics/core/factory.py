@@ -15,7 +15,7 @@ from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import Settings, apply_metrics_package_log_level
 from metrics.errors import AppError, RuntimeStartupError
 from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
-from metrics.services.platform_metrics import PlatformMetricsService
+from metrics.services.platform import PlatformMetricsService
 from metrics.telemetry import setup_telemetry
 
 _logger = logging.getLogger(__name__)

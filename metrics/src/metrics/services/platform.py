@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
-from typing import Awaitable, Callable, cast
+from typing import Awaitable, Callable
 
 from metrics.cache import TTLCacheBackend
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
@@ -41,32 +41,32 @@ class PlatformMetricsService:
     def __init__(
         self,
         *,
-        load_platform: Callable[[], Awaitable[PlatformMetricsData]],
+        platform: Callable[[], Awaitable[PlatformMetricsData]],
         cache: TTLCacheBackend[CachedMetrics],
-        cache_key: Callable[[], str],
-        metrics_recorder: MetricsRecorder | None = None,
-        platform_ttl_seconds: int | None = None,
-        telemetry_provider_name: str = "unknown",
+        key: Callable[[], str],
+        telemetry: MetricsRecorder | None = None,
+        ttl: int | None = None,
+        provider: str = "unknown",
     ) -> None:
         """Wire cache, loader, and optional telemetry for platform scope reads.
 
         Args:
-            load_platform: Async callable that fetches fresh :class:`PlatformMetricsData`.
+            platform: Async callable that fetches fresh :class:`PlatformMetricsData`.
             cache: Async TTL backend storing :class:`CachedMetrics`.
-            cache_key: Sync callable returning the cache key (owned by :class:`MetricsRuntime`).
-            metrics_recorder: Optional cache/provider timing recorder.
-            platform_ttl_seconds: Override cache TTL; defaults to the backend's TTL.
-            telemetry_provider_name: Adapter name for :meth:`MetricsRecorder.record_provider_duration`
+            key: Sync callable returning the cache key (owned by :class:`MetricsRuntime`).
+            telemetry: Optional cache/provider timing recorder.
+            ttl: Override cache TTL; defaults to the backend's TTL.
+            provider: Adapter name for :meth:`MetricsRecorder.record_provider_duration`
                 (``bundle.provider.name`` at the :class:`MetricsRuntime` / registry Seam).
         """
-        self._load_platform = load_platform
+        self._platform = platform
         self._cache = cache
-        self._cache_key = cache_key
-        self._metrics_recorder = metrics_recorder or NoopMetricsRecorder()
+        self._key = key
+        self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._platform_ttl_seconds = (
-            platform_ttl_seconds if platform_ttl_seconds is not None else self._cache.ttl_seconds
+            ttl if ttl is not None else self._cache.ttl_seconds
         )
-        self._telemetry_provider_name = telemetry_provider_name
+        self._provider = provider
 
     @property
     def cache_ttl_seconds(self) -> int:
@@ -83,7 +83,7 @@ class PlatformMetricsService:
             AppError: On provider unavailability (503) or execution failure (502), with
             details only in server logs.
         """
-        cache_key = self._cache_key()
+        cache_key = self._key()
         scope = "platform"
         cached = await self._cache.get(cache_key)
         if cached is not None:
@@ -93,7 +93,7 @@ class PlatformMetricsService:
                 scope=scope,
             )
             return ServiceResult(
-                data=cast(PlatformMetricsData, cached.data),
+                data=cached.data,
                 created=cached.created,
                 cached=True,
             )
@@ -129,7 +129,7 @@ class PlatformMetricsService:
         started = perf_counter()
         pstatus = "ok"
         try:
-            return await self._load_platform()
+            return await self._platform()
         except Exception as exc:
             pstatus = exc.__class__.__name__
             if isinstance(exc, ProviderUnavailableError):
@@ -157,7 +157,7 @@ class PlatformMetricsService:
             raise
         finally:
             self._metrics_recorder.record_provider_duration(
-                provider=self._telemetry_provider_name,
+                provider=self._provider,
                 scope="platform",
                 status=pstatus,
                 seconds=perf_counter() - started,

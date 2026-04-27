@@ -7,7 +7,7 @@ import pytest
 from metrics.cache import InMemoryTTLCache
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
 from metrics.schemas.metrics import PlatformMetricsData
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
+from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import MetricsRecorder
 
 
@@ -25,9 +25,9 @@ async def test_service_returns_platform_metrics_and_uses_cache() -> None:
         )
 
     service = PlatformMetricsService(
-        load_platform=good,
+        platform=good,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
-        cache_key=_fixed_cache_key,
+        key=_fixed_cache_key,
     )
 
     first = await service.get_platform_metrics()
@@ -46,9 +46,9 @@ async def test_service_raises_unavailable() -> None:
         raise ProviderUnavailableError("nope")
 
     service = PlatformMetricsService(
-        load_platform=bad,
+        platform=bad,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
-        cache_key=_fixed_cache_key,
+        key=_fixed_cache_key,
     )
     with pytest.raises(AppError) as ei:
         await service.get_platform_metrics()
@@ -102,11 +102,11 @@ async def test_service_telemetry_uses_telemetry_provider_name() -> None:
         )
 
     service = PlatformMetricsService(
-        load_platform=good,
+        platform=good,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
-        cache_key=_fixed_cache_key,
-        metrics_recorder=CaptureRecorder(),
-        telemetry_provider_name="my-adapter",
+        key=_fixed_cache_key,
+        telemetry=CaptureRecorder(),
+        provider="my-adapter",
     )
     await service.get_platform_metrics()
     assert recorded, "expected provider duration telemetry"
@@ -120,9 +120,9 @@ async def test_service_raises_on_execution() -> None:
         raise ProviderExecutionError("e")
 
     service = PlatformMetricsService(
-        load_platform=bad,
+        platform=bad,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
-        cache_key=_fixed_cache_key,
+        key=_fixed_cache_key,
     )
     with pytest.raises(AppError) as ei:
         await service.get_platform_metrics()

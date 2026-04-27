@@ -14,7 +14,7 @@ from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.base import Provider
 from metrics.schemas.metrics import PlatformMetricsData
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService, ServiceResult
+from metrics.services.platform import CachedMetrics, PlatformMetricsService, ServiceResult
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 _logger = logging.getLogger(__name__)
@@ -108,12 +108,12 @@ class MetricsRuntime:
             return await bundle.provider.metrics().platform()
 
         platform_service = PlatformMetricsService(
-            load_platform=load_platform,
+            platform=load_platform,
             cache=cache,
-            cache_key=cache_key,
-            metrics_recorder=recorder,
-            platform_ttl_seconds=ttl,
-            telemetry_provider_name=bundle.provider.name,
+            key=cache_key,
+            telemetry=recorder,
+            ttl=ttl,
+            provider=bundle.provider.name,
         )
         runtime = cls(settings)
         runtime.set_recorder(recorder)

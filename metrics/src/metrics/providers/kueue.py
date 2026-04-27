@@ -19,7 +19,7 @@ from metrics.providers.base import (
     Provider,
     ProviderMetrics,
 )
-from metrics.providers.kube_http import (
+from metrics.providers.kube import (
     kube_auth_headers,
     kube_get_json,
     kube_parallel_get_json,

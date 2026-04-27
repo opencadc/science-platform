@@ -1,4 +1,4 @@
-"""Stub providers and small kube_http paths for coverage."""
+"""Stub providers and small kube helper paths for coverage."""
 
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ from metrics.core.settings import (
 )
 from metrics.providers.base import MetricScope, ProviderMetrics, UnsupportedMetricScope
 from metrics.schemas.metrics import PlatformMetricsData
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
+from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
 
 from metrics.providers.kube import KubeProvider
-from metrics.providers.kube_http import (
+from metrics.providers.kube import (
     resolve_kube_token,
     resolve_kube_verify,
 )
@@ -112,11 +112,11 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
     from metrics.core.runtime import MetricsRuntime  # local: avoid import cycle during collection
 
     svc = PlatformMetricsService(
-        load_platform=load,
+        platform=load,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
-        cache_key=lambda: "platform:4:stub:fp",
-        metrics_recorder=NoopMetricsRecorder(),
-        telemetry_provider_name=stub.name,
+        key=lambda: "platform:4:stub:fp",
+        telemetry=NoopMetricsRecorder(),
+        provider=stub.name,
     )
     runtime = MetricsRuntime(settings)
     runtime.set_recorder(NoopMetricsRecorder())
@@ -195,7 +195,7 @@ def test_ca_file_in_verify_uses_in_cluster_or_system() -> None:
 async def test_kube_parallel_empty() -> None:
     import httpx
 
-    from metrics.providers.kube_http import kube_parallel_get_json
+    from metrics.providers.kube import kube_parallel_get_json
 
     c = httpx.AsyncClient()
     try:

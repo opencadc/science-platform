@@ -11,7 +11,7 @@ from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache
 from metrics.core.factory import create_app
 from metrics.core.runtime import build_cache_backend
 from metrics.core.settings import CacheConfig, Settings
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
+from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder, TelemetrySetup
 
 from tests.fakes import (
@@ -27,9 +27,9 @@ def _service() -> PlatformMetricsService:
         return f"platform:4:{stub.cluster}:"
 
     return PlatformMetricsService(
-        load_platform=stub.load,
+        platform=stub.load,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=30),
-        cache_key=cache_key,
+        key=cache_key,
     )
 
 
