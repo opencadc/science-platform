@@ -1,33 +1,58 @@
-"""Provider protocols for metrics data collection."""
+"""Provider scope contracts and async provider protocol."""
 
 from __future__ import annotations
 
-from typing import Protocol
+from enum import StrEnum
+from typing import Protocol, runtime_checkable
 
-from metrics.schemas.metrics import CapacityReading, UsageReading
-
-
-class CapacityProvider(Protocol):
-    """Protocol for a capacity data source."""
-
-    source_name: str
-
-    async def get_capacity(self) -> CapacityReading:
-        """Return platform capacity readings."""
+from metrics.schemas.metrics import PlatformMetricsData
 
 
-class UsageProvider(Protocol):
-    """Protocol for a utilization data source."""
+class UnsupportedMetricScope(RuntimeError):
+    """Raised when a provider does not implement a requested metric scope."""
 
-    source_name: str
+    def __init__(self, scope: "MetricScope") -> None:
+        """Store the requested scope and build a user-facing error message.
 
-    async def get_usage(self) -> UsageReading:
-        """Return requested resource usage readings."""
+        Args:
+            scope: The :class:`MetricScope` value that the provider rejected.
+        """
+        self.scope = scope
+        super().__init__(f"Provider does not support metric scope: {scope.value}")
 
-    async def get_usage_for_user(self, user_id: str) -> UsageReading:
-        """Return requested usage scoped to one user."""
 
-    async def get_usage_for_session(
-        self, user_id: str, session_id: str
-    ) -> UsageReading:
-        """Return requested usage scoped to one user session."""
+class MetricScope(StrEnum):
+    """Supported metric API scopes (``platform`` only for now)."""
+
+    PLATFORM = "platform"
+
+
+class ProviderMetrics:
+    """Base for provider metric implementations; defaults reject every scope."""
+
+    supported_scopes: frozenset[MetricScope] = frozenset()
+
+    async def platform(self) -> PlatformMetricsData:
+        """Load cluster-level platform capacity and allocation (default: unsupported)."""
+        raise UnsupportedMetricScope(MetricScope.PLATFORM)
+
+
+@runtime_checkable
+class Provider(Protocol):
+    """Async lifecycle and typed metrics for one upstream source."""
+
+    async def startup(self) -> None:
+        """Validate connectivity and configuration (no-op when inapplicable)."""
+
+    async def shutdown(self) -> None:
+        """Release resources held for this provider."""
+
+    @property
+    def name(self) -> str:
+        """Configuration key for this provider (e.g. kueue, prometheus)."""
+
+    def metrics(self) -> ProviderMetrics:
+        """Return scope implementations for this provider."""
+
+    def cache_fingerprint(self) -> str:
+        """Stable string for app-level cache keys when this source is active."""

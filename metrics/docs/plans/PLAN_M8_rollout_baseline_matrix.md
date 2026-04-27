@@ -1,7 +1,7 @@
-# CANFAR metrics rollout baseline matrix (M7 support plan)
+# CANFAR metrics rollout baseline matrix (M8 support plan)
 
 This document captures the roadmap baseline matrix and acceptance gates for the
-post-M6 rollout sequence.
+post-M7 rollout sequence.
 
 ## Capability matrix
 
@@ -16,16 +16,19 @@ post-M6 rollout sequence.
   - Baseline: flat package layout and legacy provider remnants.
   - Target: layered FastAPI structure and three-source model with static/node
     removed.
-- **M4 kube-metrics release**
-  - Baseline: kube-metrics not fully wired as runtime source.
-  - Target: kube-metrics runtime implementation with startup validation.
-- **M5 user release**
+- **M4 provider runtime architecture**
+  - Baseline: partial provider composition and inactive user/session routes.
+  - Target: complete provider metric contracts and platform-only active API.
+- **M5 interactive quota release**
+  - Baseline: no active quota API after the M4 route surface reset.
+  - Target: `kube` provider-backed interactive quota route with private cache.
+- **M6 user release**
   - Baseline: user route exists but lacks production attribution controls.
   - Target: canonical user attribution and bounded query behavior.
-- **M6 session release**
+- **M7 session release**
   - Baseline: session route exists with contract-level coverage only.
   - Target: strict session mapping, cardinality safeguards, and rollout controls.
-- **M9 post-initial GitOps**
+- **M10 post-initial GitOps**
   - Baseline: no ArgoCD integration plan execution.
   - Target: deferred staging GitOps plan after earlier milestone stability.
 
@@ -62,7 +65,8 @@ post-M6 rollout sequence.
 - M1 confirms environment ownership boundaries.
 - M2 confirms Kueue runtime contract and version scope.
 - M3 confirms architecture cleanup and provider cutover.
-- M4 confirms kube-metrics implementation depth remains in-scope.
-- M5 confirms user-attribution contract hardening.
-- M6 confirms session identity and cardinality guardrails.
-- M8 confirms stabilization exit criteria before M9 GitOps staging kickoff.
+- M4 confirms provider runtime architecture and route surface reset.
+- M5 confirms interactive quota implementation depth and label contracts.
+- M6 confirms user-attribution contract hardening.
+- M7 confirms session identity and cardinality guardrails.
+- M9 confirms stabilization exit criteria before M10 GitOps staging kickoff.

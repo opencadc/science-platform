@@ -1,7 +1,7 @@
-# CANFAR metrics initial production debug loop (M8 support plan)
+# CANFAR metrics initial production debug loop (M9 support plan)
 
 This runbook defines the debug and stabilization loop immediately after first
-production deployment of the M1-M6 milestone set.
+production deployment of the M1-M7 milestone set.
 
 ## Entry criteria
 

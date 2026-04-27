@@ -20,7 +20,7 @@ review and arbitration.
   `Settings.user.prometheus` (label keys) with `env_nested_delimiter="__"`, plus
   `Settings._merge_legacy_environment` (`mode="before"`) to fold flat `METRICS_*`,
   `KUEUE_METRICS_*`, and legacy Prometheus keys when nested values are absent.
-  `PlatformKubeMetricsSettings.enabled=true` raises until M4.
+  `PlatformKubeMetricsSettings.enabled=true` raises until M5.
 - **Single composed runtime:** `create_app` always wires `KueuePlatformEngine.collect`,
   `KueueCapacityProvider`, and `PrometheusUsageProvider`. Platform cache fingerprinting
   always reflects configured queue list and cohort.
@@ -66,7 +66,7 @@ config, kube-metrics placeholder.
   vs Kueue checks).
 - `KueueStartupError` name overload for Prometheus misconfig.
 - `validate_kueue_mode_startup` shim retained for tests (acceptable; not a provider shim).
-- `providers/__all__` lists two adapters; third source is config-only until M4 — OK.
+- `providers/__all__` lists two adapters; third source is config-only until M5 — OK.
 
 **Arbitration**
 
@@ -74,7 +74,7 @@ config, kube-metrics placeholder.
   merge is now fill-only (same rule as platform operator aliases): applied only when
   the nested dict from constructor/env does not already define the key.
 - **Documented deferral:** Optional Prometheus HTTP probe at startup is out of scope
-  for M3 (add to M4 ops hardening or a small hotfix if operators request parity).
+  for M3 (add to M5 ops hardening or a small hotfix if operators request parity).
 - **Backlog:** Rename `KueueStartupError` → neutral `StartupValidationError` (or split
   types) when touching startup next; update log playbooks.
 
@@ -134,4 +134,5 @@ Compose empty-env footgun, default `main` import behavior.
 - Optional Prometheus TCP/HTTP readiness check at startup.
 - Rename startup exception type for mixed Kueue/Prometheus failures.
 - Declarative env-alias table or smaller validators if `_merge_legacy_environment` grows.
-- M4: implement `kube_metrics` runtime behind `platform.kube_metrics`.
+- Follow-on milestones: implement Kubernetes-backed provider scopes after the
+  M4 runtime reset.

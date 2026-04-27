@@ -1,4 +1,4 @@
-# Milestone M10: local Kubernetes workflow simplification (kind)
+# Milestone M11: local Kubernetes workflow simplification (kind)
 
 This document is the active plan for the local and CI Kubernetes smoke
 workflow. It replaces the earlier Minikube-first draft with a single `kind`

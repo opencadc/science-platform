@@ -41,9 +41,13 @@ class _CacheEntry(Generic[V]):
 class InMemoryTTLCache(Generic[V]):
     """Thread-safe in-memory TTL cache with monotonic clock semantics."""
 
-    def __init__(
-        self, ttl_seconds: int, clock: Callable[[], float] | None = None
-    ) -> None:
+    def __init__(self, ttl_seconds: int, clock: Callable[[], float] | None = None) -> None:
+        """Create an in-memory store with a fixed positive TTL in seconds.
+
+        Args:
+            ttl_seconds: Time-to-live for each entry; clamped to ``0`` or above.
+            clock: Optional monotonic time source; defaults to :func:`time.monotonic`.
+        """
         self._ttl_seconds = max(ttl_seconds, 0)
         self._clock = clock or time.monotonic
         self._lock = threading.Lock()
@@ -51,13 +55,16 @@ class InMemoryTTLCache(Generic[V]):
 
     @property
     def ttl_seconds(self) -> int:
+        """Configured non-negative TTL for new entries."""
         return self._ttl_seconds
 
     @property
     def backend_name(self) -> str:
+        """Telemetry label for the in-process backend."""
         return "memory"
 
     async def get(self, key: str) -> V | None:
+        """Return a live value or remove and return ``None`` when expired."""
         now = self._clock()
         with self._lock:
             entry = self._entries.get(key)
@@ -69,6 +76,7 @@ class InMemoryTTLCache(Generic[V]):
             return entry.value
 
     async def set(self, key: str, value: V) -> None:
+        """Store a value with an expiry of ``now + ttl_seconds``."""
         expires_at = self._clock() + self._ttl_seconds
         with self._lock:
             self._entries[key] = _CacheEntry(value=value, expires_at=expires_at)
@@ -86,6 +94,15 @@ class RedisJSONTTLCache(Generic[V]):
         serializer: Callable[[V], str],
         deserializer: Callable[[str], V],
     ) -> None:
+        """Configure Redis key prefix and JSON serialization for cached values.
+
+        Args:
+            ttl_seconds: ``EX`` expiry in seconds (non-positive values skip ``SET``).
+            redis: Async Redis client; not owned (caller may share a pool).
+            key_prefix: Prepended to each logical cache key.
+            serializer: Model-to-JSON-string for storage.
+            deserializer: JSON-string to model, used on cache hits.
+        """
         self._ttl_seconds = max(ttl_seconds, 0)
         self._redis = redis
         self._key_prefix = key_prefix
@@ -94,16 +111,19 @@ class RedisJSONTTLCache(Generic[V]):
 
     @property
     def ttl_seconds(self) -> int:
+        """Configured TTL passed to ``SET ... EX``."""
         return self._ttl_seconds
 
     @property
     def backend_name(self) -> str:
+        """Telemetry label for Redis-backed storage."""
         return "redis"
 
     def _full_key(self, key: str) -> str:
         return f"{self._key_prefix}{key}"
 
     async def get(self, key: str) -> V | None:
+        """Fetch and deserialize a value, returning ``None`` on miss or error."""
         try:
             payload = await self._redis.get(self._full_key(key))
         except RedisError:
@@ -121,6 +141,7 @@ class RedisJSONTTLCache(Generic[V]):
             return None
 
     async def set(self, key: str, value: V) -> None:
+        """Serialize and store a value; no-op when TTL is non-positive."""
         if self._ttl_seconds <= 0:
             return
 

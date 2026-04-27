@@ -1,28 +1,33 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from metrics.core.settings import (
-    PlatformKueueSettings,
-    PlatformSettings,
+    KueueProviderConfig,
+    ProviderConfigs,
     Settings,
+    SourceConfig,
 )
-from metrics.providers.kueue_platform import KueuePlatformEngine
+from metrics.providers.kueue import KueueMetrics
 
 
 @pytest.mark.anyio
-async def test_kueue_platform_engine_aggregates_queues_and_cohort(
+async def test_kueue_platform_aggregates_queues_and_cohort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(
-        platform=PlatformSettings(
-            kueue=PlatformKueueSettings(
+        cluster_name="c",
+        sources=SourceConfig(platform="kueue"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a", "cq-b"],
                 cohort="cohort-atom",
-            ),
+            )
         ),
     )
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
 
     cq_a = {
         "spec": {
@@ -61,15 +66,22 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
                     "flavors": [
                         {
                             "resources": [
-                                {"name": "cpu", "nominalQuota": "5"},
-                                {"name": "memory", "nominalQuota": "8Gi"},
+                                {"name": "cpu", "nominalQuota": "6"},
                             ]
                         }
                     ]
                 }
             ]
         },
-        "status": {"flavorsUsage": []},
+        "status": {
+            "flavorsUsage": [
+                {
+                    "resources": [
+                        {"name": "cpu", "total": "0", "borrowed": "0"},
+                    ]
+                }
+            ]
+        },
     }
     cohort = {
         "metadata": {"name": "cohort-atom"},
@@ -79,8 +91,11 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
                     "flavors": [
                         {
                             "resources": [
-                                {"name": "cpu", "nominalQuota": "3"},
-                                {"name": "memory", "nominalQuota": "4Gi"},
+                                {"name": "cpu", "nominalQuota": "2"},
+                                {
+                                    "name": "memory",
+                                    "nominalQuota": "10Gi",
+                                },
                             ]
                         }
                     ]
@@ -89,7 +104,7 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
         },
     }
 
-    async def fake_parallel(urls: list[str], **_kwargs):
+    async def fake_parallel(_c, urls: list[str], *, headers, **kwargs):
         out: list[dict] = []
         for url in urls:
             if url.endswith("/clusterqueues/cq-a"):
@@ -103,18 +118,20 @@ async def test_kueue_platform_engine_aggregates_queues_and_cohort(
         return out
 
     monkeypatch.setattr(
-        "metrics.providers.kueue_platform.kube_parallel_get_json",
+        "metrics.providers.kueue.kube_parallel_get_json",
         fake_parallel,
     )
-
-    engine = KueuePlatformEngine(settings)
-    maps = await engine.collect()
-
-    assert maps.capacity["cpu"] == "18"
-    assert maps.allocated["cpu"] == "1"
-    assert maps.allocated["memory"] == "2Gi"
-    assert "memory" in maps.capacity
-    assert "memory" in maps.allocated
+    client = httpx.AsyncClient()
+    try:
+        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
+        data = await km.platform()
+    finally:
+        await client.aclose()
+    assert data.capacity["cpu"] == "18"
+    assert data.allocated["cpu"] == "1"
+    assert data.allocated["memory"] == "2Gi"
+    assert "memory" in data.capacity
+    assert "memory" in data.allocated
 
 
 @pytest.mark.anyio
@@ -123,14 +140,17 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
 ) -> None:
     """100m in usage must not print as 100m while capacity prints whole cores."""
     settings = Settings(
-        platform=PlatformSettings(
-            kueue=PlatformKueueSettings(
+        cluster_name="c",
+        sources=SourceConfig(platform="kueue"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a"],
                 cohort="cohort-atom",
-            ),
+            )
         ),
     )
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
     cq = {
         "spec": {
             "resourceGroups": [
@@ -161,7 +181,7 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
         "spec": {"resourceGroups": []},
     }
 
-    async def fake_parallel(urls: list[str], **_kwargs):
+    async def fake_parallel(_c, urls: list[str], **_kwargs):
         out: list[dict] = []
         for url in urls:
             if url.endswith("/clusterqueues/cq-a"):
@@ -173,28 +193,36 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
         return out
 
     monkeypatch.setattr(
-        "metrics.providers.kueue_platform.kube_parallel_get_json",
+        "metrics.providers.kueue.kube_parallel_get_json",
         fake_parallel,
     )
-    maps = await KueuePlatformEngine(settings).collect()
-    assert maps.capacity["cpu"] == "10"
-    assert maps.allocated["cpu"] == "0.1"
+    client = httpx.AsyncClient()
+    try:
+        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
+        data = await km.platform()
+    finally:
+        await client.aclose()
+    assert data.capacity["cpu"] == "10"
+    assert data.allocated["cpu"] == "0.1"
 
 
 @pytest.mark.anyio
 async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No admitted workloads → Kueue often omits usage rows; API still keys allocated like capacity."""
+    """No admitted workloads: allocated keys align with capacity, zeros explicit."""
     settings = Settings(
-        platform=PlatformSettings(
-            kueue=PlatformKueueSettings(
+        cluster_name="c",
+        sources=SourceConfig(platform="kueue"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a"],
                 cohort="cohort-atom",
-            ),
+            )
         ),
     )
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
     cq = {
         "spec": {
             "resourceGroups": [
@@ -217,7 +245,7 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
         "spec": {"resourceGroups": []},
     }
 
-    async def fake_parallel(urls: list[str], **_kwargs):
+    async def fake_parallel(_c, urls: list[str], **_kwargs):
         out: list[dict] = []
         for url in urls:
             if url.endswith("/clusterqueues/cq-a"):
@@ -229,10 +257,15 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
         return out
 
     monkeypatch.setattr(
-        "metrics.providers.kueue_platform.kube_parallel_get_json",
+        "metrics.providers.kueue.kube_parallel_get_json",
         fake_parallel,
     )
-    maps = await KueuePlatformEngine(settings).collect()
-    assert maps.allocated["cpu"] == "0"
-    assert maps.allocated["memory"] == "0Gi"
-    assert set(maps.allocated.keys()) == set(maps.capacity.keys())
+    client = httpx.AsyncClient()
+    try:
+        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
+        data = await km.platform()
+    finally:
+        await client.aclose()
+    assert data.allocated["cpu"] == "0"
+    assert data.allocated["memory"] == "0Gi"
+    assert set(data.allocated.keys()) == set(data.capacity.keys())

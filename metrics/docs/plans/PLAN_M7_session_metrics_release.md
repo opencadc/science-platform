@@ -1,18 +1,18 @@
-# Milestone M6: session metrics release
+# Milestone M7: session metrics release
 
-This plan defines the sixth milestone for the CANFAR Metrics API roadmap. It
+This plan defines the seventh milestone for the CANFAR Metrics API roadmap. It
 completes the initial API scope with session-scoped metrics and strict identity
 controls.
 
 ## Repository snapshot versus milestone target
 
-The session route already exists in current code, but the milestone target is
-to harden identity semantics, cardinality guardrails, and rollout validation
-for production use.
+M4 removes the pre-release session route until a provider can return a complete
+session metric contract. M7 reintroduces the route with hardened identity
+semantics, cardinality guardrails, and rollout validation for production use.
 
 ## Summary
 
-M6 hardens `GET /api/v1/metrics/users/{user}/sessions/{uuid}` with stable
+M7 hardens `GET /api/v1/metrics/users/{user}/sessions/{uuid}` with stable
 session identity mapping, bounded high-cardinality behavior, and rollout safety
 controls.
 
@@ -33,7 +33,7 @@ controls.
 
 - M1 foundation and CI baseline.
 - M2 platform controls.
-- M5 user metrics outputs.
+- M6 user metrics outputs.
 
 ## Constraints
 

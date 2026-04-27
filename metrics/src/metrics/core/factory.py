@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,52 +9,22 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from pydantic import TypeAdapter
-from redis.asyncio import Redis
 
 from metrics.api.v1.routes import router
-from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.core.settings import Settings
-from metrics.core.startup import KueueStartupError, validate_application_startup
-from metrics.errors import AppError
+from metrics.core.runtime import MetricsRuntime
+from metrics.core.settings import Settings, apply_metrics_package_log_level
+from metrics.errors import AppError, RuntimeStartupError
 from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
-from metrics.providers.kueue import KueueCapacityProvider
-from metrics.providers.kueue_platform import KueuePlatformEngine
-from metrics.providers.prometheus import PrometheusUsageProvider
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
+from metrics.services.platform import PlatformMetricsService
 from metrics.telemetry import setup_telemetry
 
 _logger = logging.getLogger(__name__)
 
 
-def _platform_cache_fingerprint(settings: Settings) -> str:
-    """Stable token for Redis keys when Kueue scope changes."""
-    k = settings.platform.kueue
-    raw = "|".join(sorted(k.cluster_queues)) + "|" + k.cohort
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
-
-
-def _build_cache_backend(
-    settings: Settings,
-) -> tuple[TTLCacheBackend[CachedMetrics], Redis | None]:
-    if settings.cache_backend == "memory":
-        return (
-            InMemoryTTLCache[CachedMetrics](ttl_seconds=settings.cache_ttl_seconds),
-            None,
-        )
-
-    redis_client = Redis.from_url(settings.redis_url)
-    adapter = TypeAdapter(CachedMetrics)
-    return (
-        RedisJSONTTLCache[CachedMetrics](
-            ttl_seconds=settings.cache_ttl_seconds,
-            redis=redis_client,
-            key_prefix=settings.redis_key_prefix,
-            serializer=lambda value: adapter.dump_json(value).decode("utf-8"),
-            deserializer=adapter.validate_json,
-        ),
-        redis_client,
-    )
+def _metric_scope_from_path(path: str) -> str | None:
+    if path == "/api/v1/metrics/platform":
+        return "platform"
+    return None
 
 
 def create_app(
@@ -65,31 +34,53 @@ def create_app(
 ) -> FastAPI:
     """Create and configure the metrics API application."""
     settings = settings or Settings()
+    apply_metrics_package_log_level(settings)
     telemetry = setup_telemetry(settings)
-    redis_client: Redis | None = None
     httpx_instrumentor = HTTPXClientInstrumentor()
     fastapi_instrumented = False
     httpx_instrumented = False
+    _injected_platform = platform_service
 
     @asynccontextmanager
-    async def lifespan(_app_instance: FastAPI):
+    async def lifespan(_app: FastAPI):
+        nonlocal fastapi_instrumented, httpx_instrumented
+        if _injected_platform is not None:
+            runtime = MetricsRuntime.for_injected_platform(
+                settings,
+                _injected_platform,
+                recorder=telemetry.recorder,
+            )
+            _app.state.runtime = runtime
+            _app.state.api_version = f"{settings.api_group}/{settings.app_version}"
+            _app.state.cache_control_public = settings.cache_control_public
+            try:
+                yield
+            finally:
+                if fastapi_instrumented:
+                    FastAPIInstrumentor.uninstrument_app(_app)
+                if httpx_instrumented:
+                    httpx_instrumentor.uninstrument()
+                if telemetry.meter_provider is not None:
+                    telemetry.meter_provider.shutdown()
+            return
+
+        runtime = MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
+        _app.state.runtime = runtime
+        _app.state.api_version = f"{settings.api_group}/{settings.app_version}"
+        _app.state.cache_control_public = settings.cache_control_public
         try:
             try:
-                await validate_application_startup(settings)
-            except KueueStartupError:
-                _logger.exception(
-                    "Application startup validation failed; fix cluster or Prometheus "
-                    "configuration or see docs/dev-setup.md#troubleshooting"
-                )
+                await runtime.start()
+            except RuntimeStartupError:
+                _logger.exception("Application startup validation failed; see configuration docs")
                 raise
             yield
         finally:
             if fastapi_instrumented:
-                FastAPIInstrumentor.uninstrument_app(app)
+                FastAPIInstrumentor.uninstrument_app(_app)
             if httpx_instrumented:
                 httpx_instrumentor.uninstrument()
-            if redis_client is not None:
-                await redis_client.aclose()
+            await runtime.shutdown()
             if telemetry.meter_provider is not None:
                 telemetry.meter_provider.shutdown()
 
@@ -97,10 +88,7 @@ def create_app(
         title=settings.app_name,
         version=settings.app_version,
         summary="CANFAR Science Platform Metrics API",
-        description=(
-            "API for platform size and utilization metrics composed from "
-            "configured Kueue, Prometheus, and reserved kube-metrics sources."
-        ),
+        description=("API for platform metrics from configured Kueue and reserved sources."),
         lifespan=lifespan,
     )
 
@@ -135,25 +123,6 @@ def create_app(
         fastapi_instrumented = True
         httpx_instrumented = True
 
-    app.state.api_version = f"{settings.api_group}/{settings.app_version}"
-    app.state.cache_control_public = settings.cache_control_public
-
-    if platform_service is None:
-        engine = KueuePlatformEngine(settings)
-        capacity_provider = KueueCapacityProvider(settings=settings)
-        usage_provider = PrometheusUsageProvider(settings=settings)
-        cache, redis_client = _build_cache_backend(settings)
-        platform_service = PlatformMetricsService(
-            cluster_name=settings.cluster_name,
-            capacity_provider=capacity_provider,
-            usage_provider=usage_provider,
-            cache=cache,
-            metrics_recorder=telemetry.recorder,
-            platform_resource_loader=engine.collect,
-            platform_cache_fingerprint=_platform_cache_fingerprint(settings),
-        )
-
-    app.state.platform_service = platform_service
     app.include_router(router)
 
     @app.get("/healthz", include_in_schema=False)
@@ -178,9 +147,7 @@ def create_app(
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(
-        _request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
         body = ErrorResponse(
             version=app.state.api_version,
             metadata=ResponseMetadata(),
@@ -199,20 +166,11 @@ def create_app(
     return app
 
 
+def _attach_app_state(app: FastAPI, settings: Settings) -> None:
+    """Set API version and cache headers on ``app.state`` (used by the module-level app)."""
+    app.state.api_version = f"{settings.api_group}/{settings.app_version}"
+    app.state.cache_control_public = settings.cache_control_public
+
+
 app = create_app()
-
-
-def _metric_scope_from_path(path: str) -> str | None:
-    if path in ("/api/v1/metrics/platform", "/metrics"):
-        return "platform"
-    if path.startswith("/api/v1/metrics/users/"):
-        if "/sessions/" in path:
-            return "session"
-        return "user"
-    if path.startswith("/metrics/"):
-        parts = path.split("/")
-        if len(parts) >= 4:
-            return "session"
-        if len(parts) >= 3:
-            return "user"
-    return None
+_attach_app_state(app, Settings())

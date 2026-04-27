@@ -1,0 +1,29 @@
+# Example CANFAR Metrics API configuration (deployed to /etc/canfar/metrics/config.yaml).
+# `METRICS_*` overrides the same fields; non-empty files must have a top-level `metrics:` map.
+# In M4, `prometheus` and `kube` may be present for validation but have no live metric HTTP path.
+# Default container path: /etc/canfar/metrics/config.yaml; override with METRICS_CONFIG_FILE.
+metrics:
+  providers:
+    kueue:
+      kube_api_url: "https://kubernetes.default.svc"
+      cluster_queues:
+        - cq-proton
+      cohort: cohort-atom
+      token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      http:
+        max_connections: 100
+        max_keepalive_connections: 20
+        keepalive_expiry_seconds: 30
+        http2: false
+    prometheus:
+      url: null
+    kube:
+      enabled: false
+  sources:
+    platform: kueue
+  cache:
+    backend: redis
+    ttl_seconds: 300
+    scope_ttl_seconds:
+      platform: 300

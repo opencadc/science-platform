@@ -1,4 +1,4 @@
-# Milestone M9: post-initial ArgoCD staging plan
+# Milestone M10: post-initial ArgoCD staging plan
 
 This plan is intentionally deferred until the preceding delivery milestones are
 stable in production. It captures GitOps staging promotion work without
@@ -13,7 +13,7 @@ using Helm values overlays and repository-driven deployment workflows.
 
 Complete these conditions before starting:
 
-- M1 through M7 acceptance gates are satisfied, and M8 stabilization exit
+- M1 through M8 acceptance gates are satisfied, and M9 stabilization exit
   criteria are met and recorded.
 - The initial production debug loop has no open severity-1 or severity-2
   issues.

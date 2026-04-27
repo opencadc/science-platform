@@ -1,47 +1,38 @@
-"""Nested runtime settings (12-factor, environment-driven).
-
-Platform metrics are composed from configured sources (Kueue, Prometheus, and a
-reserved kube-metrics hook for M4). Legacy flat ``METRICS_*`` keys are merged
-into nested models for operator continuity during chart upgrades.
-"""
+"""Runtime settings: YAML file, then environment (METRICS_*, nested __)."""
 
 from __future__ import annotations
 
 import json
-import os
+import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+from metrics.core.yaml_config import MetricsYamlSettingsSource
+
+# --- Application config tree (typed providers, sources, cache) ---
 
 
-def _as_dict(value: object) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return dict(value)
-    if isinstance(value, BaseModel):
-        return value.model_dump()
-    return {}
+class HttpClientConfig(BaseModel):
+    """Connection pool and HTTP/2 options for upstream httpx clients."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    max_connections: int = Field(default=100, ge=1)
+    max_keepalive_connections: int = Field(default=20, ge=1)
+    keepalive_expiry_seconds: float = Field(default=30.0, gt=0)
+    http2: bool = False
 
 
-def _split_cluster_queue_env(raw: str) -> list[str]:
-    """Parse comma list or JSON array for cluster queue names."""
-    s = raw.strip()
-    if not s:
-        return []
-    if s.startswith("["):
-        try:
-            parsed = json.loads(s)
-            if isinstance(parsed, list):
-                return [str(x).strip() for x in parsed if str(x).strip()]
-        except json.JSONDecodeError:
-            pass
-    return [part.strip() for part in s.split(",") if part.strip()]
+class KueueProviderConfig(BaseModel):
+    """Kueue-related settings: ClusterQueues, cohort, and Kubernetes API access."""
 
-
-class PlatformKueueSettings(BaseModel):
-    """Kueue + Kubernetes API client configuration for platform sources."""
-
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     cluster_queues: list[str] = Field(
         default_factory=list,
@@ -50,27 +41,60 @@ class PlatformKueueSettings(BaseModel):
     cohort: str = ""
     kube_api_url: str | None = None
     kube_api_token: str | None = None
+    token_file: str | None = None
+    ca_file: str | None = None
     kube_verify_tls: bool = True
     kube_request_timeout_seconds: float = Field(default=10.0, gt=0)
     kube_clusterqueue_path: str = "/apis/kueue.x-k8s.io/v1beta2/clusterqueues"
     kube_cohort_path: str = "/apis/kueue.x-k8s.io/v1beta2/cohorts"
+    http: HttpClientConfig = Field(default_factory=HttpClientConfig)
 
     @field_validator("cluster_queues", mode="before")
     @classmethod
     def _parse_cluster_queue_list(cls, value: object) -> list[str]:
+        """Normalize ``cluster_queues`` from YAML, env, or kwargs.
+
+        Nested env and string inputs must be a JSON array of strings. Comma-separated
+        plain strings are not accepted.
+
+        Args:
+            value: Raw list, JSON array string, or empty.
+
+        Returns:
+            Stripped queue names (possibly empty).
+
+        Raises:
+            TypeError: If the decoded JSON value is not a list.
+            ValueError: If a non-empty string is not valid JSON or does not decode to a list.
+        """
         if value is None or value == "":
             return []
         if isinstance(value, list):
             return [str(item).strip() for item in value if str(item).strip()]
         if isinstance(value, str):
-            return _split_cluster_queue_env(value)
-        return []
+            stripped = value.strip()
+            if not stripped:
+                return []
+            try:
+                parsed: Any = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                msg = (
+                    "cluster_queues must be a JSON array of strings "
+                    f"(nested env uses JSON only): {exc}"
+                )
+                raise ValueError(msg) from exc
+            if not isinstance(parsed, list):
+                msg = "cluster_queues must be a JSON array of strings (nested env uses JSON only)"
+                raise TypeError(msg)
+            return [str(x).strip() for x in parsed if str(x).strip()]
+        msg = f"cluster_queues must be a list or JSON array string, got {type(value).__name__}"
+        raise TypeError(msg)
 
 
-class PlatformPrometheusSettings(BaseModel):
-    """Prometheus endpoint and PromQL for cluster-scoped usage queries."""
+class PrometheusProviderConfig(BaseModel):
+    """Prometheus provider settings (reserved for future metric scopes)."""
 
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     url: str | None = None
     verify_tls: bool = True
@@ -82,58 +106,124 @@ class PlatformPrometheusSettings(BaseModel):
     promql_requested_memory_bytes: str = (
         'sum(kube_pod_container_resource_requests{resource="memory",unit="byte"})'
     )
+    http: HttpClientConfig = Field(default_factory=HttpClientConfig)
 
 
-class PlatformKubeMetricsSettings(BaseModel):
-    """Reserved kube-metrics source; runtime depth lands in M4."""
+class KubeProviderConfig(BaseModel):
+    """Reserved for future kube-metrics; must remain disabled for now."""
 
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     enabled: bool = False
 
     @model_validator(mode="after")
-    def _reject_enabled_until_m4(self) -> PlatformKubeMetricsSettings:
+    def _kube_must_stay_disabled(self) -> KubeProviderConfig:
         if self.enabled:
-            raise ValueError(
-                "METRICS_PLATFORM__KUBE_METRICS__ENABLED is reserved for milestone M4; "
-                "leave kube_metrics disabled until kube-metrics runtime ships."
-            )
+            raise ValueError("METRICS_PROVIDERS__KUBE is reserved; leave kube provider disabled")
         return self
 
 
-class PlatformSettings(BaseModel):
-    """Configured platform metric sources."""
+class ProviderConfigs(BaseModel):
+    """Container for all optional upstream provider configuration blocks."""
 
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    kueue: PlatformKueueSettings = Field(default_factory=PlatformKueueSettings)
-    prometheus: PlatformPrometheusSettings = Field(
-        default_factory=PlatformPrometheusSettings
-    )
-    kube_metrics: PlatformKubeMetricsSettings = Field(
-        default_factory=PlatformKubeMetricsSettings
-    )
+    kueue: KueueProviderConfig = Field(default_factory=KueueProviderConfig)
+    prometheus: PrometheusProviderConfig = Field(default_factory=PrometheusProviderConfig)
+    kube: KubeProviderConfig = Field(default_factory=KubeProviderConfig)
 
 
-class UserPrometheusSettings(BaseModel):
-    """Prometheus label keys for user and session scoped queries."""
+class SourceConfig(BaseModel):
+    """Which provider powers each metric source (platform only for now)."""
 
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    user_label_key: str = "canfar-userid"
-    session_label_key: str = "canfar-sessionid"
+    platform: str = "kueue"
 
 
-class UserMetricsSettings(BaseModel):
-    """User and session metrics configuration (extension path for M5/M6)."""
+class ScopeTTLConfig(BaseModel):
+    """Explicit per-scope cache TTL overrides (extend with new fields when scopes are added)."""
 
-    model_config = {"extra": "ignore"}
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    prometheus: UserPrometheusSettings = Field(default_factory=UserPrometheusSettings)
+    platform: int | None = Field(default=None, ge=0)
+
+
+class CacheConfig(BaseModel):
+    """TTL cache backend and optional per-scope overrides."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    backend: Literal["memory", "redis"] = "redis"
+    ttl_seconds: int = Field(default=300, ge=0)
+    scope_ttl_seconds: ScopeTTLConfig = Field(default_factory=ScopeTTLConfig)
+
+    @field_validator("scope_ttl_seconds", mode="before")
+    @classmethod
+    def _parse_scope_ttls(cls, value: object) -> Any:
+        """Coerce dict or JSON string inputs into :class:`ScopeTTLConfig`.
+
+        Rejects unknown scope keys (``extra="forbid"`` on :class:`ScopeTTLConfig`).
+        Non-empty string values must be valid JSON that decodes to an object (mapping);
+        bare numbers, arrays, or opaque text are rejected.
+
+        Args:
+            value: Raw ``scope_ttl_seconds`` from YAML, env, or kwargs.
+
+        Returns:
+            A dict for Pydantic to build :class:`ScopeTTLConfig`, or an existing model.
+
+        Raises:
+            ValueError: If a non-empty string is not valid JSON, JSON is not an object,
+                or the value is not a supported input type.
+        """
+        if value is None:
+            return {}
+        if isinstance(value, ScopeTTLConfig):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return {}
+            try:
+                parsed: Any = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                msg = (
+                    "scope_ttl_seconds must be a JSON object mapping scope names to integers "
+                    f"(nested env uses JSON only): {exc}"
+                )
+                raise ValueError(msg) from exc
+            if not isinstance(parsed, dict):
+                msg = (
+                    "scope_ttl_seconds must be a JSON object mapping scope names to integers "
+                    "(nested env uses JSON only)"
+                )
+                raise ValueError(msg)
+            return parsed
+        if isinstance(value, dict):
+            return {str(name): amount for name, amount in value.items()}
+        if isinstance(value, (int, float, bool, list)):
+            msg = (
+                "scope_ttl_seconds must be a mapping or a JSON object string "
+                f"(nested env uses JSON only), not {type(value).__name__}"
+            )
+            raise ValueError(msg)
+        msg = (
+            f"scope_ttl_seconds must be a mapping or JSON object string, got {type(value).__name__}"
+        )
+        raise ValueError(msg)
+
+    def platform_ttl(self) -> int:
+        """Return TTL for the ``platform`` scope, falling back to the global default."""
+        override = self.scope_ttl_seconds.platform
+        return self.ttl_seconds if override is None else override
+
+
+# --- Top-level app settings (12-factor) ---
 
 
 class Settings(BaseSettings):
-    """Runtime settings for the API service."""
+    """Process configuration: defaults, optional YAML, then environment."""
 
     model_config = SettingsConfigDict(
         env_prefix="METRICS_",
@@ -150,9 +240,13 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
+
     cluster_name: str = "unknown"
-    cache_ttl_seconds: int = Field(default=300, ge=0)
-    cache_backend: Literal["memory", "redis"] = "redis"
+    providers: ProviderConfigs = Field(default_factory=ProviderConfigs)
+    sources: SourceConfig = Field(default_factory=SourceConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+
     redis_url: str = "redis://localhost:6379/0"
     redis_key_prefix: str = "metrics:"
     cache_control_public: bool = True
@@ -162,82 +256,39 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str | None = None
     otel_export_interval_millis: int = Field(default=60_000, gt=0)
 
-    platform: PlatformSettings = Field(default_factory=PlatformSettings)
-    user: UserMetricsSettings = Field(default_factory=UserMetricsSettings)
-
-    @model_validator(mode="before")
     @classmethod
-    def _merge_legacy_environment(cls, data: object) -> object:
-        """Fold legacy flat ``METRICS_*`` and operator aliases into nested fields.
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Order settings sources so environment overrides optional YAML and secrets.
 
-        ``pydantic-settings`` does not bind unknown top-level env keys to nested
-        models, so this runs in ``mode='before'`` and reads ``os.environ``
-        directly when nested values are absent.
+        Order matches pydantic merge: earlier source inputs have higher priority than
+        later. Place env before the YAML file so `METRICS_*` overrides
+        ``/etc/canfar/metrics/config.yaml`` (see :file:`core/yaml_config.py`).
+
+        Args:
+            settings_cls: The settings model class.
+            init_settings: Constructor keyword arguments.
+            env_settings: ``METRICS_*`` environment variables.
+            dotenv_settings: Not included in the tuple; reserved if ``env_file`` is used
+                later.
+            file_secret_settings: Optional Docker/Kubernetes secret files.
+
+        Returns:
+            The ordered list of active sources. ``dotenv`` is omitted unless added
+            explicitly when loading ``.env`` is enabled.
         """
-        if data is None:
-            d: dict[str, Any] = {}
-        elif isinstance(data, dict):
-            d = {str(k): v for k, v in data.items()}
-        else:
-            return data
-
-        def env(name: str) -> str | None:
-            v = os.getenv(name)
-            return v if v is not None and str(v).strip() != "" else None
-
-        plat = _as_dict(d.get("platform"))
-        kueue = _as_dict(plat.get("kueue"))
-        prom = _as_dict(plat.get("prometheus"))
-        user = _as_dict(d.get("user"))
-        user_p = _as_dict(user.get("prometheus"))
-
-        if not kueue.get("kube_api_url") and env("METRICS_KUBE_API_URL"):
-            kueue["kube_api_url"] = env("METRICS_KUBE_API_URL")
-        if not kueue.get("kube_api_token") and env("METRICS_KUBE_API_TOKEN"):
-            kueue["kube_api_token"] = env("METRICS_KUBE_API_TOKEN")
-        if not kueue.get("cluster_queues") and env("METRICS_KUEUE_CLUSTER_QUEUES"):
-            kueue["cluster_queues"] = _split_cluster_queue_env(
-                env("METRICS_KUEUE_CLUSTER_QUEUES") or ""
-            )
-        if not kueue.get("cohort") and env("METRICS_KUEUE_COHORT"):
-            kueue["cohort"] = env("METRICS_KUEUE_COHORT")
-
-        if not kueue.get("kube_api_url") and env("KUEUE_METRICS_URL"):
-            kueue["kube_api_url"] = env("KUEUE_METRICS_URL")
-        if not kueue.get("cluster_queues") and env("KUEUE_METRICS_CLUSTER_QUEUES"):
-            kueue["cluster_queues"] = _split_cluster_queue_env(
-                env("KUEUE_METRICS_CLUSTER_QUEUES") or ""
-            )
-        if not kueue.get("cohort") and env("KUEUE_METRICS_COHORT"):
-            kueue["cohort"] = env("KUEUE_METRICS_COHORT")
-
-        if not prom.get("url") and env("METRICS_PROMETHEUS_URL"):
-            prom["url"] = env("METRICS_PROMETHEUS_URL")
-        if raw := env("METRICS_PROMETHEUS_TIMEOUT_SECONDS"):
-            try:
-                prom["timeout_seconds"] = float(raw)
-            except ValueError:
-                pass
-        if raw := env("METRICS_PROMETHEUS_VERIFY_TLS"):
-            prom["verify_tls"] = str(raw).strip().lower() in ("1", "true", "yes")
-        if raw := env("METRICS_RESOURCE_REQUESTS_METRIC_NAME"):
-            prom["resource_requests_metric_name"] = raw
-        if raw := env("METRICS_PROMQL_REQUESTED_CPU_CORES"):
-            prom["promql_requested_cpu_cores"] = raw
-        if raw := env("METRICS_PROMQL_REQUESTED_MEMORY_BYTES"):
-            prom["promql_requested_memory_bytes"] = raw
-
-        if "user_label_key" not in user_p and env("METRICS_USER_LABEL_KEY"):
-            user_p["user_label_key"] = env("METRICS_USER_LABEL_KEY")
-        if "session_label_key" not in user_p and env("METRICS_SESSION_LABEL_KEY"):
-            user_p["session_label_key"] = env("METRICS_SESSION_LABEL_KEY")
-
-        plat["kueue"] = kueue
-        plat["prometheus"] = prom
-        d["platform"] = plat
-        user["prometheus"] = user_p
-        d["user"] = user
-        return d
+        return (
+            init_settings,
+            env_settings,
+            MetricsYamlSettingsSource(settings_cls),
+            file_secret_settings,
+        )
 
     @field_validator("environment", mode="before")
     @classmethod
@@ -259,3 +310,20 @@ class Settings(BaseSettings):
                 "(legacy aliases int and prod are still accepted)."
             )
         return mapping[key]
+
+
+_METRICS_LOG_LEVELS: dict[str, int] = {
+    "critical": logging.CRITICAL,
+    "error": logging.ERROR,
+    "warning": logging.WARNING,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
+    "trace": logging.DEBUG,
+}
+
+
+def apply_metrics_package_log_level(settings: Settings) -> None:
+    """Set the ``metrics`` logger tree level from :attr:`Settings.log_level`."""
+    key = str(settings.log_level).strip().lower()
+    level = _METRICS_LOG_LEVELS.get(key, logging.INFO)
+    logging.getLogger("metrics").setLevel(level)

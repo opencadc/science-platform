@@ -1,6 +1,6 @@
-# M10 outcomes — local Kubernetes workflow simplification
+# M11 outcomes — local Kubernetes workflow simplification
 
-Closure for M10 (see `PLAN_M10_local_k8s_workflow_simplification.md`).
+Closure for M11 (see `PLAN_M11_local_k8s_workflow_simplification.md`).
 
 ## Checkpoints (B–D)
 

@@ -21,3 +21,7 @@ class ProviderUnavailableError(Exception):
 
 class ProviderExecutionError(Exception):
     """Raised when a provider fails unexpectedly during execution."""
+
+
+class RuntimeStartupError(RuntimeError):
+    """Raised when the metrics runtime cannot complete startup validation."""
