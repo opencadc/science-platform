@@ -35,7 +35,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - name: Setup uv
@@ -82,7 +82,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: mkdir -p "${HELM_CACHE_HOME}"
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - name: Setup uv
