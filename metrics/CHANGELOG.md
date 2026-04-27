@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.4](https://github.com/opencadc/science-platform/compare/metrics-v0.1.3...metrics-v0.1.4) (2026-04-27)
+
+
+### Features
+
+* **metrics:** add reserved kube provider stub ([0ea0e62](https://github.com/opencadc/science-platform/commit/0ea0e62d4143b307df39843e1fbfe66fa516fa3a))
+* **metrics:** add runtime, registry, and YAML settings ([d1d7e73](https://github.com/opencadc/science-platform/commit/d1d7e73ceda2f157e8c45ca203bf68e8a1ed4728))
+* **metrics:** extend provider base protocol ([25b23a5](https://github.com/opencadc/science-platform/commit/25b23a5ce137aba1fd7b117ff62dfefb5dd95be5))
+* **metrics:** platform route depends on MetricsRuntime ([127a9e3](https://github.com/opencadc/science-platform/commit/127a9e3f5d676cc21f5f62352d824ed995196a63))
+
+
+### Bug Fixes
+
+* **cleanup:** general cleanup to remove not implemented things and also have better naming ([56aa40f](https://github.com/opencadc/science-platform/commit/56aa40f790502b1ce2879753279eac193469cf62))
+
+
+### Documentation
+
+* **metrics:** document TTL cache backends ([b3bab8b](https://github.com/opencadc/science-platform/commit/b3bab8b219735a02d009f53362b1ab3b35258797))
+* **metrics:** instantiated architecture rework ([7a18a37](https://github.com/opencadc/science-platform/commit/7a18a37dca8f11ffdb862402acd1bf9b1ac9c155))
+* **metrics:** refresh architecture for M4 runtime ([90992ff](https://github.com/opencadc/science-platform/commit/90992ff1230ed1dd45dfb8b2be76f57bccf15926))
+* **metrics:** refresh milestone plans and M4–M5 roadmap ([a43ce74](https://github.com/opencadc/science-platform/commit/a43ce745bbaadde7bf3f0371be15f3effe8a39ca))
+* **metrics:** update milestone process ([73cc583](https://github.com/opencadc/science-platform/commit/73cc5830619a74fc3f78dd68e6560744328d94d0))
+
 ## [0.1.3](https://github.com/opencadc/science-platform/compare/metrics-v0.1.2...metrics-v0.1.3) (2026-04-24)
 
 
