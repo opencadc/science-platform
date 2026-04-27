@@ -65,7 +65,9 @@ def test_require_config_file_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         Settings()
 
 
-def test_missing_config_file_without_require_flag_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_missing_config_file_without_require_flag_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     missing = tmp_path / "absent.yaml"
     monkeypatch.setenv("METRICS_CONFIG_FILE", str(missing))
     monkeypatch.delenv("METRICS_REQUIRE_CONFIG_FILE", raising=False)
@@ -92,7 +94,9 @@ def test_metrics_yaml_scope_ttl_platform(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert s.cache.platform_ttl() == 120
 
 
-def test_metrics_yaml_unknown_scope_ttl_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_metrics_yaml_unknown_scope_ttl_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "bad-scope.yaml"
     cfg.write_text(
         textwrap.dedent(
@@ -111,7 +115,9 @@ def test_metrics_yaml_unknown_scope_ttl_rejected(monkeypatch: pytest.MonkeyPatch
         Settings()
 
 
-def test_metrics_yaml_missing_metrics_key_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_metrics_yaml_missing_metrics_key_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "no-metrics.yaml"
     cfg.write_text(
         "sources:\n  platform: kueue\n",
@@ -123,7 +129,9 @@ def test_metrics_yaml_missing_metrics_key_raises(monkeypatch: pytest.MonkeyPatch
     assert "sources" in str(excinfo.value)
 
 
-def test_metrics_yaml_non_mapping_metrics_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_metrics_yaml_non_mapping_metrics_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "bad-metrics.yaml"
     cfg.write_text(
         "metrics: [1, 2]\n",
@@ -134,7 +142,9 @@ def test_metrics_yaml_non_mapping_metrics_raises(monkeypatch: pytest.MonkeyPatch
         Settings()
 
 
-def test_metrics_yaml_top_level_non_mapping_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_metrics_yaml_top_level_non_mapping_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg = tmp_path / "list-root.yaml"
     cfg.write_text(
         "- item\n",

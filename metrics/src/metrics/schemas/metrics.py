@@ -80,5 +80,3 @@ class ErrorResponse(BaseModel):
     metadata: ResponseMetadata
     status: Literal["Error"] = "Error"
     error: ErrorDetail
-
-

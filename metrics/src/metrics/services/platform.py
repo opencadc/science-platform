@@ -63,9 +63,7 @@ class PlatformMetricsService:
         self._cache = cache
         self._key = key
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
-        self._platform_ttl_seconds = (
-            ttl if ttl is not None else self._cache.ttl_seconds
-        )
+        self._platform_ttl_seconds = ttl if ttl is not None else self._cache.ttl_seconds
         self._provider = provider
 
     @property
