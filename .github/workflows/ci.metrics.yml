@@ -93,7 +93,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --group dev
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
         with:
