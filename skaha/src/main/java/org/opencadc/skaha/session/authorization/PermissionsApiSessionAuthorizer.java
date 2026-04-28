@@ -1,20 +1,15 @@
 package org.opencadc.skaha.session.authorization;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Objects;
-import java.util.Optional;
 import javax.security.auth.Subject;
 
 /**
  * Authorization backed by a remote permissions HTTP API
  * ({@link SessionAuthorizers#SKAHA_PERMISSIONS_API_BASE_URL_ENV}).
- *
- * <p>{@link #getSkahaWriteGrantAudience()} returns empty until the permissions API defines an audience URI for Skaha
- * callback tokens.
  */
 public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer {
 
@@ -43,14 +38,5 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
     public void authorizeGeneralSessionAccess(final Subject subject) throws IOException {
         Objects.requireNonNull(subject, "subject");
         throw new UnsupportedOperationException("TODO: call remote permissions API when implemented");
-    }
-
-    /**
-     * No stable audience URI yet for TokenTool grants when using the remote permissions API; callers must avoid issuing
-     * callback tokens against this mode until defined.
-     */
-    @Override
-    public Optional<URI> getSkahaWriteGrantAudience() {
-        return Optional.empty();
     }
 }

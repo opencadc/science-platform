@@ -1,9 +1,7 @@
 package org.opencadc.skaha.session.authorization;
 
-import javax.security.auth.Subject;
 import java.io.IOException;
-import java.net.URI;
-import java.util.Optional;
+import javax.security.auth.Subject;
 
 /**
  * Authorizes whether an authenticated subject may use the Skaha system (general HTTP flow). Implementations are chosen
@@ -19,11 +17,4 @@ public interface SessionAuthorizer {
      * @throws SessionAccessDeniedException if access is denied.
      */
     void authorizeGeneralSessionAccess(final Subject subject) throws IOException;
-
-    /**
-     * URI used as audience/resource identifier for Skaha callback tokens ({@code TokenTool} write grants). When
-     * {@link PermissionsApiSessionAuthorizer} is used and no stable URI exists yet, this returns empty until the
-     * permissions API defines one.
-     */
-    Optional<URI> getSkahaWriteGrantAudience();
 }

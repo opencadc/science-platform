@@ -3,7 +3,6 @@ package org.opencadc.skaha.session.authorization;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -17,8 +16,6 @@ public class SessionAuthorizersTest {
         Assert.assertTrue(auth instanceof GroupURISessionAuthorizer);
         final GroupURISessionAuthorizer g = (GroupURISessionAuthorizer) auth;
         Assert.assertEquals(URI.create("ivo://example.org/skaha?skaha-users"), g.getSkahaUsersGroupUri());
-        Assert.assertEquals(
-                Optional.of(URI.create("ivo://example.org/skaha?skaha-users")), auth.getSkahaWriteGrantAudience());
     }
 
     @Test
@@ -29,7 +26,6 @@ public class SessionAuthorizersTest {
         Assert.assertTrue(auth instanceof PermissionsApiSessionAuthorizer);
         final PermissionsApiSessionAuthorizer p = (PermissionsApiSessionAuthorizer) auth;
         Assert.assertEquals(URI.create("https://permissions.example/v1/").toURL(), p.getPermissionsApiBaseUrl());
-        Assert.assertEquals(Optional.empty(), auth.getSkahaWriteGrantAudience());
     }
 
     @Test

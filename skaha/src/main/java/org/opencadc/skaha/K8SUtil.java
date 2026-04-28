@@ -68,9 +68,6 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.util.StringUtil;
-
-import java.net.URI;
-import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -342,5 +339,4 @@ public class K8SUtil {
             this.featureGates.putAll(configuredFeatureGates);
         }
     }
-
 }

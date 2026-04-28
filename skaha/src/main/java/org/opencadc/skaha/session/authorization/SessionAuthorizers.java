@@ -21,11 +21,21 @@ public final class SessionAuthorizers {
 
     private SessionAuthorizers() {}
 
+    /**
+     * New instance from the System Environment.
+     *
+     * @return a SessionAuthorizer instance based on the environment configuration
+     */
     public static SessionAuthorizer fromEnvironment() {
         return fromEnvironment(System.getenv());
     }
 
-    /** @param env environment map (e.g. from tests); values may be null. */
+    /**
+     * Create a new SessionAuthorizer from the provided Environment.
+     *
+     * @param env environment map (e.g. from tests); values may be null.
+     * @return a SessionAuthorizer instance based on the environment configuration
+     */
     public static SessionAuthorizer fromEnvironment(final Map<String, String> env) {
         Objects.requireNonNull(env, "env");
         final String usersGroup = trimToNull(lookup(env, SessionAuthorizers.SKAHA_USERS_GROUP_ENV));

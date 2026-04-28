@@ -1,10 +1,8 @@
 package org.opencadc.skaha.session.authorization;
 
-import ca.nrc.cadc.auth.AuthenticationUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Objects;
-import java.util.Optional;
 import javax.security.auth.Subject;
 
 /**
@@ -34,10 +32,5 @@ public final class GroupURISessionAuthorizer implements SessionAuthorizer {
         Objects.requireNonNull(subject, "subject");
         throw new UnsupportedOperationException(
                 "TODO: migrate IvoaGroupClient membership check from SkahaAction.initiateGeneralFlow");
-    }
-
-    @Override
-    public Optional<URI> getSkahaWriteGrantAudience() {
-        return Optional.of(skahaUsersGroupUri);
     }
 }

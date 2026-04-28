@@ -97,9 +97,9 @@ import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.session.authorization.SessionAccessDeniedException;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
+import org.opencadc.skaha.session.authorization.SessionAccessDeniedException;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
@@ -577,8 +577,7 @@ public class PostAction extends SessionAction {
     }
 
     private String generateToken() throws Exception {
-        return SkahaAction.getTokenTool()
-                .generateToken(URI.create(this.skahaUsersGroup), WriteGrant.class, this.sessionID);
+        return SkahaAction.getSkahaCallbackTokenTool().generateToken(WriteGrant.class, this.sessionID);
     }
 
     /**
