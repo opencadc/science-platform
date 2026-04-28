@@ -41,7 +41,7 @@ dependencies {
     // Used to assemble URIs programmatically
     implementation 'org.apache.httpcomponents.client5:httpclient5:[5.4.1,5.5)'
 
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.21.2'
     implementation 'com.google.code.gson:gson:2.8.9'
 
     implementation 'commons-io:commons-io:[2.14.0,3.0.0)'
@@ -49,12 +49,12 @@ dependencies {
     // Used to merge YAML sections to fully configure Job files.
     // Ensure the Snake YAML version is 2.5 to prevent unnecessary logging of WARNING messages.
     implementation 'org.yaml:snakeyaml:2.5'
-    implementation 'io.kubernetes:client-java:25.0.0'
+    implementation 'io.kubernetes:client-java:26.0.0'
 
     // Used to read configuration from the environment and property files.
     implementation 'org.apache.commons:commons-configuration2:[2.11.0,3.0.0)'
 
-    implementation 'org.opencadc:cadc-access-control:[1.1.29,1.2.0)'
+    implementation 'org.opencadc:cadc-access-control:[1.1.31,1.2.0)'
     implementation 'org.opencadc:cadc-access-control-identity:[1.1.0,)'
     implementation 'org.opencadc:cadc-cdp:[1.2,)'
     implementation 'org.opencadc:cadc-gms:[1.0.15,2.0)'
@@ -64,7 +64,8 @@ dependencies {
     implementation 'org.opencadc:cadc-uws-server:[1.1.3,)'
     implementation 'org.opencadc:cadc-vos-client:[2.0.6,2.1.0)'
     implementation 'org.opencadc:cadc-vosi:[1.4.3,)'
-    implementation 'org.opencadc:cadc-permissions:[0.3.4,2.0)'
+    implementation 'org.opencadc:cadc-permissions:[0.3.4,1.0.0)'
+    implementation 'org.opencadc:cadc-permissions-client:[0.3.3,1.0.0)'
     implementation 'org.opencadc:cadc-registry:[1.7.7,)'
     implementation 'redis.clients:jedis:[5.0.2,6.0.0)'
 

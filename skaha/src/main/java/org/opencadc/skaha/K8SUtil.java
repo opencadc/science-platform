@@ -68,6 +68,9 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.util.StringUtil;
+
+import java.net.URI;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -183,10 +186,6 @@ public class K8SUtil {
 
     static List<String> getHarborHosts(final String rawHosts) {
         return Arrays.stream(rawHosts.split(" ")).map(String::trim).collect(Collectors.toList());
-    }
-
-    public static String getSkahaUsersGroup() {
-        return System.getenv("skaha.usersgroup");
     }
 
     public static String getSkahaAdminsGroup() {
@@ -343,4 +342,5 @@ public class K8SUtil {
             this.featureGates.putAll(configuredFeatureGates);
         }
     }
+
 }
