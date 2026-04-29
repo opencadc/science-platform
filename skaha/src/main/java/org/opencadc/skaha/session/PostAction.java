@@ -86,9 +86,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
-import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
@@ -99,9 +97,9 @@ import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
-import org.opencadc.skaha.session.authorization.SessionAccessDeniedException;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommandExecutioner;
+import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 
@@ -170,12 +168,6 @@ public class PostAction extends SessionAction {
     PostAction(UserStorageClient userStorageClient) {
         super();
         this.userStorageClient = userStorageClient;
-    }
-
-    private static Set<List<Group>> getCachedGroupsFromSubject() {
-        Subject subject = AuthenticationUtil.getCurrentSubject();
-        Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
-        return subject.getPublicCredentials(c);
     }
 
     @Override
@@ -394,12 +386,7 @@ public class PostAction extends SessionAction {
 
         for (String authorizedHost : harborHosts) {
             if (authorizedHost.equals(imageRegistryHost)) {
-                final SessionType sessionType = SessionType.fromApplicationStringType(type);
-                if (SessionType.HEADLESS == sessionType) {
-                    // assert headless group membership
-                    validateHeadlessMembership();
-                }
-                return sessionType;
+                return SessionType.fromApplicationStringType(type);
             }
         }
         throw new IllegalArgumentException("image not in a trusted repository");
@@ -734,19 +721,12 @@ public class PostAction extends SessionAction {
         this.userStorageClient.injectProxyCertificate(owner);
     }
 
-    private void validateHeadlessMembership() {
-        if (skahaHeadlessGroup == null) {
-            log.warn("skaha.headlessgroup not defined in system properties");
-        } else if (!headlessUser) {
-            throw new SessionAccessDeniedException("Not authorized to create a headless session");
-        }
-    }
-
     private String getSupplementalGroupsList() throws Exception {
         if (skahaCallbackFlow) {
             return callbackSupplementalGroups;
         }
-        Set<List<Group>> groupCredentials = getCachedGroupsFromSubject();
+        final List<Group> groupCredentials =
+                CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
         if (groupCredentials.size() == 1) {
             return buildGroupUriList(groupCredentials).stream()
                     .map(posixGroup -> Integer.toString(posixGroup.getGID()))
@@ -756,9 +736,8 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private List<PosixGroup> buildGroupUriList(Set<List<Group>> groupCredentials) throws Exception {
-        return toGIDs(
-                groupCredentials.iterator().next().stream().map(Group::getID).collect(Collectors.toList()));
+    private List<PosixGroup> buildGroupUriList(List<Group> groupCredentials) throws Exception {
+        return toGIDs(groupCredentials.stream().map(Group::getID).collect(Collectors.toList()));
     }
 
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {

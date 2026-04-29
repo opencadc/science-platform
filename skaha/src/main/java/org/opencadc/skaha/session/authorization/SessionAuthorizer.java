@@ -1,6 +1,5 @@
 package org.opencadc.skaha.session.authorization;
 
-import java.io.IOException;
 import javax.security.auth.Subject;
 
 /**
@@ -13,8 +12,8 @@ public interface SessionAuthorizer {
      * (for example group lists). Call with Subject.doAs() to pass the current Subject in.
      *
      * @param subject the authenticated subject to check and possibly augment; must not be null.
-     * @throws IOException delegated IO failures when validating authorization.
+     * @throws Exception delegated I/O or general network lookup failures when validating authorization.
      * @throws SessionAccessDeniedException if access is denied.
      */
-    void authorizeGeneralSessionAccess(final Subject subject) throws IOException;
+    void authorizeGeneralSessionAccess(final Subject subject) throws Exception;
 }

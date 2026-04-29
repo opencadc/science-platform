@@ -185,14 +185,6 @@ public class K8SUtil {
         return Arrays.stream(rawHosts.split(" ")).map(String::trim).collect(Collectors.toList());
     }
 
-    public static String getSkahaAdminsGroup() {
-        return System.getenv("skaha.adminsgroup");
-    }
-
-    public static String getSkahaHeadlessGroup() {
-        return System.getenv("skaha.headlessgroup");
-    }
-
     public static String getSkahaHeadlessPriorityGroup() {
         return System.getenv("skaha.headlessprioritygroup");
     }
