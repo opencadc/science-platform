@@ -23,20 +23,34 @@
         },
         "metrics": {
             "package-name": "metrics",
-            "changelog-path": "metrics/CHANGELOG.md",
+            "changelog-path": "CHANGELOG.md",
             "release-type": "python",
             "path": "metrics",
+            "exclude-paths": [
+                "skaha"
+            ],
             "bump-minor-pre-major": true,
             "bump-patch-for-minor-pre-major": true,
             "draft": false,
             "prerelease": false,
             "include-component-in-tag": true,
-            "component": "metric",
+            "component": "metrics",
             "include-v-in-tag": true,
+            "initial-version": "0.1.0",
             "extra-files": [
-                "metrics/pyproject.toml"
+                "pyproject.toml",
+                {
+                    "path": "src/metrics/__init__.py",
+                    "type": "generic"
+                },
+                {
+                    "jsonpath": "$.package[?(@.name.value=='metrics')].version",
+                    "path": "uv.lock",
+                    "type": "toml"
+                }
             ]
         }
     },
-    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+    "separate-pull-requests": true
 }

@@ -59,7 +59,7 @@ This section lists work you execute in this milestone.
 - Document environment contracts for `dev`, `integration`, `staging`, and
   `production`.
 - Configure root release-please to version Metrics independently with
-  `metric-v<semver>` tags.
+  `metrics-v<semver>` tags.
 - Publish Metrics release images only on Metrics release tags.
 - Build and publish Metrics release images for `linux/amd64` and `linux/arm64`.
 - Confirm 12-factor runtime configuration through environment variables.
@@ -145,12 +145,12 @@ This section records the baseline decisions for monorepo operation.
   immediately, with actionable feedback, when `docker`, `helm`, or `kubectl`
   are missing, or when the active cluster context is wrong.
 - **Metrics release contract:** Metrics release tags and changelog entries use
-  `metric-v0.1.1` style. `skaha` keeps its current tag style in this milestone.
+  `metrics-v0.1.1` style. `skaha` keeps its current tag style in this milestone.
 - **Metrics image publish contract:** Metrics images publish to
   `images.opencadc.org/platform/metrics` using
   `SKAHA_REGISTRY_USERNAME` and `SKAHA_REGISTRY_TOKEN`.
 - **Release-only image publish:** Metrics container images are built and pushed
-  only on `metric-v*` tag events. No Metrics edge image push is used.
+  only on `metrics-v*` tag events. No Metrics edge image push is used.
 - **Multi-arch release images:** Metrics release publishes a single manifest
   containing `linux/amd64` and `linux/arm64`.
 
@@ -204,11 +204,11 @@ This section breaks work into execution phases.
      ownership model before mode-specific implementation starts.
 6. **Release automation alignment**
    - Extend root `release-please-config.json` with a Metrics package path and
-     `metric-v*` release tag semantics.
+     `metrics-v*` release tag semantics.
    - Update `.release-please-manifest.json` to track Metrics version state.
    - Ensure Metrics-only commits do not trigger `skaha` version bumps.
 7. **Metrics release image publishing**
-   - Build and publish Metrics images only on `metric-v*` tag events.
+   - Build and publish Metrics images only on `metrics-v*` tag events.
    - Configure Buildx and QEMU for `linux/amd64` and `linux/arm64` release
      manifests.
    - Push only release tags to `images.opencadc.org/platform/metrics`.
@@ -242,10 +242,10 @@ This section defines gate checks and required evidence for milestone closure.
   - Root pre-commit run remains green for non-Metrics paths.
 - Confirm release-please behavior:
   - Metrics-only conventional-commit change creates or updates a Metrics
-    release PR with `metric-v<semver>` tag intent.
+    release PR with `metrics-v<semver>` tag intent.
   - Metrics-only changes do not bump the `skaha` root package.
 - Confirm Metrics image publish behavior:
-  - `metric-v*` tag push publishes `images.opencadc.org/platform/metrics`.
+  - `metrics-v*` tag push publishes `images.opencadc.org/platform/metrics`.
   - Published release manifests contain both `linux/amd64` and `linux/arm64`.
   - Non-tag Metrics CI does not push container images.
 - Confirm Helm behavior:
@@ -285,7 +285,7 @@ This section defines controls to keep rollout quality stable.
 - Keep root workflow ownership explicit through shared workflow files and
   component-scoped jobs.
 - Keep Metrics pre-commit hooks versioned with Metrics source changes.
-- Keep Metrics publish restricted to `metric-v*` tag events.
+- Keep Metrics publish restricted to `metrics-v*` tag events.
 - Keep Metrics release manifests dual-platform (`linux/amd64`, `linux/arm64`).
 - Keep only `dev` runtime artifacts in this repository.
 - Require prerequisite checks before local or CI cluster validation starts.
@@ -315,7 +315,7 @@ Use this checklist when you execute and close the milestone.
   documented for the external deployment repository.
 - [ ] The environment ownership review checkpoint is completed and recorded.
 - [ ] Root release-please config supports Metrics component releases using
-  `metric-v<semver>` tags.
+  `metrics-v<semver>` tags.
 - [ ] Metrics release images publish only on tags to
   `images.opencadc.org/platform/metrics`.
 - [ ] Metrics release images are published for `linux/amd64` and `linux/arm64`.

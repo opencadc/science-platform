@@ -28,8 +28,9 @@ wiring.
 
 M3 also removes `static` and `node` provider paths and treats platform metrics
 as a composed result from configured sources. The supported source set is:
-`kueue`, `prometheus`, and `kube-metrics`. Full kube-metrics runtime depth is
-delivered in M4.
+`kueue`, `prometheus`, and the reserved Kubernetes-backed provider path.
+Kubernetes-backed runtime depth is delivered through follow-on milestones,
+starting with M5 interactive quota.
 
 ## In scope
 
@@ -54,9 +55,10 @@ explicitly changes wire format.
 
 This section lists deferred work.
 
-- Full kube-metrics runtime implementation details (M4 milestone scope).
-- User and session behavior redesign (M5 and M6 scopes).
-- ArgoCD staging rollout implementation (M9 scope).
+- Kubernetes-backed quota and workload metric implementation details (M5 and
+later milestone scope).
+- User and session behavior redesign (M6 and M7 scopes).
+- ArgoCD staging rollout implementation (M10 scope).
 - Dashboard or analytics slice expansion.
 - Multi-process federation redesign.
 
@@ -89,7 +91,7 @@ metrics:
       cohort: cohort-atom
     prometheus:
       url: http://prometheus.monitoring.svc:9090
-    kube_metrics:
+    kube:
       enabled: true
   user:
     prometheus:
@@ -120,7 +122,7 @@ config[MetricsSettings_Pydantic] --> appFactory[AppFactory_Core]
 appFactory --> platformService[PlatformMetricsService]
 platformService --> kueueAdapter[KueueProvider]
 platformService --> promAdapter[PrometheusProvider]
-platformService --> kubeMetricsAdapter[KubeMetricsProvider_M4]
+platformService --> kubeAdapter[KubeProvider_FollowOn]
 platformService --> apiRoutes[ApiV1Routes]
 ```
 
@@ -130,12 +132,12 @@ platformService --> apiRoutes[ApiV1Routes]
 distinct boundary.
 - **Pydantic-only contracts:** Runtime config and schema models remain Pydantic
 across all layers.
-- **Three-source platform model:** Kueue, Prometheus, and kube-metrics are the
-only supported platform sources after cutover.
+- **Three-source platform model:** Kueue, Prometheus, and Kubernetes-backed
+providers are the only supported source families after cutover.
 - **No legacy providers:** Static and node are removed, not hidden behind
 compatibility aliases.
-- **M4 dependency:** Kube-metrics implementation depth is intentionally deferred
-to M4 while M3 establishes architecture and config contracts.
+- **Follow-on dependency:** Kubernetes-backed implementation depth is
+intentionally deferred while M3 establishes architecture and config contracts.
 
 ## Implementation phases
 
@@ -178,8 +180,9 @@ environment-derived values.
 
 This section lists milestone risks and mitigations.
 
-- **Scope creep risk:** M3 can absorb M4 behavior if boundaries are vague.
-Mitigate by keeping kube-metrics runtime depth explicitly out of scope.
+- **Scope creep risk:** M3 can absorb follow-on provider behavior if boundaries
+are vague. Mitigate by keeping Kubernetes-backed runtime depth explicitly out
+of scope.
 - **Boilerplate risk:** A new package layout can introduce empty wrappers.
 Mitigate by requiring each moved module to own clear behavior.
 - **Migration risk:** Bulk import rewrites can break startup paths. Mitigate with
@@ -197,7 +200,7 @@ This section defines rollout controls for stable operation.
 - Require explicit evidence that static and node paths are fully removed.
 - Require startup validation evidence for each supported source combination.
 - Require docs and plans index updates in the same change as milestone renaming.
-- Require follow-on M4 kickoff to confirm kube-metrics implementation scope.
+- Require follow-on kickoff to confirm Kubernetes-backed provider scope.
 
 ## Implementer handoff checklist
 
@@ -209,6 +212,7 @@ Use this checklist to close M3 execution.
 - Legacy fallback logic tied to removed providers is removed.
 - Nested Pydantic settings model for source composition is implemented.
 - No dataclasses are used for runtime config or API/schema models.
-- Platform source support is limited to Kueue, Prometheus, and kube-metrics.
-- M4 remains the implementation milestone for kube-metrics runtime depth.
+- Platform source support is limited to Kueue, Prometheus, and
+  Kubernetes-backed providers.
+- Follow-on milestones own Kubernetes-backed runtime depth.
 - Required gates pass.

@@ -1,5 +1,7 @@
-# Release Please Actions (Skaha + Metrics packages; Skaha CD dispatches are gated)
-name: "CD: Skaha Release Please"
+# Release Please (Skaha + Metrics). Image workflows: Skaha is started via
+# repository_dispatch (GITHUB_TOKEN cannot chain push.tag workflows) and/or tag
+# push when a PAT is used; Metrics uses metrics-v* tag pushes the same way.
+name: "CD: Science Platform Release Please"
 
 on:
   push:
@@ -25,34 +27,13 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Path filter for non-Metrics changes
-        uses: dorny/paths-filter@v4.0.1
-        id: path-filter
-        with:
-          base: ${{ github.event.before }}
-          ref: ${{ github.sha }}
-          filters: |
-            non_metrics:
-              - '**'
-              - '!metrics/**'
       - name: Create release
         id: release-please
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-      - name: Dispatch Edge Build
-        # Skaha edge image: skip when this push only changes Metrics paths
-        if: >-
-          steps['release-please'].outcome == 'success'
-          && github.event_name == 'push'
-          && steps['path-filter'].outputs.non_metrics == 'true'
-        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
-        with:
-          repository: opencadc/science-platform
-          event-type: edge-build
-          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Skaha Release Info
         if: >-
           steps['release-please'].outputs.release_created == 'true'
-          && !startsWith(steps['release-please'].outputs.tag_name, 'metric-v')
+          && !startsWith(steps['release-please'].outputs.tag_name, 'metrics-v')
         run: |
           echo "Releases Created: ${{ steps.release-please.outputs.release_created }}"
           echo "tag: ${{ steps.release-please.outputs.tag_name }}"
@@ -60,11 +41,11 @@ jobs:
           echo "major: ${{ steps.release-please.outputs.major }}"
           echo "minor: ${{ steps.release-please.outputs.minor }}"
           echo "patch: ${{ steps.release-please.outputs.patch }}"
-      - name: Dispatch Skaha Release Build
-        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+      - name: Dispatch Skaha release build
         if: >-
           steps['release-please'].outputs.release_created == 'true'
-          && !startsWith(steps['release-please'].outputs.tag_name, 'metric-v')
+          && !startsWith(steps['release-please'].outputs.tag_name, 'metrics-v')
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           repository: opencadc/science-platform
           event-type: release-build
@@ -74,4 +55,19 @@ jobs:
               "releases_created": "${{ steps['release-please'].outputs.release_created }}",
               "tag_name": "${{ steps['release-please'].outputs.tag_name }}",
               "sha": "${{ steps['release-please'].outputs.sha }}"
+            }
+      - name: Dispatch Metrics release build
+        if: >-
+          steps['release-please'].outputs['metrics--release_created'] == 'true'
+          && startsWith(steps['release-please'].outputs['metrics--tag_name'], 'metrics-v')
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+        with:
+          repository: opencadc/science-platform
+          event-type: metrics-release-build
+          token: ${{ secrets.GITHUB_TOKEN }}
+          client-payload: |-
+            {
+              "releases_created": "${{ steps['release-please'].outputs['metrics--release_created'] }}",
+              "tag_name": "${{ steps['release-please'].outputs['metrics--tag_name'] }}",
+              "sha": "${{ steps['release-please'].outputs['metrics--sha'] }}"
             }

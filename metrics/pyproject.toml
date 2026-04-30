@@ -1,6 +1,6 @@
 [project]
 name = "metrics"
-version = "0.1.0"
+version = "0.1.4"
 description = "CANFAR Science Platform Metrics Backend"
 readme = "README.md"
 authors = [
@@ -10,14 +10,15 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.136.0",
     "httpx>=0.28.1",
-    "niquests>=3.18.6",
     "opentelemetry-exporter-otlp-proto-http>=1.41.0",
     "opentelemetry-instrumentation-fastapi>=0.62b0",
     "opentelemetry-instrumentation-httpx>=0.62b0",
     "opentelemetry-sdk>=1.41.0",
     "pydantic>=2.13.1",
     "pydantic-settings>=2.13.1",
+    "pyyaml>=6.0.3",
     "redis>=7.4.0",
+    "requests>=2.32",
     "uvicorn>=0.44.0",
 ]
 
@@ -50,3 +51,21 @@ harness = [
     "pyyaml>=6.0.3",
     "pydantic>=2.13.1",
 ]
+
+[tool.ruff]
+line-length = 100
+src = ["src/metrics", "tests"]
+
+[tool.ruff.lint]
+extend-select = [
+    "D", # pydocstyle (Google: see [tool.ruff.lint.pydocstyle])
+]
+ignore = [
+    "D203", # one-blank-line (conflicts with D211)
+    "D213", # multi-line second line (conflicts with D212)
+]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

@@ -17,11 +17,11 @@ class MetricsRecorder:
     """Service-level metrics recorder contract."""
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
+        """Record one cache lookup for the given backend and scope."""
         raise NotImplementedError
 
-    def record_compute_duration(
-        self, *, seconds: float, status: str, scope: str
-    ) -> None:
+    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+        """Record end-to-end compute time for a metrics read."""
         raise NotImplementedError
 
     def record_provider_duration(
@@ -32,11 +32,11 @@ class MetricsRecorder:
         status: str,
         seconds: float,
     ) -> None:
+        """Record time spent inside a named provider for a scope."""
         raise NotImplementedError
 
-    def record_http_request(
-        self, *, scope: str, status_code: int, cached: bool
-    ) -> None:
+    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+        """Record an HTTP request with status and cache hit information."""
         raise NotImplementedError
 
 
@@ -44,11 +44,11 @@ class NoopMetricsRecorder(MetricsRecorder):
     """No-op metrics recorder used when OTel metrics are disabled."""
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
+        """See :meth:`MetricsRecorder.record_cache_lookup`."""
         return
 
-    def record_compute_duration(
-        self, *, seconds: float, status: str, scope: str
-    ) -> None:
+    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+        """See :meth:`MetricsRecorder.record_compute_duration`."""
         return
 
     def record_provider_duration(
@@ -59,11 +59,11 @@ class NoopMetricsRecorder(MetricsRecorder):
         status: str,
         seconds: float,
     ) -> None:
+        """See :meth:`MetricsRecorder.record_provider_duration`."""
         return
 
-    def record_http_request(
-        self, *, scope: str, status_code: int, cached: bool
-    ) -> None:
+    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+        """See :meth:`MetricsRecorder.record_http_request`."""
         return
 
 
@@ -71,6 +71,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
     """OTel-backed service recorder for cache and compute metrics."""
 
     def __init__(self, *, meter_name: str, meter_version: str) -> None:
+        """Create counters and histograms on a named OpenTelemetry :class:`Meter`."""
         meter = metrics.get_meter(meter_name, meter_version)
         self._cache_lookups = meter.create_counter(
             name="canfar.metrics.cache.lookups",
@@ -94,6 +95,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
         )
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
+        """See :meth:`MetricsRecorder.record_cache_lookup`."""
         self._cache_lookups.add(
             1,
             attributes={
@@ -103,9 +105,8 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             },
         )
 
-    def record_compute_duration(
-        self, *, seconds: float, status: str, scope: str
-    ) -> None:
+    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+        """See :meth:`MetricsRecorder.record_compute_duration`."""
         self._compute_duration.record(
             max(seconds, 0.0),
             attributes={
@@ -122,6 +123,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
         status: str,
         seconds: float,
     ) -> None:
+        """See :meth:`MetricsRecorder.record_provider_duration`."""
         self._provider_duration.record(
             max(seconds, 0.0),
             attributes={
@@ -131,9 +133,8 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             },
         )
 
-    def record_http_request(
-        self, *, scope: str, status_code: int, cached: bool
-    ) -> None:
+    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
+        """See :meth:`MetricsRecorder.record_http_request`."""
         self._http_requests.add(
             1,
             attributes={

@@ -29,7 +29,7 @@ This note records closure evidence for milestone M2
   for in-cluster auth, and `METRICS_ENVIRONMENT` aligned with the canonical
   service modes `dev` / `staging` / `integration` / `production`.
 - **Fixtures and automation (M2 closure):** Kueue smoke objects originally lived in the
-  `metrics-test-infra` Helm subchart. **Superseded in M10:** fixtures are now
+  `metrics-test-infra` Helm subchart. **Superseded in M11:** fixtures are now
   (Superseded) Smoke YAML now **`scripts/test-setup.yaml`**, run via **`scripts/minikube-smoke.sh`**
   and Skaffold; see `docs/dev-setup.md`.
 - **Helm:** Optional `serviceAccount.create` and `rbac.create` install a
@@ -136,7 +136,7 @@ explicitly widened.
   utilization analytics remain out of scope per the plan.
 - Prometheus error-path hardening (`_query_scalar` / `_build_usage_reading`) and
   import-surface cleanup (`metrics.providers` exports, unused dependencies) are
-  **M4 or later** unless pulled into scope by a new plan.
+  **M5 or later** unless pulled into scope by a new plan.
 - If webhook validation requires additional Cohort fields for your Kueue
   configuration, edit `scripts/test-setup.yaml` (and values/docs) and re-run
   `scripts/minikube-smoke.sh` or the CI workflow.

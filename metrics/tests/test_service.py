@@ -1,71 +1,33 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
 from metrics.cache import InMemoryTTLCache
-from metrics.errors import AppError, ProviderUnavailableError
-from metrics.schemas.metrics import CapacityReading, UsageReading
-from metrics.services.platform_metrics import CachedMetrics, PlatformMetricsService
+from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
+from metrics.schemas.metrics import PlatformMetricsData
+from metrics.services.platform import CachedMetrics, PlatformMetricsService
+from metrics.telemetry import MetricsRecorder
 
 
-class DummyCapacityProvider:
-    source_name = "dummy_capacity"
-
-    def __init__(self, reading: CapacityReading) -> None:
-        self._reading = reading
-        self.calls = 0
-
-    async def get_capacity(self) -> CapacityReading:
-        self.calls += 1
-        return self._reading
-
-
-class DummyUsageProvider:
-    source_name = "dummy_usage"
-
-    def __init__(self, reading: UsageReading) -> None:
-        self._reading = reading
-        self.calls = 0
-
-    async def get_usage(self) -> UsageReading:
-        self.calls += 1
-        return self._reading
-
-    async def get_usage_for_user(self, user_id: str) -> UsageReading:
-        del user_id
-        self.calls += 1
-        return self._reading
-
-    async def get_usage_for_session(
-        self, user_id: str, session_id: str
-    ) -> UsageReading:
-        del user_id, session_id
-        self.calls += 1
-        return self._reading
+def _fixed_cache_key() -> str:
+    return "platform:4:testcluster:"
 
 
 @pytest.mark.anyio
-async def test_service_returns_metrics_and_uses_cache() -> None:
-    now = datetime.now(UTC)
-    capacity = DummyCapacityProvider(
-        CapacityReading(cpu_cores=10, memory_gib=20, source="kueue", observed_at=now)
-    )
-    usage = DummyUsageProvider(
-        UsageReading(
-            requested_cpu_cores=5,
-            requested_memory_gib=10,
-            source="prometheus",
-            observed_at=now,
+async def test_service_returns_platform_metrics_and_uses_cache() -> None:
+    async def good() -> PlatformMetricsData:
+        return PlatformMetricsData(
+            cluster="prod",
+            capacity={"cpu": "10", "memory": "20Gi"},
+            allocated={"cpu": "5", "memory": "10Gi"},
         )
-    )
 
     service = PlatformMetricsService(
-        cluster_name="prod",
-        capacity_provider=capacity,
-        usage_provider=usage,
+        platform=good,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
     )
 
     first = await service.get_platform_metrics()
@@ -75,106 +37,93 @@ async def test_service_returns_metrics_and_uses_cache() -> None:
     assert second.cached is True
     assert first.created == second.created
     assert first.data.capacity["cpu"] == "10"
-    assert first.data.capacity["memory"] == "20Gi"
     assert first.data.allocated["cpu"] == "5"
-    assert first.data.allocated["memory"] == "10Gi"
-    assert capacity.calls == 1
-    assert usage.calls == 1
 
 
 @pytest.mark.anyio
-async def test_platform_static_allocated_reflects_usage_without_clamping() -> None:
-    now = datetime.now(UTC)
-    capacity = DummyCapacityProvider(
-        CapacityReading(cpu_cores=10, memory_gib=20, source="kueue", observed_at=now)
-    )
-    usage = DummyUsageProvider(
-        UsageReading(
-            requested_cpu_cores=50,
-            requested_memory_gib=40,
-            source="prometheus",
-            observed_at=now,
-        )
-    )
+async def test_service_raises_unavailable() -> None:
+    async def bad() -> PlatformMetricsData:
+        raise ProviderUnavailableError("nope")
 
     service = PlatformMetricsService(
-        cluster_name="prod",
-        capacity_provider=capacity,
-        usage_provider=usage,
+        platform=bad,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
     )
-
-    result = await service.get_platform_metrics()
-    assert result.data.allocated["cpu"] == "50"
-    assert result.data.allocated["memory"] == "40Gi"
-
-
-@pytest.mark.anyio
-async def test_service_raises_when_capacity_unavailable() -> None:
-    now = datetime.now(UTC)
-
-    class BadCapacityProvider:
-        source_name = "bad"
-
-        async def get_capacity(self) -> CapacityReading:
-            raise ProviderUnavailableError("no capacity")
-
-    usage = DummyUsageProvider(
-        UsageReading(
-            requested_cpu_cores=1,
-            requested_memory_gib=1,
-            source="prom",
-            observed_at=now,
-        )
-    )
-
-    service = PlatformMetricsService(
-        cluster_name="prod",
-        capacity_provider=BadCapacityProvider(),
-        usage_provider=usage,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=0),
-    )
-
-    with pytest.raises(AppError) as exc_info:
+    with pytest.raises(AppError) as ei:
         await service.get_platform_metrics()
-
-    assert exc_info.value.code == "capacity_unavailable"
-    assert exc_info.value.status_code == 503
+    assert ei.value.status_code == 503
 
 
 @pytest.mark.anyio
-async def test_service_returns_user_and_session_metrics() -> None:
-    now = datetime.now(UTC)
-    capacity = DummyCapacityProvider(
-        CapacityReading(cpu_cores=12, memory_gib=48, source="kueue", observed_at=now)
-    )
-    usage = DummyUsageProvider(
-        UsageReading(
-            requested_cpu_cores=3,
-            requested_memory_gib=9,
-            source="prometheus",
-            observed_at=now,
+async def test_service_telemetry_uses_telemetry_provider_name() -> None:
+    """Seam: :class:`PlatformMetricsService` records the injected provider name, not a constant."""
+
+    recorded: list[dict[str, Any]] = []
+
+    class CaptureRecorder(MetricsRecorder):
+        def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
+            return
+
+        def record_http_request(
+            self,
+            *,
+            scope: str,
+            status_code: int,
+            cached: bool,
+        ) -> None:
+            return
+
+        def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
+            return
+
+        def record_provider_duration(
+            self,
+            *,
+            provider: str,
+            scope: str,
+            status: str,
+            seconds: float,
+        ) -> None:
+            recorded.append(
+                {
+                    "provider": provider,
+                    "scope": scope,
+                    "status": status,
+                    "seconds": seconds,
+                }
+            )
+
+    async def good() -> PlatformMetricsData:
+        return PlatformMetricsData(
+            cluster="c",
+            capacity={},
+            allocated={},
         )
-    )
+
     service = PlatformMetricsService(
-        cluster_name="prod",
-        capacity_provider=capacity,
-        usage_provider=usage,
+        platform=good,
         cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
+        telemetry=CaptureRecorder(),
+        provider="my-adapter",
     )
+    await service.get_platform_metrics()
+    assert recorded, "expected provider duration telemetry"
+    assert recorded[0]["provider"] == "my-adapter"
+    assert recorded[0]["scope"] == "platform"
 
-    user_result = await service.get_user_metrics("alice")
-    session_result = await service.get_session_metrics(
-        user_id="alice",
-        session_id="sess-1",
+
+@pytest.mark.anyio
+async def test_service_raises_on_execution() -> None:
+    async def bad() -> PlatformMetricsData:
+        raise ProviderExecutionError("e")
+
+    service = PlatformMetricsService(
+        platform=bad,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
     )
-
-    assert user_result.data.user_id == "alice"
-    assert user_result.data.capacity.cpu == "12"
-    assert user_result.data.usage.requested.memory == "9 GiB"
-    assert user_result.data.usage.utilization.cpu == 0.25
-    assert user_result.cached is False
-
-    assert session_result.data.user_id == "alice"
-    assert session_result.data.session_id == "sess-1"
-    assert session_result.cached is False
+    with pytest.raises(AppError) as ei:
+        await service.get_platform_metrics()
+    assert ei.value.status_code == 502

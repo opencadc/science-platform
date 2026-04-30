@@ -1,18 +1,18 @@
-# Milestone M5: user metrics release
+# Milestone M6: user metrics release
 
-This plan defines the fifth milestone for the CANFAR Metrics API roadmap. It
-introduces production-grade user-scoped metrics on top of M2 platform and M3/M4
-provider architecture.
+This plan defines the sixth milestone for the CANFAR Metrics API roadmap. It
+introduces production-grade user-scoped metrics on top of the platform contract
+and M4 provider runtime architecture.
 
 ## Repository snapshot versus milestone target
 
-The user route already exists in current code, but attribution semantics,
-bounded operational controls, and release-grade validation are not yet locked as
-milestone outcomes.
+M4 removes the pre-release user route until a provider can return a complete
+user metric contract. M6 reintroduces the route with attribution semantics,
+bounded operational controls, and release-grade validation.
 
 ## Summary
 
-M5 hardens `GET /api/v1/metrics/users/{user}` with deterministic attribution,
+M6 hardens `GET /api/v1/metrics/users/{user}` with deterministic attribution,
 bounded query behavior, and stable operational controls.
 
 ## In scope
@@ -33,13 +33,15 @@ bounded query behavior, and stable operational controls.
 - M1 setup and CI baseline.
 - M2 platform route contract and observability controls.
 - M3 architecture realignment.
-- M4 kube-metrics provider milestone outputs where applicable.
+- M4 provider runtime architecture.
+- M5 interactive quota outputs where applicable.
 
 ## Constraints
 
 - Keep user query behavior bounded.
 - Keep error semantics deterministic.
 - Keep all runtime configuration environment-driven and Pydantic validated.
+- Do not redefine the interactive quota route delivered in M5.
 
 ## Implementation phases
 

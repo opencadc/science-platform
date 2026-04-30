@@ -47,7 +47,7 @@ def test_platform_endpoint_shape() -> None:
 
 
 def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
-    """Allocated map reflects the sample Workload from scripts/test-setup.yaml (Kueue smoke)."""
+    """Allocated map includes the borrowed Kueue smoke Workload total."""
     base_url = _base_url()
     if not base_url:
         pytest.skip("METRICS_BASE_URL not configured")
@@ -57,8 +57,10 @@ def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     allocated = response.json()["data"]["allocated"]
     cpu_cores = parse_cpu_to_cores(allocated.get("cpu", "0"))
     mem_gib = parse_memory_to_gib(allocated.get("memory", "0"))
-    # scripts/test-setup.yaml: 100m CPU, 100Mi memory → cq-proton.
-    assert cpu_cores >= 0.09, f"expected >=100m CPU in allocated, got {allocated!r}"
-    assert mem_gib > 0.0, (
-        f"expected positive memory from smoke workload in allocated, got {allocated!r}"
+    # scripts/test-setup.yaml: cq-electron has 100m/100Mi nominal quota, while
+    # integration-idle requests 200m/200Mi. Admission proves borrowing, and
+    # ClusterQueue status.flavorsUsage total must include that borrowed usage.
+    assert cpu_cores >= 0.19, f"expected >=200m CPU in allocated, got {allocated!r}"
+    assert mem_gib >= 0.19, (
+        f"expected >=200Mi memory from smoke workload in allocated, got {allocated!r}"
     )

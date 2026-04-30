@@ -10,13 +10,13 @@ This note records closure evidence for milestone M1
 ## Delivered
 
 - **CI/CD pathways:** Repo-wide workflows remain global; Skaha workflows use
-  explicit names (`cd.skaha.release.yml`, `cd.skaha.release.build.yml`) and path
+  explicit names (`cd.platform.release.yml`, `cd.skaha.release.build.yml`) and path
   filters so Metrics-only changes do not trigger Skaha linting, testing, or edge
   builds; Metrics workflows target `metrics/**` plus
   `.github/workflows/ci.metrics.yml` so workflow edits self-trigger.
-- **Skaha release gating:** `cd.skaha.release.yml` uses bracket step ids for
+- **Skaha release gating:** `cd.platform.release.yml` uses bracket step ids for
   hyphenated steps and gates Skaha edge dispatch / release-build dispatches away
-  from `metric-v*` Metrics tags; edge dispatch also respects `paths-filter`
+  from `metrics-v*` Metrics tags; edge dispatch also respects `paths-filter`
   `non_metrics`.
 - **Metrics CI:** `.github/workflows/ci.metrics.yml` runs lint, unit tests,
   harness contracts and CLI check, validates `docker compose -f compose.yaml
@@ -37,11 +37,11 @@ This note records closure evidence for milestone M1
 - **Helm:** Minimal chart under `metrics/helm/metrics-api` with `values-dev.yaml`
   only; `deploy-with-helm.sh` defaults to `helm/metrics-api` from `metrics/`.
 - **Release automation:** Root `release-please-config.json` includes a `metrics`
-  package with `metric-v*` style tags; Skaha package excludes `metrics/` so
+  package with `metrics-v*` style tags; Skaha package excludes `metrics/` so
   Metrics-only commits do not bump Skaha.
 - **Image publishing:** `.github/workflows/cd.metrics.release.build.yml` builds and
   pushes multi-arch images to `images.opencadc.org/platform/metrics` only on
-  `metric-v*` tag pushes.
+  `metrics-v*` tag pushes.
 - **Environment contracts:** `metrics/docs/environment-contracts.md` records
   ownership boundaries and the canonical service mode names `dev`, `staging`,
   `integration`, and `production`.
@@ -81,7 +81,7 @@ documentation.
   `_die` avoids exiting an interactive shell when `check-prerequisites.sh` is
   sourced (returns instead of `exit`).
 - `ci.metrics.yml` triggers when the workflow file itself changes.
-- `cd.skaha.release.yml` uses bracket notation for hyphenated step outputs.
+- `cd.platform.release.yml` uses bracket notation for hyphenated step outputs.
 - `PLAN_M1_project_setup_and_delivery_foundation.md` updated so Compose is
   recorded as shipped (no longer described as pending).
 - `env.example` carries uncommented safe defaults; README notes `METRICS_PORT`

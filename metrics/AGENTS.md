@@ -66,7 +66,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 ## Learned User Preferences
 
 - Write git commits using Conventional Commits (`type(scope): subject`, with optional body and footer).
-- When the user requests a staged-only commit (for example from a diff-tab flow), treat their staged file list as authoritative: commit only what is already staged and do not stage additional files.
+- When the user requests a staged-only commit (for example from a diff-tab flow), treat their staged file list as authoritative: commit only what is already staged and do not stage additional files; when handling subagent completion notifications, do not restate user-visible subagent output unless the user asks or cross-agent synthesis is required.
 - Before local cluster-backed or kubectl-driven checks, confirm the intended
   Kubernetes context is selected (for example
   `kubectl config use-context kind-metrics`) and that kind, Helm, and kubectl
@@ -81,6 +81,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 - In GitHub Actions workflows for this repository, do not pin `step-security/harden-runner` to a commit SHA; use a floating major tag (for example `step-security/harden-runner@v2`) unless the user specifies otherwise.
 - For platform metrics responses, keep `capacity` and `allocated` in consistent, comparable units (the user treats mixed or mismatched unit presentation in that API as an unacceptable defect).
 - After substantive changes to Metrics CI workflows or `metrics/scripts` automation, run `pre-commit run --all-files` at the science-platform repository root to verify hooks still pass.
+- For `metrics` Python, use Google-style docstrings on modules, classes, and functions; avoid single-letter names for configuration or domain parameters; Ruff pydocstyle (`D`, Google convention) is configured in `metrics/pyproject.toml` and applies to `src` (tests may ignore `D` per Ruff per-file config).
 
 ## Learned Workspace Facts
 
@@ -110,6 +111,8 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
   `bash scripts/kind-smoke.sh` (or apply `scripts/test-setup.yaml` and run
   Helm deploy steps by hand). `METRICS_CLUSTER_NAME` defaults to
   `kind-metrics` in `kind-values.yaml`.
+- `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` in nested env form must be a JSON array string (for example `'[\"cq-proton\",\"cq-neutron\"]'`), not a comma-separated plain string; pydantic-settings parses that field with JSON and will fail startup otherwise.
+- Release-please (science-platform root `release-please-config.json`) uses component `metrics`, so git tags are `metrics-v*`. The `cd.metrics.release.build.yml` workflow strips the `metrics-` prefix for the OCI image tag so published images use `v*` (for example `v0.1.2`).
 - Root pre-commit `check-yaml` skips `metrics/helm/` and `metrics/scripts/` (Helm charts, template-rendered YAML, and cluster setup manifests are not validated as plain YAML).
 - Java copy-paste detection via the removed `cpd` pre-commit hook is not used; Skaha Java checks run through `./gradlew clean check`.
 - Repository-wide PR commit-check subject line length is configured with commit-check environment variables (for example `CCHK_SUBJECT_MAX_LENGTH`) in `.github/workflows/ci.commit.check.yml` at the science-platform repository root; the upstream default is 80 characters.
