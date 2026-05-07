@@ -26,6 +26,7 @@ public class SessionAuthorizersTest {
         final Map<String, String> env = new HashMap<>();
         env.put(SessionAuthorizers.SKAHA_PERMISSIONS_API_ENABLED_FLAG_ENV, Boolean.TRUE.toString());
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_BASE_URL_ENV, "https://permissions.example/v1/");
+        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV, "https://auth.example/v1/");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_TYPE_ENV, "plugin");
         final SessionAuthorizer auth = SessionAuthorizers.fromEnvironment(env);
@@ -103,6 +104,7 @@ public class SessionAuthorizersTest {
         env.put(SessionAuthorizers.SKAHA_PERMISSIONS_API_ENABLED_FLAG_ENV, Boolean.TRUE.toString());
         env.put(GroupURISessionAuthorizer.SKAHA_USERS_GROUP_ENV, "   ");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_BASE_URL_ENV, "https://perm/");
+        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV, "https://auth/");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_TYPE_ENV, "plugin");
         final SessionAuthorizer auth = SessionAuthorizers.fromEnvironment(env);
@@ -127,6 +129,6 @@ public class SessionAuthorizersTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void permissionsApiAuthorizerRejectsBlankBaseUrl() {
-        new PermissionsApiSessionAuthorizer("\t", "\r", "\n", "\t", "\r", "\n");
+        new PermissionsApiSessionAuthorizer("\t", "\t", "\r", "\n", "\t", "\r", "\n");
     }
 }

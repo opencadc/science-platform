@@ -83,7 +83,7 @@ public class QueueConfiguration {
     private static final String QUEUE_CONFIG_VAR_DEFAULT_TYPE = "DEFAULT";
 
     // Used when querying the Kubernetes API.
-    static final String KUEUE_API_VERSION = "v1beta1";
+    static final String KUEUE_API_VERSION = "v1beta2";
     static final String KUEUE_API_GROUP = "kueue.x-k8s.io";
     static final String KUEUE_API_PLURAL = "localqueues";
 

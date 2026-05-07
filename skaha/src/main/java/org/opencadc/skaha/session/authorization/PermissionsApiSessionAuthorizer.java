@@ -7,6 +7,7 @@ import java.net.URL;
 import java.util.Map;
 import java.util.Objects;
 import javax.security.auth.Subject;
+import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.opencadc.permissions.client.srcnet.AuthorisationResult;
 import org.opencadc.permissions.client.srcnet.PermissionsAPIClient;
@@ -17,7 +18,9 @@ import org.opencadc.skaha.utils.CommonUtils;
  * ({@link PermissionsApiSessionAuthorizer#SKAHA_PERMISSIONS_API_BASE_URL_ENV}).
  */
 public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer {
+    private static final Logger LOGGER = Logger.getLogger(PermissionsApiSessionAuthorizer.class);
     static final String SKAHA_PERMISSIONS_API_BASE_URL_ENV = "SKAHA_PERMISSIONS_API_BASE_URL";
+    static final String SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV = "SKAHA_PERMISSIONS_API_AUTH_BASE_URL";
     static final String SKAHA_PERMISSIONS_API_NAME_ENV = "SKAHA_PERMISSIONS_API_NAME";
     static final String SKAHA_PERMISSIONS_API_TYPE_ENV = "SKAHA_PERMISSIONS_API_TYPE";
     static final String SKAHA_PERMISSIONS_API_ROUTE_ENV = "SKAHA_PERMISSIONS_API_ROUTE";
@@ -28,6 +31,7 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
     private static final String POLICY_TYPE_PLUGIN = "plugin";
 
     private final URL permissionsApiBaseUrl;
+    private final URL permissionsApiAuthBaseUrl;
     private final String serviceName;
     private final String authoriseType;
 
@@ -46,8 +50,10 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
      * @return A new instance of <code>PermissionsApiSessionAuthorizer</code> configured from the environment.
      */
     public static PermissionsApiSessionAuthorizer fromEnvironment(final Map<String, String> environment) {
-        final String baseUrl = CommonUtils.trimToNull(
+        final String permissionsApiBaseUrl = CommonUtils.trimToNull(
                 CommonUtils.lookup(environment, PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_BASE_URL_ENV));
+        final String permissionsApiAuthBaseUrl = CommonUtils.trimToNull(CommonUtils.lookup(
+                environment, PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV));
         final String serviceName = CommonUtils.trimToNull(
                 CommonUtils.lookup(environment, PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV));
         final String type = CommonUtils.trimToNull(
@@ -58,7 +64,10 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
                 CommonUtils.lookup(environment, PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_VERSION_ENV));
         final String method = CommonUtils.trimToNull(
                 CommonUtils.lookup(environment, PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_METHOD_ENV));
-        return new PermissionsApiSessionAuthorizer(baseUrl, serviceName, type, route, version, method);
+
+        LOGGER.debug("Permissions API Base URL: " + permissionsApiBaseUrl);
+        return new PermissionsApiSessionAuthorizer(
+                permissionsApiBaseUrl, permissionsApiAuthBaseUrl, serviceName, type, route, version, method);
     }
 
     /**
@@ -73,6 +82,7 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
      */
     PermissionsApiSessionAuthorizer(
             final String permissionsApiBaseUrl,
+            final String permissionsApiAuthBaseUrl,
             final String serviceName,
             final String authoriseType,
             final String routeName,
@@ -89,6 +99,19 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
                 throw new IllegalArgumentException("permissionsApiBaseUrl must contain a valid URL.", e);
             }
         }
+
+        final String authBaseUrl = Objects.requireNonNull(permissionsApiAuthBaseUrl, "permissionsApiAuthBaseUrl")
+                .trim();
+        if (authBaseUrl.isEmpty()) {
+            throw new IllegalArgumentException("permissionsApiAuthBaseUrl must not be blank.");
+        } else {
+            try {
+                this.permissionsApiAuthBaseUrl = URI.create(authBaseUrl).toURL();
+            } catch (final MalformedURLException e) {
+                throw new IllegalArgumentException("permissionsApiAuthBaseUrl must contain a valid URL.", e);
+            }
+        }
+
         this.serviceName = Objects.requireNonNull(serviceName, "serviceName must not be null.");
         this.authoriseType = Objects.requireNonNull(authoriseType, "authoriseType must either be plugin or route.");
 
@@ -111,7 +134,10 @@ public final class PermissionsApiSessionAuthorizer implements SessionAuthorizer 
     @Override
     public void authorizeGeneralSessionAccess(final Subject subject) throws Exception {
         Objects.requireNonNull(subject, "subject");
-        final PermissionsAPIClient permissionsAPIClient = new PermissionsAPIClient(this.permissionsApiBaseUrl);
+        LOGGER.debug("Permissions API Base URL: " + permissionsApiBaseUrl);
+        LOGGER.debug("Permissions API Auth API Base URL: " + permissionsApiAuthBaseUrl);
+        final PermissionsAPIClient permissionsAPIClient =
+                new PermissionsAPIClient(this.permissionsApiBaseUrl, this.permissionsApiAuthBaseUrl);
         final AuthorizationToken authorizationToken = CommonUtils.getAuthorizationToken(subject);
 
         // Shouldn't ever happen since the calling user should already be authenticated, but here for completeness.
