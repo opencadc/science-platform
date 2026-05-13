@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/opencadc/science-platform/compare/metrics-v0.1.4...metrics-v0.1.5) (2026-05-13)
+
+
+### Bug Fixes
+
+* **metrics:** removed dependence on requiring cohort info for platform metrics ([404e118](https://github.com/opencadc/science-platform/commit/404e1186484c013ea63f4550a0e78577bd2a64e4))
+
 ## [0.1.4](https://github.com/opencadc/science-platform/compare/metrics-v0.1.3...metrics-v0.1.4) (2026-04-27)
 
 
