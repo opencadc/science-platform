@@ -71,12 +71,6 @@ def cluster_queue_object_url(kueue_config: KueueProviderConfig, queue_name: str)
     return f"{base}{kueue_config.kube_clusterqueue_path}/{queue_name}"
 
 
-def cohort_object_url(kueue_config: KueueProviderConfig, cohort_name: str) -> str:
-    """Return the get-by-name URL for a Kueue ``Cohort`` custom resource."""
-    base = (kueue_config.kube_api_url or "").rstrip("/")
-    return f"{base}{kueue_config.kube_cohort_path}/{cohort_name}"
-
-
 def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
     """Sum ``nominalQuota`` for every resource across all groups and flavors.
 
@@ -170,14 +164,14 @@ class KueueMetrics(ProviderMetrics):
         Args:
             settings: App settings (e.g. cluster name for the API payload).
             client: Injected client used for parallel Kubernetes GET requests.
-            kueue_config: Kueue provider fields (API URL, queues, cohort, token paths).
+            kueue_config: Kueue provider fields (API URL, queues, token paths).
         """
         self._settings = settings
         self._client = client
         self._kueue_config = kueue_config
 
     async def platform(self) -> PlatformMetricsData:
-        """Load capacity and allocated maps from Kueue ClusterQueue and Cohort data."""
+        """Load capacity and allocated maps from Kueue ClusterQueue data."""
         maps = await self._collect_resource_maps()
         return PlatformMetricsData(
             cluster=self._settings.cluster_name,
@@ -189,9 +183,9 @@ class KueueMetrics(ProviderMetrics):
         kueue_config = self._kueue_config
         if not kueue_config.kube_api_url:
             raise ProviderUnavailableError("Kueue kube_api_url is not configured")
-        if not kueue_config.cluster_queues or not kueue_config.cohort:
+        if not kueue_config.cluster_queues:
             raise ProviderUnavailableError(
-                "Kueue cluster_queues and cohort must be configured for platform metrics"
+                "Kueue cluster_queues must be configured for platform metrics"
             )
         token = resolve_kube_token(kueue_config.kube_api_token, kueue_config.token_file)
         if not token:
@@ -203,12 +197,11 @@ class KueueMetrics(ProviderMetrics):
         queue_urls = [
             cluster_queue_object_url(kueue_config, q) for q in kueue_config.cluster_queues
         ]
-        cohort_url = cohort_object_url(kueue_config, kueue_config.cohort)
 
         try:
             docs = await kube_parallel_get_json(
                 self._client,
-                [*queue_urls, cohort_url],
+                queue_urls,
                 headers=headers,
             )
         except httpx.HTTPStatusError as exc:
@@ -222,21 +215,17 @@ class KueueMetrics(ProviderMetrics):
                 "Failed querying Kueue objects (upstream request error)"
             ) from exc
 
-        queue_docs = docs[:-1]
-        cohort_doc = docs[-1]
         queue_totals: dict[str, float] = {}
         allocated_totals: dict[str, float] = {}
 
-        for item in queue_docs:
+        for item in docs:
             for res_name, val in sum_nominal_quotas_by_resource(item).items():
                 merge_resource_totals(queue_totals, res_name, val)
             for res_name, val in _sum_usage_from_status(item).items():
                 merge_resource_totals(allocated_totals, res_name, val)
-        for res_name, val in sum_nominal_quotas_by_resource(cohort_doc).items():
-            merge_resource_totals(queue_totals, res_name, val)
         if not queue_totals:
             raise ProviderUnavailableError(
-                "Kueue ClusterQueue and Cohort specs did not include nominal quota values"
+                "Kueue ClusterQueue specs did not include nominal quota values"
             )
         capacity_str = _float_maps_to_strings(queue_totals)
         allocated_str = _align_allocated_with_capacity(
@@ -278,13 +267,13 @@ class KueueProvider(Provider):
         return self._metrics
 
     def cache_fingerprint(self) -> str:
-        """Hash of cohort and cluster queue list for cache key segregation."""
+        """Hash of configured cluster queue list for cache key segregation."""
         kueue_config = self._kueue_config
-        raw = "|".join(sorted(kueue_config.cluster_queues)) + "|" + kueue_config.cohort
+        raw = "|".join(sorted(kueue_config.cluster_queues))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """List ClusterQueues and fetch configured cohort/queues to validate RBAC."""
+        """List ClusterQueues and fetch configured queues to validate RBAC."""
         kueue_config = self._kueue_config
         if not kueue_config.kube_api_url:
             raise RuntimeStartupError(
@@ -293,10 +282,6 @@ class KueueProvider(Provider):
         if not kueue_config.cluster_queues:
             raise RuntimeStartupError(
                 "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES must list at least one ClusterQueue"
-            )
-        if not kueue_config.cohort:
-            raise RuntimeStartupError(
-                "METRICS_PROVIDERS__KUEUE__COHORT is required for platform metrics"
             )
         token = resolve_kube_token(kueue_config.kube_api_token, kueue_config.token_file)
         if not token:
@@ -320,42 +305,32 @@ class KueueProvider(Provider):
                 f"Cannot reach Kubernetes API for Kueue checks: {exc}"
             ) from exc
 
-        cohort_url = cohort_object_url(kueue_config, kueue_config.cohort)
-        queue_urls = [
-            cluster_queue_object_url(kueue_config, q) for q in kueue_config.cluster_queues
-        ]
-        try:
-            docs = await kube_parallel_get_json(
-                self._client, [cohort_url, *queue_urls], headers=headers
-            )
-        except httpx.HTTPStatusError as exc:
-            if exc.response is not None and exc.response.status_code == 404:
+        for qname in kueue_config.cluster_queues:
+            queue_url = cluster_queue_object_url(kueue_config, qname)
+            try:
+                cq = await kube_get_json(self._client, queue_url, headers=headers)
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                if status_code == 404:
+                    raise RuntimeStartupError(
+                        f"Configured ClusterQueue {qname!r} was not found in the cluster"
+                    ) from exc
+                if status_code == 403:
+                    raise RuntimeStartupError(
+                        f"Configured ClusterQueue {qname!r} is forbidden (HTTP 403)"
+                    ) from exc
+                if status_code is not None:
+                    raise RuntimeStartupError(
+                        f"Failed loading ClusterQueue {qname!r} (HTTP {status_code})"
+                    ) from exc
+                raise RuntimeStartupError(f"Failed loading ClusterQueue {qname!r}") from exc
+            except httpx.RequestError as exc:
                 raise RuntimeStartupError(
-                    "Configured cohort or a ClusterQueue was not found in the cluster"
+                    f"Cannot reach Kubernetes API for ClusterQueue {qname!r}: {exc}"
                 ) from exc
-            raise RuntimeStartupError(
-                f"Kubernetes request failed during Kueue validation: {exc}"
-            ) from exc
-        except httpx.RequestError as exc:
-            raise RuntimeStartupError(
-                f"Cannot reach Kubernetes API for Kueue validation: {exc}"
-            ) from exc
-        cohort_doc, *cqs = docs
-        if not isinstance(cohort_doc, dict):
-            raise RuntimeStartupError("Unexpected response when loading Cohort object")
-        meta = cohort_doc.get("metadata") or {}
-        if meta.get("name") != kueue_config.cohort:
-            raise RuntimeStartupError("Cohort response metadata did not match cohort name")
-        for cq, qname in zip(cqs, kueue_config.cluster_queues, strict=True):
             if not isinstance(cq, dict):
                 raise RuntimeStartupError(
                     f"Unexpected response when loading ClusterQueue {qname!r}"
-                )
-            spec = cq.get("spec") or {}
-            cohort_ref = str(spec.get("cohortName") or spec.get("cohort") or "")
-            if cohort_ref != kueue_config.cohort:
-                raise RuntimeStartupError(
-                    f"ClusterQueue {qname!r} has cohort {cohort_ref!r}, expected {kueue_config.cohort!r}"
                 )
 
     async def shutdown(self) -> None:

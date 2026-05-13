@@ -30,7 +30,7 @@ The service is Kubernetes-first in every environment.
 
 - `dev` requires kind, Helm, and `kubectl`. Test and verification flows assume
   you can create or use a one-node kind cluster, install Kueue charts, apply
-  ClusterQueue/Cohort objects, deploy the metrics chart, and run Redis in the
+  ClusterQueue fixture objects, deploy the metrics chart, and run Redis in the
   cluster deployment path.
 - `integration`, `staging`, and `production` use an already operating
   Kubernetes cluster. This repository deploys the service via Helm with
@@ -59,7 +59,6 @@ level must include a `metrics:` mapping (see `docs/examples/metrics.config.yaml`
 (not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with
 `METRICS_` + the nested name using `__` as the delimiter, for example:
 
-- `METRICS_PROVIDERS__KUEUE__COHORT` → `providers.kueue.cohort`
 - `METRICS_PROVIDERS__KUEUE__KUBE_API_URL` → `providers.kueue.kube_api_url`
 - `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` → must be a **JSON array of
   strings** (for example `'["cq-proton","cq-neutron"]'`), not a comma-separated
@@ -79,6 +78,9 @@ through `METRICS_PROVIDERS__KUEUE__*`.
 `providers.prometheus` and `providers.kube` may be present in YAML and pass
 validation, but M4 does not open HTTP clients to them; only the active
 platform source (Kueue) runs startup checks and platform aggregation.
+
+Borrowed/lending response expansion is out of scope for this delivery; platform
+responses remain the existing `capacity` and `allocated` maps.
 
 ## Cluster RBAC (Helm)
 

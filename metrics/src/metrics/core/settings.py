@@ -30,15 +30,14 @@ class HttpClientConfig(BaseModel):
 
 
 class KueueProviderConfig(BaseModel):
-    """Kueue-related settings: ClusterQueues, cohort, and Kubernetes API access."""
+    """Kueue settings for queue-only platform metrics and Kubernetes API access."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     cluster_queues: list[str] = Field(
         default_factory=list,
         description="ClusterQueue names included in platform aggregation.",
     )
-    cohort: str = ""
     kube_api_url: str | None = None
     kube_api_token: str | None = None
     token_file: str | None = None
@@ -46,7 +45,6 @@ class KueueProviderConfig(BaseModel):
     kube_verify_tls: bool = True
     kube_request_timeout_seconds: float = Field(default=10.0, gt=0)
     kube_clusterqueue_path: str = "/apis/kueue.x-k8s.io/v1beta2/clusterqueues"
-    kube_cohort_path: str = "/apis/kueue.x-k8s.io/v1beta2/cohorts"
     http: HttpClientConfig = Field(default_factory=HttpClientConfig)
 
     @field_validator("cluster_queues", mode="before")
