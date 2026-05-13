@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.3.0](https://github.com/opencadc/science-platform/compare/1.2.1...1.3.0) (2026-05-13)
+
+
+### Features
+
+* **metrics:** add configuration for metrics package with changelog and release settings ([954afb2](https://github.com/opencadc/science-platform/commit/954afb25f3cb0aea9b7641187f310d470d2da476))
+* **metrics:** add Helm chart, Minikube scripts, and CI updates ([4af37e3](https://github.com/opencadc/science-platform/commit/4af37e31bc98db5df73b809bea1e9dddd930de06))
+* **metrics:** add metrics pre-commit hook for automated checks ([7564d2d](https://github.com/opencadc/science-platform/commit/7564d2d710b0ab2e67a805c115b4e8e45eee4b69))
+* **metrics:** implement CI/CD workflows for Metrics API, including linting, testing, and release automation ([38432e0](https://github.com/opencadc/science-platform/commit/38432e020d2081e4e43f30ea80dcc856ac7e92b4))
+* **metrics:** Kueue Helm RBAC, Minikube helpers, and CI ([5b18b8d](https://github.com/opencadc/science-platform/commit/5b18b8d4718fa2544f53e0789800b3a9011f4842))
+* **metrics:** M1 compose stack, prerequisites, CI and docs ([de0226d](https://github.com/opencadc/science-platform/commit/de0226ddea97b48d972a06389c06c2d2c1d47ea9))
+* **metrics:** minikube smoke, Skaffold, and platform metrics cleanup ([90bb692](https://github.com/opencadc/science-platform/commit/90bb6920ff4c60fced228b7453138382040cfdab))
+
+
+### Bug Fixes
+
+* **build:** metrics ([2f7154b](https://github.com/opencadc/science-platform/commit/2f7154b46430d7d874281db8f5e4a6ad67611c30))
+* **build:** system ([8ec83b0](https://github.com/opencadc/science-platform/commit/8ec83b02417a3d5f1e5329be957b0f187c3c3e22))
+* **ci:** bound minikube smoke waits and image loads ([754b23c](https://github.com/opencadc/science-platform/commit/754b23ca824241ef76cc31372e620d6a0bad036d))
+* **ci:** updated paths-filter action ([88e4b0b](https://github.com/opencadc/science-platform/commit/88e4b0baaa8b5a054b2168663ccdafa1ef709ba3))
+* **metrics:** dispatch release builds from component outputs ([5e1d28f](https://github.com/opencadc/science-platform/commit/5e1d28f5e5a788d3900bbef4af9b9ed3fbc83a51))
+* **metrics:** repair release CI configuration ([cebf241](https://github.com/opencadc/science-platform/commit/cebf2414079ff1856f4a71ed21fb2dc10b85f9e3))
+* **release-please:** configuration to have different release tracks for skaha & metrics ([0fa8e60](https://github.com/opencadc/science-platform/commit/0fa8e60630b9afbd08794739db2142332423b429))
+* use sha value for images ([0765e62](https://github.com/opencadc/science-platform/commit/0765e623b9b8020497113b35ace73a8a235d1d21))
+
 ## [1.2.1](https://github.com/opencadc/science-platform/compare/1.2.0...1.2.1) (2026-03-03)
 
 
