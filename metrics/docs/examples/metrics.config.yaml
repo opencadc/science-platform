@@ -8,7 +8,6 @@ metrics:
       kube_api_url: "https://kubernetes.default.svc"
       cluster_queues:
         - cq-proton
-      cohort: cohort-atom
       token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
       ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
       http:

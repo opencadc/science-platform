@@ -23,7 +23,6 @@ env:
   METRICS_PROVIDERS__KUEUE__KUBE_VERIFY_TLS: "true"
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-neutron","cq-electron"]'
-  METRICS_PROVIDERS__KUEUE__COHORT: "cohort-atom"
 
 redis:
   enabled: true
