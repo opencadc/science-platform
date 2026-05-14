@@ -74,6 +74,8 @@ public class UserStorageClient {
      * @throws Exception if there is an error during allocation.
      */
     public void ensureUserBase(final String owner) throws Exception {
+        LOGGER.debug(
+                "Ensuring user base for: " + owner + " at configured site " + this.userStorageConfiguration.serviceURI);
         final VOSpaceClient cavernClient = new VOSpaceClient(this.userStorageConfiguration.serviceURI);
         final String userHomeBasePath = this.userStorageConfiguration.userHomeBaseURI.getPath();
         final String userHomePath = Path.of(userHomeBasePath, owner).toString();

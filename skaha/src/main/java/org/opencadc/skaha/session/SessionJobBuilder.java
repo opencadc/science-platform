@@ -225,12 +225,23 @@ public class SessionJobBuilder {
                     // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is
                     // greater than 0.
                     if (this.gpuCount > 0) {
+                        // According to the Kubernetes Documentation:
+                        // https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins
+                        // only the limits should be set.  However, to enable Fair Share in Kueue, the requests need
+                        // to be set as well.  As long as they are the same, this should be fine.
+                        // jenkinsd 2026.05.14
+                        //
                         final V1ResourceRequirements resourceRequirements =
                                 SessionJobBuilder.getResourceRequirements(podTemplateSpec);
                         final Map<String, Quantity> limits =
                                 Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
                         limits.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+                        final Map<String, Quantity> requests =
+                                Objects.requireNonNullElse(resourceRequirements.getRequests(), new HashMap<>());
+                        requests.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+
                         resourceRequirements.setLimits(limits);
+                        resourceRequirements.setRequests(requests);
                     }
 
                     // spec.template.spec.affinity
