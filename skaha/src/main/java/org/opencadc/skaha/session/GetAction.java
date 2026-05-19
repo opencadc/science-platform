@@ -76,6 +76,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.metrics.DummyMetricsDAO;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
@@ -177,14 +179,27 @@ public class GetAction extends SessionAction {
         try {
             final PlatformMetrics platformMetrics = metricsDAO.getPlatformMetrics();
             final PlatformClusterResourceFields clusterFields = PlatformMetricsMapper.map(platformMetrics);
-            final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = loadNodeCapacity();
 
-            final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
-            final String withRAM = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
-            final double maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
-            final double withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
+            final double maxCores;
+            final String withRAM;
+            final String maxRAMStr;
+            final double withCores;
+            if (isSessionLimitRangeEnabled()) {
+                final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = loadNodeCapacity();
+                maxRAMStr = MemoryUnitConverter.formatHumanReadable(
+                        aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
+                withRAM = MemoryUnitConverter.formatHumanReadable(
+                        aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
+                maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
+                withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
+            } else {
+                final ResourceContexts resourceContexts = loadResourceContexts();
+                maxCores = resourceContexts.getDefaultLimitCores();
+                withCores = resourceContexts.getDefaultLimitCores();
+                maxRAMStr = MemoryUnitConverter.formatHumanReadable(
+                        resourceContexts.getDefaultLimitRAM(), MemoryUnitConverter.MemoryUnit.Gi);
+                withRAM = maxRAMStr;
+            }
             return new ResourceStats(
                     clusterFields.requestedCPUCores(),
                     clusterFields.requestedRAM(),
@@ -198,6 +213,14 @@ public class GetAction extends SessionAction {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
         }
+    }
+
+    boolean isSessionLimitRangeEnabled() {
+        return K8SUtil.isSessionLimitRangeEnabled();
+    }
+
+    ResourceContexts loadResourceContexts() {
+        return new ResourceContexts();
     }
 
     NodeDAO.AggregatedCapacity loadNodeCapacity() throws Exception {
