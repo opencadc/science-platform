@@ -55,8 +55,7 @@ public class GetActionResourceStatsTest {
             get.doAction();
             Assert.fail("Expected TransientException");
         } catch (TransientException transientException) {
-            Assert.assertEquals(
-                    PlatformMetricsUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+            Assert.assertEquals(PlatformMetricsUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
         }
     }
 
@@ -82,8 +81,7 @@ public class GetActionResourceStatsTest {
             get.doAction();
             Assert.fail("Expected TransientException");
         } catch (TransientException transientException) {
-            Assert.assertEquals(
-                    SessionLimitRangeUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+            Assert.assertEquals(SessionLimitRangeUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
         }
     }
 

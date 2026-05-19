@@ -242,10 +242,6 @@ public class GetAction extends SessionAction {
         return new ResourceContexts();
     }
 
-    NodeDAO.AggregatedCapacity loadNodeCapacity() throws Exception {
-        return NodeDAO.getCapacity();
-    }
-
     LimitRangeResourceContext loadLimitRangeResourceContext() throws Exception {
         try {
             return new LimitRangeResourceContext();

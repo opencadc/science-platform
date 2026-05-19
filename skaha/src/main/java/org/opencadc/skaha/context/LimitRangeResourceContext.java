@@ -143,7 +143,6 @@ public class LimitRangeResourceContext {
         }
     }
 
-
     public IntegerRange getTotalCoreCounts() {
         return new IntegerRange(
                 1,
