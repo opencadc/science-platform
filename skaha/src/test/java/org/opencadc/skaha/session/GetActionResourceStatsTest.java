@@ -1,14 +1,22 @@
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.net.TransientException;
+import ca.nrc.cadc.rest.SyncInput;
+import ca.nrc.cadc.rest.SyncOutput;
 import ca.nrc.cadc.util.PropertiesReader;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.OutputStream;
 import java.util.Map;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.metrics.DummyMetricsDAO;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
@@ -19,9 +27,6 @@ import org.opencadc.skaha.utils.MemoryUnitConverter;
 public class GetActionResourceStatsTest {
 
     private static final String CONFIG_DIR_PROPERTY = PropertiesReader.class.getName() + ".dir";
-
-    private static final NodeDAO.AggregatedCapacity DISTINCT_NODE_CAPACITY = new NodeDAO.AggregatedCapacity(
-            999.0, 999_000_000_000L, 0, Map.entry(16.0, 64_000_000_000L), Map.entry(64_000_000_000L, 16.0));
 
     private String previousConfigDir;
 
@@ -40,10 +45,37 @@ public class GetActionResourceStatsTest {
     }
 
     @Test
+    public void statsViewReturns503WhenLimitRangeEnabledButUnavailable() throws Exception {
+        final TestableGetAction get = new TestableGetAction(new DummyMetricsDAO(), null, true);
+        get.configureStatsViewRequest();
+
+        try {
+            get.doAction();
+            Assert.fail("Expected TransientException");
+        } catch (TransientException transientException) {
+            Assert.assertEquals(
+                    SessionLimitRangeUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+        }
+    }
+
+    @Test
+    public void getResourceStatsThrowsWhenLimitRangeEnabledButUnavailable() {
+        final TestableGetAction get = new TestableGetAction(new DummyMetricsDAO(), null, true);
+
+        try {
+            get.getResourceStats();
+            Assert.fail("Expected SessionLimitRangeUnavailableException");
+        } catch (SessionLimitRangeUnavailableException unavailable) {
+            Assert.assertNotNull(unavailable.getCause());
+        }
+    }
+
+    @Test
     public void clusterTotalsComeFromPlatformMetricsNotNodeOrSessionTotals() throws Exception {
         final PlatformClusterResourceFields expectedClusterFields =
                 PlatformMetricsMapper.map(PlatformMetricsFixtures.fixedPlatformMetrics());
-        final GetAction get = new TestableGetAction(new DummyMetricsDAO(), DISTINCT_NODE_CAPACITY, true);
+        final V1LimitRangeItem limitRange = containerLimitRangeFixture();
+        final GetAction get = new TestableGetAction(new DummyMetricsDAO(), limitRange, true);
 
         final ResourceStats stats = get.getResourceStats();
         final JsonObject json = new Gson().toJsonTree(stats).getAsJsonObject();
@@ -63,23 +95,16 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals(
                 expectedClusterFields.requestedRAM(), ram.get("requestedRAM").getAsString());
 
-        Assert.assertNotEquals(
-                DISTINCT_NODE_CAPACITY.totalCores(),
-                cores.get("cpuCoresAvailable").getAsDouble(),
-                0.0);
-        Assert.assertNotEquals(
-                DISTINCT_NODE_CAPACITY.totalCores(),
-                cores.get("requestedCPUCores").getAsDouble(),
-                0.0);
-
         Assert.assertEquals(
-                DISTINCT_NODE_CAPACITY.maxCorePairing().getKey(),
-                cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(),
-                0.0);
+                8.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);
         Assert.assertEquals(
-                DISTINCT_NODE_CAPACITY.maxMemoryPairing().getValue(),
-                ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(),
-                0.0);
+                MemoryUnitConverter.formatHumanReadable(24, MemoryUnitConverter.MemoryUnit.G),
+                cores.getAsJsonObject("maxCPUCores").get("withRam").getAsString());
+        Assert.assertEquals(
+                MemoryUnitConverter.formatHumanReadable(24, MemoryUnitConverter.MemoryUnit.G),
+                ram.getAsJsonObject("maxRAM").get("ram").getAsString());
+        Assert.assertEquals(
+                8.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
     }
 
     @Test
@@ -108,17 +133,61 @@ public class GetActionResourceStatsTest {
                 5.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
     }
 
+    private static V1LimitRangeItem containerLimitRangeFixture() {
+        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
+        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
+        containerLimitRange.setDefaultRequest(
+                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
+        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+        return containerLimitRange;
+    }
+
+    private static final class StatsViewSyncInput extends SyncInput {
+        @Override
+        public String getParameter(final String name) {
+            if ("view".equals(name)) {
+                return SessionAction.SESSION_VIEW_STATS;
+            }
+            return null;
+        }
+
+        @Override
+        public String getPath() {
+            return null;
+        }
+    }
+
+    private static final class TestSyncOutput extends SyncOutput {
+        private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        @Override
+        public OutputStream getOutputStream() {
+            return outputStream;
+        }
+    }
+
     private static final class TestableGetAction extends GetAction {
-        private final NodeDAO.AggregatedCapacity nodeCapacity;
+        private final V1LimitRangeItem limitRangeItem;
         private final boolean sessionLimitRangeEnabled;
 
         TestableGetAction(
                 final MetricsDAO metricsDAO,
-                final NodeDAO.AggregatedCapacity nodeCapacity,
+                final V1LimitRangeItem limitRangeItem,
                 final boolean sessionLimitRangeEnabled) {
             super(metricsDAO);
-            this.nodeCapacity = nodeCapacity;
+            this.limitRangeItem = limitRangeItem;
             this.sessionLimitRangeEnabled = sessionLimitRangeEnabled;
+        }
+
+        void configureStatsViewRequest() {
+            syncInput = new StatsViewSyncInput();
+            syncOutput = new TestSyncOutput();
+        }
+
+        @Override
+        protected void initRequest() throws Exception {
+            requestType = REQUEST_TYPE_SESSION;
+            sessionID = null;
         }
 
         @Override
@@ -127,8 +196,13 @@ public class GetActionResourceStatsTest {
         }
 
         @Override
-        NodeDAO.AggregatedCapacity loadNodeCapacity() throws Exception {
-            return nodeCapacity;
+        LimitRangeResourceContext loadLimitRangeResourceContext() {
+            if (limitRangeItem == null) {
+                throw new SessionLimitRangeUnavailableException(
+                        "Failed to load session LimitRange for stats",
+                        new IllegalStateException("No limit ranges found in namespace"));
+            }
+            return new LimitRangeResourceContext(limitRangeItem);
         }
     }
 }

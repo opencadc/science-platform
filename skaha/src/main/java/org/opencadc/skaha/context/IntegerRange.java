@@ -12,6 +12,10 @@ public class IntegerRange {
         this.maximum = maximum;
     }
 
+    public int getMaximum() {
+        return maximum;
+    }
+
     public Iterator<Integer> iterator() {
         return new Iterator<>() {
             private int current = minimum;

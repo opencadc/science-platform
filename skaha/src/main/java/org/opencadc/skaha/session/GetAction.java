@@ -67,6 +67,7 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -77,8 +78,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.metrics.HttpMetricsDAO;
+import org.opencadc.skaha.metrics.DummyMetricsDAO;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetrics;
@@ -106,23 +108,28 @@ public class GetAction extends SessionAction {
     }
 
     static MetricsDAO createMetricsDAO() {
-        return new HttpMetricsDAO();
+        return new DummyMetricsDAO();
     }
 
     @Override
     public void doAction() throws Exception {
-        super.initRequest();
+        initRequest();
         String view = syncInput.getParameter("view");
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 final String json;
                 if (SESSION_VIEW_STATS.equals(view)) {
-                    ResourceStats resourceStats = getResourceStats();
-                    Gson gson = new GsonBuilder()
-                            .disableHtmlEscaping()
-                            .setPrettyPrinting()
-                            .create();
-                    json = gson.toJson(resourceStats);
+                    try {
+                        ResourceStats resourceStats = getResourceStats();
+                        Gson gson = new GsonBuilder()
+                                .disableHtmlEscaping()
+                                .setPrettyPrinting()
+                                .create();
+                        json = gson.toJson(resourceStats);
+                    } catch (SessionLimitRangeUnavailableException unavailable) {
+                        log.error(unavailable.getMessage(), unavailable.getCause());
+                        throw new TransientException(SessionLimitRangeUnavailableException.CLIENT_MESSAGE);
+                    }
                 } else if (SessionAction.SESSION_VIEW_INTERACTIVE.equalsIgnoreCase(view)) {
                     String statusFilter = syncInput.getParameter("status");
                     json = listInteractiveSessions(statusFilter);
@@ -185,13 +192,13 @@ public class GetAction extends SessionAction {
             final String maxRAMStr;
             final double withCores;
             if (isSessionLimitRangeEnabled()) {
-                final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = loadNodeCapacity();
+                final LimitRangeResourceContext limitRangeResourceContext = loadLimitRangeResourceContext();
+                maxCores = limitRangeResourceContext.getTotalCoreCounts().getMaximum();
+                withCores = maxCores;
                 maxRAMStr = MemoryUnitConverter.formatHumanReadable(
-                        aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
-                withRAM = MemoryUnitConverter.formatHumanReadable(
-                        aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
-                maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
-                withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
+                        limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
+                        MemoryUnitConverter.MemoryUnit.G);
+                withRAM = maxRAMStr;
             } else {
                 final ResourceContexts resourceContexts = loadResourceContexts();
                 maxCores = resourceContexts.getDefaultLimitCores();
@@ -209,6 +216,8 @@ public class GetAction extends SessionAction {
                     withRAM,
                     maxRAMStr,
                     withCores);
+        } catch (SessionLimitRangeUnavailableException unavailable) {
+            throw unavailable;
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
@@ -225,6 +234,14 @@ public class GetAction extends SessionAction {
 
     NodeDAO.AggregatedCapacity loadNodeCapacity() throws Exception {
         return NodeDAO.getCapacity();
+    }
+
+    LimitRangeResourceContext loadLimitRangeResourceContext() throws Exception {
+        try {
+            return new LimitRangeResourceContext();
+        } catch (Exception e) {
+            throw new SessionLimitRangeUnavailableException("Failed to load session LimitRange for stats", e);
+        }
     }
 
     public String getSingleDesktopApp(String sessionID, String appID) throws Exception {
