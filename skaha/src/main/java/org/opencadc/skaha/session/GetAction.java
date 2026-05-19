@@ -126,6 +126,9 @@ public class GetAction extends SessionAction {
                                 .setPrettyPrinting()
                                 .create();
                         json = gson.toJson(resourceStats);
+                    } catch (PlatformMetricsUnavailableException unavailable) {
+                        log.error(unavailable.getMessage(), unavailable.getCause());
+                        throw new TransientException(PlatformMetricsUnavailableException.CLIENT_MESSAGE);
                     } catch (SessionLimitRangeUnavailableException unavailable) {
                         log.error(unavailable.getMessage(), unavailable.getCause());
                         throw new TransientException(SessionLimitRangeUnavailableException.CLIENT_MESSAGE);
@@ -183,8 +186,13 @@ public class GetAction extends SessionAction {
     }
 
     ResourceStats getResourceStats() {
+        final PlatformMetrics platformMetrics;
         try {
-            final PlatformMetrics platformMetrics = metricsDAO.getPlatformMetrics();
+            platformMetrics = metricsDAO.getPlatformMetrics();
+        } catch (Exception e) {
+            throw new PlatformMetricsUnavailableException("Failed to fetch platform metrics for stats", e);
+        }
+        try {
             final PlatformClusterResourceFields clusterFields = PlatformMetricsMapper.map(platformMetrics);
 
             final double maxCores;
@@ -216,6 +224,8 @@ public class GetAction extends SessionAction {
                     withRAM,
                     maxRAMStr,
                     withCores);
+        } catch (PlatformMetricsUnavailableException unavailable) {
+            throw unavailable;
         } catch (SessionLimitRangeUnavailableException unavailable) {
             throw unavailable;
         } catch (Exception e) {

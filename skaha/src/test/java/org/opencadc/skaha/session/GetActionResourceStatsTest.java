@@ -10,6 +10,7 @@ import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 import org.junit.After;
@@ -41,6 +42,34 @@ public class GetActionResourceStatsTest {
             System.clearProperty(CONFIG_DIR_PROPERTY);
         } else {
             System.setProperty(CONFIG_DIR_PROPERTY, previousConfigDir);
+        }
+    }
+
+    @Test
+    public void statsViewReturns503WhenPlatformMetricsUnavailable() throws Exception {
+        final TestableGetAction get =
+                new TestableGetAction(new FailingMetricsDAO(), containerLimitRangeFixture(), true);
+        get.configureStatsViewRequest();
+
+        try {
+            get.doAction();
+            Assert.fail("Expected TransientException");
+        } catch (TransientException transientException) {
+            Assert.assertEquals(
+                    PlatformMetricsUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+        }
+    }
+
+    @Test
+    public void getResourceStatsThrowsWhenPlatformMetricsUnavailable() {
+        final TestableGetAction get =
+                new TestableGetAction(new FailingMetricsDAO(), containerLimitRangeFixture(), true);
+
+        try {
+            get.getResourceStats();
+            Assert.fail("Expected PlatformMetricsUnavailableException");
+        } catch (PlatformMetricsUnavailableException unavailable) {
+            Assert.assertNotNull(unavailable.getCause());
         }
     }
 
@@ -163,6 +192,13 @@ public class GetActionResourceStatsTest {
         @Override
         public OutputStream getOutputStream() {
             return outputStream;
+        }
+    }
+
+    private static final class FailingMetricsDAO implements MetricsDAO {
+        @Override
+        public org.opencadc.skaha.metrics.PlatformMetrics getPlatformMetrics() throws Exception {
+            throw new IOException("metrics backend unreachable");
         }
     }
 
