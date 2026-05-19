@@ -30,18 +30,12 @@ async def test_kueue_metrics_reads_nominal_for_platform(monkeypatch) -> None:
             ]
         }
     }
-    cohort = {
-        "metadata": {"name": "cohort-x"},
-        "spec": {"resourceGroups": []},
-    }
 
     async def fake_parallel(_c, urls: list[str], *, headers, **_kwargs: object) -> list[dict]:
         out = []
         for u in urls:
             if u.endswith("/clusterqueues/cq-test"):
                 out.append(doc)
-            elif u.endswith("/cohorts/cx"):
-                out.append(cohort)
         return out
 
     monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
@@ -54,7 +48,6 @@ async def test_kueue_metrics_reads_nominal_for_platform(monkeypatch) -> None:
             kueue=KueueProviderConfig(
                 kube_api_url="https://kube.local",
                 cluster_queues=["cq-test"],
-                cohort="cx",
             ),
         ),
     )

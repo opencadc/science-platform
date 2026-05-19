@@ -12,10 +12,12 @@ scopes, tests), use `docs/plans/PLAN_M4_provider_runtime_architecture.md`.
   (URLs, startup checks, nominal-quota parsing, and aggregation).
 - **Fail fast:** Misconfiguration or a missing API is detected at **startup**
   when the active platform provider runs `startup()` during app lifespan.
-- **Honest aggregation:** Per-queue nominal quota is summed, cohort nominal
-  quota is added **once**, and `allocated` reflects admitted usage from
-  `status.flavorsUsage.resources[].total`. Kueue total already includes
-  borrowed quota.
+- **Honest aggregation:** Platform capacity and allocation are derived from the
+  configured ClusterQueue set only. `allocated` reflects admitted usage from
+  `status.flavorsUsage.resources[].total`.
+- **Stable response contract:** Borrowed/lending response-field expansion is out
+  of scope for this delivery; the platform API remains `capacity` and
+  `allocated` maps only.
 
 ## Responsibility split (M4)
 
@@ -45,8 +47,9 @@ scopes, tests), use `docs/plans/PLAN_M4_provider_runtime_architecture.md`.
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
 2. **HTTP GET** `/api/v1/metrics/platform`: route depends on `MetricsRuntime`;
    `runtime.get_platform_metrics()` delegates to `PlatformMetricsService`.
-3. **Miss:** Service calls the bound loader → `KueueMetrics.platform()` parallel-fetches
-   queues plus cohort, sums nominal quota and usage `total` fields, formats strings.
+3. **Miss:** Service calls the bound loader → `KueueMetrics.platform()`
+   parallel-fetches configured queues, sums nominal quota and usage `total`
+   fields, and formats strings.
 4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;
    HTTP caching uses `Cache-Control`, `Date`, `Expires`, and `Last-Modified`
    (see `metrics.http_cache`). Keys in `allocated` match those in `capacity`.

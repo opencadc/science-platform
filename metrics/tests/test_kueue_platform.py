@@ -13,7 +13,7 @@ from metrics.providers.kueue import KueueMetrics
 
 
 @pytest.mark.anyio
-async def test_kueue_platform_aggregates_queues_and_cohort(
+async def test_kueue_platform_aggregates_configured_queues_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(
@@ -23,7 +23,6 @@ async def test_kueue_platform_aggregates_queues_and_cohort(
             kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a", "cq-b"],
-                cohort="cohort-atom",
             )
         ),
     )
@@ -83,26 +82,6 @@ async def test_kueue_platform_aggregates_queues_and_cohort(
             ]
         },
     }
-    cohort = {
-        "metadata": {"name": "cohort-atom"},
-        "spec": {
-            "resourceGroups": [
-                {
-                    "flavors": [
-                        {
-                            "resources": [
-                                {"name": "cpu", "nominalQuota": "2"},
-                                {
-                                    "name": "memory",
-                                    "nominalQuota": "10Gi",
-                                },
-                            ]
-                        }
-                    ]
-                }
-            ]
-        },
-    }
 
     async def fake_parallel(_c, urls: list[str], *, headers, **kwargs):
         out: list[dict] = []
@@ -111,8 +90,6 @@ async def test_kueue_platform_aggregates_queues_and_cohort(
                 out.append(cq_a)
             elif url.endswith("/clusterqueues/cq-b"):
                 out.append(cq_b)
-            elif url.endswith("/cohorts/cohort-atom"):
-                out.append(cohort)
             else:
                 raise AssertionError(f"unexpected url {url!r}")
         return out
@@ -127,9 +104,14 @@ async def test_kueue_platform_aggregates_queues_and_cohort(
         data = await km.platform()
     finally:
         await client.aclose()
-    assert data.capacity["cpu"] == "18"
+    payload = data.model_dump()
+    assert set(payload.keys()) == {"scope", "cluster", "capacity", "allocated"}
+    assert "borrowed" not in payload
+    assert "lending" not in payload
+    assert data.capacity["cpu"] == "16"
     assert data.allocated["cpu"] == "1"
     assert data.allocated["memory"] == "2Gi"
+    assert data.capacity["memory"] == "20Gi"
     assert "memory" in data.capacity
     assert "memory" in data.allocated
 
@@ -146,7 +128,6 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
             kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a"],
-                cohort="cohort-atom",
             )
         ),
     )
@@ -176,18 +157,12 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
             ]
         },
     }
-    cohort = {
-        "metadata": {"name": "cohort-atom"},
-        "spec": {"resourceGroups": []},
-    }
 
     async def fake_parallel(_c, urls: list[str], **_kwargs):
         out: list[dict] = []
         for url in urls:
             if url.endswith("/clusterqueues/cq-a"):
                 out.append(cq)
-            elif url.endswith("/cohorts/cohort-atom"):
-                out.append(cohort)
             else:
                 raise AssertionError(url)
         return out
@@ -218,7 +193,6 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
             kueue=KueueProviderConfig(
                 kube_api_url="https://kube.test",
                 cluster_queues=["cq-a"],
-                cohort="cohort-atom",
             )
         ),
     )
@@ -240,18 +214,12 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
         },
         "status": {},
     }
-    cohort = {
-        "metadata": {"name": "cohort-atom"},
-        "spec": {"resourceGroups": []},
-    }
 
     async def fake_parallel(_c, urls: list[str], **_kwargs):
         out: list[dict] = []
         for url in urls:
             if url.endswith("/clusterqueues/cq-a"):
                 out.append(cq)
-            elif url.endswith("/cohorts/cohort-atom"):
-                out.append(cohort)
             else:
                 raise AssertionError(url)
         return out

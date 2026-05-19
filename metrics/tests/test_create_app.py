@@ -52,7 +52,12 @@ def test_platform_endpoint() -> None:
         assert payload["metadata"]["created"] is not None
         assert "cached" not in payload["metadata"]
         assert "ttl" not in payload["metadata"]
+        assert set(payload["data"].keys()) == {"scope", "cluster", "capacity", "allocated"}
+        assert "borrowed" not in payload["data"]
+        assert "lending" not in payload["data"]
         assert payload["data"]["cluster"] == "prod"
+        assert isinstance(payload["data"]["capacity"], dict)
+        assert isinstance(payload["data"]["allocated"], dict)
         assert payload["data"]["capacity"]["cpu"] == "100"
         assert payload["data"]["capacity"]["memory"] == "200Gi"
         assert payload["data"]["allocated"]["cpu"] == "25"

@@ -65,6 +65,16 @@ def test_kueue_cluster_queues_plain_string_not_json_array_rejected() -> None:
         KueueProviderConfig(cluster_queues="cq-single")
 
 
+def test_kueue_provider_config_contract_has_no_cohort_fields() -> None:
+    assert "cohort" not in KueueProviderConfig.model_fields
+    assert "kube_cohort_path" not in KueueProviderConfig.model_fields
+
+
+def test_kueue_provider_config_rejects_removed_cohort_field() -> None:
+    with pytest.raises(ValidationError, match="cohort"):
+        KueueProviderConfig(cluster_queues=["cq-a"], cohort="legacy-cohort")
+
+
 def test_nested_prometheus_url_from_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

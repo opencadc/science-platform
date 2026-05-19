@@ -1,6 +1,6 @@
 [project]
 name = "metrics"
-version = "0.1.4"
+version = "0.1.5"
 description = "CANFAR Science Platform Metrics Backend"
 readme = "README.md"
 authors = [

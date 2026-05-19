@@ -13,7 +13,6 @@ env:
   METRICS_OTEL_METRICS_ENABLED: "false"
   METRICS_PROVIDERS__KUEUE__KUBE_API_URL: "https://kubernetes.default.svc"
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-example"]'
-  METRICS_PROVIDERS__KUEUE__COHORT: "cohort-example"
   METRICS_PROVIDERS__PROMETHEUS__URL: "http://prometheus.monitoring.svc:9090"
 
 redis:
