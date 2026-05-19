@@ -80,7 +80,7 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.context.ResourceContexts;
-import org.opencadc.skaha.metrics.DummyMetricsDAO;
+import org.opencadc.skaha.metrics.HttpMetricsDAO;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetrics;
@@ -108,7 +108,7 @@ public class GetAction extends SessionAction {
     }
 
     static MetricsDAO createMetricsDAO() {
-        return new DummyMetricsDAO();
+        return new HttpMetricsDAO();
     }
 
     @Override
