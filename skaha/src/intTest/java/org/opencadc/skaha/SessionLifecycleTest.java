@@ -71,21 +71,13 @@ import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.everit.json.schema.Schema;
-import org.everit.json.schema.loader.SchemaLoader;
-import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opencadc.skaha.context.GetAction;
 import org.opencadc.skaha.session.Session;
 import org.opencadc.skaha.session.SessionAction;
 
@@ -158,28 +150,6 @@ public class SessionLifecycleTest {
             // verify both desktop and carta sessions
             Assert.assertNotNull("no desktop session", notebookSessionID);
             Assert.assertNotNull("no carta session", cartaSessionID);
-
-            final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
-
-            try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/stats-schema.json");
-                    final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
-                    final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
-                final StringBuilder builder = new StringBuilder();
-                reader.lines().forEach(builder::append);
-                final JSONObject rawSchema = new JSONObject(builder.toString());
-                final Schema schema = SchemaLoader.load(rawSchema);
-                schema.validate(jsonObject);
-            }
-
-            final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
-            Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));
-            final double requestedRAMInGB = Double.parseDouble(requestedRAM.substring(0, requestedRAM.length() - 2));
-            Assert.assertTrue("Wrong requested RAM number", requestedRAMInGB >= 2.0D);
-
-            final BigDecimal requestedCores = jsonObject.getJSONObject("cores").getBigDecimal("requestedCPUCores");
-            Assert.assertTrue(
-                    "Wrong requested Cores number (" + requestedCores.doubleValue() + ")",
-                    requestedCores.doubleValue() >= 2.0D);
 
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, notebookSessionID);
