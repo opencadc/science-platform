@@ -71,16 +71,16 @@ import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.metrics.DummyMetricsDAO;
+import org.opencadc.skaha.metrics.MetricsDAO;
+import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
+import org.opencadc.skaha.metrics.PlatformMetrics;
+import org.opencadc.skaha.metrics.PlatformMetricsMapper;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 /**
@@ -92,8 +92,19 @@ public class GetAction extends SessionAction {
 
     private static final Logger log = Logger.getLogger(GetAction.class);
 
+    private final MetricsDAO metricsDAO;
+
     public GetAction() {
+        this(createMetricsDAO());
+    }
+
+    GetAction(final MetricsDAO metricsDAO) {
         super();
+        this.metricsDAO = metricsDAO;
+    }
+
+    static MetricsDAO createMetricsDAO() {
+        return new DummyMetricsDAO();
     }
 
     @Override
@@ -162,34 +173,23 @@ public class GetAction extends SessionAction {
         }
     }
 
-    private ResourceStats getResourceStats() {
-        try (final ExecutorService executor = Executors.newFixedThreadPool(3)) {
-            final Future<Map<String, BigDecimal>> podAllocationResourcesFuture =
-                    executor.submit(SessionDAO::getAllocatedPodResources);
-            final Future<NodeDAO.AggregatedCapacity> aggregatedNodeCapacityFuture =
-                    executor.submit(NodeDAO::getCapacity);
-
-            final Map<String, BigDecimal> podAllocations = podAllocationResourcesFuture.get();
-            double requestedCPUCores = podAllocations.get("cpu").doubleValue();
-            long requestedRAM = podAllocations.get("memory").longValue();
-            final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = aggregatedNodeCapacityFuture.get();
+    ResourceStats getResourceStats() {
+        try {
+            final PlatformMetrics platformMetrics = metricsDAO.getPlatformMetrics();
+            final PlatformClusterResourceFields clusterFields = PlatformMetricsMapper.map(platformMetrics);
+            final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = loadNodeCapacity();
 
             final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(
                     aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
-            final String requestedRAMStr =
-                    MemoryUnitConverter.formatHumanReadable(requestedRAM, MemoryUnitConverter.MemoryUnit.G);
-            final String ramAvailableStr = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.totalMemoryBytes(), MemoryUnitConverter.MemoryUnit.G);
             final String withRAM = MemoryUnitConverter.formatHumanReadable(
                     aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
             final double maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
             final double withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
-            final double coresAvailable = aggregatedNodeCapacity.totalCores();
             return new ResourceStats(
-                    requestedCPUCores,
-                    requestedRAMStr,
-                    coresAvailable,
-                    ramAvailableStr,
+                    clusterFields.requestedCPUCores(),
+                    clusterFields.requestedRAM(),
+                    clusterFields.cpuCoresAvailable(),
+                    clusterFields.ramAvailable(),
                     maxCores,
                     withRAM,
                     maxRAMStr,
@@ -198,6 +198,10 @@ public class GetAction extends SessionAction {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
         }
+    }
+
+    NodeDAO.AggregatedCapacity loadNodeCapacity() throws Exception {
+        return NodeDAO.getCapacity();
     }
 
     public String getSingleDesktopApp(String sessionID, String appID) throws Exception {
