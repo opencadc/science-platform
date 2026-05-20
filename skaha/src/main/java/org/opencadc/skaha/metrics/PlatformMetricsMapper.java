@@ -28,7 +28,11 @@ public final class PlatformMetricsMapper {
         if (cores == null || cores.isBlank()) {
             return 0.0;
         }
-        return Double.parseDouble(cores.trim());
+        try {
+            return Double.parseDouble(cores.trim());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
     }
 
     private static String toLegacyRamString(final String metricsMemory) {
