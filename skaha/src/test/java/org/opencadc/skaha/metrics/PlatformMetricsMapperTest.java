@@ -13,8 +13,7 @@ public class PlatformMetricsMapperTest {
         final PlatformMetrics metrics = new PlatformMetrics(
                 new PlatformMetricsMetadata(Instant.parse("2026-01-01T00:00:00Z")),
                 new PlatformMetricsData(
-                        Map.of("cpu", "not-a-number", "memory", "512Gi"),
-                        Map.of("cpu", "12.5", "memory", "128Gi")));
+                        Map.of("cpu", "not-a-number", "memory", "512Gi"), Map.of("cpu", "12.5", "memory", "128Gi")));
 
         final PlatformClusterResourceFields fields = PlatformMetricsMapper.map(metrics);
 
