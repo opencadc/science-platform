@@ -1,10 +1,9 @@
 package org.opencadc.skaha.metrics;
 
 /**
- * Data access for platform metrics from the co-deployed Metrics backend.
+ * Data access for platform and per-pod metrics used by Skaha session APIs.
  *
- * <p>Callers receive a typed {@link PlatformMetrics} envelope; HTTP and deserialization belong to implementations of
- * this interface.
+ * <p>Platform snapshots come from the co-deployed Metrics HTTP API; pod usage comes from the Kubernetes metrics API.
  */
 public interface MetricsDAO {
 
@@ -15,4 +14,14 @@ public interface MetricsDAO {
      * @throws Exception if the snapshot cannot be retrieved
      */
     PlatformMetrics getPlatformMetrics() throws Exception;
+
+    /**
+     * Fetch per-pod CPU and memory usage for session workloads in the Skaha namespace.
+     *
+     * @param userID constrain by user ID when non-null/non-blank; otherwise all users
+     * @param omitHeadless when true, exclude headless session pods
+     * @return pod metrics keyed by pod name (raw Kubernetes quantity strings)
+     * @throws Exception if pod metrics cannot be retrieved
+     */
+    PodMetrics getPodMetrics(String userID, boolean omitHeadless) throws Exception;
 }

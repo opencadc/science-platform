@@ -27,7 +27,17 @@ public class PlatformMetricsTest {
                 new PlatformMetricsMetadata(SNAPSHOT_CREATED),
                 new PlatformMetricsData(Map.of("cpu", "1"), Map.of("cpu", "0.5")));
 
-        final MetricsDAO dao = () -> expected;
+        final MetricsDAO dao = new MetricsDAO() {
+            @Override
+            public PlatformMetrics getPlatformMetrics() {
+                return expected;
+            }
+
+            @Override
+            public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
+                return PodMetrics.empty();
+            }
+        };
 
         Assert.assertSame(expected, dao.getPlatformMetrics());
     }

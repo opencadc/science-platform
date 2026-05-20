@@ -18,7 +18,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.opencadc.skaha.context.LimitRangeResourceContext;
-import org.opencadc.skaha.metrics.DummyMetricsDAO;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
@@ -88,7 +87,8 @@ public class GetActionResourceStatsTest {
 
     @Test
     public void statsViewReturns503WhenLimitRangeEnabledButUnavailable() throws Exception {
-        final TestableGetAction get = new TestableGetAction(new DummyMetricsDAO(), null, true);
+        final TestableGetAction get =
+                new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), null, true);
         get.configureStatsViewRequest();
 
         try {
@@ -101,7 +101,8 @@ public class GetActionResourceStatsTest {
 
     @Test
     public void getResourceStatsThrowsWhenLimitRangeEnabledButUnavailable() {
-        final TestableGetAction get = new TestableGetAction(new DummyMetricsDAO(), null, true);
+        final TestableGetAction get =
+                new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), null, true);
 
         try {
             get.getResourceStats();
@@ -116,7 +117,8 @@ public class GetActionResourceStatsTest {
         final PlatformClusterResourceFields expectedClusterFields =
                 PlatformMetricsMapper.map(PlatformMetricsFixtures.fixedPlatformMetrics());
         final V1LimitRangeItem limitRange = containerLimitRangeFixture();
-        final GetAction get = new TestableGetAction(new DummyMetricsDAO(), limitRange, true);
+        final GetAction get =
+                new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), limitRange, true);
 
         final ResourceStats stats = get.getResourceStats();
         final JsonObject json = new Gson().toJsonTree(stats).getAsJsonObject();
@@ -152,7 +154,8 @@ public class GetActionResourceStatsTest {
                 .toURI());
         System.setProperty(CONFIG_DIR_PROPERTY, configDir.getAbsolutePath());
 
-        final GetAction get = new TestableGetAction(new DummyMetricsDAO(), null, false);
+        final GetAction get =
+                new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), null, false);
 
         final ResourceStats stats = get.getResourceStats();
         final JsonObject json = new Gson().toJsonTree(stats).getAsJsonObject();
@@ -206,6 +209,11 @@ public class GetActionResourceStatsTest {
         public org.opencadc.skaha.metrics.PlatformMetrics getPlatformMetrics() throws Exception {
             throw new IOException("metrics backend unreachable");
         }
+
+        @Override
+        public org.opencadc.skaha.metrics.PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
+            return org.opencadc.skaha.metrics.PodMetrics.empty();
+        }
     }
 
     private static class LazyMetricsGetAction extends GetAction {
@@ -214,7 +222,7 @@ public class GetActionResourceStatsTest {
         @Override
         protected MetricsDAO createMetricsDAO() {
             createMetricsDaoCalled = true;
-            return new DummyMetricsDAO();
+            return PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics();
         }
 
         @Override

@@ -12,7 +12,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-public class HttpMetricsDAOTest {
+public class PlatformMetricsDAOTest {
 
     private static final String FIXTURE_JSON =
             """
@@ -65,7 +65,7 @@ public class HttpMetricsDAOTest {
 
     @Test
     public void getPlatformMetricsParsesMetricsApiEnvelope() throws Exception {
-        final HttpMetricsDAO dao = new HttpMetricsDAO("http://127.0.0.1:" + port);
+        final PlatformMetricsDAO dao = new PlatformMetricsDAO("http://127.0.0.1:" + port);
 
         final PlatformMetrics metrics = dao.getPlatformMetrics();
 
@@ -79,7 +79,7 @@ public class HttpMetricsDAOTest {
 
     @Test
     public void normalizesTrailingSlashOnBaseUrl() throws Exception {
-        final HttpMetricsDAO dao = new HttpMetricsDAO("http://127.0.0.1:" + port + "/");
+        final PlatformMetricsDAO dao = new PlatformMetricsDAO("http://127.0.0.1:" + port + "/");
 
         final PlatformMetrics metrics = dao.getPlatformMetrics();
 
@@ -89,7 +89,7 @@ public class HttpMetricsDAOTest {
 
     @Test
     public void requiresNonBlankMetricsBackendUrl() {
-        Assert.assertThrows(IllegalStateException.class, () -> new HttpMetricsDAO("  "));
-        Assert.assertThrows(IllegalStateException.class, () -> new HttpMetricsDAO(null));
+        Assert.assertThrows(IllegalStateException.class, () -> new PlatformMetricsDAO("  "));
+        Assert.assertThrows(IllegalStateException.class, () -> new PlatformMetricsDAO(null));
     }
 }

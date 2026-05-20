@@ -19,6 +19,9 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.metrics.PodMetricsDAO;
+import org.opencadc.skaha.metrics.PodMetricsMapper;
+import org.opencadc.skaha.metrics.PodResourceUsage;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -29,6 +32,8 @@ public class SessionDAO {
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
 
     static final String NONE = "<none>";
+
+    private static final PodMetricsDAO POD_METRICS_DAO = new PodMetricsDAO();
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
@@ -159,7 +164,7 @@ public class SessionDAO {
         final String labelSelector = String.join(",", labelSelectors);
         jobListRequest.labelSelector(labelSelector);
 
-        final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, omitHeadless);
+        final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless);
         final List<V1Job> userJobs = jobListRequest.execute().getItems();
         LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector
                 + " before filtering.");
@@ -169,6 +174,15 @@ public class SessionDAO {
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
                 + " after filtering.");
         return sessions;
+    }
+
+    static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {
+        try {
+            return PodMetricsMapper.toPodResourceUsage(POD_METRICS_DAO.getPodMetrics(forUserID, omitHeadless));
+        } catch (Exception e) {
+            LOGGER.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
+            return PodResourceUsage.empty();
+        }
     }
 
     static String getConnectURL(

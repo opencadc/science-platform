@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.metrics.PodResourceUsage;
+import org.opencadc.skaha.metrics.ResourceQuantityFormatter;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 
@@ -149,12 +151,12 @@ class SessionBuilder {
                         Objects.requireNonNullElse(resourceRequirements.getRequests(), Collections.emptyMap());
                 if (this.isFixedResources) {
                     if (resourceRequests.containsKey("memory")) {
-                        this.requestedMemory = PodResourceUsage.toCommonMemoryUnit(
+                        this.requestedMemory = ResourceQuantityFormatter.toSessionMemoryGb(
                                 resourceRequests.get("memory").toSuffixedString());
                     }
 
                     if (resourceRequests.containsKey("cpu")) {
-                        this.requestedCPUCores = PodResourceUsage.toCoreUnit(
+                        this.requestedCPUCores = ResourceQuantityFormatter.toCoreUnit(
                                 resourceRequests.get("cpu").toSuffixedString());
                     }
                 }

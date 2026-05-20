@@ -15,12 +15,12 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * {@link MetricsDAO} that fetches platform metrics from the co-deployed Metrics HTTP API.
+ * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
  * <p>Configured via the {@value #SKAHA_METRICS_BACKEND_URL} environment variable (in-cluster base URL, without a
  * trailing slash).
  */
-public class HttpMetricsDAO implements MetricsDAO {
+public class PlatformMetricsDAO {
 
     /** Environment variable holding the Metrics backend base URL (scheme, host, optional port). */
     public static final String SKAHA_METRICS_BACKEND_URL = "SKAHA_METRICS_BACKEND_URL";
@@ -32,12 +32,12 @@ public class HttpMetricsDAO implements MetricsDAO {
     private final String platformMetricsUrl;
 
     /** Uses {@link #SKAHA_METRICS_BACKEND_URL} from the process environment. */
-    public HttpMetricsDAO() {
+    public PlatformMetricsDAO() {
         this(System.getenv(SKAHA_METRICS_BACKEND_URL));
     }
 
     /** @param metricsBackendBaseUrl Metrics backend base URL (for example {@code http://skaha-metrics:8000}) */
-    HttpMetricsDAO(final String metricsBackendBaseUrl) {
+    PlatformMetricsDAO(final String metricsBackendBaseUrl) {
         this.platformMetricsUrl = platformMetricsUrl(requireBaseUrl(metricsBackendBaseUrl));
     }
 
@@ -60,7 +60,6 @@ public class HttpMetricsDAO implements MetricsDAO {
         return normalizeBaseUrl(normalizedBaseUrl) + PLATFORM_METRICS_PATH;
     }
 
-    @Override
     public PlatformMetrics getPlatformMetrics() throws Exception {
         final ByteArrayOutputStream responseBody = new ByteArrayOutputStream();
         final HttpGet get = new HttpGet(URI.create(platformMetricsUrl).toURL(), responseBody);

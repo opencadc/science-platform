@@ -80,7 +80,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.opencadc.skaha.metrics.DummyMetricsDAO;
+import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
 
 /**
  * Unit Test for GetAction for sessions.
@@ -265,7 +265,7 @@ public class GetActionTests {
     static class TestGetAction extends GetAction {
 
         TestGetAction() {
-            super(new DummyMetricsDAO());
+            super(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics());
         }
 
         @Override
