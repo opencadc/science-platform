@@ -35,6 +35,12 @@ public class PodMetricsDAO {
         return PodMetricsMapper.fromKubernetes(podMetricsList);
     }
 
+    /**
+     * Build a Kubernetes label selector for session pods in the workload namespace.
+     *
+     * @return comma-separated selector, or {@code ""} when no filters apply (all pods in the namespace, same as
+     *     historical {@code kubectl top pod} without {@code -l})
+     */
     static String buildLabelSelector(final String userID, final boolean omitHeadless) {
         final List<String> labelSelectors = new ArrayList<>();
         if (StringUtil.hasLength(userID)) {

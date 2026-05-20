@@ -23,8 +23,8 @@ public final class PodMetricsMapper {
                 continue;
             }
             final String podName = podMetrics.getMetadata().getName();
-            final Quantity cpu = firstContainerQuantity(podMetrics.getContainers(), "cpu");
-            final Quantity memory = firstContainerQuantity(podMetrics.getContainers(), "memory");
+            final Quantity cpu = primaryContainerQuantity(podMetrics.getContainers(), "cpu");
+            final Quantity memory = primaryContainerQuantity(podMetrics.getContainers(), "memory");
             if (cpu != null) {
                 cpuByPodName.put(podName, cpu.toSuffixedString());
             }
@@ -53,7 +53,14 @@ public final class PodMetricsMapper {
         return new PodResourceUsage(cpu, memory);
     }
 
-    private static Quantity firstContainerQuantity(final List<ContainerMetrics> containers, final String resource) {
+    /**
+     * Usage from the primary workload container (index 0).
+     *
+     * <p>Session pods are modeled with a single main container today ({@code SessionBuilder} reads container index 0).
+     * Sidecars are not summed; if multi-container pods become common, aggregate usage here to match {@code kubectl top
+     * pod} totals.
+     */
+    private static Quantity primaryContainerQuantity(final List<ContainerMetrics> containers, final String resource) {
         if (containers == null || containers.isEmpty()) {
             return null;
         }

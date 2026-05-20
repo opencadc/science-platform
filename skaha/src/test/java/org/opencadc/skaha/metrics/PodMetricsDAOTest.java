@@ -15,6 +15,7 @@ public class PodMetricsDAOTest {
 
     @Test
     public void buildLabelSelectorEmptyWhenNoFilters() {
+        // Empty selector lists all pods in the namespace (client-java Metrics API; same as kubectl top without -l).
         Assert.assertEquals("", PodMetricsDAO.buildLabelSelector(null, false));
     }
 }

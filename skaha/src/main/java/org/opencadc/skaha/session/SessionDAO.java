@@ -19,9 +19,10 @@ import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.metrics.PodMetricsDAO;
+import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PodMetricsMapper;
 import org.opencadc.skaha.metrics.PodResourceUsage;
+import org.opencadc.skaha.metrics.SkahaMetricsDAO;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -30,10 +31,6 @@ public class SessionDAO {
     private static final String DESKTOP_APP_ID_LABEL = "canfar-net-appID";
     private static final String USER_ID_LABEL = "canfar-net-userid";
     private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
-
-    static final String NONE = "<none>";
-
-    private static final PodMetricsDAO POD_METRICS_DAO = new PodMetricsDAO();
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
@@ -177,12 +174,21 @@ public class SessionDAO {
     }
 
     static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {
+        return loadPodResourceUsage(defaultMetricsDAO(), forUserID, omitHeadless);
+    }
+
+    static PodResourceUsage loadPodResourceUsage(
+            final MetricsDAO metricsDAO, final String forUserID, final boolean omitHeadless) {
         try {
-            return PodMetricsMapper.toPodResourceUsage(POD_METRICS_DAO.getPodMetrics(forUserID, omitHeadless));
+            return PodMetricsMapper.toPodResourceUsage(metricsDAO.getPodMetrics(forUserID, omitHeadless));
         } catch (Exception e) {
             LOGGER.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
             return PodResourceUsage.empty();
         }
+    }
+
+    private static MetricsDAO defaultMetricsDAO() {
+        return new SkahaMetricsDAO();
     }
 
     static String getConnectURL(
