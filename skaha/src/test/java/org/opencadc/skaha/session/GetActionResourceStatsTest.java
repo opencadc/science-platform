@@ -23,7 +23,6 @@ import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
 import org.opencadc.skaha.metrics.PlatformMetricsMapper;
-import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 public class GetActionResourceStatsTest {
 
@@ -43,6 +42,21 @@ public class GetActionResourceStatsTest {
         } else {
             System.setProperty(CONFIG_DIR_PROPERTY, previousConfigDir);
         }
+    }
+
+    @Test
+    public void metricsDaoNotCreatedUntilResourceStatsRequested() throws Exception {
+        final LazyMetricsGetAction get = new LazyMetricsGetAction();
+        Assert.assertFalse(get.createMetricsDaoCalled);
+
+        get.getResourceStats();
+
+        Assert.assertTrue(get.createMetricsDaoCalled);
+    }
+
+    @Test
+    public void publicConstructorDoesNotEagerlyCreateMetricsDao() {
+        new GetAction();
     }
 
     @Test
@@ -125,11 +139,8 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals(
                 8.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);
         Assert.assertEquals(
-                MemoryUnitConverter.formatHumanReadable(24, MemoryUnitConverter.MemoryUnit.G),
-                cores.getAsJsonObject("maxCPUCores").get("withRam").getAsString());
-        Assert.assertEquals(
-                MemoryUnitConverter.formatHumanReadable(24, MemoryUnitConverter.MemoryUnit.G),
-                ram.getAsJsonObject("maxRAM").get("ram").getAsString());
+                "24G", cores.getAsJsonObject("maxCPUCores").get("withRam").getAsString());
+        Assert.assertEquals("24G", ram.getAsJsonObject("maxRAM").get("ram").getAsString());
         Assert.assertEquals(
                 8.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
     }
@@ -151,11 +162,8 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals(
                 5.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);
         Assert.assertEquals(
-                MemoryUnitConverter.formatHumanReadable(20, MemoryUnitConverter.MemoryUnit.Gi),
-                cores.getAsJsonObject("maxCPUCores").get("withRam").getAsString());
-        Assert.assertEquals(
-                MemoryUnitConverter.formatHumanReadable(20, MemoryUnitConverter.MemoryUnit.Gi),
-                ram.getAsJsonObject("maxRAM").get("ram").getAsString());
+                "20Gi", cores.getAsJsonObject("maxCPUCores").get("withRam").getAsString());
+        Assert.assertEquals("20Gi", ram.getAsJsonObject("maxRAM").get("ram").getAsString());
         Assert.assertEquals(
                 5.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
     }
@@ -197,6 +205,26 @@ public class GetActionResourceStatsTest {
         @Override
         public org.opencadc.skaha.metrics.PlatformMetrics getPlatformMetrics() throws Exception {
             throw new IOException("metrics backend unreachable");
+        }
+    }
+
+    private static class LazyMetricsGetAction extends GetAction {
+        private boolean createMetricsDaoCalled;
+
+        @Override
+        protected MetricsDAO createMetricsDAO() {
+            createMetricsDaoCalled = true;
+            return new DummyMetricsDAO();
+        }
+
+        @Override
+        boolean isSessionLimitRangeEnabled() {
+            return true;
+        }
+
+        @Override
+        LimitRangeResourceContext loadLimitRangeResourceContext() {
+            return new LimitRangeResourceContext(containerLimitRangeFixture());
         }
     }
 

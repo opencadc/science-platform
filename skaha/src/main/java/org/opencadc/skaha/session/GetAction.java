@@ -96,10 +96,10 @@ public class GetAction extends SessionAction {
 
     private static final Logger log = Logger.getLogger(GetAction.class);
 
-    private final MetricsDAO metricsDAO;
+    private MetricsDAO metricsDAO;
 
     public GetAction() {
-        this(createMetricsDAO());
+        super();
     }
 
     GetAction(final MetricsDAO metricsDAO) {
@@ -107,8 +107,15 @@ public class GetAction extends SessionAction {
         this.metricsDAO = metricsDAO;
     }
 
-    static MetricsDAO createMetricsDAO() {
+    protected MetricsDAO createMetricsDAO() {
         return new HttpMetricsDAO();
+    }
+
+    private MetricsDAO metricsDAO() {
+        if (metricsDAO == null) {
+            metricsDAO = createMetricsDAO();
+        }
+        return metricsDAO;
     }
 
     @Override
@@ -188,7 +195,7 @@ public class GetAction extends SessionAction {
     ResourceStats getResourceStats() {
         final PlatformMetrics platformMetrics;
         try {
-            platformMetrics = metricsDAO.getPlatformMetrics();
+            platformMetrics = metricsDAO().getPlatformMetrics();
         } catch (Exception e) {
             throw new PlatformMetricsUnavailableException("Failed to fetch platform metrics for stats", e);
         }
@@ -204,7 +211,8 @@ public class GetAction extends SessionAction {
                 maxCores = limitRangeResourceContext.getTotalCoreCounts().getMaximum();
                 withCores = maxCores;
                 maxRAMStr = MemoryUnitConverter.formatHumanReadable(
-                        limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
+                        (double)
+                                limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
                         MemoryUnitConverter.MemoryUnit.G);
                 withRAM = maxRAMStr;
             } else {
@@ -212,7 +220,7 @@ public class GetAction extends SessionAction {
                 maxCores = resourceContexts.getDefaultLimitCores();
                 withCores = resourceContexts.getDefaultLimitCores();
                 maxRAMStr = MemoryUnitConverter.formatHumanReadable(
-                        resourceContexts.getDefaultLimitRAM(), MemoryUnitConverter.MemoryUnit.Gi);
+                        resourceContexts.getDefaultLimitRAM().doubleValue(), MemoryUnitConverter.MemoryUnit.Gi);
                 withRAM = maxRAMStr;
             }
             return new ResourceStats(
