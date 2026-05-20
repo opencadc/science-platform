@@ -13,6 +13,12 @@ public class ResourceQuantityFormatterTest {
     }
 
     @Test
+    public void toCoreUnitPassesThroughWhenNumericPartInvalid() {
+        Assert.assertEquals("1.5m", ResourceQuantityFormatter.toCoreUnit("1.5m"));
+        Assert.assertEquals("badm", ResourceQuantityFormatter.toCoreUnit("badm"));
+    }
+
+    @Test
     public void testPrintMemory() {
         Assert.assertEquals("Wrong memory unit.", "1.61", ResourceQuantityFormatter.toSessionMemoryGb("1536Mi"));
         Assert.assertEquals("Wrong memory unit.", "0.54", ResourceQuantityFormatter.toSessionMemoryGb("512Mi"));

@@ -28,9 +28,13 @@ public final class ResourceQuantityFormatter {
         if (dividend == null) {
             return cores;
         }
-        final int coreValueWithoutUnit = Integer.parseInt(cores.substring(0, cores.length() - 1));
-        final double coreValue = coreValueWithoutUnit / Math.pow(10, dividend);
-        return String.format("%.3f", coreValue);
+        try {
+            final int coreValueWithoutUnit = Integer.parseInt(cores.substring(0, cores.length() - 1));
+            final double coreValue = coreValueWithoutUnit / Math.pow(10, dividend);
+            return String.format("%.3f", coreValue);
+        } catch (NumberFormatException e) {
+            return cores;
+        }
     }
 
     /**
