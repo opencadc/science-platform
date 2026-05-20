@@ -12,7 +12,8 @@ import org.json.JSONWriter;
 /**
  * Legacy per-pod CPU and memory usage for session listings, keyed by pod name.
  *
- * <p>Produced by {@link PodMetricsMapper} from {@link PodMetrics}; field values match the historical session API.
+ * <p>Produced by {@link PodMetrics#toPodResourceUsage(PodMetrics)} from {@link PodMetrics}; field values match the
+ * historical session API.
  */
 public record PodResourceUsage(Map<String, String> cpu, Map<String, String> memory) {
     private static final Logger LOGGER = Logger.getLogger(PodResourceUsage.class);

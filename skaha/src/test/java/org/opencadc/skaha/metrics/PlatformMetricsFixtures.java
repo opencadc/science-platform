@@ -10,7 +10,7 @@ public final class PlatformMetricsFixtures {
     public static final Map<String, String> ALLOCATED = Map.of("cpu", "12.5", "memory", "128Gi");
 
     private static final PlatformMetrics FIXED = new PlatformMetrics(
-            new PlatformMetricsMetadata(SNAPSHOT_CREATED), new PlatformMetricsData(CAPACITY, ALLOCATED));
+            new PlatformMetrics.Metadata(SNAPSHOT_CREATED), new PlatformMetrics.Data(CAPACITY, ALLOCATED));
 
     private PlatformMetricsFixtures() {}
 

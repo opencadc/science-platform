@@ -32,7 +32,7 @@ public class PodMetricsDAO {
         final String labelSelector = buildLabelSelector(userID, omitHeadless);
         final PodMetricsList podMetricsList =
                 metricsClient.getPodMetrics(K8SUtil.getWorkloadNamespace(), labelSelector);
-        return PodMetricsMapper.fromKubernetes(podMetricsList);
+        return PodMetrics.fromKubernetes(podMetricsList);
     }
 
     /**

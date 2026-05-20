@@ -19,9 +19,8 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.opencadc.skaha.context.GetAction;
-import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
+import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
-import org.opencadc.skaha.metrics.PlatformMetricsMapper;
 
 /**
  * Integration tests for {@code GET /v1/session?view=stats} (platform stats).
@@ -70,8 +69,8 @@ public class PlatformStatsIntTest {
             final JSONObject stats = SessionUtil.getStats(sessionURL);
             validateStatsSchema(stats);
 
-            final PlatformClusterResourceFields expected =
-                    PlatformMetricsMapper.map(PlatformMetricsFixtures.fixedPlatformMetrics());
+            final ClusterResourceFields expected =
+                    PlatformMetricsFixtures.fixedPlatformMetrics().toClusterResourceFields();
             final JSONObject cores = stats.getJSONObject("cores");
             final JSONObject ram = stats.getJSONObject("ram");
 

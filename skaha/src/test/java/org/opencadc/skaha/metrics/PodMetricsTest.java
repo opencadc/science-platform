@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class PodMetricsMapperTest {
+public class PodMetricsTest {
 
     @Test
     public void fromKubernetesMapsPodUsageToRawQuantities() {
@@ -24,7 +24,7 @@ public class PodMetricsMapperTest {
         final PodMetricsList list = new PodMetricsList();
         list.setItems(List.of(k8sPod));
 
-        final PodMetrics podMetrics = PodMetricsMapper.fromKubernetes(list);
+        final PodMetrics podMetrics = PodMetrics.fromKubernetes(list);
 
         Assert.assertEquals("1367m", podMetrics.cpuByPodName().get("skaha-notebook-alice-abc"));
         Assert.assertEquals("1536Mi", podMetrics.memoryByPodName().get("skaha-notebook-alice-abc"));
@@ -35,7 +35,7 @@ public class PodMetricsMapperTest {
         final PodMetrics podMetrics = new PodMetrics(
                 Map.of("skaha-notebook-alice-abc", "1367m"), Map.of("skaha-notebook-alice-abc", "1536Mi"));
 
-        final PodResourceUsage usage = PodMetricsMapper.toPodResourceUsage(podMetrics);
+        final PodResourceUsage usage = PodMetrics.toPodResourceUsage(podMetrics);
 
         Assert.assertEquals("1.367", usage.cpu().get("skaha-notebook-alice-abc"));
         Assert.assertEquals("1.61", usage.memory().get("skaha-notebook-alice-abc"));
@@ -43,7 +43,7 @@ public class PodMetricsMapperTest {
 
     @Test
     public void fromKubernetesReturnsEmptyWhenListMissing() {
-        Assert.assertEquals(PodMetrics.empty(), PodMetricsMapper.fromKubernetes(null));
-        Assert.assertEquals(PodMetrics.empty(), PodMetricsMapper.fromKubernetes(new PodMetricsList()));
+        Assert.assertEquals(PodMetrics.empty(), PodMetrics.fromKubernetes(null));
+        Assert.assertEquals(PodMetrics.empty(), PodMetrics.fromKubernetes(new PodMetricsList()));
     }
 }

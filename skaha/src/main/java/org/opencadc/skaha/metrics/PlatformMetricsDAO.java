@@ -80,7 +80,8 @@ public class PlatformMetricsDAO {
         final Instant created = Instant.parse(metadata.get("created").getAsString());
         final Map<String, String> capacity = parseResourceMap(data, "capacity");
         final Map<String, String> allocated = parseResourceMap(data, "allocated");
-        return new PlatformMetrics(new PlatformMetricsMetadata(created), new PlatformMetricsData(capacity, allocated));
+        return new PlatformMetrics(
+                new PlatformMetrics.Metadata(created), new PlatformMetrics.Data(capacity, allocated));
     }
 
     private Map<String, String> parseResourceMap(final JsonObject data, final String field) {

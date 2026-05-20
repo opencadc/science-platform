@@ -19,9 +19,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.metrics.MetricsDAO;
-import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
+import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
-import org.opencadc.skaha.metrics.PlatformMetricsMapper;
 
 public class GetActionResourceStatsTest {
 
@@ -114,8 +113,8 @@ public class GetActionResourceStatsTest {
 
     @Test
     public void clusterTotalsComeFromPlatformMetricsNotNodeOrSessionTotals() throws Exception {
-        final PlatformClusterResourceFields expectedClusterFields =
-                PlatformMetricsMapper.map(PlatformMetricsFixtures.fixedPlatformMetrics());
+        final ClusterResourceFields expectedClusterFields =
+                PlatformMetricsFixtures.fixedPlatformMetrics().toClusterResourceFields();
         final V1LimitRangeItem limitRange = containerLimitRangeFixture();
         final GetAction get =
                 new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), limitRange, true);

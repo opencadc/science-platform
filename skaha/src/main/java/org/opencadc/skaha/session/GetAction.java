@@ -81,9 +81,8 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.metrics.MetricsDAO;
-import org.opencadc.skaha.metrics.PlatformClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetrics;
-import org.opencadc.skaha.metrics.PlatformMetricsMapper;
+import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
 import org.opencadc.skaha.metrics.SkahaMetricsDAO;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
@@ -200,7 +199,7 @@ public class GetAction extends SessionAction {
             throw new PlatformMetricsUnavailableException("Failed to fetch platform metrics for stats", e);
         }
         try {
-            final PlatformClusterResourceFields clusterFields = PlatformMetricsMapper.map(platformMetrics);
+            final ClusterResourceFields clusterFields = platformMetrics.toClusterResourceFields();
 
             final double maxCores;
             final String withRAM;
