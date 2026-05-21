@@ -4,6 +4,12 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
+
+import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
+import ca.nrc.cadc.auth.HttpPrincipal;
 import org.apache.commons.configuration2.CombinedConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.EnvironmentConfiguration;
@@ -12,6 +18,11 @@ import org.apache.commons.configuration2.convert.DefaultConversionHandler;
 import org.apache.commons.configuration2.ex.ConversionException;
 import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
 import org.apache.commons.configuration2.tree.MergeCombiner;
+import org.opencadc.vospace.ContainerNode;
+import org.opencadc.vospace.NodeProperty;
+import org.opencadc.vospace.VOS;
+
+import javax.security.auth.Subject;
 
 public class UserStorageConfiguration {
     public static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY = "SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY";
@@ -35,11 +46,6 @@ public class UserStorageConfiguration {
 
         // Allow for system properties to override environment variables.  Useful for testing.
         configuration.addConfiguration(new SystemConfiguration());
-        return new UserStorageConfiguration(configuration);
-    }
-
-    public static UserStorageConfiguration fromConfiguration(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "Configuration must not be null.");
         return new UserStorageConfiguration(configuration);
     }
 
@@ -78,6 +84,30 @@ public class UserStorageConfiguration {
                 "User Storage (Cavern) Projects Base Directory must not be null.  Please set the "
                         + UserStorageConfiguration.SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY
                         + " environment variable or system property.");
+    }
+
+    public static void configureOwner(final ContainerNode userHomeNode, final Subject resourceOwner) {
+        final AuthMethod authMethod = AuthenticationUtil.getAuthMethod(resourceOwner);
+        if (authMethod == AuthMethod.TOKEN) {
+            final AuthorizationToken accessToken = resourceOwner.getPublicCredentials(AuthorizationToken.class).stream()
+                    .filter(token -> AuthenticationUtil.CHALLENGE_TYPE_BEARER.equalsIgnoreCase(token.getType()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No Bearer token found in Subject."));
+            userHomeNode
+                    .getProperties()
+                    .add(new NodeProperty(VOS.PROPERTY_URI_CREATOR_JWT, accessToken.getCredentials()));
+        } else {
+            // Try to set the owner of the user home node from what Principals are in the Subject.
+            final Set<HttpPrincipal> httpPrincipals = resourceOwner.getPrincipals(HttpPrincipal.class);
+            if (httpPrincipals.isEmpty()) {
+                throw new IllegalStateException(
+                        "No HTTP Principal found in Subject. Cannot determine creator username.  Ensure the Subject has been properly authenticated and augmented.");
+            } else {
+                // Take the first username.
+                final String creatorUserID = httpPrincipals.toArray(new HttpPrincipal[0])[0].getName();
+                userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR, creatorUserID));
+            }
+        }
     }
 
     private static class PathConversionHandler extends DefaultConversionHandler {

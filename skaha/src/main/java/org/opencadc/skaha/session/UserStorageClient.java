@@ -78,17 +78,13 @@ public class UserStorageClient {
         final String userHomeBasePath = this.userStorageConfiguration.userHomeBaseURI.getPath();
         final String userHomePath = Path.of(userHomeBasePath, owner).toString();
 
-        // Call as null user to ensure that the owner is properly augmented without the actual current user in the
-        // context.
-        final Subject adminOwner = Subject.callAs(null, this.userStorageAdminConfiguration.owner::toSubject);
-
         try {
             // Run this as the current user.
             cavernClient.getNode(userHomePath);
             LOGGER.debug("User home already exists: " + userHomePath);
         } catch (ResourceNotFoundException nodeNotFoundException) {
             LOGGER.debug("User home does not exist, allocating new user home at " + userHomePath);
-            allocateUser(adminOwner, owner, cavernClient, this.userStorageAdminConfiguration);
+            allocateUser(owner, cavernClient);
             LOGGER.debug("User home does not exist, allocating new user home at " + userHomePath + ": OK");
         }
     }
@@ -270,26 +266,27 @@ public class UserStorageClient {
      * Call the Cavern service to allocate a new user home. The new User Allocation (ContainerNode) will be created with
      * the appropriate "creator" (Resource Owner) set, and the default quota.
      *
-     * @param adminOwner The owner of the allocation folder (i.e. /home) to create the user home in.
+     * @param nodeName Name of the folder node.
      * @param voSpaceClient An existing VOSpace client
-     * @param userStorageAdminConfiguration The configuration to connect to the Cavern service.
      * @throws IOException For any issues with writing the Node to the Cavern service.
      */
-    void allocateUser(
-            final Subject adminOwner,
-            final String owner,
-            final VOSpaceClient voSpaceClient,
-            final UserStorageAdminConfiguration userStorageAdminConfiguration)
-            throws IOException {
+    void allocateUser(final String nodeName, final VOSpaceClient voSpaceClient) throws IOException {
         LOGGER.debug("UserStorageClient.allocateUser()");
         try {
-            final ContainerNode userHomeNode = new ContainerNode(owner);
+            // Call as null user to ensure that the owner is properly augmented without the actual current user in the
+            // context.  This is the user that will make the request to Cavern as.  This can be the allocation parent
+            // owner (administrator), or the resource (/home/{username}) owner.
+            final Subject requestOwner =
+                    Subject.callAs(null, this.userStorageAdminConfiguration.requestOwner::toSubject);
+            final ContainerNode userHomeNode = new ContainerNode(nodeName);
             userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
-            userStorageAdminConfiguration.configureOwner(userHomeNode, AuthenticationUtil.getCurrentSubject());
+            UserStorageConfiguration.configureOwner(userHomeNode, AuthenticationUtil.getCurrentSubject());
 
-            final ContainerNode newUserHome = Subject.callAs(adminOwner, () -> {
+            final ContainerNode newUserHome = Subject.callAs(requestOwner, () -> {
                 final Node createdNode = voSpaceClient.createNode(
-                        new VOSURI(this.userStorageConfiguration.userHomeBaseURI + "/" + owner), userHomeNode, false);
+                        new VOSURI(this.userStorageConfiguration.userHomeBaseURI + "/" + nodeName),
+                        userHomeNode,
+                        false);
                 if (createdNode instanceof ContainerNode) {
                     return (ContainerNode) createdNode;
                 } else {

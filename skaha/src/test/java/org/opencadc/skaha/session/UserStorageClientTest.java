@@ -101,7 +101,6 @@ public class UserStorageClientTest {
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY, "/data");
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY, "home");
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY, "projects");
-        System.setProperty(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_API_KEY, "secret-admin-key");
     }
 
     @Test
