@@ -75,7 +75,6 @@ bash scripts/kind-smoke-teardown.sh --all --kind
 The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
 
 - `default-flavor`
-- `cohort-atom`
 - `cq-proton`
 - `cq-neutron`
 - `cq-electron`
@@ -84,8 +83,8 @@ The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
 
 The sample workload targets `cq-electron`, which has `100m` CPU and `100Mi`
 memory nominal quota. The workload requests `200m` CPU and `200Mi` memory, so
-the smoke test exercises Kueue cohort borrowing and verifies that allocated
-metrics include borrowed usage.
+the smoke test verifies admitted usage totals in platform `allocated`. Borrowed
+and lending response-field expansion is out of scope for this delivery.
 
 ## Troubleshooting
 
@@ -96,7 +95,7 @@ metrics include borrowed usage.
 - API startup failure: check logs with
   `kubectl --context kind-metrics -n metrics logs deploy/metrics-api-metrics-api --tail=200`.
 - Workload not admitted: check Kueue status and fixture objects:
-  `kubectl --context kind-metrics get clusterqueue,cohort` and
+  `kubectl --context kind-metrics get clusterqueue` and
   `kubectl --context kind-metrics -n metrics get localqueue,workload`.
 - Redis cache data stale during iterative tests:
   `kubectl --context kind-metrics exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`.

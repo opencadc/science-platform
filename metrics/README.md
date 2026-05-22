@@ -7,7 +7,7 @@ container process.
 ## Kueue mode and RBAC
 
 When running in-cluster, the workload needs read access
-to `clusterqueues` and `cohorts` in the `kueue.x-k8s.io` API group. Prefer
+to `clusterqueues` in the `kueue.x-k8s.io` API group. Prefer
 creating a dedicated Kubernetes `ServiceAccount` via the chart
 (`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
 permissions are not bound to the namespace `default` ServiceAccount. See
@@ -71,7 +71,6 @@ Run the API locally:
 METRICS_CACHE__BACKEND=memory \
 METRICS_PROVIDERS__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
 METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-proton"]' \
-METRICS_PROVIDERS__KUEUE__COHORT=cohort-atom \
 uv run python -m metrics.main
 ```
 
@@ -82,6 +81,9 @@ Kubernetes-first setup in `docs/dev-setup.md`.
 
 For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
 `dev`, integration, staging, and production, see `docs/environment-contracts.md`.
+
+Platform response expansion for borrowed/lending details is out of scope for
+this delivery; the API contract remains `capacity` and `allocated` maps only.
 
 ### Kueue-backed platform metrics
 
