@@ -85,7 +85,6 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.TestUtils;
 
