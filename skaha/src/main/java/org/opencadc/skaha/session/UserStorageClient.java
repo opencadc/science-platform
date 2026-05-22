@@ -21,6 +21,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.security.auth.Subject;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -56,6 +57,27 @@ public class UserStorageClient {
     private final UserStorageAdminConfiguration userStorageAdminConfiguration;
     private final UserStorageConfiguration userStorageConfiguration;
 
+    /**
+     * Per-JVM cache of user home existence.
+     *
+     * <p>This service runs in Kubernetes and can be scaled horizontally. The cache is therefore scoped to a single JVM
+     * (pod) and is used only as a performance optimization to avoid repeatedly calling the expensive VOSpace getNode
+     * operation when we already know that a user's home exists.
+     *
+     * <p>We only cache <em>existence</em> of a user home and not its contents. A time-to-live is applied so that
+     * administrative deletions or other rare changes are eventually observed.
+     */
+    private static final ConcurrentHashMap<String, Long> USER_HOME_EXISTENCE_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * Time-to-live for cached user home existence entries, in milliseconds.
+     *
+     * <p>Choosing a modest TTL balances performance and correctness: user homes are created rarely and rarely deleted,
+     * so caching for several hours significantly reduces load while ensuring that rare deletions are eventually
+     * observed.
+     */
+    private static final long USER_HOME_CACHE_TTL_MILLIS = 5L * 60L * 60L * 1000L; // 5 hours
+
     public UserStorageClient() {
         this(UserStorageAdminConfiguration.fromEnv(), UserStorageConfiguration.fromEnv());
     }
@@ -76,13 +98,14 @@ public class UserStorageClient {
     public void ensureUserBase(final String owner) throws Exception {
         LOGGER.debug(
                 "Ensuring user base for: " + owner + " at configured site " + this.userStorageConfiguration.serviceURI);
+        if (isUserHomeCachedAndFresh(owner)) {
+            LOGGER.debug("User home cached as existing for owner: " + owner);
+            return;
+        }
+
         final VOSpaceClient cavernClient = new VOSpaceClient(this.userStorageConfiguration.serviceURI);
         final String userHomeBasePath = this.userStorageConfiguration.userHomeBaseURI.getPath();
         final String userHomePath = Path.of(userHomeBasePath, owner).toString();
-
-        // Call as null user to ensure that the owner is properly augmented without the actual current user in the
-        // context.
-        final Subject adminOwner = Subject.callAs(null, this.userStorageAdminConfiguration.owner::toSubject);
 
         try {
             // Run this as the current user.
@@ -90,9 +113,33 @@ public class UserStorageClient {
             LOGGER.debug("User home already exists: " + userHomePath);
         } catch (ResourceNotFoundException nodeNotFoundException) {
             LOGGER.debug("User home does not exist, allocating new user home at " + userHomePath);
-            allocateUser(adminOwner, owner, cavernClient, this.userStorageAdminConfiguration);
+            allocateUser(owner, cavernClient);
             LOGGER.debug("User home does not exist, allocating new user home at " + userHomePath + ": OK");
         }
+
+        UserStorageClient.cacheUserHome(owner);
+    }
+
+    /** Determine whether the user home for the given owner is present in the cache and still within its TTL. */
+    private static boolean isUserHomeCachedAndFresh(final String owner) {
+        final Long lastVerifiedTimestamp = USER_HOME_EXISTENCE_CACHE.get(owner);
+        if (lastVerifiedTimestamp == null) {
+            return false;
+        }
+
+        final long ageMillis = System.currentTimeMillis() - lastVerifiedTimestamp;
+        if (ageMillis > USER_HOME_CACHE_TTL_MILLIS) {
+            // Entry is stale; remove it so that subsequent calls will re-validate with VOSpace.
+            USER_HOME_EXISTENCE_CACHE.remove(owner, lastVerifiedTimestamp);
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Record that the user home for the given owner has been verified to exist at the current time. */
+    private static void cacheUserHome(final String owner) {
+        USER_HOME_EXISTENCE_CACHE.put(owner, System.currentTimeMillis());
     }
 
     /**
@@ -272,26 +319,26 @@ public class UserStorageClient {
      * Call the Cavern service to allocate a new user home. The new User Allocation (ContainerNode) will be created with
      * the appropriate "creator" (Resource Owner) set, and the default quota.
      *
-     * @param adminOwner The owner of the allocation folder (i.e. /home) to create the user home in.
+     * @param nodeName Name of the folder node, also the owner (posix) username.
      * @param voSpaceClient An existing VOSpace client
-     * @param userStorageAdminConfiguration The configuration to connect to the Cavern service.
      * @throws IOException For any issues with writing the Node to the Cavern service.
      */
-    void allocateUser(
-            final Subject adminOwner,
-            final String owner,
-            final VOSpaceClient voSpaceClient,
-            final UserStorageAdminConfiguration userStorageAdminConfiguration)
-            throws IOException {
+    void allocateUser(final String nodeName, final VOSpaceClient voSpaceClient) throws IOException {
         LOGGER.debug("UserStorageClient.allocateUser()");
         try {
-            final ContainerNode userHomeNode = new ContainerNode(owner);
+            // Call as null user to ensure that the owner is properly augmented without the actual current user in the
+            // context.  This is the user that will make the request to Cavern as.  This can be the allocation parent
+            // owner (administrator), or the resource (/home/{username}) owner.
+            final Subject requestOwner = this.userStorageAdminConfiguration.requestOwner.toSubject();
+            final ContainerNode userHomeNode = new ContainerNode(nodeName);
             userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
-            userStorageAdminConfiguration.configureOwner(userHomeNode, AuthenticationUtil.getCurrentSubject());
+            userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR, nodeName));
 
-            final ContainerNode newUserHome = Subject.callAs(adminOwner, () -> {
+            final ContainerNode newUserHome = Subject.callAs(requestOwner, () -> {
                 final Node createdNode = voSpaceClient.createNode(
-                        new VOSURI(this.userStorageConfiguration.userHomeBaseURI + "/" + owner), userHomeNode, false);
+                        new VOSURI(this.userStorageConfiguration.userHomeBaseURI + "/" + nodeName),
+                        userHomeNode,
+                        false);
                 if (createdNode instanceof ContainerNode) {
                     return (ContainerNode) createdNode;
                 } else {

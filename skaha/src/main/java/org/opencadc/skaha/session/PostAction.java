@@ -727,13 +727,9 @@ public class PostAction extends SessionAction {
         }
         final List<Group> groupCredentials =
                 CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
-        if (groupCredentials.size() == 1) {
-            return buildGroupUriList(groupCredentials).stream()
-                    .map(posixGroup -> Integer.toString(posixGroup.getGID()))
-                    .collect(Collectors.joining(","));
-        } else {
-            return "";
-        }
+        return buildGroupUriList(groupCredentials).stream()
+                .map(posixGroup -> Integer.toString(posixGroup.getGID()))
+                .collect(Collectors.joining(","));
     }
 
     private List<PosixGroup> buildGroupUriList(List<Group> groupCredentials) throws Exception {

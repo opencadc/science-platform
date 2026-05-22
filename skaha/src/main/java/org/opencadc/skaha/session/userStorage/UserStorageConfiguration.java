@@ -38,11 +38,6 @@ public class UserStorageConfiguration {
         return new UserStorageConfiguration(configuration);
     }
 
-    public static UserStorageConfiguration fromConfiguration(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "Configuration must not be null.");
-        return new UserStorageConfiguration(configuration);
-    }
-
     private UserStorageConfiguration(final Configuration configuration) {
         this.serviceURI = configuration.get(URI.class, UserStorageConfiguration.SKAHA_USER_STORAGE_SERVICE_URI);
         this.userHomeBaseURI = configuration.get(URI.class, UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI);
