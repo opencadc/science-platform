@@ -57,7 +57,7 @@ jobs:
         with:
           install: true
       - name: Perform Container Registry Login
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: images.opencadc.org
           username: ${{ secrets.SKAHA_REGISTRY_USERNAME }}
