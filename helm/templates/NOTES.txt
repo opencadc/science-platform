@@ -1,0 +1,104 @@
+{{- /*
+Post-install notes for Skaha with optional Kueue integration.
+*/ -}}
+
+Skaha release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Skaha workload namespace: {{ include "skaha.workloadNamespace" . }}
+
+{{- $userStorage := .Values.deployment.skaha.sessions.userStorage | default dict }}
+{{- $legacyPVCName := hasKey $userStorage "persistentVolumeClaimName" }}
+{{- $platformAuth := mergeOverwrite (.Values.deployment.skaha.authorization | default dict) (.Values.deployment.skaha.sessions.authorization | default dict) }}
+{{- $platformGroup := $platformAuth.group | default dict }}
+{{- $legacyUsersGroupDepr := and (.Values.deployment.skaha.usersGroup | default "" | trim) (not ($platformGroup.enabled | default false)) }}
+{{- if $legacyPVCName }}
+
+################################################################################
+#                                                                              #
+#  USER SESSION STORAGE — configuration notice                                 #
+#                                                                              #
+#  deployment.skaha.sessions.userStorage.persistentVolumeClaimName is         #
+#  deprecated. Prefer userStorage.spec (e.g. spec.persistentVolumeClaim).      #
+#  The legacy field is still used when spec is unset or empty.               #
+#                                                                              #
+################################################################################
+
+{{- end }}
+
+{{- if $legacyUsersGroupDepr }}
+
+################################################################################
+#                                                                              #
+#  PLATFORM ACCESS — configuration notice                                    #
+#                                                                              #
+#  deployment.skaha.usersGroup is deprecated. Prefer                             #
+#  deployment.skaha.sessions.authorization.group / permissionsAPI,           #
+#  usersGroup remains honoured until removed in a future chart major.          #
+#                                                                              #
+################################################################################
+
+{{- end }}
+
+User Sessions:
+- Ensure CARTA images being used are at version 5.0.3 or higher.
+
+{{- with .Values.deployment.skaha.sessions.ingress }}
+User Sessions Ingress Configurations:
+{{- with .customResponseHeaders }}
+- Custom Response Headers:
+{{ toYaml . | indent 6 }}
+{{- end }}
+{{- with .tls }}
+- TLS configured:
+{{- end }}
+{{- end }}
+
+Kueue:
+{{- if .Values.deployment.skaha.sessions.kueue }}
+  - It's expected that the Kueue CRDs and controllers to be present if you set session queues.
+{{- $queues := omit (default dict .Values.deployment.skaha.sessions.kueue) "rbac" }}
+{{- if gt (len $queues) 0 }}
+{{- range $type, $cfg := $queues }}
+  - {{ $cfg.queueName | default (printf "%s-%s" $.Release.Name $type) }} (type: {{ $type }})
+{{- end }}
+{{- else }}
+  - none configured; Jobs will NOT run with Kueue unless annotated by Skaha.
+{{- end }}
+{{- else }}
+  - Not configured
+{{- end }}
+
+Quick checks:
+  - kubectl get deployment {{ .Release.Name }}-skaha-tomcat -n {{ .Release.Namespace }}
+  - kubectl get clusterqueues 2>/dev/null || true
+  - kubectl get localqueues -n {{ include "skaha.workloadNamespace" . }} 2>/dev/null || true
+
+If user Jobs remain Pending:
+- Ensure LocalQueue exists in {{ include "skaha.workloadNamespace" . }} and references your configured ClusterQueue.
+- Verify ClusterQueue quotas are sufficient.
+- Confirm priority classes referenced by sessions exist or are created.
+
+!! ISSUES !!:
+{{- $sw := .Values.skahaWorkload | default dict }}
+{{- $sessNs := .Values.deployment.skaha.sessions.namespace -}}
+{{- $legacySkahaWorkloadNs := and $sw.namespace (not (kindIs "string" $sessNs)) }}
+{{- if and (not $legacySkahaWorkloadNs) (not $legacyPVCName) }}
+None.
+{{- end }}
+{{- if $legacySkahaWorkloadNs }}
+You are using deprecated top-level skahaWorkload.namespace; the chart still applies it as the workload namespace. Prefer deployment.skaha.sessions.namespace.
+{{- end }}
+{{- if $legacyPVCName }}
+Your values still set deployment.skaha.sessions.userStorage.persistentVolumeClaimName — migrate to userStorage.spec (see notice above). The legacy field remains honoured when spec is unset or empty.
+{{- end }}
+{{- if $legacyUsersGroupDepr }}
+You still set deployment.skaha.usersGroup — migrate to deployment.skaha.sessions.authorization (group or permissionsAPI; see notice above).
+{{- end }}
+
+Experimental Features Configured:
+{{- if and .Values.experimentalFeatures .Values.experimentalFeatures.enabled }}
+{{ include "skaha.experimentalFeatureGates" $ }}
+{{- else }}
+None
+{{- end }}

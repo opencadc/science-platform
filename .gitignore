@@ -4,6 +4,7 @@
 /**/build
 /**/bin
 .vscode
+/**/charts/
 
 # Local build stuff
 Dockerfile.local

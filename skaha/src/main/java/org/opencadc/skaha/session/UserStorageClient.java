@@ -329,8 +329,13 @@ public class UserStorageClient {
             // Call as null user to ensure that the owner is properly augmented without the actual current user in the
             // context.  This is the user that will make the request to Cavern as.  This can be the allocation parent
             // owner (administrator), or the resource (/home/{username}) owner.
-            final Subject requestOwner = this.userStorageAdminConfiguration.requestOwner.toSubject();
+            final Subject requestOwner = this.userStorageAdminConfiguration.requestOwner;
             final ContainerNode userHomeNode = new ContainerNode(nodeName);
+
+            // For self-allocations (i.e. where the user is making the call as themselves), these properties will be
+            // ignored in favour of the defaults of the service.  These properties will remain here to accommodate
+            // deployments where an administrator is making this call.
+            // @see org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration
             userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
             userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR, nodeName));
 

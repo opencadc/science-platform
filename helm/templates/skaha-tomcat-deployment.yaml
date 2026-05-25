@@ -1,0 +1,264 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: {{ .Release.Name }}-skaha-tomcat
+  name: {{ .Release.Name }}-skaha-tomcat
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- if not (default false .Values.autoscaling.enabled) }}
+  replicas: {{ default 1 .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      run: {{ .Release.Name }}-skaha-tomcat
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: {{ .Release.Name }}-skaha-tomcat
+    spec:
+      {{- with .Values.deployment.skaha.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- with .Values.deployment.skaha.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - env:
+      {{- include "skaha.validatePlatformAccess" . }}
+      {{ $userStorage := required "Missing .Values.deployment.skaha.sessions.userStorage configuration" .Values.deployment.skaha.sessions.userStorage }}
+      {{- $adminCertSecretName := "" }}
+      {{- $adminCertSecretKey := "cadcproxy.pem" }}
+      {{- with $userStorage }}
+      {{- with .admin }}
+      {{- $auth := .auth }}
+      {{- if $auth }}
+      {{- if or $auth.apiKey $auth.apiKeySecret }}
+      {{- fail "deployment.skaha.sessions.userStorage.admin.auth.apiKey and apiKeySecret are no longer supported." }}
+      {{- else if $auth.certificateSecret }}
+      {{- with $auth.certificateSecret }}
+      {{- $adminCertSecretName = .name | required "Missing .Values.deployment.skaha.sessions.userStorage.admin.auth.certificateSecret.name" }}
+      {{- $adminCertSecretKey = .key | default "cadcproxy.pem" }}
+      {{- end }}
+      {{- else if gt (len (keys $auth)) 0 }}
+      {{- fail "deployment.skaha.sessions.userStorage.admin.auth may only contain certificateSecret; omit admin.auth entirely to authenticate user allocations with the requesting user's token." }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- if $adminCertSecretName }}
+        - name: SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED
+          value: "true"
+      {{- end }}
+        - name: SKAHA_USER_STORAGE_SERVICE_URI
+          value: "{{ required "Missing .Values.deployment.skaha.sessions.userStorage.serviceURI" .serviceURI }}"
+        - name: SKAHA_USER_STORAGE_USER_HOME_URI
+          value: "{{ template "skaha.job.userStorage.homeURI" $ }}"
+        - name: SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY
+          value: "{{ required ".Values.deployment.skaha.sessions.userStorage.topLevelDirectory topLevelDirectory is required." .topLevelDirectory }}"
+        - name: SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY
+          value: "{{ template "skaha.job.userStorage.homeBaseDirectory" $ }}"
+        - name: SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY
+          value: "{{ template "skaha.job.userStorage.projectsBaseDirectory" $ }}"
+      {{- end }}
+      {{- if .Values.deployment.skaha.posixMapperCacheTTLSeconds }}
+        - name: SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS
+          value: "{{ .Values.deployment.skaha.posixMapperCacheTTLSeconds }}"
+      {{- end }}
+        - name: SKAHA_SESSIONS_HOSTNAME
+          value: "{{ .Values.deployment.skaha.sessions.hostname | default .Values.deployment.hostname }}"
+        - name: SKAHA_HOSTNAME
+          value: "{{ .Values.deployment.hostname }}"
+        - name: GPU_ENABLED
+          value: "{{ .Values.deployment.skaha.sessions.gpuEnabled | default "false" }}"
+        - name: skaha.homedir
+          value: "{{ .Values.deployment.skaha.skahaTld }}/home"
+        - name: skaha.namespace
+          value: "{{ include "skaha.workloadNamespace" . }}"
+        - name: skaha.maxusersessions
+          value: "{{ .Values.deployment.skaha.sessions.maxCount }}"
+        - name: skaha.sessionexpiry
+          value: "{{ .Values.deployment.skaha.sessions.expirySeconds }}"
+        - name: skaha.defaultquotagb
+          value: "{{ .Values.deployment.skaha.defaultQuotaGB }}"
+        - name: skaha.harborhosts
+          value: "{{ .Values.deployment.skaha.registryHosts }}"
+        {{- $authorization := mergeOverwrite (.Values.deployment.skaha.authorization | default dict) (.Values.deployment.skaha.sessions.authorization | default dict) }}
+        {{- $grp := $authorization.group | default dict }}
+        {{- $permAPI := $authorization.permissionsAPI | default dict }}
+        {{- $legacyUsersGroupTrim := trim (.Values.deployment.skaha.usersGroup | default "" | toString) }}
+        {{- $groupEnabled := or ($grp.enabled | default false) (ne $legacyUsersGroupTrim "") }}
+        {{- $permEnabled := $permAPI.enabled | default false }}
+        - name: SKAHA_SESSIONS_AUTHORIZATION_GROUP_ENABLED
+          value: "{{ $groupEnabled }}"
+        - name: SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED
+          value: "{{ $permEnabled }}"
+        {{- if $groupEnabled }}
+        - name: SKAHA_USERS_GROUP
+          value: {{ trim ($grp.uri | default "" | toString) | default $legacyUsersGroupTrim | quote }}
+        {{- end }}
+        {{- if $permEnabled }}
+        {{- $permURL := trim (default "" $permAPI.baseURL) }}
+        {{- $permAuthURL := trim (default "" $permAPI.authAPIBaseURL) }}
+        {{- if $permURL }}
+        - name: SKAHA_PERMISSIONS_API_BASE_URL
+          value: {{ $permURL | quote }}
+        {{- end }}
+        {{- if $permAuthURL }}
+        - name: SKAHA_PERMISSIONS_API_AUTH_BASE_URL
+          value: {{ $permAuthURL | quote }}
+        {{- end }}
+        - name: SKAHA_PERMISSIONS_API_TYPE
+          value: {{ ($permAPI.type | default "route") | quote }}
+        - name: SKAHA_PERMISSIONS_API_NAME
+          value: {{ ($permAPI.name | default "skaha") | quote }}
+        {{- if eq (($permAPI.type | default "route") | lower) "route" }}
+        {{- $rte := trim (default "" $permAPI.route) }}
+        {{- if $rte }}
+        - name: SKAHA_PERMISSIONS_API_ROUTE
+          value: {{ $rte | quote }}
+        {{- end }}
+        {{- end }}
+        {{- with trim (default "" $permAPI.version) }}
+        - name: SKAHA_PERMISSIONS_API_VERSION
+          value: {{ . | quote }}
+        {{- end }}
+        {{- with trim (default "" $permAPI.method) }}
+        - name: SKAHA_PERMISSIONS_API_METHOD
+          value: {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.deployment.skaha.headlessPriorityGroup }}
+        - name: skaha.headlessprioritygroup
+          value: "{{ . }}"
+        {{- end }}
+        {{- $headlessPC := include "skaha.headlessPriorityClassName" . }}
+        {{- with $headlessPC }}
+        - name: SKAHA_HEADLESS_PRIORITY_CLASS
+          value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.deployment.skaha.sessions.nodeLabelSelector }}
+        - name: SKAHA_WORKER_NODE_LABEL_SELECTOR
+          value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.deployment.skaha.sessions.kueue }}
+        {{- range $queueConfigKey, $queueConfig := . }}
+        {{- if ne $queueConfigKey "rbac" }}
+        - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_NAME
+          value: "{{ $queueConfig.queueName | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.queueName" $queueConfigKey) }}"
+        - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_PRIORITY_CLASS
+          value: "{{ $queueConfig.priorityClass | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.priorityClass" $queueConfigKey) }}"
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.deployment.skaha.sessions.limitRange.enabled }}
+        - name: SKAHA_SESSION_LIMIT_RANGE_ENABLED
+          value: "true"
+        {{- end }}
+        # Flex Resource Requests are a way of setting default resource requests for new User Sessions based on type.
+        # The LimitRange will be enforced still, and will take precedence for any missing values (cpu or memory).
+        # This configuration ONLY applies when the "flex" resource profile is requested, and only for resource requests (not limits).
+        # See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-pod-priority-affects-resource-allocation
+        {{- with .Values.deployment.skaha.sessions.flexResourceRequests }}
+        {{- range $sessionTypeKey, $sessionTypeConfig := . }}
+        {{- if $sessionTypeConfig.memory }}
+        - name: SKAHA_FLEX_RESOURCE_REQUEST_{{ $sessionTypeKey | upper }}_MEMORY
+          value: "{{ $sessionTypeConfig.memory }}"
+        {{- end }}
+        {{- if $sessionTypeConfig.cpu }}
+        - name: SKAHA_FLEX_RESOURCE_REQUEST_{{ $sessionTypeKey | upper }}_CPU
+          value: "{{ $sessionTypeConfig.cpu }}"
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        - name: skaha.posixmapper.resourceid
+          value: "{{ .Values.deployment.skaha.posixMapperResourceID }}"
+        - name: REDIS_HOST
+          value: "{{ .Release.Name }}-redis-master.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}"
+        - name: REDIS_PORT
+          value: "6379"
+        {{- $mb := .Values.metricsBackend | default dict }}
+        {{- if (default false $mb.enabled) }}
+        - name: SKAHA_METRICS_BACKEND_URL
+          value: {{ include "skaha.metricsBackend.internalURL" . | quote }}
+        {{- end }}
+        - name: SKAHA_EXPERIMENTAL_FEATURE_GATES
+          value: "{{ include "skaha.experimentalFeatureGates" $ }}"
+        {{- with .Values.deployment.skaha.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        image: {{ .Values.deployment.skaha.image }}
+        imagePullPolicy: {{ .Values.deployment.skaha.imagePullPolicy }}
+        name: {{ .Release.Name }}-skaha-tomcat
+        resources:
+          requests:
+            memory: {{ .Values.deployment.skaha.resources.requests.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.deployment.skaha.resources.limits.memory }}
+            cpu: {{ .Values.deployment.skaha.resources.limits.cpu }}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        {{- with .Values.deployment.skaha.extraPorts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: "/config"
+          name: config-volume
+        - mountPath: "/add-user-config"
+          name: add-user-config
+        {{- with .Values.deployment.skaha.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- with .Values.deployment.extraHosts }}
+      hostAliases:
+{{- range $extraHost := . }}
+        - ip: {{ $extraHost.ip }}
+          hostnames:
+            - {{ $extraHost.hostname }}
+{{- end }}
+{{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $apiPC := include "skaha.apiPriorityClassName" . }}
+      {{- with $apiPC }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      serviceAccountName: {{ include "skaha.serviceAccountName" . }}
+      volumes:
+      {{- if $adminCertSecretName }}
+      - name: config-volume
+        projected:
+          sources:
+          - configMap:
+              name: {{ .Release.Name }}-skaha-config
+          - secret:
+              name: {{ $adminCertSecretName }}
+              items:
+              - key: {{ $adminCertSecretKey }}
+                path: {{ $adminCertSecretKey }}
+      {{- else }}
+      - name: config-volume
+        configMap:
+          name: {{ .Release.Name }}-skaha-config
+      {{- end }}
+      - name: add-user-config
+        configMap:
+          name: {{ .Release.Name }}-add-user-config
+      {{- with .Values.deployment.skaha.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

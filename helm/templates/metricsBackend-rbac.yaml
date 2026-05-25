@@ -1,0 +1,35 @@
+{{- $mb := .Values.metricsBackend | default dict }}
+{{- $mbRbac := default dict $mb.rbac }}
+{{- if and (default false $mb.enabled) (default true $mbRbac.enabled) }}
+{{/*
+  Kueue read ClusterRole / ClusterRoleBinding. With metricsBackend.enabled Helm renders these
+  before the metrics Deployment and Service (Helm builtin kind install order applies RBAC before
+  typical workload kinds). Apply failures (for example forbidden cluster RBAC) fail the release
+  before those workload resources reconcile.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["clusterqueues"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "skaha.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,73 @@
+{{- $kueue := .Values.deployment.skaha.sessions.kueue | default dict }}
+{{- if and $kueue.rbac $kueue.rbac.create }}
+{{- $saName := include "skaha.serviceAccountName" . }}
+{{- $saNs := .Release.Namespace }}
+{{- $roleName := printf "%s-kueue-localqueues" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $bindingName := printf "%s-read-kueue-localqueues" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $skahaWorkloadNs := include "skaha.workloadNamespace" . }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - localqueues
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $bindingName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $roleName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $saName }}
+  namespace: {{ $saNs }}
+{{- if ne .Release.Namespace $skahaWorkloadNs }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ $skahaWorkloadNs }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - localqueues
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $bindingName }}
+  namespace: {{ $skahaWorkloadNs }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $roleName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $saName }}
+  namespace: {{ $saNs }}
+{{- end }}
+{{- end }}

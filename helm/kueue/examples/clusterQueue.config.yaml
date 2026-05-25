@@ -1,0 +1,85 @@
+# Example Cluster Queue configuration for Kueue.  Usually a single ClusterQueue is sufficient, but read the documentation for more details.
+# @see https://kueue.sigs.k8s.io/docs/concepts/cluster_queue/
+#
+# Priority Classes are used in Skaha's configuration to allow Workloads to be prioritized.
+#
+# jenkinsd 2025.09.11
+#
+---
+# Resource Flavors
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: canfar-science-platform-default
+---
+# ClusterQueue
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: canfar-science-platform-cluster-queue
+spec:
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: [ skaha-workload ]
+  queueingStrategy: BestEffortFIFO
+  cohort: canfar-science-platform-cohort
+  resourceGroups:
+    - coveredResources:
+      - "cpu"
+      - "memory"
+      - "ephemeral-storage"
+      - "nvidia.com/gpu"
+      flavors:
+        - name: "canfar-science-platform-default"
+        # These values represent the total resources available to this ClusterQueue, and requires some knowledge of the cluster's capacity.
+        # Omit the nvidia.com/gpu resource if GPUs are not available in the cluster (also from the coveredResources above).
+          resources:
+            - name: "cpu"
+              nominalQuota:   "1680"
+              borrowingLimit: "420"
+              lendingLimit:   "420"
+            - name: "memory"
+              nominalQuota:   "6562Gi"
+              borrowingLimit: "1640Gi"
+              lendingLimit:   "1640Gi"
+            - name: "ephemeral-storage"
+              nominalQuota:   "52636Gi"
+              borrowingLimit: "13159Gi"
+              lendingLimit:   "13159Gi"
+            - name: "nvidia.com/gpu"
+              nominalQuota: "18"
+              borrowingLimit: "0"
+              lendingLimit: "0"
+  preemption:
+    reclaimWithinCohort: LowerPriority
+    borrowWithinCohort:
+      policy: LowerPriority
+      maxPriorityThreshold: 10000
+    withinClusterQueue: LowerPriority
+  stopPolicy: None
+---
+# WorkloadPriorityClass
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: low
+value: 10000
+description: "Low Priority"
+---
+# WorkloadPriorityClass
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: medium
+value: 100000
+description: "Medium Priority"
+---
+# WorkloadPriorityClass
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: high
+value: 1000000
+description: "High Priority"

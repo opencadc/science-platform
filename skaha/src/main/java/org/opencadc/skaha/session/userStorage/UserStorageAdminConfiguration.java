@@ -1,10 +1,10 @@
 package org.opencadc.skaha.session.userStorage;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.cred.client.CredUtil;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Objects;
+import javax.security.auth.Subject;
 import org.apache.commons.configuration2.CombinedConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.EnvironmentConfiguration;
@@ -23,14 +23,15 @@ public class UserStorageAdminConfiguration {
     private static final Logger LOGGER = Logger.getLogger(UserStorageAdminConfiguration.class.getName());
 
     // For Certificate-based authentication.
-    public static final String SKAHA_USER_STORAGE_ADMIN_CERTIFICATE = "SKAHA_USER_STORAGE_ADMIN_CERTIFICATE";
+    public static final String SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED =
+            "SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED";
 
     // A configure Permissions API service.
     public static final String SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED =
             "SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED";
 
     // Represents the
-    public final UserStorageAdministrator requestOwner;
+    public final Subject requestOwner;
 
     /**
      * Create a UserStorageAdminConfiguration from the environment variables.
@@ -50,29 +51,20 @@ public class UserStorageAdminConfiguration {
     }
 
     private UserStorageAdminConfiguration(final Configuration configuration) {
-        if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE)) {
-            final String certificateString =
-                    configuration.getString(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE);
+        if (configuration.containsKey(UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED)
+                && configuration.getBoolean(
+                        UserStorageAdminConfiguration.SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED)) {
             LOGGER.debug("Configuring certificate client for User Storage.");
-            requestOwner = configureCertificateOwner(certificateString);
+            requestOwner = CredUtil.createOpsSubject();
         } else if (configuration.containsKey(
                         UserStorageAdminConfiguration.SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED)
                 && configuration.getBoolean(
                         UserStorageAdminConfiguration.SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED)) {
             LOGGER.debug("Configuring session authorization API for User Storage.");
-            requestOwner = createSelfOwner();
+            requestOwner = AuthenticationUtil.getCurrentSubject();
         } else {
             throw new IllegalArgumentException("No OIDC client ID or certificate provided for User Storage admin.");
         }
-    }
-
-    private UserStorageAdministrator configureCertificateOwner(final String certificateString) {
-        Objects.requireNonNull(certificateString, "Certificate String must not be null");
-        return new UserStorageCertificateAdministrator(certificateString.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private UserStorageAdministrator createSelfOwner() {
-        return new UserStorageSelfAdministrator(AuthenticationUtil.getCurrentSubject());
     }
 
     private static class URIConversionHandler extends DefaultConversionHandler {

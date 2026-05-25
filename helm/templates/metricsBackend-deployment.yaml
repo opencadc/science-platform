@@ -1,0 +1,79 @@
+{{- $mb := .Values.metricsBackend | default dict }}
+{{- if (default false $mb.enabled) }}
+{{- $img := $mb.image | default dict }}
+{{- $customEnv := $mb.env | default dict }}
+{{- $redis := $mb.redis | default dict }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "skaha.metricsBackend.deploymentName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ $mb.replicaCount | default 1 }}
+  revisionHistoryLimit: {{ $mb.revisionHistoryLimit | default 3 }}
+  selector:
+    matchLabels:
+      {{- include "skaha.metricsBackend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "skaha.metricsBackend.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "skaha.serviceAccountName" . }}
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+      containers:
+        - name: metrics-api
+          image: "{{ $img.repository }}:{{ $img.tag | default "v0.1.5" }}"
+          imagePullPolicy: {{ $img.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            {{- if and (default true $redis.enabled) (not (hasKey $customEnv "METRICS_REDIS_URL")) }}
+            - name: METRICS_REDIS_URL
+              value: {{ include "skaha.metricsBackend.chartRedisURL" . | quote }}
+            {{- end }}
+            {{- range $k, $v := $customEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 40
+            periodSeconds: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 3
+          {{- with $mb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

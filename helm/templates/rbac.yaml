@@ -1,0 +1,74 @@
+{{- with .Values.rbac }}
+{{- if .create }}
+{{- $roleName := printf "%s-workload-controller" $.Release.Name | trunc 63 | trimSuffix "-" }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ include "skaha.workloadNamespace" $ }}
+rules:
+- apiGroups: [""]
+  resources: ["events", "limitranges"]
+  verbs: ["get", "list", "watch"]
+
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "deletecollection", "delete", "get", "list"]
+
+- apiGroups: [""]
+  resources: ["pods", "services", "secrets"]
+  verbs: ["create", "deletecollection", "delete", "get", "list"]
+
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+
+- apiGroups: ["traefik.io"]
+  resources: ["ingressroutes", "middlewares"]
+  verbs: ["create", "deletecollection", "delete", "get", "list"]
+
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ include "skaha.workloadNamespace" $ }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "skaha.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $roleName }}
+  apiGroup: rbac.authorization.k8s.io
+{{- if .clusterRole.create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-list-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows the Skaha service account to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: ServiceAccount
+  name: {{ include "skaha.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: node-list-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
+{{- end }}
