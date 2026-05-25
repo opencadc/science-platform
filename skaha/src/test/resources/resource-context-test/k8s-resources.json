@@ -1,0 +1,15 @@
+{
+  "cores": {
+    "defaultRequest": 1,
+    "defaultLimit": 5,
+    "options": [1, 2, 3, 4, 5]
+  },
+  "memoryGB": {
+    "defaultRequest": 2,
+    "defaultLimit": 20,
+    "options": [1, 2, 4, 20]
+  },
+  "gpus": {
+    "options": [1]
+  }
+}

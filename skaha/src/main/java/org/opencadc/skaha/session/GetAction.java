@@ -67,20 +67,23 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.context.LimitRangeResourceContext;
+import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.metrics.MetricsDAO;
+import org.opencadc.skaha.metrics.PlatformMetrics;
+import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
+import org.opencadc.skaha.metrics.SkahaMetricsDAO;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 /**
@@ -92,24 +95,50 @@ public class GetAction extends SessionAction {
 
     private static final Logger log = Logger.getLogger(GetAction.class);
 
+    private MetricsDAO metricsDAO;
+
     public GetAction() {
         super();
     }
 
+    GetAction(final MetricsDAO metricsDAO) {
+        super();
+        this.metricsDAO = metricsDAO;
+    }
+
+    protected MetricsDAO createMetricsDAO() {
+        return new SkahaMetricsDAO();
+    }
+
+    private MetricsDAO metricsDAO() {
+        if (metricsDAO == null) {
+            metricsDAO = createMetricsDAO();
+        }
+        return metricsDAO;
+    }
+
     @Override
     public void doAction() throws Exception {
-        super.initRequest();
+        initRequest();
         String view = syncInput.getParameter("view");
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 final String json;
                 if (SESSION_VIEW_STATS.equals(view)) {
-                    ResourceStats resourceStats = getResourceStats();
-                    Gson gson = new GsonBuilder()
-                            .disableHtmlEscaping()
-                            .setPrettyPrinting()
-                            .create();
-                    json = gson.toJson(resourceStats);
+                    try {
+                        ResourceStats resourceStats = getResourceStats();
+                        Gson gson = new GsonBuilder()
+                                .disableHtmlEscaping()
+                                .setPrettyPrinting()
+                                .create();
+                        json = gson.toJson(resourceStats);
+                    } catch (PlatformMetricsUnavailableException unavailable) {
+                        log.error(unavailable.getMessage(), unavailable.getCause());
+                        throw new TransientException(PlatformMetricsUnavailableException.CLIENT_MESSAGE);
+                    } catch (SessionLimitRangeUnavailableException unavailable) {
+                        log.error(unavailable.getMessage(), unavailable.getCause());
+                        throw new TransientException(SessionLimitRangeUnavailableException.CLIENT_MESSAGE);
+                    }
                 } else if (SessionAction.SESSION_VIEW_INTERACTIVE.equalsIgnoreCase(view)) {
                     String statusFilter = syncInput.getParameter("status");
                     json = listInteractiveSessions(statusFilter);
@@ -162,41 +191,69 @@ public class GetAction extends SessionAction {
         }
     }
 
-    private ResourceStats getResourceStats() {
-        try (final ExecutorService executor = Executors.newFixedThreadPool(3)) {
-            final Future<Map<String, BigDecimal>> podAllocationResourcesFuture =
-                    executor.submit(SessionDAO::getAllocatedPodResources);
-            final Future<NodeDAO.AggregatedCapacity> aggregatedNodeCapacityFuture =
-                    executor.submit(NodeDAO::getCapacity);
+    ResourceStats getResourceStats() {
+        final PlatformMetrics platformMetrics;
+        try {
+            platformMetrics = metricsDAO().getPlatformMetrics();
+        } catch (Exception e) {
+            throw new PlatformMetricsUnavailableException("Failed to fetch platform metrics for stats", e);
+        }
+        try {
+            final ClusterResourceFields clusterFields = platformMetrics.toClusterResourceFields();
 
-            final Map<String, BigDecimal> podAllocations = podAllocationResourcesFuture.get();
-            double requestedCPUCores = podAllocations.get("cpu").doubleValue();
-            long requestedRAM = podAllocations.get("memory").longValue();
-            final NodeDAO.AggregatedCapacity aggregatedNodeCapacity = aggregatedNodeCapacityFuture.get();
-
-            final String maxRAMStr = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.maxMemoryPairing().getKey(), MemoryUnitConverter.MemoryUnit.G);
-            final String requestedRAMStr =
-                    MemoryUnitConverter.formatHumanReadable(requestedRAM, MemoryUnitConverter.MemoryUnit.G);
-            final String ramAvailableStr = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.totalMemoryBytes(), MemoryUnitConverter.MemoryUnit.G);
-            final String withRAM = MemoryUnitConverter.formatHumanReadable(
-                    aggregatedNodeCapacity.maxCorePairing().getValue(), MemoryUnitConverter.MemoryUnit.G);
-            final double maxCores = aggregatedNodeCapacity.maxCorePairing().getKey();
-            final double withCores = aggregatedNodeCapacity.maxMemoryPairing().getValue();
-            final double coresAvailable = aggregatedNodeCapacity.totalCores();
+            final double maxCores;
+            final String withRAM;
+            final String maxRAMStr;
+            final double withCores;
+            if (isSessionLimitRangeEnabled()) {
+                final LimitRangeResourceContext limitRangeResourceContext = loadLimitRangeResourceContext();
+                maxCores = limitRangeResourceContext.getTotalCoreCounts().getMaximum();
+                withCores = maxCores;
+                maxRAMStr = MemoryUnitConverter.formatHumanReadable(
+                        (double)
+                                limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
+                        MemoryUnitConverter.MemoryUnit.G);
+                withRAM = maxRAMStr;
+            } else {
+                final ResourceContexts resourceContexts = loadResourceContexts();
+                maxCores = resourceContexts.getDefaultLimitCores();
+                withCores = resourceContexts.getDefaultLimitCores();
+                maxRAMStr = MemoryUnitConverter.formatHumanReadable(
+                        resourceContexts.getDefaultLimitRAM().doubleValue(), MemoryUnitConverter.MemoryUnit.Gi);
+                withRAM = maxRAMStr;
+            }
             return new ResourceStats(
-                    requestedCPUCores,
-                    requestedRAMStr,
-                    coresAvailable,
-                    ramAvailableStr,
+                    clusterFields.requestedCPUCores(),
+                    clusterFields.requestedRAM(),
+                    clusterFields.cpuCoresAvailable(),
+                    clusterFields.ramAvailable(),
                     maxCores,
                     withRAM,
                     maxRAMStr,
                     withCores);
+        } catch (PlatformMetricsUnavailableException unavailable) {
+            throw unavailable;
+        } catch (SessionLimitRangeUnavailableException unavailable) {
+            throw unavailable;
         } catch (Exception e) {
             log.error(e);
             throw new IllegalStateException("failed to gather resource statistics", e);
+        }
+    }
+
+    boolean isSessionLimitRangeEnabled() {
+        return K8SUtil.isSessionLimitRangeEnabled();
+    }
+
+    ResourceContexts loadResourceContexts() {
+        return new ResourceContexts();
+    }
+
+    LimitRangeResourceContext loadLimitRangeResourceContext() throws Exception {
+        try {
+            return new LimitRangeResourceContext();
+        } catch (Exception e) {
+            throw new SessionLimitRangeUnavailableException("Failed to load session LimitRange for stats", e);
         }
     }
 
