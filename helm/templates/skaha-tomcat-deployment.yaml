@@ -37,6 +37,15 @@ spec:
       {{ $userStorage := required "Missing .Values.deployment.skaha.sessions.userStorage configuration" .Values.deployment.skaha.sessions.userStorage }}
       {{- $adminCertSecretName := "" }}
       {{- $adminCertSecretKey := "cadcproxy.pem" }}
+      {{- $cspkRoot := (.Values.deployment.skaha.cookieSignaturePublicKey | default dict) }}
+      {{- $cspkRef := ($cspkRoot.existingSecret | default dict) }}
+      {{- $cookiePubSecretName := trim (($cspkRef.name | default "") | toString) }}
+      {{- $cookiePubMountPath := "" }}
+      {{- if trim (($cspkRef.path | default "") | toString) }}
+      {{- $cookiePubMountPath = trim (($cspkRef.path | default "") | toString) }}
+      {{- else }}
+      {{- $cookiePubMountPath = "RsaSignaturePub.key" }}
+      {{- end }}
       {{- with $userStorage }}
       {{- with .admin }}
       {{- $auth := .auth }}
@@ -240,17 +249,38 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       volumes:
-      {{- if $adminCertSecretName }}
+      {{- $useProjectedCfg := or $adminCertSecretName $cookiePubSecretName }}
+      {{- if $useProjectedCfg }}
       - name: config-volume
         projected:
           sources:
           - configMap:
               name: {{ .Release.Name }}-skaha-config
+          {{- $sameKubeSecret := and $adminCertSecretName $cookiePubSecretName (eq $adminCertSecretName $cookiePubSecretName) }}
+          {{- if $sameKubeSecret }}
           - secret:
               name: {{ $adminCertSecretName }}
               items:
               - key: {{ $adminCertSecretKey }}
                 path: {{ $adminCertSecretKey }}
+              - key: RsaSignaturePub.key
+                path: {{ $cookiePubMountPath }}
+          {{- else }}
+          {{- if $adminCertSecretName }}
+          - secret:
+              name: {{ $adminCertSecretName }}
+              items:
+              - key: {{ $adminCertSecretKey }}
+                path: {{ $adminCertSecretKey }}
+          {{- end }}
+          {{- if $cookiePubSecretName }}
+          - secret:
+              name: {{ $cookiePubSecretName }}
+              items:
+              - key: RsaSignaturePub.key
+                path: {{ $cookiePubMountPath }}
+          {{- end }}
+          {{- end }}
       {{- else }}
       - name: config-volume
         configMap:

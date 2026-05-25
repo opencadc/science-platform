@@ -10,7 +10,6 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Repository | Name | Version |
 |------------|------|---------|
-| file://../utils | utils | ^0.1.0 |
 | oci://registry-1.docker.io/bitnamicharts | redis | ^18.19.0 |
 
 ## Values
@@ -22,6 +21,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | autoscaling.minReplicas | int | `2` | Minimum number of skaha-tomcat replicas. |
 | deployment.hostname | string | `"myhost.example.com"` | Public hostname for the Skaha API. |
 | deployment.skaha.apiVersion | string | `"v1"` | Skaha API version path segment (for example, `v1` -> `/skaha/v1/...`). |
+| deployment.skaha.cookieSignaturePublicKey | object | `{"existingSecret":{"name":"","path":""}}` | Mount RSA public verification material via projected Secret (`existingSecret.name`). Secret `.data` key must be **`RsaSignaturePub.key`**. Filename under `/config` is `existingSecret.path`, default **`RsaSignaturePub.key`**. Leave `name` empty to omit mount. See README "Cookie verification public key". |
 | deployment.skaha.defaultQuotaGB | string | `"10"` | Default user storage quota in GiB for first-time users. |
 | deployment.skaha.identityManagerClass | string | `"org.opencadc.auth.StandardIdentityManager"` | Java IdentityManager implementation used for authentication. |
 | deployment.skaha.image | string | `"images.opencadc.org/platform/skaha:1.3.0"` | Container image for the Skaha API service. |
@@ -106,6 +106,42 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
 | serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
 | tolerations | list | `[]` | Tolerations applied to the Skaha API Pod. |
+
+## Harbor publishing (Science Platform CI)
+
+Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:
+
+`POST {base}/chartrepo/{project}/charts` (multipart `chart=@skaha-<version>.tgz`), **not** `helm push oci://`.
+
+That publishes to the Harbor **Helm Charts** tab. Repo variables (defaults in the workflow):
+
+- **`HARBOR_HELM_BASE_URL`** — HTTPS origin only (example `https://images.opencadc.org`), when it differs from `https://<Docker registry hostname>`.
+- **`HARBOR_HELM_REPO_PROJECT`** — Harbor project that hosts Helm charts (default `platform`).
+
+Uses the same `SKAHA_REGISTRY_USERNAME` / `SKAHA_REGISTRY_TOKEN` secrets as Docker login.
+
+## Cookie verification public key (RSA)
+
+Deployments that rely on verifying browser cookies signed with platform RSA material can mount **only the public half** via `deployment.skaha.cookieSignaturePublicKey.existingSecret` (Kubernetes Secret, release namespace—better optics than a ConfigMap plain-text entry). The projected volume always reads Secret data key **`RsaSignaturePub.key`**.
+
+1. Create the Secret outside Helm (do not paste PEM into `values.yaml` in prod). Store the PEM under **`RsaSignaturePub.key`**, for example:
+
+   `kubectl create secret generic my-skaha-cookie-verify-pub -n <release-namespace> --from-file=RsaSignaturePub.key=./public.pem`
+
+2. Reference the Secret from values (optional **`existingSecret.path`** overrides the basename under `/config`; default **`RsaSignaturePub.key`**):
+
+```yaml
+deployment:
+  skaha:
+    cookieSignaturePublicKey:
+      existingSecret:
+        name: my-skaha-cookie-verify-pub
+        path: RsaSignaturePub.key
+```
+
+Omit `existingSecret.name` (leave default empty) when you do not use this stack—the pod still uses WAR classpath material if packaged in the image.
+
+**Runtime note:** Signed session callbacks also read RSA key material from workload Secret **`pre-auth-token-skaha`** (data keys **`public`** / **`private`**). Confirm with ops which path your environment uses (`/config/RsaSignaturePub.key`, that Secret, classpath, or combinations).
 
 ## metricsBackend install ordering
 

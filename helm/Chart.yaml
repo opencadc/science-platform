@@ -21,7 +21,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 1.6.0-rc.5
+version: 1.6.0-rc.6
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
@@ -33,6 +33,3 @@ dependencies:
   - name: "redis"
     version: "^18.19.0"
     repository: "oci://registry-1.docker.io/bitnamicharts"
-  - name: "utils"
-    version: "^0.1.0"
-    repository: "file://../utils"

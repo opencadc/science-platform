@@ -22,5 +22,4 @@ data:
   {{- tpl ($.Files.Get $path) $currContext | nindent 4 }}
 {{ end }}
 {{ tpl ($.Files.Glob "skaha-config/*.json").AsConfig . | indent 2 }}
-{{- include "utils.extraConfig" (dict "extraConfigData" .Values.deployment.skaha.extraConfigData) -}}
 {{- (.Files.Glob "image-cache/*").AsConfig | nindent 2 }}

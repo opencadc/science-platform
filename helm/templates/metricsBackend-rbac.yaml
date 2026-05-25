@@ -1,6 +1,6 @@
 {{- $mb := .Values.metricsBackend | default dict }}
 {{- $mbRbac := default dict $mb.rbac }}
-{{- if and (default false $mb.enabled) (default true $mbRbac.enabled) }}
+{{- if and (eq $mb.enabled true) (eq $mbRbac.enabled true) }}
 {{/*
   Kueue read ClusterRole / ClusterRoleBinding. With metricsBackend.enabled Helm renders these
   before the metrics Deployment and Service (Helm builtin kind install order applies RBAC before

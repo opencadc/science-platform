@@ -12,6 +12,42 @@
 
 {{ template "chart.valuesSection" . }}
 
+## Harbor publishing (Science Platform CI)
+
+Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:
+
+`POST {base}/chartrepo/{project}/charts` (multipart `chart=@skaha-<version>.tgz`), **not** `helm push oci://`.
+
+That publishes to the Harbor **Helm Charts** tab. Repo variables (defaults in the workflow):
+
+- **`HARBOR_HELM_BASE_URL`** — HTTPS origin only (example `https://images.opencadc.org`), when it differs from `https://<Docker registry hostname>`.
+- **`HARBOR_HELM_REPO_PROJECT`** — Harbor project that hosts Helm charts (default `platform`).
+
+Uses the same `SKAHA_REGISTRY_USERNAME` / `SKAHA_REGISTRY_TOKEN` secrets as Docker login.
+
+## Cookie verification public key (RSA)
+
+Deployments that rely on verifying browser cookies signed with platform RSA material can mount **only the public half** via `deployment.skaha.cookieSignaturePublicKey.existingSecret` (Kubernetes Secret, release namespace—better optics than a ConfigMap plain-text entry). The projected volume always reads Secret data key **`RsaSignaturePub.key`**.
+
+1. Create the Secret outside Helm (do not paste PEM into `values.yaml` in prod). Store the PEM under **`RsaSignaturePub.key`**, for example:
+
+   `kubectl create secret generic my-skaha-cookie-verify-pub -n <release-namespace> --from-file=RsaSignaturePub.key=./public.pem`
+
+2. Reference the Secret from values (optional **`existingSecret.path`** overrides the basename under `/config`; default **`RsaSignaturePub.key`**):
+
+```yaml
+deployment:
+  skaha:
+    cookieSignaturePublicKey:
+      existingSecret:
+        name: my-skaha-cookie-verify-pub
+        path: RsaSignaturePub.key
+```
+
+Omit `existingSecret.name` (leave default empty) when you do not use this stack—the pod still uses WAR classpath material if packaged in the image.
+
+**Runtime note:** Signed session callbacks also read RSA key material from workload Secret **`pre-auth-token-skaha`** (data keys **`public`** / **`private`**). Confirm with ops which path your environment uses (`/config/RsaSignaturePub.key`, that Secret, classpath, or combinations).
+
 ## metricsBackend install ordering
 
 When `metricsBackend.enabled` is true, the chart emits `ClusterRole`, `ClusterRoleBinding`, `Service`, and `Deployment` for metrics. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go) so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.

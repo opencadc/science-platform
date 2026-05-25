@@ -77,6 +77,17 @@ deployment:
     # -- TTL in seconds for cached POSIX mapper entries.
     posixMapperCacheTTLSeconds: "86400"
 
+    # Mount an RSA **public** key for cookie/signature verification as `/config/<path>` via Kubernetes Secret projection.
+    # The Secret **data** entry must always be **`RsaSignaturePub.key`** (e.g. `kubectl create secret generic ... --from-file=RsaSignaturePub.key=./your-public.pem`).
+    # Omit `existingSecret.name` (default empty) when this overlay is not required (typical collaborator installs using other auth stacks).
+    # **Runtime note:** Callback signing tokens also use workload Secret `pre-auth-token-skaha` (`public` / `private` keys) via application code paths; verify with your ops team whether your deployment consumes `/config/RsaSignaturePub.key`, WAR classpath material, both, or neither.
+    cookieSignaturePublicKey:
+      existingSecret:
+        # Secret name (release namespace).
+        name: ""
+        # Filename under `/config` in the pod; defaults to **`RsaSignaturePub.key`** (must match Secret data entry name).
+        path: ""
+
     # -- @deprecated Prefer deployment.skaha.sessions.authorization or deprecated usersGroup alone. Still honoured when sessions.authorization.group.enabled is false.
     # The IVOA GMS Group URI to verify users against for permission to use the Science Platform.
     # See https://www.ivoa.net/documents/GMS/20220222/REC-GMS-1.0.html#tth_sEc3.2
@@ -586,7 +597,7 @@ metricsBackend:
   enabled: false
   rbac:
     # -- When true, create metricsBackend Kueue-read ClusterRole/ClusterRoleBinding. Set false to disable cluster-scoped RBAC while keeping the metrics workload enabled.
-    enabled: false
+    enabled: true
   # -- Fixed replica count for the Metrics API (no HPA in this chart version).
   replicaCount: 1
   image:
