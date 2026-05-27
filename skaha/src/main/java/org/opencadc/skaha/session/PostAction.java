@@ -78,6 +78,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -90,6 +91,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
@@ -114,7 +116,7 @@ import org.opencadc.skaha.utils.PosixCache;
  * @author majorb
  */
 public class PostAction extends SessionAction {
-
+    private static final Logger LOGGER = Logger.getLogger(PostAction.class.getName());
     private static final int POSIX_MAPPER_GID_QUERY_BATCH_SIZE = 20;
 
     // variables replaced in kubernetes YAML config files for
@@ -742,11 +744,20 @@ public class PostAction extends SessionAction {
         return toGIDs(groupCredentials.stream().map(Group::getID).collect(Collectors.toList()));
     }
 
+    /**
+     * Capture the GIDs associated with each group. This will be used to pass to the Job as supplemental groups added to
+     * the image. Query this in batches as it needs to use them in a GET request as a query string.
+     *
+     * @param groupURIS The GroupURIs the current user belongs to.
+     * @return List of PosixGroup objects, or empty list.
+     * @throws Exception If the query could not be completed.
+     */
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
         if (groupURIS.isEmpty()) {
             return List.of();
         }
 
+        final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         final PosixMapperClient posixMapperClient = posixMapperConfiguration.getPosixMapperClient();
         if (groupURIS.size() <= PostAction.POSIX_MAPPER_GID_QUERY_BATCH_SIZE) {
             return posixMapperClient.getGID(groupURIS);
@@ -758,13 +769,15 @@ public class PostAction extends SessionAction {
                     offset, Math.min(offset + PostAction.POSIX_MAPPER_GID_QUERY_BATCH_SIZE, groupURIS.size())));
             batchFutures.add(CompletableFuture.supplyAsync(() -> {
                 try {
-                    return posixMapperClient.getGID(batch);
+                    return Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
+                            () -> posixMapperClient.getGID(batch));
                 } catch (Exception exception) {
                     throw new CompletionException(exception);
                 }
             }));
         }
 
+        LOGGER.debug("Issuing " + batchFutures.size() + " posix group requests.");
         final List<PosixGroup> posixGroups = new ArrayList<>(groupURIS.size());
         for (final CompletableFuture<List<PosixGroup>> batchFuture : batchFutures) {
             try {
