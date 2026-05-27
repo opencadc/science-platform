@@ -371,6 +371,12 @@ deployment:
       #        create: true
       # -- Per-session-type Kueue configuration.
       kueue:
+        # -- Kueue CustomObjects API (LocalQueues): sets SKAHA_KUEUE_API_VERSION and SKAHA_KUEUE_API_GROUP on the Skaha Deployment.
+        api:
+          # -- Kueue API version segment for LocalQueue lookups (override e.g. to v1beta1 for older Kueue installs).
+          version: v1beta2
+          # -- Kueue API group CRDs belong to.
+          group: kueue.x-k8s.io
         rbac:
           create: false
 

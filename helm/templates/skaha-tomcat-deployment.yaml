@@ -159,11 +159,21 @@ spec:
         {{- end }}
         {{- with .Values.deployment.skaha.sessions.kueue }}
         {{- range $queueConfigKey, $queueConfig := . }}
-        {{- if ne $queueConfigKey "rbac" }}
+        {{- if and (ne $queueConfigKey "rbac") (ne $queueConfigKey "api") }}
         - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_NAME
           value: "{{ $queueConfig.queueName | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.queueName" $queueConfigKey) }}"
         - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_PRIORITY_CLASS
           value: "{{ $queueConfig.priorityClass | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.priorityClass" $queueConfigKey) }}"
+        {{- end }}
+        {{- end }}
+        {{- with .api }}
+        {{- with trim (default "" (.version | toString)) }}
+        - name: SKAHA_KUEUE_API_VERSION
+          value: {{ . | quote }}
+        {{- end }}
+        {{- with trim (default "" (.group | toString)) }}
+        - name: SKAHA_KUEUE_API_GROUP
+          value: {{ . | quote }}
         {{- end }}
         {{- end }}
         {{- end }}

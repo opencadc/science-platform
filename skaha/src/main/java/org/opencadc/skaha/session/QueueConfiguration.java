@@ -82,9 +82,13 @@ public class QueueConfiguration {
     private static final String QUEUE_CONFIG_VAR_PRIORITY_CLASS = "%s%s_PRIORITY_CLASS";
     private static final String QUEUE_CONFIG_VAR_DEFAULT_TYPE = "DEFAULT";
 
-    // Used when querying the Kubernetes API.
-    static final String KUEUE_API_VERSION = "v1beta2";
-    static final String KUEUE_API_GROUP = "kueue.x-k8s.io";
+    // Used when querying the Kubernetes CustomObjects API for LocalQueues.
+    private static final String KUEUE_API_VERSION_ENV = "SKAHA_KUEUE_API_VERSION";
+    private static final String KUEUE_API_GROUP_ENV = "SKAHA_KUEUE_API_GROUP";
+    /** Default CRD apiVersion segment (without group) when {@code SKAHA_KUEUE_API_VERSION} is unset or blank. */
+    static final String DEFAULT_KUEUE_API_VERSION = "v1beta2";
+    /** Default API group when {@code SKAHA_KUEUE_API_GROUP} is unset or blank. */
+    static final String DEFAULT_KUEUE_API_GROUP = "kueue.x-k8s.io";
     static final String KUEUE_API_PLURAL = "localqueues";
 
     final String sessionType;
@@ -143,6 +147,49 @@ public class QueueConfiguration {
                 return null;
             }
         }
+    }
+
+    /**
+     * Kueue API version segment used for LocalQueue lookups ({@code SKAHA_KUEUE_API_VERSION}).
+     * When unset or blank, {@value DEFAULT_KUEUE_API_VERSION} is used.
+     */
+    static String getKueueApiVersion() {
+        return QueueConfiguration.getKueueApiVersion(System.getenv());
+    }
+
+    /**
+     * @param env Environment map (tests may supply an explicit map).
+     * @see #getKueueApiVersion()
+     */
+    static String getKueueApiVersion(final Map<String, String> env) {
+        return QueueConfiguration.envWithDefault(
+                env,
+                QueueConfiguration.KUEUE_API_VERSION_ENV,
+                QueueConfiguration.DEFAULT_KUEUE_API_VERSION);
+    }
+
+    /**
+     * Kueue API group for LocalQueue lookups ({@code SKAHA_KUEUE_API_GROUP}).
+     * When unset or blank, {@value DEFAULT_KUEUE_API_GROUP} is used.
+     */
+    static String getKueueApiGroup() {
+        return QueueConfiguration.getKueueApiGroup(System.getenv());
+    }
+
+    /**
+     * @param env Environment map (tests may supply an explicit map).
+     * @see #getKueueApiGroup()
+     */
+    static String getKueueApiGroup(final Map<String, String> env) {
+        return QueueConfiguration.envWithDefault(
+                env,
+                QueueConfiguration.KUEUE_API_GROUP_ENV,
+                QueueConfiguration.DEFAULT_KUEUE_API_GROUP);
+    }
+
+    private static String envWithDefault(final Map<String, String> env, final String envKey, final String defaultValue) {
+        final String value = Objects.requireNonNull(env, "Environment must be provided.").get(envKey);
+        return StringUtil.hasText(value) ? value : defaultValue;
     }
 
     private static String getQueueNameForType(final String type, final Map<String, String> env) {

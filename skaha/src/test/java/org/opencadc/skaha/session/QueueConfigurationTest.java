@@ -130,4 +130,26 @@ public class QueueConfigurationTest {
                 "high-med-priority",
                 Objects.requireNonNull(QueueConfiguration.fromType("notebook", testEnvironment)).priorityClass);
     }
+
+    @Test
+    public void testKueueApiEnvDefaults() {
+        final Map<String, String> env = new HashMap<>();
+        Assert.assertEquals(
+                "Default Kueue api version.",
+                QueueConfiguration.DEFAULT_KUEUE_API_VERSION,
+                QueueConfiguration.getKueueApiVersion(env));
+        Assert.assertEquals(
+                "Default Kueue api group.",
+                QueueConfiguration.DEFAULT_KUEUE_API_GROUP,
+                QueueConfiguration.getKueueApiGroup(env));
+    }
+
+    @Test
+    public void testKueueApiEnvOverrides() {
+        final Map<String, String> env = new HashMap<>();
+        env.put("SKAHA_KUEUE_API_VERSION", "v1beta1");
+        env.put("SKAHA_KUEUE_API_GROUP", "other.kueue.example");
+        Assert.assertEquals("v1beta1", QueueConfiguration.getKueueApiVersion(env));
+        Assert.assertEquals("other.kueue.example", QueueConfiguration.getKueueApiGroup(env));
+    }
 }
