@@ -27,13 +27,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 import org.opencadc.vospace.ContainerNode;
 import org.opencadc.vospace.Node;
-import org.opencadc.vospace.NodeProperty;
 import org.opencadc.vospace.VOS;
 import org.opencadc.vospace.VOSURI;
 import org.opencadc.vospace.client.ClientTransfer;
@@ -54,7 +51,6 @@ public class UserStorageClient {
             new File("/add-user-config/desktop-config.tar");
     private static final String DESKTOP_USER_HOME_PREPARATION_FILES_PATH_CHECK_FILENAME = ".bashrc";
 
-    private final UserStorageAdminConfiguration userStorageAdminConfiguration;
     private final UserStorageConfiguration userStorageConfiguration;
 
     /**
@@ -79,13 +75,10 @@ public class UserStorageClient {
     private static final long USER_HOME_CACHE_TTL_MILLIS = 5L * 60L * 60L * 1000L; // 5 hours
 
     public UserStorageClient() {
-        this(UserStorageAdminConfiguration.fromEnv(), UserStorageConfiguration.fromEnv());
+        this(UserStorageConfiguration.fromEnv());
     }
 
-    public UserStorageClient(
-            final UserStorageAdminConfiguration userStorageAdminConfiguration,
-            final UserStorageConfiguration userStorageConfiguration) {
-        this.userStorageAdminConfiguration = userStorageAdminConfiguration;
+    public UserStorageClient(final UserStorageConfiguration userStorageConfiguration) {
         this.userStorageConfiguration = userStorageConfiguration;
     }
 
@@ -329,16 +322,8 @@ public class UserStorageClient {
             // Call as null user to ensure that the owner is properly augmented without the actual current user in the
             // context.  This is the user that will make the request to Cavern as.  This can be the allocation parent
             // owner (administrator), or the resource (/home/{username}) owner.
-            final Subject requestOwner = this.userStorageAdminConfiguration.requestOwner;
+            final Subject requestOwner = AuthenticationUtil.getCurrentSubject();
             final ContainerNode userHomeNode = new ContainerNode(nodeName);
-
-            // For self-allocations (i.e. where the user is making the call as themselves), these properties will be
-            // ignored in favour of the defaults of the service.  These properties will remain here to accommodate
-            // deployments where an administrator is making this call.
-            // @see org.opencadc.skaha.session.userStorage.UserStorageAdminConfiguration
-            userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_QUOTA, K8SUtil.getDefaultQuotaBytes()));
-            userHomeNode.getProperties().add(new NodeProperty(VOS.PROPERTY_URI_CREATOR, nodeName));
-
             final ContainerNode newUserHome = Subject.callAs(requestOwner, () -> {
                 final Node createdNode = voSpaceClient.createNode(
                         new VOSURI(this.userStorageConfiguration.userHomeBaseURI + "/" + nodeName),

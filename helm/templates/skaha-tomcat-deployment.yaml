@@ -35,8 +35,6 @@ spec:
       - env:
       {{- include "skaha.validatePlatformAccess" . }}
       {{ $userStorage := required "Missing .Values.deployment.skaha.sessions.userStorage configuration" .Values.deployment.skaha.sessions.userStorage }}
-      {{- $adminCertSecretName := "" }}
-      {{- $adminCertSecretKey := "cadcproxy.pem" }}
       {{- $cspkRoot := (.Values.deployment.skaha.cookieSignaturePublicKey | default dict) }}
       {{- $cspkRef := ($cspkRoot.existingSecret | default dict) }}
       {{- $cookiePubSecretName := trim (($cspkRef.name | default "") | toString) }}
@@ -47,25 +45,6 @@ spec:
       {{- $cookiePubMountPath = "RsaSignaturePub.key" }}
       {{- end }}
       {{- with $userStorage }}
-      {{- with .admin }}
-      {{- $auth := .auth }}
-      {{- if $auth }}
-      {{- if or $auth.apiKey $auth.apiKeySecret }}
-      {{- fail "deployment.skaha.sessions.userStorage.admin.auth.apiKey and apiKeySecret are no longer supported." }}
-      {{- else if $auth.certificateSecret }}
-      {{- with $auth.certificateSecret }}
-      {{- $adminCertSecretName = .name | required "Missing .Values.deployment.skaha.sessions.userStorage.admin.auth.certificateSecret.name" }}
-      {{- $adminCertSecretKey = .key | default "cadcproxy.pem" }}
-      {{- end }}
-      {{- else if gt (len (keys $auth)) 0 }}
-      {{- fail "deployment.skaha.sessions.userStorage.admin.auth may only contain certificateSecret; omit admin.auth entirely to authenticate user allocations with the requesting user's token." }}
-      {{- end }}
-      {{- end }}
-      {{- end }}
-      {{- if $adminCertSecretName }}
-        - name: SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED
-          value: "true"
-      {{- end }}
         - name: SKAHA_USER_STORAGE_SERVICE_URI
           value: "{{ required "Missing .Values.deployment.skaha.sessions.userStorage.serviceURI" .serviceURI }}"
         - name: SKAHA_USER_STORAGE_USER_HOME_URI
@@ -95,8 +74,6 @@ spec:
           value: "{{ .Values.deployment.skaha.sessions.maxCount }}"
         - name: skaha.sessionexpiry
           value: "{{ .Values.deployment.skaha.sessions.expirySeconds }}"
-        - name: skaha.defaultquotagb
-          value: "{{ .Values.deployment.skaha.defaultQuotaGB }}"
         - name: skaha.harborhosts
           value: "{{ .Values.deployment.skaha.registryHosts }}"
         {{- $authorization := mergeOverwrite (.Values.deployment.skaha.authorization | default dict) (.Values.deployment.skaha.sessions.authorization | default dict) }}
@@ -259,38 +236,17 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       volumes:
-      {{- $useProjectedCfg := or $adminCertSecretName $cookiePubSecretName }}
-      {{- if $useProjectedCfg }}
+      {{- if $cookiePubSecretName }}
       - name: config-volume
         projected:
           sources:
           - configMap:
               name: {{ .Release.Name }}-skaha-config
-          {{- $sameKubeSecret := and $adminCertSecretName $cookiePubSecretName (eq $adminCertSecretName $cookiePubSecretName) }}
-          {{- if $sameKubeSecret }}
-          - secret:
-              name: {{ $adminCertSecretName }}
-              items:
-              - key: {{ $adminCertSecretKey }}
-                path: {{ $adminCertSecretKey }}
-              - key: RsaSignaturePub.key
-                path: {{ $cookiePubMountPath }}
-          {{- else }}
-          {{- if $adminCertSecretName }}
-          - secret:
-              name: {{ $adminCertSecretName }}
-              items:
-              - key: {{ $adminCertSecretKey }}
-                path: {{ $adminCertSecretKey }}
-          {{- end }}
-          {{- if $cookiePubSecretName }}
           - secret:
               name: {{ $cookiePubSecretName }}
               items:
               - key: RsaSignaturePub.key
                 path: {{ $cookiePubMountPath }}
-          {{- end }}
-          {{- end }}
       {{- else }}
       - name: config-volume
         configMap:

@@ -40,6 +40,9 @@ Skaha workload namespace: {{ include "skaha.workloadNamespace" . }}
 
 {{- end }}
 
+User allocation (Cavern):
+  Skaha uses self-allocation for user home directories. Requests to Cavern are performed as the requesting user, not with an administrator credential.
+
 User Sessions:
 - Ensure CARTA images being used are at version 5.0.3 or higher.
 

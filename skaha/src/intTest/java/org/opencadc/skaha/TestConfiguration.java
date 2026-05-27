@@ -8,7 +8,6 @@ import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.SSOCookieCredential;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.net.HttpPost;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.net.NetrcFile;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -22,8 +21,8 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.MissingResourceException;
 import javax.security.auth.Subject;
@@ -83,11 +82,10 @@ public class TestConfiguration {
         return desktopImageID;
     }
 
-    private static AuthorizationToken getBearerToken(final URL sessionURL) throws Exception {
+    private static AuthorizationToken getBearerToken() throws Exception {
         final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token", SessionUtil.class);
         final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-        return new AuthorizationToken(
-                "Bearer", bearerToken.replaceAll("\n", ""), List.of(NetUtil.getDomainName(sessionURL)));
+        return new AuthorizationToken("Bearer", bearerToken.replace("\n", ""), Collections.emptyList());
     }
 
     private static X509CertificateChain getProxyCertificate() throws Exception {
@@ -125,25 +123,24 @@ public class TestConfiguration {
     /**
      * Read in the current user's credentials from the local path.
      *
-     * @param sessionURL The current URL to use to deduce a domain.
      * @return Subject instance, never null.
      */
-    static Subject getCurrentUser(final URL sessionURL) throws Exception {
+    static AuthenticatedUser getCurrentUser() throws Exception {
         try {
             final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
             LOGGER.info("PEM Certificate found in path.");
-            return AuthenticationUtil.getSubject(proxyCertificate);
+            return new AuthenticatedUser(AuthenticationUtil.getSubject(proxyCertificate), AuthMethod.CERT);
         } catch (MissingResourceException noProxyCertificate) {
             LOGGER.warn("No proxy certificate (skaha-test.pem) found in path.");
         }
 
         try {
-            final AuthorizationToken bearerToken = TestConfiguration.getBearerToken(sessionURL);
+            final AuthorizationToken bearerToken = TestConfiguration.getBearerToken();
             final Subject subject = new Subject();
             subject.getPublicCredentials().add(bearerToken);
             subject.getPublicCredentials().add(AuthMethod.TOKEN);
             LOGGER.info("Bearer Token found in path.");
-            return subject;
+            return new AuthenticatedUser(subject, AuthMethod.TOKEN);
         } catch (MissingResourceException noTokenFile) {
             LOGGER.warn("No bearer token (skaha-test.token) found in path.");
         }
@@ -164,13 +161,13 @@ public class TestConfiguration {
             final String cookieValue = TestConfiguration.getCookieValue(loginURL);
             final Subject subject = new Subject();
             LOGGER.info("Using cookie value: " + cookieValue);
-            subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, NetUtil.getDomainName(sessionURL)));
+            subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, null));
             subject.getPublicCredentials()
                     .add(new SSOCookieCredential(cookieValue, "cadc-ccda.hia-iha.nrc-cnrc.gc.ca"));
             subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "canfar.net"));
             subject.getPublicCredentials().add(new SSOCookieCredential(cookieValue, "cadc.dao.nrc.ca"));
             subject.getPublicCredentials().add(AuthMethod.COOKIE);
-            return subject;
+            return new AuthenticatedUser(subject, AuthMethod.COOKIE);
         } catch (Exception ex) {
             LOGGER.warn("Could not get Cookie login: " + ex.getMessage());
         }

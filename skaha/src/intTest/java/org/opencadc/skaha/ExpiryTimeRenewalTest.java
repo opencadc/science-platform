@@ -67,11 +67,12 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.net.HttpPost;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
@@ -102,21 +103,21 @@ public class ExpiryTimeRenewalTest {
     }
 
     protected final URL sessionURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public ExpiryTimeRenewalTest() throws Exception {
-        RegistryClient regClient = new RegistryClient();
+        final RegistryClient regClient = new RegistryClient();
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
-        log.info("sessions URL: " + sessionURL);
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
 
-        this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
-        log.debug("userSubject: " + userSubject);
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+        log.debug("userSubject: " + authenticatedUser.subject);
     }
 
     @Test
     public void testRenewCARTA() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 
@@ -160,7 +161,7 @@ public class ExpiryTimeRenewalTest {
 
     @Test
     public void testRenewHeadless() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
 
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
@@ -190,7 +191,7 @@ public class ExpiryTimeRenewalTest {
 
     @Test
     public void testRenewDesktop() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 
@@ -230,7 +231,8 @@ public class ExpiryTimeRenewalTest {
     private void renewSession(URL sessionURL, String sessionID) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
-        HttpPost post = new HttpPost(new URL(sessionURL.toString() + "/" + sessionID), params, false);
+        HttpPost post =
+                new HttpPost(URI.create(sessionURL.toString() + "/" + sessionID).toURL(), params, false);
         post.prepare();
     }
 }

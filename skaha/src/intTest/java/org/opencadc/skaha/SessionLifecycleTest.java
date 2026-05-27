@@ -67,7 +67,7 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -103,21 +103,23 @@ public class SessionLifecycleTest {
     }
 
     protected final URL sessionURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
         log.info("sessions URL: " + sessionURL);
 
-        this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
-        log.debug("userSubject: " + userSubject);
+        log.debug("userSubject: " + authenticatedUser);
     }
 
     @Test
     public void testCreateDeleteSessions() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
 
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);

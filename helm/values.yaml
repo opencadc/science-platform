@@ -284,22 +284,6 @@ deployment:
         #   nodeURIPrefix: "vos://skao.int~cavern"
         # nodeURIPrefix:
 
-        # Optional.  Optionally supply admin credentials when creating User Storage allocations (new home dirs) requires a PEM client certificate
-        # distinct from users' Bearer tokens.
-        #
-        # If omitted, or if admin.auth is omitted or empty, Skaha uses the authenticated end user's Bearer token when performing user allocations.
-        #
-        # When admin.auth is set, configure certificateSecret — a Kubernetes Secret holding a PEM client certificate for User Storage Admin.
-        # Its key is projected into `/config/<key>` together with chart ConfigMap data (projected volume) so Skaha can read the PEM from disk as a conventionally named file beside other `/config` content. The chart sets SKAHA_USER_STORAGE_ADMIN_CERTIFICATE_ENABLED=true on the Skaha deployment when this is configured.
-        # Default Secret key name is "cadcproxy.pem" (override with certificateSecret.key).
-        # Example:
-        # admin:
-        #   auth:
-        #     certificateSecret:
-        #       name: "science-platform-user-storage-admin-certificate"
-        #       key: "certificate.pem"
-        admin: {}
-
       # The image pull policy for User Sessions (applies to ALL types).  This is the default, but can be overridden.  Defaults to Always.
       # @see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
       # Example:

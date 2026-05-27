@@ -86,10 +86,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
+import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
@@ -110,6 +114,8 @@ import org.opencadc.skaha.utils.PosixCache;
  * @author majorb
  */
 public class PostAction extends SessionAction {
+
+    private static final int POSIX_MAPPER_GID_QUERY_BATCH_SIZE = 20;
 
     // variables replaced in kubernetes YAML config files for
     // launching desktop sessions and launching software
@@ -737,7 +743,44 @@ public class PostAction extends SessionAction {
     }
 
     List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
-        return posixMapperConfiguration.getPosixMapperClient().getGID(groupURIS);
+        if (groupURIS.isEmpty()) {
+            return List.of();
+        }
+
+        final PosixMapperClient posixMapperClient = posixMapperConfiguration.getPosixMapperClient();
+        if (groupURIS.size() <= PostAction.POSIX_MAPPER_GID_QUERY_BATCH_SIZE) {
+            return posixMapperClient.getGID(groupURIS);
+        }
+
+        final List<CompletableFuture<List<PosixGroup>>> batchFutures = new ArrayList<>();
+        for (int offset = 0; offset < groupURIS.size(); offset += PostAction.POSIX_MAPPER_GID_QUERY_BATCH_SIZE) {
+            final List<GroupURI> batch = List.copyOf(groupURIS.subList(
+                    offset, Math.min(offset + PostAction.POSIX_MAPPER_GID_QUERY_BATCH_SIZE, groupURIS.size())));
+            batchFutures.add(CompletableFuture.supplyAsync(() -> {
+                try {
+                    return posixMapperClient.getGID(batch);
+                } catch (Exception exception) {
+                    throw new CompletionException(exception);
+                }
+            }));
+        }
+
+        final List<PosixGroup> posixGroups = new ArrayList<>(groupURIS.size());
+        for (final CompletableFuture<List<PosixGroup>> batchFuture : batchFutures) {
+            try {
+                posixGroups.addAll(batchFuture.get());
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                throw interruptedException;
+            } catch (ExecutionException executionException) {
+                final Throwable cause = executionException.getCause();
+                if (cause instanceof Exception exception) {
+                    throw exception;
+                }
+                throw new Exception(cause.getMessage(), cause);
+            }
+        }
+        return posixGroups;
     }
 
     /**
