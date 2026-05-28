@@ -5,7 +5,7 @@ Expand the name of the chart.
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{/*
+{{/* 
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
@@ -226,10 +226,21 @@ USER SESSION TEMPLATE DEFINITIONS
 */}}
 
 {{/*
+Validated deployment.skaha.sessions.userStorage.nodeURIPrefix (must use vos:// scheme).
+*/}}
+{{- define "skaha.job.userStorage.nodeURIPrefix" -}}
+{{- $nodeURIPrefix := trim (required ".Values.deployment.skaha.sessions.userStorage.nodeURIPrefix nodeURIPrefix is required." .Values.deployment.skaha.sessions.userStorage.nodeURIPrefix) -}}
+{{- if not (hasPrefix "vos://" $nodeURIPrefix) -}}
+{{- fail "deployment.skaha.sessions.userStorage.nodeURIPrefix must be a vos:// URI (e.g. vos://example.org~cavern)" -}}
+{{- end -}}
+{{- $nodeURIPrefix -}}
+{{- end -}}
+
+{{/*
 The Home VOSpace Node URI (uses vos:// scheme) for the User Home directory in Cavern.
 */}}
 {{- define "skaha.job.userStorage.homeURI" -}}
-{{- $nodeURIPrefix := trimAll "/" (required ".Values.deployment.skaha.sessions.userStorage.nodeURIPrefix nodeURIPrefix is required." .Values.deployment.skaha.sessions.userStorage.nodeURIPrefix) -}}
+{{- $nodeURIPrefix := include "skaha.job.userStorage.nodeURIPrefix" . -}}
 {{- $homeDirectoryName := trimAll "/" (required ".Values.deployment.skaha.sessions.userStorage.homeDirectory home folder name is required." .Values.deployment.skaha.sessions.userStorage.homeDirectory) -}}
 {{- printf "%s/%s" $nodeURIPrefix $homeDirectoryName -}}
 {{- end -}}

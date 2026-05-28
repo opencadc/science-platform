@@ -12,6 +12,26 @@
 
 {{ template "chart.valuesSection" . }}
 
+## User storage (Cavern)
+
+User home allocations in Cavern are configured under `deployment.skaha.sessions.userStorage`. Set **`nodeURIPrefix`** to a **`vos://` scheme** URI. The host (authority) and Cavern service name are separated by a tilde (`~`).
+
+Example:
+
+```yaml
+deployment:
+  skaha:
+    sessions:
+      userStorage:
+        nodeURIPrefix: "vos://storage.example.com~cavern"
+        homeDirectory: "home"
+        topLevelDirectory: "/cavern"
+```
+
+Skaha sets `SKAHA_USER_STORAGE_USER_HOME_URI` to the prefix plus `homeDirectory`, for example **`vos://storage.example.com~cavern/home`**. That URI identifies the VOSpace folder where per-user ContainerNodes are created (a value such as `vos://storage.example.com~cavern/home/` refers to the same home folder; trailing slashes are normalized).
+
+Skaha resolves the backing Cavern service for registry lookup as **`ivo://storage.example.com/cavern`**: the `ivo://` authority matches the `vos://` host, and the service path is the segment immediately after `~` (`cavern`), not the subsequent node path (`/home`).
+
 ## Harbor publishing (Science Platform CI)
 
 Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:

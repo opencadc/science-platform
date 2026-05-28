@@ -45,8 +45,6 @@ spec:
       {{- $cookiePubMountPath = "RsaSignaturePub.key" }}
       {{- end }}
       {{- with $userStorage }}
-        - name: SKAHA_USER_STORAGE_SERVICE_URI
-          value: "{{ required "Missing .Values.deployment.skaha.sessions.userStorage.serviceURI" .serviceURI }}"
         - name: SKAHA_USER_STORAGE_USER_HOME_URI
           value: "{{ template "skaha.job.userStorage.homeURI" $ }}"
         - name: SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY

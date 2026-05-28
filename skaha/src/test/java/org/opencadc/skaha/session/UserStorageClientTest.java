@@ -95,8 +95,7 @@ public class UserStorageClientTest {
 
     @BeforeClass
     public static void setUpBeforeClass() {
-        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_SERVICE_URI, "ivo://example.org/storage");
-        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI, "vos://storage/home/");
+        System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI, "vos://storage.com~cavern/home/");
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY, "/data");
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY, "home");
         System.setProperty(UserStorageConfiguration.SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY, "projects");

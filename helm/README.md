@@ -65,6 +65,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.sessions.priorityClass | object | `{"create":false,"description":"For high-priority user pods. Preempting.","globalDefault":false,"name":"uber-user-preempt-high","preemptionPolicy":"PreemptLowerPriority","value":2000}` | PriorityClass assigned to the Skaha API Pod. |
 | deployment.skaha.sessions.tolerations | list | `[]` | Tolerations applied to user session Pods. |
 | deployment.skaha.sessions.userStorage.homeDirectory | string | `"home"` | Relative path under topLevelDirectory for user home directories. |
+| deployment.skaha.sessions.userStorage.nodeURIPrefix | string | `nil` | Required `vos://` URI prefix (`vos://<authority>~<cavern-service>`). Example: `vos://storage.example.com~cavern`. See [User storage (Cavern)](#user-storage-cavern). |
 | deployment.skaha.sessions.userStorage.projectsDirectory | string | `"projects"` | Relative path under topLevelDirectory for shared projects storage. |
 | deployment.skaha.sessions.userStorage.topLevelDirectory | string | `"/cavern"` | Absolute mount path containing user home and projects directories. |
 | experimentalFeatures.enabled | bool | `false` | Enable processing of experimental feature gates. |
@@ -107,6 +108,26 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
 | serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
 | tolerations | list | `[]` | Tolerations applied to the Skaha API Pod. |
+
+## User storage (Cavern)
+
+User home allocations in Cavern are configured under `deployment.skaha.sessions.userStorage`. Set **`nodeURIPrefix`** to a **`vos://` scheme** URI. The host (authority) and Cavern service name are separated by a tilde (`~`).
+
+Example:
+
+```yaml
+deployment:
+  skaha:
+    sessions:
+      userStorage:
+        nodeURIPrefix: "vos://storage.example.com~cavern"
+        homeDirectory: "home"
+        topLevelDirectory: "/cavern"
+```
+
+Skaha sets `SKAHA_USER_STORAGE_USER_HOME_URI` to the prefix plus `homeDirectory`, for example **`vos://storage.example.com~cavern/home`**. That URI identifies the VOSpace folder where per-user ContainerNodes are created (a value such as `vos://storage.example.com~cavern/home/` refers to the same home folder; trailing slashes are normalized).
+
+Skaha resolves the backing Cavern service for registry lookup as **`ivo://storage.example.com/cavern`**: the `ivo://` authority matches the `vos://` host, and the service path is the segment immediately after `~` (`cavern`), not the subsequent node path (`/home`).
 
 ## Harbor publishing (Science Platform CI)
 

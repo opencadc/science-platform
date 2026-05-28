@@ -14,7 +14,7 @@ rules:
 
 - apiGroups: ["batch"]
   resources: ["jobs"]
-  verbs: ["create", "deletecollection", "delete", "get", "list"]
+  verbs: ["create", "deletecollection", "delete", "get", "list", "patch"]
 
 - apiGroups: [""]
   resources: ["pods", "services", "secrets"]

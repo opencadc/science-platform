@@ -149,8 +149,9 @@ public class ExpiryTimeRenewalTest {
             long changedTime = timeToLiveAfterRenewal - timeToLive;
             if (changedTime <= SLEEP_TIME_SECONDS) {
                 // renew failed
-                Assert.fail(
-                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test.");
+                Assert.fail(String.format(
+                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %d).",
+                        changedTime));
             }
 
             SessionUtil.deleteSession(this.sessionURL, cartaSessionID);

@@ -273,15 +273,14 @@ deployment:
         #         name: ceph-secret
         spec: {}
 
-        # Required.  The VOSpace Service URI (uses ivo:// scheme) for the Cavern Service.
-        # This is the VOSpace location where user home directories will be created, as well as any other user data.  Requires Cavern to be running.
+        # Required.  VOSpace node URI prefix for user home folders in Cavern.  Must use the `vos://` scheme.
+        # Authority (host) and Cavern service name are separated by a tilde (`~`).  Skaha appends
+        # `homeDirectory` to form SKAHA_USER_STORAGE_USER_HOME_URI and derives the Cavern service
+        # identifier from the prefix (e.g. vos://storage.example.com~cavern/home → ivo://storage.example.com/cavern).
         # Example:
-        #   serviceURI: "ivo://example.org/cavern"
-        # serviceURI:
-
-        # Required.  The VOSpace Resource ID (Node URI) prefix (uses vos:// scheme) for the Cavern Service.
-        # Example:
-        #   nodeURIPrefix: "vos://skao.int~cavern"
+        #   nodeURIPrefix: "vos://storage.example.com~cavern"
+        #   homeDirectory: "home"
+        # -- Required `vos://` URI prefix (`vos://<authority>~<cavern-service>`, e.g. `vos://storage.example.com~cavern`). See README "User storage (Cavern)".
         # nodeURIPrefix:
 
       # The image pull policy for User Sessions (applies to ALL types).  This is the default, but can be overridden.  Defaults to Always.
