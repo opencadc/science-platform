@@ -166,7 +166,7 @@ public class SessionLifecycleTest {
             try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/stats-schema.json")) {
                 Assert.assertNotNull(schemaStream);
                 try (final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
-                     final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
+                        final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
                     final StringBuilder builder = new StringBuilder();
                     reader.lines().forEach(builder::append);
                     final JSONObject rawSchema = new JSONObject(builder.toString());
