@@ -11,8 +11,8 @@ import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
-import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1PodStatus;
 import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.openapi.models.V1Status;
 import java.math.BigDecimal;
@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.opencadc.skaha.K8SInformerCache;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
@@ -127,11 +128,17 @@ public class SessionDAO {
     }
 
     static KubernetesJob getJob(final String jobName) throws Exception {
-        final ApiClient client = Configuration.getDefaultApiClient();
-        final BatchV1Api api = new BatchV1Api(client);
-
-        final V1Job job =
-                api.readNamespacedJob(jobName, K8SUtil.getWorkloadNamespace()).execute();
+        final V1Job job;
+        if (K8SInformerCache.isRunning()) {
+            job = K8SInformerCache.getJob(jobName);
+            if (job == null) {
+                throw new ResourceNotFoundException("Job " + jobName + " not found");
+            }
+        } else {
+            final ApiClient client = Configuration.getDefaultApiClient();
+            final BatchV1Api api = new BatchV1Api(client);
+            job = api.readNamespacedJob(jobName, K8SUtil.getWorkloadNamespace()).execute();
+        }
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
 
@@ -145,38 +152,55 @@ public class SessionDAO {
 
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
             throws Exception {
-        final ApiClient client = Configuration.getDefaultApiClient();
+        final List<V1Job> userJobs;
 
-        final List<String> labelSelectors = new ArrayList<>();
-        if (omitHeadless) {
-            labelSelectors.add(
-                    String.format("%s!=%s", SessionDAO.SESSION_TYPE_LABEL, SessionAction.SESSION_TYPE_HEADLESS));
+        if (K8SInformerCache.isRunning()) {
+            userJobs = K8SInformerCache.listJobs().stream()
+                    .filter(job -> {
+                        final Map<String, String> labels =
+                                job.getMetadata() != null ? job.getMetadata().getLabels() : null;
+                        if (labels == null) {
+                            return false;
+                        }
+                        if (omitHeadless && SkahaAction.SESSION_TYPE_HEADLESS.equals(labels.get(SESSION_TYPE_LABEL))) {
+                            return false;
+                        }
+                        if (StringUtil.hasLength(sessionID) && !sessionID.equals(labels.get(SESSION_ID_LABEL))) {
+                            return false;
+                        }
+                        if (StringUtil.hasLength(forUserID) && !forUserID.equals(labels.get(USER_ID_LABEL))) {
+                            return false;
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            final ApiClient client = Configuration.getDefaultApiClient();
+            final List<String> labelSelectors = new ArrayList<>();
+            if (omitHeadless) {
+                labelSelectors.add(
+                        String.format("%s!=%s", SessionDAO.SESSION_TYPE_LABEL, SessionAction.SESSION_TYPE_HEADLESS));
+            }
+            if (StringUtil.hasLength(sessionID)) {
+                labelSelectors.add(String.format("%s=%s", SessionDAO.SESSION_ID_LABEL, sessionID));
+            }
+            final BatchV1Api api = new BatchV1Api(client);
+            final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
+                    api.listNamespacedJob(K8SUtil.getWorkloadNamespace());
+            if (StringUtil.hasLength(forUserID)) {
+                labelSelectors.add("canfar-net-userid=" + forUserID);
+            }
+            final String labelSelector = String.join(",", labelSelectors);
+            jobListRequest.labelSelector(labelSelector);
+            userJobs = jobListRequest.execute().getItems();
         }
 
-        if (StringUtil.hasLength(sessionID)) {
-            labelSelectors.add(String.format("%s=%s", SessionDAO.SESSION_ID_LABEL, sessionID));
-        }
-
-        final BatchV1Api api = new BatchV1Api(client);
-        final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
-                api.listNamespacedJob(K8SUtil.getWorkloadNamespace());
-
-        if (StringUtil.hasLength(forUserID)) {
-            labelSelectors.add("canfar-net-userid=" + forUserID);
-        }
-
-        final String labelSelector = String.join(",", labelSelectors);
-        jobListRequest.labelSelector(labelSelector);
-
+        LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " before filtering.");
         final PodResourceUsage podResourceUsage = PodResourceUsage.get(forUserID, omitHeadless);
-        final List<V1Job> userJobs = jobListRequest.execute().getItems();
-        LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector
-                + " before filtering.");
         final List<Session> sessions = userJobs.stream()
                 .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
-        LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
-                + " after filtering.");
+        LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " after filtering.");
         return sessions;
     }
 
@@ -188,17 +212,28 @@ public class SessionDAO {
      * @throws Exception If the Kubernetes API call fails.
      */
     static Map<String, BigDecimal> getAllocatedPodResources() throws Exception {
-        final ApiClient client = Configuration.getDefaultApiClient();
-        final CoreV1Api api = new CoreV1Api(client);
-        final V1PodList podList = api.listNamespacedPod(K8SUtil.getWorkloadNamespace())
-                .fieldSelector("status.phase=Running")
-                .execute();
+        final List<V1Pod> runningPods;
+        if (K8SInformerCache.isRunning()) {
+            runningPods = K8SInformerCache.listPods().stream()
+                    .filter(pod -> {
+                        final V1PodStatus status = pod.getStatus();
+                        return status != null && "Running".equals(status.getPhase());
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            final ApiClient client = Configuration.getDefaultApiClient();
+            final CoreV1Api api = new CoreV1Api(client);
+            runningPods = api.listNamespacedPod(K8SUtil.getWorkloadNamespace())
+                    .fieldSelector("status.phase=Running")
+                    .execute()
+                    .getItems();
+        }
         final PodResourceUsage podResourceUsage = PodResourceUsage.getAll();
 
         final Map<String, BigDecimal> resources = new HashMap<>();
         resources.put("cpu", BigDecimal.ZERO);
         resources.put("memory", BigDecimal.ZERO);
-        for (final V1Pod pod : podList.getItems()) {
+        for (final V1Pod pod : runningPods) {
             final String podName = Objects.requireNonNullElse(pod.getMetadata(), new V1ObjectMeta())
                     .getName();
             final List<V1Container> containers =

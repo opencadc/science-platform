@@ -79,6 +79,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opencadc.skaha.K8SInformerCache;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 
@@ -110,6 +111,10 @@ public class InitializationAction extends InitAction {
             final ApiClient client = Config.fromCluster();
             Configuration.setDefaultApiClient(client);
             LOGGER.info("Initialized Kubernetes API client for cluster with base path: {}", client.getBasePath());
+
+            LOGGER.info("Starting K8S informer cache...");
+            K8SInformerCache.start(client);
+            LOGGER.info("Starting K8S informer cache: OK");
         } catch (IOException e) {
             LOGGER.error("Failed to configure k8s client from cluster: {}", e.getMessage(), e);
         }
