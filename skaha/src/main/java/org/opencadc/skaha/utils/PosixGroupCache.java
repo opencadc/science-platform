@@ -3,8 +3,11 @@ package org.opencadc.skaha.utils;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,39 +44,35 @@ public class PosixGroupCache {
      * @return One {@link PosixGroup} per input {@link GroupURI}, in the same order.
      * @throws Exception If the query could not be completed or a mapping is missing after lookup.
      */
-    public List<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
+    public Set<PosixGroup> toGIDs(final List<GroupURI> groupURIS) throws Exception {
         if (groupURIS.isEmpty()) {
-            return List.of();
+            return Set.of();
         }
 
-        final List<PosixGroup> results = new ArrayList<>(groupURIS.size());
+        final Set<PosixGroup> results = new HashSet<>(groupURIS.size());
         final List<GroupURI> missingGroupURIs = new ArrayList<>();
 
-        for (final GroupURI groupURI : groupURIS) {
+        groupURIS.stream().filter(Objects::nonNull).forEach(groupURI -> {
             final PosixGroup cachedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(groupURI);
             if (cachedGroup != null) {
                 results.add(cachedGroup);
             } else {
                 missingGroupURIs.add(groupURI);
-                results.add(null);
             }
-        }
+        });
 
         if (!missingGroupURIs.isEmpty()) {
             PosixGroupCache.queryAndCacheGroupGids(
                     new ArrayList<>(new LinkedHashSet<>(missingGroupURIs)), this.posixMapperClient);
 
-            for (int index = 0; index < groupURIS.size(); index++) {
-                if (results.get(index) == null) {
-                    final PosixGroup fetchedGroup =
-                            PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(groupURIS.get(index));
-                    if (fetchedGroup == null) {
-                        throw new IllegalStateException(
-                                "POSIX Mapper did not return a group mapping for " + groupURIS.get(index));
-                    }
-                    results.set(index, fetchedGroup);
+            missingGroupURIs.forEach(missingGroupURI -> {
+                final PosixGroup fetchedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(missingGroupURI);
+                if (fetchedGroup == null) {
+                    throw new IllegalStateException(
+                            "POSIX Mapper did not return a group mapping for " + missingGroupURI);
                 }
-            }
+                results.add(fetchedGroup);
+            });
         }
 
         return results;

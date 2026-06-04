@@ -310,6 +310,7 @@ public class SessionUtil {
 
     private static Session getSessionWithoutWait(
             final URL sessionURL, final String sessionID, final String expectedState) throws Exception {
+
         return SessionUtil.getAllSessions(sessionURL).stream()
                 .filter(session -> session.getId().equals(sessionID)
                         && session.getStatus().equals(expectedState)

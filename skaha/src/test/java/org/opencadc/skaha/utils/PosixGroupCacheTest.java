@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import org.junit.Test;
@@ -37,7 +38,6 @@ public class PosixGroupCacheTest {
         final PosixMapperClient client = mock(PosixMapperClient.class);
         when(client.getGID(anyList())).thenAnswer(invocation -> {
             queryCount.incrementAndGet();
-            @SuppressWarnings("unchecked")
             final List<GroupURI> groupURIs = invocation.getArgument(0);
             if (groupURIs.equals(List.of(cachedUri))) {
                 return List.of(cachedGroup);
@@ -52,10 +52,10 @@ public class PosixGroupCacheTest {
         cache.toGIDs(List.of(cachedUri));
         queryCount.set(0);
 
-        final List<PosixGroup> results = cache.toGIDs(List.of(cachedUri, missingUri, cachedUri));
+        final Set<PosixGroup> results = cache.toGIDs(List.of(cachedUri, missingUri, cachedUri));
 
         Assert.assertEquals(1, queryCount.get());
-        Assert.assertEquals(List.of(cachedGroup, missingGroup, cachedGroup), results);
+        Assert.assertEquals(Set.of(cachedGroup, missingGroup), results);
     }
 
     @Test
@@ -69,7 +69,6 @@ public class PosixGroupCacheTest {
         final PosixMapperClient client = mock(PosixMapperClient.class);
         when(client.getGID(anyList())).thenAnswer(invocation -> {
             queryCount.incrementAndGet();
-            @SuppressWarnings("unchecked")
             final List<GroupURI> groupURIs = invocation.getArgument(0);
             if (groupURIs.equals(List.of(groupOne, groupTwo))) {
                 return List.of(posixGroupOne, posixGroupTwo);
@@ -81,10 +80,10 @@ public class PosixGroupCacheTest {
         cache.toGIDs(List.of(groupOne, groupTwo));
         queryCount.set(0);
 
-        final List<PosixGroup> results = cache.toGIDs(List.of(groupOne, groupTwo));
+        final Set<PosixGroup> results = cache.toGIDs(List.of(groupOne, groupTwo));
 
         Assert.assertEquals(0, queryCount.get());
-        Assert.assertEquals(List.of(posixGroupOne, posixGroupTwo), results);
+        Assert.assertEquals(Set.of(posixGroupOne, posixGroupTwo), results);
     }
 
     @Test
@@ -101,7 +100,6 @@ public class PosixGroupCacheTest {
         final PosixMapperClient client = mock(PosixMapperClient.class);
         when(client.getGID(anyList())).thenAnswer(invocation -> {
             queryCount.incrementAndGet();
-            @SuppressWarnings("unchecked")
             final List<GroupURI> requestedGroupURIs = invocation.getArgument(0);
             final List<PosixGroup> batchResults = new ArrayList<>();
             for (final GroupURI requestedGroupURI : requestedGroupURIs) {
@@ -112,15 +110,20 @@ public class PosixGroupCacheTest {
             return batchResults;
         });
 
-        final List<PosixGroup> results = new PosixGroupCache(client).toGIDs(groupURIs);
+        final Set<PosixGroup> results = new PosixGroupCache(client).toGIDs(groupURIs);
 
         Assert.assertEquals(2, queryCount.get());
         Assert.assertEquals(expectedGroups.size(), results.size());
-        for (int index = 0; index < expectedGroups.size(); index++) {
-            Assert.assertEquals(
-                    expectedGroups.get(index).getGroupURI(), results.get(index).getGroupURI());
-            Assert.assertEquals(
-                    expectedGroups.get(index).getGID(), results.get(index).getGID());
+        final AtomicInteger actualCount = new AtomicInteger();
+        for (final PosixGroup expectedGroup : expectedGroups) {
+            for (final PosixGroup batchResult : results) {
+                if (batchResult.getGroupURI().equals(expectedGroup.getGroupURI())
+                        && batchResult.getGID().equals(expectedGroup.getGID())) {
+                    actualCount.incrementAndGet();
+                }
+            }
         }
+
+        Assert.assertEquals("Should match counts.", expectedGroups.size(), actualCount.get());
     }
 }

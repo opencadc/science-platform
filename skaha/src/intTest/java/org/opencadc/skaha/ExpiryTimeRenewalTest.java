@@ -95,7 +95,7 @@ import org.opencadc.skaha.session.SessionAction;
  */
 public class ExpiryTimeRenewalTest {
 
-    public static final int SLEEP_TIME_SECONDS = 15;
+    public static final int SLEEP_TIME_SECONDS = 20;
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
 
     static {
@@ -127,31 +127,32 @@ public class ExpiryTimeRenewalTest {
                     "inttest-" + SessionAction.SESSION_TYPE_CARTA,
                     TestConfiguration.getCARTAImageID(),
                     SessionAction.SESSION_TYPE_CARTA);
-            Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+            final Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+
+            final Instant expiryTime = Instant.parse(cartaSession.getExpiryTime());
+            final long expiryTimeSinceEpoch = expiryTime.toEpochMilli();
+            log.info("expiryTime: " + expiryTimeSinceEpoch);
 
             // Sleep to force time to pass before renewal
             TimeUnit.SECONDS.sleep(SLEEP_TIME_SECONDS);
 
-            final Instant expiryTime = Instant.parse(cartaSession.getExpiryTime());
-            final Instant startTime = Instant.parse(cartaSession.getStartTime());
-            final long timeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
-
             // renew session
             renewSession(sessionURL, cartaSessionID);
 
-            cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
-            final Instant expiryTimeAfterRenewal = Instant.parse(cartaSession.getExpiryTime());
-            final Instant startTimeAfterRenewal = Instant.parse(cartaSession.getStartTime());
-            final long timeToLiveAfterRenewal = startTimeAfterRenewal.until(expiryTimeAfterRenewal, ChronoUnit.SECONDS);
+            final Session renewedCartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+            final Instant expiryTimeAfterRenewal = Instant.parse(renewedCartaSession.getExpiryTime());
+            final long expiryTimeAfterRenewalSinceEpoch = expiryTimeAfterRenewal.toEpochMilli();
 
             // Pre-condition: activeDeadlineSeconds == skaha.sessionexpiry
             // If the pre-condition has changed, the conditional code below needs to be updated
-            long changedTime = timeToLiveAfterRenewal - timeToLive;
-            if (changedTime <= SLEEP_TIME_SECONDS) {
+            final long changedTime = expiryTimeAfterRenewalSinceEpoch - expiryTimeSinceEpoch;
+            if (changedTime <= 0) {
                 // renew failed
                 Assert.fail(String.format(
-                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %d).",
-                        changedTime));
+                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %ds) (Original expiry time %d vs Refreshed expiry time %d).",
+                        changedTime, expiryTime.toEpochMilli(), expiryTimeAfterRenewal.toEpochMilli()));
+            } else {
+                log.info(String.format("Expiry time extended by %d seconds", changedTime / 1000));
             }
 
             SessionUtil.deleteSession(this.sessionURL, cartaSessionID);
@@ -230,10 +231,13 @@ public class ExpiryTimeRenewalTest {
     }
 
     private void renewSession(URL sessionURL, String sessionID) throws Exception {
-        Map<String, Object> params = new HashMap<>();
+        log.info(String.format("Renewing session %s", sessionID));
+        final URL postURL = URI.create(sessionURL.toString() + "/" + sessionID).toURL();
+        log.info(String.format("Session renewal URL is %s", postURL));
+        final Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
-        HttpPost post =
-                new HttpPost(URI.create(sessionURL.toString() + "/" + sessionID).toURL(), params, false);
+        HttpPost post = new HttpPost(postURL, params, false);
         post.prepare();
+        log.info(String.format("Renewing session %s: OK", sessionID));
     }
 }

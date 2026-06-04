@@ -283,6 +283,16 @@ deployment:
         # -- Required `vos://` URI prefix (`vos://<authority>~<cavern-service>`, e.g. `vos://storage.example.com~cavern`). See README "User storage (Cavern)".
         # nodeURIPrefix:
 
+        # -- (Optional) Enable ownership of volumes being mounted into the User Sessions.  This is usually not a good idea as the volumes are multi-user and multi-group,
+        # so running chown on the volumes is not a good idea.  This is here for the rare case where you need to ensure that the volumes are owned by the correct user and group.
+        # This feature will set the fsGroup to the current user's main POSIX GID.  The policy can be set here.
+        # Example:
+        #   ownership:
+        #     enabled: true
+        #     fsGroupChangePolicy: OnRootMismatch
+        ownership:
+          enabled: false
+
       # The image pull policy for User Sessions (applies to ALL types).  This is the default, but can be overridden.  Defaults to Always.
       # @see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
       # Example:
