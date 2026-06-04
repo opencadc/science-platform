@@ -8,10 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import javax.security.auth.Subject;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
@@ -24,10 +21,19 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This service runs in Kubernetes and can be scaled horizontally. The cache is scoped to a single JVM (pod) and
  * avoids repeated POSIX Mapper lookups when resolving supplemental groups for session jobs.
+ *
+ * <p>The GROUP_LOAD_LOCK with double-check before querying. Concurrent requests on an empty cache now serialize: the
+ * first thread loads, the others wait and then read from cache.
+ *
+ * <p>uncachedGroupURIs() filters out entries populated while waiting, so redundant mapper calls are avoided.
+ *
+ * <p>If the mapper returns fewer groups than requested (e.g. empty body on first call), one retry runs before toGIDs
+ * throws.
  */
 public class PosixGroupCache {
     private static final Logger LOGGER = LoggerFactory.getLogger(PosixGroupCache.class);
     private static final int POSIX_MAPPER_GID_QUERY_BATCH_SIZE = 20;
+    private static final Object GROUP_LOAD_LOCK = new Object();
     static final ConcurrentHashMap<GroupURI, PosixGroup> GROUP_URI_POSIX_GROUP_CACHE = new ConcurrentHashMap<>();
 
     private final PosixMapperClient posixMapperClient;
@@ -80,54 +86,56 @@ public class PosixGroupCache {
 
     private static void queryAndCacheGroupGids(
             final List<GroupURI> groupURIsToQuery, final PosixMapperClient posixMapperClient) throws Exception {
-        if (groupURIsToQuery.isEmpty()) {
+        List<GroupURI> uncachedGroupURIs = PosixGroupCache.uncachedGroupURIs(groupURIsToQuery);
+        if (uncachedGroupURIs.isEmpty()) {
             return;
         }
 
+        synchronized (PosixGroupCache.GROUP_LOAD_LOCK) {
+            uncachedGroupURIs = PosixGroupCache.uncachedGroupURIs(groupURIsToQuery);
+            if (uncachedGroupURIs.isEmpty()) {
+                return;
+            }
+            PosixGroupCache.fetchAndCacheGroupBatches(uncachedGroupURIs, posixMapperClient);
+
+            uncachedGroupURIs = PosixGroupCache.uncachedGroupURIs(groupURIsToQuery);
+            if (!uncachedGroupURIs.isEmpty()) {
+                LOGGER.debug(
+                        "Retrying POSIX group lookup for {} uncached group(s) after partial mapper response.",
+                        uncachedGroupURIs.size());
+                PosixGroupCache.fetchAndCacheGroupBatches(uncachedGroupURIs, posixMapperClient);
+            }
+        }
+    }
+
+    private static List<GroupURI> uncachedGroupURIs(final List<GroupURI> groupURIs) {
+        final List<GroupURI> uncachedGroupURIs = new ArrayList<>();
+        for (final GroupURI groupURI : groupURIs) {
+            if (!PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.containsKey(groupURI)) {
+                uncachedGroupURIs.add(groupURI);
+            }
+        }
+        return uncachedGroupURIs;
+    }
+
+    private static void fetchAndCacheGroupBatches(
+            final List<GroupURI> groupURIsToQuery, final PosixMapperClient posixMapperClient) throws Exception {
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
-        if (groupURIsToQuery.size() <= PosixGroupCache.POSIX_MAPPER_GID_QUERY_BATCH_SIZE) {
-            final List<PosixGroup> fetchedGroups =
-                    Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
-                            () -> posixMapperClient.getGID(groupURIsToQuery));
-            fetchedGroups.forEach(posixGroup ->
-                    PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(posixGroup.getGroupURI(), posixGroup));
-            return;
-        }
-
-        final List<CompletableFuture<List<PosixGroup>>> batchFutures = new ArrayList<>();
         for (int offset = 0;
                 offset < groupURIsToQuery.size();
                 offset += PosixGroupCache.POSIX_MAPPER_GID_QUERY_BATCH_SIZE) {
             final List<GroupURI> batch = List.copyOf(groupURIsToQuery.subList(
                     offset,
                     Math.min(offset + PosixGroupCache.POSIX_MAPPER_GID_QUERY_BATCH_SIZE, groupURIsToQuery.size())));
-            batchFutures.add(CompletableFuture.supplyAsync(() -> {
-                try {
-                    return Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
-                            () -> posixMapperClient.getGID(batch));
-                } catch (Exception exception) {
-                    throw new CompletionException(exception);
-                }
-            }));
-        }
-
-        LOGGER.debug("Issuing {} posix group requests.", batchFutures.size());
-        for (final CompletableFuture<List<PosixGroup>> batchFuture : batchFutures) {
-            try {
-                batchFuture
-                        .get()
-                        .forEach(posixGroup ->
-                                PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(posixGroup.getGroupURI(), posixGroup));
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                throw interruptedException;
-            } catch (ExecutionException executionException) {
-                final Throwable cause = executionException.getCause();
-                if (cause instanceof Exception exception) {
-                    throw exception;
-                }
-                throw new Exception(cause.getMessage(), cause);
+            final List<GroupURI> uncachedBatch = PosixGroupCache.uncachedGroupURIs(batch);
+            if (uncachedBatch.isEmpty()) {
+                continue;
             }
+            final List<PosixGroup> fetchedGroups =
+                    Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
+                            () -> posixMapperClient.getGID(uncachedBatch));
+            fetchedGroups.forEach(posixGroup ->
+                    PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(posixGroup.getGroupURI(), posixGroup));
         }
     }
 }

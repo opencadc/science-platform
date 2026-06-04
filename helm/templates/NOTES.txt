@@ -9,8 +9,6 @@ Skaha workload namespace: {{ include "skaha.workloadNamespace" . }}
 
 {{- $userStorage := .Values.deployment.skaha.sessions.userStorage | default dict }}
 {{- $legacyPVCName := hasKey $userStorage "persistentVolumeClaimName" }}
-{{- $ownership := $userStorage.ownership | default dict }}
-{{- $ownershipEnabled := $ownership.enabled | default false }}
 {{- $platformAuth := mergeOverwrite (.Values.deployment.skaha.authorization | default dict) (.Values.deployment.skaha.sessions.authorization | default dict) }}
 {{- $platformGroup := $platformAuth.group | default dict }}
 {{- $legacyUsersGroupDepr := and (.Values.deployment.skaha.usersGroup | default "" | trim) (not ($platformGroup.enabled | default false)) }}
@@ -37,22 +35,6 @@ Skaha workload namespace: {{ include "skaha.workloadNamespace" . }}
 #  deployment.skaha.usersGroup is deprecated. Prefer                             #
 #  deployment.skaha.sessions.authorization.group / permissionsAPI,           #
 #  usersGroup remains honoured until removed in a future chart major.          #
-#                                                                              #
-################################################################################
-
-{{- end }}
-
-{{- if $ownershipEnabled }}
-
-################################################################################
-#                                                                              #
-#  USER SESSION STORAGE — configuration notice                                 #
-#                                                                              #
-#  deployment.skaha.sessions.userStorage.ownership is enabled.                 #
-#  In most deployments this should not be used: session volumes are            #
-#  multi-user and multi-group; fsGroup / chown behaviour is rarely appropriate.#
-#  Disable ownership unless you have a specific need to set fsGroup to the     #
-#  session user's POSIX GID (see values.yaml comments).                        #
 #                                                                              #
 ################################################################################
 
@@ -104,7 +86,7 @@ If user Jobs remain Pending:
 {{- $sw := .Values.skahaWorkload | default dict }}
 {{- $sessNs := .Values.deployment.skaha.sessions.namespace -}}
 {{- $legacySkahaWorkloadNs := and $sw.namespace (not (kindIs "string" $sessNs)) }}
-{{- if and (not $legacySkahaWorkloadNs) (not $legacyPVCName) (not $ownershipEnabled) }}
+{{- if and (not $legacySkahaWorkloadNs) (not $legacyPVCName) }}
 None.
 {{- end }}
 {{- if $legacySkahaWorkloadNs }}
@@ -115,9 +97,6 @@ Your values still set deployment.skaha.sessions.userStorage.persistentVolumeClai
 {{- end }}
 {{- if $legacyUsersGroupDepr }}
 You still set deployment.skaha.usersGroup — migrate to deployment.skaha.sessions.authorization (group or permissionsAPI; see notice above).
-{{- end }}
-{{- if $ownershipEnabled }}
-deployment.skaha.sessions.userStorage.ownership is enabled — in most cases this should not be used (see notice above).
 {{- end }}
 
 Experimental Features Configured:

@@ -8,7 +8,12 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.opencadc.auth.PosixGroup;
@@ -16,6 +21,11 @@ import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 
 public class PosixGroupCacheTest {
+    @After
+    public void clearCache() {
+        PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.clear();
+    }
+
     private static GroupURI groupUri(final String query) {
         return new GroupURI(URI.create("ivo://example.org/gms?" + query));
     }
@@ -125,5 +135,58 @@ public class PosixGroupCacheTest {
         }
 
         Assert.assertEquals("Should match counts.", expectedGroups.size(), actualCount.get());
+    }
+
+    @Test
+    public void testConcurrentColdCacheLoadIssuesSingleMapperQuery() throws Exception {
+        final GroupURI groupURI = groupUri("concurrent-group");
+        final PosixGroup expectedGroup = posixGroup(groupURI, 4001);
+        final AtomicInteger queryCount = new AtomicInteger();
+        final CountDownLatch mapperCalled = new CountDownLatch(1);
+        final CountDownLatch releaseMapper = new CountDownLatch(1);
+
+        final PosixMapperClient client = mock(PosixMapperClient.class);
+        when(client.getGID(anyList())).thenAnswer(invocation -> {
+            queryCount.incrementAndGet();
+            mapperCalled.countDown();
+            releaseMapper.await();
+            return List.of(expectedGroup);
+        });
+
+        final PosixGroupCache cache = new PosixGroupCache(client);
+        final ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            final Future<Set<PosixGroup>> firstLookup = executor.submit(() -> cache.toGIDs(List.of(groupURI)));
+            final Future<Set<PosixGroup>> secondLookup = executor.submit(() -> cache.toGIDs(List.of(groupURI)));
+
+            mapperCalled.await();
+            releaseMapper.countDown();
+
+            Assert.assertEquals(Set.of(expectedGroup), firstLookup.get());
+            Assert.assertEquals(Set.of(expectedGroup), secondLookup.get());
+            Assert.assertEquals(1, queryCount.get());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void testPartialMapperResponseIsRetried() throws Exception {
+        final GroupURI groupURI = groupUri("retry-group");
+        final PosixGroup expectedGroup = posixGroup(groupURI, 5001);
+        final AtomicInteger queryCount = new AtomicInteger();
+
+        final PosixMapperClient client = mock(PosixMapperClient.class);
+        when(client.getGID(anyList())).thenAnswer(invocation -> {
+            if (queryCount.incrementAndGet() == 1) {
+                return List.of();
+            }
+            return List.of(expectedGroup);
+        });
+
+        final Set<PosixGroup> results = new PosixGroupCache(client).toGIDs(List.of(groupURI));
+
+        Assert.assertEquals(2, queryCount.get());
+        Assert.assertEquals(Set.of(expectedGroup), results);
     }
 }

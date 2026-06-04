@@ -21,7 +21,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.MissingResourceException;
@@ -85,7 +85,7 @@ public class TestConfiguration {
     private static AuthorizationToken getBearerToken() throws Exception {
         final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token", SessionUtil.class);
         final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-        return new AuthorizationToken("Bearer", bearerToken.replace("\n", ""), Collections.emptyList());
+        return new AuthorizationToken("Bearer", bearerToken.replace("\n", ""), new ArrayList<>());
     }
 
     private static X509CertificateChain getProxyCertificate() throws Exception {
