@@ -547,7 +547,7 @@ rbac:
   # This is used to provide information to the Science Portal UI about available resources in the cluster.
   # A simple node: list permission is granted, but this does require elevated privileges, so it is optional and defaults to false.
   clusterRole:
-    create: false
+    create: true
 
 # This is a list of tolerations that will be added to the Pod spec of the Skaha API.
 # @see https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
