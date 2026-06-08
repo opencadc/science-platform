@@ -55,8 +55,16 @@ public final class GroupURISessionAuthorizer implements SessionAuthorizer {
         return skahaUsersGroupUri;
     }
 
+    /**
+     * Group URI check.
+     *
+     * @param subject the authenticated subject to check and possibly augment; must not be null.
+     * @param requestMethod the request method. Not used.
+     * @param routePath the request path. Not used.
+     */
     @Override
-    public void authorizeGeneralSessionAccess(final Subject subject) {
+    public void authorizeGeneralSessionAccess(
+            final Subject subject, final String requestMethod, final String routePath) {
         Objects.requireNonNull(subject, "subject");
         LOGGER.debug("user is a member of skaha user group ");
 

@@ -716,6 +716,11 @@ public class PostAction extends SessionAction {
         this.userStorageClient.injectProxyCertificate(owner);
     }
 
+    @Override
+    protected String getRequestMethod() {
+        return "POST";
+    }
+
     private String getSupplementalGroupsList() throws Exception {
         if (skahaCallbackFlow) {
             return callbackSupplementalGroups;

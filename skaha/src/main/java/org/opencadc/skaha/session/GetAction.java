@@ -162,6 +162,11 @@ public class GetAction extends SessionAction {
         }
     }
 
+    @Override
+    protected String getRequestMethod() {
+        return "GET";
+    }
+
     private ResourceStats getResourceStats() {
         try (final ExecutorService executor = Executors.newFixedThreadPool(3)) {
             final Future<Map<String, BigDecimal>> podAllocationResourcesFuture =

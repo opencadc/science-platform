@@ -157,16 +157,10 @@ deployment:
           baseURL: ""
           # -- Base URL for the SRCNet Auth API used by the permissions client.
           authAPIBaseURL: ""
-          # -- Type of the permissions API.
-          type: "route"
-          # -- Route of the permissions API.
-          route: ""
           # -- Name of the permissions API.
           name: "skaha"
           # -- Version of the permissions API.
           version: ""
-          # -- Method of the permissions API.
-          method: ""
 
       # YAML for a LimitRange named `<release>-session-limit-range` (Helm: `{{ .Release.Name }}-session-limit-range`) in the workload namespace when this chart creates it.
       # When `create` is false, the chart does not create a LimitRange; provide one in the workload namespace out-of-band. Skaha does **not** choose a LimitRange by name: when `enabled` is true it uses the **first** `LimitRange` object returned for the workload namespace, so the resource name is mostly irrelevant at runtime. The chart still uses a stable name when it manages the object so installs stay predictable.

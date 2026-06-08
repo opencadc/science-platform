@@ -1,12 +1,26 @@
 package org.opencadc.skaha.session.authorization;
 
+import ca.nrc.cadc.util.InvalidConfigException;
 import java.net.URI;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class SessionAuthorizersTest {
+
+    private static StandardServiceLookup createTestLookup() {
+        return standardId -> {
+            if (PermissionsApiSessionAuthorizer.STD_AUTH_API.equals(standardId)) {
+                return URI.create("https://auth.example/v1/");
+            }
+            if (PermissionsApiSessionAuthorizer.STD_PERMISSIONS_API.equals(standardId)) {
+                return URI.create("https://permissions.example/v1/");
+            }
+            return null;
+        };
+    }
 
     @Test
     public void fromEnvironmentOnlyUsersGroupReturnsGroupUriAuthorizer() {
@@ -24,14 +38,9 @@ public class SessionAuthorizersTest {
     @Test
     public void fromEnvironmentOnlyPermissionsBaseReturnsPermissionsApiAuthorizer() throws Exception {
         final Map<String, String> env = new HashMap<>();
-        env.put(SessionAuthorizers.SKAHA_PERMISSIONS_API_ENABLED_FLAG_ENV, Boolean.TRUE.toString());
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_BASE_URL_ENV, "https://permissions.example/v1/");
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV, "https://auth.example/v1/");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_TYPE_ENV, "plugin");
-        final SessionAuthorizer auth = SessionAuthorizers.fromEnvironment(env);
-        Assert.assertTrue(auth instanceof PermissionsApiSessionAuthorizer);
-        final PermissionsApiSessionAuthorizer p = (PermissionsApiSessionAuthorizer) auth;
+        final PermissionsApiSessionAuthorizer p =
+                PermissionsApiSessionAuthorizer.fromEnvironment(env, createTestLookup());
         Assert.assertEquals(URI.create("https://permissions.example/v1/").toURL(), p.getPermissionsApiBaseUrl());
     }
 
@@ -101,14 +110,11 @@ public class SessionAuthorizersTest {
     @Test
     public void fromEnvironmentWhitespaceOnlyUsersGroupCountsAsUnsetWhenPermissionsSet() {
         final Map<String, String> env = new HashMap<>();
-        env.put(SessionAuthorizers.SKAHA_PERMISSIONS_API_ENABLED_FLAG_ENV, Boolean.TRUE.toString());
         env.put(GroupURISessionAuthorizer.SKAHA_USERS_GROUP_ENV, "   ");
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_BASE_URL_ENV, "https://perm/");
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_AUTH_BASE_URL_ENV, "https://auth/");
         env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
-        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_TYPE_ENV, "plugin");
-        final SessionAuthorizer auth = SessionAuthorizers.fromEnvironment(env);
-        Assert.assertTrue(auth instanceof PermissionsApiSessionAuthorizer);
+        final PermissionsApiSessionAuthorizer auth =
+                PermissionsApiSessionAuthorizer.fromEnvironment(env, createTestLookup());
+        Assert.assertNotNull(auth);
     }
 
     @Test
@@ -127,8 +133,67 @@ public class SessionAuthorizersTest {
         new GroupURISessionAuthorizer(" ");
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void permissionsApiAuthorizerRejectsBlankBaseUrl() {
-        new PermissionsApiSessionAuthorizer("\t", "\t", "\r", "\n", "\t", "\r", "\n");
+    @Test(expected = NullPointerException.class)
+    public void permissionsApiAuthorizerRejectsNullBaseUrl() throws Exception {
+        final URL authUrl = URI.create("https://auth.example/v1/").toURL();
+        new PermissionsApiSessionAuthorizer(null, authUrl, "skaha", "1");
+    }
+
+    @Test
+    public void fromEnvironmentMissingAuthApiThrowsInvalidConfigException() {
+        final Map<String, String> env = new HashMap<>();
+        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
+        final StandardServiceLookup lookup = standardId -> {
+            if (PermissionsApiSessionAuthorizer.STD_PERMISSIONS_API.equals(standardId)) {
+                return URI.create("https://permissions.example/v1/");
+            }
+            return null;
+        };
+        try {
+            PermissionsApiSessionAuthorizer.fromEnvironment(env, lookup);
+            Assert.fail("expected InvalidConfigException");
+        } catch (InvalidConfigException expected) {
+            Assert.assertTrue(expected.getMessage().contains("missing authAPI"));
+        }
+    }
+
+    @Test
+    public void fromEnvironmentMissingPermissionsApiThrowsInvalidConfigException() {
+        final Map<String, String> env = new HashMap<>();
+        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
+        final StandardServiceLookup lookup = standardId -> {
+            if (PermissionsApiSessionAuthorizer.STD_AUTH_API.equals(standardId)) {
+                return URI.create("https://auth.example/v1/");
+            }
+            return null;
+        };
+        try {
+            PermissionsApiSessionAuthorizer.fromEnvironment(env, lookup);
+            Assert.fail("expected InvalidConfigException");
+        } catch (InvalidConfigException expected) {
+            Assert.assertTrue(expected.getMessage().contains("missing authAPI"));
+        }
+    }
+
+    @Test
+    public void fromEnvironmentInvalidUrlThrowsInvalidConfigException() {
+        final Map<String, String> env = new HashMap<>();
+        env.put(PermissionsApiSessionAuthorizer.SKAHA_PERMISSIONS_API_NAME_ENV, "skaha");
+        final StandardServiceLookup lookup = standardId -> {
+            if (PermissionsApiSessionAuthorizer.STD_AUTH_API.equals(standardId)) {
+                return URI.create("ivo://only/authority");
+            }
+            if (PermissionsApiSessionAuthorizer.STD_PERMISSIONS_API.equals(standardId)) {
+                return URI.create("https://permissions.example/v1/");
+            }
+            return null;
+        };
+        try {
+            PermissionsApiSessionAuthorizer.fromEnvironment(env, lookup);
+            Assert.fail("expected InvalidConfigException");
+        } catch (InvalidConfigException expected) {
+            Assert.assertTrue(expected.getMessage().contains("invalid URL"));
+            Assert.assertTrue(expected.getMessage().contains(PermissionsApiSessionAuthorizer.STD_AUTH_API.toString()));
+        }
     }
 }

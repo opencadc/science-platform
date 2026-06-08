@@ -213,6 +213,13 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
+    /**
+     * Return this action's request method.
+     *
+     * @return String method UPPER-CASE, never null.
+     */
+    protected abstract String getRequestMethod();
+
     @Override
     protected InlineContentHandler getInlineContentHandler() {
         return null;
@@ -246,7 +253,8 @@ public abstract class SkahaAction extends RestAction {
             currentSubject.getPublicCredentials().add(groups);
 
             log.debug("Checking if current user is authorized to use the system.");
-            SessionAuthorizers.fromEnvironment().authorizeGeneralSessionAccess(currentSubject);
+            SessionAuthorizers.fromEnvironment()
+                    .authorizeGeneralSessionAccess(currentSubject, getRequestMethod(), this.syncInput.getContextPath());
             log.debug("Checking if current user is authorized to use the system: OK");
             initiateGeneralFlow(currentSubject);
         }

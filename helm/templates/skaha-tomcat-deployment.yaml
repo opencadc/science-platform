@@ -89,33 +89,10 @@ spec:
           value: {{ trim ($grp.uri | default "" | toString) | default $legacyUsersGroupTrim | quote }}
         {{- end }}
         {{- if $permEnabled }}
-        {{- $permURL := trim (default "" $permAPI.baseURL) }}
-        {{- $permAuthURL := trim (default "" $permAPI.authAPIBaseURL) }}
-        {{- if $permURL }}
-        - name: SKAHA_PERMISSIONS_API_BASE_URL
-          value: {{ $permURL | quote }}
-        {{- end }}
-        {{- if $permAuthURL }}
-        - name: SKAHA_PERMISSIONS_API_AUTH_BASE_URL
-          value: {{ $permAuthURL | quote }}
-        {{- end }}
-        - name: SKAHA_PERMISSIONS_API_TYPE
-          value: {{ ($permAPI.type | default "route") | quote }}
         - name: SKAHA_PERMISSIONS_API_NAME
-          value: {{ ($permAPI.name | default "skaha") | quote }}
-        {{- if eq (($permAPI.type | default "route") | lower) "route" }}
-        {{- $rte := trim (default "" $permAPI.route) }}
-        {{- if $rte }}
-        - name: SKAHA_PERMISSIONS_API_ROUTE
-          value: {{ $rte | quote }}
-        {{- end }}
-        {{- end }}
+          value: {{ ($permAPI.name | default "canfar-api") | quote }}
         {{- with trim (default "" $permAPI.version) }}
         - name: SKAHA_PERMISSIONS_API_VERSION
-          value: {{ . | quote }}
-        {{- end }}
-        {{- with trim (default "" $permAPI.method) }}
-        - name: SKAHA_PERMISSIONS_API_METHOD
           value: {{ . | quote }}
         {{- end }}
         {{- end }}

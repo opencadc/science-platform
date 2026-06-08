@@ -12,8 +12,10 @@ public interface SessionAuthorizer {
      * (for example group lists). Call with Subject.doAs() to pass the current Subject in.
      *
      * @param subject the authenticated subject to check and possibly augment; must not be null.
+     * @param requestMethod the request method.
+     * @param routePath the request path.
      * @throws Exception delegated I/O or general network lookup failures when validating authorization.
      * @throws SessionAccessDeniedException if access is denied.
      */
-    void authorizeGeneralSessionAccess(final Subject subject) throws Exception;
+    void authorizeGeneralSessionAccess(final Subject subject, String requestMethod, String routePath) throws Exception;
 }
