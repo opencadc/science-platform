@@ -142,24 +142,24 @@ deployment:
       # -- Maximum ephemeral storage limit for sessions (non-desktop).
       maxEphemeralStorage: "200Gi"
 
-      # Platform access for Skaha sessions: set authorization.group, authorization.permissionsAPI, or deprecated deployment.skaha.usersGroup.
-      # The Deployment receives SKAHA_SESSIONS_AUTHORIZATION_*_ENABLED and mode-specific vars; only fields for modes with enabled: true are set.
+      # Platform access for Skaha sessions: enable exactly one of authorization.group or authorization.permissionsAPI (or set deprecated deployment.skaha.usersGroup for group mode).
+      # The Deployment receives SKAHA_SESSIONS_AUTHORIZATION_*_ENABLED. Group mode sets SKAHA_USERS_GROUP. Permissions mode sets SKAHA_PERMISSIONS_API_NAME and optional SKAHA_PERMISSIONS_API_VERSION; baseURL and authAPIBaseURL are written to cadc-registry.properties for local authority lookup.
       authorization:
         group:
           # -- When true, SKAHA_USERS_GROUP is set from uri. Required uri when enabled (Helm validates). The Skaha service enforces mutually exclusive authorization modes at runtime.
           enabled: false
           uri: ""
         permissionsAPI:
-          # @see https://permissions.srcnet.skao.int/api/openapi.json for the API specification.
-          # -- When true, SKAHA_PERMISSIONS_API_* vars are set from baseURL, authAPIBaseURL, type, route, name, version, and method. Required baseURL and authAPIBaseURL when enabled (Helm validates). The Skaha service enforces mutually exclusive authorization modes at runtime.
+          # API spec: https://permissions.srcnet.skao.int/api/openapi.json
+          # -- When true, enables permissions-API session authorization. Sets SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED plus SKAHA_PERMISSIONS_API_NAME and optional SKAHA_PERMISSIONS_API_VERSION. Required baseURL and authAPIBaseURL are written to cadc-registry.properties (not environment variables). Helm validates baseURL and authAPIBaseURL when enabled. Mutually exclusive with group mode at runtime.
           enabled: false
-          # -- Required when enabled is true (Helm validates).
+          # -- Permissions API base URL. Written to cadc-registry.properties as ivo://skao.int/std/PermissionsAPI when enabled. Required when enabled (Helm validates).
           baseURL: ""
-          # -- Base URL for the SRCNet Auth API used by the permissions client.
+          # -- Auth API base URL for the permissions client. Written to cadc-registry.properties as ivo://skao.int/std/AuthAPI when enabled. Required when enabled (Helm validates).
           authAPIBaseURL: ""
-          # -- Name of the permissions API.
+          # -- Service name passed to the permissions API (SKAHA_PERMISSIONS_API_NAME).
           name: "skaha"
-          # -- Version of the permissions API.
+          # -- Policy version passed to the permissions API (SKAHA_PERMISSIONS_API_VERSION). Omitted from the Deployment when empty; Skaha defaults to "1".
           version: ""
 
       # YAML for a LimitRange named `<release>-session-limit-range` (Helm: `{{ .Release.Name }}-session-limit-range`) in the workload namespace when this chart creates it.

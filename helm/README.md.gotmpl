@@ -32,6 +32,44 @@ Skaha sets `SKAHA_USER_STORAGE_USER_HOME_URI` to the prefix plus `homeDirectory`
 
 Skaha resolves the backing Cavern service for registry lookup as **`ivo://storage.example.com/cavern`**: the `ivo://` authority matches the `vos://` host, and the service path is the segment immediately after `~` (`cavern`), not the subsequent node path (`/home`).
 
+## Session authorization
+
+Platform access for user sessions is configured under `deployment.skaha.sessions.authorization`. Enable **exactly one** mode: `group` or `permissionsAPI`. The deprecated `deployment.skaha.usersGroup` value still enables group mode when `authorization.group.enabled` is false.
+
+### Group mode (`authorization.group`)
+
+When `group.enabled` is true, Helm sets `SKAHA_SESSIONS_AUTHORIZATION_GROUP_ENABLED=true` and `SKAHA_USERS_GROUP` from `group.uri`. Skaha checks GMS group membership.
+
+### Permissions API mode (`authorization.permissionsAPI`)
+
+When `permissionsAPI.enabled` is true, Helm sets `SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED=true`, `SKAHA_PERMISSIONS_API_NAME` from `name`, and `SKAHA_PERMISSIONS_API_VERSION` when `version` is non-empty.
+
+API endpoint URLs are **not** passed as environment variables. Instead, Helm writes them into the mounted `cadc-registry.properties` ConfigMap:
+
+| Value field | Registry entry |
+|-------------|------------------|
+| `authAPIBaseURL` | `ivo://skao.int/std/AuthAPI` |
+| `baseURL` | `ivo://skao.int/std/PermissionsAPI` |
+
+Skaha resolves those standard IDs at runtime via `LocalAuthority` and authorizes each request using the incoming HTTP method and route path. The former `type`, `route`, and `method` values are no longer configurable.
+
+Example:
+
+```yaml
+deployment:
+  skaha:
+    sessions:
+      authorization:
+        permissionsAPI:
+          enabled: true
+          baseURL: "https://permissions.example.org/v1/"
+          authAPIBaseURL: "https://auth.example.org/v1/"
+          name: "skaha"
+          version: "1"
+```
+
+API specification: https://permissions.srcnet.skao.int/api/openapi.json
+
 ## Harbor publishing (Science Platform CI)
 
 Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:
