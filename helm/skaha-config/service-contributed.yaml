@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: skaha-contributed-svc-${skaha.sessionid}
+  labels:
+    run: skaha-contributed-svc-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    name: http-connection
+  selector:
+    canfar-net-sessionID: ${skaha.sessionid}

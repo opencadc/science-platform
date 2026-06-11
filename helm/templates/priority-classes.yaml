@@ -1,0 +1,29 @@
+{{- $pc := include "skaha.effectiveApiPriorityClassJSON" . | fromJson }}
+{{- if $pc.create }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "skaha.apiPriorityClassName" . | required "deployment.skaha.sessions.priorityClass.name (or legacy deployment.skaha.priorityClass / priorityClassName) is required when create is true" }}
+  labels:
+    {{- include "skaha.labels" $ | nindent 4 }}
+value: {{ $pc.value }}
+preemptionPolicy: {{ $pc.preemptionPolicy }}
+globalDefault: {{ $pc.globalDefault }}
+description: {{ $pc.description | quote }}
+{{- end }}
+{{- $hpc := include "skaha.effectiveHeadlessPriorityClassJSON" . | fromJson }}
+{{- if $hpc.create }}
+{{- if $pc.create }}
+---
+{{- end }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ $hpc.name | required "deployment.skaha.sessions.headlessPriorityClass.name (or legacy headless PriorityClass map) is required when create is true" }}
+  labels:
+    {{- include "skaha.labels" $ | nindent 4 }}
+value: {{ $hpc.value }}
+preemptionPolicy: {{ $hpc.preemptionPolicy }}
+globalDefault: {{ $hpc.globalDefault }}
+description: {{ $hpc.description | quote }}
+{{- end }}

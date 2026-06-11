@@ -1,0 +1,19 @@
+{{- $mb := .Values.metricsBackend | default dict }}
+{{- if (default false $mb.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "skaha.metricsBackend.serviceName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "skaha.metricsBackend.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+{{- end }}

@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: skaha-desktop-middleware-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  replacePathRegex:
+    regex: ^/session/desktop/${skaha.sessionid}(/|$)(.*)
+    replacement: /$2
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-desktop-ingress-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  tls:
+  {{- with .Values.deployment.skaha.sessions.tls }}
+    {{- toYaml . | nindent 6 }}
+  {{- end }}
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.sessions.hostname}`) && PathPrefix(`/session/desktop/${skaha.sessionid}/`)
+    services:
+    - kind: Service
+      name: skaha-desktop-svc-${skaha.sessionid}
+      port: 6901
+      scheme: http
+    middlewares:
+      - name: skaha-desktop-middleware-${skaha.sessionid}
+{{- if .Values.deployment.skaha.sessions.ingress.customResponseHeaders }}
+      - name: {{ .Release.Name }}-custom-response-headers
+{{- end }}

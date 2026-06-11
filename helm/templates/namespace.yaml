@@ -1,0 +1,14 @@
+# This file is used to create a namespace for the skaha sessions when sessions.namespace.create is true and the workload namespace differs from the release namespace.
+{{- $wns := include "skaha.workloadNamespace" . }}
+{{- $nsCfg := .Values.deployment.skaha.sessions.namespace -}}
+{{- $createWorkloadNs := true -}}
+{{- if and $nsCfg (kindIs "map" $nsCfg) (hasKey $nsCfg "create") -}}
+{{- $createWorkloadNs = $nsCfg.create -}}
+{{- end -}}
+{{- if and $wns $createWorkloadNs (not (eq $.Release.Namespace $wns)) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $wns }}
+{{- end }}

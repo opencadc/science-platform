@@ -4,8 +4,10 @@
 /**/build
 /**/bin
 .vscode
+/**/charts/
 
 # Local build stuff
+Dockerfile.local
 *tgz*
 *_key
 *.crt

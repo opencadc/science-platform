@@ -1,0 +1,36 @@
+{{- $mb := .Values.metricsBackend | default dict }}
+{{- $test := $mb.test | default dict }}
+{{- if and (default false $mb.enabled) (default true $test.enabled) }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "skaha.fullname" . }}-metrics-backend-test
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: wget
+      image: {{ $test.image | default "busybox:1.37.0" }}
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          url="http://{{ include "skaha.metricsBackend.serviceName" . }}.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:8000/healthz"
+          max={{ $test.maxWaitSeconds | default 180 }}
+          i=0
+          while [ "$i" -lt "$max" ]; do
+            if wget -q -T 3 -O /dev/null "$url" 2>/dev/null; then
+              echo "metricsBackend health check ok"
+              exit 0
+            fi
+            i=$((i+1))
+            sleep 1
+          done
+          echo "metricsBackend health check failed after ${max}s" >&2
+          exit 1
+  restartPolicy: Never
+{{- end }}

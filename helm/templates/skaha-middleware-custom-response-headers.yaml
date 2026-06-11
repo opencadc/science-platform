@@ -1,0 +1,18 @@
+{{- if .Values.deployment.skaha.sessions.ingress.customResponseHeaders -}}
+# General Middleware to support the Science Gateway feature to embed User Sessions.
+# This middleware adds the content-security-policy header to allow embedding in iframes.
+# @see https://jira.skatelescope.org/browse/SP-6284
+# jenkinsd 2026.01.07
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-custom-response-headers
+  namespace: {{ include "skaha.workloadNamespace" . }}
+spec:
+  headers:
+    customResponseHeaders:
+{{- with .Values.deployment.skaha.sessions.ingress.customResponseHeaders }}
+{{ toYaml . | indent 6 }}
+{{- end }}
+{{- end -}}

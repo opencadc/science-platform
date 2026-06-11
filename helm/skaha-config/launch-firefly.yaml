@@ -1,0 +1,143 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+  name: "${skaha.jobname}"
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      {{ template "skaha.job.nodeAffinity" . }}
+      securityContext:
+        {{ template "skaha.job.securityContext" . }}
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      containers:
+      - name: "${skaha.jobname}"
+        env:
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: PWD
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: XDG_CACHE_HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: JULIA_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: OPENBLAS_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: MKL_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: OMP_NUM_THREADS
+          value: "${software.thread.count}"
+        - name: DEBUG
+          value: "FALSE"
+        - name: PROPS_sso__framework__adapter
+          value: "org.opencadc.security.sso.TokenRelay"
+        - name: CADC_SSO_COOKIE_NAME
+          value: "CADC_SSO"
+        - name: CADC_SSO_COOKIE_DOMAIN
+          value: ".canfar.net"
+        - name: CADC_ALLOWED_DOMAIN
+          value: ".canfar.net"
+        - name: baseURL
+          value: "/session/firefly/${skaha.sessionid}/"
+        - name: "PROPS_FIREFLY_OPTIONS"
+          value: >-
+            {"tap":
+                {"additional":
+                  {"services":[
+                    {
+                      "label": "CADC YouCAT",
+                      "value": "https://ws-uv.canfar.net/youcat",
+                      "centerWP": "62;-37;EQ_J2000",
+                      "fovDeg": 10
+                    }]
+                }
+              }
+            }
+        image: ${software.imageid}
+        imagePullPolicy: {{ .Values.deployment.skaha.sessions.imagePullPolicy | required "deployment.skaha.sessions.imagePullPolicy must be set." }}
+        resources:
+          # https://docs.cloudbees.com/docs/cloudbees-ci-kb/latest/best-practices/jvm-memory-settings-best-practice
+          # memory limits / requests are equal and use -XX:InitialRAMPercentage / -XX:MaxRAMPercentage
+          requests:
+            memory: "4Gi"
+            cpu: "0.1"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
+          limits:
+            memory: "4Gi"
+            cpu: "1"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: firefly-port
+        livenessProbe:
+          tcpSocket:
+            port: 8080
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          periodSeconds: 10
+        startupProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 5
+
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        {{ template "skaha.session.commonVolumeMounts" . }}
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: init-users-groups
+        configMap:
+          name: {{ .Release.Name }}-init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

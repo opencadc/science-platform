@@ -1,0 +1,113 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+| Chart | AppVersion | Type |
+|:-----:|:----------:|:----:|
+|{{ template "chart.version" . }}<!-- x-release-please-version --> | {{ template "chart.appVersion" . }} | {{ template "chart.type" . }} |
+
+{{ template "chart.homepageLine" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+## User storage (Cavern)
+
+User home allocations in Cavern are configured under `deployment.skaha.sessions.userStorage`. Set **`nodeURIPrefix`** to a **`vos://` scheme** URI. The host (authority) and Cavern service name are separated by a tilde (`~`).
+
+Example:
+
+```yaml
+deployment:
+  skaha:
+    sessions:
+      userStorage:
+        nodeURIPrefix: "vos://storage.example.com~cavern"
+        homeDirectory: "home"
+        topLevelDirectory: "/cavern"
+```
+
+Skaha sets `SKAHA_USER_STORAGE_USER_HOME_URI` to the prefix plus `homeDirectory`, for example **`vos://storage.example.com~cavern/home`**. That URI identifies the VOSpace folder where per-user ContainerNodes are created (a value such as `vos://storage.example.com~cavern/home/` refers to the same home folder; trailing slashes are normalized).
+
+Skaha resolves the backing Cavern service for registry lookup as **`ivo://storage.example.com/cavern`**: the `ivo://` authority matches the `vos://` host, and the service path is the segment immediately after `~` (`cavern`), not the subsequent node path (`/home`).
+
+## Session authorization
+
+Platform access for user sessions is configured under `deployment.skaha.sessions.authorization`. Enable **exactly one** mode: `group` or `permissionsAPI`. The deprecated `deployment.skaha.usersGroup` value still enables group mode when `authorization.group.enabled` is false.
+
+### Group mode (`authorization.group`)
+
+When `group.enabled` is true, Helm sets `SKAHA_SESSIONS_AUTHORIZATION_GROUP_ENABLED=true` and `SKAHA_USERS_GROUP` from `group.uri`. Skaha checks GMS group membership.
+
+### Permissions API mode (`authorization.permissionsAPI`)
+
+When `permissionsAPI.enabled` is true, Helm sets `SKAHA_SESSIONS_AUTHORIZATION_PERMISSIONS_API_ENABLED=true`, `SKAHA_PERMISSIONS_API_NAME` from `name`, and `SKAHA_PERMISSIONS_API_VERSION` when `version` is non-empty.
+
+API endpoint URLs are **not** passed as environment variables. Instead, Helm writes them into the mounted `cadc-registry.properties` ConfigMap:
+
+| Value field | Registry entry |
+|-------------|------------------|
+| `authAPIBaseURL` | `ivo://skao.int/std/AuthAPI` |
+| `baseURL` | `ivo://skao.int/std/PermissionsAPI` |
+
+Skaha resolves those standard IDs at runtime via `LocalAuthority` and authorizes each request using the incoming HTTP method and route path. The former `type`, `route`, and `method` values are no longer configurable.
+
+Example:
+
+```yaml
+deployment:
+  skaha:
+    sessions:
+      authorization:
+        permissionsAPI:
+          enabled: true
+          baseURL: "https://permissions.example.org/v1/"
+          authAPIBaseURL: "https://auth.example.org/v1/"
+          name: "skaha"
+          version: "1"
+```
+
+API specification: https://permissions.srcnet.skao.int/api/openapi.json
+
+## Harbor publishing (Science Platform CI)
+
+Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:
+
+`POST {base}/chartrepo/{project}/charts` (multipart `chart=@skaha-<version>.tgz`), **not** `helm push oci://`.
+
+That publishes to the Harbor **Helm Charts** tab. Repo variables (defaults in the workflow):
+
+- **`HARBOR_HELM_BASE_URL`** — HTTPS origin only (example `https://images.opencadc.org`), when it differs from `https://<Docker registry hostname>`.
+- **`HARBOR_HELM_REPO_PROJECT`** — Harbor project that hosts Helm charts (default `platform`).
+
+Uses the same `SKAHA_REGISTRY_USERNAME` / `SKAHA_REGISTRY_TOKEN` secrets as Docker login.
+
+## Cookie verification public key (RSA)
+
+Deployments that rely on verifying browser cookies signed with platform RSA material can mount **only the public half** via `deployment.skaha.cookieSignaturePublicKey.existingSecret` (Kubernetes Secret, release namespace—better optics than a ConfigMap plain-text entry). The projected volume always reads Secret data key **`RsaSignaturePub.key`**.
+
+1. Create the Secret outside Helm (do not paste PEM into `values.yaml` in prod). Store the PEM under **`RsaSignaturePub.key`**, for example:
+
+   `kubectl create secret generic my-skaha-cookie-verify-pub -n <release-namespace> --from-file=RsaSignaturePub.key=./public.pem`
+
+2. Reference the Secret from values (optional **`existingSecret.path`** overrides the basename under `/config`; default **`RsaSignaturePub.key`**):
+
+```yaml
+deployment:
+  skaha:
+    cookieSignaturePublicKey:
+      existingSecret:
+        name: my-skaha-cookie-verify-pub
+        path: RsaSignaturePub.key
+```
+
+Omit `existingSecret.name` (leave default empty) when you do not use this stack—the pod still uses WAR classpath material if packaged in the image.
+
+**Runtime note:** Signed session callbacks also read RSA key material from workload Secret **`pre-auth-token-skaha`** (data keys **`public`** / **`private`**). Confirm with ops which path your environment uses (`/config/RsaSignaturePub.key`, that Secret, classpath, or combinations).
+
+## metricsBackend install ordering
+
+When `metricsBackend.enabled` is true, the chart emits `ClusterRole`, `ClusterRoleBinding`, `Service`, and `Deployment` for metrics. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go) so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
+
+If `metricsBackend.enabled=true` and `metricsBackend.rbac.enabled=false`, this chart will not create the metrics ClusterRole/ClusterRoleBinding. In that mode, the deployer is responsible for ensuring the Skaha ServiceAccount (`deployment.skaha.serviceAccountName`) already has `get`/`list` permissions on the Kueue `ClusterQueue` API before installation.

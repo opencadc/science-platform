@@ -12,17 +12,17 @@ import org.apache.commons.configuration2.convert.DefaultConversionHandler;
 import org.apache.commons.configuration2.ex.ConversionException;
 import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
 import org.apache.commons.configuration2.tree.MergeCombiner;
+import org.opencadc.vospace.VOSURI;
 
 public class UserStorageConfiguration {
     public static final String SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY = "SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY";
     public static final String SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY = "SKAHA_USER_STORAGE_HOME_BASE_DIRECTORY";
     public static final String SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY =
             "SKAHA_USER_STORAGE_PROJECTS_BASE_DIRECTORY";
-    public static final String SKAHA_USER_STORAGE_SERVICE_URI = "SKAHA_USER_STORAGE_SERVICE_URI";
     public static final String SKAHA_USER_STORAGE_USER_HOME_URI = "SKAHA_USER_STORAGE_USER_HOME_URI";
 
     public final URI serviceURI;
-    public final URI userHomeBaseURI;
+    public final VOSURI userHomeBaseURI;
     public final Path topLevelDirectory;
     public final Path homeBaseDirectory;
     public final Path projectsBaseDirectory;
@@ -38,14 +38,10 @@ public class UserStorageConfiguration {
         return new UserStorageConfiguration(configuration);
     }
 
-    public static UserStorageConfiguration fromConfiguration(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "Configuration must not be null.");
-        return new UserStorageConfiguration(configuration);
-    }
-
     private UserStorageConfiguration(final Configuration configuration) {
-        this.serviceURI = configuration.get(URI.class, UserStorageConfiguration.SKAHA_USER_STORAGE_SERVICE_URI);
-        this.userHomeBaseURI = configuration.get(URI.class, UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI);
+        this.userHomeBaseURI =
+                new VOSURI(configuration.get(URI.class, UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI));
+        this.serviceURI = this.userHomeBaseURI.getServiceURI();
         this.topLevelDirectory =
                 configuration.get(Path.class, UserStorageConfiguration.SKAHA_USER_STORAGE_TOP_LEVEL_DIRECTORY);
         this.homeBaseDirectory =
@@ -56,13 +52,8 @@ public class UserStorageConfiguration {
         Objects.requireNonNull(
                 this.serviceURI,
                 "User Storage (Cavern) Service URI must not be null.  Please set the "
-                        + UserStorageConfiguration.SKAHA_USER_STORAGE_SERVICE_URI
-                        + " environment variable or system property.");
-        Objects.requireNonNull(
-                this.userHomeBaseURI,
-                "User Storage (Cavern) User Home Base URI must not be null.  Please set the "
                         + UserStorageConfiguration.SKAHA_USER_STORAGE_USER_HOME_URI
-                        + " environment variable or system property.");
+                        + " environment variable or system property to a proper vos:// URI.");
         Objects.requireNonNull(
                 this.topLevelDirectory,
                 "User Storage (Cavern) Top Level Directory must not be null.  Please set the "

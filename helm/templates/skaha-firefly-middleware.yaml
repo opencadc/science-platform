@@ -1,0 +1,11 @@
+# Common middleware logic for Firefly sessions.  Exists here to only create it once and share it amongst the Firefly User Sessions.
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-firefly-set-x-forwarded-proto
+  namespace: {{ include "skaha.workloadNamespace" . }}
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: https

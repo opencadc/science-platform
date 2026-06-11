@@ -13,10 +13,11 @@
         <init-param>
             <param-name>logLevelPackages</param-name>
             <param-value>
-                  org.opencadc.skaha
-                  ca.nrc.cadc.util
-                  ca.nrc.cadc.rest
-                  ca.nrc.cadc.net
+                org.opencadc.permissions
+                org.opencadc.skaha
+                ca.nrc.cadc.util
+                ca.nrc.cadc.rest
+                ca.nrc.cadc.net
             </param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>

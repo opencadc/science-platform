@@ -1,5 +1,8 @@
 package org.opencadc.skaha.utils;
 
+import ca.nrc.cadc.ac.Group;
+import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.reg.client.LocalAuthority;
 import ca.nrc.cadc.util.StringUtil;
 import java.net.URI;
@@ -7,6 +10,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
 
 public class CommonUtils {
@@ -81,5 +85,39 @@ public class CommonUtils {
         final String instantTime = String.format(outputTemplate, (Object[]) captureGroupsArray);
         final Instant instant = Instant.parse(instantTime);
         return instant.plusSeconds(expiryTimeInSeconds).toString();
+    }
+
+    public static List<Group> getCachedGroupsFromSubject(final Subject subject) {
+        final Class<List<Group>> c = (Class<List<Group>>) (Class<?>) List.class;
+        final Set<List<Group>> setOfGroupLists =
+                Objects.requireNonNullElse(subject.getPublicCredentials(c), Collections.emptySet());
+        return setOfGroupLists.isEmpty()
+                ? Collections.emptyList()
+                : setOfGroupLists.stream().findFirst().get();
+    }
+
+    /**
+     * Obtain the given Subject's bearer token. Null if none found.,
+     *
+     * @param subject The Subject to look through.
+     * @return AuthorizationToken with type "Bearer", or null if none found.
+     */
+    public static AuthorizationToken getAuthorizationToken(final Subject subject) {
+        return subject.getPublicCredentials(AuthorizationToken.class).stream()
+                .filter(token -> AuthenticationUtil.CHALLENGE_TYPE_BEARER.equalsIgnoreCase(token.getType()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public static String lookup(final Map<String, String> env, final String key) {
+        return env.get(key);
+    }
+
+    public static String trimToNull(final String value) {
+        if (value == null) {
+            return null;
+        }
+        final String t = value.trim();
+        return t.isEmpty() ? null : t;
     }
 }

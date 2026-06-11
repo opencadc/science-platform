@@ -99,6 +99,11 @@ public class DeleteAction extends SessionAction {
         }
     }
 
+    @Override
+    protected String getRequestMethod() {
+        return "DELETE";
+    }
+
     private void deleteDesktopApp() throws Exception {
         // kill the session specified by sessionID
         log.debug("Stopping Desktop App for Session " + sessionID);

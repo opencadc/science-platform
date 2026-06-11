@@ -68,6 +68,7 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -96,7 +97,7 @@ public class DesktopAppLifecycleTest {
     }
 
     protected final URL sessionURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public DesktopAppLifecycleTest() {
         try {
@@ -105,8 +106,9 @@ public class DesktopAppLifecycleTest {
                     TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
             log.info("sessions URL: " + sessionURL);
 
-            this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
-            log.debug("userSubject: " + userSubject);
+            this.authenticatedUser = TestConfiguration.getCurrentUser();
+            this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+            log.debug("userSubject: " + authenticatedUser);
         } catch (Exception e) {
             log.error("init exception", e);
             throw new RuntimeException("init exception", e);
@@ -115,7 +117,7 @@ public class DesktopAppLifecycleTest {
 
     @Test
     public void testCreateDeleteDesktopApp() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 

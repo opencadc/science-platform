@@ -36,4 +36,9 @@ public class GetAction extends SkahaAction {
     String[] getHarborHosts() {
         return this.harborHosts.toArray(new String[0]);
     }
+
+    @Override
+    protected String getRequestMethod() {
+        return "GET";
+    }
 }

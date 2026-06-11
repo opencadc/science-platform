@@ -1,0 +1,72 @@
+{{/*
+ Skaha (when SKAHA_SESSION_LIMIT_RANGE_ENABLED is true) uses the **first** LimitRange returned for the workload namespace; the resource name is mostly irrelevant.
+ This chart still names a chart-managed LimitRange `<release>-session-limit-range` for predictable installs.
+*/}}
+{{- $limitRange := .Values.deployment.skaha.sessions.limitRange }}
+{{- if $limitRange.enabled }}
+{{- if $limitRange.create }}
+{{- $spec := $limitRange.spec }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ $.Release.Name }}-session-limit-range
+  namespace: {{ include "skaha.workloadNamespace" $ }}
+spec:
+{{- with $spec }}
+  limits:
+    - type: Container
+{{- if .max }}
+      max:
+{{ toYaml .max | indent 8 }}
+{{- end }}
+{{- if .default }}
+      default:
+{{ toYaml .default | indent 8 }}
+{{- end }}
+{{- if .defaultRequest }}
+      defaultRequest:
+{{ toYaml .defaultRequest | indent 8 }}
+{{- end }}
+{{- end }} # End with .spec
+{{- end }}
+
+# RBAC for LimitRange (emitted only when `limitRange.enabled`; Role/Binding when `rbac.create`). If created outside this installation, set rbac.create to false.
+{{- with $limitRange.rbac }}
+{{- if .create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Release.Name }}-session-limit-range-role
+  namespace: {{ include "skaha.workloadNamespace" $ }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - limitranges
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-session-limit-range
+  namespace: {{ include "skaha.workloadNamespace" $ }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $.Release.Name }}-session-limit-range-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "skaha.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+# End if .create
+{{- end }}
+
+# End with $limitRange.rbac
+{{- end }}
+
+# End if $limitRange.enabled
+{{- end }}

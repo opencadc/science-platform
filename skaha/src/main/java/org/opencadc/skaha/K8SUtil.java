@@ -79,7 +79,6 @@ import org.jetbrains.annotations.NotNull;
 import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
-    static final String ARC_USER_QUOTA_IN_GB_NAME = "skaha.defaultquotagb";
     private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
 
     static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
@@ -129,40 +128,6 @@ public class K8SUtil {
         return System.getenv("skaha.sessionexpiry");
     }
 
-    /**
-     * Obtain the configured default quota size in Gigabytes.
-     *
-     * @return integer in GB.
-     */
-    public static String getDefaultQuotaGB() {
-        return System.getenv(K8SUtil.ARC_USER_QUOTA_IN_GB_NAME);
-    }
-
-    public static String getDefaultQuotaBytes() {
-        return K8SUtil.getDefaultQuotaBytes(K8SUtil.getDefaultQuotaGB());
-    }
-
-    /**
-     * Obtain the default quota size in bytes.
-     *
-     * @param defaultQuotaGB The default quota size in Gigabytes as a String.
-     * @return String representing the default quota size in bytes.
-     */
-    static String getDefaultQuotaBytes(final String defaultQuotaGB) {
-        final double sizeInGB;
-        if (StringUtil.hasText(defaultQuotaGB)) {
-            try {
-                sizeInGB = Double.parseDouble(defaultQuotaGB);
-            } catch (NumberFormatException numberFormatException) {
-                throw new IllegalArgumentException("Invalid default quota size in GB: " + defaultQuotaGB);
-            }
-        } else {
-            sizeInGB = 10.0D; // Default to 10 GB if not specified
-        }
-
-        return Double.valueOf(sizeInGB * 1024.0D * 1024.0D * 1024.0D).longValue() + "";
-    }
-
     public static String getPreAuthorizedTokenSecretName() {
         return "pre-auth-token-skaha";
     }
@@ -183,18 +148,6 @@ public class K8SUtil {
 
     static List<String> getHarborHosts(final String rawHosts) {
         return Arrays.stream(rawHosts.split(" ")).map(String::trim).collect(Collectors.toList());
-    }
-
-    public static String getSkahaUsersGroup() {
-        return System.getenv("skaha.usersgroup");
-    }
-
-    public static String getSkahaAdminsGroup() {
-        return System.getenv("skaha.adminsgroup");
-    }
-
-    public static String getSkahaHeadlessGroup() {
-        return System.getenv("skaha.headlessgroup");
     }
 
     public static String getSkahaHeadlessPriorityGroup() {

@@ -67,8 +67,8 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -100,16 +100,19 @@ public class ImagesTest {
     }
 
     protected final URL imageURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public ImagesTest() {
         try {
-            RegistryClient regClient = new RegistryClient();
+            final RegistryClient regClient = new RegistryClient();
+            this.authenticatedUser = TestConfiguration.getCurrentUser();
             this.imageURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1, AuthMethod.TOKEN);
-            log.info("sessions URL: " + imageURL);
+                    TestConfiguration.getSkahaServiceID(),
+                    Standards.PLATFORM_IMAGE_1,
+                    this.authenticatedUser.authMethod);
 
-            this.userSubject = TestConfiguration.getCurrentUser(imageURL);
+            this.authenticatedUser.setDomain(NetUtil.getDomainName(this.imageURL));
+            log.info("sessions URL: " + imageURL);
         } catch (Exception e) {
             log.error("init exception", e);
             throw new RuntimeException("init exception", e);
@@ -132,7 +135,7 @@ public class ImagesTest {
     @Test
     public void testGetImageList() {
         try {
-            Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+            Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
                 // should have at least one image
                 List<Image> images = ImagesTest.getImages(imageURL);
                 Assert.assertFalse("one or more images", images.isEmpty());

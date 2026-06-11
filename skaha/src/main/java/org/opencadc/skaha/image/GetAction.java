@@ -118,4 +118,9 @@ public class GetAction extends SkahaAction {
     protected List<Image> queryCache() {
         return RedisCache.getAll(K8SUtil.getRedisHost(), K8SUtil.getRedisPort(), PUBLIC_IMAGES, Image.class);
     }
+
+    @Override
+    protected String getRequestMethod() {
+        return "GET";
+    }
 }

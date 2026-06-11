@@ -1,0 +1,35 @@
+{{/**
+Fragment of Pod .spec.volumes for user sessions. `userStorage.spec` is a Kubernetes volume
+source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, etc.), mounted as `cavern-volume`.
+*/}}
+{{- define "skaha.session.commonVolumes" -}}
+      {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+      {{- range . }}
+      - name: {{ .name }}
+        {{- if eq .volume.type "PVC" }}
+        persistentVolumeClaim:
+          claimName: {{ .volume.name }}
+        {{- else if eq .volume.type "HOST_PATH" }}
+        hostPath:
+          path: {{ .volume.hostPath }}
+          type: {{ .volume.hostPathType }}
+        {{- else if eq .volume.type "CONFIG_MAP" }}
+        configMap:
+          name: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- else if eq .volume.type "SECRET" }}
+        secret:
+          secretName: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      - name: cavern-volume
+{{ include "skaha.session.userStorageVolumeSpec" . }}
+      - name: scratch-dir
+        emptyDir: {}
+{{- end }}
