@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.3.0](https://github.com/opencadc/science-platform/compare/1.2.1...1.3.0) (2026-06-11)
+
+
+### Features
+
+* add group cache to prevent gms calls and make fsgroup optional with warning ([5ea99e9](https://github.com/opencadc/science-platform/commit/5ea99e90091aac3eea6b298abbfb64938d8177f3))
+* add permissions api support config with group access ([846bd18](https://github.com/opencadc/science-platform/commit/846bd18df7489617ab01bb65500c752f66b82cc1))
+* allow for different session authorizers ([c031183](https://github.com/opencadc/science-platform/commit/c0311839261a60f1aa7d7da5ec3d0f0abc53909d))
+* first broken pass for replacing group authorization access ([e7e703d](https://github.com/opencadc/science-platform/commit/e7e703dea361e0cbd4f0b37cfefd99fcfcea1c4a))
+* implement session auth with existing group or remote service ([beb4083](https://github.com/opencadc/science-platform/commit/beb4083c342571f2509de36e1a261fe07af283c4))
+* **metrics:** add configuration for metrics package with changelog and release settings ([954afb2](https://github.com/opencadc/science-platform/commit/954afb25f3cb0aea9b7641187f310d470d2da476))
+* **metrics:** add Helm chart, Minikube scripts, and CI updates ([4af37e3](https://github.com/opencadc/science-platform/commit/4af37e31bc98db5df73b809bea1e9dddd930de06))
+* **metrics:** add metrics pre-commit hook for automated checks ([7564d2d](https://github.com/opencadc/science-platform/commit/7564d2d710b0ab2e67a805c115b4e8e45eee4b69))
+* **metrics:** implement CI/CD workflows for Metrics API, including linting, testing, and release automation ([38432e0](https://github.com/opencadc/science-platform/commit/38432e020d2081e4e43f30ea80dcc856ac7e92b4))
+* **metrics:** Kueue Helm RBAC, Minikube helpers, and CI ([5b18b8d](https://github.com/opencadc/science-platform/commit/5b18b8d4718fa2544f53e0789800b3a9011f4842))
+* **metrics:** M1 compose stack, prerequisites, CI and docs ([de0226d](https://github.com/opencadc/science-platform/commit/de0226ddea97b48d972a06389c06c2d2c1d47ea9))
+* **metrics:** minikube smoke, Skaffold, and platform metrics cleanup ([90bb692](https://github.com/opencadc/science-platform/commit/90bb6920ff4c60fced228b7453138382040cfdab))
+
+
+### Bug Fixes
+
+* accept current user or certificate for auth to storage ([d2d69df](https://github.com/opencadc/science-platform/commit/d2d69df1d2c9204de80aa94b10cc318cad015a97))
+* add papi config to reg properties ([099ca6b](https://github.com/opencadc/science-platform/commit/099ca6b187a91d2c82420fe2711982b34f0a8ce9))
+* add patch job permission ([9b77dd9](https://github.com/opencadc/science-platform/commit/9b77dd9de8069cb5060e08ab45d9b83a9586d5c3))
+* add the chart and storage papi updates ([62cdca8](https://github.com/opencadc/science-platform/commit/62cdca830efa72f560a42a82bfa57139caab774a))
+* added group gid querying ([4bf7853](https://github.com/opencadc/science-platform/commit/4bf7853a9c941b27cd74e44ac7f23f08b44d909f))
+* **build:** metrics ([2f7154b](https://github.com/opencadc/science-platform/commit/2f7154b46430d7d874281db8f5e4a6ad67611c30))
+* **build:** system ([8ec83b0](https://github.com/opencadc/science-platform/commit/8ec83b02417a3d5f1e5329be957b0f187c3c3e22))
+* chart version release ([39d6a2c](https://github.com/opencadc/science-platform/commit/39d6a2c007257b3b00cf8e2c52bd024e949b762f))
+* **ci:** bound minikube smoke waits and image loads ([754b23c](https://github.com/opencadc/science-platform/commit/754b23ca824241ef76cc31372e620d6a0bad036d))
+* **ci:** updated paths-filter action ([88e4b0b](https://github.com/opencadc/science-platform/commit/88e4b0baaa8b5a054b2168663ccdafa1ef709ba3))
+* configure queue version ([d725e07](https://github.com/opencadc/science-platform/commit/d725e07b8a4cd6f7bc8c67d74a205412c7611692))
+* create cluster role by default ([9524f99](https://github.com/opencadc/science-platform/commit/9524f99bc152f94706f5269f0452de3fef788ad0))
+* fix for how permissions api client is called and configured ([63bab4b](https://github.com/opencadc/science-platform/commit/63bab4bc0f4245bacc3834255d5527bd00bb7098))
+* fix to add caching and fix call to cavern ([5e51114](https://github.com/opencadc/science-platform/commit/5e51114fa8ab6b04611b83c14c5152690146f604))
+* hush the linter ([8f22340](https://github.com/opencadc/science-platform/commit/8f22340cfd2af8174753518bb64c835bfbfc5ed8))
+* **metrics:** dispatch release builds from component outputs ([5e1d28f](https://github.com/opencadc/science-platform/commit/5e1d28f5e5a788d3900bbef4af9b9ed3fbc83a51))
+* **metrics:** repair release CI configuration ([cebf241](https://github.com/opencadc/science-platform/commit/cebf2414079ff1856f4a71ed21fb2dc10b85f9e3))
+* properly set request and limit gpu value ([b7f73b5](https://github.com/opencadc/science-platform/commit/b7f73b544bd086a2454b87d6139e699aa36097d9))
+* put rsa pub key in a secret ([134e43f](https://github.com/opencadc/science-platform/commit/134e43f6dee82336472d0f2eed3292e08fc70595))
+* readme version ([8ca2f2a](https://github.com/opencadc/science-platform/commit/8ca2f2a3e8327b5c74566399e0a6b3f693566f67))
+* **release-please:** configuration to have different release tracks for skaha & metrics ([0fa8e60](https://github.com/opencadc/science-platform/commit/0fa8e60630b9afbd08794739db2142332423b429))
+* remove dev file ([c9fd7ca](https://github.com/opencadc/science-platform/commit/c9fd7ca0bf64c7a878dbb20bf00869f177f20fad))
+* remove ownership for fsgroup settings ([9814d16](https://github.com/opencadc/science-platform/commit/9814d161fbfac6fd001edde632eccfa590e44abe))
+* small code change ([8158918](https://github.com/opencadc/science-platform/commit/8158918c238af85add016685210d042a2f78a5b3))
+* small code fix for npe ([959264a](https://github.com/opencadc/science-platform/commit/959264a995bb6b97f28f64b10a20e26aeb5a1fdb))
+* update group cache to prevent numerous gms calls ([d6ba8a8](https://github.com/opencadc/science-platform/commit/d6ba8a8500db1b0e1dfb77d8ccf34a0c1ac16d08))
+* update integration tests ([9ba85ae](https://github.com/opencadc/science-platform/commit/9ba85aed9f5114bb6d217186b616d09e192838c1))
+* use sha value for images ([0765e62](https://github.com/opencadc/science-platform/commit/0765e623b9b8020497113b35ace73a8a235d1d21))
+
 ## [1.2.1](https://github.com/opencadc/science-platform/compare/1.2.0...1.2.1) (2026-03-03)
 
 
