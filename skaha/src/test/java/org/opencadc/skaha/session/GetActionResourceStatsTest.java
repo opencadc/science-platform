@@ -10,7 +10,6 @@ import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 import org.junit.After;
@@ -59,8 +58,8 @@ public class GetActionResourceStatsTest {
 
     @Test
     public void statsViewReturns503WhenPlatformMetricsUnavailable() throws Exception {
-        final TestableGetAction get =
-                new TestableGetAction(new FailingMetricsDAO(), containerLimitRangeFixture(), true);
+        final TestableGetAction get = new TestableGetAction(
+                PlatformMetricsFixtures.failingPlatformMetricsDAO(), containerLimitRangeFixture(), true);
         get.configureStatsViewRequest();
 
         try {
@@ -72,9 +71,9 @@ public class GetActionResourceStatsTest {
     }
 
     @Test
-    public void getResourceStatsThrowsWhenPlatformMetricsUnavailable() {
-        final TestableGetAction get =
-                new TestableGetAction(new FailingMetricsDAO(), containerLimitRangeFixture(), true);
+    public void getResourceStatsThrowsWhenPlatformMetricsUnavailable() throws Exception {
+        final TestableGetAction get = new TestableGetAction(
+                PlatformMetricsFixtures.failingPlatformMetricsDAO(), containerLimitRangeFixture(), true);
 
         try {
             get.getResourceStats();
@@ -99,7 +98,7 @@ public class GetActionResourceStatsTest {
     }
 
     @Test
-    public void getResourceStatsThrowsWhenLimitRangeEnabledButUnavailable() {
+    public void getResourceStatsThrowsWhenLimitRangeEnabledButUnavailable() throws Exception {
         final TestableGetAction get =
                 new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), null, true);
 
@@ -203,25 +202,17 @@ public class GetActionResourceStatsTest {
         }
     }
 
-    private static final class FailingMetricsDAO implements MetricsDAO {
-        @Override
-        public org.opencadc.skaha.metrics.PlatformMetrics getPlatformMetrics() throws Exception {
-            throw new IOException("metrics backend unreachable");
-        }
-
-        @Override
-        public org.opencadc.skaha.metrics.PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
-            return org.opencadc.skaha.metrics.PodMetrics.empty();
-        }
-    }
-
     private static class LazyMetricsGetAction extends GetAction {
         private boolean createMetricsDaoCalled;
 
         @Override
         protected MetricsDAO createMetricsDAO() {
             createMetricsDaoCalled = true;
-            return PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics();
+            try {
+                return PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
         @Override

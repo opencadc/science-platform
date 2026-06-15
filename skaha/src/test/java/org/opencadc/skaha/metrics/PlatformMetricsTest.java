@@ -23,27 +23,6 @@ public class PlatformMetricsTest {
     }
 
     @Test
-    public void metricsDaoContractReturnsDomainModel() throws Exception {
-        final PlatformMetrics expected = new PlatformMetrics(
-                new PlatformMetrics.Metadata(SNAPSHOT_CREATED),
-                new PlatformMetrics.Data(Map.of("cpu", "1"), Map.of("cpu", "0.5")));
-
-        final MetricsDAO dao = new MetricsDAO() {
-            @Override
-            public PlatformMetrics getPlatformMetrics() {
-                return expected;
-            }
-
-            @Override
-            public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
-                return PodMetrics.empty();
-            }
-        };
-
-        Assert.assertSame(expected, dao.getPlatformMetrics());
-    }
-
-    @Test
     public void toClusterResourceFieldsMapsInvalidCpuStringsToZeroCores() {
         final PlatformMetrics metrics = new PlatformMetrics(
                 new PlatformMetrics.Metadata(Instant.parse("2026-01-01T00:00:00Z")),

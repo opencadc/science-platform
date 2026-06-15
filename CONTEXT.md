@@ -14,11 +14,14 @@ Skaha is the session API for CANFAR; the Metrics service exposes cluster-wide ca
 
 **Metrics backend**: The co-deployed Metrics API pod Skaha calls in-cluster (`SKAHA_METRICS_BACKEND_URL`). _Avoid_: "metrics pod" in specs (implementation detail).
 
+**MetricsDAO**: The single Skaha seam for all metrics access — **platform stats** capacity/allocation and session-list pod usage. Callers use `MetricsDAO` only; platform HTTP and pod-usage source selection are internal. _Avoid_: `SkahaMetricsDAO`, `PlatformMetricsDAO`, `PodMetricsDAO` in session-layer specs (implementation details).
+
 **Resource context file**: Static `k8s-resources.json` mounted at `/config`; defines launch-form options and default limits when LimitRange is disabled. _Avoid_: "k8s config" (ambiguous).
 
 ## Relationships
 
-- **Platform stats** combines **platform capacity** and **platform allocation** (from **Metrics backend**) with **session resource ceiling** (from LimitRange or **resource context file**).
+- **Platform stats** combines **platform capacity** and **platform allocation** (from **Metrics backend** via **MetricsDAO**) with **session resource ceiling** (from LimitRange or **resource context file**).
+- Session-list pod usage (`cpuCoresInUse`, `memoryInUse`) is fetched through **MetricsDAO**; today from the Kubernetes metrics API, future from the **Metrics backend**.
 - **Session resource ceiling** is independent of **platform capacity**; a session may request up to the ceiling while the cluster may have more or less capacity remaining.
 
 ## Example dialogue
@@ -42,3 +45,5 @@ Skaha is the session API for CANFAR; the Metrics service exposes cluster-wide ca
 - On successful **platform stats**, `lastUpdate` reflects the Metrics snapshot time (`metadata.created`), not when Skaha assembled the response.
 
 - **Platform stats** tests: unit coverage for mapping and 503 paths; dedicated integration test with stub Metrics; session lifecycle tests must not depend on Metrics for unrelated session flows.
+
+- Session-list pod usage is temporarily sourced from the Kubernetes metrics API inside **MetricsDAO**; when the Metrics backend exposes pod usage, **MetricsDAO** will switch via configuration without changing session handler call sites.

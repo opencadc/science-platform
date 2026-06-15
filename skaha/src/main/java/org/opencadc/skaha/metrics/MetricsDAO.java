@@ -1,27 +1,72 @@
 package org.opencadc.skaha.metrics;
 
+import org.apache.log4j.Logger;
+
 /**
- * Data access for platform and per-pod metrics used by Skaha session APIs.
- *
- * <p>Platform snapshots come from the co-deployed Metrics HTTP API; pod usage comes from the Kubernetes metrics API.
+ * Central data access for all Skaha metrics: platform stats from the Metrics backend and session pod usage (Kubernetes
+ * metrics API today; Metrics backend in future).
  */
-public interface MetricsDAO {
+public class MetricsDAO {
+
+    private static final Logger log = Logger.getLogger(MetricsDAO.class);
+    private static MetricsDAO defaultInstance;
+
+    private final PlatformMetricsDAO platformMetricsDAO;
+    private final PodUsageProvider podUsageProvider;
+
+    /** Production wiring: Metrics backend for platform stats, environment-selected pod-usage provider. */
+    public MetricsDAO() {
+        this(new PlatformMetricsDAO(), PodUsageProvider.fromEnvironment());
+    }
+
+    MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
+        this.platformMetricsDAO = platformMetricsDAO;
+        this.podUsageProvider = podUsageProvider;
+    }
+
+    /** @visibleForTesting */
+    static void resetDefaultForTests() {
+        defaultInstance = null;
+    }
+
+    /** @visibleForTesting */
+    static void setDefaultForTests(final MetricsDAO metricsDAO) {
+        defaultInstance = metricsDAO;
+    }
+
+    /** Shared production instance for session handlers. */
+    public static MetricsDAO getDefault() {
+        if (defaultInstance == null) {
+            defaultInstance = new MetricsDAO();
+        }
+        return defaultInstance;
+    }
 
     /**
-     * Fetch the current platform metrics snapshot.
+     * Fetch the current platform metrics snapshot from the Metrics backend.
      *
      * @return platform metrics from the Metrics backend
      * @throws Exception if the snapshot cannot be retrieved
      */
-    PlatformMetrics getPlatformMetrics() throws Exception;
+    public PlatformMetrics getPlatformMetrics() throws Exception {
+        return platformMetricsDAO.getPlatformMetrics();
+    }
 
     /**
-     * Fetch per-pod CPU and memory usage for session workloads in the Skaha namespace.
+     * Fetch per-pod CPU and memory usage for session workloads, formatted for session listings.
+     *
+     * <p>Soft-fails: returns {@link PodResourceUsage#empty()} when pod metrics cannot be retrieved.
      *
      * @param userID constrain by user ID when non-null/non-blank; otherwise all users
      * @param omitHeadless when true, exclude headless session pods
-     * @return pod metrics keyed by pod name (raw Kubernetes quantity strings)
-     * @throws Exception if pod metrics cannot be retrieved
+     * @return session-list pod usage DTO
      */
-    PodMetrics getPodMetrics(String userID, boolean omitHeadless) throws Exception;
+    public PodResourceUsage getPodResourceUsage(final String userID, final boolean omitHeadless) {
+        try {
+            return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless));
+        } catch (Exception e) {
+            log.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
+            return PodResourceUsage.empty();
+        }
+    }
 }

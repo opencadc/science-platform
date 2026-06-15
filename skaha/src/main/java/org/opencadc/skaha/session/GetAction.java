@@ -83,7 +83,6 @@ import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PlatformMetrics;
 import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
-import org.opencadc.skaha.metrics.SkahaMetricsDAO;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
 /**
@@ -107,7 +106,7 @@ public class GetAction extends SessionAction {
     }
 
     protected MetricsDAO createMetricsDAO() {
-        return new SkahaMetricsDAO();
+        return MetricsDAO.getDefault();
     }
 
     private MetricsDAO metricsDAO() {

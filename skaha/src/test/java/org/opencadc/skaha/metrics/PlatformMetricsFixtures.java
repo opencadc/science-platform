@@ -1,7 +1,9 @@
 package org.opencadc.skaha.metrics;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.mockito.Mockito;
 
 /** Stable platform metrics values for unit and integration tests. */
 public final class PlatformMetricsFixtures {
@@ -18,18 +20,17 @@ public final class PlatformMetricsFixtures {
         return FIXED;
     }
 
-    /** {@link MetricsDAO} that returns {@link #fixedPlatformMetrics()} and empty pod metrics. */
-    public static MetricsDAO metricsDAOWithFixedPlatformMetrics() {
-        return new MetricsDAO() {
-            @Override
-            public PlatformMetrics getPlatformMetrics() {
-                return PlatformMetricsFixtures.fixedPlatformMetrics();
-            }
+    /** {@link MetricsDAO} that returns {@link #fixedPlatformMetrics()} and empty pod usage. */
+    public static MetricsDAO metricsDAOWithFixedPlatformMetrics() throws Exception {
+        final PlatformMetricsDAO platformDao = Mockito.mock(PlatformMetricsDAO.class);
+        Mockito.when(platformDao.getPlatformMetrics()).thenReturn(fixedPlatformMetrics());
+        return new MetricsDAO(platformDao, (userID, omitHeadless) -> PodMetrics.empty());
+    }
 
-            @Override
-            public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
-                return PodMetrics.empty();
-            }
-        };
+    /** {@link MetricsDAO} whose platform metrics call fails (for 503 stats tests). */
+    public static MetricsDAO failingPlatformMetricsDAO() throws Exception {
+        final PlatformMetricsDAO platformDao = Mockito.mock(PlatformMetricsDAO.class);
+        Mockito.when(platformDao.getPlatformMetrics()).thenThrow(new IOException("metrics backend unreachable"));
+        return new MetricsDAO(platformDao, (userID, omitHeadless) -> PodMetrics.empty());
     }
 }

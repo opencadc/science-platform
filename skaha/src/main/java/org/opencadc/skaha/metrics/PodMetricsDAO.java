@@ -16,7 +16,7 @@ import org.opencadc.skaha.session.SessionAction;
  * <p>Uses {@link Configuration#getDefaultApiClient()} (in-cluster service account). Does not call
  * {@link io.kubernetes.client.util.Config#fromCluster()} here.
  */
-public class PodMetricsDAO {
+class PodMetricsDAO {
 
     private final Metrics metricsClient;
 

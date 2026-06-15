@@ -20,9 +20,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.metrics.MetricsDAO;
-import org.opencadc.skaha.metrics.PodMetrics;
 import org.opencadc.skaha.metrics.PodResourceUsage;
-import org.opencadc.skaha.metrics.SkahaMetricsDAO;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -174,21 +172,12 @@ public class SessionDAO {
     }
 
     static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {
-        return loadPodResourceUsage(defaultMetricsDAO(), forUserID, omitHeadless);
+        return loadPodResourceUsage(MetricsDAO.getDefault(), forUserID, omitHeadless);
     }
 
     static PodResourceUsage loadPodResourceUsage(
             final MetricsDAO metricsDAO, final String forUserID, final boolean omitHeadless) {
-        try {
-            return PodMetrics.toPodResourceUsage(metricsDAO.getPodMetrics(forUserID, omitHeadless));
-        } catch (Exception e) {
-            LOGGER.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
-            return PodResourceUsage.empty();
-        }
-    }
-
-    private static MetricsDAO defaultMetricsDAO() {
-        return new SkahaMetricsDAO();
+        return metricsDAO.getPodResourceUsage(forUserID, omitHeadless);
     }
 
     static String getConnectURL(

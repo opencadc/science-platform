@@ -264,7 +264,7 @@ public class GetActionTests {
 
     static class TestGetAction extends GetAction {
 
-        TestGetAction() {
+        TestGetAction() throws Exception {
             super(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics());
         }
 

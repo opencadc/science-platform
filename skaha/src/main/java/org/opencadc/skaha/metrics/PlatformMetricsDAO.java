@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>Configured via the {@value #SKAHA_METRICS_BACKEND_URL} environment variable (in-cluster base URL, without a
  * trailing slash).
  */
-public class PlatformMetricsDAO {
+class PlatformMetricsDAO {
 
     /** Environment variable holding the Metrics backend base URL (scheme, host, optional port). */
     public static final String SKAHA_METRICS_BACKEND_URL = "SKAHA_METRICS_BACKEND_URL";
