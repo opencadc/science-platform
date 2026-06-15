@@ -46,9 +46,7 @@ public class PlatformStatsIntTest {
         final RegistryClient regClient = new RegistryClient();
         this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(),
-                Standards.PLATFORM_SESSION_1,
-                this.authenticatedUser.authMethod);
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
         log.info("sessions URL: " + sessionURL);
     }
 
