@@ -41,6 +41,7 @@ repos:
             ^skaha/src/test/resources/
             |^metrics/helm/
             |^metrics/scripts/
+            |^helm/
           )
       # Attempts to load all xml files to verify syntax.
       - id: check-xml

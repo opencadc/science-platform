@@ -1,6 +1,5 @@
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -41,19 +40,21 @@ public class PlatformStatsIntTest {
     }
 
     private final URL sessionURL;
-    private final Subject userSubject;
+    private final AuthenticatedUser authenticatedUser;
 
     public PlatformStatsIntTest() throws Exception {
         final RegistryClient regClient = new RegistryClient();
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
+                TestConfiguration.getSkahaServiceID(),
+                Standards.PLATFORM_SESSION_1,
+                this.authenticatedUser.authMethod);
         log.info("sessions URL: " + sessionURL);
-        this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
     }
 
     @Test
     public void platformStatsMatchesSchema() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             final JSONObject stats = SessionUtil.getStats(sessionURL);
             validateStatsSchema(stats);
             assertClusterTotalsPresent(stats);
@@ -65,7 +66,7 @@ public class PlatformStatsIntTest {
     public void platformStatsClusterTotalsMatchFixtureWhenConfigured() throws Exception {
         Assume.assumeTrue(FIXTURE_MODE.equalsIgnoreCase(System.getenv(METRICS_INTTEST_MODE_ENV)));
 
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             final JSONObject stats = SessionUtil.getStats(sessionURL);
             validateStatsSchema(stats);
 

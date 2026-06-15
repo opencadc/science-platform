@@ -118,6 +118,11 @@ public class GetAction extends SessionAction {
     }
 
     @Override
+    protected String getRequestMethod() {
+        return "GET";
+    }
+
+    @Override
     public void doAction() throws Exception {
         initRequest();
         String view = syncInput.getParameter("view");

@@ -153,30 +153,6 @@ public class SessionLifecycleTest {
             Assert.assertNotNull("no desktop session", notebookSessionID);
             Assert.assertNotNull("no carta session", cartaSessionID);
 
-            final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
-
-            try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/stats-schema.json")) {
-                Assert.assertNotNull(schemaStream);
-                try (final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
-                        final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
-                    final StringBuilder builder = new StringBuilder();
-                    reader.lines().forEach(builder::append);
-                    final JSONObject rawSchema = new JSONObject(builder.toString());
-                    final Schema schema = SchemaLoader.load(rawSchema);
-                    schema.validate(jsonObject);
-                }
-            }
-
-            final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
-            Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));
-            final double requestedRAMInGB = Double.parseDouble(requestedRAM.substring(0, requestedRAM.length() - 2));
-            Assert.assertTrue("Wrong requested RAM number", requestedRAMInGB >= 2.0D);
-
-            final BigDecimal requestedCores = jsonObject.getJSONObject("cores").getBigDecimal("requestedCPUCores");
-            Assert.assertTrue(
-                    "Wrong requested Cores number (" + requestedCores.doubleValue() + ")",
-                    requestedCores.doubleValue() >= 2.0D);
-
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, notebookSessionID);
 
