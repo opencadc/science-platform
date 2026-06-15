@@ -6,7 +6,7 @@ This file stores repository-specific behavioral specifications.
 
 - Define expected behavior as testable outcomes.
 - Keep each spec tied to observable API or module behavior.
-- Defer delivery sequencing details to `docs/plans/`.
+- Durable decisions live in [`docs/adr/README.md`](adr/README.md).
 
 ## Update rules
 
@@ -14,6 +14,8 @@ This file stores repository-specific behavioral specifications.
 - Use concrete examples and acceptance checks.
 
 ## Service behavior specifications
+
+See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 
 - The API exposes `GET /api/v1/metrics/platform` and `GET /healthz` (M4).
 - Runtime configuration is environment-driven through `METRICS_*` settings and
@@ -37,11 +39,12 @@ This file stores repository-specific behavioral specifications.
 
 ## Milestone linkage
 
-- Architecture realignment and provider cleanup: `docs/plans/PLAN_M3_app_structure_and_platform_sources.md`
-- Provider runtime architecture: `docs/plans/PLAN_M4_provider_runtime_architecture.md`
-- Interactive quota release: `docs/plans/PLAN_M5_interactive_quota_release.md`
+Canonical decisions: [`docs/adr/README.md`](adr/README.md).
 
 ## Planned target behavior (roadmap)
 
-- Interactive quota becomes an active source once M5 implements runtime depth
-  behind the configured `kube` provider and `sources.quotas.interactive`.
+- **InteractiveQuota** (M5): `sources.quotas.interactive` + kube provider — ADR-0015–0018.
+- **UserMetrics** (M6): `GET /api/v1/metrics/users/{user}`, provider e.g. kube or
+  prometheus — ADR-0020.
+- **SessionMetrics** (M7): `GET /api/v1/metrics/users/{user}/sessions/{uuid}` —
+  ADR-0021.

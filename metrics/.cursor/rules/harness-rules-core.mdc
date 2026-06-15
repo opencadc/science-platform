@@ -1,5 +1,0 @@
----
-description: Apply core engineering rules.
-alwaysApply: false
----
-Follow `docs/harness/rules-core.md` when code, tests, schemas, or docs are modified.

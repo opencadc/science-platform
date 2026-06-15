@@ -1,7 +1,6 @@
 # Architecture reference
 
-This file stores repository-specific architecture facts only. Harness process
-policy belongs in `docs/harness/`.
+This file stores repository-specific architecture facts only.
 
 ## Ownership
 
@@ -9,9 +8,8 @@ policy belongs in `docs/harness/`.
 - Document architecture invariants that are verifiable in code.
 - Remove claims that are not currently implemented.
 
-**Contributors:** use `docs/plans/PLAN_M4_provider_runtime_architecture.md` for
-the stepwise extension pattern (config, registry, provider, scopes) when
-adding a new metrics source or provider class.
+**Contributors:** when adding a provider or scope, follow ADR-0011 and
+[`docs/adr/0005-metrics-runtime-composition-root.md`](adr/0005-metrics-runtime-composition-root.md).
 
 ## Current state
 
