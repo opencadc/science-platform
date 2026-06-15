@@ -67,11 +67,12 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.net.HttpPost;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
@@ -94,7 +95,7 @@ import org.opencadc.skaha.session.SessionAction;
  */
 public class ExpiryTimeRenewalTest {
 
-    public static final int SLEEP_TIME_SECONDS = 15;
+    public static final int SLEEP_TIME_SECONDS = 20;
     private static final Logger log = Logger.getLogger(ExpiryTimeRenewalTest.class);
 
     static {
@@ -102,21 +103,21 @@ public class ExpiryTimeRenewalTest {
     }
 
     protected final URL sessionURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public ExpiryTimeRenewalTest() throws Exception {
-        RegistryClient regClient = new RegistryClient();
+        final RegistryClient regClient = new RegistryClient();
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
-        log.info("sessions URL: " + sessionURL);
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
 
-        this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
-        log.debug("userSubject: " + userSubject);
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+        log.debug("userSubject: " + authenticatedUser.subject);
     }
 
     @Test
     public void testRenewCARTA() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 
@@ -126,30 +127,32 @@ public class ExpiryTimeRenewalTest {
                     "inttest-" + SessionAction.SESSION_TYPE_CARTA,
                     TestConfiguration.getCARTAImageID(),
                     SessionAction.SESSION_TYPE_CARTA);
-            Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+            final Session cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+
+            final Instant expiryTime = Instant.parse(cartaSession.getExpiryTime());
+            final long expiryTimeSinceEpoch = expiryTime.toEpochMilli();
+            log.info("expiryTime: " + expiryTimeSinceEpoch);
 
             // Sleep to force time to pass before renewal
             TimeUnit.SECONDS.sleep(SLEEP_TIME_SECONDS);
 
-            final Instant expiryTime = Instant.parse(cartaSession.getExpiryTime());
-            final Instant startTime = Instant.parse(cartaSession.getStartTime());
-            final long timeToLive = startTime.until(expiryTime, ChronoUnit.SECONDS);
-
             // renew session
             renewSession(sessionURL, cartaSessionID);
 
-            cartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
-            final Instant expiryTimeAfterRenewal = Instant.parse(cartaSession.getExpiryTime());
-            final Instant startTimeAfterRenewal = Instant.parse(cartaSession.getStartTime());
-            final long timeToLiveAfterRenewal = startTimeAfterRenewal.until(expiryTimeAfterRenewal, ChronoUnit.SECONDS);
+            final Session renewedCartaSession = SessionUtil.waitForSession(this.sessionURL, cartaSessionID);
+            final Instant expiryTimeAfterRenewal = Instant.parse(renewedCartaSession.getExpiryTime());
+            final long expiryTimeAfterRenewalSinceEpoch = expiryTimeAfterRenewal.toEpochMilli();
 
             // Pre-condition: activeDeadlineSeconds == skaha.sessionexpiry
             // If the pre-condition has changed, the conditional code below needs to be updated
-            long changedTime = timeToLiveAfterRenewal - timeToLive;
-            if (changedTime <= SLEEP_TIME_SECONDS) {
+            final long changedTime = expiryTimeAfterRenewalSinceEpoch - expiryTimeSinceEpoch;
+            if (changedTime <= 0) {
                 // renew failed
-                Assert.fail(
-                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test.");
+                Assert.fail(String.format(
+                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %ds) (Original expiry time %d vs Refreshed expiry time %d).",
+                        changedTime, expiryTime.toEpochMilli(), expiryTimeAfterRenewal.toEpochMilli()));
+            } else {
+                log.info(String.format("Expiry time extended by %d seconds", changedTime / 1000));
             }
 
             SessionUtil.deleteSession(this.sessionURL, cartaSessionID);
@@ -160,7 +163,7 @@ public class ExpiryTimeRenewalTest {
 
     @Test
     public void testRenewHeadless() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Void>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
 
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
@@ -190,7 +193,7 @@ public class ExpiryTimeRenewalTest {
 
     @Test
     public void testRenewDesktop() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
 
@@ -228,9 +231,13 @@ public class ExpiryTimeRenewalTest {
     }
 
     private void renewSession(URL sessionURL, String sessionID) throws Exception {
-        Map<String, Object> params = new HashMap<>();
+        log.info(String.format("Renewing session %s", sessionID));
+        final URL postURL = URI.create(sessionURL.toString() + "/" + sessionID).toURL();
+        log.info(String.format("Session renewal URL is %s", postURL));
+        final Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
-        HttpPost post = new HttpPost(new URL(sessionURL.toString() + "/" + sessionID), params, false);
+        HttpPost post = new HttpPost(postURL, params, false);
         post.prepare();
+        log.info(String.format("Renewing session %s: OK", sessionID));
     }
 }

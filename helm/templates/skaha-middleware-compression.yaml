@@ -1,0 +1,14 @@
+# Middleware to enable compression for Skaha sessions.  This relies on the caller setting the `accept-encoding` header in order to work.
+#
+# https://doc.traefik.io/traefik/middlewares/compress/
+#
+# Driven by a GitHub request Issue:
+# https://github.com/opencadc/science-containers/issues/123
+#
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-workload-enable-compression
+  namespace: {{ include "skaha.workloadNamespace" . }}
+spec:
+  compress: {}

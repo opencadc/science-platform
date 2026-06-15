@@ -62,6 +62,27 @@ public class SessionJobBuilderTest {
                         .getResources()
                         .getLimits()
                         .containsKey("nvidia.com/gpu"));
+
+        // GPU requests should also not be set when GPUs are not enabled.
+        if (Objects.requireNonNull(job.getSpec())
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources()
+                        .getRequests()
+                != null) {
+            Assert.assertFalse(
+                    "Wrong GPU request.",
+                    job.getSpec()
+                            .getTemplate()
+                            .getSpec()
+                            .getContainers()
+                            .get(0)
+                            .getResources()
+                            .getRequests()
+                            .containsKey("nvidia.com/gpu"));
+        }
     }
 
     private void testBaseValuesAffinityJob(final int gpuCount) throws Exception {
@@ -101,6 +122,21 @@ public class SessionJobBuilderTest {
                             .get("nvidia.com/gpu")
                             .getNumber()
                             .intValue());
+
+            // When GPUs are requested, the GPU requests should match the limits.
+            Assert.assertEquals(
+                    "Wrong GPU request.",
+                    gpuCount,
+                    Objects.requireNonNull(job.getSpec())
+                            .getTemplate()
+                            .getSpec()
+                            .getContainers()
+                            .get(0)
+                            .getResources()
+                            .getRequests()
+                            .get("nvidia.com/gpu")
+                            .getNumber()
+                            .intValue());
         } else {
             Assert.assertNull(
                     "GPU limit should be null.",
@@ -112,6 +148,26 @@ public class SessionJobBuilderTest {
                             .getResources()
                             .getLimits()
                             .get("nvidia.com/gpu"));
+
+            if (Objects.requireNonNull(job.getSpec())
+                            .getTemplate()
+                            .getSpec()
+                            .getContainers()
+                            .get(0)
+                            .getResources()
+                            .getRequests()
+                    != null) {
+                Assert.assertFalse(
+                        "GPU request should be absent.",
+                        job.getSpec()
+                                .getTemplate()
+                                .getSpec()
+                                .getContainers()
+                                .get(0)
+                                .getResources()
+                                .getRequests()
+                                .containsKey("nvidia.com/gpu"));
+            }
         }
 
         Assert.assertEquals(

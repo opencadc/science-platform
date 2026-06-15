@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=(VERSION)
+Name=(NAME)
+Comment=(NAME)
+Keywords=(NAME)
+Exec=(EXECUTABLE)/(NAME).sh
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=(CATEGORY);

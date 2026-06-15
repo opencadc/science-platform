@@ -1,0 +1,133 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    canfar-net-sessionID: "${skaha.sessionid}"
+    canfar-net-sessionName: "${skaha.sessionname}"
+    canfar-net-sessionType: "${skaha.sessiontype}"
+    canfar-net-userid: "${skaha.userid}"
+
+  name: "${skaha.jobname}"
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: ${skaha.sessionexpiry}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        canfar-net-sessionID: "${skaha.sessionid}"
+        canfar-net-sessionName: "${skaha.sessionname}"
+        canfar-net-sessionType: "${skaha.sessiontype}"
+        canfar-net-userid: "${skaha.userid}"
+        job-name: "${skaha.jobname}"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      {{ template "skaha.job.nodeAffinity" . }}
+      securityContext:
+        {{ template "skaha.job.securityContext" . }}
+      priorityClassName: uber-user-preempt-medium
+      hostname: "${software.hostname}"
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      containers:
+      - name: "${skaha.jobname}"
+        command: ["/skaha-system/start-desktop.sh"]
+        args:
+        - ${skaha.hostname}
+        env:
+        - name: HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: VNC_PW
+          value: "${skaha.sessionid}"
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: MOZ_FORCE_DISABLE_E10S
+          value: "1"
+        - name: SKAHA_API_VERSION
+          value: "{{ .Values.deployment.skaha.apiVersion }}"
+        - name: DESKTOP_SESSION_APP_TOKEN
+          value: "${software.desktop.app.token}"
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        image: ${software.imageid}
+        imagePullPolicy: {{ .Values.deployment.skaha.sessions.imagePullPolicy | required "deployment.skaha.sessions.imagePullPolicy must be set." }}
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "250m"
+            ephemeral-storage: "2Gi"
+          limits:
+            memory: "4Gi"
+            cpu: "1"
+            ephemeral-storage: "10Gi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 6901
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /?password=${skaha.sessionid}&path=session/desktop/${skaha.sessionid}
+            port: 6901
+          periodSeconds: 15
+        startupProbe:
+          httpGet:
+            path: /
+            port: 6901
+          initialDelaySeconds: 30
+          timeoutSeconds: 300
+          periodSeconds: 10
+          failureThreshold: 30
+        ports:
+        - containerPort: 5901
+          protocol: TCP
+          name: vnc-port
+        - containerPort: 6901
+          protocol: TCP
+          name: novnc-port
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        - mountPath: "/desktopstartup"
+          name: templates
+        - mountPath: "/skaha-system"
+          name: start-desktop
+        {{ template "skaha.session.commonVolumeMounts" . }}
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: start-desktop
+        configMap:
+          name: {{ .Release.Name }}-launch-scripts
+          defaultMode: 0777
+      - name: templates
+        configMap:
+          name: {{ .Release.Name }}-templates
+          defaultMode: 0777
+      - name: init-users-groups
+        configMap:
+          name: {{ .Release.Name }}-init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

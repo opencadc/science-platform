@@ -99,4 +99,9 @@ public class GetAction extends SkahaAction {
             writer.flush();
         }
     }
+
+    @Override
+    protected String getRequestMethod() {
+        return "GET";
+    }
 }

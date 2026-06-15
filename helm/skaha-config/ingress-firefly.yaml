@@ -1,0 +1,33 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-firefly-ingress-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  tls:
+  {{- with .Values.deployment.skaha.sessions.tls }}
+    {{- toYaml . | nindent 6 }}
+  {{- end }}
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.sessions.hostname}`) && PathPrefix(`/session/firefly/${skaha.sessionid}/`)
+    middlewares:
+      - name: {{ .Release.Name }}-firefly-set-x-forwarded-proto
+{{- if .Values.deployment.skaha.sessions.ingress.customResponseHeaders }}
+      - name: {{ .Release.Name }}-custom-response-headers
+{{- end }}
+    services:
+    - kind: Service
+      name: skaha-firefly-svc-${skaha.sessionid}
+      port: 8080
+      scheme: http

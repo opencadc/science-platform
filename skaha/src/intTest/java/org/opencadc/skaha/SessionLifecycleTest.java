@@ -67,7 +67,7 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -95,21 +95,23 @@ public class SessionLifecycleTest {
     }
 
     protected final URL sessionURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
+                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
         log.info("sessions URL: " + sessionURL);
 
-        this.userSubject = TestConfiguration.getCurrentUser(sessionURL);
-        log.debug("userSubject: " + userSubject);
+        log.debug("userSubject: " + authenticatedUser);
     }
 
     @Test
     public void testCreateDeleteSessions() throws Exception {
-        Subject.doAs(userSubject, (PrivilegedExceptionAction<Object>) () -> {
+        Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
 
             // ensure that there is no active session
             SessionUtil.initializeCleanup(this.sessionURL);
@@ -150,6 +152,30 @@ public class SessionLifecycleTest {
             // verify both desktop and carta sessions
             Assert.assertNotNull("no desktop session", notebookSessionID);
             Assert.assertNotNull("no carta session", cartaSessionID);
+
+            final JSONObject jsonObject = SessionUtil.getStats(sessionURL);
+
+            try (final InputStream schemaStream = GetAction.class.getResourceAsStream("/stats-schema.json")) {
+                Assert.assertNotNull(schemaStream);
+                try (final InputStreamReader schemaStreamReader = new InputStreamReader(schemaStream);
+                        final BufferedReader reader = new BufferedReader(schemaStreamReader)) {
+                    final StringBuilder builder = new StringBuilder();
+                    reader.lines().forEach(builder::append);
+                    final JSONObject rawSchema = new JSONObject(builder.toString());
+                    final Schema schema = SchemaLoader.load(rawSchema);
+                    schema.validate(jsonObject);
+                }
+            }
+
+            final String requestedRAM = jsonObject.getJSONObject("ram").getString("requestedRAM");
+            Assert.assertTrue("Wrong requested RAM", requestedRAM.endsWith("G"));
+            final double requestedRAMInGB = Double.parseDouble(requestedRAM.substring(0, requestedRAM.length() - 2));
+            Assert.assertTrue("Wrong requested RAM number", requestedRAMInGB >= 2.0D);
+
+            final BigDecimal requestedCores = jsonObject.getJSONObject("cores").getBigDecimal("requestedCPUCores");
+            Assert.assertTrue(
+                    "Wrong requested Cores number (" + requestedCores.doubleValue() + ")",
+                    requestedCores.doubleValue() >= 2.0D);
 
             // delete desktop session
             SessionUtil.deleteSession(sessionURL, notebookSessionID);

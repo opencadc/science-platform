@@ -70,7 +70,6 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
-import jakarta.annotation.Nullable;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -278,7 +277,8 @@ public abstract class SessionAction extends SkahaAction {
      *
      * @return String representing the requested session type. Possibly null.
      */
-    @Nullable protected static String getRequestedSessionType(final SyncInput syncInput) {
-        return syncInput.getParameter("type");
+    protected static String getRequestedSessionType(final SyncInput syncInput) {
+        final String suppliedType = syncInput.getParameter("type");
+        return StringUtil.hasText(suppliedType) ? suppliedType : PostAction.SESSION_TYPE_HEADLESS;
     }
 }

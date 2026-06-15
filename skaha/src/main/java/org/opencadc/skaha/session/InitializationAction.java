@@ -146,8 +146,8 @@ public class InitializationAction extends InitAction {
             // Throws an API Exception with a 404 is the queue does not exist.
             customObjectsApi
                     .getNamespacedCustomObject(
-                            QueueConfiguration.KUEUE_API_GROUP,
-                            QueueConfiguration.KUEUE_API_VERSION,
+                            QueueConfiguration.getKueueApiGroup(),
+                            QueueConfiguration.getKueueApiVersion(),
                             getWorkloadNamespace(),
                             QueueConfiguration.KUEUE_API_PLURAL,
                             queueConfiguration.queueName)

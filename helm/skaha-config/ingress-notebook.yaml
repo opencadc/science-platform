@@ -1,0 +1,31 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: skaha-notebook-ingress-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  tls:
+  {{- with .Values.deployment.skaha.sessions.tls }}
+    {{- toYaml . | nindent 6 }}
+  {{- end }}
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  - kind: Rule
+    match: Host(`${skaha.sessions.hostname}`) && PathPrefix(`/session/notebook/${skaha.sessionid}/`)
+{{- if .Values.deployment.skaha.sessions.ingress.customResponseHeaders }}
+    middlewares:
+      - name: {{ .Release.Name }}-custom-response-headers
+{{- end }}
+    services:
+    - kind: Service
+      name: skaha-notebook-svc-${skaha.sessionid}
+      port: 8888
+      scheme: http

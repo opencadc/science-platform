@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=4.8.8
+Name=topcat
+Comment=Graphical viewer and editor for tabular data. topcat starts up directly, bypassing the xterm.
+Keywords=topcat
+Exec=(SCRIPT)
+Terminal=false
+X-MultipleArgs=false
+Icon=/headless/.icons/topcat.svg
+Type=Application
+Categories=X-Xfce-Toplevel;

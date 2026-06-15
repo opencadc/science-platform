@@ -1,7 +1,7 @@
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.net.HttpGet;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -26,20 +26,24 @@ public class RepositoryHostsTest {
     }
 
     protected final URL repositoryURL;
-    protected final Subject userSubject;
+    protected final AuthenticatedUser authenticatedUser;
 
     public RepositoryHostsTest() throws Exception {
         final String configuredServiceEndpoint = System.getProperty("SKAHA_SERVICE_ENDPOINT");
+        this.authenticatedUser = TestConfiguration.getCurrentUser();
+
         if (StringUtil.hasText(configuredServiceEndpoint)) {
-            repositoryURL = URI.create(configuredServiceEndpoint).toURL();
+            this.repositoryURL = URI.create(configuredServiceEndpoint).toURL();
         } else {
             final RegistryClient regClient = new RegistryClient();
             this.repositoryURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_REPO_1, AuthMethod.TOKEN);
+                    TestConfiguration.getSkahaServiceID(),
+                    Standards.PLATFORM_REPO_1,
+                    this.authenticatedUser.authMethod);
         }
-        log.info("sessions URL: " + repositoryURL);
 
-        this.userSubject = TestConfiguration.getCurrentUser(repositoryURL);
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.repositoryURL));
+        log.info("sessions URL: " + repositoryURL);
     }
 
     protected static String[] getRepositoryHosts(final URL serviceURLEndpoint) {
@@ -56,7 +60,7 @@ public class RepositoryHostsTest {
     @Test
     public void testGetImageList() {
         try {
-            Subject.doAs(this.userSubject, (PrivilegedExceptionAction<Object>) () -> {
+            Subject.doAs(this.authenticatedUser.subject, (PrivilegedExceptionAction<Object>) () -> {
                 // should have at least one image
                 final String[] repositoryHosts = RepositoryHostsTest.getRepositoryHosts(this.repositoryURL);
                 Assert.assertNotEquals(

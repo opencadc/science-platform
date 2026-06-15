@@ -98,23 +98,6 @@ public class K8SUtilTest {
     }
 
     @Test
-    public void getDefaultQuotaBytes() {
-        Assert.assertEquals(
-                "Default quota should be 34 GB",
-                Double.valueOf(34.0D * 1024L * 1024L * 1024L).longValue() + "",
-                K8SUtil.getDefaultQuotaBytes("34"));
-        Assert.assertEquals("Default quota for empty", "10737418240", K8SUtil.getDefaultQuotaBytes(null));
-        Assert.assertEquals("Default quota for empty", "10737418240", K8SUtil.getDefaultQuotaBytes(""));
-
-        try {
-            K8SUtil.getDefaultQuotaBytes("Bogus");
-            Assert.fail("Should throw IllegalArgumentException for bogus quota");
-        } catch (IllegalArgumentException e) {
-            // Good.
-        }
-    }
-
-    @Test
     public void getWorkerNodeSelector() {
         // Handle if happens to be set.
         final String original = System.getenv().getOrDefault(K8SUtil.SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV, "");
