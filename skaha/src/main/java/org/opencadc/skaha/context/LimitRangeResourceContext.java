@@ -49,7 +49,7 @@ public class LimitRangeResourceContext {
      *
      * @param containerLimitRange A configured LimitRangeItem from Kubernetes.
      */
-    LimitRangeResourceContext(@NotNull final V1LimitRangeItem containerLimitRange) {
+    public LimitRangeResourceContext(@NotNull final V1LimitRangeItem containerLimitRange) {
         LOGGER.debug("Initializing LimitRangeResourceContext with " + containerLimitRange);
         final Map<String, Quantity> configuredMax =
                 Objects.requireNonNullElse(containerLimitRange.getMax(), new HashMap<>());
@@ -143,7 +143,7 @@ public class LimitRangeResourceContext {
         }
     }
 
-    IntegerRange getTotalCoreCounts() {
+    public IntegerRange getTotalCoreCounts() {
         return new IntegerRange(
                 1,
                 LimitRangeResourceContext.quantityAsInt(
@@ -157,7 +157,7 @@ public class LimitRangeResourceContext {
                 LimitRangeResourceContext.quantityAsInt(this.defaultLimitValues, limitRangeKey));
     }
 
-    IntegerRange getTotalMemoryCounts() {
+    public IntegerRange getTotalMemoryCounts() {
         return new IntegerRange(
                 1,
                 LimitRangeResourceContext.quantityAsInt(
