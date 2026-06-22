@@ -171,6 +171,25 @@ public abstract class SkahaAction extends RestAction {
         }
     }
 
+    /**
+     * Override here to handle the generic SecurityException for users not authenticated.
+     *
+     * @return Object resulting from a run. Possibly null.
+     * @throws Exception For any exceptions, caught or otherwise.
+     */
+    @Override
+    public Object run() throws Exception {
+        try {
+            return super.run();
+        } catch (SessionAccessDeniedException sessionAccessDeniedException) {
+            logInfo.setSuccess(true);
+            logInfo.setMessage(sessionAccessDeniedException.getMessage());
+            handleException(sessionAccessDeniedException, 403, sessionAccessDeniedException.getMessage(), false, false);
+        }
+
+        return null;
+    }
+
     protected static SkahaCallbackTokenTool getSkahaCallbackTokenTool() throws Exception {
         final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
         return new SkahaCallbackTokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
