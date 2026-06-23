@@ -51,6 +51,11 @@ deployment:
     # -- Image pull policy for the Skaha API container.
     imagePullPolicy: Always
 
+    # -- Annotations added to the Skaha API Deployment metadata.
+    annotations: {}
+    # -- Annotations added to the Skaha API Pod template metadata.
+    podAnnotations: {}
+
     # Cron string for the image caching cron job schedule. Defaults to every half hour.
     imageCache:
       # -- Cron schedule used to refresh cached images.

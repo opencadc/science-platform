@@ -172,10 +172,19 @@ public abstract class SkahaAction extends RestAction {
     }
 
     /**
-     * Override here to handle the generic SecurityException for users not authenticated.
+     * Maps {@link SessionAccessDeniedException} to HTTP 403 Forbidden.
      *
-     * @return Object resulting from a run. Possibly null.
-     * @throws Exception For any exceptions, caught or otherwise.
+     * <p>{@link ca.nrc.cadc.rest.RestAction#run()} handles {@link java.security.AccessControlException} as 403, but not
+     * {@code SessionAccessDeniedException}. Skaha uses the latter (see
+     * {@link org.opencadc.skaha.session.authorization.SessionAccessDeniedException}) because
+     * {@code AccessControlException} is deprecated. Without this override, an authorization failure would escape
+     * {@code RestAction} and be reported as a server error (500).
+     *
+     * <p>Missing or invalid authentication is still handled by {@code RestAction} via
+     * {@link ca.nrc.cadc.auth.NotAuthenticatedException} (401).
+     *
+     * @return the result of {@code super.run()}, or {@code null} after a handled 403 response
+     * @throws Exception if {@code super.run()} throws any exception other than {@code SessionAccessDeniedException}
      */
     @Override
     public Object run() throws Exception {
