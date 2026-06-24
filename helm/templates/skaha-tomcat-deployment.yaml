@@ -5,6 +5,10 @@ metadata:
     run: {{ .Release.Name }}-skaha-tomcat
   name: {{ .Release.Name }}-skaha-tomcat
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.deployment.skaha.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (default false .Values.autoscaling.enabled) }}
   replicas: {{ default 1 .Values.replicaCount }}
@@ -17,6 +21,10 @@ spec:
       creationTimestamp: null
       labels:
         run: {{ .Release.Name }}-skaha-tomcat
+      {{- with .Values.deployment.skaha.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with .Values.deployment.skaha.imagePullSecrets }}
       imagePullSecrets:
