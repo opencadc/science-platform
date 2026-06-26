@@ -7,9 +7,14 @@ package org.opencadc.skaha.metrics;
  */
 final class MetricsBackendPodUsageProvider implements PodUsageProvider {
 
+    public static MetricsBackendPodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+        return new MetricsBackendPodUsageProvider();
+    }
+
+    private MetricsBackendPodUsageProvider() {}
+
     @Override
     public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
-        throw new UnsupportedOperationException("Metrics backend pod usage is not implemented; use "
-                + PodUsageProvider.SKAHA_POD_METRICS_SOURCE + "=" + PodUsageProvider.SOURCE_KUBERNETES);
+        throw new UnsupportedOperationException("Metrics backend pod usage is not implemented; use kubernetes style.");
     }
 }

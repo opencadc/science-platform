@@ -1,5 +1,6 @@
 package org.opencadc.skaha.metrics;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
@@ -61,23 +62,18 @@ public class MetricsDAOTest {
     }
 
     @Test
-    public void fromEnvironmentSelectsKubernetesProviderByDefault() throws Exception {
-        final PodUsageProvider provider = PodUsageProvider.fromEnvironment();
+    public void fromEnvironmentSelectsKubernetesProviderByDefault() {
+        final PodUsageProvider provider = PodUsageProvider.fromConfiguration(new MetricsConfiguration(null));
         Assert.assertTrue(provider instanceof KubernetesPodUsageProvider);
     }
 
     @Test
-    public void fromEnvironmentSelectsBackendProviderWhenConfigured() {
-        final String previous = System.getenv(PodUsageProvider.SKAHA_POD_METRICS_SOURCE);
-        try {
-            // Cannot set env in Java easily; test the backend class directly
-            final PodUsageProvider provider = new MetricsBackendPodUsageProvider();
-            Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
-        } finally {
-            // env unchanged in test JVM
-            if (previous != null) {
-                // no-op: documented limitation
-            }
-        }
+    public void fromEnvironmentSelectsBackendProviderWhenConfigured() throws Exception {
+        final Map<String, String> properties = new HashMap<>();
+        properties.put(MetricsConfiguration.SKAHA_METRICS_BACKEND_URL, "http://localhost:8080");
+        final MetricsConfiguration metricsConfiguration = MetricsConfiguration.fromEnv(properties);
+        // Cannot set env in Java easily; test the backend class directly
+        final PodUsageProvider provider = MetricsBackendPodUsageProvider.fromConfiguration(metricsConfiguration);
+        Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
     }
 }

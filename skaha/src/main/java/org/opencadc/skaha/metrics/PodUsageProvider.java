@@ -7,20 +7,11 @@ package org.opencadc.skaha.metrics;
  * backend when that API is available.
  */
 interface PodUsageProvider {
-
-    /** Environment variable selecting the pod-usage source ({@code kubernetes} or {@code backend}). */
-    String SKAHA_POD_METRICS_SOURCE = "SKAHA_POD_METRICS_SOURCE";
-
-    String SOURCE_KUBERNETES = "kubernetes";
-    String SOURCE_BACKEND = "backend";
-
     PodMetrics getPodMetrics(String userID, boolean omitHeadless) throws Exception;
 
-    static PodUsageProvider fromEnvironment() {
-        final String source = System.getenv(SKAHA_POD_METRICS_SOURCE);
-        if (SOURCE_BACKEND.equalsIgnoreCase(source)) {
-            return new MetricsBackendPodUsageProvider();
-        }
-        return new KubernetesPodUsageProvider(new PodMetricsDAO());
+    static PodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+        return metricsConfiguration.metricsBackEndUrl == null
+                ? KubernetesPodUsageProvider.fromConfiguration(metricsConfiguration)
+                : MetricsBackendPodUsageProvider.fromConfiguration(metricsConfiguration);
     }
 }
