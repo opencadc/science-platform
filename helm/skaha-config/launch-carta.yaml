@@ -58,6 +58,13 @@ spec:
           value: "6901"
         - name: CARTA_IDLE_TIMEOUT
           value: "100000"
+
+        # Increase the maximum headers size to 32KB to support the large number of headers required by the Carta session.
+        # This is an issue because local cookies will be sent to the server in the headers, and the default size is too small.
+        # 2026.06.26 jenkinsd
+        #
+        - name: UWS_HTTP_MAX_HEADERS_SIZE
+          value: "32768"
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
