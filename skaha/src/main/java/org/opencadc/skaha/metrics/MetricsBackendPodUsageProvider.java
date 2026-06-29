@@ -7,7 +7,7 @@ package org.opencadc.skaha.metrics;
  */
 final class MetricsBackendPodUsageProvider implements PodUsageProvider {
 
-    public static MetricsBackendPodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+    public static MetricsBackendPodUsageProvider fromConfiguration() {
         return new MetricsBackendPodUsageProvider();
     }
 
