@@ -14,7 +14,7 @@ final class KubernetesPodUsageProvider implements PodUsageProvider {
 
     private final Metrics metricsClient;
 
-    public static KubernetesPodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+    public static KubernetesPodUsageProvider fromConfiguration() {
         return new KubernetesPodUsageProvider(new Metrics(Configuration.getDefaultApiClient()));
     }
 
