@@ -11,7 +11,7 @@ interface PodUsageProvider {
 
     static PodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
         return metricsConfiguration.metricsBackEndUrl == null
-                ? KubernetesPodUsageProvider.fromConfiguration(metricsConfiguration)
-                : MetricsBackendPodUsageProvider.fromConfiguration(metricsConfiguration);
+                ? KubernetesPodUsageProvider.fromConfiguration()
+                : MetricsBackendPodUsageProvider.fromConfiguration();
     }
 }
