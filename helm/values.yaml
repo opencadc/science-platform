@@ -579,17 +579,17 @@ ingress:
   # -- Ingress path prefix routed to the Skaha API Service.
   path: /skaha
 
-# OpenTelemetry export is disabled unless skahaEnabled is true and otlpEndpoint is non-empty.
+# OpenTelemetry export is disabled unless the target service toggle is true and telemetry.otlp.destination is non-empty.
 telemetry:
-  # -- OTLP HTTP collector endpoint shared by Science Platform telemetry exporters. Required when telemetry.skahaEnabled is true.
-  otlpEndpoint: ""
-  # -- Export interval in seconds for Skaha Java-agent metrics.
-  exportIntervalSeconds: 60
-  # -- Enable the OpenTelemetry Java agent on the Skaha Tomcat container. Requires telemetry.otlpEndpoint.
-  skahaEnabled: false
-  metrics:
-    # -- OpenTelemetry service.name for the Skaha Tomcat workload.
-    skahaServiceName: canfar-skaha
+  # -- Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination.
+  controller: false
+  # -- Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version.
+  metrics: false
+  otlp:
+    # -- OTLP HTTP collector endpoint where enabled telemetry services POST metrics.
+    destination: ""
+    # -- Export interval in seconds for enabled telemetry services.
+    interval: 30
 
 # Optional science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:

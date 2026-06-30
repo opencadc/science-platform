@@ -47,10 +47,8 @@ spec:
       {{- $cspkRoot := (.Values.deployment.skaha.cookieSignaturePublicKey | default dict) }}
       {{- $cspkRef := ($cspkRoot.existingSecret | default dict) }}
       {{- $telemetry := .Values.telemetry | default dict }}
-      {{- $telemetryMetrics := $telemetry.metrics | default dict }}
-      {{- $telemetryEndpoint := trim (default "" $telemetry.otlpEndpoint | toString) }}
-      {{- $skahaTelemetryEnabled := and (default false $telemetry.skahaEnabled) $telemetryEndpoint }}
-      {{- $telemetryExportIntervalMillis := mul (int ($telemetry.exportIntervalSeconds | default 60)) 1000 }}
+      {{- $telemetryOtlp := $telemetry.otlp | default dict }}
+      {{- $telemetryEndpoint := trim (default "" $telemetryOtlp.destination | toString) }}
       {{- $cookiePubSecretName := trim (($cspkRef.name | default "") | toString) }}
       {{- $cookiePubMountPath := "" }}
       {{- if trim (($cspkRef.path | default "") | toString) }}
@@ -176,11 +174,11 @@ spec:
         {{- end }}
         - name: SKAHA_EXPERIMENTAL_FEATURE_GATES
           value: "{{ include "skaha.experimentalFeatureGates" $ }}"
-        {{- if $skahaTelemetryEnabled }}
+        {{- if and (default false $telemetry.controller) $telemetryEndpoint }}
         - name: CATALINA_OPTS
           value: "-javaagent:/opt/opentelemetry-javaagent/opentelemetry-javaagent.jar"
         - name: OTEL_SERVICE_NAME
-          value: {{ ($telemetryMetrics.skahaServiceName | default "canfar-skaha") | quote }}
+          value: "skaha-controller"
         - name: OTEL_METRICS_EXPORTER
           value: "otlp"
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -188,7 +186,7 @@ spec:
         - name: OTEL_EXPORTER_OTLP_PROTOCOL
           value: "http/protobuf"
         - name: OTEL_METRIC_EXPORT_INTERVAL
-          value: {{ $telemetryExportIntervalMillis | quote }}
+          value: {{ mul (int ($telemetryOtlp.interval | default 30)) 1000 | quote }}
         - name: OTEL_TRACES_EXPORTER
           value: "none"
         - name: OTEL_LOGS_EXPORTER

@@ -9,19 +9,7 @@ COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
-FROM base AS otel-javaagent
-ARG OTEL_JAVA_AGENT_VERSION=2.29.0
-ARG OTEL_JAVA_AGENT_SHA256=546531ca690a8603d2923b6db26bbda35c6409327b1e610430ae33c2f8f68050
-
-RUN set -eux \
-    && apk add --no-cache curl \
-    && mkdir -p /opt/opentelemetry-javaagent \
-    && curl --fail --location --show-error --silent \
-        --output /tmp/opentelemetry-javaagent.jar \
-        "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVA_AGENT_VERSION}/opentelemetry-javaagent.jar" \
-    && echo "${OTEL_JAVA_AGENT_SHA256}  /tmp/opentelemetry-javaagent.jar" | sha256sum --check --status \
-    && mv /tmp/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar \
-    && chmod 0444 /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
+FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0@sha256:3571c114fa43ca9ce1997ad50e695e601e1dfbfd3f8afde24f2ad00810a89ad2 AS otel-javaagent
 
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
 
@@ -38,5 +26,5 @@ RUN set -eux \
     # Clean up dnf cache and other unneeded files to reduce image size
     && dnf clean all
 
-COPY --from=otel-javaagent /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
+COPY --from=otel-javaagent /javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
 COPY --from=builder /src/skaha/build/libs/skaha.war /usr/share/tomcat/webapps/

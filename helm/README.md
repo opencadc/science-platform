@@ -107,10 +107,10 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | securityContext | object | `{}` | Optional Pod-level security context for the Skaha API Deployment. |
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
 | serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
-| telemetry.exportIntervalSeconds | int | `60` | Export interval in seconds for Skaha Java-agent metrics. |
-| telemetry.metrics.skahaServiceName | string | `"canfar-skaha"` | OpenTelemetry service.name for the Skaha Tomcat workload. |
-| telemetry.otlpEndpoint | string | `""` | OTLP HTTP collector endpoint shared by Science Platform telemetry exporters. Required when telemetry.skahaEnabled is true. |
-| telemetry.skahaEnabled | bool | `false` | Enable the OpenTelemetry Java agent on the Skaha Tomcat container. Requires telemetry.otlpEndpoint. |
+| telemetry.controller | bool | `false` | Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination. |
+| telemetry.metrics | bool | `false` | Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version. |
+| telemetry.otlp.destination | string | `""` | OTLP HTTP collector endpoint where enabled telemetry services POST metrics. |
+| telemetry.otlp.interval | int | `30` | Export interval in seconds for enabled telemetry services. |
 | tolerations | list | `[]` | Tolerations applied to the Skaha API Pod. |
 
 ## User storage (Cavern)
@@ -173,17 +173,17 @@ API specification: https://permissions.srcnet.skao.int/api/openapi.json
 
 ## Skaha OpenTelemetry
 
-Skaha OpenTelemetry is off by default. To enable v1 metrics export for the Tomcat workload, set both `telemetry.skahaEnabled: true` and `telemetry.otlpEndpoint` to the ops-provided OTLP HTTP collector endpoint.
+Skaha OpenTelemetry is off by default. To enable v1 metrics export for the Tomcat controller workload, set `telemetry.controller: true` and `telemetry.otlp.destination` to the ops-provided OTLP HTTP collector endpoint.
 
-When enabled, the chart attaches the image-bundled OpenTelemetry Java agent with `CATALINA_OPTS` and emits standard `OTEL_*` environment variables for metrics-only OTLP export. Traces and logs are explicitly disabled with `OTEL_TRACES_EXPORTER=none` and `OTEL_LOGS_EXPORTER=none`; v1 does not deploy a collector or add Prometheus scrape endpoints.
+When enabled, the chart attaches the image-bundled OpenTelemetry Java agent with `CATALINA_OPTS` and emits standard `OTEL_*` environment variables for metrics-only OTLP export. Skaha controller metrics always use `OTEL_SERVICE_NAME=skaha-controller`; `telemetry.metrics` is reserved for the future Python metrics backend name `skaha-metrics` and must remain false in this chart version. Traces and logs are explicitly disabled with `OTEL_TRACES_EXPORTER=none` and `OTEL_LOGS_EXPORTER=none`; v1 does not deploy a collector or add Prometheus scrape endpoints.
 
 ```yaml
 telemetry:
-  skahaEnabled: true
-  otlpEndpoint: "http://otel-collector.observability.svc.cluster.local:4318"
-  exportIntervalSeconds: 60
-  metrics:
-    skahaServiceName: canfar-skaha
+  controller: true
+  metrics: false
+  otlp:
+    destination: "http://otel-collector.observability.svc.cluster.local:4318"
+    interval: 30
 ```
 
 ## Harbor publishing (Science Platform CI)

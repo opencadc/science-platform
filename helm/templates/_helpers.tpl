@@ -226,14 +226,23 @@ OpenTelemetry validation for the Skaha Java agent.
 */}}
 {{- define "skaha.validateTelemetry" }}
 {{- $telemetry := .Values.telemetry | default dict -}}
-{{- $endpoint := trim (default "" $telemetry.otlpEndpoint | toString) -}}
-{{- if and (default false $telemetry.skahaEnabled) (not $endpoint) }}
-{{- fail "telemetry.skahaEnabled is true but telemetry.otlpEndpoint is empty." }}
+{{- $otlp := $telemetry.otlp | default dict -}}
+{{- $endpoint := trim (default "" $otlp.destination | toString) -}}
+{{- $controllerEnabled := default false $telemetry.controller -}}
+{{- $interval := trim ((default 30 $otlp.interval) | toString) -}}
+{{- if default false $telemetry.metrics }}
+{{- fail "telemetry.metrics is reserved for future skaha-metrics OpenTelemetry support and must remain false in this chart version." }}
 {{- end }}
-{{- if and (default false $telemetry.skahaEnabled) $endpoint }}
+{{- if and $controllerEnabled (not $endpoint) }}
+{{- fail "telemetry.controller is true but telemetry.otlp.destination is empty." }}
+{{- end }}
+{{- if and $controllerEnabled (not (regexMatch "^[1-9][0-9]*$" $interval)) }}
+{{- fail "telemetry.otlp.interval must be a positive integer number of seconds when telemetry.controller is true." }}
+{{- end }}
+{{- if and $controllerEnabled $endpoint }}
 {{- range $index, $env := (.Values.deployment.skaha.extraEnv | default list) }}
 {{- if eq (default "" $env.name | toString) "CATALINA_OPTS" }}
-{{- fail "deployment.skaha.extraEnv cannot set CATALINA_OPTS when telemetry.skahaEnabled is true; telemetry manages the OpenTelemetry Java agent CATALINA_OPTS." }}
+{{- fail "deployment.skaha.extraEnv cannot set CATALINA_OPTS when telemetry.controller is true; telemetry manages the OpenTelemetry Java agent CATALINA_OPTS." }}
 {{- end }}
 {{- end }}
 {{- end }}
