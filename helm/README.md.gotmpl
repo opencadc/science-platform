@@ -70,6 +70,21 @@ deployment:
 
 API specification: https://permissions.srcnet.skao.int/api/openapi.json
 
+## Skaha OpenTelemetry
+
+Skaha OpenTelemetry is off by default. To enable v1 metrics export for the Tomcat workload, set both `telemetry.skahaEnabled: true` and `telemetry.otlpEndpoint` to the ops-provided OTLP HTTP collector endpoint.
+
+When enabled, the chart attaches the image-bundled OpenTelemetry Java agent with `CATALINA_OPTS` and emits standard `OTEL_*` environment variables for metrics-only OTLP export. Traces and logs are explicitly disabled with `OTEL_TRACES_EXPORTER=none` and `OTEL_LOGS_EXPORTER=none`; v1 does not deploy a collector or add Prometheus scrape endpoints.
+
+```yaml
+telemetry:
+  skahaEnabled: true
+  otlpEndpoint: "http://otel-collector.observability.svc.cluster.local:4318"
+  exportIntervalSeconds: 60
+  metrics:
+    skahaServiceName: canfar-skaha
+```
+
 ## Harbor publishing (Science Platform CI)
 
 Successful Skaha image releases (`CD: Skaha Release Build`) also package this chart (`helm dependency build`, `helm package`) and upload the `.tgz` to Harbor via the **classic Helm chartrepo API**:

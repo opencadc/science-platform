@@ -222,6 +222,24 @@ Structural validation only; Skaha rejects conflicting modes at runtime.
 {{- end }}
 
 {{/*
+OpenTelemetry validation for the Skaha Java agent.
+*/}}
+{{- define "skaha.validateTelemetry" }}
+{{- $telemetry := .Values.telemetry | default dict -}}
+{{- $endpoint := trim (default "" $telemetry.otlpEndpoint | toString) -}}
+{{- if and (default false $telemetry.skahaEnabled) (not $endpoint) }}
+{{- fail "telemetry.skahaEnabled is true but telemetry.otlpEndpoint is empty." }}
+{{- end }}
+{{- if and (default false $telemetry.skahaEnabled) $endpoint }}
+{{- range $index, $env := (.Values.deployment.skaha.extraEnv | default list) }}
+{{- if eq (default "" $env.name | toString) "CATALINA_OPTS" }}
+{{- fail "deployment.skaha.extraEnv cannot set CATALINA_OPTS when telemetry.skahaEnabled is true; telemetry manages the OpenTelemetry Java agent CATALINA_OPTS." }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
 USER SESSION TEMPLATE DEFINITIONS
 */}}
 
