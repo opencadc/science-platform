@@ -9,6 +9,8 @@ COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
+FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0@sha256:3571c114fa43ca9ce1997ad50e695e601e1dfbfd3f8afde24f2ad00810a89ad2 AS otel-javaagent
+
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
 
 RUN set -eux \
@@ -24,4 +26,5 @@ RUN set -eux \
     # Clean up dnf cache and other unneeded files to reduce image size
     && dnf clean all
 
+COPY --from=otel-javaagent /javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
 COPY --from=builder /src/skaha/build/libs/skaha.war /usr/share/tomcat/webapps/

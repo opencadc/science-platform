@@ -579,6 +579,18 @@ ingress:
   # -- Ingress path prefix routed to the Skaha API Service.
   path: /skaha
 
+# OpenTelemetry export is disabled unless the target service toggle is true and telemetry.otlp.destination is non-empty.
+telemetry:
+  # -- Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination.
+  controller: false
+  # -- Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version.
+  metrics: false
+  otlp:
+    # -- OTLP HTTP collector endpoint where enabled telemetry services POST metrics.
+    destination: ""
+    # -- Export interval in seconds for enabled telemetry services.
+    interval: 30
+
 # Optional science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:
   # -- When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).

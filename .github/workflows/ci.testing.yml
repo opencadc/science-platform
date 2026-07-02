@@ -39,6 +39,12 @@ jobs:
         run: |
             cd skaha
             ./gradlew clean check --no-daemon
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.21.0
+      - name: Run Helm Render Tests
+        run: helm/tests/test-skaha-otel-render.sh
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
