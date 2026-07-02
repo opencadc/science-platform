@@ -1,6 +1,5 @@
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
@@ -76,17 +75,13 @@ class SessionBuilder {
         final Map<String, String> labels = jobMetadata.getLabels();
         Objects.requireNonNull(labels, "Invalid Job with null Labels");
 
-        final String sessionID = labels.get(CustomColumns.SESSION_ID.simpleName);
+        final String sessionID = labels.get(SessionLabels.Key.ID.label());
         final SessionBuilder sessionBuilder = new SessionBuilder(
-                sessionID, labels.get(CustomColumns.USERID.simpleName), labels.get(CustomColumns.TYPE.simpleName));
+                sessionID, labels.get(SessionLabels.Key.USERNAME.label()), labels.get(SessionLabels.Key.KIND.label()));
 
-        sessionBuilder.appID = labels.get(CustomColumns.APP_ID.simpleName);
-        sessionBuilder.name = labels.get(CustomColumns.NAME.simpleName);
-        final String flexLabelValue = labels.get(SessionJobBuilder.JOB_RESOURCE_FLEXIBLE_LABEL_KEY);
-
-        // Absence of flex is interpreted as fixed resources.  This allows the existing sessions to be treated as
-        // fixed.
-        sessionBuilder.isFixedResources = !StringUtil.hasText(flexLabelValue) || !Boolean.parseBoolean(flexLabelValue);
+        sessionBuilder.appID = labels.get(SessionLabels.Key.APP_ID.label());
+        sessionBuilder.name = labels.get(SessionLabels.Key.NAME.label());
+        sessionBuilder.isFixedResources = "fixed".equals(labels.get(SessionLabels.Key.FLAVOR.label()));
         sessionBuilder.jobName = jobMetadata.getName();
 
         return sessionBuilder
@@ -279,35 +274,5 @@ class SessionBuilder {
                 + activeExpirySeconds + ", connectURL='"
                 + connectURL + '\'' + ", jobName='"
                 + jobName + '\'' + '}';
-    }
-
-    enum CustomColumns {
-        SESSION_ID(".metadata.labels", "canfar-net-sessionID", false),
-        USERID(".metadata.labels", "canfar-net-userid", false),
-        RUN_AS_UID(".spec.securityContext", "runAsUser", false),
-        RUN_AS_GID(".spec.securityContext", "runAsGroup", false),
-        SUPPLEMENTAL_GROUPS(".spec.securityContext", "supplementalGroups", false),
-        IMAGE(".spec.containers[0]", "image", false),
-        TYPE(".metadata.labels", "canfar-net-sessionType", false),
-        STATUS(".status", "phase", false),
-        NAME(".metadata.labels", "canfar-net-sessionName", false),
-        STARTED(".status", "startTime", false),
-        DELETION(".metadata", "deletionTimestamp", false),
-        APP_ID(".metadata.labels", "canfar-net-appID", false),
-        REQUESTED_RAM(".spec.containers[0].resources.requests", "memory", true),
-        REQUESTED_CPU(".spec.containers[0].resources.requests", "cpu", true),
-        REQUESTED_GPU(".spec.containers[0].resources.requests", "nvidia\\.com/gpu", true),
-        FULL_NAME(".metadata", "name", true),
-        UID(".metadata.ownerReferences[]", "uid", true);
-
-        final String selectorPrefix;
-        final String simpleName;
-        final boolean forUserOnly;
-
-        CustomColumns(String selectorPrefix, String simpleName, boolean forUserOnly) {
-            this.selectorPrefix = selectorPrefix;
-            this.simpleName = simpleName;
-            this.forUserOnly = forUserOnly;
-        }
     }
 }

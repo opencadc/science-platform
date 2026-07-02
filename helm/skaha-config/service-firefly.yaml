@@ -18,5 +18,3 @@ spec:
   - port: 8080
     protocol: TCP
     name: firefly-port
-  selector:
-    canfar-net-sessionID: ${skaha.sessionid}

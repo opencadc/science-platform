@@ -1,7 +1,6 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
@@ -9,7 +8,6 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Status;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +22,6 @@ import org.opencadc.skaha.metrics.PodResourceUsage;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
-
-    private static final String SESSION_ID_LABEL = "canfar-net-sessionID";
-    private static final String DESKTOP_APP_ID_LABEL = "canfar-net-appID";
-    private static final String USER_ID_LABEL = "canfar-net-userid";
-    private static final String SESSION_TYPE_LABEL = "canfar-net-sessionType";
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
         final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
@@ -52,15 +45,9 @@ public class SessionDAO {
 
         final ApiClient client = Configuration.getDefaultApiClient();
         final BatchV1Api api = new BatchV1Api(client);
-        final List<String> labelsSelector = new ArrayList<>();
-
-        labelsSelector.add(String.format("%s=%s", SESSION_ID_LABEL, sessionID));
-        labelsSelector.add(String.format("%s=%s", USER_ID_LABEL, username));
-        labelsSelector.add(String.format("%s=%s", DESKTOP_APP_ID_LABEL, appID));
-        labelsSelector.add(String.format("%s=%s", SESSION_TYPE_LABEL, SessionType.DESKTOP_APP.applicationName));
 
         final V1Status status = api.deleteCollectionNamespacedJob(K8SUtil.getWorkloadNamespace())
-                .labelSelector(String.join(",", labelsSelector))
+                .labelSelector(buildDesktopApplicationLabelSelector(sessionID, username, appID))
                 .propagationPolicy("Background")
                 .execute();
 
@@ -86,14 +73,9 @@ public class SessionDAO {
 
         final ApiClient client = Configuration.getDefaultApiClient();
         final BatchV1Api api = new BatchV1Api(client);
-        final List<String> labelsSelector = new ArrayList<>();
-
-        labelsSelector.add(String.format("%s=%s", SESSION_ID_LABEL, sessionID));
-        labelsSelector.add(String.format("%s=%s", USER_ID_LABEL, username));
-        labelsSelector.add(String.format("%s!=%s", SESSION_TYPE_LABEL, SessionType.DESKTOP_APP.applicationName));
 
         final V1Status status = api.deleteCollectionNamespacedJob(K8SUtil.getWorkloadNamespace())
-                .labelSelector(String.join(",", labelsSelector))
+                .labelSelector(SessionLabels.forSessionExceptDesktopApp(username, sessionID))
                 .propagationPolicy("Background")
                 .execute();
 
@@ -129,34 +111,20 @@ public class SessionDAO {
         return new KubernetesJob(
                 jobName,
                 jobMetadata.getUid(),
-                labels.get(SessionDAO.SESSION_ID_LABEL),
-                SessionType.fromApplicationStringType(Objects.requireNonNullElse(
-                        labels.get(SessionDAO.SESSION_TYPE_LABEL), SessionType.HEADLESS.applicationName)));
+                labels.get(SessionLabels.Key.ID.label()),
+                SessionType.fromApplicationStringType(
+                        Objects.requireNonNull(labels.get(SessionLabels.Key.KIND.label()))));
     }
 
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
             throws Exception {
         final ApiClient client = Configuration.getDefaultApiClient();
 
-        final List<String> labelSelectors = new ArrayList<>();
-        if (omitHeadless) {
-            labelSelectors.add(
-                    String.format("%s!=%s", SessionDAO.SESSION_TYPE_LABEL, SessionAction.SESSION_TYPE_HEADLESS));
-        }
-
-        if (StringUtil.hasLength(sessionID)) {
-            labelSelectors.add(String.format("%s=%s", SessionDAO.SESSION_ID_LABEL, sessionID));
-        }
-
         final BatchV1Api api = new BatchV1Api(client);
         final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
                 api.listNamespacedJob(K8SUtil.getWorkloadNamespace());
 
-        if (StringUtil.hasLength(forUserID)) {
-            labelSelectors.add("canfar-net-userid=" + forUserID);
-        }
-
-        final String labelSelector = String.join(",", labelSelectors);
+        final String labelSelector = buildUserSessionLabelSelector(forUserID, sessionID, omitHeadless);
         jobListRequest.labelSelector(labelSelector);
 
         final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless);
@@ -169,6 +137,16 @@ public class SessionDAO {
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
                 + " after filtering.");
         return sessions;
+    }
+
+    static String buildUserSessionLabelSelector(
+            final String forUserID, final String sessionID, final boolean omitHeadless) {
+        return SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless);
+    }
+
+    static String buildDesktopApplicationLabelSelector(
+            final String sessionID, final String username, final String appID) {
+        return SessionLabels.forDesktopApp(sessionID, username, appID);
     }
 
     static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {

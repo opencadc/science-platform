@@ -170,7 +170,7 @@ public abstract class SessionAction extends SkahaAction {
         KubectlCommandBuilder.KubectlCommand getPodCmd = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label(buildSessionLabelSelector(forUserID, sessionID))
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name");
 
@@ -210,7 +210,7 @@ public abstract class SessionAction extends SkahaAction {
 
         KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label(buildSessionLabelSelector(forUserID, sessionID))
                 .option("--tail", "-1");
 
         CommandExecutioner.execute(getLogsCmd.build(), out);
@@ -265,11 +265,15 @@ public abstract class SessionAction extends SkahaAction {
         KubectlCommandBuilder.KubectlCommand getSessionJobCmd = KubectlCommandBuilder.command("get")
                 .namespace(k8sNamespace)
                 .job()
-                .label("canfar-net-userid=" + forUserID)
+                .label(SessionLabels.forUser(forUserID))
                 .noHeaders()
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
 
         return getSessionJobCmd.build();
+    }
+
+    protected static String buildSessionLabelSelector(final String forUserID, final String sessionID) {
+        return SessionLabels.forSession(forUserID, sessionID);
     }
 
     /**

@@ -318,7 +318,7 @@ public class PostAction extends SessionAction {
         KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .job()
-                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label(buildSessionLabelSelector(forUserID, sessionID))
                 .noHeaders()
                 .outputFormat(
                         "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
@@ -492,6 +492,7 @@ public class PostAction extends SessionAction {
         }
 
         String jobLaunchString = sessionJobBuilder.build();
+        final Map<String, String> serviceMetadataLabels = SessionLabelApplicator.metadataLabelsFromJob(jobLaunchString);
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
@@ -518,6 +519,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            serviceString = SessionLabelApplicator.mergeServiceLabelsAndSelector(serviceString, serviceMetadataLabels);
             final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
 
             log.debug("Create service result: " + createServiceResult);
@@ -533,6 +535,7 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString = SessionLabelApplicator.mergeYamlMetadataLabels(ingressString, serviceMetadataLabels);
             final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
 
             log.debug("Create ingress result: " + createIngressResult);
@@ -604,10 +607,11 @@ public class PostAction extends SessionAction {
         KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .selector("canfar-net-sessionID=" + sessionID)
+                .selector(SessionLabels.forSession(posixPrincipal.username, sessionID))
                 .noHeaders()
                 .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,"
-                        + "TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name");
+                        + "TYPE:.metadata.labels." + SessionLabels.jsonPath(SessionLabels.Key.KIND)
+                        + ",NAME:.metadata.name");
 
         String ipResult = CommandExecutioner.execute(getIPCommand.build());
 

@@ -18,5 +18,3 @@ spec:
   - port: 8888
     protocol: TCP
     name: notebook-port
-  selector:
-    canfar-net-sessionID: ${skaha.sessionid}

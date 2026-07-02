@@ -2,11 +2,6 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  labels:
-    canfar-net-sessionID: "${skaha.sessionid}"
-    canfar-net-sessionType: "${skaha.sessiontype}"
-    canfar-net-appID: "${software.appid}"
-    canfar-net-userid: "${skaha.userid}"
   name: "${software.jobname}"
   ownerReferences:
   - apiVersion: batch/v1
@@ -23,13 +18,6 @@ spec:
   activeDeadlineSeconds: ${skaha.sessionexpiry}
   ttlSecondsAfterFinished: 86400
   template:
-    metadata:
-      labels:
-        canfar-net-sessionID: "${skaha.sessionid}"
-        canfar-net-appID: "${software.appid}"
-        canfar-net-sessionType: "${skaha.sessiontype}"
-        canfar-net-userid: "${skaha.userid}"
-        job-name: "${software.jobname}"
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false

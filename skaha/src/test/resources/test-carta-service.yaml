@@ -21,5 +21,3 @@ spec:
     - port: 5901
       protocol: TCP
       name: socket-connection
-  selector:
-    canfar-net-sessionID: ${skaha.sessionid}

@@ -80,6 +80,7 @@ import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
     private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
+    private static final String SKAHA_VERSION_ENV = "SKAHA_VERSION";
 
     static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
 
@@ -98,6 +99,10 @@ public class K8SUtil {
 
     public static String getSkahaHostName() {
         return System.getenv("SKAHA_HOSTNAME");
+    }
+
+    public static String getSkahaVersion() {
+        return System.getenv(K8SUtil.SKAHA_VERSION_ENV);
     }
 
     public static String getWorkloadNamespace() {
