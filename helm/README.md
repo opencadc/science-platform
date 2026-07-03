@@ -2,9 +2,9 @@
 
 A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
-|                 Chart                 | AppVersion | Type |
-|:-------------------------------------:|:----------:|:----:|
-|1.6.0<!-- x-release-please-version --> | 1.3.0 | application |
+| Chart | AppVersion | Type |
+|:-----:|:----------:|:----:|
+|1.6.1-rc.1<!-- x-release-please-version --> | 1.3.1 | application |
 
 ## Requirements
 
@@ -20,16 +20,18 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | autoscaling.maxReplicas | int | `6` | Maximum number of skaha-tomcat replicas. |
 | autoscaling.minReplicas | int | `2` | Minimum number of skaha-tomcat replicas. |
 | deployment.hostname | string | `"myhost.example.com"` | Public hostname for the Skaha API. |
+| deployment.skaha.annotations | object | `{}` | Annotations added to the Skaha API Deployment metadata. |
 | deployment.skaha.apiVersion | string | `"v1"` | Skaha API version path segment (for example, `v1` -> `/skaha/v1/...`). |
 | deployment.skaha.cookieSignaturePublicKey.existingSecret.name | string | `""` |  |
 | deployment.skaha.cookieSignaturePublicKey.existingSecret.path | string | `""` |  |
 | deployment.skaha.defaultQuotaGB | string | `"10"` | Default user storage quota in GiB for first-time users. |
 | deployment.skaha.identityManagerClass | string | `"org.opencadc.auth.StandardIdentityManager"` | Java IdentityManager implementation used for authentication. |
-| deployment.skaha.image | string | `"images.opencadc.org/platform/skaha:1.3.0"` | Container image for the Skaha API service. |
+| deployment.skaha.image | string | `"images.opencadc.org/platform/skaha:1.3.1"` | Container image for the Skaha API service. |
 | deployment.skaha.imageCache.refreshSchedule | string | `"*/30 * * * *"` | Cron schedule used to refresh cached images. |
 | deployment.skaha.imagePullPolicy | string | `"Always"` | Image pull policy for the Skaha API container. |
 | deployment.skaha.init.image | string | `"busybox:1.37.0"` | Init container image used to bootstrap user storage paths. |
 | deployment.skaha.init.imagePullPolicy | string | `"IfNotPresent"` | Image pull policy for the bootstrap init container. |
+| deployment.skaha.podAnnotations | object | `{}` | Annotations added to the Skaha API Pod template metadata. |
 | deployment.skaha.posixMapperCacheTTLSeconds | string | `"86400"` | TTL in seconds for cached POSIX mapper entries. |
 | deployment.skaha.registryHosts | string | `"images.canfar.net"` | Space-delimited list of image registry hosts allowed for sessions. |
 | deployment.skaha.resources.limits.cpu | string | `"2000m"` | CPU limit for the Skaha API container. |
@@ -105,6 +107,10 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | securityContext | object | `{}` | Optional Pod-level security context for the Skaha API Deployment. |
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
 | serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
+| telemetry.controller | bool | `false` | Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination. |
+| telemetry.metrics | bool | `false` | Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version. |
+| telemetry.otlp.destination | string | `""` | OTLP HTTP collector endpoint where enabled telemetry services POST metrics. |
+| telemetry.otlp.interval | int | `30` | Export interval in seconds for enabled telemetry services. |
 | tolerations | list | `[]` | Tolerations applied to the Skaha API Pod. |
 
 ## User storage (Cavern)
@@ -164,6 +170,21 @@ deployment:
 ```
 
 API specification: https://permissions.srcnet.skao.int/api/openapi.json
+
+## Skaha OpenTelemetry
+
+Skaha OpenTelemetry is off by default. To enable v1 metrics export for the Tomcat controller workload, set `telemetry.controller: true` and `telemetry.otlp.destination` to the ops-provided OTLP HTTP collector endpoint.
+
+When enabled, the chart attaches the image-bundled OpenTelemetry Java agent with `CATALINA_OPTS` and emits standard `OTEL_*` environment variables for metrics-only OTLP export. Skaha controller metrics always use `OTEL_SERVICE_NAME=skaha-controller`; `telemetry.metrics` is reserved for the future Python metrics backend name `skaha-metrics` and must remain false in this chart version. Traces and logs are explicitly disabled with `OTEL_TRACES_EXPORTER=none` and `OTEL_LOGS_EXPORTER=none`; v1 does not deploy a collector or add Prometheus scrape endpoints.
+
+```yaml
+telemetry:
+  controller: true
+  metrics: false
+  otlp:
+    destination: "http://otel-collector.observability.svc.cluster.local:4318"
+    interval: 30
+```
 
 ## Harbor publishing (Science Platform CI)
 

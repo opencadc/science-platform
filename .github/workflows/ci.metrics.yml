@@ -74,7 +74,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Cache Helm data
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .ci-helm-cache
           key: metrics-kind-helm-${{ runner.os }}-kueue-${{ env.KUEUE_CHART_VERSION }}-${{ hashFiles('.github/workflows/ci.metrics.yml') }}
@@ -110,7 +110,7 @@ jobs:
           cluster_name: metrics
           wait: 120s
       - name: Build Metrics image (cache-enabled)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: ./metrics
           file: ./metrics/Dockerfile
