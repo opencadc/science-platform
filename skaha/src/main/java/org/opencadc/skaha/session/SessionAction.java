@@ -170,7 +170,7 @@ public abstract class SessionAction extends SkahaAction {
         KubectlCommandBuilder.KubectlCommand getPodCmd = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .label(buildSessionLabelSelector(forUserID, sessionID))
+                .label(SessionLabels.forSession(forUserID, sessionID))
                 .noHeaders()
                 .outputFormat("custom-columns=NAME:.metadata.name");
 
@@ -210,7 +210,7 @@ public abstract class SessionAction extends SkahaAction {
 
         KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .label(buildSessionLabelSelector(forUserID, sessionID))
+                .label(SessionLabels.forSession(forUserID, sessionID))
                 .option("--tail", "-1");
 
         CommandExecutioner.execute(getLogsCmd.build(), out);
@@ -270,17 +270,6 @@ public abstract class SessionAction extends SkahaAction {
                 .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
 
         return getSessionJobCmd.build();
-    }
-
-    /**
-     * Build the canonical selector for kubectl operations scoped to one session.
-     *
-     * @param forUserID session owner
-     * @param sessionID session identifier
-     * @return comma-separated Kubernetes label selector
-     */
-    protected static String buildSessionLabelSelector(final String forUserID, final String sessionID) {
-        return SessionLabels.forSession(forUserID, sessionID);
     }
 
     /**

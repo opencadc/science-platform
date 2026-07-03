@@ -47,7 +47,7 @@ public class SessionDAO {
         final BatchV1Api api = new BatchV1Api(client);
 
         final V1Status status = api.deleteCollectionNamespacedJob(K8SUtil.getWorkloadNamespace())
-                .labelSelector(buildDesktopApplicationLabelSelector(sessionID, username, appID))
+                .labelSelector(SessionLabels.forDesktopApp(sessionID, username, appID))
                 .propagationPolicy("Background")
                 .execute();
 
@@ -108,12 +108,13 @@ public class SessionDAO {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
 
+        final SessionLabels.SessionMetadata sessionMetadata = SessionLabels.fromMetadata(labels);
+
         return new KubernetesJob(
                 jobName,
                 jobMetadata.getUid(),
-                labels.get(SessionLabels.Key.ID.label()),
-                SessionType.fromApplicationStringType(
-                        Objects.requireNonNull(labels.get(SessionLabels.Key.KIND.label()))));
+                sessionMetadata.id(),
+                SessionType.fromApplicationStringType(sessionMetadata.kind()));
     }
 
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
@@ -124,7 +125,7 @@ public class SessionDAO {
         final BatchV1Api.APIlistNamespacedJobRequest jobListRequest =
                 api.listNamespacedJob(K8SUtil.getWorkloadNamespace());
 
-        final String labelSelector = buildUserSessionLabelSelector(forUserID, sessionID, omitHeadless);
+        final String labelSelector = SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless);
         jobListRequest.labelSelector(labelSelector);
 
         final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless);
@@ -137,32 +138,6 @@ public class SessionDAO {
         LOGGER.debug("Found " + sessions.size() + " sessions for user " + forUserID + " with selector " + labelSelector
                 + " after filtering.");
         return sessions;
-    }
-
-    /**
-     * Build the canonical selector used to list jobs that back sessions.
-     *
-     * @param forUserID session owner, or blank to include all users
-     * @param sessionID session identifier, or blank to include all sessions
-     * @param omitHeadless true to exclude headless sessions
-     * @return comma-separated Kubernetes label selector
-     */
-    static String buildUserSessionLabelSelector(
-            final String forUserID, final String sessionID, final boolean omitHeadless) {
-        return SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless);
-    }
-
-    /**
-     * Build the canonical selector used to delete a desktop application job.
-     *
-     * @param sessionID parent session identifier
-     * @param username session owner
-     * @param appID desktop application identifier
-     * @return comma-separated Kubernetes label selector
-     */
-    static String buildDesktopApplicationLabelSelector(
-            final String sessionID, final String username, final String appID) {
-        return SessionLabels.forDesktopApp(sessionID, username, appID);
     }
 
     static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {

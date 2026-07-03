@@ -23,9 +23,6 @@ import org.opencadc.skaha.K8SUtil;
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
 
-    static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
-    static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
-
     /** Configuration for the queue to use. */
     private final Map<String, String> parameters = new HashMap<>();
 
@@ -166,30 +163,40 @@ public class SessionJobBuilder {
      * @throws IOException If the provided Path cannot be read.
      */
     String build() throws IOException {
+        return buildManifest().job();
+    }
+
+    /**
+     * Construct the launch manifest output of this builder.
+     *
+     * @return SessionLaunchManifest instance. Never null.
+     * @throws IOException If the provided Path cannot be read.
+     */
+    SessionLaunchManifest buildManifest() throws IOException {
         final byte[] jobFileBytes = Files.readAllBytes(jobFilePath);
         String jobFileString = new String(jobFileBytes, StandardCharsets.UTF_8);
         for (final Map.Entry<String, String> entry : this.parameters.entrySet()) {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return buildJob(jobFileString);
+        return buildManifest(jobFileString);
     }
 
     /**
      * Build and mutate a Job from a rendered YAML template.
      *
      * @param jobFileString rendered Kubernetes Job YAML
-     * @return rendered Kubernetes Job YAML after Skaha-managed mutations
+     * @return launch manifest after Skaha-managed mutations
      * @throws IOException when the YAML cannot be parsed as a Kubernetes Job
      */
-    private String buildJob(final String jobFileString) throws IOException {
+    private SessionLaunchManifest buildManifest(final String jobFileString) throws IOException {
         final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
         mergeSessionLabels(launchJob);
         mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
 
-        return Yaml.dump(launchJob);
+        return SessionLaunchManifest.fromJob(launchJob);
     }
 
     /**

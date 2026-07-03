@@ -37,17 +37,6 @@ public class SessionLabelsTest {
     }
 
     @Test
-    public void selectorUsesCanonicalLabelsOnly() {
-        final String selector = SessionLabels.selector(
-                SessionLabels.labelEquals(SessionLabels.Key.ID, "session-123"),
-                SessionLabels.labelEquals(SessionLabels.Key.USERNAME, "alice"),
-                SessionLabels.labelNotEquals(SessionLabels.Key.KIND, "desktop-app"));
-
-        Assert.assertEquals(
-                "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/kind!=desktop-app", selector);
-    }
-
-    @Test
     public void selectorHelpersUseCanonicalLabelsOnly() {
         Assert.assertEquals(
                 "canfar.net/id=session-123,canfar.net/username=alice",
@@ -59,7 +48,7 @@ public class SessionLabelsTest {
         Assert.assertEquals(
                 "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/app-id=app-123,canfar.net/kind=desktop-app",
                 SessionLabels.forDesktopApp("session-123", "alice", "app-123"));
-        Assert.assertEquals("canfar\\.net/kind", SessionLabels.jsonPath(SessionLabels.Key.KIND));
+        Assert.assertEquals("canfar\\.net/kind", SessionLabels.sessionKindJsonPath());
     }
 
     @Test

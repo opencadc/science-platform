@@ -21,6 +21,8 @@ public final class SessionLabels {
     private static final String FLAVOR_FLEXIBLE = "flexible";
     private static final String HEADLESS = "headless";
     private static final String DESKTOP_APP = "desktop-app";
+    private static final String KUEUE_QUEUE_NAME = "kueue.x-k8s.io/queue-name";
+    private static final String KUEUE_PRIORITY_CLASS = "kueue.x-k8s.io/priority-class";
     private static final Pattern KUBERNETES_LABEL_VALUE = Pattern.compile("[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?");
 
     private SessionLabels() {}
@@ -61,7 +63,7 @@ public final class SessionLabels {
                 throw new IllegalArgumentException(Key.VERSION.label + " is derived from SKAHA_VERSION");
             }
 
-            labels.put(key.label, validateLabelValue(key.label, value));
+            labels.put(key.label, validateCanonicalLabelValue(key, value));
         }
 
         labels.putIfAbsent(Key.ACCELERATOR.label, ACCELERATOR_NONE);
@@ -72,18 +74,18 @@ public final class SessionLabels {
     }
 
     /**
-     * Build the labels consumed by Kueue.
+     * Build validated Kueue labels for a Job.
      *
-     * @param queueName local queue name for the job
-     * @param priorityClass priority class for the queued job
-     * @return immutable Kubernetes label map for Kueue
+     * @param queueName local queue name
+     * @param priorityClass priority class name
+     * @return immutable Kueue label map
      */
-    public static Map<String, String> kueue(final String queueName, final String priorityClass) {
+    static Map<String, String> kueue(final String queueName, final String priorityClass) {
         return Map.of(
-                "kueue.x-k8s.io/queue-name",
-                validateLabelValue("kueue.x-k8s.io/queue-name", queueName),
-                "kueue.x-k8s.io/priority-class",
-                validateLabelValue("kueue.x-k8s.io/priority-class", priorityClass));
+                KUEUE_QUEUE_NAME,
+                validateLabelValue(KUEUE_QUEUE_NAME, queueName),
+                KUEUE_PRIORITY_CLASS,
+                validateLabelValue(KUEUE_PRIORITY_CLASS, priorityClass));
     }
 
     /**
@@ -124,7 +126,7 @@ public final class SessionLabels {
             requirements.add(labelEquals(Key.USERNAME, username));
         }
         if (omitHeadless) {
-            requirements.add(withoutHeadless());
+            requirements.add(labelNotEquals(Key.KIND, HEADLESS));
         }
         return selector(requirements.toArray(new LabelSelectorRequirement[0]));
     }
@@ -160,66 +162,22 @@ public final class SessionLabels {
     }
 
     /**
-     * Build a selector requirement that excludes headless sessions.
+     * Escape the session kind label for kubectl JSONPath and custom-column usage.
      *
-     * @return selector requirement for non-headless sessions
+     * @return escaped session kind label path
      */
-    public static LabelSelectorRequirement withoutHeadless() {
-        return labelNotEquals(Key.KIND, HEADLESS);
+    static String sessionKindJsonPath() {
+        return jsonPath(Key.KIND);
     }
 
     /**
-     * Build an equality selector requirement for a canonical label key.
+     * Read canonical session metadata from Kubernetes labels.
      *
-     * @param key canonical label key
-     * @param value expected label value
-     * @return selector requirement using the {@code =} operator
+     * @param labels Kubernetes metadata labels
+     * @return session metadata view
      */
-    public static LabelSelectorRequirement labelEquals(final Key key, final String value) {
-        return new LabelSelectorRequirement(key, "=", value);
-    }
-
-    /**
-     * Build an inequality selector requirement for a canonical label key.
-     *
-     * @param key canonical label key
-     * @param value rejected label value
-     * @return selector requirement using the {@code !=} operator
-     */
-    public static LabelSelectorRequirement labelNotEquals(final Key key, final String value) {
-        return new LabelSelectorRequirement(key, "!=", value);
-    }
-
-    /**
-     * Join selector requirements into Kubernetes selector syntax.
-     *
-     * @param requirements selector requirements to join
-     * @return comma-separated Kubernetes label selector
-     */
-    public static String selector(final LabelSelectorRequirement... requirements) {
-        Objects.requireNonNull(requirements, "requirements cannot be null");
-
-        final StringBuilder selector = new StringBuilder();
-
-        for (final LabelSelectorRequirement requirement : requirements) {
-            Objects.requireNonNull(requirement, "label selector requirement cannot be null");
-            if (!selector.isEmpty()) {
-                selector.append(',');
-            }
-            selector.append(requirement.format());
-        }
-
-        return selector.toString();
-    }
-
-    /**
-     * Escape a canonical label key for kubectl JSONPath and custom-column usage.
-     *
-     * @param key canonical label key
-     * @return label path with dots escaped
-     */
-    public static String jsonPath(final Key key) {
-        return Objects.requireNonNull(key, "key cannot be null").label.replace(".", "\\.");
+    static SessionMetadata fromMetadata(final Map<String, String> labels) {
+        return new SessionMetadata(labels);
     }
 
     /**
@@ -232,6 +190,32 @@ public final class SessionLabels {
         return validateLabelValue(Key.VERSION.label, value);
     }
 
+    private static LabelSelectorRequirement labelEquals(final Key key, final String value) {
+        return new LabelSelectorRequirement(key, "=", value);
+    }
+
+    private static LabelSelectorRequirement labelNotEquals(final Key key, final String value) {
+        return new LabelSelectorRequirement(key, "!=", value);
+    }
+
+    private static String selector(final LabelSelectorRequirement... requirements) {
+        Objects.requireNonNull(requirements, "requirements cannot be null");
+
+        final StringBuilder selector = new StringBuilder();
+        for (final LabelSelectorRequirement requirement : requirements) {
+            Objects.requireNonNull(requirement, "label selector requirement cannot be null");
+            if (!selector.isEmpty()) {
+                selector.append(',');
+            }
+            selector.append(requirement.format());
+        }
+        return selector.toString();
+    }
+
+    private static String jsonPath(final Key key) {
+        return Objects.requireNonNull(key, "key cannot be null").label.replace(".", "\\.");
+    }
+
     private static boolean hasText(final String value) {
         return value != null && !value.isBlank();
     }
@@ -240,27 +224,43 @@ public final class SessionLabels {
         if (value == null || value.isBlank()) {
             return DEFAULT_SCOPE;
         }
-
         return validateLabelValue(label, value);
+    }
+
+    private static String validateCanonicalLabelValue(final Key key, final String value) {
+        if (Key.NAME == key) {
+            return validateLabelValue(key.label, truncateLabelValue(key.label, value));
+        }
+
+        return validateLabelValue(key.label, value);
+    }
+
+    private static String truncateLabelValue(final String label, final String value) {
+        if (value == null) {
+            throw new IllegalArgumentException(label + " label value cannot be null");
+        }
+
+        String candidate = value.length() > 63 ? value.substring(0, 63) : value;
+        while (!candidate.isEmpty()
+                && !KUBERNETES_LABEL_VALUE.matcher(candidate).matches()) {
+            candidate = candidate.substring(0, candidate.length() - 1);
+        }
+        return candidate;
     }
 
     private static String validateLabelValue(final String label, final String value) {
         if (value == null) {
             throw new IllegalArgumentException(label + " label value cannot be null");
         }
-
         if (value.isBlank()) {
             throw new IllegalArgumentException(label + " label value cannot be blank");
         }
-
         if (value.length() > 63) {
             throw new IllegalArgumentException(label + " label value exceeds 63 characters");
         }
-
         if (!KUBERNETES_LABEL_VALUE.matcher(value).matches()) {
             throw new IllegalArgumentException(label + " label value must match Kubernetes label value syntax");
         }
-
         return value;
     }
 
@@ -276,8 +276,7 @@ public final class SessionLabels {
         }
     }
 
-    /** Canonical label keys used by Skaha session jobs, services, ingresses, and selectors. */
-    public enum Key {
+    enum Key {
         COMMUNITY("canfar.net/community"),
         PROJECT("canfar.net/project"),
         ID("canfar.net/id"),
@@ -298,18 +297,49 @@ public final class SessionLabels {
             this.label = label;
         }
 
-        /**
-         * Return the Kubernetes label key.
-         *
-         * @return label key string
-         */
-        public String label() {
+        String label() {
             return this.label;
         }
     }
 
-    /** One Kubernetes label selector requirement using a canonical key. */
-    public static final class LabelSelectorRequirement {
+    /** Canonical session metadata read from Kubernetes labels. */
+    static final class SessionMetadata {
+        private final Map<String, String> labels;
+
+        private SessionMetadata(final Map<String, String> labels) {
+            this.labels = Map.copyOf(Objects.requireNonNull(labels, "labels cannot be null"));
+        }
+
+        String id() {
+            return required(Key.ID);
+        }
+
+        String username() {
+            return required(Key.USERNAME);
+        }
+
+        String kind() {
+            return required(Key.KIND);
+        }
+
+        String name() {
+            return labels.get(Key.NAME.label);
+        }
+
+        String appID() {
+            return labels.get(Key.APP_ID.label);
+        }
+
+        boolean fixedResources() {
+            return FLAVOR_FIXED.equals(labels.get(Key.FLAVOR.label));
+        }
+
+        private String required(final Key key) {
+            return Objects.requireNonNull(labels.get(key.label), key.label + " label is required");
+        }
+    }
+
+    private static final class LabelSelectorRequirement {
         private final Key key;
         private final String operator;
         private final String value;
@@ -320,11 +350,6 @@ public final class SessionLabels {
             this.value = validateLabelValue(key.label, value);
         }
 
-        /**
-         * Format the requirement for Kubernetes label selector syntax.
-         *
-         * @return formatted selector requirement
-         */
         private String format() {
             return key.label + operator + value;
         }

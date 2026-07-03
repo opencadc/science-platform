@@ -75,13 +75,13 @@ class SessionBuilder {
         final Map<String, String> labels = jobMetadata.getLabels();
         Objects.requireNonNull(labels, "Invalid Job with null Labels");
 
-        final String sessionID = labels.get(SessionLabels.Key.ID.label());
-        final SessionBuilder sessionBuilder = new SessionBuilder(
-                sessionID, labels.get(SessionLabels.Key.USERNAME.label()), labels.get(SessionLabels.Key.KIND.label()));
+        final SessionLabels.SessionMetadata sessionMetadata = SessionLabels.fromMetadata(labels);
+        final SessionBuilder sessionBuilder =
+                new SessionBuilder(sessionMetadata.id(), sessionMetadata.username(), sessionMetadata.kind());
 
-        sessionBuilder.appID = labels.get(SessionLabels.Key.APP_ID.label());
-        sessionBuilder.name = labels.get(SessionLabels.Key.NAME.label());
-        sessionBuilder.isFixedResources = "fixed".equals(labels.get(SessionLabels.Key.FLAVOR.label()));
+        sessionBuilder.appID = sessionMetadata.appID();
+        sessionBuilder.name = sessionMetadata.name();
+        sessionBuilder.isFixedResources = sessionMetadata.fixedResources();
         sessionBuilder.jobName = jobMetadata.getName();
 
         return sessionBuilder
