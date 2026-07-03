@@ -139,11 +139,27 @@ public class SessionDAO {
         return sessions;
     }
 
+    /**
+     * Build the canonical selector used to list jobs that back sessions.
+     *
+     * @param forUserID session owner, or blank to include all users
+     * @param sessionID session identifier, or blank to include all sessions
+     * @param omitHeadless true to exclude headless sessions
+     * @return comma-separated Kubernetes label selector
+     */
     static String buildUserSessionLabelSelector(
             final String forUserID, final String sessionID, final boolean omitHeadless) {
         return SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless);
     }
 
+    /**
+     * Build the canonical selector used to delete a desktop application job.
+     *
+     * @param sessionID parent session identifier
+     * @param username session owner
+     * @param appID desktop application identifier
+     * @return comma-separated Kubernetes label selector
+     */
     static String buildDesktopApplicationLabelSelector(
             final String sessionID, final String username, final String appID) {
         return SessionLabels.forDesktopApp(sessionID, username, appID);

@@ -51,6 +51,12 @@ public class SessionJobBuilder {
         return new SessionJobBuilder(jobFilePath);
     }
 
+    /**
+     * Obtain a mutable Job metadata label map.
+     *
+     * @param job Kubernetes Job to mutate
+     * @return mutable label map attached to the Job metadata
+     */
     @NotNull private static Map<String, String> getOrCreateJobLabels(V1Job job) {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(jobMetadata.getLabels(), Map.of()));
@@ -169,6 +175,13 @@ public class SessionJobBuilder {
         return buildJob(jobFileString);
     }
 
+    /**
+     * Build and mutate a Job from a rendered YAML template.
+     *
+     * @param jobFileString rendered Kubernetes Job YAML
+     * @return rendered Kubernetes Job YAML after Skaha-managed mutations
+     * @throws IOException when the YAML cannot be parsed as a Kubernetes Job
+     */
     private String buildJob(final String jobFileString) throws IOException {
         final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
         mergeSessionLabels(launchJob);
@@ -179,6 +192,11 @@ public class SessionJobBuilder {
         return Yaml.dump(launchJob);
     }
 
+    /**
+     * Attach canonical session labels to the Job and its pod template.
+     *
+     * @param launchJob Kubernetes Job to mutate
+     */
     private void mergeSessionLabels(final V1Job launchJob) {
         final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
         putRequiredParameterLabel(labelValues, SessionLabels.Key.ID, PostAction.SKAHA_SESSIONID);
@@ -213,6 +231,13 @@ public class SessionJobBuilder {
         launchJob.setSpec(jobSpec);
     }
 
+    /**
+     * Copy the first present request parameter into a required canonical label value.
+     *
+     * @param labelValues destination label values
+     * @param label canonical label key
+     * @param parameterKeys request parameter keys to search in priority order
+     */
     private void putRequiredParameterLabel(
             final Map<SessionLabels.Key, String> labelValues,
             final SessionLabels.Key label,
@@ -224,6 +249,13 @@ public class SessionJobBuilder {
         }
     }
 
+    /**
+     * Copy the first present request parameter into an optional canonical label value.
+     *
+     * @param labelValues destination label values
+     * @param label canonical label key
+     * @param parameterKeys request parameter keys to search in priority order
+     */
     private void putParameterLabel(
             final Map<SessionLabels.Key, String> labelValues,
             final SessionLabels.Key label,
@@ -237,6 +269,12 @@ public class SessionJobBuilder {
         }
     }
 
+    /**
+     * Infer whether the Job uses fixed or flexible memory sizing.
+     *
+     * @param launchJob Kubernetes Job to inspect
+     * @return {@code fixed} when memory request equals limit, otherwise {@code flexible}
+     */
     private String getResourceFlavor(final V1Job launchJob) {
         final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
         final V1PodSpec podSpec =

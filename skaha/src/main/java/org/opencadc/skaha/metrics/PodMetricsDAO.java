@@ -35,6 +35,8 @@ class PodMetricsDAO {
     /**
      * Build a Kubernetes label selector for session pods in the workload namespace.
      *
+     * @param userID session owner, or blank to include all users
+     * @param omitHeadless true to exclude headless session pods
      * @return comma-separated selector, or {@code ""} when no filters apply (all pods in the namespace, same as
      *     historical {@code kubectl top pod} without {@code -l})
      */

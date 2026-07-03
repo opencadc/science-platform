@@ -101,6 +101,11 @@ public class K8SUtil {
         return System.getenv("SKAHA_HOSTNAME");
     }
 
+    /**
+     * Obtain the Skaha application version passed from the Helm chart.
+     *
+     * @return String from {@code SKAHA_VERSION}, or null when not configured
+     */
     public static String getSkahaVersion() {
         return System.getenv(K8SUtil.SKAHA_VERSION_ENV);
     }

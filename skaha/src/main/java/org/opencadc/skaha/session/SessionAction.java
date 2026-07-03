@@ -272,6 +272,13 @@ public abstract class SessionAction extends SkahaAction {
         return getSessionJobCmd.build();
     }
 
+    /**
+     * Build the canonical selector for kubectl operations scoped to one session.
+     *
+     * @param forUserID session owner
+     * @param sessionID session identifier
+     * @return comma-separated Kubernetes label selector
+     */
     protected static String buildSessionLabelSelector(final String forUserID, final String sessionID) {
         return SessionLabels.forSession(forUserID, sessionID);
     }
