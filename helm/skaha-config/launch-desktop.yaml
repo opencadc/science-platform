@@ -55,6 +55,8 @@ spec:
           value: "{{ .Values.deployment.skaha.apiVersion }}"
         - name: DESKTOP_SESSION_APP_TOKEN
           value: "${software.desktop.app.token}"
+        - name: DESKTOP_DEFAULT_ICON_PROJECT
+          value: {{ index (.Values.deployment.skaha.sessions.desktop | default dict) "default-icon-project" | default "" | quote }}
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false

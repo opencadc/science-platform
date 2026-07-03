@@ -463,6 +463,12 @@ deployment:
       # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity
       # nodeAffinity: {}
 
+      desktop:
+        # -- Registry project path segment (second component of image IDs) used to select
+        # desktop icon versions when multiple projects share the same short name.
+        # When empty, icon selection uses the latest version across all projects (legacy behaviour).
+        default-icon-project: ""
+
     # Optionally set the DEBUG port.
     # extraEnv:
     # - name: CATALINA_OPTS

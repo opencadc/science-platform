@@ -4,6 +4,7 @@ HOST=$1
 
 # Callback token
 TOKEN="${DESKTOP_SESSION_APP_TOKEN}"
+DEFAULT_ICON_PROJECT="${DESKTOP_DEFAULT_ICON_PROJECT:-}"
 
 ICON_DIR="/headless/.icons"
 STARTUP_DIR="/desktopstartup"
@@ -214,11 +215,15 @@ build_menu_item () {
   rm -f $tmp_start_executable
   rm -f $tmp_desktop
   if [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]]; then
-    if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
-      # pick the latest version
-      app_version[${short_name}]="${name}"
-      # accessed via icon on desktop
-      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
+    if [[ ${image_id} == *"/${category}/${short_name}:"* ]]; then
+      if [[ -z "${DEFAULT_ICON_PROJECT}" || "${category}" == "${DEFAULT_ICON_PROJECT}" ]]; then
+        if [[ "${name}" > "${app_version[${short_name}]}" ]]; then
+          # pick the latest version
+          app_version[${short_name}]="${name}"
+          # accessed via icon on desktop
+          update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
+        fi
+      fi
     fi
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
