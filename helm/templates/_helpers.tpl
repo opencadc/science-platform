@@ -450,5 +450,3 @@ source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, e
           name: scratch-dir
           subPath: "${skaha.sessionid}"
 {{- end }}
-
-
