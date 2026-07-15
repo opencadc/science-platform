@@ -15,8 +15,6 @@ This file stores repository-specific behavioral specifications.
 
 ## Service behavior specifications
 
-See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
-
 - The API exposes `GET /api/v1/metrics/platform` and `GET /healthz` (M4).
 - Runtime configuration is environment-driven through `METRICS_*` settings and
   validated through Pydantic `Settings` (`providers`, `sources`, `cache`)

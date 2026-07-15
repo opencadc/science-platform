@@ -9,9 +9,10 @@ roles to Jira statuses used for Metrics work in the CADC project.
 | `needs-info` | `On Hold` | Waiting on reporter for more information |
 | `ready-for-agent` | `In Progress` | Fully specified, ready for an AFK agent |
 | `ready-for-human` | `Review` | Requires human implementation or review |
-| `wontfix` | `On Hold` | Will not be actioned |
+| `wontfix` | `On Hold` | Will not be actioned (set resolution / comment; distinct from `needs-info`) |
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), move the
-issue to the corresponding Jira status from this table.
+issue to the corresponding Jira status from this table. Where two roles share a
+status, disambiguate with the issue resolution or a clear comment.
 
 Keep the **`CANFAR`** Jira label on Metrics work.

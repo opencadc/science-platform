@@ -30,8 +30,7 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 
 ## Design mapping
 
-See [`docs/adr/README.md`](adr/README.md) for milestone-to-decision mapping
-(M3–M11).
+Milestone-to-decision mapping (M3–M11): [`docs/adr/README.md`](adr/README.md).
 
 ## Ownership
 

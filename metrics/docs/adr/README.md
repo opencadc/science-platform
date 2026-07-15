@@ -21,16 +21,16 @@ decision log** for durable design choices.
 | [0012](0012-async-upstream-http-client-ownership.md) | Async upstream HTTP client ownership | M4 |
 | [0013](0013-sanitized-client-facing-error-responses.md) | Sanitized client-facing error responses | M4 |
 | [0014](0014-progressive-public-route-surface.md) | Progressive public route surface | M4+ |
-| [0015](0015-interactive-quota-scope-and-kube-provider-role.md) | Interactive quota scope and kube provider | M5 (proposed) |
-| [0016](0016-interactive-quota-api-contract.md) | InteractiveQuota API contract | M5 (proposed) |
-| [0017](0017-private-cache-for-user-scoped-metrics.md) | Private cache for user-scoped metrics | M5 (proposed) |
-| [0018](0018-list-on-request-kubernetes-reads-for-quota.md) | List-on-request Kubernetes reads for quota | M5 (proposed) |
 | [0019](0019-opentelemetry-metrics-contract.md) | OpenTelemetry metrics contract | M8 |
 
 ## Proposed (planned milestones)
 
 | ADR | Title | Milestone |
 | --- | --- | --- |
+| [0015](0015-interactive-quota-scope-and-kube-provider-role.md) | Interactive quota scope and kube provider | M5 |
+| [0016](0016-interactive-quota-api-contract.md) | InteractiveQuota API contract | M5 |
+| [0017](0017-private-cache-for-user-scoped-metrics.md) | Private cache for user-scoped metrics | M5 |
+| [0018](0018-list-on-request-kubernetes-reads-for-quota.md) | List-on-request Kubernetes reads for quota | M5 |
 | [0020](0020-user-metrics-attribution-contract.md) | UserMetrics contract | M6 |
 | [0021](0021-session-metrics-identity-contract.md) | SessionMetrics contract | M7 |
 

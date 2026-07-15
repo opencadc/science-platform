@@ -15,5 +15,10 @@ __pycache__/
 .env
 compose.override.yaml
 
+# Local AI assistant / IDE adapter dirs (not part of Metrics delivery)
+.cursor/
+.claude/
+.codex/
+
 # Legacy packaged Helm subchart tarballs (file:// deps), if reintroduced
 helm/metrics-api/charts/*.tgz

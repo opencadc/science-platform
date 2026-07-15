@@ -18,9 +18,9 @@ Metrics implementation facts also live under `metrics/docs/` (`architecture.md`,
 `design.md`, `specs.md`, `learnings.md`, `environment-contracts.md`,
 `kueue-platform.md`). **Canonical decisions:** [`../adr/README.md`](../adr/README.md).
 
-If any file does not exist, **proceed silently**. The producer skill
-(`/grill-with-docs`) creates glossary terms and ADRs lazily when decisions
-crystallize.
+If any glossary or ADR path is missing for the context you need, ask before
+inventing terms. Prefer crystallizing decisions in `CONTEXT.md` / ADRs rather
+than one-off vocabulary in chats.
 
 ## File structure
 

@@ -6,7 +6,7 @@
 - `tests/` — unit and integration tests (`integration` marker requires cluster/services).
 - `helm/metrics-api/` — reference Helm chart (authoritative deploy chart is in `deployments`).
 - `scripts/` — kind smoke, Helm deploy helpers, local cluster fixtures.
-- `docs/` — architecture, design, specs, plans, and agent configuration.
+- `docs/` — architecture, design, specs, ADRs, learnings, and agent skills.
 
 ## Validation
 
@@ -41,12 +41,12 @@ Multi-context monorepo: start at `CONTEXT-MAP.md` at the science-platform repo r
   Kubernetes context is selected (for example
   `kubectl config use-context kind-metrics`) and that kind, Helm, and kubectl
   are installed.
-- For substantial milestone or feature work, run multiple reviewer personas or aspect-focused reviews, synthesize a consensus, incorporate the feedback, and ask for human arbitration if reviewer disagreement deadlocks; when the work materially changes behavior or structure, update `docs/architecture.md`, `docs/design.md`, `docs/specs.md`, and `docs/learnings.md` so those documents match the delivered system.
-- When implementing approved restructuring plans, relocate or consolidate modules as the plan describes instead of relying on thin re-export shims or extra boilerplate that keeps obsolete import surfaces alive.
+- For substantial feature work, run aspect-focused reviews (architecture, reliability, scale, token efficiency as relevant), synthesize a consensus, and ask for human arbitration if reviewers deadlock; when the work materially changes behavior or structure, update `docs/architecture.md`, `docs/design.md`, `docs/specs.md`, `docs/learnings.md`, and ADRs under `docs/adr/` so those documents match the delivered system.
+- When implementing approved restructuring work, relocate or consolidate modules as decided instead of relying on thin re-export shims or extra boilerplate that keeps obsolete import surfaces alive.
 - For local kind workflows, use the existing cluster when possible (typically
   `metrics`); do not create extra disposable clusters unless the user asks for
   them.
-- When executing an attached implementation plan, carry out the steps but do not edit the plan file itself unless the user explicitly requests plan updates.
+- When executing an attached implementation plan or ADR follow-up, carry out the steps but do not edit the plan/ADR file itself unless the user explicitly requests updates.
 - For user-facing HTTP APIs, avoid internal implementation details in JSON bodies; prefer standard HTTP caching headers (`Cache-Control`, `Expires`, `Date`, `Last-Modified`, and related headers) over embedding cache metadata in JSON for shared cacheable resources.
 - In GitHub Actions workflows for this repository, do not pin `step-security/harden-runner` to a commit SHA; use a floating major tag (for example `step-security/harden-runner@v2`) unless the user specifies otherwise.
 - For platform metrics responses, keep `capacity` and `allocated` in consistent, comparable units (the user treats mixed or mismatched unit presentation in that API as an unacceptable defect).
