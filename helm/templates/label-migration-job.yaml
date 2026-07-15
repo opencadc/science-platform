@@ -66,6 +66,7 @@ spec:
               build_scope_patch_object() {
                 local ref="$1"
                 local scope="$2"
+                local mode="$3"
                 local -a pairs=()
                 local legacy_key
                 local canonical_key
@@ -73,10 +74,24 @@ spec:
 
                 while IFS='=' read -r legacy_key canonical_key; do
                   value="$(read_legacy_value "$ref" "$scope" "$legacy_key")"
-                  if [[ -n "$value" ]]; then
-                    pairs+=("\"$canonical_key\":\"$value\"")
-                    pairs+=("\"$legacy_key\":null")
-                  fi
+                  [[ -n "$value" ]] || continue
+
+                  case "$mode" in
+                    add)
+                      pairs+=("\"$canonical_key\":\"$value\"")
+                      ;;
+                    replace)
+                      pairs+=("\"$canonical_key\":\"$value\"")
+                      pairs+=("\"$legacy_key\":null")
+                      ;;
+                    strip)
+                      pairs+=("\"$legacy_key\":null")
+                      ;;
+                    *)
+                      log "unsupported patch mode: $mode"
+                      return 1
+                      ;;
+                  esac
                 done <<'EOF'
               canfar-net-sessionID=canfar.net/id
               canfar-net-userid=canfar.net/username
@@ -112,23 +127,26 @@ spec:
               patch_object() {
                 local kind="$1"
                 local ref="$2"
+                local metadata_mode="$3"
+                local template_mode="$4"
+                local selector_mode="$5"
                 local metadata_patch=""
                 local template_patch=""
                 local selector_patch=""
                 local -a sections=()
 
-                if metadata_patch="$(build_scope_patch_object "$ref" metadata)"; then
+                if [[ -n "$metadata_mode" ]] && metadata_patch="$(build_scope_patch_object "$ref" metadata "$metadata_mode")"; then
                   sections+=("\"metadata\":{\"labels\":$metadata_patch}")
                 fi
 
                 case "$kind" in
                   jobs)
-                    if template_patch="$(build_scope_patch_object "$ref" template)"; then
+                    if [[ -n "$template_mode" ]] && template_patch="$(build_scope_patch_object "$ref" template "$template_mode")"; then
                       sections+=("\"spec\":{\"template\":{\"metadata\":{\"labels\":$template_patch}}}")
                     fi
                     ;;
                   services)
-                    if selector_patch="$(build_scope_patch_object "$ref" selector)"; then
+                    if [[ -n "$selector_mode" ]] && selector_patch="$(build_scope_patch_object "$ref" selector "$selector_mode")"; then
                       sections+=("\"spec\":{\"selector\":$selector_patch}")
                     fi
                     ;;
@@ -144,6 +162,9 @@ spec:
 
               migrate_kind() {
                 local kind="$1"
+                local metadata_mode="$2"
+                local template_mode="$3"
+                local selector_mode="$4"
                 local -a refs=()
                 local selected=0
                 local patched=0
@@ -154,12 +175,13 @@ spec:
                 selected="${#refs[@]}"
 
                 for ref in "${refs[@]}"; do
-                  if patch_object "$kind" "$ref"; then
+                  if patch_object "$kind" "$ref" "$metadata_mode" "$template_mode" "$selector_mode"; then
                     patched=$((patched + 1))
                     continue
+                  else
+                    rc=$?
                   fi
 
-                  rc=$?
                   if (( rc == 10 )); then
                     skipped=$((skipped + 1))
                     continue
@@ -172,9 +194,18 @@ spec:
               }
 
               log "migrating legacy session labels in namespace $NS"
-              migrate_kind pods
-              migrate_kind jobs
-              migrate_kind services
-              migrate_kind ingresses
+              log "phase A: add canonical labels to pods and jobs"
+              migrate_kind pods add "" ""
+              migrate_kind jobs add add ""
+
+              log "phase B: flip services to canonical selectors"
+              migrate_kind services replace "" replace
+
+              log "phase C: strip legacy ingress labels"
+              migrate_kind ingresses replace "" ""
+
+              log "phase D: strip legacy labels from pods and jobs"
+              migrate_kind pods strip "" ""
+              migrate_kind jobs strip strip ""
               log "session label migration complete"
 {{- end }}
