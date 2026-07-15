@@ -16,7 +16,8 @@ import java.util.Objects;
 /**
  * Assembles session launch Kubernetes manifests with one canonical session label set.
  *
- * <p>Kueue labels remain Job-only; Service and Ingress metadata receive only session identity labels.
+ * <p>Kueue labels remain Job-only. Service and Ingress metadata receive the canonical {@link SessionLabels.Key} set
+ * present on the Job; Service selectors use session id and kind only.
  */
 final class SessionLaunchManifest {
     private final V1Job job;
@@ -25,6 +26,12 @@ final class SessionLaunchManifest {
     private SessionLaunchManifest(final V1Job job, final Map<String, String> metadataLabels) {
         this.job = Objects.requireNonNull(job, "job cannot be null");
         this.metadataLabels = Map.copyOf(metadataLabels);
+    }
+
+    static SessionLaunchManifest fromJobAndPlan(final V1Job job, final SessionLabelPlan plan) {
+        return new SessionLaunchManifest(
+                Objects.requireNonNull(job, "job cannot be null"),
+                Objects.requireNonNull(plan, "plan cannot be null").serviceMetadataLabels());
     }
 
     static SessionLaunchManifest fromJob(final V1Job job) {

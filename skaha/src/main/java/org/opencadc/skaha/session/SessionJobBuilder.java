@@ -177,7 +177,8 @@ public class SessionJobBuilder {
     /** Construct the launch manifest output of this builder. */
     @Deprecated
     SessionLaunchManifest buildManifest() throws IOException {
-        return SessionLaunchManifest.fromJob(buildLaunch().job());
+        final LaunchArtifacts launch = buildLaunch();
+        return SessionLaunchManifest.fromJobAndPlan(launch.job(), launch.labels());
     }
 
     /** Build and mutate launch artifacts from a rendered YAML template. */

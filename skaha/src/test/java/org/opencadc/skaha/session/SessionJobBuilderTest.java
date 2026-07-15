@@ -7,6 +7,7 @@ import io.kubernetes.client.openapi.models.V1NodeAffinity;
 import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.Yaml;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,44 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class SessionJobBuilderTest {
+    @Test
+    public void launchManifestServiceUsesPlanMetadataInsteadOfScrapedJobLabels() throws Exception {
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
+                .toPath();
+        final Path serviceTemplatePath = FileUtil.getFileFromResource("test-carta-service.yaml", SessionJobBuilderTest.class)
+                .toPath();
+        final Map<String, String> parametersToReplaceValues = new HashMap<>();
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
+        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
+        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
+
+        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
+                .withParameters(parametersToReplaceValues)
+                .buildLaunch();
+        final V1Job job = launch.job();
+        final Map<String, String> tamperedJobLabels =
+                Objects.requireNonNull(job.getMetadata().getLabels());
+        tamperedJobLabels.put("canfar.net/name", "tampered-name");
+        tamperedJobLabels.put("canfar.net/kind", "tampered-kind");
+
+        final String renderedService = SessionLaunchManifest.fromJobAndPlan(job, launch.labels())
+                .service(Files.readString(serviceTemplatePath));
+        final V1Service service = (V1Service) Yaml.load(renderedService);
+        final Map<String, String> serviceLabels =
+                Objects.requireNonNull(service.getMetadata().getLabels());
+        final Map<String, String> serviceSelector =
+                Objects.requireNonNull(service.getSpec().getSelector());
+
+        Assert.assertEquals("analysis", serviceLabels.get("canfar.net/name"));
+        Assert.assertEquals("notebook", serviceLabels.get("canfar.net/kind"));
+        Assert.assertEquals("session-123", serviceSelector.get("canfar.net/id"));
+        Assert.assertEquals("notebook", serviceSelector.get("canfar.net/kind"));
+        Assert.assertEquals(2, serviceSelector.size());
+    }
+
     @Test
     public void launchManifestAppliesCanonicalLabelsAcrossLaunchResourcesWithoutKueueLeakage() throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
