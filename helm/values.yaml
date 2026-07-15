@@ -591,9 +591,9 @@ telemetry:
     # -- Export interval in seconds for enabled telemetry services.
     interval: 30
 
-# Pre-upgrade hook that rewrites legacy live session labels before Skaha rolls.
+# Pre-upgrade hook that rewrites legacy live session labels before Skaha rolls. Job pod templates are not rewritten because `spec.template.metadata.labels` is immutable.
 labelMigration:
-  # -- When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` in phases across Pods, Jobs, Services, and Ingresses.
+  # -- When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` in phases across Pods, Job metadata, Services, and Ingresses. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable.
   enabled: true
   # -- Container image for the label migration hook Job. Must provide `kubectl` and `bash`.
   image: bitnami/kubectl:1.29.0

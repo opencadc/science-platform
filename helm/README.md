@@ -73,7 +73,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | labelMigration.backoffLimit | int | `1` | `backoffLimit` for the label migration pre-upgrade Job. |
-| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` in phases across Pods, Jobs, Services, and Ingresses. |
+| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` in phases across Pods, Job metadata, Services, and Ingresses. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable. |
 | labelMigration.image | string | `"bitnami/kubectl:1.29.0"` | Container image for the label migration hook Job. Must provide `kubectl` and `bash`. |
 | metricsBackend.enabled | bool | `false` | When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden). |
 | metricsBackend.env | object | `{}` | Map of environment variables for the Metrics container (typically METRICS_*). GitOps should supply the full map per environment. |
@@ -120,9 +120,15 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
 Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and migrates mapped labels to
-`canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Jobs first, flip
-Service selectors to the canonical keys while workloads still carry both label families, then strip
-legacy labels from Services, Ingresses, Pods, and Jobs.
+`canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Job metadata first,
+flip Service selectors to the canonical keys while workloads still carry both label families, then
+strip legacy labels from Services, Ingresses, Pods, and Job metadata.
+
+The hook does **not** rewrite `Job.spec.template.metadata.labels`. Kubernetes treats Job pod
+templates as immutable, so the chart only patches `Job.metadata.labels` and relies on the separate
+Pod migration for live Pods. If a Job Pod restarts during the upgrade window, Kubernetes may
+recreate it from legacy template labels; prefer a quiet upgrade window or accept that residual
+risk.
 
 Disable the Job after all environments have cut over. As an alternative, drain sessions before the
 upgrade and run with the Job disabled.

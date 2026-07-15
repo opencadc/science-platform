@@ -16,9 +16,15 @@
 
 When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
 Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and migrates mapped labels to
-`canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Jobs first, flip
-Service selectors to the canonical keys while workloads still carry both label families, then strip
-legacy labels from Services, Ingresses, Pods, and Jobs.
+`canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Job metadata first,
+flip Service selectors to the canonical keys while workloads still carry both label families, then
+strip legacy labels from Services, Ingresses, Pods, and Job metadata.
+
+The hook does **not** rewrite `Job.spec.template.metadata.labels`. Kubernetes treats Job pod
+templates as immutable, so the chart only patches `Job.metadata.labels` and relies on the separate
+Pod migration for live Pods. If a Job Pod restarts during the upgrade window, Kubernetes may
+recreate it from legacy template labels; prefer a quiet upgrade window or accept that residual
+risk.
 
 Disable the Job after all environments have cut over. As an alternative, drain sessions before the
 upgrade and run with the Job disabled.
