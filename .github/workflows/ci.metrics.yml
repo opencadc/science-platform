@@ -49,10 +49,6 @@ jobs:
         run: uv run ruff check src tests
       - name: Unit tests
         run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80 -m "not integration"
-      - name: Harness contract tests
-        run: uv run --group harness pytest -q tests/harness/test_contracts.py
-      - name: Harness CLI check
-        run: uv run --group harness python -m harness check
 
   metrics-kind-smoke:
     runs-on: ubuntu-latest

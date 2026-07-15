@@ -1,7 +1,7 @@
 # Project learnings
 
-This file stores product and repository implementation lessons only. Harness
-process lessons belong in `docs/harness/learnings.md`.
+This file stores product and repository implementation lessons only. Durable
+decisions are also recorded under `docs/adr/`.
 
 ## Ownership
 
@@ -71,7 +71,7 @@ process lessons belong in `docs/harness/learnings.md`.
 - Context: M1 delivery foundation (CI pathways, Helm, release-please, Minikube smoke).
 - Lesson: Path-based workflow filters (`paths` / `paths-ignore`) and tag-prefix guards (`metrics-v*`) are the primary levers for keeping Skaha and Metrics pipelines independent in a shared monorepo.
 - Evidence: `.github/workflows/ci.*.yml`, `cd.platform.release.yml`, `release-please-config.json`.
-- Action taken: Documented in `docs/plans/PLAN_M1_outcomes.md` and `metrics/README.md`.
+- Action taken: Documented in `metrics/README.md` and ADR-0001.
 
 - Date: April 26, 2026
 - Context: M4 provider runtime — single `MetricsRuntime` composition root and
@@ -80,19 +80,17 @@ process lessons belong in `docs/harness/learnings.md`.
   startup and dependency surfaces match what operators actually use; optional
   HTTP/2 should stay off by default to avoid an implicit `h2` install.
 - Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/provider_registry.py`,
-  and `PLAN_M4_provider_runtime_architecture.md`.
-- Action taken: Documented in `docs/architecture.md` and
-  `docs/plans/M4-implementation-outcomes.md`.
+  and `docs/adr/0005-metrics-runtime-composition-root.md`.
+- Action taken: Documented in `docs/architecture.md` and ADR-0005.
 
-- Date: April 22, 2026
+- Date: April 22, 2026 (superseded June 2026)
 - Context: M3 documentation realignment and roadmap cleanup.
-- Lesson: Milestones stay readable and executable when roadmap stages are
-  strictly incremental (`PLAN_M<n>_<topic>`), and inserting a stage requires
-  immediate renumbering of later plan files and references.
-- Evidence: `docs/plans/milestone-process.md`, `docs/plans/index.md`, and
-  plans renamed to M3-M10 during this update.
-- Action taken: Added milestone naming rules and updated all roadmap filenames
+- Lesson: Milestone delivery stayed readable when stages were strictly
+  incremental; inserting a stage required immediate renumbering of later files
   and cross-links.
+- Evidence: `docs/adr/README.md` and `docs/design.md`.
+- Action taken: Milestone plan files were distilled into ADRs and removed in
+  June 2026; ADRs and code are the authoritative delivery record.
 
 - Date: April 22, 2026
 - Context: Environment contract review after roadmap realignment.
@@ -104,3 +102,11 @@ process lessons belong in `docs/harness/learnings.md`.
 - Action taken: Updated documentation to require a Kubernetes-first local
   cluster (kind) with Helm and `kubectl` in `dev` and clarified higher-environment
   cluster ownership.
+
+- Date: June 2026
+- Context: Milestone plans distilled into ADRs and CONTEXT updates.
+- Lesson: When plan text conflicts with ADRs (for example M2 cohort/borrowed
+  aggregation), treat plans as historical; ADRs and code are authoritative.
+- Evidence: `metrics/docs/adr/README.md`.
+- Action taken: Added Metrics ADRs 0007–0021 and system ADRs 0003–0004; expanded
+  `metrics/CONTEXT.md` glossary; removed superseded `docs/plans/` tree.

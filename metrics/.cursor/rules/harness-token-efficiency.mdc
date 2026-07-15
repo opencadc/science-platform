@@ -1,5 +1,0 @@
----
-description: Apply token-efficiency policy.
-alwaysApply: false
----
-Follow `docs/harness/token-efficiency.md` for context budgeting.
