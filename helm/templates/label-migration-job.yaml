@@ -1,0 +1,180 @@
+{{- if .Values.labelMigration.enabled }}
+{{- $hookName := printf "%s-label-migration" (include "skaha.fullname" .) | trunc 63 | trimSuffix "-" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $hookName }}
+  namespace: {{ include "skaha.workloadNamespace" . }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.labelMigration.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "skaha.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $hookName }}
+      restartPolicy: Never
+      containers:
+        - name: migrate-session-labels
+          image: {{ .Values.labelMigration.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              set -euo pipefail
+
+              NS="{{ include "skaha.workloadNamespace" . }}"
+              SELECTOR="canfar-net-sessionID"
+
+              log() {
+                printf '[label-migration] %s\n' "$*"
+              }
+
+              read_legacy_value() {
+                local ref="$1"
+                local scope="$2"
+                local key="$3"
+                local template
+
+                case "$scope" in
+                  metadata)
+                    template="{{`{{ with .metadata.labels }}{{ index . \"KEY\" }}{{ end }}`}}"
+                    ;;
+                  template)
+                    template="{{`{{ with .spec.template.metadata.labels }}{{ index . \"KEY\" }}{{ end }}`}}"
+                    ;;
+                  selector)
+                    template="{{`{{ with .spec.selector }}{{ index . \"KEY\" }}{{ end }}`}}"
+                    ;;
+                  *)
+                    log "unsupported scope: $scope"
+                    return 1
+                    ;;
+                esac
+
+                template="${template//KEY/$key}"
+                kubectl get -n "$NS" "$ref" -o go-template --template="$template"
+              }
+
+              build_scope_patch_object() {
+                local ref="$1"
+                local scope="$2"
+                local -a pairs=()
+                local legacy_key
+                local canonical_key
+                local value
+
+                while IFS='=' read -r legacy_key canonical_key; do
+                  value="$(read_legacy_value "$ref" "$scope" "$legacy_key")"
+                  if [[ -n "$value" ]]; then
+                    pairs+=("\"$canonical_key\":\"$value\"")
+                    pairs+=("\"$legacy_key\":null")
+                  fi
+                done <<'EOF'
+              canfar-net-sessionID=canfar.net/id
+              canfar-net-userid=canfar.net/username
+              canfar-net-sessionName=canfar.net/name
+              canfar-net-sessionType=canfar.net/kind
+              canfar-net-appID=canfar.net/app-id
+              EOF
+
+                if (( ${#pairs[@]} == 0 )); then
+                  return 1
+                fi
+
+                local IFS=,
+                printf '{%s}' "${pairs[*]}"
+              }
+
+              retry_patch() {
+                local ref="$1"
+                local patch="$2"
+                local attempt=1
+
+                until kubectl patch -n "$NS" "$ref" --type=merge -p "$patch" >/dev/null; do
+                  if (( attempt >= 3 )); then
+                    log "patch failed for $ref after ${attempt} attempts"
+                    return 1
+                  fi
+                  log "patch failed for $ref, retrying (${attempt}/3)"
+                  attempt=$((attempt + 1))
+                  sleep "$attempt"
+                done
+              }
+
+              patch_object() {
+                local kind="$1"
+                local ref="$2"
+                local metadata_patch=""
+                local template_patch=""
+                local selector_patch=""
+                local -a sections=()
+
+                if metadata_patch="$(build_scope_patch_object "$ref" metadata)"; then
+                  sections+=("\"metadata\":{\"labels\":$metadata_patch}")
+                fi
+
+                case "$kind" in
+                  jobs)
+                    if template_patch="$(build_scope_patch_object "$ref" template)"; then
+                      sections+=("\"spec\":{\"template\":{\"metadata\":{\"labels\":$template_patch}}}")
+                    fi
+                    ;;
+                  services)
+                    if selector_patch="$(build_scope_patch_object "$ref" selector)"; then
+                      sections+=("\"spec\":{\"selector\":$selector_patch}")
+                    fi
+                    ;;
+                esac
+
+                if (( ${#sections[@]} == 0 )); then
+                  return 10
+                fi
+
+                local IFS=,
+                retry_patch "$ref" "{${sections[*]}}"
+              }
+
+              migrate_kind() {
+                local kind="$1"
+                local -a refs=()
+                local selected=0
+                local patched=0
+                local skipped=0
+                local rc
+
+                mapfile -t refs < <(kubectl get -n "$NS" "$kind" -l "$SELECTOR" -o name)
+                selected="${#refs[@]}"
+
+                for ref in "${refs[@]}"; do
+                  if patch_object "$kind" "$ref"; then
+                    patched=$((patched + 1))
+                    continue
+                  fi
+
+                  rc=$?
+                  if (( rc == 10 )); then
+                    skipped=$((skipped + 1))
+                    continue
+                  fi
+
+                  return "$rc"
+                done
+
+                log "$kind: selected=$selected patched=$patched skipped=$skipped"
+              }
+
+              log "migrating legacy session labels in namespace $NS"
+              migrate_kind pods
+              migrate_kind jobs
+              migrate_kind services
+              migrate_kind ingresses
+              log "session label migration complete"
+{{- end }}

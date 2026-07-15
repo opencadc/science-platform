@@ -12,6 +12,15 @@
 
 {{ template "chart.valuesSection" . }}
 
+## Session label migration
+
+When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
+Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and rewrites mapped labels to
+`canfar.net/*` before Skaha rolls.
+
+Disable the Job after all environments have cut over. As an alternative, drain sessions before the
+upgrade and run with the Job disabled.
+
 ## User storage (Cavern)
 
 User home allocations in Cavern are configured under `deployment.skaha.sessions.userStorage`. Set **`nodeURIPrefix`** to a **`vos://` scheme** URI. The host (authority) and Cavern service name are separated by a tilde (`~`).

@@ -591,6 +591,15 @@ telemetry:
     # -- Export interval in seconds for enabled telemetry services.
     interval: 30
 
+# Pre-upgrade hook that rewrites legacy live session labels before Skaha rolls.
+labelMigration:
+  # -- When true, run a Helm `pre-upgrade` Job in the workload namespace that rewrites live `canfar-net-*` session labels to `canfar.net/*` on Pods, Jobs, Services, and Ingresses.
+  enabled: true
+  # -- Container image for the label migration hook Job. Must provide `kubectl` and `bash`.
+  image: bitnami/kubectl:1.29.0
+  # -- `backoffLimit` for the label migration pre-upgrade Job.
+  backoffLimit: 1
+
 # Optional science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:
   # -- When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).
