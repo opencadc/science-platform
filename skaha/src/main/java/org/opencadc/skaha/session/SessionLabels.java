@@ -1,5 +1,6 @@
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.util.StringUtil;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,57 +89,32 @@ public final class SessionLabels {
                 validateLabelValue(KUEUE_PRIORITY_CLASS, priorityClass));
     }
 
-    /**
-     * Build a selector for one user's session.
-     *
-     * @param username session owner
-     * @param sessionID session identifier
-     * @return comma-separated Kubernetes label selector
-     */
+    /** Selector for one user's session. */
     public static String forSession(final String username, final String sessionID) {
         return selector(labelEquals(Key.ID, sessionID), labelEquals(Key.USERNAME, username));
     }
 
-    /**
-     * Build a selector for all sessions owned by a user.
-     *
-     * @param username session owner
-     * @return comma-separated Kubernetes label selector, or {@code ""} when username is blank
-     */
+    /** Selector for all sessions owned by a user, or {@code ""} when username is blank. */
     public static String forUser(final String username) {
-        return hasText(username) ? selector(labelEquals(Key.USERNAME, username)) : "";
+        return StringUtil.hasText(username) ? selector(labelEquals(Key.USERNAME, username)) : "";
     }
 
-    /**
-     * Build a selector for session listings and pod metrics.
-     *
-     * @param username session owner, or blank to omit this filter
-     * @param sessionID session identifier, or blank to omit this filter
-     * @param omitHeadless true to exclude headless sessions
-     * @return comma-separated Kubernetes label selector
-     */
+    /** Selector for session listings and pod metrics. */
     public static String forUserSessions(final String username, final String sessionID, final boolean omitHeadless) {
-        final List<LabelSelectorRequirement> requirements = new ArrayList<>();
-        if (hasText(sessionID)) {
+        final List<String> requirements = new ArrayList<>();
+        if (StringUtil.hasText(sessionID)) {
             requirements.add(labelEquals(Key.ID, sessionID));
         }
-        if (hasText(username)) {
+        if (StringUtil.hasText(username)) {
             requirements.add(labelEquals(Key.USERNAME, username));
         }
         if (omitHeadless) {
             requirements.add(labelNotEquals(Key.KIND, HEADLESS));
         }
-        return selector(requirements.toArray(new LabelSelectorRequirement[0]));
+        return selector(requirements.toArray(new String[0]));
     }
 
-    /**
-     * Build a selector for one desktop application job.
-     *
-     * @param sessionID parent session identifier
-     * @param username session owner
-     * @param appID desktop application identifier
-     * @return comma-separated Kubernetes label selector
-     */
+    /** Selector for one desktop application job. */
     public static String forDesktopApp(final String sessionID, final String username, final String appID) {
         return selector(
                 labelEquals(Key.ID, sessionID),
@@ -147,13 +123,7 @@ public final class SessionLabels {
                 labelEquals(Key.KIND, DESKTOP_APP));
     }
 
-    /**
-     * Build a selector for the parent session job while excluding desktop application jobs.
-     *
-     * @param username session owner
-     * @param sessionID session identifier
-     * @return comma-separated Kubernetes label selector
-     */
+    /** Selector for the parent session job, excluding desktop application jobs. */
     public static String forSessionExceptDesktopApp(final String username, final String sessionID) {
         return selector(
                 labelEquals(Key.ID, sessionID),
@@ -161,63 +131,43 @@ public final class SessionLabels {
                 labelNotEquals(Key.KIND, DESKTOP_APP));
     }
 
-    /**
-     * Escape the session kind label for kubectl JSONPath and custom-column usage.
-     *
-     * @return escaped session kind label path
-     */
+    /** Escape the session kind label for kubectl JSONPath and custom-column usage. */
     static String sessionKindJsonPath() {
         return jsonPath(Key.KIND);
     }
 
-    /**
-     * Read canonical session metadata from Kubernetes labels.
-     *
-     * @param labels Kubernetes metadata labels
-     * @return session metadata view
-     */
-    static SessionMetadata fromMetadata(final Map<String, String> labels) {
-        return new SessionMetadata(labels);
+    static String require(final Map<String, String> labels, final Key key) {
+        return Objects.requireNonNull(get(labels, key), key.label + " label is required");
     }
 
-    /**
-     * Validate the Skaha application version label value.
-     *
-     * @param value chart application version passed through {@code SKAHA_VERSION}
-     * @return validated label value
-     */
+    static String get(final Map<String, String> labels, final Key key) {
+        Objects.requireNonNull(labels, "labels cannot be null");
+        return labels.get(Objects.requireNonNull(key, "key cannot be null").label);
+    }
+
+    static boolean fixedResources(final Map<String, String> labels) {
+        return FLAVOR_FIXED.equals(get(labels, Key.FLAVOR));
+    }
+
+    /** Validate the Skaha application version label value. */
     static String version(final String value) {
         return validateLabelValue(Key.VERSION.label, value);
     }
 
-    private static LabelSelectorRequirement labelEquals(final Key key, final String value) {
-        return new LabelSelectorRequirement(key, "=", value);
+    private static String labelEquals(final Key key, final String value) {
+        return key.label + "=" + validateLabelValue(key.label, value);
     }
 
-    private static LabelSelectorRequirement labelNotEquals(final Key key, final String value) {
-        return new LabelSelectorRequirement(key, "!=", value);
+    private static String labelNotEquals(final Key key, final String value) {
+        return key.label + "!=" + validateLabelValue(key.label, value);
     }
 
-    private static String selector(final LabelSelectorRequirement... requirements) {
-        Objects.requireNonNull(requirements, "requirements cannot be null");
-
-        final StringBuilder selector = new StringBuilder();
-        for (final LabelSelectorRequirement requirement : requirements) {
-            Objects.requireNonNull(requirement, "label selector requirement cannot be null");
-            if (!selector.isEmpty()) {
-                selector.append(',');
-            }
-            selector.append(requirement.format());
-        }
-        return selector.toString();
+    private static String selector(final String... requirements) {
+        return String.join(",", requirements);
     }
 
     private static String jsonPath(final Key key) {
         return Objects.requireNonNull(key, "key cannot be null").label.replace(".", "\\.");
-    }
-
-    private static boolean hasText(final String value) {
-        return value != null && !value.isBlank();
     }
 
     private static String defaultWhenBlank(final String label, final String value) {
@@ -302,56 +252,4 @@ public final class SessionLabels {
         }
     }
 
-    /** Canonical session metadata read from Kubernetes labels. */
-    static final class SessionMetadata {
-        private final Map<String, String> labels;
-
-        private SessionMetadata(final Map<String, String> labels) {
-            this.labels = Map.copyOf(Objects.requireNonNull(labels, "labels cannot be null"));
-        }
-
-        String id() {
-            return required(Key.ID);
-        }
-
-        String username() {
-            return required(Key.USERNAME);
-        }
-
-        String kind() {
-            return required(Key.KIND);
-        }
-
-        String name() {
-            return labels.get(Key.NAME.label);
-        }
-
-        String appID() {
-            return labels.get(Key.APP_ID.label);
-        }
-
-        boolean fixedResources() {
-            return FLAVOR_FIXED.equals(labels.get(Key.FLAVOR.label));
-        }
-
-        private String required(final Key key) {
-            return Objects.requireNonNull(labels.get(key.label), key.label + " label is required");
-        }
-    }
-
-    private static final class LabelSelectorRequirement {
-        private final Key key;
-        private final String operator;
-        private final String value;
-
-        private LabelSelectorRequirement(final Key key, final String operator, final String value) {
-            this.key = Objects.requireNonNull(key, "key cannot be null");
-            this.operator = Objects.requireNonNull(operator, "operator cannot be null");
-            this.value = validateLabelValue(key.label, value);
-        }
-
-        private String format() {
-            return key.label + operator + value;
-        }
-    }
 }

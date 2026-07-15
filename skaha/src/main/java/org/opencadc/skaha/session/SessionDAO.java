@@ -108,13 +108,11 @@ public class SessionDAO {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
 
-        final SessionLabels.SessionMetadata sessionMetadata = SessionLabels.fromMetadata(labels);
-
         return new KubernetesJob(
                 jobName,
                 jobMetadata.getUid(),
-                sessionMetadata.id(),
-                SessionType.fromApplicationStringType(sessionMetadata.kind()));
+                SessionLabels.require(labels, SessionLabels.Key.ID),
+                SessionType.fromApplicationStringType(SessionLabels.require(labels, SessionLabels.Key.KIND)));
     }
 
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)

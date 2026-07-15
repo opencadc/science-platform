@@ -49,6 +49,26 @@ public class SessionLabelsTest {
                 "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/app-id=app-123,canfar.net/kind=desktop-app",
                 SessionLabels.forDesktopApp("session-123", "alice", "app-123"));
         Assert.assertEquals("canfar\\.net/kind", SessionLabels.sessionKindJsonPath());
+        Assert.assertEquals("canfar.net/kind!=headless", SessionLabels.forUserSessions("", "", true));
+        Assert.assertEquals("", SessionLabels.forUserSessions("", "", false));
+    }
+
+    @Test
+    public void mapHelpersReadCanonicalMetadata() {
+        final Map<String, String> labels = SessionLabels.canonical(Map.of(
+                SessionLabels.Key.ID, "session-123",
+                SessionLabels.Key.USERNAME, "alice",
+                SessionLabels.Key.NAME, "analysis",
+                SessionLabels.Key.KIND, "headless",
+                SessionLabels.Key.FLAVOR, "fixed",
+                SessionLabels.Key.JOB, "headless-alice-session-123",
+                SessionLabels.Key.ACCELERATOR, "none"));
+
+        Assert.assertEquals("session-123", SessionLabels.require(labels, SessionLabels.Key.ID));
+        Assert.assertEquals("alice", SessionLabels.require(labels, SessionLabels.Key.USERNAME));
+        Assert.assertEquals("analysis", SessionLabels.get(labels, SessionLabels.Key.NAME));
+        Assert.assertNull(SessionLabels.get(labels, SessionLabels.Key.APP_ID));
+        Assert.assertTrue(SessionLabels.fixedResources(labels));
     }
 
     @Test
