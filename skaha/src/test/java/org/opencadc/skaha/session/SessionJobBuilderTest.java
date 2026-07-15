@@ -7,7 +7,6 @@ import io.kubernetes.client.openapi.models.V1NodeAffinity;
 import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.Yaml;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,26 +29,19 @@ public class SessionJobBuilderTest {
         parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
         parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "carta-alice-session-123");
 
-        final SessionLaunchManifest launchManifest = SessionJobBuilder.fromPath(testBaseValuesPath)
+        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
                 .withQueue(new QueueConfiguration("carta", "high", "my-queue"))
-                .buildManifest();
+                .buildLaunch();
 
-        final V1Job job = (V1Job) Yaml.load(launchManifest.job());
+        final V1Job job = launch.job();
         final Map<String, String> jobLabels =
                 Objects.requireNonNull(job.getMetadata().getLabels());
         Assert.assertEquals("my-queue", jobLabels.get("kueue.x-k8s.io/queue-name"));
         Assert.assertEquals("session-123", jobLabels.get("canfar.net/id"));
 
-        String serviceString =
-                Files.readString(FileUtil.getFileFromResource("test-carta-service.yaml", SessionJobBuilderTest.class)
-                        .toPath());
-        serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, "session-123");
-        final V1Service service = (V1Service) Yaml.load(launchManifest.service(serviceString));
-        final Map<String, String> serviceLabels =
-                Objects.requireNonNull(service.getMetadata().getLabels());
-        final Map<String, String> serviceSelector =
-                Objects.requireNonNull(service.getSpec().getSelector());
+        final Map<String, String> serviceLabels = launch.labels().serviceMetadataLabels();
+        final Map<String, String> serviceSelector = launch.labels().serviceSelector();
 
         Assert.assertEquals("session-123", serviceLabels.get("canfar.net/id"));
         Assert.assertEquals("analysis", serviceLabels.get("canfar.net/name"));
@@ -61,32 +53,14 @@ public class SessionJobBuilderTest {
         Assert.assertEquals(2, serviceSelector.size());
         Assert.assertEquals("session-123", serviceSelector.get("canfar.net/id"));
         Assert.assertEquals("carta", serviceSelector.get("canfar.net/kind"));
-
-        final String ingressYaml =
-                """
-                apiVersion: traefik.io/v1alpha1
-                kind: Middleware
-                metadata:
-                  name: session-middleware
-                spec: {}
-                ---
-                apiVersion: traefik.io/v1alpha1
-                kind: IngressRoute
-                metadata:
-                  name: session-ingress
-                  labels:
-                    route-owned: keep
-                spec: {}
-                """;
-
-        final List<Object> documents = new ArrayList<>();
-        new org.yaml.snakeyaml.Yaml()
-                .loadAll(launchManifest.ingress(ingressYaml))
-                .forEach(documents::add);
-
-        Assert.assertEquals(2, documents.size());
-        assertYamlMetadataLabels(documents.get(0), "session-123", "carta", "carta-alice-session-123", null);
-        assertYamlMetadataLabels(documents.get(1), "session-123", "carta", "carta-alice-session-123", "keep");
+        final Map<String, String> ingressLabels = launch.labels().ingressMetadataLabels();
+        Assert.assertEquals("session-123", ingressLabels.get("canfar.net/id"));
+        Assert.assertEquals("analysis", ingressLabels.get("canfar.net/name"));
+        Assert.assertEquals("carta", ingressLabels.get("canfar.net/kind"));
+        Assert.assertEquals("alice", ingressLabels.get("canfar.net/username"));
+        Assert.assertEquals("carta-alice-session-123", ingressLabels.get("canfar.net/job"));
+        Assert.assertFalse(ingressLabels.containsKey("kueue.x-k8s.io/queue-name"));
+        Assert.assertFalse(ingressLabels.containsKey("kueue.x-k8s.io/priority-class"));
     }
 
     @Test
@@ -428,25 +402,4 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
     }
 
-    @SuppressWarnings("unchecked")
-    private static void assertYamlMetadataLabels(
-            final Object document,
-            final String expectedID,
-            final String expectedKind,
-            final String expectedJob,
-            final String expectedRouteLabel) {
-        final Map<String, Object> yamlDocument = (Map<String, Object>) document;
-        final Map<String, Object> metadata = (Map<String, Object>) yamlDocument.get("metadata");
-        final Map<String, Object> labels = (Map<String, Object>) metadata.get("labels");
-
-        Assert.assertEquals(expectedID, labels.get("canfar.net/id"));
-        Assert.assertEquals(expectedKind, labels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", labels.get("canfar.net/username"));
-        Assert.assertEquals(expectedJob, labels.get("canfar.net/job"));
-        Assert.assertFalse(labels.containsKey("kueue.x-k8s.io/queue-name"));
-        Assert.assertFalse(labels.containsKey("kueue.x-k8s.io/priority-class"));
-        if (expectedRouteLabel != null) {
-            Assert.assertEquals(expectedRouteLabel, labels.get("route-owned"));
-        }
-    }
 }

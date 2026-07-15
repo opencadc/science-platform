@@ -23,6 +23,8 @@ import org.opencadc.skaha.K8SUtil;
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
 
+    record LaunchArtifacts(V1Job job, SessionLabelPlan labels) {}
+
     /** Configuration for the queue to use. */
     private final Map<String, String> parameters = new HashMap<>();
 
@@ -48,12 +50,7 @@ public class SessionJobBuilder {
         return new SessionJobBuilder(jobFilePath);
     }
 
-    /**
-     * Obtain a mutable Job metadata label map.
-     *
-     * @param job Kubernetes Job to mutate
-     * @return mutable label map attached to the Job metadata
-     */
+    /** Obtain a mutable Job metadata label map attached to the Job. */
     @NotNull private static Map<String, String> getOrCreateJobLabels(V1Job job) {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
         final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(jobMetadata.getLabels(), Map.of()));
@@ -163,68 +160,68 @@ public class SessionJobBuilder {
      * @throws IOException If the provided Path cannot be read.
      */
     String build() throws IOException {
-        return buildManifest().job();
+        return Yaml.dump(buildLaunch().job());
     }
 
-    /**
-     * Construct the launch manifest output of this builder.
-     *
-     * @return SessionLaunchManifest instance. Never null.
-     * @throws IOException If the provided Path cannot be read.
-     */
-    SessionLaunchManifest buildManifest() throws IOException {
+    /** Build launch artifacts from the rendered template. */
+    LaunchArtifacts buildLaunch() throws IOException {
         final byte[] jobFileBytes = Files.readAllBytes(jobFilePath);
         String jobFileString = new String(jobFileBytes, StandardCharsets.UTF_8);
         for (final Map.Entry<String, String> entry : this.parameters.entrySet()) {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return buildManifest(jobFileString);
+        return buildLaunch(jobFileString);
     }
 
-    /**
-     * Build and mutate a Job from a rendered YAML template.
-     *
-     * @param jobFileString rendered Kubernetes Job YAML
-     * @return launch manifest after Skaha-managed mutations
-     * @throws IOException when the YAML cannot be parsed as a Kubernetes Job
-     */
-    private SessionLaunchManifest buildManifest(final String jobFileString) throws IOException {
+    /** Construct the launch manifest output of this builder. */
+    @Deprecated
+    SessionLaunchManifest buildManifest() throws IOException {
+        return SessionLaunchManifest.fromJob(buildLaunch().job());
+    }
+
+    /** Build and mutate launch artifacts from a rendered YAML template. */
+    private LaunchArtifacts buildLaunch(final String jobFileString) throws IOException {
         final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
-        mergeSessionLabels(launchJob);
+        final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
+        applyJobLabels(launchJob, labelPlan);
         mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
 
-        return SessionLaunchManifest.fromJob(launchJob);
+        return new LaunchArtifacts(launchJob, labelPlan);
     }
 
-    /**
-     * Attach canonical session labels to the Job and its pod template.
-     *
-     * @param launchJob Kubernetes Job to mutate
-     */
-    private void mergeSessionLabels(final V1Job launchJob) {
+    /** Build the canonical label plan for this launch. */
+    private SessionLabelPlan buildLabelPlan(final V1Job launchJob) {
         final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
-        putRequiredParameterLabel(labelValues, SessionLabels.Key.ID, PostAction.SKAHA_SESSIONID);
-        putRequiredParameterLabel(labelValues, SessionLabels.Key.USERNAME, PostAction.SKAHA_USERID);
-        putRequiredParameterLabel(labelValues, SessionLabels.Key.NAME, PostAction.SKAHA_SESSIONNAME);
-        putRequiredParameterLabel(labelValues, SessionLabels.Key.KIND, PostAction.SKAHA_SESSIONTYPE);
-        putParameterLabel(labelValues, SessionLabels.Key.APP_ID, PostAction.SOFTWARE_APPID);
-        putRequiredParameterLabel(
-                labelValues, SessionLabels.Key.JOB, PostAction.SOFTWARE_JOBNAME, PostAction.SKAHA_JOBNAME);
+        labelValues.put(SessionLabels.Key.ID, requireParam(PostAction.SKAHA_SESSIONID));
+        labelValues.put(SessionLabels.Key.USERNAME, requireParam(PostAction.SKAHA_USERID));
+        labelValues.put(SessionLabels.Key.NAME, requireParam(PostAction.SKAHA_SESSIONNAME));
+        labelValues.put(SessionLabels.Key.KIND, requireParam(PostAction.SKAHA_SESSIONTYPE));
+        final String appId = firstNonBlank(PostAction.SOFTWARE_APPID);
+        if (appId != null) {
+            labelValues.put(SessionLabels.Key.APP_ID, appId);
+        }
+        labelValues.put(
+                SessionLabels.Key.JOB,
+                requireFirstNonBlank(PostAction.SOFTWARE_JOBNAME, PostAction.SKAHA_JOBNAME));
         labelValues.put(SessionLabels.Key.FLAVOR, getResourceFlavor(launchJob));
         labelValues.put(SessionLabels.Key.ACCELERATOR, this.gpuCount > 0 ? "gpu" : "none");
 
         final Map<String, String> labels = new HashMap<>(SessionLabels.canonical(labelValues));
-
         final String skahaVersion = K8SUtil.getSkahaVersion();
         if (StringUtil.hasText(skahaVersion)) {
             labels.put(SessionLabels.Key.VERSION.label(), SessionLabels.version(skahaVersion));
         }
 
-        SessionJobBuilder.getOrCreateJobLabels(launchJob).putAll(labels);
+        return SessionLabelPlan.of(labels);
+    }
 
+    /** Attach job labels to the Job metadata and pod template metadata. */
+    private void applyJobLabels(final V1Job launchJob, final SessionLabelPlan plan) {
+        final Map<String, String> labels = plan.jobLabels();
+        SessionJobBuilder.getOrCreateJobLabels(launchJob).putAll(labels);
         final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
         final V1PodTemplateSpec podTemplate =
                 Objects.requireNonNullElse(jobSpec.getTemplate(), new V1PodTemplateSpec());
@@ -238,50 +235,32 @@ public class SessionJobBuilder {
         launchJob.setSpec(jobSpec);
     }
 
-    /**
-     * Copy the first present request parameter into a required canonical label value.
-     *
-     * @param labelValues destination label values
-     * @param label canonical label key
-     * @param parameterKeys request parameter keys to search in priority order
-     */
-    private void putRequiredParameterLabel(
-            final Map<SessionLabels.Key, String> labelValues,
-            final SessionLabels.Key label,
-            final String... parameterKeys) {
-        putParameterLabel(labelValues, label, parameterKeys);
-        if (!labelValues.containsKey(label)) {
-            throw new IllegalArgumentException(
-                    label.label() + " requires one of parameters " + String.join(", ", parameterKeys));
-        }
-    }
-
-    /**
-     * Copy the first present request parameter into an optional canonical label value.
-     *
-     * @param labelValues destination label values
-     * @param label canonical label key
-     * @param parameterKeys request parameter keys to search in priority order
-     */
-    private void putParameterLabel(
-            final Map<SessionLabels.Key, String> labelValues,
-            final SessionLabels.Key label,
-            final String... parameterKeys) {
-        for (final String parameterKey : parameterKeys) {
-            final String value = this.parameters.get(parameterKey);
+    /** Return the first non-blank parameter value for the provided keys. */
+    private String firstNonBlank(final String... keys) {
+        for (final String key : keys) {
+            final String value = this.parameters.get(key);
             if (StringUtil.hasText(value)) {
-                labelValues.put(label, value);
-                return;
+                return value;
             }
         }
+        return null;
     }
 
-    /**
-     * Infer whether the Job uses fixed or flexible memory sizing.
-     *
-     * @param launchJob Kubernetes Job to inspect
-     * @return {@code fixed} when memory request equals limit, otherwise {@code flexible}
-     */
+    /** Return one required parameter value. */
+    private String requireParam(final String key) {
+        return requireFirstNonBlank(key);
+    }
+
+    /** Return the first non-blank value or throw when none are present. */
+    private String requireFirstNonBlank(final String... keys) {
+        final String value = firstNonBlank(keys);
+        if (value == null) {
+            throw new IllegalArgumentException("requires one of parameters " + String.join(", ", keys));
+        }
+        return value;
+    }
+
+    /** Infer {@code fixed} vs {@code flexible} from memory request/limit equality. */
     private String getResourceFlavor(final V1Job launchJob) {
         final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
         final V1PodSpec podSpec =
