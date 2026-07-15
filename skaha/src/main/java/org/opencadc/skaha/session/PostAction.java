@@ -73,6 +73,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -491,8 +492,8 @@ public class PostAction extends SessionAction {
             sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
         }
 
-        final SessionLaunchManifest launchManifest = sessionJobBuilder.buildManifest();
-        String jobLaunchString = launchManifest.job();
+        final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
+        String jobLaunchString = Yaml.dump(launch.job());
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
@@ -519,7 +520,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            serviceString = launchManifest.service(serviceString);
+            serviceString = SessionJobBuilder.labelService(serviceString, launch.labels());
             final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
 
             log.debug("Create service result: " + createServiceResult);
@@ -535,7 +536,7 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString = launchManifest.ingress(ingressString);
+            ingressString = SessionJobBuilder.labelIngress(ingressString, launch.labels());
             final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
 
             log.debug("Create ingress result: " + createIngressResult);

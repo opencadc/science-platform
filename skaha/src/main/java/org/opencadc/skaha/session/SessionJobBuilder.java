@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -174,11 +175,35 @@ public class SessionJobBuilder {
         return buildLaunch(jobFileString);
     }
 
-    /** Construct the launch manifest output of this builder. */
-    @Deprecated
-    SessionLaunchManifest buildManifest() throws IOException {
-        final LaunchArtifacts launch = buildLaunch();
-        return SessionLaunchManifest.fromJobAndPlan(launch.job(), launch.labels());
+    static String labelService(final String serviceString, final SessionLabelPlan plan) throws IOException {
+        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
+        final V1Service service = (V1Service) Yaml.load(serviceString);
+        final V1ObjectMeta metadata = Objects.requireNonNullElse(service.getMetadata(), new V1ObjectMeta());
+        final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(metadata.getLabels(), Map.of()));
+        labels.putAll(labelPlan.serviceMetadataLabels());
+        metadata.setLabels(labels);
+        service.setMetadata(metadata);
+
+        final V1ServiceSpec spec = Objects.requireNonNullElse(service.getSpec(), new V1ServiceSpec());
+        spec.setSelector(labelPlan.serviceSelector());
+        service.setSpec(spec);
+
+        return Yaml.dump(service);
+    }
+
+    static String labelIngress(final String ingressString, final SessionLabelPlan plan) {
+        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
+        final org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        final List<Object> documents = new ArrayList<>();
+
+        for (final Object document : yaml.loadAll(ingressString)) {
+            if (document instanceof Map<?, ?> yamlDocument) {
+                applyMetadataLabels(yamlDocument, labelPlan.ingressMetadataLabels());
+            }
+            documents.add(document);
+        }
+
+        return yaml.dumpAll(documents.iterator());
     }
 
     /** Build and mutate launch artifacts from a rendered YAML template. */
@@ -234,6 +259,20 @@ public class SessionJobBuilder {
         podTemplate.setMetadata(podMetadata);
         jobSpec.setTemplate(podTemplate);
         launchJob.setSpec(jobSpec);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void applyMetadataLabels(final Map<?, ?> yamlDocument, final Map<String, String> metadataLabels) {
+        final Map<String, Object> document = (Map<String, Object>) yamlDocument;
+        final Map<String, Object> metadata =
+                (Map<String, Object>) document.computeIfAbsent("metadata", key -> new LinkedHashMap<>());
+        final Map<String, Object> labels = new LinkedHashMap<>();
+        final Object currentLabels = metadata.get("labels");
+        if (currentLabels instanceof Map<?, ?> currentLabelMap) {
+            currentLabelMap.forEach((key, value) -> labels.put(key.toString(), value));
+        }
+        labels.putAll(metadataLabels);
+        metadata.put("labels", labels);
     }
 
     /** Return the first non-blank parameter value for the provided keys. */

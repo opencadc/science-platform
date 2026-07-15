@@ -19,7 +19,7 @@ import org.junit.Test;
 
 public class SessionJobBuilderTest {
     @Test
-    public void launchManifestServiceUsesPlanMetadataInsteadOfScrapedJobLabels() throws Exception {
+    public void labelServiceUsesPlanMetadataInsteadOfScrapedJobLabels() throws Exception {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-queue.yaml", SessionJobBuilderTest.class)
                 .toPath();
@@ -41,8 +41,7 @@ public class SessionJobBuilderTest {
         tamperedJobLabels.put("canfar.net/name", "tampered-name");
         tamperedJobLabels.put("canfar.net/kind", "tampered-kind");
 
-        final String renderedService = SessionLaunchManifest.fromJobAndPlan(job, launch.labels())
-                .service(Files.readString(serviceTemplatePath));
+        final String renderedService = SessionJobBuilder.labelService(Files.readString(serviceTemplatePath), launch.labels());
         final V1Service service = (V1Service) Yaml.load(renderedService);
         final Map<String, String> serviceLabels =
                 Objects.requireNonNull(service.getMetadata().getLabels());
@@ -54,6 +53,61 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("session-123", serviceSelector.get("canfar.net/id"));
         Assert.assertEquals("notebook", serviceSelector.get("canfar.net/kind"));
         Assert.assertEquals(2, serviceSelector.size());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void labelIngressAppliesCanonicalMetadataLabelsAcrossYamlDocuments() throws Exception {
+        final Path testBaseValuesPath = FileUtil.getFileFromResource(
+                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
+                .toPath();
+        final Map<String, String> parametersToReplaceValues = new HashMap<>();
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
+        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "carta");
+        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
+        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "carta-alice-session-123");
+
+        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
+                .withParameters(parametersToReplaceValues)
+                .buildLaunch();
+
+        final String ingressYaml = """
+                apiVersion: networking.k8s.io/v1
+                kind: Ingress
+                metadata:
+                  name: carta-ingress
+                  labels:
+                    existing: label
+                ---
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: carta-config
+                """;
+
+        final String renderedIngress = SessionJobBuilder.labelIngress(ingressYaml, launch.labels());
+        final List<Map<String, Object>> documents = new ArrayList<>();
+        final org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        yaml.loadAll(renderedIngress).forEach(document -> documents.add((Map<String, Object>) document));
+
+        Assert.assertEquals(2, documents.size());
+        final Map<String, Object> ingressMetadata = (Map<String, Object>) documents.get(0).get("metadata");
+        final Map<String, Object> ingressLabels = (Map<String, Object>) ingressMetadata.get("labels");
+        Assert.assertEquals("label", ingressLabels.get("existing"));
+        Assert.assertEquals("session-123", ingressLabels.get("canfar.net/id"));
+        Assert.assertEquals("analysis", ingressLabels.get("canfar.net/name"));
+        Assert.assertEquals("carta", ingressLabels.get("canfar.net/kind"));
+        Assert.assertEquals("alice", ingressLabels.get("canfar.net/username"));
+        Assert.assertEquals("carta-alice-session-123", ingressLabels.get("canfar.net/job"));
+
+        final Map<String, Object> configMapMetadata = (Map<String, Object>) documents.get(1).get("metadata");
+        final Map<String, Object> configMapLabels = (Map<String, Object>) configMapMetadata.get("labels");
+        Assert.assertEquals("session-123", configMapLabels.get("canfar.net/id"));
+        Assert.assertEquals("analysis", configMapLabels.get("canfar.net/name"));
+        Assert.assertEquals("carta", configMapLabels.get("canfar.net/kind"));
+        Assert.assertEquals("alice", configMapLabels.get("canfar.net/username"));
+        Assert.assertEquals("carta-alice-session-123", configMapLabels.get("canfar.net/job"));
     }
 
     @Test
