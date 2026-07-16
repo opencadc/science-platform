@@ -6,6 +6,18 @@
 .vscode
 /**/charts/
 
+# Coding agents / local AI tooling
+.cursor/
+.claude/
+.codex/
+.superpowers/
+.agent/
+.agents/
+.gemini/
+.windsurf/
+.continue/
+.aider*
+
 # Local build stuff
 Dockerfile.local
 *tgz*
