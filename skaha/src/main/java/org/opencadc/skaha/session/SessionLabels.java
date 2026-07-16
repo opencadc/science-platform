@@ -251,5 +251,4 @@ public final class SessionLabels {
             return this.label;
         }
     }
-
 }

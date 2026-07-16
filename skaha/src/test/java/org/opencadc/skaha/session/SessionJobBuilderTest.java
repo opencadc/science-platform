@@ -23,7 +23,8 @@ public class SessionJobBuilderTest {
         final Path testBaseValuesPath = FileUtil.getFileFromResource(
                         "test-base-values-queue.yaml", SessionJobBuilderTest.class)
                 .toPath();
-        final Path serviceTemplatePath = FileUtil.getFileFromResource("test-carta-service.yaml", SessionJobBuilderTest.class)
+        final Path serviceTemplatePath = FileUtil.getFileFromResource(
+                        "test-carta-service.yaml", SessionJobBuilderTest.class)
                 .toPath();
         final Map<String, String> parametersToReplaceValues = new HashMap<>();
         parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
@@ -41,7 +42,8 @@ public class SessionJobBuilderTest {
         tamperedJobLabels.put("canfar.net/name", "tampered-name");
         tamperedJobLabels.put("canfar.net/kind", "tampered-kind");
 
-        final String renderedService = SessionJobBuilder.labelService(Files.readString(serviceTemplatePath), launch.labels());
+        final String renderedService =
+                SessionJobBuilder.labelService(Files.readString(serviceTemplatePath), launch.labels());
         final V1Service service = (V1Service) Yaml.load(renderedService);
         final Map<String, String> serviceLabels =
                 Objects.requireNonNull(service.getMetadata().getLabels());
@@ -72,7 +74,8 @@ public class SessionJobBuilderTest {
                 .withParameters(parametersToReplaceValues)
                 .buildLaunch();
 
-        final String ingressYaml = """
+        final String ingressYaml =
+                """
                 apiVersion: networking.k8s.io/v1
                 kind: Ingress
                 metadata:
@@ -92,7 +95,8 @@ public class SessionJobBuilderTest {
         yaml.loadAll(renderedIngress).forEach(document -> documents.add((Map<String, Object>) document));
 
         Assert.assertEquals(2, documents.size());
-        final Map<String, Object> ingressMetadata = (Map<String, Object>) documents.get(0).get("metadata");
+        final Map<String, Object> ingressMetadata =
+                (Map<String, Object>) documents.get(0).get("metadata");
         final Map<String, Object> ingressLabels = (Map<String, Object>) ingressMetadata.get("labels");
         Assert.assertEquals("label", ingressLabels.get("existing"));
         Assert.assertEquals("session-123", ingressLabels.get("canfar.net/id"));
@@ -101,7 +105,8 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("alice", ingressLabels.get("canfar.net/username"));
         Assert.assertEquals("carta-alice-session-123", ingressLabels.get("canfar.net/job"));
 
-        final Map<String, Object> configMapMetadata = (Map<String, Object>) documents.get(1).get("metadata");
+        final Map<String, Object> configMapMetadata =
+                (Map<String, Object>) documents.get(1).get("metadata");
         final Map<String, Object> configMapLabels = (Map<String, Object>) configMapMetadata.get("labels");
         Assert.assertEquals("session-123", configMapLabels.get("canfar.net/id"));
         Assert.assertEquals("analysis", configMapLabels.get("canfar.net/name"));
@@ -494,5 +499,4 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("skaha", labels.get("app.kubernetes.io/managed-by"));
         Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
     }
-
 }

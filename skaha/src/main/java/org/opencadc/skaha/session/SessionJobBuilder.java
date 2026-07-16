@@ -230,8 +230,7 @@ public class SessionJobBuilder {
             labelValues.put(SessionLabels.Key.APP_ID, appId);
         }
         labelValues.put(
-                SessionLabels.Key.JOB,
-                requireFirstNonBlank(PostAction.SOFTWARE_JOBNAME, PostAction.SKAHA_JOBNAME));
+                SessionLabels.Key.JOB, requireFirstNonBlank(PostAction.SOFTWARE_JOBNAME, PostAction.SKAHA_JOBNAME));
         labelValues.put(SessionLabels.Key.FLAVOR, getResourceFlavor(launchJob));
         labelValues.put(SessionLabels.Key.ACCELERATOR, this.gpuCount > 0 ? "gpu" : "none");
 
