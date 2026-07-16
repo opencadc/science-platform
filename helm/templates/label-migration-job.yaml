@@ -68,6 +68,9 @@ spec:
                 local legacy_key
                 local canonical_key
                 local value
+                local fixed_present
+                local flexible_present
+                local flavor=""
 
                 while IFS='=' read -r legacy_key canonical_key; do
                   value="$(read_legacy_value "$ref" "$scope" "$legacy_key")"
@@ -96,6 +99,33 @@ spec:
               canfar-net-sessionType=canfar.net/kind
               canfar-net-appID=canfar.net/app-id
               EOF
+
+                # Presence labels (value typically "true") → canfar.net/flavor=<token>.
+                # Prefer fixed when both legacy keys are present.
+                fixed_present="$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-fixed")"
+                flexible_present="$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-flexible")"
+                if [[ -n "$fixed_present" ]]; then
+                  flavor="fixed"
+                elif [[ -n "$flexible_present" ]]; then
+                  flavor="flexible"
+                fi
+
+                if [[ -n "$flavor" ]]; then
+                  case "$mode" in
+                    add)
+                      pairs+=("\"canfar.net/flavor\":\"$flavor\"")
+                      ;;
+                    replace)
+                      pairs+=("\"canfar.net/flavor\":\"$flavor\"")
+                      [[ -n "$fixed_present" ]] && pairs+=("\"opencadc.org/canfar-job-fixed\":null")
+                      [[ -n "$flexible_present" ]] && pairs+=("\"opencadc.org/canfar-job-flexible\":null")
+                      ;;
+                    strip)
+                      [[ -n "$fixed_present" ]] && pairs+=("\"opencadc.org/canfar-job-fixed\":null")
+                      [[ -n "$flexible_present" ]] && pairs+=("\"opencadc.org/canfar-job-flexible\":null")
+                      ;;
+                  esac
+                fi
 
                 if (( ${#pairs[@]} == 0 )); then
                   return 1

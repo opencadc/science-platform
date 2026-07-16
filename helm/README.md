@@ -73,7 +73,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | labelMigration.backoffLimit | int | `1` | `backoffLimit` for the label migration pre-upgrade Job. |
-| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` in phases across Pods, Job metadata, Services, and Ingresses. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable. |
+| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` (and `opencadc.org/canfar-job-fixed|flexible` → `canfar.net/flavor`) in phases across Pods, Job metadata, Services, and Ingresses. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable. |
 | labelMigration.image | string | `"bitnami/kubectl:1.29.0"` | Container image for the label migration hook Job. Must provide `kubectl` and `bash`. |
 | metricsBackend.enabled | bool | `false` | When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden). |
 | metricsBackend.env | object | `{}` | Map of environment variables for the Metrics container (typically METRICS_*). GitOps should supply the full map per environment. |
