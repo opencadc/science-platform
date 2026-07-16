@@ -118,6 +118,9 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 ## Session label migration
 
+Canonical keys, selectors, and the legacy→canonical mapping tables live in
+[skaha/docs/labels.md](../skaha/docs/labels.md).
+
 When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
 Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and migrates mapped labels to
 `canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Job metadata first,
