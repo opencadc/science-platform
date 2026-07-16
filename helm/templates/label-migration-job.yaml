@@ -25,10 +25,10 @@ spec:
           image: {{ .Values.labelMigration.image | quote }}
           imagePullPolicy: IfNotPresent
           command:
-            - /bin/bash
+            - /bin/sh
             - -ec
             - |
-              set -euo pipefail
+              set -eu
 
               NS="{{ include "skaha.workloadNamespace" . }}"
               SELECTOR="canfar-net-sessionID"
@@ -37,11 +37,21 @@ spec:
                 printf '[label-migration] %s\n' "$*"
               }
 
+              append_pair() {
+                pair_key="$1"
+                pair_value="$2"
+                if [ -n "$pairs" ]; then
+                  pairs="$pairs,\"$pair_key\":\"$pair_value\""
+                else
+                  pairs="\"$pair_key\":\"$pair_value\""
+                fi
+              }
+
               read_legacy_value() {
-                local ref="$1"
-                local scope="$2"
-                local key="$3"
-                local template
+                ref="$1"
+                scope="$2"
+                key="$3"
+                template=""
 
                 case "$scope" in
                   metadata)
@@ -56,42 +66,26 @@ spec:
                     ;;
                 esac
 
-                template="${template//KEY/$key}"
+                template=$(printf '%s' "$template" | sed "s|KEY|$key|g")
                 kubectl get -n "$NS" "$ref" -o go-template --template="$template"
               }
 
               build_scope_patch_object() {
-                local ref="$1"
-                local scope="$2"
-                local mode="$3"
-                local -a pairs=()
-                local legacy_key
-                local canonical_key
-                local value
-                local fixed_present
-                local flexible_present
-                local flavor=""
+                ref="$1"
+                scope="$2"
+                pairs=""
+                legacy_key=""
+                canonical_key=""
+                value=""
+                fixed_present=""
+                flexible_present=""
+                flavor=""
 
                 while IFS='=' read -r legacy_key canonical_key; do
-                  value="$(read_legacy_value "$ref" "$scope" "$legacy_key")"
-                  [[ -n "$value" ]] || continue
-
-                  case "$mode" in
-                    add)
-                      pairs+=("\"$canonical_key\":\"$value\"")
-                      ;;
-                    replace)
-                      pairs+=("\"$canonical_key\":\"$value\"")
-                      pairs+=("\"$legacy_key\":null")
-                      ;;
-                    strip)
-                      pairs+=("\"$legacy_key\":null")
-                      ;;
-                    *)
-                      log "unsupported patch mode: $mode"
-                      return 1
-                      ;;
-                  esac
+                  value=$(read_legacy_value "$ref" "$scope" "$legacy_key") || true
+                  if [ -n "$value" ]; then
+                    append_pair "$canonical_key" "$value"
+                  fi
                 done <<'EOF'
               canfar-net-sessionID=canfar.net/id
               canfar-net-userid=canfar.net/username
@@ -101,47 +95,33 @@ spec:
               EOF
 
                 # Presence labels (value typically "true") → canfar.net/flavor=<token>.
-                # Prefer fixed when both legacy keys are present.
-                fixed_present="$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-fixed")"
-                flexible_present="$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-flexible")"
-                if [[ -n "$fixed_present" ]]; then
+                # Prefer fixed when both legacy keys are present. Legacy keys are left in place.
+                fixed_present=$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-fixed") || true
+                flexible_present=$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-flexible") || true
+                if [ -n "$fixed_present" ]; then
                   flavor="fixed"
-                elif [[ -n "$flexible_present" ]]; then
+                elif [ -n "$flexible_present" ]; then
                   flavor="flexible"
                 fi
 
-                if [[ -n "$flavor" ]]; then
-                  case "$mode" in
-                    add)
-                      pairs+=("\"canfar.net/flavor\":\"$flavor\"")
-                      ;;
-                    replace)
-                      pairs+=("\"canfar.net/flavor\":\"$flavor\"")
-                      [[ -n "$fixed_present" ]] && pairs+=("\"opencadc.org/canfar-job-fixed\":null")
-                      [[ -n "$flexible_present" ]] && pairs+=("\"opencadc.org/canfar-job-flexible\":null")
-                      ;;
-                    strip)
-                      [[ -n "$fixed_present" ]] && pairs+=("\"opencadc.org/canfar-job-fixed\":null")
-                      [[ -n "$flexible_present" ]] && pairs+=("\"opencadc.org/canfar-job-flexible\":null")
-                      ;;
-                  esac
+                if [ -n "$flavor" ]; then
+                  append_pair "canfar.net/flavor" "$flavor"
                 fi
 
-                if (( ${#pairs[@]} == 0 )); then
+                if [ -z "$pairs" ]; then
                   return 1
                 fi
 
-                local IFS=,
-                printf '{%s}' "${pairs[*]}"
+                printf '{%s}' "$pairs"
               }
 
               retry_patch() {
-                local ref="$1"
-                local patch="$2"
-                local attempt=1
+                ref="$1"
+                patch="$2"
+                attempt=1
 
-                until kubectl patch -n "$NS" "$ref" --type=merge -p "$patch" >/dev/null; do
-                  if (( attempt >= 3 )); then
+                until kubectl patch -n "$NS" "$ref" --type=merge -p "$patch" >/dev/null 2>&1; do
+                  if [ "$attempt" -ge 3 ]; then
                     log "patch failed for $ref after ${attempt} attempts"
                     return 1
                   fi
@@ -152,16 +132,18 @@ spec:
               }
 
               patch_object() {
-                local kind="$1"
-                local ref="$2"
-                local metadata_mode="$3"
-                local selector_mode="$4"
-                local metadata_patch=""
-                local selector_patch=""
-                local -a sections=()
+                kind="$1"
+                ref="$2"
+                patch_metadata="$3"
+                patch_selector="$4"
+                metadata_patch=""
+                selector_patch=""
+                sections=""
 
-                if [[ -n "$metadata_mode" ]] && metadata_patch="$(build_scope_patch_object "$ref" metadata "$metadata_mode")"; then
-                  sections+=("\"metadata\":{\"labels\":$metadata_patch}")
+                if [ "$patch_metadata" = "true" ]; then
+                  if metadata_patch=$(build_scope_patch_object "$ref" metadata); then
+                    sections="\"metadata\":{\"labels\":$metadata_patch}"
+                  fi
                 fi
 
                 case "$kind" in
@@ -169,70 +151,66 @@ spec:
                     # Job pod templates are immutable, so only top-level metadata labels can be patched.
                     ;;
                   services)
-                    if [[ -n "$selector_mode" ]] && selector_patch="$(build_scope_patch_object "$ref" selector "$selector_mode")"; then
-                      sections+=("\"spec\":{\"selector\":$selector_patch}")
+                    if [ "$patch_selector" = "true" ]; then
+                      if selector_patch=$(build_scope_patch_object "$ref" selector); then
+                        if [ -n "$sections" ]; then
+                          sections="$sections,\"spec\":{\"selector\":$selector_patch}"
+                        else
+                          sections="\"spec\":{\"selector\":$selector_patch}"
+                        fi
+                      fi
                     fi
                     ;;
                 esac
 
-                if (( ${#sections[@]} == 0 )); then
+                if [ -z "$sections" ]; then
                   return 10
                 fi
 
-                local IFS=,
-                retry_patch "$ref" "{${sections[*]}}"
+                retry_patch "$ref" "{$sections}"
               }
 
               migrate_kind() {
-                local kind="$1"
-                local metadata_mode="$2"
-                local template_mode="$3"
-                local selector_mode="$4"
-                local -a refs=()
-                local selected=0
-                local patched=0
-                local skipped=0
-                local rc
+                kind="$1"
+                patch_metadata="$2"
+                patch_selector="$3"
+                refs_file=""
+                selected=0
+                patched=0
+                skipped=0
+                rc=0
 
-                mapfile -t refs < <(kubectl get -n "$NS" "$kind" -l "$SELECTOR" -o name)
-                selected="${#refs[@]}"
+                refs_file=$(mktemp)
+                kubectl get -n "$NS" "$kind" -l "$SELECTOR" -o name >"$refs_file"
+                selected=$(wc -l <"$refs_file" | tr -d ' ')
 
-                if [[ "$kind" == "jobs" && -n "$template_mode" && "$selected" -gt 0 ]]; then
+                if [ "$kind" = "jobs" ] && [ "$selected" -gt 0 ]; then
                   log "warning: Job.spec.template.metadata.labels is immutable; only Job metadata.labels will be patched. Live Pods are migrated separately, but Pod restarts during the upgrade window may recreate from legacy Job template labels. Prefer a quiet upgrade window or accept this residual risk."
                 fi
 
-                for ref in "${refs[@]}"; do
-                  if patch_object "$kind" "$ref" "$metadata_mode" "$selector_mode"; then
+                while IFS= read -r ref; do
+                  [ -n "$ref" ] || continue
+                  if patch_object "$kind" "$ref" "$patch_metadata" "$patch_selector"; then
                     patched=$((patched + 1))
                     continue
-                  else
-                    rc=$?
                   fi
-
-                  if (( rc == 10 )); then
+                  rc=$?
+                  if [ "$rc" -eq 10 ]; then
                     skipped=$((skipped + 1))
                     continue
                   fi
-
+                  rm -f "$refs_file"
                   return "$rc"
-                done
+                done <"$refs_file"
+                rm -f "$refs_file"
 
                 log "$kind: selected=$selected patched=$patched skipped=$skipped"
               }
 
-              log "migrating legacy session labels in namespace $NS"
-              log "phase A: add canonical labels to pods and Job metadata"
-              migrate_kind pods add "" ""
-              migrate_kind jobs add add ""
-
-              log "phase B: flip services to canonical selectors"
-              migrate_kind services replace "" replace
-
-              log "phase C: strip legacy ingress labels"
-              migrate_kind ingresses replace "" ""
-
-              log "phase D: strip legacy labels from pods and Job metadata"
-              migrate_kind pods strip "" ""
-              migrate_kind jobs strip strip ""
+              log "migrating legacy session labels in namespace $NS (add canonical labels only; legacy keys are retained)"
+              migrate_kind pods true false
+              migrate_kind jobs true false
+              migrate_kind services true true
+              migrate_kind ingresses true false
               log "session label migration complete"
 {{- end }}

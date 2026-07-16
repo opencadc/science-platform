@@ -73,8 +73,8 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | labelMigration.backoffLimit | int | `1` | `backoffLimit` for the label migration pre-upgrade Job. |
-| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that migrates live `canfar-net-*` session labels to `canfar.net/*` (and `opencadc.org/canfar-job-fixed|flexible` → `canfar.net/flavor`) in phases across Pods, Job metadata, Services, and Ingresses. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable. |
-| labelMigration.image | string | `"bitnami/kubectl:1.29.0"` | Container image for the label migration hook Job. Must provide `kubectl` and `bash`. |
+| labelMigration.enabled | bool | `true` | When true, run a Helm `pre-upgrade` Job in the workload namespace that adds mapped `canfar.net/*` labels (and `canfar.net/flavor` from `opencadc.org/canfar-job-fixed|flexible`) alongside legacy keys on Pods, Job metadata, Service metadata/selectors, and Ingresses. Legacy labels are not removed. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable. |
+| labelMigration.image | string | `"alpine/kubectl:latest"` | Container image for the label migration hook Job. Must provide `kubectl` and POSIX `sh` (for example `alpine/kubectl`). |
 | metricsBackend.enabled | bool | `false` | When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden). |
 | metricsBackend.env | object | `{}` | Map of environment variables for the Metrics container (typically METRICS_*). GitOps should supply the full map per environment. |
 | metricsBackend.image.pullPolicy | string | `"IfNotPresent"` | imagePullPolicy for the Metrics API container. |
@@ -122,10 +122,10 @@ Canonical keys, selectors, and the legacy→canonical mapping tables live in
 [skaha/docs/labels.md](../skaha/docs/labels.md).
 
 When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
-Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and migrates mapped labels to
-`canfar.net/*` in phases before Skaha rolls: add canonical labels to Pods and Job metadata first,
-flip Service selectors to the canonical keys while workloads still carry both label families, then
-strip legacy labels from Services, Ingresses, Pods, and Job metadata.
+Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and **adds** mapped `canfar.net/*`
+labels (and `canfar.net/flavor` from `opencadc.org/canfar-job-fixed|flexible`) before Skaha rolls.
+Legacy `canfar-net-*` and `opencadc.org/*` keys are left in place on metadata and Service
+selectors.
 
 The hook does **not** rewrite `Job.spec.template.metadata.labels`. Kubernetes treats Job pod
 templates as immutable, so the chart only patches `Job.metadata.labels` and relies on the separate
