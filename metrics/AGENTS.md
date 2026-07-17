@@ -1,67 +1,37 @@
-# AGENTS routing index
+# Metrics agent instructions
 
-This file is routing-only. Keep detailed policy in `docs/harness/`.
+## Repo map
 
-## Canonical precedence
+- `src/metrics/` — FastAPI Metrics API (platform metrics, providers, cache, telemetry).
+- `tests/` — unit and integration tests (`integration` marker requires cluster/services).
+- `helm/metrics-api/` — reference Helm chart (authoritative deploy chart is in `deployments`).
+- `scripts/` — kind smoke, Helm deploy helpers, local cluster fixtures.
+- `docs/` — architecture, design, specs, ADRs, learnings, and agent skills.
 
-Follow `docs/harness/index.md` for precedence and conflict handling.
+## Validation
 
-## Required reading
+From `metrics/`:
 
-Start with `docs/harness/index.md`. It routes to every canonical harness
-module by concern and keeps the module map in one place so this file stays
-a thin pointer. All canonical modules live under `docs/harness/`:
+- Lint: `uv run ruff check src tests`
+- Unit tests: `uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80 -m "not integration"`
+- Integration (local kind): `bash scripts/kind-smoke.sh`
 
-- `docs/harness/index.md`
-- `docs/harness/loop.md`
-- `docs/harness/rules-core.md`
-- `docs/harness/routing.md`
-- `docs/harness/hooks.md`
-- `docs/harness/verification.md`
-- `docs/harness/artifacts.md`
-- `docs/harness/subagents.md`
-- `docs/harness/handoff-templates.md`
-- `docs/harness/review-arbitration.md`
-- `docs/harness/token-efficiency.md`
-- `docs/harness/doc-gardening.md`
-- `docs/harness/metrics.md`
-- `docs/harness/learnings.md`
+After substantive CI or script changes, run `pre-commit run --all-files` at the
+science-platform repository root.
 
-## Machine-readable policy
+## Agent skills
 
-- `docs/harness/router-policy.yaml`
-- `docs/harness/artifact-schema.yaml`
-- `docs/harness/hook-policy.yaml`
-- `docs/harness/metrics-schema.yaml`
-- `project-gates.yaml`
+### Issue tracker
 
-## Repository-specific docs
+Metrics work is tracked in Jira (CADC project on `herzberg.atlassian.net`, **`CANFAR`** label). See `docs/agents/issue-tracker.md`.
 
-Use these for project facts and behavior only.
+### Triage labels
 
-- `docs/architecture.md`
-- `docs/design.md`
-- `docs/specs.md`
-- `docs/learnings.md`
-- `docs/plans/index.md`
-- `docs/plans/milestone-process.md`
+Canonical triage roles map to Jira statuses in `docs/agents/triage-labels.md`.
 
-## Adapter locations
+### Domain docs
 
-- Canonical reviewer personas: `docs/harness/personas/`
-- Codex: `.codex/hooks.json`, `.codex/agents/`
-- Cursor: `.cursor/hooks.json`, `.cursor/rules/`, `.cursor/agents/`
-- Claude: `.claude/hooks.json`, `.claude/agents/`
-
-All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
---tool <tool>` so canonical policy lives in `docs/harness/hook-policy.yaml`.
-
-## Ownership boundaries
-
-- Reusable process policy: `docs/harness/`
-- Harness runtime code: `.harness/harness/`
-- Project implementation facts: `docs/`
-- Delivery and milestones: `docs/plans/`
+Multi-context monorepo: start at `CONTEXT-MAP.md` at the science-platform repo root; read `metrics/CONTEXT.md` and `metrics/docs/adr/` for Metrics work. See `docs/agents/domain.md`.
 
 ## Learned User Preferences
 
@@ -71,12 +41,12 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
   Kubernetes context is selected (for example
   `kubectl config use-context kind-metrics`) and that kind, Helm, and kubectl
   are installed.
-- For substantial milestone or feature work, run multiple reviewer personas or aspect-focused reviews, synthesize a consensus, incorporate the feedback, and ask for human arbitration if reviewer disagreement deadlocks; when the work materially changes behavior or structure, update `docs/architecture.md`, `docs/design.md`, `docs/specs.md`, and `docs/learnings.md` so those documents match the delivered system.
-- When implementing approved restructuring plans, relocate or consolidate modules as the plan describes instead of relying on thin re-export shims or extra boilerplate that keeps obsolete import surfaces alive.
+- For substantial feature work, run aspect-focused reviews (architecture, reliability, scale, token efficiency as relevant), synthesize a consensus, and ask for human arbitration if reviewers deadlock; when the work materially changes behavior or structure, update `docs/architecture.md`, `docs/design.md`, `docs/specs.md`, `docs/learnings.md`, and ADRs under `docs/adr/` so those documents match the delivered system.
+- When implementing approved restructuring work, relocate or consolidate modules as decided instead of relying on thin re-export shims or extra boilerplate that keeps obsolete import surfaces alive.
 - For local kind workflows, use the existing cluster when possible (typically
   `metrics`); do not create extra disposable clusters unless the user asks for
   them.
-- When executing an attached implementation plan, carry out the steps but do not edit the plan file itself unless the user explicitly requests plan updates.
+- When executing an attached implementation plan or ADR follow-up, carry out the steps but do not edit the plan/ADR file itself unless the user explicitly requests updates.
 - For user-facing HTTP APIs, avoid internal implementation details in JSON bodies; prefer standard HTTP caching headers (`Cache-Control`, `Expires`, `Date`, `Last-Modified`, and related headers) over embedding cache metadata in JSON for shared cacheable resources.
 - In GitHub Actions workflows for this repository, do not pin `step-security/harden-runner` to a commit SHA; use a floating major tag (for example `step-security/harden-runner@v2`) unless the user specifies otherwise.
 - For platform metrics responses, keep `capacity` and `allocated` in consistent, comparable units (the user treats mixed or mismatched unit presentation in that API as an unacceptable defect).
@@ -85,7 +55,7 @@ All adapters invoke the shared bridge `python -m harness.hooks.bridge <event>
 
 ## Learned Workspace Facts
 
-- Product and implementation conventions belong in `docs/learnings.md`; harness-wide notes belong in `docs/harness/learnings.md`.
+- Product and implementation conventions belong in `docs/learnings.md`.
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke: `metrics/scripts/kind-smoke.sh`
   (Kueue, `scripts/test-setup.yaml`, Docker build/load, integration tests) and

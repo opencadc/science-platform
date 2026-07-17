@@ -2,8 +2,6 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.harness/telemetry.jsonl
-.harness/claims.jsonl
 
 .coverage
 
@@ -17,12 +15,10 @@ __pycache__/
 .env
 compose.override.yaml
 
-# Cursor and IDE runtime state - not part of the harness contract
-.cursor/hooks/state/
-.cursor/hooks/state/**
-.cursor/.runtime/
-.codex/.runtime/
-.claude/.runtime/
+# Local AI assistant / IDE adapter dirs (not part of Metrics delivery)
+.cursor/
+.claude/
+.codex/
 
 # Legacy packaged Helm subchart tarballs (file:// deps), if reintroduced
 helm/metrics-api/charts/*.tgz

@@ -406,10 +406,6 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
-harness = [
-    { name = "pydantic" },
-    { name = "pyyaml" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -434,10 +430,6 @@ dev = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.14.2" },
-]
-harness = [
-    { name = "pydantic", specifier = ">=2.13.1" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]

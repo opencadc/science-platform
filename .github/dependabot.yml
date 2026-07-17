@@ -4,8 +4,36 @@ updates:
     directory: /
     schedule:
       interval: daily
+    open-pull-requests-limit: 3
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
+        update-types:
+          - "minor"
+          - "patch"
+      docker-actions:
+        patterns:
+          - "docker/*"
+        update-types:
+          - "minor"
+          - "patch"
+      github-actions:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "github/codeql-action/*"
+          - "docker/*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: docker
     directory: /skaha
     schedule:
       interval: daily
+    open-pull-requests-limit: 1
+    groups:
+      skaha-docker-images:
+        patterns:
+          - "*"

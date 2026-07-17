@@ -4,6 +4,15 @@
 /**/build
 /**/bin
 .vscode
+
+# Local AI assistant / IDE tool directories (repo root only)
+/.cursor/
+/.claude/
+/.codex/
+/.aider/
+/.continue/
+/.windsurf/
+
 /**/charts/
 
 # Local build stuff
