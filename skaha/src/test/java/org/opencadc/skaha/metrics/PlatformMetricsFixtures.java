@@ -20,6 +20,11 @@ public final class PlatformMetricsFixtures {
         return FIXED;
     }
 
+    /** {@link MetricsDAO} with no Metrics backend configured (for 503 stats tests). */
+    public static MetricsDAO unconfiguredPlatformMetricsDAO() {
+        return new MetricsDAO(null, (userID, omitHeadless) -> PodMetrics.empty());
+    }
+
     /** {@link MetricsDAO} that returns {@link #fixedPlatformMetrics()} and empty pod usage. */
     public static MetricsDAO metricsDAOWithFixedPlatformMetrics() throws Exception {
         final PlatformMetricsDAO platformDao = Mockito.mock(PlatformMetricsDAO.class);

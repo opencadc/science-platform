@@ -18,7 +18,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.opencadc.skaha.context.LimitRangeResourceContext;
 import org.opencadc.skaha.metrics.MetricsDAO;
-import org.opencadc.skaha.metrics.PodMetrics;
 import org.opencadc.skaha.metrics.PlatformMetrics.ClusterResourceFields;
 import org.opencadc.skaha.metrics.PlatformMetricsFixtures;
 
@@ -87,7 +86,7 @@ public class GetActionResourceStatsTest {
     @Test
     public void statsViewReturns503WhenMetricsBackendNotConfigured() throws Exception {
         final TestableGetAction get = new TestableGetAction(
-                new MetricsDAO(null, (userID, omitHeadless) -> PodMetrics.empty()),
+                PlatformMetricsFixtures.unconfiguredPlatformMetricsDAO(),
                 containerLimitRangeFixture(),
                 true);
         get.configureStatsViewRequest();

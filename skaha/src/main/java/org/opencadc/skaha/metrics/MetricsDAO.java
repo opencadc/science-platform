@@ -26,8 +26,7 @@ public class MetricsDAO {
         this(PlatformMetricsDAO.fromEnvironmentOrNull(), PodUsageProvider.fromEnvironment());
     }
 
-    /** @visibleForTesting */
-    public MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
+    MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
         this.platformMetricsDAO = platformMetricsDAO;
         this.podUsageProvider = podUsageProvider;
     }
