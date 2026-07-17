@@ -18,7 +18,8 @@ import java.util.Map;
  * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
  * <p>Configured via the {@value #SKAHA_METRICS_BACKEND_URL} environment variable (in-cluster base URL, without a
- * trailing slash).
+ * trailing slash). When that variable is unset, use {@link #fromEnvironmentOrNull()} and treat a {@code null} result as
+ * Metrics not deployed.
  */
 class PlatformMetricsDAO {
 
@@ -31,9 +32,16 @@ class PlatformMetricsDAO {
     private final Gson gson = new Gson();
     private final String platformMetricsUrl;
 
-    /** Uses {@link #SKAHA_METRICS_BACKEND_URL} from the process environment. */
-    public PlatformMetricsDAO() {
-        this(System.getenv(SKAHA_METRICS_BACKEND_URL));
+    /**
+     * Returns a platform Metrics client when {@link #SKAHA_METRICS_BACKEND_URL} is set; otherwise {@code null} so
+     * callers can run without a co-deployed Metrics backend.
+     */
+    static PlatformMetricsDAO fromEnvironmentOrNull() {
+        final String metricsBackendBaseUrl = System.getenv(SKAHA_METRICS_BACKEND_URL);
+        if (!StringUtil.hasText(metricsBackendBaseUrl)) {
+            return null;
+        }
+        return new PlatformMetricsDAO(metricsBackendBaseUrl);
     }
 
     /** @param metricsBackendBaseUrl Metrics backend base URL (for example {@code http://skaha-metrics:8000}) */

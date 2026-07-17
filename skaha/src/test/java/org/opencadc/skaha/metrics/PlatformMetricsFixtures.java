@@ -33,4 +33,9 @@ public final class PlatformMetricsFixtures {
         Mockito.when(platformDao.getPlatformMetrics()).thenThrow(new IOException("metrics backend unreachable"));
         return new MetricsDAO(platformDao, (userID, omitHeadless) -> PodMetrics.empty());
     }
+
+    /** {@link MetricsDAO} with no Metrics backend configured (metricsBackend.enabled=false). */
+    public static MetricsDAO unconfiguredPlatformMetricsDAO() {
+        return new MetricsDAO(null, (userID, omitHeadless) -> PodMetrics.empty());
+    }
 }
