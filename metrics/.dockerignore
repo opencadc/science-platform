@@ -17,11 +17,6 @@ dist/
 build/
 *.egg-info/
 
-.cursor/
-.claude/
-.codex/
-.harness/
-
 tests/
 scripts/
 helm/

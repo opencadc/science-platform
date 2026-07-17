@@ -67,17 +67,12 @@ init_skaha_dir () {
 
 init_applications_dir () {
   # XFCE is hardcoded to use ~/.local/share/applications
-  if [[ -d ${XFCE_DESKTOP_DIR} ]]; then
-    # directory already exists, delete it
+  if [[ -e ${XFCE_DESKTOP_DIR} || -L ${XFCE_DESKTOP_DIR} ]]; then
     rm -rf ${XFCE_DESKTOP_DIR}
   fi
 
-  # create soft link if there isn't one already
-  # ensure the parent directory is created first
-  if [[ ! -L ${XFCE_DESKTOP_DIR} ]]; then
-    mkdir -p ${XFCE_DESKTOP_DIR_PARENT}
-    ln -s ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
-  fi
+  mkdir -p ${XFCE_DESKTOP_DIR_PARENT}
+  ln -sfn ${DESKTOP_DIR} ${XFCE_DESKTOP_DIR}
 }
 
 init () {

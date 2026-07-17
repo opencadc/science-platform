@@ -9,7 +9,7 @@ COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
-FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0@sha256:3571c114fa43ca9ce1997ad50e695e601e1dfbfd3f8afde24f2ad00810a89ad2 AS otel-javaagent
+FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0@sha256:5c3b76d34492efbd3166bdcfacfc0154b071bb323c3734ebb018223170d52e29 AS otel-javaagent
 
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
 

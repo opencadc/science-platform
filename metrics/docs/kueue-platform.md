@@ -1,10 +1,12 @@
 # Kueue platform metrics (developer guide)
 
 This document explains **why** the Kueue integration is structured the way it
-is and **which modules** participate. It complements milestone plans under
-`docs/plans/` and operator-facing notes in `docs/environment-contracts.md`.
-For the full M4 composition rules (add a config block, register a provider, wire
-scopes, tests), use `docs/plans/PLAN_M4_provider_runtime_architecture.md`.
+is and **which modules** participate. It complements
+[`docs/adr/README.md`](adr/README.md) and operator-facing notes in
+[`environment-contracts.md`](environment-contracts.md). For the extension pattern
+(config, registry, provider, scopes), see
+[`adr/0005-metrics-runtime-composition-root.md`](adr/0005-metrics-runtime-composition-root.md)
+and ADR-0011.
 
 ## Goals
 

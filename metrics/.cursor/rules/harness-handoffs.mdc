@@ -1,5 +1,0 @@
----
-description: Apply handoff templates and output contracts.
-alwaysApply: false
----
-Follow `docs/harness/handoff-templates.md` and `docs/harness/artifact-schema.yaml` for agent handoffs.

@@ -1,5 +1,0 @@
----
-description: Route to canonical harness index.
-alwaysApply: true
----
-Use `docs/harness/index.md` as the source of truth.
