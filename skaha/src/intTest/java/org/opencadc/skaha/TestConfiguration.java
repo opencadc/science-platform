@@ -149,11 +149,10 @@ public class TestConfiguration {
             final RegistryClient registryClient = new RegistryClient();
             final URI loginServiceID = TestConfiguration.getGMSServiceID();
             final URL loginURL;
-            final URL newLoginURL =
-                    registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            final URL newLoginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10);
             if (newLoginURL == null) {
                 LOGGER.info("No login service URL found.  Trying older login Resource ID...");
-                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01, AuthMethod.ANON);
+                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01);
             } else {
                 loginURL = newLoginURL;
             }

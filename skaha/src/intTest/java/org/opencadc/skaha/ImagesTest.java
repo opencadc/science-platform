@@ -106,10 +106,7 @@ public class ImagesTest {
         try {
             final RegistryClient regClient = new RegistryClient();
             this.authenticatedUser = TestConfiguration.getCurrentUser();
-            this.imageURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(),
-                    Standards.PLATFORM_IMAGE_1,
-                    this.authenticatedUser.authMethod);
+            this.imageURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1);
 
             this.authenticatedUser.setDomain(NetUtil.getDomainName(this.imageURL));
             log.info("sessions URL: " + imageURL);

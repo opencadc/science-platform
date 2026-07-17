@@ -67,11 +67,11 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
@@ -102,8 +102,8 @@ public class DesktopAppLifecycleTest {
     public DesktopAppLifecycleTest() {
         try {
             RegistryClient regClient = new RegistryClient();
-            this.sessionURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, AuthMethod.TOKEN);
+            this.sessionURL =
+                    regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
             log.info("sessions URL: " + sessionURL);
 
             this.authenticatedUser = TestConfiguration.getCurrentUser();
@@ -132,7 +132,8 @@ public class DesktopAppLifecycleTest {
             SessionUtil.verifySession(
                     desktopSession, SessionAction.SESSION_TYPE_DESKTOP, "inttest" + SessionAction.SESSION_TYPE_DESKTOP);
 
-            final URL desktopAppURL = new URL(this.sessionURL.toString() + "/" + desktopSession.getId() + "/app");
+            final URL desktopAppURL = URI.create(this.sessionURL.toString() + "/" + desktopSession.getId() + "/app")
+                    .toURL();
             log.info("desktop-app URL: " + desktopAppURL);
 
             // create a terminal desktop-app

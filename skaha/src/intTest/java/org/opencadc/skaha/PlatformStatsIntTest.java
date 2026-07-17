@@ -1,8 +1,10 @@
 package org.opencadc.skaha;
 
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
+import ca.nrc.cadc.util.StringUtil;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -32,6 +34,7 @@ public class PlatformStatsIntTest {
 
     private static final String METRICS_INTTEST_MODE_ENV = "SKAHA_METRICS_INTTEST_MODE";
     private static final String FIXTURE_MODE = "fixture";
+    private static final String DISABLED_MODE = "disabled";
 
     private static final Logger log = Logger.getLogger(PlatformStatsIntTest.class);
 
@@ -41,17 +44,30 @@ public class PlatformStatsIntTest {
 
     private final URL sessionURL;
     private final AuthenticatedUser authenticatedUser;
+    private final String metricsMode = !StringUtil.hasText(System.getenv(METRICS_INTTEST_MODE_ENV))
+            ? DISABLED_MODE
+            : System.getenv(METRICS_INTTEST_MODE_ENV);
 
     public PlatformStatsIntTest() throws Exception {
         final RegistryClient regClient = new RegistryClient();
         this.authenticatedUser = TestConfiguration.getCurrentUser();
-        this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+        this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
+        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+        log.info("Metrics mode is " + metricsMode);
         log.info("sessions URL: " + sessionURL);
+    }
+
+    boolean metricsDisabled() {
+        return this.metricsMode.equals(DISABLED_MODE);
     }
 
     @Test
     public void platformStatsMatchesSchema() throws Exception {
+        if (metricsDisabled()) {
+            log.info("Skipping platform stats matching test");
+            return;
+        }
+
         Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             final JSONObject stats = SessionUtil.getStats(sessionURL);
             validateStatsSchema(stats);
@@ -62,6 +78,11 @@ public class PlatformStatsIntTest {
 
     @Test
     public void platformStatsClusterTotalsMatchFixtureWhenConfigured() throws Exception {
+        if (metricsDisabled()) {
+            log.info("Skipping platform stats matching test");
+            return;
+        }
+
         Assume.assumeTrue(FIXTURE_MODE.equalsIgnoreCase(System.getenv(METRICS_INTTEST_MODE_ENV)));
 
         Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {

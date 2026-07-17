@@ -8,7 +8,7 @@ import javax.security.auth.Subject;
 
 public class AuthenticatedUser {
     final Subject subject;
-    final AuthMethod authMethod;
+    private final AuthMethod authMethod;
 
     public AuthenticatedUser(final Subject subject, final AuthMethod authMethod) {
         this.subject = subject;

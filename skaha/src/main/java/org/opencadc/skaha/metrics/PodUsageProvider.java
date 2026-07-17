@@ -10,8 +10,6 @@ interface PodUsageProvider {
     PodMetrics getPodMetrics(String userID, boolean omitHeadless) throws Exception;
 
     static PodUsageProvider fromConfiguration(final MetricsConfiguration metricsConfiguration) {
-        return metricsConfiguration.metricsBackEndUrl == null
-                ? KubernetesPodUsageProvider.fromConfiguration()
-                : MetricsBackendPodUsageProvider.fromConfiguration();
+        return KubernetesPodUsageProvider.fromConfiguration();
     }
 }

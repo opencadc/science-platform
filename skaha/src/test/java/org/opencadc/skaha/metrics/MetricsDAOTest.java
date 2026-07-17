@@ -1,5 +1,6 @@
 package org.opencadc.skaha.metrics;
 
+import java.net.URI;
 import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
@@ -67,8 +68,15 @@ public class MetricsDAOTest {
     }
 
     @Test
-    public void fromEnvironmentSelectsBackendProviderWhenConfigured() throws Exception {
-        // Cannot set env in Java easily; test the backend class directly
+    public void fromConfigurationUsesKubernetesPodProviderWhenMetricsBackendConfigured() throws Exception {
+        final MetricsConfiguration config =
+                new MetricsConfiguration(URI.create("http://metrics:8000").toURL());
+        final PodUsageProvider provider = PodUsageProvider.fromConfiguration(config);
+        Assert.assertTrue(provider instanceof KubernetesPodUsageProvider);
+    }
+
+    @Test
+    public void metricsBackendPodProviderIsNotYetImplemented() {
         final PodUsageProvider provider = MetricsBackendPodUsageProvider.fromConfiguration();
         Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
     }

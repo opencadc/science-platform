@@ -36,10 +36,8 @@ public class RepositoryHostsTest {
             this.repositoryURL = URI.create(configuredServiceEndpoint).toURL();
         } else {
             final RegistryClient regClient = new RegistryClient();
-            this.repositoryURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(),
-                    Standards.PLATFORM_REPO_1,
-                    this.authenticatedUser.authMethod);
+            this.repositoryURL =
+                    regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_REPO_1);
         }
 
         this.authenticatedUser.setDomain(NetUtil.getDomainName(this.repositoryURL));

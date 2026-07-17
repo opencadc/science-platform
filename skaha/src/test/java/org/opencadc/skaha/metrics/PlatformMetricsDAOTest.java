@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
@@ -90,14 +91,33 @@ public class PlatformMetricsDAOTest {
     }
 
     @Test
+    public void getPlatformMetricsFetchesFromApiPathOnBaseUrl() throws Exception {
+        final PlatformMetricsDAO dao =
+                new PlatformMetricsDAO(URI.create("http://127.0.0.1:" + port).toURL());
+
+        final PlatformMetrics metrics = dao.getPlatformMetrics();
+
+        Assert.assertEquals(
+                Instant.parse("2026-03-15T12:30:00Z"), metrics.metadata().created());
+        Assert.assertEquals(
+                Map.of("cpu", "100", "memory", "200Gi"), metrics.data().capacity());
+        Assert.assertEquals(
+                Map.of("cpu", "25", "memory", "50Gi"), metrics.data().allocated());
+    }
+
+    @Test
+    public void platformMetricsUrlAppendsApiPath() throws Exception {
+        final URL base = URI.create("http://metrics:8000").toURL();
+
+        Assert.assertEquals(
+                "http://metrics:8000/api/v1/metrics/platform",
+                PlatformMetricsDAO.platformMetricsUrl(base).toString());
+    }
+
+    @Test
     public void normalizesTrailingSlashOnBaseUrl() throws Exception {
         final PlatformMetricsDAO dao = new PlatformMetricsDAO(
-                URI.create("http://127.0.0.1:" + port + "/").toURL()) {
-            @Override
-            void getFromMetricsService(OutputStream responseBody) throws Exception {
-                PlatformMetricsDAOTest.writeJSON("normalizesTrailingSlashOnBaseUrl", responseBody);
-            }
-        };
+                URI.create("http://127.0.0.1:" + port + "/").toURL());
 
         final PlatformMetrics metrics = dao.getPlatformMetrics();
 
@@ -108,6 +128,7 @@ public class PlatformMetricsDAOTest {
     @Test
     public void requiresNonBlankMetricsBackendUrl() {
         Assert.assertThrows(IllegalArgumentException.class, () -> new PlatformMetricsDAO(null));
+        Assert.assertThrows(IllegalArgumentException.class, () -> PlatformMetricsDAO.platformMetricsUrl(null));
     }
 
     static void writeJSON(final String methodName, final OutputStream responseBody) throws IOException {

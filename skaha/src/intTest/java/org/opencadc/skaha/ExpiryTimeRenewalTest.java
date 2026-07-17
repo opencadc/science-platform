@@ -108,8 +108,7 @@ public class ExpiryTimeRenewalTest {
     public ExpiryTimeRenewalTest() throws Exception {
         final RegistryClient regClient = new RegistryClient();
         this.authenticatedUser = TestConfiguration.getCurrentUser();
-        this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+        this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
 
         this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
         log.debug("userSubject: " + authenticatedUser.subject);

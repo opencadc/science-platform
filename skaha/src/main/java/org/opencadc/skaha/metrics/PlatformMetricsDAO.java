@@ -9,6 +9,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.time.Instant;
 import java.util.Collections;
@@ -18,10 +20,10 @@ import java.util.Objects;
 /**
  * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
- * <p>Configured via the {@value org.opencadc.skaha.metrics.MetricsConfiguration} environment variable (in-cluster base
- * URL, without a trailing slash).
+ * <p>Configured via {@code SKAHA_METRICS_BACKEND_URL} (in-cluster base URL, without a trailing slash).
  */
 class PlatformMetricsDAO implements PlatformUsageProvider {
+    static final String PLATFORM_METRICS_PATH = "/api/v1/metrics/platform";
     private static final Type STRING_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
     private final Gson gson = new Gson();
@@ -38,11 +40,21 @@ class PlatformMetricsDAO implements PlatformUsageProvider {
         return new PlatformMetricsDAO(metricsConfiguration.metricsBackEndUrl);
     }
 
-    PlatformMetricsDAO(final URL platformMetricsUrl) {
-        if (platformMetricsUrl == null) {
-            throw new IllegalArgumentException("platformMetricsUrl cannot be null");
+    static URL platformMetricsUrl(final URL metricsBackendBaseUrl) {
+        if (metricsBackendBaseUrl == null) {
+            throw new IllegalArgumentException("metricsBackendBaseUrl cannot be null");
         }
-        this.platformMetricsUrl = platformMetricsUrl;
+        try {
+            return URI.create(MetricsConfiguration.normalizeBaseUrl(metricsBackendBaseUrl.toString())
+                            + PLATFORM_METRICS_PATH)
+                    .toURL();
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("invalid metrics backend base URL: " + metricsBackendBaseUrl, e);
+        }
+    }
+
+    PlatformMetricsDAO(final URL metricsBackendBaseUrl) {
+        this.platformMetricsUrl = platformMetricsUrl(metricsBackendBaseUrl);
     }
 
     void getFromMetricsService(final OutputStream responseBody) throws Exception {
