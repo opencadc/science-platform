@@ -287,6 +287,7 @@ public class UserStorageClient {
         final URI nodeURI =
                 URI.create(this.userStorageConfiguration.userHomeBaseURI + "/" + owner + "/" + relativePath);
         final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
+        transfer.setQuickTransfer(true);
         transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
 
         final ClientTransfer clientTransfer = voSpaceClient.createTransfer(transfer);

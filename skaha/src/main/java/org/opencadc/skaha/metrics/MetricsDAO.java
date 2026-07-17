@@ -11,16 +11,18 @@ public class MetricsDAO {
     private static final Logger log = Logger.getLogger(MetricsDAO.class);
     private static MetricsDAO defaultInstance;
 
-    private final PlatformMetricsDAO platformMetricsDAO;
+    private final PlatformUsageProvider platformUsageProvider;
     private final PodUsageProvider podUsageProvider;
 
     /** Production wiring: Metrics backend for platform stats, environment-selected pod-usage provider. */
-    public MetricsDAO() {
-        this(new PlatformMetricsDAO(), PodUsageProvider.fromEnvironment());
+    public static MetricsDAO fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+        return new MetricsDAO(
+                PlatformUsageProvider.fromConfiguration(metricsConfiguration),
+                PodUsageProvider.fromConfiguration(metricsConfiguration));
     }
 
-    MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
-        this.platformMetricsDAO = platformMetricsDAO;
+    MetricsDAO(final PlatformUsageProvider platformUsageProvider, final PodUsageProvider podUsageProvider) {
+        this.platformUsageProvider = platformUsageProvider;
         this.podUsageProvider = podUsageProvider;
     }
 
@@ -35,9 +37,9 @@ public class MetricsDAO {
     }
 
     /** Shared production instance for session handlers. */
-    public static MetricsDAO getDefault() {
+    public static MetricsDAO getDefault() throws Exception {
         if (defaultInstance == null) {
-            defaultInstance = new MetricsDAO();
+            defaultInstance = MetricsDAO.fromConfiguration(MetricsConfiguration.fromEnv());
         }
         return defaultInstance;
     }
@@ -47,9 +49,10 @@ public class MetricsDAO {
      *
      * @return platform metrics from the Metrics backend
      * @throws Exception if the snapshot cannot be retrieved
+     * @throws UnsupportedOperationException If no platform metrics are implemented
      */
     public PlatformMetrics getPlatformMetrics() throws Exception {
-        return platformMetricsDAO.getPlatformMetrics();
+        return platformUsageProvider.getPlatformMetrics();
     }
 
     /**

@@ -1,0 +1,13 @@
+{
+  "metadata": { "created": "2026-03-15T12:30:00Z" },
+  "data": {
+    "capacity": {
+      "cpu": "100",
+      "memory": "200Gi"
+    },
+    "allocated": {
+      "cpu": "25",
+      "memory": "50Gi"
+    }
+  }
+}

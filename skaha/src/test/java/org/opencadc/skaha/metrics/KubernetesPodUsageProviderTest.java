@@ -4,18 +4,17 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.opencadc.skaha.session.SessionAction;
 
-public class PodMetricsDAOTest {
-
+public class KubernetesPodUsageProviderTest {
     @Test
     public void buildLabelSelectorForUserAndOmitHeadless() {
         Assert.assertEquals(
                 "canfar-net-userid=alice,canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS,
-                PodMetricsDAO.buildLabelSelector("alice", true));
+                KubernetesPodUsageProvider.buildLabelSelector("alice", true));
     }
 
     @Test
     public void buildLabelSelectorEmptyWhenNoFilters() {
         // Empty selector lists all pods in the namespace (client-java Metrics API; same as kubectl top without -l).
-        Assert.assertEquals("", PodMetricsDAO.buildLabelSelector(null, false));
+        Assert.assertEquals("", KubernetesPodUsageProvider.buildLabelSelector(null, false));
     }
 }

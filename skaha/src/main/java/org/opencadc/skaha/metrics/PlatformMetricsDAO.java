@@ -1,72 +1,62 @@
 package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
-import java.net.URI;
+import java.net.URL;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
- * <p>Configured via the {@value #SKAHA_METRICS_BACKEND_URL} environment variable (in-cluster base URL, without a
- * trailing slash).
+ * <p>Configured via the {@value org.opencadc.skaha.metrics.MetricsConfiguration} environment variable (in-cluster base
+ * URL, without a trailing slash).
  */
-class PlatformMetricsDAO {
-
-    /** Environment variable holding the Metrics backend base URL (scheme, host, optional port). */
-    public static final String SKAHA_METRICS_BACKEND_URL = "SKAHA_METRICS_BACKEND_URL";
-
-    private static final String PLATFORM_METRICS_PATH = "/api/v1/metrics/platform";
+class PlatformMetricsDAO implements PlatformUsageProvider {
     private static final Type STRING_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
     private final Gson gson = new Gson();
-    private final String platformMetricsUrl;
+    private final URL platformMetricsUrl;
 
-    /** Uses {@link #SKAHA_METRICS_BACKEND_URL} from the process environment. */
-    public PlatformMetricsDAO() {
-        this(System.getenv(SKAHA_METRICS_BACKEND_URL));
+    /**
+     * New instance using configuration.
+     *
+     * @param metricsConfiguration MetricsConfiguration instance.
+     * @return PlatformMetricsDAO instance. Never null.
+     */
+    public static PlatformMetricsDAO fromConfiguration(final MetricsConfiguration metricsConfiguration) {
+        Objects.requireNonNull(metricsConfiguration, "metricsConfiguration cannot be null");
+        return new PlatformMetricsDAO(metricsConfiguration.metricsBackEndUrl);
     }
 
-    /** @param metricsBackendBaseUrl Metrics backend base URL (for example {@code http://skaha-metrics:8000}) */
-    PlatformMetricsDAO(final String metricsBackendBaseUrl) {
-        this.platformMetricsUrl = platformMetricsUrl(requireBaseUrl(metricsBackendBaseUrl));
-    }
-
-    static String requireBaseUrl(final String metricsBackendBaseUrl) {
-        if (!StringUtil.hasText(metricsBackendBaseUrl)) {
-            throw new IllegalStateException("missing configuration: " + SKAHA_METRICS_BACKEND_URL);
+    PlatformMetricsDAO(final URL platformMetricsUrl) {
+        if (platformMetricsUrl == null) {
+            throw new IllegalArgumentException("platformMetricsUrl cannot be null");
         }
-        return metricsBackendBaseUrl.trim();
+        this.platformMetricsUrl = platformMetricsUrl;
     }
 
-    static String normalizeBaseUrl(final String metricsBackendBaseUrl) {
-        final String trimmed = metricsBackendBaseUrl.trim();
-        if (trimmed.endsWith("/")) {
-            return trimmed.substring(0, trimmed.length() - 1);
+    void getFromMetricsService(final OutputStream responseBody) throws Exception {
+        final HttpGet get = new HttpGet(this.platformMetricsUrl, responseBody);
+        get.run();
+        if (get.getThrowable() != null) {
+            throw new IOException(
+                    "failed to fetch platform metrics from " + this.platformMetricsUrl, get.getThrowable());
         }
-        return trimmed;
-    }
-
-    static String platformMetricsUrl(final String normalizedBaseUrl) {
-        return normalizeBaseUrl(normalizedBaseUrl) + PLATFORM_METRICS_PATH;
     }
 
     public PlatformMetrics getPlatformMetrics() throws Exception {
         final ByteArrayOutputStream responseBody = new ByteArrayOutputStream();
-        final HttpGet get = new HttpGet(URI.create(platformMetricsUrl).toURL(), responseBody);
-        get.run();
-        if (get.getThrowable() != null) {
-            throw new IOException("failed to fetch platform metrics from " + platformMetricsUrl, get.getThrowable());
-        }
+        getFromMetricsService(responseBody);
         return parseEnvelope(responseBody.toString());
     }
 

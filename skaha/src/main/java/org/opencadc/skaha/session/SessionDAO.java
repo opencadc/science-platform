@@ -171,7 +171,7 @@ public class SessionDAO {
         return sessions;
     }
 
-    static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {
+    static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) throws Exception {
         return loadPodResourceUsage(MetricsDAO.getDefault(), forUserID, omitHeadless);
     }
 

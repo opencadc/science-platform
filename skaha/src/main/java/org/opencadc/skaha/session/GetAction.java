@@ -105,11 +105,11 @@ public class GetAction extends SessionAction {
         this.metricsDAO = metricsDAO;
     }
 
-    protected MetricsDAO createMetricsDAO() {
+    protected MetricsDAO createMetricsDAO() throws Exception {
         return MetricsDAO.getDefault();
     }
 
-    private MetricsDAO metricsDAO() {
+    private MetricsDAO metricsDAO() throws Exception {
         if (metricsDAO == null) {
             metricsDAO = createMetricsDAO();
         }
@@ -217,15 +217,14 @@ public class GetAction extends SessionAction {
                         (double)
                                 limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
                         MemoryUnitConverter.MemoryUnit.G);
-                withRAM = maxRAMStr;
             } else {
                 final ResourceContexts resourceContexts = loadResourceContexts();
                 maxCores = resourceContexts.getDefaultLimitCores();
                 withCores = resourceContexts.getDefaultLimitCores();
                 maxRAMStr = MemoryUnitConverter.formatHumanReadable(
                         resourceContexts.getDefaultLimitRAM().doubleValue(), MemoryUnitConverter.MemoryUnit.Gi);
-                withRAM = maxRAMStr;
             }
+            withRAM = maxRAMStr;
             return new ResourceStats(
                     clusterFields.requestedCPUCores(),
                     clusterFields.requestedRAM(),
@@ -235,9 +234,7 @@ public class GetAction extends SessionAction {
                     withRAM,
                     maxRAMStr,
                     withCores);
-        } catch (PlatformMetricsUnavailableException unavailable) {
-            throw unavailable;
-        } catch (SessionLimitRangeUnavailableException unavailable) {
+        } catch (PlatformMetricsUnavailableException | SessionLimitRangeUnavailableException unavailable) {
             throw unavailable;
         } catch (Exception e) {
             log.error(e);

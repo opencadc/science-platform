@@ -66,7 +66,7 @@ public class SessionJobBuilder {
             throw new IllegalStateException("GPU Node Selector cannot exceed one selector.");
         }
 
-        final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.get(0);
+        final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.getFirst();
         final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions =
                 gpuNodeSelectorTerm.getMatchExpressions();
 
@@ -77,7 +77,7 @@ public class SessionJobBuilder {
                     + gpuNodeSelectorMatchExpressions.size() + ")");
         }
 
-        return gpuNodeSelectorMatchExpressions.get(0);
+        return gpuNodeSelectorMatchExpressions.getFirst();
     }
 
     static String setConfigValue(String doc, String key, String value) {
@@ -323,7 +323,7 @@ public class SessionJobBuilder {
     }
 
     @NotNull private static V1ResourceRequirements getResourceRequirements(V1PodSpec podTemplateSpec) {
-        final V1Container container = podTemplateSpec.getContainers().get(0);
+        final V1Container container = podTemplateSpec.getContainers().getFirst();
         final V1ResourceRequirements resourceRequirements =
                 Objects.requireNonNullElse(container.getResources(), new V1ResourceRequirements());
         container.setResources(resourceRequirements);
