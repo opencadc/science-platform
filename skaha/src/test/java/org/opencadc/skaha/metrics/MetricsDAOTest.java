@@ -23,8 +23,7 @@ public class MetricsDAOTest {
         final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
         final MetricsDAO dao = new MetricsDAO(null, podProvider);
 
-        final IllegalStateException thrown =
-                Assert.assertThrows(IllegalStateException.class, dao::getPlatformMetrics);
+        final IllegalStateException thrown = Assert.assertThrows(IllegalStateException.class, dao::getPlatformMetrics);
         Assert.assertTrue(thrown.getMessage().contains(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL));
     }
 

@@ -86,9 +86,7 @@ public class GetActionResourceStatsTest {
     @Test
     public void statsViewReturns503WhenMetricsBackendNotConfigured() throws Exception {
         final TestableGetAction get = new TestableGetAction(
-                PlatformMetricsFixtures.unconfiguredPlatformMetricsDAO(),
-                containerLimitRangeFixture(),
-                true);
+                PlatformMetricsFixtures.unconfiguredPlatformMetricsDAO(), containerLimitRangeFixture(), true);
         get.configureStatsViewRequest();
 
         try {
