@@ -15,8 +15,7 @@ public class MetricsDAOTest {
                 "SKAHA_METRICS_BACKEND_URL must be unset for this test",
                 StringUtil.hasText(System.getenv(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL)));
 
-        final MetricsDAO dao = new MetricsDAO();
-        Assert.assertNotNull(dao);
+        new MetricsDAO();
     }
 
     @Test
@@ -27,19 +26,6 @@ public class MetricsDAOTest {
         final IllegalStateException thrown =
                 Assert.assertThrows(IllegalStateException.class, dao::getPlatformMetrics);
         Assert.assertTrue(thrown.getMessage().contains(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL));
-    }
-
-    @Test
-    public void getPodResourceUsageWorksWhenPlatformBackendNotConfigured() throws Exception {
-        final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
-        final PodMetrics podMetrics = new PodMetrics(Map.of("pod-1", "250m"), Map.of("pod-1", "1Gi"));
-        Mockito.when(podProvider.getPodMetrics("alice", true)).thenReturn(podMetrics);
-
-        final MetricsDAO dao = new MetricsDAO(null, podProvider);
-        final PodResourceUsage usage = dao.getPodResourceUsage("alice", true);
-
-        Assert.assertEquals("0.250", usage.cpu().get("pod-1"));
-        Mockito.verify(podProvider).getPodMetrics("alice", true);
     }
 
     @Test

@@ -6,7 +6,7 @@ package org.opencadc.skaha.metrics;
  * <p>Today the default implementation reads the Kubernetes metrics API; a future implementation will read the Metrics
  * backend when that API is available.
  */
-interface PodUsageProvider {
+public interface PodUsageProvider {
 
     /** Environment variable selecting the pod-usage source ({@code kubernetes} or {@code backend}). */
     String SKAHA_POD_METRICS_SOURCE = "SKAHA_POD_METRICS_SOURCE";

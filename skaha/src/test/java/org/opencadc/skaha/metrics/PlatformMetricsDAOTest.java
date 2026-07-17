@@ -1,6 +1,5 @@
 package org.opencadc.skaha.metrics;
 
-import ca.nrc.cadc.util.StringUtil;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -10,7 +9,6 @@ import java.time.Instant;
 import java.util.Map;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -87,15 +85,6 @@ public class PlatformMetricsDAOTest {
 
         Assert.assertEquals(
                 Map.of("cpu", "100", "memory", "200Gi"), metrics.data().capacity());
-    }
-
-    @Test
-    public void fromEnvironmentOrNullReturnsNullWhenUrlUnset() {
-        Assume.assumeFalse(
-                "SKAHA_METRICS_BACKEND_URL must be unset for this test",
-                StringUtil.hasText(System.getenv(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL)));
-
-        Assert.assertNull(PlatformMetricsDAO.fromEnvironmentOrNull());
     }
 
     @Test

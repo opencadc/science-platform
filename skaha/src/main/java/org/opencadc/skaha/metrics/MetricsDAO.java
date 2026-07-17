@@ -26,7 +26,8 @@ public class MetricsDAO {
         this(PlatformMetricsDAO.fromEnvironmentOrNull(), PodUsageProvider.fromEnvironment());
     }
 
-    MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
+    /** @visibleForTesting */
+    public MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
         this.platformMetricsDAO = platformMetricsDAO;
         this.podUsageProvider = podUsageProvider;
     }
@@ -57,7 +58,7 @@ public class MetricsDAO {
      */
     public PlatformMetrics getPlatformMetrics() throws Exception {
         if (platformMetricsDAO == null) {
-            throw new IllegalStateException("missing configuration: " + PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL);
+            PlatformMetricsDAO.requireBaseUrl(null);
         }
         return platformMetricsDAO.getPlatformMetrics();
     }
