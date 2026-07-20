@@ -1,11 +1,31 @@
 package org.opencadc.skaha.metrics;
 
+import ca.nrc.cadc.util.StringUtil;
 import java.util.Map;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 public class MetricsDAOTest {
+
+    @Test
+    public void defaultConstructorSucceedsWhenMetricsBackendUrlUnset() {
+        Assume.assumeFalse(
+                "SKAHA_METRICS_BACKEND_URL must be unset for this test",
+                StringUtil.hasText(System.getenv(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL)));
+
+        new MetricsDAO();
+    }
+
+    @Test
+    public void getPlatformMetricsFailsWhenBackendNotConfigured() {
+        final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
+        final MetricsDAO dao = new MetricsDAO(null, podProvider);
+
+        final IllegalStateException thrown = Assert.assertThrows(IllegalStateException.class, dao::getPlatformMetrics);
+        Assert.assertTrue(thrown.getMessage().contains(PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL));
+    }
 
     @Test
     public void delegatesPlatformMetricsToPlatformClient() throws Exception {
