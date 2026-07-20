@@ -467,7 +467,7 @@ deployment:
         # -- Registry project path segment (second component of image IDs) used to select
         # desktop icon versions when multiple projects share the same short name.
         # When empty, icon selection uses the latest version across all projects (legacy behaviour).
-        default-icon-project: ""
+        defaultIconProject: ""
 
     # Optionally set the DEBUG port.
     # extraEnv:
