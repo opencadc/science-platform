@@ -254,7 +254,7 @@ deployment:
         projectsDirectory: "projects"
 
         # Kubernetes Pod volume source for User Storage (the content under .spec.volumes[].<name>
-        # for volume `cavern-volume`). May be persistentVolumeClaim, cephfs, nfs, csi, or any other
+        # for volume `user-storage-volume`). May be persistentVolumeClaim, cephfs, nfs, csi, or any other
         # supported volume type. See https://kubernetes.io/docs/concepts/storage/volumes/
         # If omitted or empty, the chart falls back to persistentVolumeClaim.claimName from
         # persistentVolumeClaimName (deprecated) or the default claim skaha-workload-cavern-pvc.

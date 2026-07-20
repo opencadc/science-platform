@@ -291,7 +291,7 @@ The Projects Directory base absolute path.
 {{- end -}}
 
 {{/*
-Volume source YAML for the session "cavern-volume" (content below volume name in a Pod spec).
+Volume source YAML for the session "user-storage-volume" (content below volume name in a Pod spec).
 Uses userStorage.spec when non-empty; else persistentVolumeClaimName or default claim skaha-workload-cavern-pvc.
 */}}
 {{- define "skaha.session.userStorageVolumeSpec" -}}
@@ -393,7 +393,7 @@ Common security context settings for User Session Jobs
 
 {{/**
 Fragment of Pod .spec.volumes for user sessions. `userStorage.spec` is a Kubernetes volume
-source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, etc.), mounted as `cavern-volume`.
+source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, etc.), mounted as `user-storage-volume`.
 */}}
 {{- define "skaha.session.commonVolumes" -}}
       {{- with .Values.deployment.skaha.sessions.extraVolumes }}
