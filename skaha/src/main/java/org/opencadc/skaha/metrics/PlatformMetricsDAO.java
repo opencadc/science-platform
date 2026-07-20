@@ -20,7 +20,9 @@ import java.util.Objects;
 /**
  * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
- * <p>Configured via {@code SKAHA_METRICS_BACKEND_URL} (in-cluster base URL, without a trailing slash).
+ * <p>Configured via {@link MetricsConfiguration#SKAHA_METRICS_BACKEND_URL} (in-cluster base URL, without a trailing
+ * slash). When that variable is unset, {@link PlatformUsageProvider#fromConfiguration(MetricsConfiguration)} selects
+ * {@link NoOpPlatformUsageProvider} so callers can run without a co-deployed Metrics backend.
  */
 class PlatformMetricsDAO implements PlatformUsageProvider {
     static final String PLATFORM_METRICS_PATH = "/api/v1/metrics/platform";
