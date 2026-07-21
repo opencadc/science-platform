@@ -22,7 +22,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}  # checkout PR HEAD commit
           fetch-depth: 0  # required for merge-base check
