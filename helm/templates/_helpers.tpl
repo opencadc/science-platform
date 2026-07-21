@@ -325,8 +325,8 @@ The init containers for the launch scripts.
               - ALL
         resources:
           requests:
-            memory: "32Mi"
-            cpu: "100m"
+            memory: "64Mi"
+            cpu: "200m"
           limits:
             memory: "64Mi"
             cpu: "200m"
@@ -353,8 +353,8 @@ The init containers for the launch scripts.
               - ALL
         resources:
           requests:
-            memory: "32Mi"
-            cpu: "100m"
+            memory: "64Mi"
+            cpu: "200m"
           limits:
             memory: "64Mi"
             cpu: "200m"
