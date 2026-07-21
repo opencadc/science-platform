@@ -149,8 +149,8 @@ public class ExpiryTimeRenewalTest {
             if (changedTime <= 0) {
                 // renew failed
                 Assert.fail(String.format(
-                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %ds) (Original expiry time %d vs Refreshed expiry time %d).",
-                        changedTime, expiryTime.toEpochMilli(), expiryTimeAfterRenewal.toEpochMilli()));
+                        "activeDeadlineSeconds and/or skaha.sessionexpiry for a CARTA session has been changed, please update the test (Changed time %dms) (Original expiry time %d vs Refreshed expiry time %d).",
+                        changedTime, expiryTimeSinceEpoch, expiryTimeAfterRenewalSinceEpoch));
             } else {
                 log.info(String.format("Expiry time extended by %d seconds", changedTime / 1000));
             }
@@ -237,6 +237,8 @@ public class ExpiryTimeRenewalTest {
         final Map<String, Object> params = new HashMap<>();
         params.put("action", "renew");
         HttpPost post = new HttpPost(postURL, params, false);
+        post.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        post.setRequestProperty("Accept", "application/json");
         post.prepare();
         log.info(String.format("Renewing session %s: OK", sessionID));
     }
