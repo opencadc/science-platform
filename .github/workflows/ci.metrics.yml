@@ -33,7 +33,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
@@ -68,7 +68,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Cache Helm data
         uses: actions/cache@v6
         with:
