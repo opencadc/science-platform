@@ -84,7 +84,7 @@ spec:
         configMap:
           name: init-users-groups-config
           defaultMode: 0777
-      - name: cavern-volume
+      - name: user-storage-volume
         persistentVolumeClaim:
           claimName: skaha-workload-cavern-pvc
       - name: scratch-dir

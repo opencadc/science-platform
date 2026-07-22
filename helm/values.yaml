@@ -254,7 +254,7 @@ deployment:
         projectsDirectory: "projects"
 
         # Kubernetes Pod volume source for User Storage (the content under .spec.volumes[].<name>
-        # for volume `cavern-volume`). May be persistentVolumeClaim, cephfs, nfs, csi, or any other
+        # for volume `user-storage-volume`). May be persistentVolumeClaim, cephfs, nfs, csi, or any other
         # supported volume type. See https://kubernetes.io/docs/concepts/storage/volumes/
         # If omitted or empty, the chart falls back to persistentVolumeClaim.claimName from
         # persistentVolumeClaimName (deprecated) or the default claim skaha-workload-cavern-pvc.
@@ -462,6 +462,12 @@ deployment:
       # or to control how and where User Session Pods are scheduled.  This can be potentially dangerous unless you know what you are doing.
       # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity
       # nodeAffinity: {}
+
+      desktop:
+        # -- Registry project path segment (second component of image IDs) used to select
+        # desktop icon versions when multiple projects share the same short name.
+        # When empty, icon selection uses the latest version across all projects (legacy behaviour).
+        defaultIconProject: ""
 
     # Optionally set the DEBUG port.
     # extraEnv:
