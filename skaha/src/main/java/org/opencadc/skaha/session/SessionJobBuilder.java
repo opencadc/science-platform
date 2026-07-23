@@ -10,21 +10,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.opencadc.skaha.K8SUtil;
 
 /** Class to interface with Kubernetes. */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
 
-    static final String JOB_QUEUE_LABEL_KEY = "kueue.x-k8s.io/queue-name";
-    static final String JOB_PRIORITY_CLASS_LABEL_KEY = "kueue.x-k8s.io/priority-class";
-    static final String JOB_RESOURCE_FLEXIBLE_LABEL_KEY = "opencadc.org/canfar-job-flexible";
-    static final String JOB_RESOURCE_FIXED_LABEL_KEY = "opencadc.org/canfar-job-fixed";
+    record LaunchArtifacts(V1Job job, SessionLabelPlan labels) {}
 
     /** Configuration for the queue to use. */
     private final Map<String, String> parameters = new HashMap<>();
@@ -51,9 +51,10 @@ public class SessionJobBuilder {
         return new SessionJobBuilder(jobFilePath);
     }
 
+    /** Obtain a mutable Job metadata label map attached to the Job. */
     @NotNull private static Map<String, String> getOrCreateJobLabels(V1Job job) {
         final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
-        final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
+        final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(jobMetadata.getLabels(), Map.of()));
         jobMetadata.setLabels(labels);
         job.setMetadata(jobMetadata);
 
@@ -160,26 +161,146 @@ public class SessionJobBuilder {
      * @throws IOException If the provided Path cannot be read.
      */
     String build() throws IOException {
+        return Yaml.dump(buildLaunch().job());
+    }
+
+    /** Build launch artifacts from the rendered template. */
+    LaunchArtifacts buildLaunch() throws IOException {
         final byte[] jobFileBytes = Files.readAllBytes(jobFilePath);
         String jobFileString = new String(jobFileBytes, StandardCharsets.UTF_8);
         for (final Map.Entry<String, String> entry : this.parameters.entrySet()) {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return buildJob(jobFileString);
+        return buildLaunch(jobFileString);
     }
 
-    private String buildJob(final String jobFileString) throws IOException {
+    static String labelService(final String serviceString, final SessionLabelPlan plan) throws IOException {
+        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
+        final V1Service service = (V1Service) Yaml.load(serviceString);
+        final V1ObjectMeta metadata = Objects.requireNonNullElse(service.getMetadata(), new V1ObjectMeta());
+        final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(metadata.getLabels(), Map.of()));
+        labels.putAll(labelPlan.serviceMetadataLabels());
+        metadata.setLabels(labels);
+        service.setMetadata(metadata);
+
+        final V1ServiceSpec spec = Objects.requireNonNullElse(service.getSpec(), new V1ServiceSpec());
+        spec.setSelector(labelPlan.serviceSelector());
+        service.setSpec(spec);
+
+        return Yaml.dump(service);
+    }
+
+    static String labelIngress(final String ingressString, final SessionLabelPlan plan) {
+        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
+        final org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        final List<Object> documents = new ArrayList<>();
+
+        for (final Object document : yaml.loadAll(ingressString)) {
+            if (document instanceof Map<?, ?> yamlDocument) {
+                applyMetadataLabels(yamlDocument, labelPlan.ingressMetadataLabels());
+            }
+            documents.add(document);
+        }
+
+        return yaml.dumpAll(documents.iterator());
+    }
+
+    /** Build and mutate launch artifacts from a rendered YAML template. */
+    private LaunchArtifacts buildLaunch(final String jobFileString) throws IOException {
         final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
-        mergeResourceLabels(launchJob);
+        final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
+        applyJobLabels(launchJob, labelPlan);
         mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
 
-        return Yaml.dump(launchJob);
+        return new LaunchArtifacts(launchJob, labelPlan);
     }
 
-    private void mergeResourceLabels(final V1Job launchJob) {
+    /** Build the canonical label plan for this launch. */
+    private SessionLabelPlan buildLabelPlan(final V1Job launchJob) {
+        final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
+        labelValues.put(SessionLabels.Key.ID, requireParam(PostAction.SKAHA_SESSIONID));
+        labelValues.put(SessionLabels.Key.USERNAME, requireParam(PostAction.SKAHA_USERID));
+        labelValues.put(SessionLabels.Key.NAME, requireParam(PostAction.SKAHA_SESSIONNAME));
+        labelValues.put(SessionLabels.Key.KIND, requireParam(PostAction.SKAHA_SESSIONTYPE));
+        final String appId = firstNonBlank(PostAction.SOFTWARE_APPID);
+        if (appId != null) {
+            labelValues.put(SessionLabels.Key.APP_ID, appId);
+        }
+        labelValues.put(
+                SessionLabels.Key.JOB, requireFirstNonBlank(PostAction.SOFTWARE_JOBNAME, PostAction.SKAHA_JOBNAME));
+        labelValues.put(SessionLabels.Key.FLAVOR, getResourceFlavor(launchJob));
+        labelValues.put(SessionLabels.Key.ACCELERATOR, this.gpuCount > 0 ? "gpu" : "none");
+
+        final Map<String, String> labels = new HashMap<>(SessionLabels.canonical(labelValues));
+        final String skahaVersion = K8SUtil.getSkahaVersion();
+        if (StringUtil.hasText(skahaVersion)) {
+            labels.put(SessionLabels.Key.VERSION.label(), SessionLabels.version(skahaVersion));
+        }
+
+        return SessionLabelPlan.of(labels);
+    }
+
+    /** Attach job labels to the Job metadata and pod template metadata. */
+    private void applyJobLabels(final V1Job launchJob, final SessionLabelPlan plan) {
+        final Map<String, String> labels = plan.jobLabels();
+        SessionJobBuilder.getOrCreateJobLabels(launchJob).putAll(labels);
+        final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
+        final V1PodTemplateSpec podTemplate =
+                Objects.requireNonNullElse(jobSpec.getTemplate(), new V1PodTemplateSpec());
+        final V1ObjectMeta podMetadata = Objects.requireNonNullElse(podTemplate.getMetadata(), new V1ObjectMeta());
+        final Map<String, String> podLabels =
+                new HashMap<>(Objects.requireNonNullElse(podMetadata.getLabels(), Map.of()));
+        podLabels.putAll(labels);
+        podMetadata.setLabels(podLabels);
+        podTemplate.setMetadata(podMetadata);
+        jobSpec.setTemplate(podTemplate);
+        launchJob.setSpec(jobSpec);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void applyMetadataLabels(final Map<?, ?> yamlDocument, final Map<String, String> metadataLabels) {
+        final Map<String, Object> document = (Map<String, Object>) yamlDocument;
+        final Map<String, Object> metadata =
+                (Map<String, Object>) document.computeIfAbsent("metadata", key -> new LinkedHashMap<>());
+        final Map<String, Object> labels = new LinkedHashMap<>();
+        final Object currentLabels = metadata.get("labels");
+        if (currentLabels instanceof Map<?, ?> currentLabelMap) {
+            currentLabelMap.forEach((key, value) -> labels.put(key.toString(), value));
+        }
+        labels.putAll(metadataLabels);
+        metadata.put("labels", labels);
+    }
+
+    /** Return the first non-blank parameter value for the provided keys. */
+    private String firstNonBlank(final String... keys) {
+        for (final String key : keys) {
+            final String value = this.parameters.get(key);
+            if (StringUtil.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** Return one required parameter value. */
+    private String requireParam(final String key) {
+        return requireFirstNonBlank(key);
+    }
+
+    /** Return the first non-blank value or throw when none are present. */
+    private String requireFirstNonBlank(final String... keys) {
+        final String value = firstNonBlank(keys);
+        if (value == null) {
+            throw new IllegalArgumentException("requires one of parameters " + String.join(", ", keys));
+        }
+        return value;
+    }
+
+    /** Infer {@code fixed} vs {@code flexible} from memory request/limit equality. */
+    private String getResourceFlavor(final V1Job launchJob) {
         final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
         final V1PodSpec podSpec =
                 Objects.requireNonNullElse(jobSpec.getTemplate().getSpec(), new V1PodSpec());
@@ -191,20 +312,11 @@ public class SessionJobBuilder {
 
         final Quantity memoryLimit = resourceLimits.get("memory");
         final Quantity memoryRequest = resourceRequests.get("memory");
-        if (memoryRequest != null) {
-            final Map<String, String> labels = SessionJobBuilder.getOrCreateJobLabels(launchJob);
-            if (memoryRequest.equals(memoryLimit)) {
-                // If the memory limit and request are the same, we can assume that this is a "fixed" Job, meaning
-                // the caller requested a specific amount of memory, in which case the limit is set to match that
-                // value.
-                labels.put(SessionJobBuilder.JOB_RESOURCE_FIXED_LABEL_KEY, Boolean.TRUE.toString());
-            } else {
-                // If the memory request is less than the limit, we can assume that this is a "flexible" Job,
-                // meaning
-                // the caller made no request for memory, so defaults were set on their behalf.
-                labels.put(SessionJobBuilder.JOB_RESOURCE_FLEXIBLE_LABEL_KEY, Boolean.TRUE.toString());
-            }
+        if (memoryRequest != null && memoryRequest.equals(memoryLimit)) {
+            return "fixed";
         }
+
+        return "flexible";
     }
 
     /**
@@ -343,8 +455,8 @@ public class SessionJobBuilder {
             final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
 
             final Map<String, String> labels = SessionJobBuilder.getOrCreateJobLabels(launchJob);
-            labels.put(SessionJobBuilder.JOB_QUEUE_LABEL_KEY, this.queueConfiguration.queueName);
-            labels.put(SessionJobBuilder.JOB_PRIORITY_CLASS_LABEL_KEY, this.queueConfiguration.priorityClass);
+            labels.putAll(
+                    SessionLabels.kueue(this.queueConfiguration.queueName, this.queueConfiguration.priorityClass));
 
             jobSpec.setSuspend(true);
 

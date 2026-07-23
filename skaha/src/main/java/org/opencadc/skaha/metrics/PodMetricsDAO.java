@@ -1,14 +1,11 @@
 package org.opencadc.skaha.metrics;
 
-import ca.nrc.cadc.util.StringUtil;
 import io.kubernetes.client.Metrics;
 import io.kubernetes.client.custom.PodMetricsList;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
-import java.util.ArrayList;
-import java.util.List;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.session.SessionAction;
+import org.opencadc.skaha.session.SessionLabels;
 
 /**
  * Fetches per-pod resource usage from the Kubernetes metrics API ({@code metrics.k8s.io}).
@@ -38,17 +35,12 @@ class PodMetricsDAO {
     /**
      * Build a Kubernetes label selector for session pods in the workload namespace.
      *
+     * @param userID session owner, or blank to include all users
+     * @param omitHeadless true to exclude headless session pods
      * @return comma-separated selector, or {@code ""} when no filters apply (all pods in the namespace, same as
      *     historical {@code kubectl top pod} without {@code -l})
      */
     static String buildLabelSelector(final String userID, final boolean omitHeadless) {
-        final List<String> labelSelectors = new ArrayList<>();
-        if (StringUtil.hasLength(userID)) {
-            labelSelectors.add("canfar-net-userid=" + userID);
-        }
-        if (omitHeadless) {
-            labelSelectors.add("canfar-net-sessionType!=" + SessionAction.SESSION_TYPE_HEADLESS);
-        }
-        return String.join(",", labelSelectors);
+        return SessionLabels.forUserSessions(userID, null, omitHeadless);
     }
 }

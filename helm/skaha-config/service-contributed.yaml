@@ -16,5 +16,3 @@ spec:
   - port: 5000
     protocol: TCP
     name: http-connection
-  selector:
-    canfar-net-sessionID: ${skaha.sessionid}

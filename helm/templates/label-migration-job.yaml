@@ -1,0 +1,216 @@
+{{- if .Values.labelMigration.enabled }}
+{{- $hookName := printf "%s-label-migration" (include "skaha.fullname" .) | trunc 63 | trimSuffix "-" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $hookName }}
+  namespace: {{ include "skaha.workloadNamespace" . }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.labelMigration.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "skaha.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $hookName }}
+      restartPolicy: Never
+      containers:
+        - name: migrate-session-labels
+          image: {{ .Values.labelMigration.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -eu
+
+              NS="{{ include "skaha.workloadNamespace" . }}"
+              SELECTOR="canfar-net-sessionID"
+
+              log() {
+                printf '[label-migration] %s\n' "$*"
+              }
+
+              append_pair() {
+                pair_key="$1"
+                pair_value="$2"
+                if [ -n "$pairs" ]; then
+                  pairs="$pairs,\"$pair_key\":\"$pair_value\""
+                else
+                  pairs="\"$pair_key\":\"$pair_value\""
+                fi
+              }
+
+              read_legacy_value() {
+                ref="$1"
+                scope="$2"
+                key="$3"
+                template=""
+
+                case "$scope" in
+                  metadata)
+                    template="{{`{{ with .metadata.labels }}{{ index . \"KEY\" }}{{ end }}`}}"
+                    ;;
+                  selector)
+                    template="{{`{{ with .spec.selector }}{{ index . \"KEY\" }}{{ end }}`}}"
+                    ;;
+                  *)
+                    log "unsupported scope: $scope"
+                    return 1
+                    ;;
+                esac
+
+                template=$(printf '%s' "$template" | sed "s|KEY|$key|g")
+                kubectl get -n "$NS" "$ref" -o go-template --template="$template"
+              }
+
+              build_scope_patch_object() {
+                ref="$1"
+                scope="$2"
+                pairs=""
+                legacy_key=""
+                canonical_key=""
+                value=""
+                fixed_present=""
+                flexible_present=""
+                flavor=""
+
+                while IFS='=' read -r legacy_key canonical_key; do
+                  value=$(read_legacy_value "$ref" "$scope" "$legacy_key") || true
+                  if [ -n "$value" ]; then
+                    append_pair "$canonical_key" "$value"
+                  fi
+                done <<'EOF'
+              canfar-net-sessionID=canfar.net/id
+              canfar-net-userid=canfar.net/username
+              canfar-net-sessionName=canfar.net/name
+              canfar-net-sessionType=canfar.net/kind
+              canfar-net-appID=canfar.net/app-id
+              EOF
+
+                # Presence labels (value typically "true") → canfar.net/flavor=<token>.
+                # Prefer fixed when both legacy keys are present. Legacy keys are left in place.
+                fixed_present=$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-fixed") || true
+                flexible_present=$(read_legacy_value "$ref" "$scope" "opencadc.org/canfar-job-flexible") || true
+                if [ -n "$fixed_present" ]; then
+                  flavor="fixed"
+                elif [ -n "$flexible_present" ]; then
+                  flavor="flexible"
+                fi
+
+                if [ -n "$flavor" ]; then
+                  append_pair "canfar.net/flavor" "$flavor"
+                fi
+
+                if [ -z "$pairs" ]; then
+                  return 1
+                fi
+
+                printf '{%s}' "$pairs"
+              }
+
+              retry_patch() {
+                ref="$1"
+                patch="$2"
+                attempt=1
+
+                until kubectl patch -n "$NS" "$ref" --type=merge -p "$patch" >/dev/null 2>&1; do
+                  if [ "$attempt" -ge 3 ]; then
+                    log "patch failed for $ref after ${attempt} attempts"
+                    return 1
+                  fi
+                  log "patch failed for $ref, retrying (${attempt}/3)"
+                  attempt=$((attempt + 1))
+                  sleep "$attempt"
+                done
+              }
+
+              patch_object() {
+                kind="$1"
+                ref="$2"
+                patch_metadata="$3"
+                patch_selector="$4"
+                metadata_patch=""
+                selector_patch=""
+                sections=""
+
+                if [ "$patch_metadata" = "true" ]; then
+                  if metadata_patch=$(build_scope_patch_object "$ref" metadata); then
+                    sections="\"metadata\":{\"labels\":$metadata_patch}"
+                  fi
+                fi
+
+                case "$kind" in
+                  jobs)
+                    # Job pod templates are immutable, so only top-level metadata labels can be patched.
+                    ;;
+                  services)
+                    if [ "$patch_selector" = "true" ]; then
+                      if selector_patch=$(build_scope_patch_object "$ref" selector); then
+                        if [ -n "$sections" ]; then
+                          sections="$sections,\"spec\":{\"selector\":$selector_patch}"
+                        else
+                          sections="\"spec\":{\"selector\":$selector_patch}"
+                        fi
+                      fi
+                    fi
+                    ;;
+                esac
+
+                if [ -z "$sections" ]; then
+                  return 10
+                fi
+
+                retry_patch "$ref" "{$sections}"
+              }
+
+              migrate_kind() {
+                kind="$1"
+                patch_metadata="$2"
+                patch_selector="$3"
+                refs_file=""
+                selected=0
+                patched=0
+                skipped=0
+                rc=0
+
+                refs_file=$(mktemp)
+                kubectl get -n "$NS" "$kind" -l "$SELECTOR" -o name >"$refs_file"
+                selected=$(wc -l <"$refs_file" | tr -d ' ')
+
+                if [ "$kind" = "jobs" ] && [ "$selected" -gt 0 ]; then
+                  log "warning: Job.spec.template.metadata.labels is immutable; only Job metadata.labels will be patched. Live Pods are migrated separately, but Pod restarts during the upgrade window may recreate from legacy Job template labels. Prefer a quiet upgrade window or accept this residual risk."
+                fi
+
+                while IFS= read -r ref; do
+                  [ -n "$ref" ] || continue
+                  if patch_object "$kind" "$ref" "$patch_metadata" "$patch_selector"; then
+                    patched=$((patched + 1))
+                    continue
+                  fi
+                  rc=$?
+                  if [ "$rc" -eq 10 ]; then
+                    skipped=$((skipped + 1))
+                    continue
+                  fi
+                  rm -f "$refs_file"
+                  return "$rc"
+                done <"$refs_file"
+                rm -f "$refs_file"
+
+                log "$kind: selected=$selected patched=$patched skipped=$skipped"
+              }
+
+              log "migrating legacy session labels in namespace $NS (add canonical labels only; legacy keys are retained)"
+              migrate_kind pods true false
+              migrate_kind jobs true false
+              migrate_kind services true true
+              migrate_kind ingresses true false
+              log "session label migration complete"
+{{- end }}

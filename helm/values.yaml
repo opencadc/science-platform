@@ -591,6 +591,15 @@ telemetry:
     # -- Export interval in seconds for enabled telemetry services.
     interval: 30
 
+# Pre-upgrade hook that rewrites legacy live session labels before Skaha rolls. Job pod templates are not rewritten because `spec.template.metadata.labels` is immutable.
+labelMigration:
+  # -- When true, run a Helm `pre-upgrade` Job in the workload namespace that adds mapped `canfar.net/*` labels (and `canfar.net/flavor` from `opencadc.org/canfar-job-fixed|flexible`) alongside legacy keys on Pods, Job metadata, Service metadata/selectors, and Ingresses. Legacy labels are not removed. Job pod templates remain unchanged because `spec.template.metadata.labels` is immutable.
+  enabled: true
+  # -- Container image for the label migration hook Job. Must provide `kubectl` and POSIX `sh` (for example `alpine/kubectl`).
+  image: alpine/kubectl:latest
+  # -- `backoffLimit` for the label migration pre-upgrade Job.
+  backoffLimit: 1
+
 # Optional science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:
   # -- When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).

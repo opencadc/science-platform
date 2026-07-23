@@ -24,7 +24,8 @@ In OpenCADC, the publicly released code lives in the main (or master) branch of 
 Java code is licenced under the Affero GPL version 3 (AGPL-3.0) and each file originally created by CADC staff includes a standard bilingual copyright notice with `(C) Government of Canada ...`; modifications to those files (e.g. bug fixes and minor enhancements) assume copyright assignment to the original holder. New modules (libaries or applications) created and contributed should be under the same license and may contain their own suitable `(C)` claim; copyright is assumed to be assigned (to GoC) if the standard bilingual notice is included. Copyright policy for new files contributed to existing modules: **TBD**.
 
 #### Tools
-We currently target Java 11 runtime (should be no problem with later versions); some build files specify minimum source compatibility of `11` and others are still at `1.8` (being updated gradually from downstream modules back to the core libraries).
+This repository's Java modules target **Java 21** runtime and source/target compatibility
+(see each module's `build.gradle`, e.g. `sourceCompatibility = JavaVersion.VERSION_21`).
 
 All java modules use `gradle` as the build tool and each repository includes the gradle wrapper for use in github workflows; it can also be used by developers directly (or note that the first run installs a complete gradle system in `$HOME/.gradle/wrapper/dists` which can be used directly). This is currently fixed at gradle-6.8.3 so build file style has to work with this version (see CI below).
 

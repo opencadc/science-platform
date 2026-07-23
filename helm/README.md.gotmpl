@@ -12,6 +12,26 @@
 
 {{ template "chart.valuesSection" . }}
 
+## Session label migration
+
+Canonical keys, selectors, and the legacy→canonical mapping tables live in
+[skaha/docs/labels.md](../skaha/docs/labels.md).
+
+When `labelMigration.enabled` is true, a Helm `pre-upgrade` Job in the workload namespace selects
+Jobs, Pods, Services, and Ingresses with `canfar-net-sessionID` and **adds** mapped `canfar.net/*`
+labels (and `canfar.net/flavor` from `opencadc.org/canfar-job-fixed|flexible`) before Skaha rolls.
+Legacy `canfar-net-*` and `opencadc.org/*` keys are left in place on metadata and Service
+selectors.
+
+The hook does **not** rewrite `Job.spec.template.metadata.labels`. Kubernetes treats Job pod
+templates as immutable, so the chart only patches `Job.metadata.labels` and relies on the separate
+Pod migration for live Pods. If a Job Pod restarts during the upgrade window, Kubernetes may
+recreate it from legacy template labels; prefer a quiet upgrade window or accept that residual
+risk.
+
+Disable the Job after all environments have cut over. As an alternative, drain sessions before the
+upgrade and run with the Job disabled.
+
 ## User storage (Cavern)
 
 User home allocations in Cavern are configured under `deployment.skaha.sessions.userStorage`. Set **`nodeURIPrefix`** to a **`vos://` scheme** URI. The host (authority) and Cavern service name are separated by a tilde (`~`).
