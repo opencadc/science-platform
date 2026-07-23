@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.6](https://github.com/opencadc/science-platform/compare/metrics-v0.1.5...metrics-v0.1.6) (2026-07-23)
+
+
+### Documentation
+
+* **metrics:** ignore AI adapter dirs and fix ADR/docs cleanup ([399416b](https://github.com/opencadc/science-platform/commit/399416b2b825ba3ea3190dd9d825f5843d1b6e59))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([9bc7d92](https://github.com/opencadc/science-platform/commit/9bc7d9296b9e598204d7b511517e642f84d7df04))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([0cf4955](https://github.com/opencadc/science-platform/commit/0cf49556c5364bc8f0cfd40c2859af4188120660))
+
 ## [0.1.5](https://github.com/opencadc/science-platform/compare/metrics-v0.1.4...metrics-v0.1.5) (2026-05-13)
 
 
