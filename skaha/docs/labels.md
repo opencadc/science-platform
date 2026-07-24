@@ -64,25 +64,8 @@ app.kubernetes.io/version=<SKAHA_VERSION>
 | Memory request ≠ limit (or unpaired) | `canfar.net/flavor=flexible` |
 | Community / project omitted | Both set to `default` |
 
-## Legacy → canonical migration
+## Legacy keys (historical)
 
-Helm `labelMigration` (pre-upgrade Job) rewrites live objects selected by
-`canfar-net-sessionID`. Value-copy mappings:
-
-| Legacy | Canonical |
-|--------|-----------|
-| `canfar-net-sessionID` | `canfar.net/id` |
-| `canfar-net-userid` | `canfar.net/username` |
-| `canfar-net-sessionName` | `canfar.net/name` |
-| `canfar-net-sessionType` | `canfar.net/kind` |
-| `canfar-net-appID` | `canfar.net/app-id` |
-
-Presence → value (Job metadata historically; value was typically `true`):
-
-| Legacy key present | Canonical |
-|--------------------|-----------|
-| `opencadc.org/canfar-job-fixed` | `canfar.net/flavor=fixed` |
-| `opencadc.org/canfar-job-flexible` | `canfar.net/flavor=flexible` |
-
-If both presence keys exist, migration prefers `fixed`. New launches write only
-`canfar.net/flavor` (not the `opencadc.org/*` keys).
+Older Skaha releases used `canfar-net-*` and `opencadc.org/canfar-job-fixed|flexible`
+labels. Current launches write only the `canfar.net/*` keys above (including
+`canfar.net/flavor`).
