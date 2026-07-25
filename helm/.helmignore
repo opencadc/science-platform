@@ -22,7 +22,5 @@
 *.tmproj
 .vscode/
 *-values.yaml
-# Dashboard generator sources. Only dashboards/dist/**.json is read at render time.
-dashboards/*.py
+# Dashboard docs; only dashboards/*.json is read at render time.
 dashboards/README.md
-dashboards/__pycache__/

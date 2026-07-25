@@ -64,15 +64,6 @@ repos:
         language: system
         pass_filenames: false
         files: ^metrics/
-      - id: grafana-dashboards
-        name: Grafana dashboards are in sync with generate.py
-        entry: /bin/bash
-        args:
-          - -c
-          - cd helm/dashboards && python3 generate.py --check
-        language: system
-        pass_filenames: false
-        files: ^helm/dashboards/
       - id: gradle-build
         name: Skaha Gradle Build
         entry: /bin/bash

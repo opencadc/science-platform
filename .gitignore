@@ -19,10 +19,6 @@
 .continue/
 .aider*
 
-# Python bytecode (helm/dashboards generator)
-__pycache__/
-*.py[cod]
-
 # Local build stuff
 Dockerfile.local
 *tgz*

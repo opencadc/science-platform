@@ -1,18 +1,8 @@
 {{/*
 CANFAR Science Platform Grafana dashboards.
 
-One ConfigMap per dashboard, picked up by the Grafana sidecar via the
-`grafana_dashboard` label and filed under `grafana_folder`. Source JSON lives in
-helm/dashboards/dist and is produced by helm/dashboards/generate.py.
-
-The dashboards are generated once, carrying `__CANFAR_LABEL_*__` placeholders wherever
-a Prometheus label name belongs. This template substitutes the real names for each
-label generation named in `grafanaDashboards.schemes`, which is what keeps one JSON
-file per dashboard in the repo rather than one per generation.
-
-A dashboard that contains no label placeholder is generation-independent (queue,
-capacity, storage, services) and is rendered exactly once, without a uid suffix, no
-matter how many generations are installed.
+One ConfigMap per dashboard in helm/dashboards, labelled for the Grafana sidecar to
+collect and annotated with the folder to file it under.
 
 `tpl` is deliberately NOT used on the dashboard bodies: Grafana legend formats are
 written as {{ "{{" }}label{{ "}}" }} and Helm would try to evaluate them.
@@ -20,26 +10,12 @@ written as {{ "{{" }}label{{ "}}" }} and Helm would try to evaluate them.
 {{- $cfg := .Values.grafanaDashboards | default dict -}}
 {{- if $cfg.enabled -}}
 {{- $ctx := . -}}
-{{- $labels := $ctx.Files.Get "dashboards/dist/labels.yaml" | fromYaml -}}
-{{- if not $labels }}
-  {{- fail "dashboards/dist/labels.yaml is missing or unparseable; run `python3 helm/dashboards/generate.py`" -}}
-{{- end -}}
-{{- $schemes := $cfg.schemes | default (list "next") -}}
-{{- range $schemes -}}
-  {{- if not (hasKey $labels .) -}}
-    {{- fail (printf "grafanaDashboards.schemes: %q is not one of %v" . (keys $labels | sortAlpha)) -}}
-  {{- end -}}
-{{- end -}}
 {{- $namespace := $cfg.namespace | default $ctx.Release.Namespace -}}
-{{- $files := $ctx.Files.Glob "dashboards/dist/*.json" -}}
+{{- $files := $ctx.Files.Glob "dashboards/*.json" -}}
 {{- if not $files }}
-  {{- fail "grafanaDashboards.enabled is true but no dashboard JSON was found under dashboards/dist; run `python3 helm/dashboards/generate.py`" -}}
+  {{- fail "grafanaDashboards.enabled is true but no dashboard JSON was found under helm/dashboards" -}}
 {{- end -}}
-
-{{/* Generation-independent dashboards: rendered once, no substitution needed. */}}
 {{- range $path, $_ := $files }}
-{{- $body := $ctx.Files.Get $path }}
-{{- if not (contains "__CANFAR_LABEL_" $body) }}
 {{- $stem := trimSuffix ".json" (base $path) }}
 ---
 apiVersion: v1
@@ -49,7 +25,6 @@ metadata:
   namespace: {{ $namespace }}
   labels:
     {{- include "skaha.labels" $ctx | nindent 4 }}
-    canfar.net/dashboard-scheme: shared
     {{ $cfg.sidecarLabel | default "grafana_dashboard" }}: {{ $cfg.sidecarLabelValue | default "1" | quote }}
   annotations:
     {{- with $cfg.folder }}
@@ -59,49 +34,8 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 data:
-  {{/* Keys are unique across ConfigMaps so the sidecar never overwrites a dashboard. */}}
+  {{/* Prefixed so the key is unique in the sidecar's shared dashboard directory. */}}
   canfar-{{ $stem }}.json: |-
-    {{- $body | replace "__CANFAR_UID_SUFFIX__" "" | replace "__CANFAR_TITLE_SUFFIX__" "" | nindent 4 }}
-{{- end }}
-{{- end }}
-
-{{/* Session dashboards: one copy per installed label generation. */}}
-{{- range $scheme := $schemes }}
-{{- $map := index $labels $scheme }}
-{{- $uidSuffix := ternary "" (printf "-%s" $scheme) (eq $scheme "next") }}
-{{- $titleSuffix := ternary "" (printf " (%s labels)" $scheme) (eq $scheme "next") }}
-{{- range $path, $_ := $files }}
-{{- $body := $ctx.Files.Get $path }}
-{{- if contains "__CANFAR_LABEL_" $body }}
-{{- $stem := trimSuffix ".json" (base $path) }}
-{{- $body = $body | replace "__CANFAR_UID_SUFFIX__" $uidSuffix | replace "__CANFAR_TITLE_SUFFIX__" $titleSuffix }}
-{{- range $token, $label := $map }}
-{{- $body = $body | replace $token $label }}
-{{- end }}
-{{- if contains "__CANFAR_LABEL_" $body }}
-  {{- fail (printf "dashboard %s still has an unsubstituted label placeholder for scheme %s; dashboards/dist/labels.yaml is out of date with dashboards/dist" $stem $scheme) }}
-{{- end }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ printf "%s-grafana-dashboard-%s-%s" $ctx.Release.Name $scheme $stem | trunc 63 | trimSuffix "-" }}
-  namespace: {{ $namespace }}
-  labels:
-    {{- include "skaha.labels" $ctx | nindent 4 }}
-    canfar.net/dashboard-scheme: {{ $scheme }}
-    {{ $cfg.sidecarLabel | default "grafana_dashboard" }}: {{ $cfg.sidecarLabelValue | default "1" | quote }}
-  annotations:
-    {{- with $cfg.folder }}
-    grafana_folder: {{ . | quote }}
-    {{- end }}
-    {{- with $cfg.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-data:
-  canfar-{{ $scheme }}-{{ $stem }}.json: |-
-    {{- $body | nindent 4 }}
-{{- end }}
-{{- end }}
+    {{- $ctx.Files.Get $path | nindent 4 }}
 {{- end }}
 {{- end }}

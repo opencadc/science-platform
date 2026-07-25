@@ -73,7 +73,6 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | grafanaDashboards.enabled | bool | `false` | Render the CANFAR Grafana dashboard ConfigMaps. |
 | grafanaDashboards.folder | string | `"CANFAR Science Platform"` | Grafana folder the dashboards are filed under, via the `grafana_folder` annotation. |
 | grafanaDashboards.namespace | string | `""` | Namespace to create the ConfigMaps in. Defaults to the release namespace; set this when the Grafana sidecar only watches a specific namespace. |
-| grafanaDashboards.schemes | list | `["next"]` | Session label schemes to install. `next` reads the realigned `canfar.net/*` pod labels; `legacy` reads the older `canfar-net-*` keys. Install both while running sessions are draining onto the new contract, then drop `legacy`. The four label-independent dashboards (queue, capacity, storage, services) are always installed. Valid values: `legacy`, `next`. |
 | grafanaDashboards.sidecarLabel | string | `"grafana_dashboard"` | Label the Grafana sidecar selects on. |
 | grafanaDashboards.sidecarLabelValue | string | `"1"` | Value for `sidecarLabel`. |
 | ingress.enabled | bool | `true` | Enable ingress routing for the Skaha API. |

@@ -1,6 +1,6 @@
 {
-  "uid": "canfar-overview__CANFAR_UID_SUFFIX__",
-  "title": "CANFAR · Platform Overview__CANFAR_TITLE_SUFFIX__",
+  "uid": "canfar-overview",
+  "title": "CANFAR · Platform Overview",
   "description": "Single-screen health and demand picture for the CANFAR Science Platform.",
   "tags": [
     "canfar",
@@ -74,86 +74,18 @@
         "allowCustomValue": false
       },
       {
-        "name": "community",
-        "type": "query",
-        "label": "Community",
-        "description": "CANFAR session community. Resolves to `canfar.net/community` or `canfar.net/community` depending on the installed label generation.",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_COMMUNITY__!=\"\"}, __CANFAR_LABEL_COMMUNITY__)",
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_COMMUNITY__!=\"\"}, __CANFAR_LABEL_COMMUNITY__)",
-          "refId": "community-variable-query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "options": [],
-        "hide": 0,
-        "skipUrlSync": false,
-        "allowCustomValue": false
-      },
-      {
-        "name": "project",
-        "type": "query",
-        "label": "Project",
-        "description": "CANFAR session project. Resolves to `canfar.net/project` or `canfar.net/project` depending on the installed label generation.",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_PROJECT__!=\"\"}, __CANFAR_LABEL_PROJECT__)",
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_PROJECT__!=\"\"}, __CANFAR_LABEL_PROJECT__)",
-          "refId": "project-variable-query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "options": [],
-        "hide": 0,
-        "skipUrlSync": false,
-        "allowCustomValue": false
-      },
-      {
         "name": "user",
         "type": "query",
         "label": "User",
-        "description": "CANFAR session user. Resolves to `canfar-net-userid` or `canfar.net/username` depending on the installed label generation.",
+        "description": "CANFAR `canfar-net-userid` pod label.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, __CANFAR_LABEL_USER__)",
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\"}, label_canfar_net_userid)",
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, __CANFAR_LABEL_USER__)",
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\"}, label_canfar_net_userid)",
           "refId": "user-variable-query"
         },
         "refresh": 2,
@@ -179,84 +111,16 @@
         "name": "kind",
         "type": "query",
         "label": "Session kind",
-        "description": "CANFAR session session kind. Resolves to `canfar-net-sessionType` or `canfar.net/kind` depending on the installed label generation.",
+        "description": "CANFAR `canfar-net-sessionType` pod label.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_KIND__!=\"\"}, __CANFAR_LABEL_KIND__)",
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_session_type!=\"\"}, label_canfar_net_session_type)",
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_KIND__!=\"\"}, __CANFAR_LABEL_KIND__)",
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_session_type!=\"\"}, label_canfar_net_session_type)",
           "refId": "kind-variable-query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "options": [],
-        "hide": 0,
-        "skipUrlSync": false,
-        "allowCustomValue": false
-      },
-      {
-        "name": "flavor",
-        "type": "query",
-        "label": "Flavor",
-        "description": "CANFAR session flavor. Resolves to `canfar.net/flavor` or `canfar.net/flavor` depending on the installed label generation.",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_FLAVOR__!=\"\"}, __CANFAR_LABEL_FLAVOR__)",
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_FLAVOR__!=\"\"}, __CANFAR_LABEL_FLAVOR__)",
-          "refId": "flavor-variable-query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "options": [],
-        "hide": 0,
-        "skipUrlSync": false,
-        "allowCustomValue": false
-      },
-      {
-        "name": "accelerator",
-        "type": "query",
-        "label": "Accelerator",
-        "description": "CANFAR session accelerator. Resolves to `canfar.net/accelerator` or `canfar.net/accelerator` depending on the installed label generation.",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_ACCELERATOR__!=\"\"}, __CANFAR_LABEL_ACCELERATOR__)",
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_ACCELERATOR__!=\"\"}, __CANFAR_LABEL_ACCELERATOR__)",
-          "refId": "accelerator-variable-query"
         },
         "refresh": 2,
         "regex": "",
@@ -340,7 +204,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(\n  kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "expr": "count(\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -405,7 +269,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(\n  count by (__CANFAR_LABEL_USER__) (\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n)",
+          "expr": "count(\n  count by (label_canfar_net_userid) (\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -470,7 +334,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(\n  kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Pending\"} == 1)\n)",
+          "expr": "count(\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Pending\"} == 1)\n)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -833,7 +697,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(\n  sum by (namespace, pod) (\n    kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\", reason=\"OOMKilled\"}\n  ) > 0\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)\nor vector(0)",
+          "expr": "count(\n  sum by (namespace, pod) (\n    kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\", reason=\"OOMKilled\"}\n  ) > 0\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -919,8 +783,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count by (__CANFAR_LABEL_KIND__) (\n  kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
-          "legendFormat": "{{__CANFAR_LABEL_KIND__}}",
+          "expr": "count by (label_canfar_net_session_type) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_canfar_net_session_type}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1018,7 +882,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Requested",
           "editorMode": "code",
           "range": true,
@@ -1029,7 +893,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Used",
           "editorMode": "code",
           "range": true,
@@ -1149,8 +1013,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Active sessions by project",
-      "description": "Top 15 projects by running session count. Reads empty on the legacy label generation, which had no project dimension.",
+      "title": "Top sessions by user",
+      "description": "The 15 users with the most running sessions. Project and community attribution arrive with the canfar.net/* label realignment.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1158,8 +1022,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(15,\n  count by (__CANFAR_LABEL_PROJECT__) (\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n)",
-          "legendFormat": "{{__CANFAR_LABEL_PROJECT__}}",
+          "expr": "topk(15,\n  count by (label_canfar_net_userid) (\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n)",
+          "legendFormat": "{{label_canfar_net_userid}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1254,7 +1118,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Requested",
           "editorMode": "code",
           "range": true,
@@ -1265,7 +1129,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n  )\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Used",
           "editorMode": "code",
           "range": true,
@@ -1411,7 +1275,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(\n  sum(\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum(\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)",
+          "expr": "(\n  sum(\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)\n/\n(\n  sum(\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -1484,7 +1348,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(\n  sum(\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum(\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)",
+          "expr": "(\n  sum(\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)\n/\n(\n  sum(\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n    )\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -1557,8 +1421,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(\n  sum by (__CANFAR_LABEL_KIND__) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (__CANFAR_LABEL_KIND__)\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (__CANFAR_LABEL_KIND__) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (__CANFAR_LABEL_KIND__)\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)",
-          "legendFormat": "{{__CANFAR_LABEL_KIND__}}",
+          "expr": "(\n  sum by (label_canfar_net_session_type) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_session_type)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_session_type) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_session_type)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_session_type}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1665,8 +1529,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(\n  sum by (__CANFAR_LABEL_KIND__) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (__CANFAR_LABEL_KIND__)\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (__CANFAR_LABEL_KIND__) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (__CANFAR_LABEL_KIND__)\n    kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n  )\n)",
-          "legendFormat": "{{__CANFAR_LABEL_KIND__}}",
+          "expr": "(\n  sum by (label_canfar_net_session_type) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_session_type)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_session_type) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_session_type)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_session_type}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1790,7 +1654,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"OOMKilled\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"OOMKilled\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "OOMKilled",
           "editorMode": "code",
           "range": true,
@@ -1801,7 +1665,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Error\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Error\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Error",
           "editorMode": "code",
           "range": true,
@@ -1812,7 +1676,7 @@
         },
         {
           "refId": "C",
-          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Completed\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Completed\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
           "legendFormat": "Completed",
           "editorMode": "code",
           "range": true,
@@ -1954,8 +1818,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (__CANFAR_LABEL_KIND__) (\n  (\n    sum by (namespace, pod) (\n      increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[$__rate_interval])\n    )\n  )\n  * on (namespace, pod) group_left (__CANFAR_LABEL_KIND__)\n  kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
-          "legendFormat": "{{__CANFAR_LABEL_KIND__}}",
+          "expr": "sum by (label_canfar_net_session_type) (\n  (\n    sum by (namespace, pod) (\n      increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[$__rate_interval])\n    )\n  )\n  * on (namespace, pod) group_left (label_canfar_net_session_type)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_userid!=\"\", label_canfar_net_userid=~\"$user\", label_canfar_net_session_type=~\"$kind\"}\n)",
+          "legendFormat": "{{label_canfar_net_session_type}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
