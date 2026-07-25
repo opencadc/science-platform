@@ -69,6 +69,13 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.sessions.userStorage.projectsDirectory | string | `"projects"` | Relative path under topLevelDirectory for shared projects storage. |
 | deployment.skaha.sessions.userStorage.topLevelDirectory | string | `"/cavern"` | Absolute mount path containing user home and projects directories. |
 | experimentalFeatures.enabled | bool | `false` | Enable processing of experimental feature gates. |
+| grafanaDashboards.annotations | object | `{}` | Extra annotations added to every dashboard ConfigMap. |
+| grafanaDashboards.enabled | bool | `false` | Render the CANFAR Grafana dashboard ConfigMaps. |
+| grafanaDashboards.folder | string | `"CANFAR Science Platform"` | Grafana folder the dashboards are filed under, via the `grafana_folder` annotation. |
+| grafanaDashboards.namespace | string | `""` | Namespace to create the ConfigMaps in. Defaults to the release namespace; set this when the Grafana sidecar only watches a specific namespace. |
+| grafanaDashboards.schemes | list | `["next"]` | Session label schemes to install. `next` reads the realigned `canfar.net/*` pod labels; `legacy` reads the older `canfar-net-*` keys. Install both while running sessions are draining onto the new contract, then drop `legacy`. The four label-independent dashboards (queue, capacity, storage, services) are always installed. Valid values: `legacy`, `next`. |
+| grafanaDashboards.sidecarLabel | string | `"grafana_dashboard"` | Label the Grafana sidecar selects on. |
+| grafanaDashboards.sidecarLabelValue | string | `"1"` | Value for `sidecarLabel`. |
 | ingress.enabled | bool | `true` | Enable ingress routing for the Skaha API. |
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |

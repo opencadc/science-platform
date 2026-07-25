@@ -1,0 +1,1601 @@
+{
+  "uid": "canfar-drilldown__CANFAR_UID_SUFFIX__",
+  "title": "CANFAR · Session Drilldown__CANFAR_TITLE_SUFFIX__",
+  "description": "Per-session forensics: pick a user, kind, or pod and see exactly what that workload did.",
+  "tags": [
+    "canfar",
+    "drilldown"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "1m",
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "preload": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "pluginId": "prometheus",
+        "refresh": 1,
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "regex": "",
+        "skipUrlSync": false
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "label": "Namespace",
+        "description": "CANFAR session workload namespace(s).",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_info, namespace)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "namespace-variable-query"
+        },
+        "refresh": 2,
+        "regex": ".*workload.*",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "community",
+        "type": "query",
+        "label": "Community",
+        "description": "CANFAR session community. Resolves to `canfar.net/community` or `canfar.net/community` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_COMMUNITY__!=\"\"}, __CANFAR_LABEL_COMMUNITY__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_COMMUNITY__!=\"\"}, __CANFAR_LABEL_COMMUNITY__)",
+          "refId": "community-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "description": "CANFAR session project. Resolves to `canfar.net/project` or `canfar.net/project` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_PROJECT__!=\"\"}, __CANFAR_LABEL_PROJECT__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_PROJECT__!=\"\"}, __CANFAR_LABEL_PROJECT__)",
+          "refId": "project-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "user",
+        "type": "query",
+        "label": "User",
+        "description": "CANFAR session user. Resolves to `canfar-net-userid` or `canfar.net/username` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, __CANFAR_LABEL_USER__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, __CANFAR_LABEL_USER__)",
+          "refId": "user-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "kind",
+        "type": "query",
+        "label": "Session kind",
+        "description": "CANFAR session session kind. Resolves to `canfar-net-sessionType` or `canfar.net/kind` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_KIND__!=\"\"}, __CANFAR_LABEL_KIND__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_KIND__!=\"\"}, __CANFAR_LABEL_KIND__)",
+          "refId": "kind-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "flavor",
+        "type": "query",
+        "label": "Flavor",
+        "description": "CANFAR session flavor. Resolves to `canfar.net/flavor` or `canfar.net/flavor` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_FLAVOR__!=\"\"}, __CANFAR_LABEL_FLAVOR__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_FLAVOR__!=\"\"}, __CANFAR_LABEL_FLAVOR__)",
+          "refId": "flavor-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "accelerator",
+        "type": "query",
+        "label": "Accelerator",
+        "description": "CANFAR session accelerator. Resolves to `canfar.net/accelerator` or `canfar.net/accelerator` depending on the installed label generation.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_ACCELERATOR__!=\"\"}, __CANFAR_LABEL_ACCELERATOR__)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_ACCELERATOR__!=\"\"}, __CANFAR_LABEL_ACCELERATOR__)",
+          "refId": "accelerator-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "label": "Session pod",
+        "description": "Session pod name, which embeds kind, user, and session ID. Used instead of the session-ID label so drilldown does not depend on that label being in the kube-state-metrics allowlist.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, pod)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\"}, pod)",
+          "refId": "pod-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "CANFAR",
+      "tags": [
+        "canfar"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true,
+      "targetBlank": false,
+      "icon": "external link",
+      "tooltip": "Other CANFAR Science Platform dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Selected sessions",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "id": 1
+    },
+    {
+      "type": "table",
+      "title": "Session inventory",
+      "description": "Every session pod matching the current filters, with the CANFAR labels it carries and the node it landed on.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n* on (namespace, pod) group_left (node, pod_ip, created_by_name)\nkube_pod_info{namespace=~\"$namespace\"}",
+          "legendFormat": "__auto",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "sortBy": [],
+        "footer": {
+          "show": false,
+          "reducer": [],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "__CANFAR_LABEL_COMMUNITY__": "Community",
+              "__CANFAR_LABEL_PROJECT__": "Project",
+              "__CANFAR_LABEL_USER__": "User",
+              "__CANFAR_LABEL_KIND__": "Session kind",
+              "__CANFAR_LABEL_FLAVOR__": "Flavor",
+              "__CANFAR_LABEL_ACCELERATOR__": "Accelerator",
+              "__CANFAR_LABEL_NAME__": "Session name",
+              "__CANFAR_LABEL_ID__": "Session ID",
+              "__CANFAR_LABEL_APP_ID__": "Desktop app",
+              "node": "Node",
+              "pod": "Pod",
+              "namespace": "Namespace"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "uid": true,
+              "container": true,
+              "endpoint": true,
+              "service": true,
+              "host_ip": true,
+              "host_network": true,
+              "created_by_kind": true,
+              "pod_ip": false
+            },
+            "indexByName": {}
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 11
+      },
+      "id": 2
+    },
+    {
+      "type": "row",
+      "title": "Resource usage",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 1
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU per session",
+      "description": "Actual CPU burn per selected session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:cores",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 9
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory per session",
+      "description": "Working-set memory per selected session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 9
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU headroom per session",
+      "description": "Requested and limit CPU per session, to compare against actual burn.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "request · {{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_limits{namespace=~\"$namespace\", resource=\"cpu\"})\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "limit · {{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:cores",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory headroom per session",
+      "description": "Requested and limit memory per session. A session whose working set approaches its limit is about to be OOM killed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "request · {{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_limits{namespace=~\"$namespace\", resource=\"memory\"})\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "limit · {{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "id": 7
+    },
+    {
+      "type": "row",
+      "title": "Network & disk",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      },
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Network receive",
+      "description": "Inbound network throughput per session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Network transmit",
+      "description": "Outbound network throughput per session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "Filesystem reads",
+      "description": "Container filesystem read throughput per session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "id": 11
+    },
+    {
+      "type": "timeseries",
+      "title": "Filesystem writes",
+      "description": "Container filesystem write throughput per session.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "id": 12
+    },
+    {
+      "type": "row",
+      "title": "Health",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 24,
+        "h": 1
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Session container terminations by reason",
+      "description": "OOMKilled means the user under-requested memory and lost work. Error means the payload itself failed. Completed is the healthy exit path.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"OOMKilled\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "legendFormat": "OOMKilled",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Error\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "legendFormat": "Error",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum(\n  sum by (namespace, pod) (\n    kube_pod_container_status_terminated_reason{namespace=~\"$namespace\", reason=\"Completed\"}\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\"}\n)",
+          "legendFormat": "Completed",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OOMKilled"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      },
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU throttling",
+      "description": "Fraction of CPU scheduling periods in which the session was throttled against its limit. Sustained throttling means the session is limit-bound, not idle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (\n  (\n    sum by (namespace, pod) (\n      rate(container_cpu_cfs_throttled_periods_total{namespace=~\"$namespace\", container!=\"\"}[$__rate_interval])\n    )\n    /\n    sum by (namespace, pod) (\n      rate(container_cpu_cfs_periods_total{namespace=~\"$namespace\", container!=\"\"}[$__rate_interval])\n    )\n  )\n  and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", __CANFAR_LABEL_USER__!=\"\", __CANFAR_LABEL_COMMUNITY__=~\"$community\", __CANFAR_LABEL_PROJECT__=~\"$project\", __CANFAR_LABEL_USER__=~\"$user\", __CANFAR_LABEL_KIND__=~\"$kind\", __CANFAR_LABEL_FLAVOR__=~\"$flavor\", __CANFAR_LABEL_ACCELERATOR__=~\"$accelerator\", pod=~\"$pod\"}\n)",
+          "legendFormat": "{{pod}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 0.75
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      },
+      "id": 15
+    }
+  ]
+}
