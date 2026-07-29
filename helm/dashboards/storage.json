@@ -231,8 +231,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -367,8 +366,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },

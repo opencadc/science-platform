@@ -143,9 +143,9 @@ to the session filters.
 Overview mixed two audiences: people asking who is using what, and operators asking
 whether the platform is holding up. Platform Health carries the operational half —
 load with trends, reliability, and node-level OOM kills — and deliberately carries no
-workload breakdown at all. Session counts by kind, by user and by project stay on
-Overview and Sessions & Users; Platform Health answers "is the platform holding up",
-not "what is running".
+workload breakdown at all. Counts by kind and by user stay on Overview and
+Sessions & Users, and by community and project on Communities & Projects; Platform
+Health answers "is the platform holding up", not "what is running".
 
 OOM appears in exactly two places by design. Platform Health owns the operational
 view (which node, how often). Session Drilldown keeps terminations because it is
@@ -166,7 +166,7 @@ and the meaning of a colour would shift between refreshes. Fixed bounds keep a c
 comparable across time and across nodes, at the cost of everything above 10 sharing the
 same red.
 
-Platform Health opens at 24h while the other eight open at 6h. An hourly grid needs
+Platform Health opens at 24h while the other nine open at 6h. An hourly grid needs
 enough columns to show a pattern, and six of them cannot.
 
 The panel is read for shape rather than magnitude. Over one recent six-hour window

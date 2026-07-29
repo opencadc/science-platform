@@ -26,6 +26,7 @@ metadata:
   labels:
     {{- include "skaha.labels" $ctx | nindent 4 }}
     {{ $cfg.sidecarLabel | default "grafana_dashboard" }}: {{ $cfg.sidecarLabelValue | default "1" | quote }}
+  {{- if or $cfg.folder $cfg.annotations }}
   annotations:
     {{- with $cfg.folder }}
     grafana_folder: {{ . | quote }}
@@ -33,6 +34,7 @@ metadata:
     {{- with $cfg.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- end }}
 data:
   {{/* Prefixed so the key is unique in the sidecar's shared dashboard directory. */}}
   canfar-{{ $stem }}.json: |-

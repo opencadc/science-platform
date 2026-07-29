@@ -655,9 +655,11 @@ secrets:
 # whichever it wrote last. The dashboards' namespace picker already spans every workload
 # namespace, so a single install covers them all.
 #
-# The session dashboards read the `canfar-net-*` pod labels, which kube-state-metrics
-# only exposes when they are named in `--metric-labels-allowlist`. See
-# helm/dashboards/README.md.
+# The session dashboards read the `canfar.net/*` labels Skaha writes at launch (see
+# skaha/docs/labels.md). kube-state-metrics only exposes object labels named in
+# `--metric-labels-allowlist`, and pods and jobs are separate allowlists there: the
+# lifecycle and duration panels read Job labels, so both must include the keys.
+# See helm/dashboards/README.md.
 grafanaDashboards:
   # -- Render the CANFAR Grafana dashboard ConfigMaps.
   enabled: false
