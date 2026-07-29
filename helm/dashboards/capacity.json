@@ -31,15 +31,16 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Prometheus",
-          "value": "prometheus"
+          "text": "Mimir",
+          "value": "mimir"
         },
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "options": [],
         "regex": "",
-        "skipUrlSync": false
+        "skipUrlSync": false,
+        "description": "Mimir. Prometheus remains selectable as a fallback."
       },
       {
         "name": "node",
@@ -138,7 +139,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_node_status_condition{condition=\"Ready\", status=\"true\", node=~\"$node\"} == 1)",
+          "expr": "count(kube_node_status_condition{condition=\"Ready\", status=\"true\", node=~\"$node\"} == 1)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -162,8 +163,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -296,8 +296,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -361,8 +360,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -1099,6 +1097,30 @@
           },
           "instant": true,
           "format": "table"
+        },
+        {
+          "refId": "I",
+          "expr": "sum by (node) (kube_node_status_allocatable{resource=\"nvidia_com_gpu\", node=~\"$node\"})",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "J",
+          "expr": "sum by (node) (kube_pod_container_resource_requests{resource=\"nvidia_com_gpu\"}\n  * on (namespace, pod) group_left (node) kube_pod_info{node=~\"$node\"})",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -1261,6 +1283,38 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPUs"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPUs requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
           }
         ]
       },
@@ -1303,7 +1357,9 @@
               "Value #E": "CPU used",
               "Value #F": "Memory",
               "Value #G": "Memory requested",
-              "Value #H": "Memory used"
+              "Value #H": "Memory used",
+              "Value #I": "GPUs",
+              "Value #J": "GPUs requested"
             },
             "excludeByName": {
               "Time": true,
@@ -1314,7 +1370,9 @@
               "Time 5": true,
               "Time 6": true,
               "Time 7": true,
-              "Time 8": true
+              "Time 8": true,
+              "Time 9": true,
+              "Time 10": true
             },
             "indexByName": {
               "node": 0,
@@ -1325,7 +1383,9 @@
               "Value #E": 5,
               "Value #F": 6,
               "Value #G": 7,
-              "Value #H": 8
+              "Value #H": 8,
+              "Value #I": 9,
+              "Value #J": 10
             }
           }
         }

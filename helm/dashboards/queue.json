@@ -31,15 +31,16 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Prometheus",
-          "value": "prometheus"
+          "text": "Mimir",
+          "value": "mimir"
         },
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "options": [],
         "regex": "",
-        "skipUrlSync": false
+        "skipUrlSync": false,
+        "description": "Mimir. Prometheus remains selectable as a fallback."
       },
       {
         "name": "cluster_queue",
@@ -163,7 +164,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "noValue": "0",
           "decimals": 2
         },
         "overrides": []
@@ -228,8 +228,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -301,8 +300,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -375,7 +373,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "noValue": "0",
           "decimals": 3
         },
         "overrides": []
@@ -448,8 +445,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "noValue": "0"
+          }
         },
         "overrides": []
       },
@@ -492,11 +488,12 @@
           "expr": "sum(increase(kueue_evicted_workloads_total[$__range]))\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
-          "range": true,
+          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -528,7 +525,7 @@
       },
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "textMode": "auto",
@@ -608,7 +605,7 @@
             "drawStyle": "line",
             "lineInterpolation": "smooth",
             "lineWidth": 2,
-            "fillOpacity": 25,
+            "fillOpacity": 8,
             "gradientMode": "opacity",
             "showPoints": "never",
             "pointSize": 5,
@@ -626,7 +623,7 @@
             },
             "stacking": {
               "group": "A",
-              "mode": "normal"
+              "mode": "none"
             },
             "hideFrom": {
               "legend": false,
@@ -636,7 +633,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -707,7 +705,7 @@
             "drawStyle": "line",
             "lineInterpolation": "smooth",
             "lineWidth": 2,
-            "fillOpacity": 25,
+            "fillOpacity": 8,
             "gradientMode": "opacity",
             "showPoints": "never",
             "pointSize": 5,
@@ -725,7 +723,7 @@
             },
             "stacking": {
               "group": "A",
-              "mode": "normal"
+              "mode": "none"
             },
             "hideFrom": {
               "legend": false,
@@ -735,7 +733,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -889,7 +888,7 @@
     {
       "type": "timeseries",
       "title": "Evictions by reason",
-      "description": "Preemption pressure. Above roughly 5% of the admission rate the policy is too aggressive and is destroying more work than it unblocks.",
+      "description": "Preemption pressure. Above roughly 5% of the admission rate the policy is too aggressive and is destroying more work than it unblocks. Stacked: each band adds to the one below, so the top edge is the total.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -929,8 +928,8 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "lineWidth": 1,
+            "fillOpacity": 45,
             "gradientMode": "opacity",
             "showPoints": "never",
             "pointSize": 5,
@@ -1436,7 +1435,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },

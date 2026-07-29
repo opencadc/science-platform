@@ -1,7 +1,7 @@
 {
   "uid": "canfar-storage",
   "title": "CANFAR · Storage",
-  "description": "PersistentVolumeClaim fill, inode headroom, and node block-device throughput and latency. Label-scheme independent.",
+  "description": "PersistentVolumeClaim inventory and fill for the CANFAR namespaces, plus node block-device throughput and latency.",
   "tags": [
     "canfar",
     "shared",
@@ -30,15 +30,50 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Prometheus",
-          "value": "prometheus"
+          "text": "Mimir",
+          "value": "mimir"
         },
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "options": [],
         "regex": "",
-        "skipUrlSync": false
+        "skipUrlSync": false,
+        "description": "Mimir. Prometheus remains selectable as a fallback."
+      },
+      {
+        "name": "pvc_namespace",
+        "type": "query",
+        "label": "Namespace",
+        "description": "CANFAR namespaces holding PersistentVolumeClaims.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_persistentvolumeclaim_info, namespace)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_persistentvolumeclaim_info, namespace)",
+          "refId": "pvc_namespace-variable-query"
+        },
+        "refresh": 2,
+        "regex": "/^canfar-/",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "canfar-.*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
       },
       {
         "name": "pvc",
@@ -162,8 +197,8 @@
     },
     {
       "type": "stat",
-      "title": "Volumes tracked",
-      "description": "PersistentVolumeClaims reporting stats.",
+      "title": "Volumes",
+      "description": "PersistentVolumeClaims that exist in scope.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -171,14 +206,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "count(kube_persistentvolumeclaim_info{namespace=~\"$pvc_namespace\"})",
           "editorMode": "code",
-          "range": true,
+          "instant": true,
+          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "legendFormat": "__auto"
         }
       ],
       "fieldConfig": {
@@ -202,7 +238,7 @@
       },
       "options": {
         "colorMode": "none",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "textMode": "auto",
@@ -227,8 +263,8 @@
     },
     {
       "type": "stat",
-      "title": "Volumes above 80%",
-      "description": "Volumes at risk of filling up.",
+      "title": "Reporting usage",
+      "description": "How many of those have usage metrics. The kubelet only emits volume stats for some volumes, so the rest show capacity but no Used or Fill. A gap here is a measurement gap, not an empty volume.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -236,14 +272,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(\n  kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"}\n  / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"}\n  > 0.8\n)\nor vector(0)",
-          "legendFormat": "__auto",
+          "expr": "count(kubelet_volume_stats_capacity_bytes{namespace=~\"$pvc_namespace\"})\nor vector(0)",
           "editorMode": "code",
-          "range": true,
+          "instant": true,
+          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "legendFormat": "__auto"
         }
       ],
       "fieldConfig": {
@@ -271,7 +308,7 @@
       },
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "textMode": "auto",
@@ -296,8 +333,8 @@
     },
     {
       "type": "stat",
-      "title": "Total capacity",
-      "description": "Sum of provisioned PVC capacity.",
+      "title": "Provisioned capacity",
+      "description": "Sum of requested capacity across every claim in scope, measurable or not.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -305,14 +342,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace=~\"$pvc_namespace\"})",
           "editorMode": "code",
-          "range": true,
+          "instant": true,
+          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "legendFormat": "__auto"
         }
       ],
       "fieldConfig": {
@@ -336,7 +374,7 @@
       },
       "options": {
         "colorMode": "none",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "textMode": "auto",
@@ -361,8 +399,8 @@
     },
     {
       "type": "stat",
-      "title": "Total used",
-      "description": "Sum of consumed PVC space.",
+      "title": "Used (measurable only)",
+      "description": "Consumed space across only the volumes kubelet reports. Not comparable to provisioned capacity above, which covers every claim.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -370,14 +408,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "sum(kubelet_volume_stats_used_bytes{namespace=~\"$pvc_namespace\"})\nor vector(0)",
           "editorMode": "code",
-          "range": true,
+          "instant": true,
+          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "legendFormat": "__auto"
         }
       ],
       "fieldConfig": {
@@ -401,7 +440,7 @@
       },
       "options": {
         "colorMode": "none",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "textMode": "auto",
@@ -427,7 +466,7 @@
     {
       "type": "gauge",
       "title": "Aggregate fill",
-      "description": "Used over provisioned, across all selected volumes.",
+      "description": "Used over capacity across the volumes kubelet reports. Excludes any volume without usage metrics.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -435,7 +474,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"})\n/ sum(kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
+          "expr": "sum(kubelet_volume_stats_used_bytes{namespace=~\"$pvc_namespace\"})\n/ sum(kubelet_volume_stats_capacity_bytes{namespace=~\"$pvc_namespace\"})",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -500,68 +539,158 @@
     {
       "type": "table",
       "title": "Volume inventory",
-      "description": "Space and inode consumption per claim. Inode exhaustion fills a volume that still reports free bytes, so both columns matter.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Every PersistentVolumeClaim in scope, whether or not usage can be measured. Capacity comes from the claim itself so it is always present; Used and Fill come from kubelet volume stats, which the kubelet only emits for some volumes — a blank Used is a measurement gap, not an empty volume. Sorted by capacity.",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "label_join(kube_persistentvolumeclaim_info{namespace=~\"$pvc_namespace\"}, \"key\", \"/\", \"namespace\", \"persistentvolumeclaim\")",
           "editorMode": "code",
+          "instant": true,
           "range": false,
+          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "instant": true,
-          "format": "table"
+          "legendFormat": "__auto"
         },
         {
           "refId": "B",
-          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "label_join(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace=~\"$pvc_namespace\"}, \"key\", \"/\", \"namespace\", \"persistentvolumeclaim\")",
           "editorMode": "code",
+          "instant": true,
           "range": false,
+          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "instant": true,
-          "format": "table"
+          "legendFormat": "__auto"
         },
         {
           "refId": "C",
-          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"})\n/ sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "label_join(kubelet_volume_stats_used_bytes{namespace=~\"$pvc_namespace\"}, \"key\", \"/\", \"namespace\", \"persistentvolumeclaim\")",
           "editorMode": "code",
+          "instant": true,
           "range": false,
+          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "instant": true,
-          "format": "table"
+          "legendFormat": "__auto"
         },
         {
           "refId": "D",
-          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_inodes_used{persistentvolumeclaim=~\"$pvc\"})\n/ sum by (persistentvolumeclaim) (kubelet_volume_stats_inodes{persistentvolumeclaim=~\"$pvc\"})",
-          "legendFormat": "__auto",
+          "expr": "label_join(kubelet_volume_stats_used_bytes{namespace=~\"$pvc_namespace\"}\n/ on (namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_resource_requests_storage_bytes{namespace=~\"$pvc_namespace\"}, \"key\", \"/\", \"namespace\", \"persistentvolumeclaim\")",
           "editorMode": "code",
+          "instant": true,
           "range": false,
+          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "instant": true,
-          "format": "table"
+          "legendFormat": "__auto"
         }
       ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "key",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "key": true,
+              "Value #A": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "endpoint": true,
+              "container": true,
+              "pod": true,
+              "uid": true,
+              "volumename": true,
+              "namespace 2": true,
+              "namespace 3": true,
+              "namespace 4": true,
+              "persistentvolumeclaim 2": true,
+              "persistentvolumeclaim 3": true,
+              "persistentvolumeclaim 4": true,
+              "prometheus": true,
+              "prometheus_replica": true,
+              "cluster": true,
+              "metrics_path": true,
+              "node": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "namespace 1": "Namespace",
+              "persistentvolumeclaim": "Volume",
+              "persistentvolumeclaim 1": "Volume",
+              "storageclass": "Class",
+              "Value #B": "Capacity",
+              "Value #C": "Used",
+              "Value #D": "Fill"
+            },
+            "indexByName": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Capacity",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "sortBy": [
+          {
+            "displayName": "Capacity",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": [
+            "Capacity",
+            "Used"
+          ]
+        }
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -570,9 +699,6 @@
                 "value": null
               }
             ]
-          },
-          "color": {
-            "mode": "thresholds"
           },
           "custom": {
             "align": "auto",
@@ -587,24 +713,60 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Used"
+              "options": "Namespace"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "bytes"
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 190
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "Capacity"
+              "options": "Class"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "bytes"
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              },
+              {
+                "id": "noValue",
+                "value": "static"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Used"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": "not measurable"
               }
             ]
           },
@@ -623,12 +785,23 @@
                 "value": 1
               },
               {
+                "id": "min",
+                "value": 0
+              },
+              {
                 "id": "max",
                 "value": 1
               },
               {
-                "id": "min",
-                "value": 0
+                "id": "noValue",
+                "value": "—"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
               },
               {
                 "id": "thresholds",
@@ -640,7 +813,7 @@
                       "value": null
                     },
                     {
-                      "color": "#EAB839",
+                      "color": "orange",
                       "value": 0.75
                     },
                     {
@@ -648,143 +821,36 @@
                       "value": 0.9
                     }
                   ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background",
-                  "mode": "gradient"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "continuous-GrYlRd"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Inodes used"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percentunit"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "max",
-                "value": 1
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "#EAB839",
-                      "value": 0.75
-                    },
-                    {
-                      "color": "red",
-                      "value": 0.9
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background",
-                  "mode": "gradient"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "continuous-GrYlRd"
                 }
               }
             ]
           }
         ]
       },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "enablePagination": true,
-        "sortBy": [
-          {
-            "displayName": "Fill",
-            "desc": true
-          }
-        ],
-        "footer": {
-          "show": true,
-          "reducer": [
-            "sum"
-          ],
-          "countRows": false,
-          "fields": ""
-        }
-      },
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "persistentvolumeclaim",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "persistentvolumeclaim": "PersistentVolumeClaim",
-              "Value #A": "Used",
-              "Value #B": "Capacity",
-              "Value #C": "Fill",
-              "Value #D": "Inodes used"
-            },
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true,
-              "Time 4": true
-            },
-            "indexByName": {
-              "persistentvolumeclaim": 0,
-              "Value #A": 1,
-              "Value #B": 2,
-              "Value #C": 3,
-              "Value #D": 4
-            }
-          }
-        }
-      ],
       "gridPos": {
         "x": 0,
         "y": 6,
-        "w": 14,
-        "h": 11
+        "w": 24,
+        "h": 12
       },
       "id": 7
+    },
+    {
+      "type": "row",
+      "title": "Node block device I/O",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 1
+      },
+      "id": 8
     },
     {
       "type": "timeseries",
@@ -797,7 +863,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"$pvc\"})\n/ sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\"$pvc\"})",
+          "expr": "sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=~\"$pvc_namespace\", persistentvolumeclaim=~\"$pvc\"})\n/ sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace=~\"$pvc_namespace\", persistentvolumeclaim=~\"$pvc\"})",
           "legendFormat": "{{persistentvolumeclaim}}",
           "editorMode": "code",
           "range": true,
@@ -885,27 +951,10 @@
         }
       },
       "gridPos": {
-        "x": 14,
-        "y": 6,
-        "w": 10,
-        "h": 11
-      },
-      "id": 8
-    },
-    {
-      "type": "row",
-      "title": "Node block device I/O",
-      "collapsed": false,
-      "panels": [],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 18,
         "w": 24,
-        "h": 1
+        "h": 9
       },
       "id": 9
     },
