@@ -74,6 +74,8 @@ spec:
           value: "{{ .Values.deployment.skaha.sessions.hostname | default .Values.deployment.hostname }}"
         - name: SKAHA_HOSTNAME
           value: "{{ .Values.deployment.hostname }}"
+        - name: SKAHA_VERSION
+          value: "{{ .Chart.AppVersion }}"
         - name: GPU_ENABLED
           value: "{{ .Values.deployment.skaha.sessions.gpuEnabled | default "false" }}"
         - name: skaha.homedir

@@ -73,6 +73,7 @@ import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
+import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -318,7 +319,7 @@ public class PostAction extends SessionAction {
         KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
                 .namespace(K8SUtil.getWorkloadNamespace())
                 .job()
-                .label("canfar-net-sessionID=" + sessionID + ",canfar-net-userid=" + forUserID)
+                .label(SessionLabels.forSession(forUserID, sessionID))
                 .noHeaders()
                 .outputFormat(
                         "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
@@ -491,7 +492,8 @@ public class PostAction extends SessionAction {
             sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
         }
 
-        String jobLaunchString = sessionJobBuilder.build();
+        final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
+        String jobLaunchString = Yaml.dump(launch.job());
         String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
@@ -518,6 +520,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
+            serviceString = SessionJobBuilder.labelService(serviceString, launch.labels());
             final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
 
             log.debug("Create service result: " + createServiceResult);
@@ -533,6 +536,7 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
+            ingressString = SessionJobBuilder.labelIngress(ingressString, launch.labels());
             final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
 
             log.debug("Create ingress result: " + createIngressResult);
@@ -604,10 +608,11 @@ public class PostAction extends SessionAction {
         KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
                 .pod()
                 .namespace(K8SUtil.getWorkloadNamespace())
-                .selector("canfar-net-sessionID=" + sessionID)
+                .selector(SessionLabels.forSession(posixPrincipal.username, sessionID))
                 .noHeaders()
                 .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,"
-                        + "TYPE:.metadata.labels.canfar-net-sessionType,NAME:.metadata.name");
+                        + "TYPE:.metadata.labels." + SessionLabels.sessionKindJsonPath()
+                        + ",NAME:.metadata.name");
 
         String ipResult = CommandExecutioner.execute(getIPCommand.build());
 
@@ -672,6 +677,7 @@ public class PostAction extends SessionAction {
                 .withGPUEnabled(this.gpuEnabled)
                 .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
+                .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())

@@ -3,8 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    canfar-net-sessionID: "${skaha.sessionid}"
-    kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
+    template-owned: job
   name: test-base-values-queue-job
 spec:
   parallelism: 1
@@ -14,7 +13,7 @@ spec:
   template:
     metadata:
       labels:
-        canfar-net-sessionID: "${skaha.sessionid}"
+        template-owned: pod
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false

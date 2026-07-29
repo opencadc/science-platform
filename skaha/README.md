@@ -4,6 +4,10 @@ The Science Platform is designed to be a powerful and flexible environment for s
 
 As a part of the science platform, Skaha is a Java servlet implementation offering a REST API to the functionality of the platform.  It is designed to be run in a containerized environment, to manage the underlying orchestration platform (Kubernetes) and the lifecycle of the user's containers.
 
+## Documentation
+
+- [Session Kubernetes labels](docs/labels.md) — canonical `canfar.net/*` label contract, selectors, launch projections, and legacy migration tables.
+
 ## Software Releases
 
 ## Official Docker Image

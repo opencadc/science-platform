@@ -2,12 +2,6 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  labels:
-    canfar-net-sessionID: "${skaha.sessionid}"
-    canfar-net-sessionName: "${skaha.sessionname}"
-    canfar-net-sessionType: "${skaha.sessiontype}"
-    canfar-net-userid: "${skaha.userid}"
-    kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
   name: "${skaha.jobname}"
 spec:
   parallelism: 1
@@ -15,13 +9,6 @@ spec:
   activeDeadlineSeconds: 86400
   ttlSecondsAfterFinished: 86400
   template:
-    metadata:
-      labels:
-        canfar-net-sessionID: "${skaha.sessionid}"
-        canfar-net-sessionName: "${skaha.sessionname}"
-        canfar-net-sessionType: "${skaha.sessiontype}"
-        canfar-net-userid: "${skaha.userid}"
-        job-name: "test-job"
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false

@@ -2,9 +2,6 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  labels:
-    canfar-net-sessionID: "${skaha.sessionid}"
-    kueue.x-k8s.io/queue-name: skaha-workload-queue-interactive
   name: test-base-values-affinity-job
 spec:
   parallelism: 1
@@ -12,9 +9,6 @@ spec:
   activeDeadlineSeconds: 88
   ttlSecondsAfterFinished: 86400
   template:
-    metadata:
-      labels:
-        canfar-net-sessionID: "${skaha.sessionid}"
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false

@@ -2,11 +2,6 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  labels:
-    canfar-net-sessionID: "${skaha.sessionid}"
-    canfar-net-sessionName: "${skaha.sessionname}"
-    canfar-net-sessionType: "${skaha.sessiontype}"
-    canfar-net-userid: "${skaha.userid}"
   name: "${skaha.jobname}"
 spec:
   parallelism: 1
@@ -15,13 +10,6 @@ spec:
   ttlSecondsAfterFinished: 3600
   backoffLimit: 0
   template:
-    metadata:
-      labels:
-        canfar-net-sessionID: "${skaha.sessionid}"
-        canfar-net-sessionName: "${skaha.sessionname}"
-        canfar-net-sessionType: "${skaha.sessiontype}"
-        canfar-net-userid: "${skaha.userid}"
-        job-name: "${skaha.jobname}"
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
