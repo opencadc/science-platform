@@ -1,7 +1,7 @@
 {
   "uid": "canfar-services",
-  "title": "CANFAR · Platform Services",
-  "description": "Health of the CANFAR control plane itself — the Skaha API, the metrics backend, and their supporting Deployments. User workload namespaces are excluded throughout; for those see Sessions & Users.",
+  "title": "CANFAR \u00b7 Platform Services",
+  "description": "Health of the CANFAR control plane itself \u2014 the Skaha API, the metrics backend, and their supporting Deployments. User workload namespaces are excluded throughout; for those see Sessions & Users.",
   "tags": [
     "canfar",
     "services",
@@ -30,8 +30,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -39,21 +39,21 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "service_namespace",
         "type": "query",
         "label": "Namespace",
-        "description": "Namespaces holding CANFAR platform Deployments. Workload namespaces are excluded: user sessions are not platform services and would dominate these numbers.",
+        "description": "Namespaces holding CANFAR platform Deployments. The session workload namespace is excluded: user sessions are not platform services and would dominate these numbers.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_deployment_spec_replicas{namespace!~\".*workload.*\"}, namespace)",
+        "definition": "label_values(kube_deployment_spec_replicas{namespace!=\"__CANFAR_WORKLOAD_NS__\"}, namespace)",
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_deployment_spec_replicas{namespace!~\".*workload.*\"}, namespace)",
+          "query": "label_values(kube_deployment_spec_replicas{namespace!=\"__CANFAR_WORKLOAD_NS__\"}, namespace)",
           "refId": "service_namespace-variable-query"
         },
         "refresh": 2,
@@ -172,7 +172,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(kube_deployment_spec_replicas{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", deployment=~\"$deployment\"})",
+          "expr": "count(kube_deployment_spec_replicas{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", deployment=~\"$deployment\"})",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -236,7 +236,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_deployment_status_replicas_unavailable{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", deployment=~\"$deployment\"})\nor vector(0)",
+          "expr": "sum(kube_deployment_status_replicas_unavailable{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", deployment=~\"$deployment\"})\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -305,7 +305,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(kube_pod_status_ready{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", condition=\"true\"} == 0)\nor vector(0)",
+          "expr": "count(kube_pod_status_ready{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", condition=\"true\"} == 0)\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -374,7 +374,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"}[$__range]))\nor vector(0)",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"}[$__range]))\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": false,
@@ -449,7 +449,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_status_waiting_reason{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", reason=~\"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerError\"})\nor vector(0)",
+          "expr": "sum(kube_pod_container_status_waiting_reason{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", reason=~\"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerError\"})\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -518,7 +518,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - min(kube_pod_start_time{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"})\nor vector(0)",
+          "expr": "time() - min(kube_pod_start_time{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"})\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -600,8 +600,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (deployment) (kube_deployment_spec_replicas{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", deployment=~\"$deployment\"})",
-          "legendFormat": "desired · {{deployment}}",
+          "expr": "sum by (deployment) (kube_deployment_spec_replicas{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", deployment=~\"$deployment\"})",
+          "legendFormat": "desired \u00b7 {{deployment}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -611,8 +611,8 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (deployment) (kube_deployment_status_replicas_available{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", deployment=~\"$deployment\"})",
-          "legendFormat": "available · {{deployment}}",
+          "expr": "sum by (deployment) (kube_deployment_status_replicas_available{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", deployment=~\"$deployment\"})",
+          "legendFormat": "available \u00b7 {{deployment}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -707,7 +707,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (reason) (kube_pod_container_status_waiting_reason{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"} > 0)",
+          "expr": "sum by (reason) (kube_pod_container_status_waiting_reason{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"} > 0)",
           "legendFormat": "{{reason}}",
           "editorMode": "code",
           "range": true,
@@ -807,7 +807,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", container!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", container!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{pod}}",
           "editorMode": "code",
           "range": true,
@@ -818,7 +818,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", resource=\"cpu\"})",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", resource=\"cpu\"})",
           "legendFormat": "total requested",
           "editorMode": "code",
           "range": true,
@@ -946,7 +946,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", container!=\"\"})",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", container!=\"\"})",
           "legendFormat": "{{pod}}",
           "editorMode": "code",
           "range": true,
@@ -957,7 +957,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(kube_pod_container_resource_limits{namespace=~\"$service_namespace\", namespace!~\".*workload.*\", resource=\"memory\"})",
+          "expr": "sum(kube_pod_container_resource_limits{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\", resource=\"memory\"})",
           "legendFormat": "total limit",
           "editorMode": "code",
           "range": true,
@@ -1102,8 +1102,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"})",
-          "legendFormat": "current · {{horizontalpodautoscaler}}",
+          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"})",
+          "legendFormat": "current \u00b7 {{horizontalpodautoscaler}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1113,8 +1113,8 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_desired_replicas{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"})",
-          "legendFormat": "desired · {{horizontalpodautoscaler}}",
+          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_desired_replicas{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"})",
+          "legendFormat": "desired \u00b7 {{horizontalpodautoscaler}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1124,8 +1124,8 @@
         },
         {
           "refId": "C",
-          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{namespace=~\"$service_namespace\", namespace!~\".*workload.*\"})",
-          "legendFormat": "max · {{horizontalpodautoscaler}}",
+          "expr": "sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{namespace=~\"$service_namespace\", namespace!=\"__CANFAR_WORKLOAD_NS__\"})",
+          "legendFormat": "max \u00b7 {{horizontalpodautoscaler}}",
           "editorMode": "code",
           "range": true,
           "datasource": {

@@ -70,6 +70,8 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.sessions.userStorage.topLevelDirectory | string | `"/cavern"` | Absolute mount path containing user home and projects directories. |
 | experimentalFeatures.enabled | bool | `false` | Enable processing of experimental feature gates. |
 | grafanaDashboards.annotations | object | `{}` | Extra annotations added to every dashboard ConfigMap. |
+| grafanaDashboards.datasourceName | string | `"Mimir"` | Display name shown for `datasourceUid` in the data source picker. |
+| grafanaDashboards.datasourceUid | string | `"mimir"` | Uid of the Prometheus-compatible data source the dashboards query. |
 | grafanaDashboards.enabled | bool | `false` | Render the CANFAR Grafana dashboard ConfigMaps. |
 | grafanaDashboards.folder | string | `"CANFAR Science Platform"` | Grafana folder the dashboards are filed under, via the `grafana_folder` annotation. |
 | grafanaDashboards.namespace | string | `""` | Namespace to create the ConfigMaps in. Defaults to the release namespace; set this when the Grafana sidecar only watches a specific namespace. |

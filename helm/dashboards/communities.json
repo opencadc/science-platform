@@ -1,6 +1,6 @@
 {
   "uid": "canfar-communities",
-  "title": "CANFAR · Communities & Projects",
+  "title": "CANFAR \u00b7 Communities & Projects",
   "description": "Attribution of platform usage to communities and projects. canfar.net/community is the Kueue ClusterQueue / fair-share dimension and canfar.net/project the LocalQueue dimension, per CADC-15910. Both default to `default` when a session supplies none, so the Kueue queue labels are shown alongside as the working segmentation until launch-time attribution is populated.",
   "tags": [
     "canfar",
@@ -31,8 +31,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -40,13 +40,13 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "namespace",
         "type": "query",
         "label": "Namespace",
-        "description": "CANFAR session workload namespace(s).",
+        "description": "Namespace holding CANFAR session workloads. Set at install time from the chart's resolved workload namespace.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
@@ -58,11 +58,11 @@
           "refId": "namespace-variable-query"
         },
         "refresh": 2,
-        "regex": ".*workload.*",
+        "regex": "/^__CANFAR_WORKLOAD_NS__$/",
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
+        "allValue": "__CANFAR_WORKLOAD_NS__",
         "current": {
           "text": [
             "All"
@@ -317,7 +317,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Communities — Kueue ClusterQueue / fair-share dimension",
+      "title": "Communities \u2014 Kueue ClusterQueue / fair-share dimension",
       "collapsed": false,
       "panels": [],
       "datasource": {
@@ -335,7 +335,7 @@
     {
       "type": "stat",
       "title": "Communities",
-      "description": "Distinct canfar.net/community values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Distinct canfar.net/community values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -401,7 +401,7 @@
     {
       "type": "stat",
       "title": "Projects",
-      "description": "Distinct canfar.net/project values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Distinct canfar.net/project values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -599,7 +599,7 @@
     {
       "type": "table",
       "title": "Per-community footprint",
-      "description": "Resource footprint and efficiency per community, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Resource footprint and efficiency per community, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1031,7 +1031,7 @@
     {
       "type": "timeseries",
       "title": "Active sessions by community",
-      "description": "Running sessions per community. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Running sessions per community. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1130,7 +1130,7 @@
     },
     {
       "type": "row",
-      "title": "Projects — Kueue LocalQueue dimension",
+      "title": "Projects \u2014 Kueue LocalQueue dimension",
       "collapsed": false,
       "panels": [],
       "datasource": {
@@ -1148,7 +1148,7 @@
     {
       "type": "table",
       "title": "Per-project footprint",
-      "description": "Resource footprint and efficiency per project, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Resource footprint and efficiency per project, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1580,7 +1580,7 @@
     {
       "type": "timeseries",
       "title": "Active sessions by project",
-      "description": "Running sessions per project. Sessions that supply no value are labelled `default`, per the Skaha label contract — a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "description": "Running sessions per project. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"

@@ -652,8 +652,14 @@ secrets:
 #
 # Enable this on ONE release only. Two releases pointing at the same Grafana would
 # render ConfigMaps carrying identical dashboard uids and the sidecar would import
-# whichever it wrote last. The dashboards' namespace picker already spans every workload
-# namespace, so a single install covers them all.
+# whichever it wrote last.
+#
+# Nothing about a particular installation is baked into the dashboard JSON. The session
+# panels are scoped to this release's resolved workload namespace, and the storage panels
+# default to this release's namespaces, all substituted at render time. A release
+# therefore reports on its own sessions: where several releases each own a workload
+# namespace, enable this on the one whose sessions you want to see, or widen the
+# `$namespace` picker in Grafana after import.
 #
 # The session dashboards read the `canfar.net/*` labels Skaha writes at launch (see
 # skaha/docs/labels.md). kube-state-metrics only exposes object labels named in
@@ -672,6 +678,13 @@ grafanaDashboards:
   sidecarLabel: grafana_dashboard
   # -- Value for `sidecarLabel`.
   sidecarLabelValue: "1"
+  # The dashboards' data source picker is seeded with this uid. A picker whose selection
+  # does not resolve leaves every panel silently empty on a provisioned dashboard, so this
+  # must name a Prometheus-type data source that exists in the target Grafana.
+  # -- Uid of the Prometheus-compatible data source the dashboards query.
+  datasourceUid: mimir
+  # -- Display name shown for `datasourceUid` in the data source picker.
+  datasourceName: Mimir
   # -- Extra annotations added to every dashboard ConfigMap.
   annotations: {}
 

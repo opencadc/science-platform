@@ -1,6 +1,6 @@
 {
   "uid": "canfar-overview",
-  "title": "CANFAR · Platform Overview",
+  "title": "CANFAR \u00b7 Platform Overview",
   "description": "Demand, GPU and efficiency for the CANFAR Science Platform. Operational health and node OOM kills live on Platform Health.",
   "tags": [
     "canfar",
@@ -29,8 +29,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -38,13 +38,13 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "namespace",
         "type": "query",
         "label": "Namespace",
-        "description": "CANFAR session workload namespace(s).",
+        "description": "Namespace holding CANFAR session workloads. Set at install time from the chart's resolved workload namespace.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
@@ -56,11 +56,11 @@
           "refId": "namespace-variable-query"
         },
         "refresh": 2,
-        "regex": ".*workload.*",
+        "regex": "/^__CANFAR_WORKLOAD_NS__$/",
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
+        "allValue": "__CANFAR_WORKLOAD_NS__",
         "current": {
           "text": [
             "All"
@@ -1327,7 +1327,7 @@
     {
       "type": "stat",
       "title": "GPUs requested",
-      "description": "GPUs held by running CANFAR sessions. These are GPUs *requested*, not GPU utilisation — a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
+      "description": "GPUs held by running CANFAR sessions. These are GPUs *requested*, not GPU utilisation \u2014 a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1392,7 +1392,7 @@
     {
       "type": "gauge",
       "title": "GPU allocation",
-      "description": "Share of cluster GPUs held by running sessions. These are GPUs *requested*, not GPU utilisation — a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
+      "description": "Share of cluster GPUs held by running sessions. These are GPUs *requested*, not GPU utilisation \u2014 a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1465,7 +1465,7 @@
     {
       "type": "timeseries",
       "title": "GPUs requested by session kind",
-      "description": "Which workload types are holding the GPUs. These are GPUs *requested*, not GPU utilisation — a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
+      "description": "Which workload types are holding the GPUs. These are GPUs *requested*, not GPU utilisation \u2014 a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1562,7 +1562,7 @@
     {
       "type": "timeseries",
       "title": "GPUs requested by user",
-      "description": "Top 10 users by GPUs held. These are GPUs *requested*, not GPU utilisation — a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
+      "description": "Top 10 users by GPUs held. These are GPUs *requested*, not GPU utilisation \u2014 a held GPU may be completely idle. Measuring real GPU usage needs a DCGM exporter, which is not deployed.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1676,7 +1676,7 @@
     {
       "type": "gauge",
       "title": "CPU efficiency",
-      "description": "Used ÷ requested CPU across all running sessions. Above 100% the session is bursting beyond what it reserved.",
+      "description": "Used \u00f7 requested CPU across all running sessions. Above 100% the session is bursting beyond what it reserved.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1861,7 +1861,7 @@
     {
       "type": "gauge",
       "title": "RAM efficiency",
-      "description": "Working set ÷ requested memory across all running sessions. Above 100% the session is bursting beyond what it reserved.",
+      "description": "Working set \u00f7 requested memory across all running sessions. Above 100% the session is bursting beyond what it reserved.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"

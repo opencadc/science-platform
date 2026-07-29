@@ -1,6 +1,6 @@
 {
   "uid": "canfar-platform-health",
-  "title": "CANFAR · Platform Health",
+  "title": "CANFAR \u00b7 Platform Health",
   "description": "Operational view: load, reliability, and node-level OOM kills, without per-user attribution. For who is using what, see Sessions & Users.",
   "tags": [
     "canfar",
@@ -30,8 +30,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -39,13 +39,13 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "namespace",
         "type": "query",
         "label": "Namespace",
-        "description": "CANFAR session workload namespace(s).",
+        "description": "Namespace holding CANFAR session workloads. Set at install time from the chart's resolved workload namespace.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
@@ -57,11 +57,11 @@
           "refId": "namespace-variable-query"
         },
         "refresh": 2,
-        "regex": ".*workload.*",
+        "regex": "/^__CANFAR_WORKLOAD_NS__$/",
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
+        "allValue": "__CANFAR_WORKLOAD_NS__",
         "current": {
           "text": [
             "All"
@@ -1265,8 +1265,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "label_replace(\n  topk(1,\n    sum by (nodename) (\n      increase(node_vmstat_oom_kill[$__range])\n      * on (instance) group_left (nodename) node_uname_info\n    )\n  ),\n  \"node\", \"$1\", \"nodename\", \"keel-prod-([^.]+).*\"\n)",
-          "legendFormat": "{{node}}",
+          "expr": "topk(1,\n    sum by (nodename) (\n      increase(node_vmstat_oom_kill[$__range])\n      * on (instance) group_left (nodename) node_uname_info\n    )\n  )",
+          "legendFormat": "{{nodename}}",
           "editorMode": "code",
           "range": false,
           "datasource": {
@@ -1413,7 +1413,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "One cell per node per hour, coloured green through yellow to red by kill count. The scale is pinned from 0 to 10 so a colour means the same thing on every refresh: green is a clean hour, yellow around 5, red at 10 or more. Hover for the exact count — hours above 10 stay full red rather than rescaling the panel. Read it for shape: colour scattered across several hours means a node is looping and wants draining or a memory-limit review, a single coloured cell was one bad hour. Rows are alphabetical and the prefix carries the role: c compute, g GPU, s services, k control plane. Nodes with no node-exporter do not appear.",
+      "description": "One cell per node per hour, coloured green through yellow to red by kill count. The scale is pinned from 0 to 10 so a colour means the same thing on every refresh: green is a clean hour, yellow around 5, red at 10 or more. Hover for the exact count \u2014 hours above 10 stay full red rather than rescaling the panel. Read it for shape: colour scattered across several hours means a node is looping and wants draining or a memory-limit review, a single coloured cell was one bad hour. Rows are alphabetical and the prefix carries the role: c compute, g GPU, s services, k control plane. Nodes with no node-exporter do not appear.",
       "targets": [
         {
           "refId": "A",
@@ -1423,8 +1423,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "{{node}}",
-          "expr": "label_replace(\n  sum by (nodename) (\n    increase(node_vmstat_oom_kill[1h])\n    * on (instance) group_left (nodename) node_uname_info\n  ),\n  \"node\", \"$1\", \"nodename\", \"keel-prod-([^.]+).*\"\n)",
+          "legendFormat": "{{nodename}}",
+          "expr": "sum by (nodename) (\n    increase(node_vmstat_oom_kill[1h])\n    * on (instance) group_left (nodename) node_uname_info\n  )",
           "interval": "1h"
         }
       ],

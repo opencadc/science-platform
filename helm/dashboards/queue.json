@@ -1,6 +1,6 @@
 {
   "uid": "canfar-queue",
-  "title": "CANFAR · Queue & Scheduling",
+  "title": "CANFAR \u00b7 Queue & Scheduling",
   "description": "Kueue throughput, wait time, quota saturation, and preemption badput. Label-scheme independent: every series here comes from Kueue itself.",
   "tags": [
     "canfar",
@@ -31,8 +31,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -40,7 +40,7 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "cluster_queue",
@@ -477,7 +477,7 @@
     {
       "type": "stat",
       "title": "Evictions in range",
-      "description": "Workloads killed to make room for others. Every eviction is discarded compute — badput.",
+      "description": "Workloads killed to make room for others. Every eviction is discarded compute \u2014 badput.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1016,7 +1016,7 @@
         {
           "refId": "A",
           "expr": "sum by (cluster_queue, resource) (\n  kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\"}\n)\n/\nsum by (cluster_queue, resource) (\n  kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\"}\n)",
-          "legendFormat": "{{cluster_queue}} · {{resource}}",
+          "legendFormat": "{{cluster_queue}} \u00b7 {{resource}}",
           "editorMode": "code",
           "range": false,
           "datasource": {
@@ -1357,7 +1357,7 @@
         {
           "refId": "A",
           "expr": "sum by (exported_namespace) (kueue_local_queue_pending_workloads)",
-          "legendFormat": "pending · {{exported_namespace}}",
+          "legendFormat": "pending \u00b7 {{exported_namespace}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1368,7 +1368,7 @@
         {
           "refId": "B",
           "expr": "sum by (exported_namespace) (kueue_local_queue_reserving_active_workloads)",
-          "legendFormat": "reserving · {{exported_namespace}}",
+          "legendFormat": "reserving \u00b7 {{exported_namespace}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1379,7 +1379,7 @@
         {
           "refId": "C",
           "expr": "sum by (exported_namespace) (kueue_local_queue_admitted_active_workloads)",
-          "legendFormat": "admitted · {{exported_namespace}}",
+          "legendFormat": "admitted \u00b7 {{exported_namespace}}",
           "editorMode": "code",
           "range": true,
           "datasource": {

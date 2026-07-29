@@ -1,6 +1,6 @@
 {
   "uid": "canfar-capacity",
-  "title": "CANFAR · Cluster Capacity",
+  "title": "CANFAR \u00b7 Cluster Capacity",
   "description": "Node inventory, commitment, pressure conditions, and slot fragmentation. Label-scheme independent.",
   "tags": [
     "canfar",
@@ -31,8 +31,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -40,7 +40,7 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "node",
@@ -1892,7 +1892,7 @@
     {
       "type": "timeseries",
       "title": "Stranded CPU on memory-full nodes",
-      "description": "Free cores sitting on nodes whose memory is more than 90% committed. These cores are unschedulable in practice — the slot-fragmentation signal that says hardware shape and job shape have diverged.",
+      "description": "Free cores sitting on nodes whose memory is more than 90% committed. These cores are unschedulable in practice \u2014 the slot-fragmentation signal that says hardware shape and job shape have diverged.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"

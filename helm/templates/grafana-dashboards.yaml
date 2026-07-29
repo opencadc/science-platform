@@ -4,19 +4,30 @@ CANFAR Science Platform Grafana dashboards.
 One ConfigMap per dashboard in helm/dashboards, labelled for the Grafana sidecar to
 collect and annotated with the folder to file it under.
 
-`tpl` is deliberately NOT used on the dashboard bodies: Grafana legend formats are
-written as {{ "{{" }}label{{ "}}" }} and Helm would try to evaluate them.
+The dashboards carry namespace placeholders so nothing about one installation's naming
+is baked into the JSON. They are substituted with `replace` rather than `tpl`: Grafana
+legend formats are written as {{ "{{" }}label{{ "}}" }} and Helm would try to evaluate
+them.
 */}}
 {{- $cfg := .Values.grafanaDashboards | default dict -}}
 {{- if $cfg.enabled -}}
 {{- $ctx := . -}}
 {{- $namespace := $cfg.namespace | default $ctx.Release.Namespace -}}
+{{- $workloadNamespace := include "skaha.workloadNamespace" $ctx -}}
 {{- $files := $ctx.Files.Glob "dashboards/*.json" -}}
 {{- if not $files }}
   {{- fail "grafanaDashboards.enabled is true but no dashboard JSON was found under helm/dashboards" -}}
 {{- end -}}
 {{- range $path, $_ := $files }}
 {{- $stem := trimSuffix ".json" (base $path) }}
+{{- $body := $ctx.Files.Get $path
+      | replace "__CANFAR_WORKLOAD_NS__" $workloadNamespace
+      | replace "__CANFAR_RELEASE_NS__" $ctx.Release.Namespace
+      | replace "__CANFAR_DS_UID__" ($cfg.datasourceUid | default "mimir")
+      | replace "__CANFAR_DS_NAME__" ($cfg.datasourceName | default "Mimir") }}
+{{- if regexMatch "__CANFAR_[A-Z_]+__" $body }}
+  {{- fail (printf "%s still contains an unsubstituted __CANFAR_*__ placeholder; add it to the replace chain in templates/grafana-dashboards.yaml" $path) -}}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -38,6 +49,6 @@ metadata:
 data:
   {{/* Prefixed so the key is unique in the sidecar's shared dashboard directory. */}}
   canfar-{{ $stem }}.json: |-
-    {{- $ctx.Files.Get $path | nindent 4 }}
+    {{- $body | nindent 4 }}
 {{- end }}
 {{- end }}

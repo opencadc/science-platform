@@ -1,6 +1,6 @@
 {
   "uid": "canfar-storage",
-  "title": "CANFAR · Storage",
+  "title": "CANFAR \u00b7 Storage",
   "description": "PersistentVolumeClaim inventory and fill for the CANFAR namespaces, plus node block-device throughput and latency.",
   "tags": [
     "canfar",
@@ -30,8 +30,8 @@
         "pluginId": "prometheus",
         "refresh": 1,
         "current": {
-          "text": "Mimir",
-          "value": "mimir"
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
         },
         "hide": 0,
         "includeAll": false,
@@ -39,13 +39,13 @@
         "options": [],
         "regex": "",
         "skipUrlSync": false,
-        "description": "Mimir. Prometheus remains selectable as a fallback."
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
       },
       {
         "name": "pvc_namespace",
         "type": "query",
         "label": "Namespace",
-        "description": "CANFAR namespaces holding PersistentVolumeClaims.",
+        "description": "Namespaces holding PersistentVolumeClaims. Defaults to the namespaces this chart installs into; every namespace with claims is available in the picker.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
@@ -57,17 +57,19 @@
           "refId": "pvc_namespace-variable-query"
         },
         "refresh": 2,
-        "regex": "/^canfar-/",
+        "regex": "",
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": "canfar-.*",
+        "allValue": ".*",
         "current": {
           "text": [
-            "All"
+            "__CANFAR_RELEASE_NS__",
+            "__CANFAR_WORKLOAD_NS__"
           ],
           "value": [
-            "$__all"
+            "__CANFAR_RELEASE_NS__",
+            "__CANFAR_WORKLOAD_NS__"
           ]
         },
         "options": [],
@@ -541,7 +543,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Every PersistentVolumeClaim in scope, whether or not usage can be measured. Capacity comes from the claim itself so it is always present; Used and Fill come from kubelet volume stats, which the kubelet only emits for some volumes — a blank Used is a measurement gap, not an empty volume. Sorted by capacity.",
+      "description": "Every PersistentVolumeClaim in scope, whether or not usage can be measured. Capacity comes from the claim itself so it is always present; Used and Fill come from kubelet volume stats, which the kubelet only emits for some volumes \u2014 a blank Used is a measurement gap, not an empty volume. Sorted by capacity.",
       "targets": [
         {
           "refId": "A",
@@ -792,7 +794,7 @@
               },
               {
                 "id": "noValue",
-                "value": "—"
+                "value": "\u2014"
               },
               {
                 "id": "custom.cellOptions",
@@ -1164,7 +1166,7 @@
         {
           "refId": "A",
           "expr": "sum by (instance) (rate(node_disk_reads_completed_total{device=~\"$device\"}[$__rate_interval]))",
-          "legendFormat": "read · {{instance}}",
+          "legendFormat": "read \u00b7 {{instance}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1175,7 +1177,7 @@
         {
           "refId": "B",
           "expr": "sum by (instance) (rate(node_disk_writes_completed_total{device=~\"$device\"}[$__rate_interval]))",
-          "legendFormat": "write · {{instance}}",
+          "legendFormat": "write \u00b7 {{instance}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1273,7 +1275,7 @@
         {
           "refId": "A",
           "expr": "rate(node_disk_read_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ clamp_min(rate(node_disk_reads_completed_total{device=~\"$device\"}[$__rate_interval]), 1)",
-          "legendFormat": "read · {{instance}} {{device}}",
+          "legendFormat": "read \u00b7 {{instance}} {{device}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
@@ -1284,7 +1286,7 @@
         {
           "refId": "B",
           "expr": "rate(node_disk_write_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ clamp_min(rate(node_disk_writes_completed_total{device=~\"$device\"}[$__rate_interval]), 1)",
-          "legendFormat": "write · {{instance}} {{device}}",
+          "legendFormat": "write \u00b7 {{instance}} {{device}}",
           "editorMode": "code",
           "range": true,
           "datasource": {
