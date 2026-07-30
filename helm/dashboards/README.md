@@ -17,9 +17,9 @@ The Helm chart turns each one into a ConfigMap that the Grafana sidecar collects
 | **Queue & Scheduling** | `canfar-queue` | Is Kueue admitting work, and is the fair-share policy sane? |
 | **Cluster Capacity** | `canfar-capacity` | Do we have room, and where is capacity stranded? |
 | **Storage** | `canfar-storage` | Are volumes filling up, and is the disk keeping up? |
-| **Platform Services** | `canfar-services` | Is the Skaha API and its supporting deployment healthy? |
+| **Platform Services** | `canfar-services` | Is the Skaha API and its supporting deployment healthy, and what is the application itself reporting? |
 
-137 panels across ten dashboards.
+160 panels across ten dashboards.
 
 ## Deploying
 
@@ -105,6 +105,57 @@ session dashboards do not, the allowlist is the cause.
 Other exporters required: **kube-state-metrics** (`kube_*`), **cAdvisor/kubelet**
 (`container_*`, `kubelet_volume_stats_*`), **node-exporter** (`node_*`), and **Kueue**
 metrics scraped into Prometheus (`kueue_*`). Only the Queue dashboard needs Kueue.
+
+## Application metrics over OpenTelemetry
+
+Platform Services carries three rows fed by OpenTelemetry rather than by the exporters
+above: **Skaha API**, **Skaha JVM runtime**, and **Metrics Server**. Skaha is
+instrumented by the OpenTelemetry Java agent baked into its image; the metrics service
+uses the Python SDK plus FastAPI and httpx instrumentation. Both push OTLP.
+
+These rows are optional. Everything else on the dashboard works without them; if
+telemetry is disabled or the OTLP endpoint is unreachable, these panels are empty and
+nothing else changes.
+
+Three properties of the pipeline shape how the queries are written.
+
+**Metric names may keep their dots.** Where the receiver is configured with a
+non-escaping translation strategy, a metric arrives as `jvm.memory.used_bytes`, not
+`jvm_memory_used_bytes`, and every selector needs PromQL's UTF-8 quoting:
+
+```promql
+count({"jvm.memory.used_bytes"})
+sum by ("http.route") (rate({"http.server.request.duration_seconds_count"}[$__rate_interval]))
+```
+
+Label names keep their dots too — `http.route`, `service.name`, `cache.hit`. The
+unquoted spelling is not an error, it simply matches nothing, so a panel written from
+habit fails silently. If your receiver escapes to underscores instead, these panels need
+the names rewritten.
+
+**The two services are on different semantic-convention generations.** The Java agent
+emits the stable names (`http.server.request.duration_seconds`, label `http.route`,
+seconds); the Python SDK emits the legacy ones (`http.server.duration_milliseconds`,
+label `http.target`, milliseconds). No single query spans both, which is why the rows are
+separate and carry different units. Routes are templated on the Java side
+(`/skaha/v1/session/*`) but raw paths on the Python side, so the latter is worth watching
+for cardinality if an endpoint ever puts an identifier in its path.
+
+**Instances are identified by a random UUID, not by pod name.** `service.instance.id` is
+generated per JVM, so JVM panels cannot be joined to a pod and a restart appears as a new
+instance. The per-replica panels are labelled by that id deliberately — it is the only
+identity available.
+
+Two variables, `$skaha_job` and `$metrics_job`, resolve the service names. Neither is
+hardcoded: each is a `label_values` query over a metric only that service emits, so a
+deployment that sets a different `OTEL_SERVICE_NAME` still resolves. Note that if two
+releases export the same service name, their series merge and these panels will show the
+sum.
+
+A health probe can dominate request volume — on one deployment during development the
+readiness probe was over 99.9% of all requests the metrics service saw. The rate and
+latency panels for real endpoints exclude it explicitly; the by-endpoint panels include
+it so its share stays visible.
 
 ## Label contract
 
@@ -242,9 +293,11 @@ Where no `ceph_*` metrics are scraped there is no alternative source for CephFS 
 
 ## Known gaps
 
-- **No `cluster` label.** Multi-cluster selectors are deliberately absent: no `cluster`
-  label is exposed today, and a join on an absent label fails silently to an empty panel.
-  Scoping is by namespace.
+- **No multi-cluster selectors.** Whether a `cluster` label exists depends on the
+  backend: where Prometheus remote-writes to a long-term store, the store's copy is
+  usually stamped with one while Prometheus's own is not. These dashboards join on
+  neither, so they work against either — but it also means they cannot separate two
+  clusters sharing one store. Scoping is by namespace.
 - **No rollup / recording rules.** The
   [CANFAR Metrics Collection](https://herzberg.atlassian.net/wiki/spaces/C/pages/2335047722/CANFAR+Metrics+Collection)
   page specifies a `canfar:id:*` to `canfar:user:*` to `canfar:project:*` to
@@ -261,8 +314,10 @@ Where no `ceph_*` metrics are scraped there is no alternative source for CephFS 
 - **Percentile and waste panels are expensive** — they use
   `max_over_time(...[$__range:5m])` subqueries. Fine at 24h; be careful over a month.
 - **Metrics nothing emits yet** are not charted: login latency, token issuance success
-  rate, group membership query latency, authentication uptime, storage API response time
-  and throughput. A panel that can never populate is indistinguishable from a broken one.
+  rate, group membership query latency, and authentication uptime. A panel that can never
+  populate is indistinguishable from a broken one. Skaha's *own* API latency and
+  throughput are no longer in this list — they arrive over OpenTelemetry and are charted
+  on Platform Services.
 - **Session counts come from `kube_job_*`.** Skaha launches every session as a Job, which
   makes lifecycle and wall-clock duration directly readable, but bounds those counts by
   the Job TTL controller's retention.

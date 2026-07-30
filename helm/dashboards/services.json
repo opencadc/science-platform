@@ -1,7 +1,7 @@
 {
   "uid": "canfar-services",
   "title": "CANFAR \u00b7 Platform Services",
-  "description": "Health of the CANFAR control plane itself \u2014 the Skaha API, the metrics backend, and their supporting Deployments. User workload namespaces are excluded throughout; for those see Sessions & Users.",
+  "description": "Health of the CANFAR control plane itself \u2014 the Skaha API, the metrics backend, and their supporting Deployments. User workload namespaces are excluded throughout; for those see Sessions & Users. The Skaha and Metrics Server rows read OpenTelemetry metrics the services export themselves, which are not namespace-scoped and so ignore the namespace picker.",
   "tags": [
     "canfar",
     "services",
@@ -89,6 +89,74 @@
           "qryType": 1,
           "query": "label_values(kube_deployment_spec_replicas{namespace=~\"$service_namespace\"}, deployment)",
           "refId": "deployment-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "skaha_job",
+        "type": "query",
+        "label": "Skaha job",
+        "description": "OpenTelemetry job name for the Skaha controller, discovered from the JVM metrics only it exports.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values({\"jvm.memory.used_bytes\"}, job)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values({\"jvm.memory.used_bytes\"}, job)",
+          "refId": "skaha_job-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "metrics_job",
+        "type": "query",
+        "label": "Metrics job",
+        "description": "OpenTelemetry job name for the metrics API, discovered from the custom instruments only it exports.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values({\"canfar.metrics.http.requests_total\"}, job)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values({\"canfar.metrics.http.requests_total\"}, job)",
+          "refId": "metrics_job-variable-query"
         },
         "refresh": 2,
         "regex": "",
@@ -1209,6 +1277,1725 @@
         "h": 9
       },
       "id": 14
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Skaha API \u2014 requests and latency",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "description": "Application-level view of the Skaha API from its OpenTelemetry Java agent. Complements the pod-level panels above: those say whether the container is up, these say whether it is serving."
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Replicas reporting",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "JVMs currently exporting telemetry. Compare with the Deployment replica count above: a JVM that is running but silent here has a broken agent or a blocked exporter. Note the agent identifies instances by a random UUID, not by pod name, so a restart appears as a new instance.",
+      "targets": [
+        {
+          "expr": "count(group by (\"service.instance.id\") ({\"jvm.cpu.count\",job=~\"$skaha_job\"}))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Requests per second",
+      "gridPos": {
+        "x": 6,
+        "y": 36,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Inbound request rate across all replicas and routes. This is real application traffic, unlike the pod CPU panels which cannot distinguish a busy server from a spinning one.",
+      "targets": [
+        {
+          "expr": "sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Server error ratio",
+      "gridPos": {
+        "x": 12,
+        "y": 36,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of requests answered 5xx over the selected range. No 5xx series exists until the first failure, hence the `or vector(0)`: without it this would read as no data rather than as healthy.",
+      "targets": [
+        {
+          "expr": "(sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ clamp_min(sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])), 0.0000001)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "p95 latency",
+      "gridPos": {
+        "x": 18,
+        "y": 36,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "95th percentile server-side duration over the whole selected range, not the refresh window \u2014 this traffic is sparse enough that a short window is often empty. Session listing dominates and is genuinely slow because it queries Kubernetes.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"http.server.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__range])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Requests by route",
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Which endpoints carry the traffic. Routes are templated by the agent (/skaha/v1/session/* rather than one series per session id), so cardinality stays bounded. Stacked, because the parts sum to the total.",
+      "targets": [
+        {
+          "expr": "sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{http.route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Latency percentiles",
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Server-side duration spread. Gaps are honest: a percentile over a window with no requests has no value, and drawing zero there would imply the API answered instantly. Watch p99 pulling away from p50 \u2014 that is queueing or a slow dependency, not uniform slowness.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate({\"http.server.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate({\"http.server.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__rate_interval])))",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate({\"http.server.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__rate_interval])))",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "always",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Route breakdown",
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Every route with its volume, tail latency and error share over the selected range. Sort by p95 to find what to optimise, by requests to find what matters. A blank p95 means the route saw no traffic in range.",
+      "targets": [
+        {
+          "expr": "sum by (\"http.route\") (increase({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (\"http.route\",le) (rate({\"http.server.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__range])))",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "(\n  sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"[45]..\"}[$__range]))\n  or\n  (sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])), 0.0000001)",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "renameByName": {
+              "http.route": "Route",
+              "Value #A": "Requests",
+              "Value #B": "p95",
+              "Value #C": "Error share"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Requests",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.01
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.05
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Requests"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Outbound dependency latency (p95)",
+      "gridPos": {
+        "x": 12,
+        "y": 50,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "How long Skaha waits on the services it calls \u2014 the Kubernetes API and the CADC web services. When request latency above rises, this panel says whether the cause is inside Skaha or downstream of it.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (\"server.address\",le) (rate({\"http.client.request.duration_seconds_bucket\",job=~\"$skaha_job\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{server.address}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "always",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "Skaha JVM runtime",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 59,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "description": "Runtime health of the Skaha JVMs. Read this when the API is slow or restarting and the request panels above do not explain why."
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Heap used (busiest replica)",
+      "gridPos": {
+        "x": 0,
+        "y": 60,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Highest heap utilisation across replicas, against the JVM's own -Xmx rather than the container limit. A JVM at its heap ceiling throws OutOfMemoryError while the container looks fine to Kubernetes, so this will not appear in the pod memory panels above.",
+      "targets": [
+        {
+          "expr": "max(\n  sum by (\"service.instance.id\") ({\"jvm.memory.used_bytes\",job=~\"$skaha_job\",\"jvm.memory.type\"=\"heap\"})\n  / sum by (\"service.instance.id\") ({\"jvm.memory.limit_bytes\",job=~\"$skaha_job\",\"jvm.memory.type\"=\"heap\"})\n)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.75
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "Time spent in GC",
+      "gridPos": {
+        "x": 8,
+        "y": 60,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Fraction of wall-clock time the busiest JVM spends collecting garbage. Above a few percent, requests are paying for memory pressure. This is the cheapest early warning of an undersized heap.",
+      "targets": [
+        {
+          "expr": "max(sum by (\"service.instance.id\") (rate({\"jvm.gc.duration_seconds_sum\",job=~\"$skaha_job\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.05
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "stat",
+      "title": "Threads (busiest replica)",
+      "gridPos": {
+        "x": 16,
+        "y": 60,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Live threads in the busiest JVM. Tomcat's pool is bounded, so a count that climbs and never falls means threads are stuck on something \u2014 usually a downstream call with no timeout.",
+      "targets": [
+        {
+          "expr": "max(sum by (\"service.instance.id\") ({\"jvm.thread.count\",job=~\"$skaha_job\"}))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 400
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Heap used against limit, per replica",
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Heap per JVM with the ceiling drawn alongside. The sawtooth is normal \u2014 allocation then collection. What matters is the distance to the limit line, and whether the troughs stay level.",
+      "targets": [
+        {
+          "expr": "sum by (\"service.instance.id\") ({\"jvm.memory.used_bytes\",job=~\"$skaha_job\",\"jvm.memory.type\"=\"heap\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{service.instance.id}}"
+        },
+        {
+          "expr": "max({\"jvm.memory.limit_bytes\",job=~\"$skaha_job\",\"jvm.memory.type\"=\"heap\"})",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "heap limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "timeseries",
+      "title": "Live set after last GC, per replica",
+      "gridPos": {
+        "x": 12,
+        "y": 65,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Heap still held immediately after a collection \u2014 memory the JVM could not reclaim. This is the leak detector: raw heap above sawtooths whether or not anything is wrong, whereas a floor that climbs steadily here is a genuine leak, and predicts an OutOfMemoryError hours ahead.",
+      "targets": [
+        {
+          "expr": "sum by (\"service.instance.id\") ({\"jvm.memory.used_after_last_gc_bytes\",job=~\"$skaha_job\",\"jvm.memory.type\"=\"heap\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{service.instance.id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "GC pause and collection rate",
+      "gridPos": {
+        "x": 0,
+        "y": 74,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Mean pause per collector with the collection rate alongside. A p99 here would be empty in most windows because an idle JVM collects rarely; the mean is derived from counters and stays readable. Young-generation pauses should stay in the low tens of milliseconds. A pause is latency every in-flight request pays.",
+      "targets": [
+        {
+          "expr": "sum by (\"jvm.gc.name\") (rate({\"jvm.gc.duration_seconds_sum\",job=~\"$skaha_job\"}[$__rate_interval]))\n/ clamp_min(sum by (\"jvm.gc.name\") (rate({\"jvm.gc.duration_seconds_count\",job=~\"$skaha_job\"}[$__rate_interval])), 0.0000001)",
+          "legendFormat": "mean pause {{jvm.gc.name}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "sum by (\"jvm.gc.name\") (rate({\"jvm.gc.duration_seconds_count\",job=~\"$skaha_job\"}[$__rate_interval]))",
+          "legendFormat": "collections/s {{jvm.gc.name}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "always",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "collections/s.*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ops"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Threads by state",
+      "gridPos": {
+        "x": 12,
+        "y": 74,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Thread states summed across replicas. Growth in `waiting` or `timed_waiting` alongside flat `runnable` means threads are blocked on I/O rather than doing work \u2014 the signature of a stalled dependency.",
+      "targets": [
+        {
+          "expr": "sum by (\"jvm.thread.state\") ({\"jvm.thread.count\",job=~\"$skaha_job\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{jvm.thread.state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "row",
+      "title": "Metrics Server",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 83,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "description": "The Python metrics API: its FastAPI request metrics and the cache, compute and provider instruments it records itself. Note this service uses the older OpenTelemetry conventions, so durations here are milliseconds and endpoints appear as http.target rather than a templated route."
+    },
+    {
+      "id": 33,
+      "type": "stat",
+      "title": "Requests per second, real endpoints",
+      "gridPos": {
+        "x": 0,
+        "y": 84,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Real API traffic, with the health probe excluded. The probe accounts for virtually all requests this service sees, so any rate that includes it measures the kubelet rather than users.",
+      "targets": [
+        {
+          "expr": "sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__rate_interval]))\nor vector(0)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 34,
+      "type": "stat",
+      "title": "p95 response time",
+      "gridPos": {
+        "x": 6,
+        "y": 84,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "95th percentile response time for real endpoints over the selected range. Milliseconds here, seconds on the Skaha panels above \u2014 the two services emit different OpenTelemetry conventions.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__range])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 35,
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "gridPos": {
+        "x": 12,
+        "y": 84,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of cache lookups served from Redis over the selected range. This is the service's own instrument, not an inference. A falling ratio means more requests reach the providers, which is what makes the compute duration below rise.",
+      "targets": [
+        {
+          "expr": "sum(increase({\"canfar.metrics.cache.lookups_total\",\"cache.hit\"=\"true\"}[$__range]))\n/ clamp_min(sum(increase({\"canfar.metrics.cache.lookups_total\"}[$__range])), 1)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 36,
+      "type": "stat",
+      "title": "Compute p95",
+      "gridPos": {
+        "x": 18,
+        "y": 84,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "End-to-end time to build a metrics response on a cache miss. Compare with the provider duration panel below: if they track each other, the cost is the upstream call, not this service.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\"}[$__range])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 37,
+      "type": "timeseries",
+      "title": "Requests by endpoint",
+      "gridPos": {
+        "x": 0,
+        "y": 89,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Traffic per endpoint, health probe included so its share is visible. http.target is the raw path rather than a templated route, so a future endpoint carrying an identifier in its path would create one series per value \u2014 worth watching for cardinality.",
+      "targets": [
+        {
+          "expr": "sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{http.target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "type": "timeseries",
+      "title": "Cache lookups, hit against miss",
+      "gridPos": {
+        "x": 12,
+        "y": 89,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Lookup rate split by outcome, labelled with the backend the service reports. Rising misses with flat hits means the cache is expiring faster than it is being used, or that request keys are more varied than expected.",
+      "targets": [
+        {
+          "expr": "sum by (\"cache.hit\") (rate({\"canfar.metrics.cache.lookups_total\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "hit={{cache.hit}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 39,
+      "type": "timeseries",
+      "title": "Latency percentiles by endpoint",
+      "gridPos": {
+        "x": 0,
+        "y": 98,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Tail latency per endpoint. The health probe should sit near zero; if it does not, the service is struggling to answer anything and the problem is the process rather than any one endpoint.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (\"http.target\",le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "p95 {{http.target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "always",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Provider call duration (p95)",
+      "gridPos": {
+        "x": 12,
+        "y": 98,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Time spent inside each upstream provider, with call rate and outcome alongside. This is where a slow metrics response usually originates, and result.status distinguishes a provider that is slow from one that is failing.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (\"provider.name\",le) (rate({\"canfar.metrics.provider.duration_seconds_bucket\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "p95 {{provider.name}}"
+        },
+        {
+          "expr": "sum by (\"provider.name\",\"result.status\") (rate({\"canfar.metrics.provider.duration_seconds_count\"}[$__rate_interval]))",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "calls {{provider.name}} ({{result.status}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "always",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ]
 }
