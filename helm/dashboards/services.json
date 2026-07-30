@@ -1568,7 +1568,8 @@
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "pointSize": 5
           }
         },
         "overrides": []
@@ -1641,7 +1642,7 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 0,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "lineInterpolation": "smooth",
             "pointSize": 5
@@ -1917,7 +1918,7 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 0,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "lineInterpolation": "smooth",
             "pointSize": 5
@@ -2206,7 +2207,8 @@
             "fillOpacity": 0,
             "showPoints": "never",
             "spanNulls": false,
-            "lineInterpolation": "smooth"
+            "lineInterpolation": "smooth",
+            "pointSize": 5
           },
           "min": 0
         },
@@ -2264,7 +2266,8 @@
             "fillOpacity": 0,
             "showPoints": "never",
             "spanNulls": false,
-            "lineInterpolation": "smooth"
+            "lineInterpolation": "smooth",
+            "pointSize": 5
           },
           "min": 0
         },
@@ -2329,7 +2332,7 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 0,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "lineInterpolation": "smooth",
             "pointSize": 5
@@ -2432,7 +2435,8 @@
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "pointSize": 5
           },
           "min": 0
         },
@@ -2753,7 +2757,8 @@
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "pointSize": 5
           }
         },
         "overrides": []
@@ -2814,7 +2819,8 @@
             "stacking": {
               "mode": "normal",
               "group": "A"
-            }
+            },
+            "pointSize": 5
           }
         },
         "overrides": []
@@ -2869,7 +2875,7 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 0,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "lineInterpolation": "smooth",
             "pointSize": 5
@@ -2954,7 +2960,7 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 0,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "lineInterpolation": "smooth",
             "pointSize": 5
