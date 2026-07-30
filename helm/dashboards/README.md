@@ -19,7 +19,7 @@ The Helm chart turns each one into a ConfigMap that the Grafana sidecar collects
 | **Storage** | `canfar-storage` | Are volumes filling up, and is the disk keeping up? |
 | **Platform Services** | `canfar-services` | Is the Skaha API and its supporting deployment healthy, and what is the application itself reporting? |
 
-160 panels across ten dashboards.
+165 panels across ten dashboards.
 
 ## Deploying
 
@@ -108,10 +108,46 @@ metrics scraped into Prometheus (`kueue_*`). Only the Queue dashboard needs Kueu
 
 ## Application metrics over OpenTelemetry
 
-Platform Services carries three rows fed by OpenTelemetry rather than by the exporters
-above: **Skaha API**, **Skaha JVM runtime**, and **Metrics Server**. Skaha is
-instrumented by the OpenTelemetry Java agent baked into its image; the metrics service
-uses the Python SDK plus FastAPI and httpx instrumentation. Both push OTLP.
+Platform Services carries four rows fed by OpenTelemetry rather than by the exporters
+above. Skaha is instrumented by the OpenTelemetry Java agent baked into its image; the
+metrics service uses the Python SDK plus FastAPI and httpx instrumentation. Both push
+OTLP.
+
+| Row | Kind | Collapsed |
+|---|---|---|
+| Skaha API — requests and latency | generic | no |
+| Skaha JVM runtime | runtime, Java-only | **yes** |
+| Metrics API — requests and latency | generic | no |
+| Metrics API — custom instruments | bespoke | no |
+
+**The generic row is a template, deliberately identical per service.** Adding a third
+instrumented service means copying that row and changing two things: the job variable and
+the metric flavour. Panel titles repeat across rows on purpose — the row header is what
+disambiguates them, and Grafana keys panels by id, not title.
+
+| Panel | Expression shape |
+|---|---|
+| Replicas reporting | `count(group by (instance) (target_info{job=~"$job"}))` |
+| Requests per second | `sum(rate({"<count metric>"}[$__rate_interval]))` |
+| Server error ratio | 5xx over total, `or vector(0)` so no-errors reads as healthy |
+| p95 | `histogram_quantile(0.95, …[$__range])` — whole range, since sparse traffic empties a short window |
+| Requests by route | `sum by ("<route label>") (rate(…))`, stacked |
+| Latency percentiles | p50 / p90 / p99 |
+| Route breakdown | table: volume, p95, error share, sortable |
+| Outbound dependency | `http.client.*` p95 by peer |
+
+Each service then gets its own row for the instruments it chooses to record — the
+bespoke half. For the metrics service that is cache hit ratio, compute duration and
+per-provider latency, none of which a generic agent could infer.
+
+Two traps in that template, both learned the hard way:
+
+- **The error-share fallback must carry labels.** `or vector(0)` produces a label-less
+  vector, so dividing it by a per-route vector matches nothing and the column comes back
+  empty for every route. The fallback is `total * 0` instead, which keeps the route label.
+- **Do not clamp a ratio's denominator to 1.** It converts "nothing happened" into a real
+  zero — a cache hit ratio of 0% reads as a cache that never hits. Guard with
+  `/ (denominator > 0)` so the sample drops and the panel says No data.
 
 These rows are optional. Everything else on the dashboard works without them; if
 telemetry is disabled or the OTLP endpoint is unreachable, these panels are empty and
@@ -141,10 +177,20 @@ separate and carry different units. Routes are templated on the Java side
 (`/skaha/v1/session/*`) but raw paths on the Python side, so the latter is worth watching
 for cardinality if an endpoint ever puts an identifier in its path.
 
-**Instances are identified by a random UUID, not by pod name.** `service.instance.id` is
-generated per JVM, so JVM panels cannot be joined to a pod and a restart appears as a new
-instance. The per-replica panels are labelled by that id deliberately — it is the only
-identity available.
+**Instance identity is weak, and uneven between SDKs.** The Java agent sets
+`service.instance.id` to a random UUID per JVM, so JVM panels cannot be joined to a pod
+and a restart appears as a new instance; the per-replica panels are labelled by that id
+because it is the only identity available. The Python SDK sets no instance id at all, so
+its replicas are indistinguishable and their series merge. "Replicas reporting" counts
+reporting instances, which means a service whose SDK omits the id reads 1 however many
+replicas it runs — stated in that panel's description rather than hidden.
+
+**A full request URL is not available on client metrics.** OpenTelemetry's HTTP client
+metric convention deliberately omits it to bound cardinality: `url.full` exists only as a
+span attribute, and traces are not exported here. Outbound panels therefore name a peer
+as method plus `server.address:server.port`, which is as specific as the metric allows.
+The legacy convention the Python SDK emits carries no peer dimension at all, so that
+service's outbound panel breaks down by status only.
 
 Two variables, `$skaha_job` and `$metrics_job`, resolve the service names. Neither is
 hardcoded: each is a `label_values` query over a metric only that service emits, so a
