@@ -265,19 +265,17 @@ public class PostAction extends SessionAction {
     }
 
     private void renew(Map.Entry<String, List<String>> entry) throws Exception {
-        Long newExpiryTime = calculateExpiryTime(entry.getValue());
+        final Long newExpiryTime = calculateExpiryTime(entry.getValue());
         if (newExpiryTime > 0) {
+            final String patchArgument = entry.getKey();
+            log.debug("Renewing " + patchArgument + " to " + newExpiryTime);
             KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
                     .namespace(K8SUtil.getWorkloadNamespace())
                     .job()
-                    .argument(entry.getKey())
-                    .argument("--type=json")
-                    .option(
-                            "-p",
-                            "[{\"op\":\"add\",\"path\":\"/spec/activeDeadlineSeconds\", \"value\":" + newExpiryTime
-                                    + "}]");
+                    .argument(patchArgument)
+                    .option("-p", "{\"spec\":{\"activeDeadlineSeconds\":" + newExpiryTime + "}}");
 
-            CommandExecutioner.execute(renewExpiryTimeCmd.build());
+            CommandExecutioner.execute(renewExpiryTimeCmd.build(), false);
         }
 
         this.userStorageClient.injectProxyCertificate(getUsername());
