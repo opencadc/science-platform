@@ -39,8 +39,8 @@ This file stores repository-specific architecture facts only.
 - `providers/`: `kueue` and `base` (scope protocol). Kueue owns its private
   Kubernetes HTTP helpers and uses an injected `httpx.AsyncClient`.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
-  alongside HTTP and aggregation; `cache.py` and `quantity.py` are shared
-  supporting modules.
+  alongside HTTP and aggregation. Shared `quantity.py` parses and accumulates
+  Kubernetes quantities with `Decimal`; malformed values fail the provider read.
 
 ## Architecture invariants
 

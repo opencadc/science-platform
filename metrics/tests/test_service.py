@@ -117,7 +117,9 @@ async def test_service_telemetry_uses_telemetry_provider_name() -> None:
 @pytest.mark.anyio
 async def test_service_raises_on_execution() -> None:
     async def bad() -> PlatformMetricsData:
-        raise ProviderExecutionError("e")
+        raise ProviderExecutionError(
+            "bad-secret-value from https://kube.test containing implementation details"
+        )
 
     service = PlatformMetricsService(
         platform=bad,
@@ -127,3 +129,6 @@ async def test_service_raises_on_execution() -> None:
     with pytest.raises(AppError) as ei:
         await service.get_platform_metrics()
     assert ei.value.status_code == 502
+    assert ei.value.message == "Platform metrics collection failed"
+    assert "bad-secret-value" not in ei.value.message
+    assert "kube.test" not in ei.value.message

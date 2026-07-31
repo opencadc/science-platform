@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -60,7 +61,7 @@ def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     # scripts/test-setup.yaml: cq-electron has 100m/100Mi nominal quota, while
     # integration-idle requests 200m/200Mi. Admission proves borrowing, and
     # ClusterQueue status.flavorsUsage total must include that borrowed usage.
-    assert cpu_cores >= 0.19, f"expected >=200m CPU in allocated, got {allocated!r}"
-    assert mem_gib >= 0.19, (
+    assert cpu_cores >= Decimal("0.19"), f"expected >=200m CPU in allocated, got {allocated!r}"
+    assert mem_gib >= Decimal("0.19"), (
         f"expected >=200Mi memory from smoke workload in allocated, got {allocated!r}"
     )

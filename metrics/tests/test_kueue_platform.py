@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import httpx
 import pytest
 
@@ -9,7 +11,40 @@ from metrics.core.settings import (
     Settings,
     SourceConfig,
 )
+from metrics.errors import ProviderExecutionError
 from metrics.providers.kueue import KueueMetrics
+from metrics.schemas.metrics import PlatformMetricsData
+
+
+async def _read_platform_doc(
+    monkeypatch: pytest.MonkeyPatch,
+    doc: Mapping[str, object],
+) -> PlatformMetricsData:
+    settings = Settings(
+        cluster_name="c",
+        sources=SourceConfig(platform="kueue"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
+                kube_api_url="https://kube.test",
+                cluster_queues=["cq-a"],
+            )
+        ),
+    )
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
+
+    async def fake_parallel(*_args, **_kwargs):
+        return [doc]
+
+    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
+    client = httpx.AsyncClient()
+    try:
+        return await KueueMetrics(
+            settings=settings,
+            client=client,
+            kueue_config=settings.providers.kueue,
+        ).platform()
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.anyio
@@ -35,8 +70,13 @@ async def test_kueue_platform_aggregates_configured_queues_only(
                     "flavors": [
                         {
                             "resources": [
-                                {"name": "cpu", "nominalQuota": "10"},
+                                {"name": "cpu", "nominalQuota": "10.1"},
                                 {"name": "memory", "nominalQuota": "20Gi"},
+                                {
+                                    "name": "ephemeral-storage",
+                                    "nominalQuota": "512Mi",
+                                },
+                                {"name": "nvidia.com/gpu", "nominalQuota": "0.1"},
                             ]
                         }
                     ]
@@ -53,6 +93,7 @@ async def test_kueue_platform_aggregates_configured_queues_only(
                             "total": "2Gi",
                             "borrowed": "1Gi",
                         },
+                        {"name": "nvidia.com/gpu", "total": "0.1"},
                     ]
                 }
             ]
@@ -65,7 +106,12 @@ async def test_kueue_platform_aggregates_configured_queues_only(
                     "flavors": [
                         {
                             "resources": [
-                                {"name": "cpu", "nominalQuota": "6"},
+                                {"name": "cpu", "nominalQuota": "5.2"},
+                                {
+                                    "name": "ephemeral-storage",
+                                    "nominalQuota": "1.5Gi",
+                                },
+                                {"name": "nvidia.com/gpu", "nominalQuota": "0.2"},
                             ]
                         }
                     ]
@@ -77,6 +123,7 @@ async def test_kueue_platform_aggregates_configured_queues_only(
                 {
                     "resources": [
                         {"name": "cpu", "total": "0", "borrowed": "0"},
+                        {"name": "nvidia.com/gpu", "total": "0.2"},
                     ]
                 }
             ]
@@ -108,12 +155,16 @@ async def test_kueue_platform_aggregates_configured_queues_only(
     assert set(payload.keys()) == {"scope", "cluster", "capacity", "allocated"}
     assert "borrowed" not in payload
     assert "lending" not in payload
-    assert data.capacity["cpu"] == "16"
+    assert data.capacity["cpu"] == "15.3"
     assert data.allocated["cpu"] == "1"
     assert data.allocated["memory"] == "2Gi"
     assert data.capacity["memory"] == "20Gi"
-    assert "memory" in data.capacity
-    assert "memory" in data.allocated
+    assert data.capacity["ephemeral-storage"] == "2Gi"
+    assert data.allocated["ephemeral-storage"] == "0Gi"
+    assert data.capacity["nvidia.com/gpu"] == "0.3"
+    assert data.allocated["nvidia.com/gpu"] == "0.3"
+    assert list(data.capacity) == sorted(data.capacity)
+    assert list(data.allocated) == sorted(data.allocated)
 
 
 @pytest.mark.anyio
@@ -237,3 +288,67 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
     assert data.allocated["cpu"] == "0"
     assert data.allocated["memory"] == "0Gi"
     assert set(data.allocated.keys()) == set(data.capacity.keys())
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "resource",
+    [
+        {"name": "cpu"},
+        {"name": "cpu", "nominalQuota": "bad-secret-value"},
+        {"name": "cpu", "nominalQuota": "-1"},
+        {"name": "cpu", "nominalQuota": " 1 "},
+        {"name": "cpu", "nominalQuota": 1},
+    ],
+)
+async def test_kueue_platform_rejects_corrupt_capacity_quantities(
+    monkeypatch: pytest.MonkeyPatch,
+    resource: dict[str, object],
+) -> None:
+    doc = {
+        "spec": {
+            "resourceGroups": [{"flavors": [{"resources": [resource]}]}],
+        },
+    }
+
+    with pytest.raises(
+        ProviderExecutionError,
+        match="Kueue platform data contained an invalid resource quantity",
+    ) as exc_info:
+        await _read_platform_doc(monkeypatch, doc)
+    assert "bad-secret-value" not in str(exc_info.value)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "resource",
+    [
+        {"name": "cpu"},
+        {"name": "cpu", "total": "bad-secret-value"},
+    ],
+)
+async def test_kueue_platform_rejects_missing_allocation_quantity(
+    monkeypatch: pytest.MonkeyPatch,
+    resource: dict[str, str],
+) -> None:
+    doc = {
+        "spec": {
+            "resourceGroups": [
+                {
+                    "flavors": [
+                        {
+                            "resources": [
+                                {"name": "cpu", "nominalQuota": "1"},
+                            ]
+                        }
+                    ]
+                }
+            ],
+        },
+        "status": {
+            "flavorsUsage": [{"resources": [resource]}],
+        },
+    }
+
+    with pytest.raises(ProviderExecutionError):
+        await _read_platform_doc(monkeypatch, doc)
