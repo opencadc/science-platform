@@ -1,9 +1,8 @@
-"""Provider test doubles and small Kubernetes HTTP helper paths."""
+"""Provider test doubles and runtime lifecycle paths."""
 
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import pytest
 
@@ -14,11 +13,6 @@ from metrics.errors import RuntimeStartupError
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
 from tests.fakes import LifecycleProvider
-
-from metrics.providers.kueue import (
-    resolve_kube_token,
-    resolve_kube_verify,
-)
 
 
 def test_platform_cache_key_preserves_scope_schema_cluster_and_fingerprint() -> None:
@@ -145,26 +139,3 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
     assert events == ["startup", "provider shutdown", "redis shutdown"]
 
 
-def test_token_file_reads(tmp_path: Path) -> None:
-    t = tmp_path / "t.tok"
-    t.write_text("  secret  ", encoding="utf-8")
-    assert resolve_kube_token(None, str(t)) == "secret"
-
-
-def test_ca_file_in_verify_uses_in_cluster_or_system() -> None:
-    p = Path("/nope/no-ca-here-123")
-    v = resolve_kube_verify(True, ca_file=str(p))
-    assert v is True or isinstance(v, str)
-
-
-@pytest.mark.anyio
-async def test_kube_parallel_empty() -> None:
-    import httpx
-
-    from metrics.providers.kueue import kube_parallel_get_json
-
-    c = httpx.AsyncClient()
-    try:
-        assert await kube_parallel_get_json(c, [], headers={}) == []
-    finally:
-        await c.aclose()

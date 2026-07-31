@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import httpx
 import pytest
 
 from metrics.core.settings import (
@@ -10,10 +9,11 @@ from metrics.core.settings import (
     SourceConfig,
 )
 from metrics.providers.kueue import KueueProvider
+from tests.fakes import FakeKueueApi
 
 
 @pytest.mark.anyio
-async def test_kueue_metrics_reads_nominal_for_platform(monkeypatch) -> None:
+async def test_kueue_metrics_reads_nominal_for_platform() -> None:
     doc = {
         "spec": {
             "resourceGroups": [
@@ -31,30 +31,13 @@ async def test_kueue_metrics_reads_nominal_for_platform(monkeypatch) -> None:
         }
     }
 
-    async def fake_parallel(_c, urls: list[str], *, headers, **_kwargs: object) -> list[dict]:
-        out = []
-        for u in urls:
-            if u.endswith("/clusterqueues/cq-test"):
-                out.append(doc)
-        return out
-
-    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
-    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
-
     settings = Settings(
         cluster_name="x",
         sources=SourceConfig(platform="kueue"),
         providers=ProviderConfigs(
-            kueue=KueueProviderConfig(
-                kube_api_url="https://kube.local",
-                cluster_queues=["cq-test"],
-            ),
+            kueue=KueueProviderConfig(cluster_queues=["cq-test"]),
         ),
     )
-    c = httpx.AsyncClient()
-    try:
-        data = await KueueProvider(settings, c).platform()
-    finally:
-        await c.aclose()
+    data = await KueueProvider(settings, api=FakeKueueApi({"cq-test": doc})).platform()
     assert "cpu" in data.capacity
     assert "memory" in data.capacity

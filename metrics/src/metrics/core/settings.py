@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -18,18 +18,13 @@ from metrics.core.yaml_config import MetricsYamlSettingsSource
 # --- Application config tree (typed providers, sources, cache) ---
 
 
-class HttpClientConfig(BaseModel):
-    """Connection pool options for upstream HTTP/1.1 clients."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    max_connections: int = Field(default=100, ge=1)
-    max_keepalive_connections: int = Field(default=20, ge=1)
-    keepalive_expiry_seconds: float = Field(default=30.0, gt=0)
-
-
 class KueueProviderConfig(BaseModel):
-    """Kueue settings for queue-only platform metrics and Kubernetes API access."""
+    """Kueue settings for queue-only platform metrics.
+
+    Kubernetes API discovery (endpoint, credentials, CA trust) is owned by the
+    kr8s client, which reads the in-cluster service account or a kubeconfig;
+    it is intentionally not configurable here (see ADR-0023).
+    """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -37,24 +32,8 @@ class KueueProviderConfig(BaseModel):
         default_factory=list,
         description="ClusterQueue names included in platform aggregation.",
     )
-    kube_api_url: str | None = None
-    kube_api_token: str | None = None
-    token_file: str | None = None
-    ca_file: str | None = None
-    kube_verify_tls: bool = True
+    kueue_api_version: str = "kueue.x-k8s.io/v1beta2"
     kube_request_timeout_seconds: float = Field(default=10.0, gt=0)
-    kube_clusterqueue_path: str = "/apis/kueue.x-k8s.io/v1beta2/clusterqueues"
-    http: HttpClientConfig = Field(default_factory=HttpClientConfig)
-
-    @field_validator("kube_api_url")
-    @classmethod
-    def _validate_kube_api_url(cls, value: str | None) -> str | None:
-        """Require a complete HTTP or HTTPS Kubernetes API URL when configured."""
-        if value is None:
-            return None
-        url = value.strip()
-        HttpUrl(url)
-        return url
 
     @field_validator("cluster_queues", mode="before")
     @classmethod

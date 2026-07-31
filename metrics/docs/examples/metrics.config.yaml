@@ -4,15 +4,12 @@
 metrics:
   providers:
     kueue:
-      kube_api_url: "https://kubernetes.default.svc"
+      # Kubernetes endpoint/credentials/CA are discovered by kr8s from the
+      # in-cluster service account or a kubeconfig (ADR-0023).
       cluster_queues:
         - cq-proton
-      token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      http:
-        max_connections: 100
-        max_keepalive_connections: 20
-        keepalive_expiry_seconds: 30
+      kueue_api_version: "kueue.x-k8s.io/v1beta2"
+      kube_request_timeout_seconds: 10
   sources:
     platform: kueue
   cache:

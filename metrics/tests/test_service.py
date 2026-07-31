@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -38,6 +39,88 @@ async def test_service_returns_platform_metrics_and_uses_cache() -> None:
     assert first.created == second.created
     assert first.data.capacity["cpu"] == "10"
     assert first.data.allocated["cpu"] == "5"
+
+
+@pytest.mark.anyio
+async def test_concurrent_misses_coalesce_to_one_backend_load() -> None:
+    loads = 0
+    release = asyncio.Event()
+
+    async def counting() -> PlatformMetricsData:
+        nonlocal loads
+        loads += 1
+        await release.wait()
+        return PlatformMetricsData(cluster="c", capacity={"cpu": "1"}, allocated={"cpu": "0"})
+
+    service = PlatformMetricsService(
+        platform=counting,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
+    )
+
+    tasks = [asyncio.create_task(service.get_platform_metrics()) for _ in range(10)]
+    await asyncio.sleep(0)  # let every request reach the miss path
+    release.set()
+    results = await asyncio.gather(*tasks)
+
+    assert loads == 1
+    assert all(r.data.capacity["cpu"] == "1" for r in results)
+    assert all(r.cached is False for r in results)
+    # Follow-up call is now a plain cache hit.
+    assert (await service.get_platform_metrics()).cached is True
+
+
+@pytest.mark.anyio
+async def test_concurrent_misses_share_the_same_mapped_error() -> None:
+    loads = 0
+
+    async def failing() -> PlatformMetricsData:
+        nonlocal loads
+        loads += 1
+        await asyncio.sleep(0)
+        raise ProviderUnavailableError("down")
+
+    service = PlatformMetricsService(
+        platform=failing,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
+    )
+
+    tasks = [asyncio.create_task(service.get_platform_metrics()) for _ in range(5)]
+    await asyncio.sleep(0)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert loads == 1
+    assert all(isinstance(r, AppError) and r.status_code == 503 for r in results)
+
+
+@pytest.mark.anyio
+async def test_cancelling_one_waiter_keeps_the_shared_load_alive() -> None:
+    loads = 0
+    release = asyncio.Event()
+
+    async def counting() -> PlatformMetricsData:
+        nonlocal loads
+        loads += 1
+        await release.wait()
+        return PlatformMetricsData(cluster="c", capacity={"cpu": "1"}, allocated={"cpu": "0"})
+
+    service = PlatformMetricsService(
+        platform=counting,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=_fixed_cache_key,
+    )
+
+    first = asyncio.create_task(service.get_platform_metrics())
+    second = asyncio.create_task(service.get_platform_metrics())
+    await asyncio.sleep(0)
+    first.cancel()
+    await asyncio.gather(first, return_exceptions=True)
+    release.set()
+
+    result = await second
+    assert result.data.capacity["cpu"] == "1"
+    assert loads == 1
 
 
 @pytest.mark.anyio

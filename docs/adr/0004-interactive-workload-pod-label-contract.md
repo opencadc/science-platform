@@ -31,5 +31,5 @@ be wrong without API-level namespace parameters.
 
 ## References
 
-- [`../../metrics/docs/adr/0016-interactive-quota-api-contract.md`](../../metrics/docs/adr/0016-interactive-quota-api-contract.md)
+- [`../../metrics/docs/adr/0015-interactive-quota-contract.md`](../../metrics/docs/adr/0015-interactive-quota-contract.md)
 - [`../../skaha/CONTEXT.md`](../../skaha/CONTEXT.md)

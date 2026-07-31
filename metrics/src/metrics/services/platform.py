@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -65,6 +66,7 @@ class PlatformMetricsService:
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._platform_ttl_seconds = ttl if ttl is not None else self._cache.ttl_seconds
         self._provider = provider
+        self._inflight: dict[str, asyncio.Task[ServiceResult[PlatformMetricsData]]] = {}
 
     @property
     def cache_ttl_seconds(self) -> int:
@@ -74,6 +76,11 @@ class PlatformMetricsService:
     async def get_platform_metrics(self) -> ServiceResult[PlatformMetricsData]:
         """Read platform metrics, using cache on hit and the loader on miss.
 
+        Concurrent cache misses coalesce onto one in-flight backend load per key
+        (single-flight): every waiter shares that load's result or mapped error,
+        so the provider sees at most one upstream request per miss window in this
+        process. With the Redis backend the guarantee is per replica, not global.
+
         Returns:
             Snapshot data, the snapshot creation time, and whether it came from cache.
 
@@ -82,13 +89,12 @@ class PlatformMetricsService:
             details only in server logs.
         """
         cache_key = self._key()
-        scope = "platform"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             self._metrics_recorder.record_cache_lookup(
                 backend=self._cache.backend_name,
                 hit=True,
-                scope=scope,
+                scope="platform",
             )
             return ServiceResult(
                 data=cached.data,
@@ -98,8 +104,27 @@ class PlatformMetricsService:
         self._metrics_recorder.record_cache_lookup(
             backend=self._cache.backend_name,
             hit=False,
-            scope=scope,
+            scope="platform",
         )
+        task = self._inflight.get(cache_key)
+        if task is None or task.done():
+            task = asyncio.create_task(self._load_and_cache(cache_key))
+            self._inflight[cache_key] = task
+            task.add_done_callback(self._make_inflight_reaper(cache_key))
+        # Shield: cancelling one waiter must not cancel the shared load for the rest.
+        return await asyncio.shield(task)
+
+    def _make_inflight_reaper(self, cache_key: str) -> Callable[[asyncio.Task], None]:
+        def reap(done: asyncio.Task) -> None:
+            if self._inflight.get(cache_key) is done:
+                del self._inflight[cache_key]
+            if not done.cancelled():
+                done.exception()  # mark retrieved even if every waiter was cancelled
+
+        return reap
+
+    async def _load_and_cache(self, cache_key: str) -> ServiceResult[PlatformMetricsData]:
+        scope = "platform"
         started = perf_counter()
         status = "ok"
         try:

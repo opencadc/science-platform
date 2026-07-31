@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kr8s-kueue-validation
+  namespace: canfar-system-staging
+  labels:
+    app.kubernetes.io/name: kr8s-kueue-validation
+    app.kubernetes.io/managed-by: claude-validation
+spec:
+  serviceAccountName: canfar-skaha-staging
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: python:3.12-slim
+      command: ["/bin/sh", "-c"]
+      args:
+        - pip install --quiet --no-cache-dir --target /tmp/deps kr8s &&
+          PYTHONPATH=/tmp/deps python /scripts/test_kr8s.py
+      env:
+        - name: HOME
+          value: /tmp
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 512Mi
+      volumeMounts:
+        - name: script
+          mountPath: /scripts
+          readOnly: true
+  volumes:
+    - name: script
+      configMap:
+        name: kr8s-kueue-validation-script

@@ -8,8 +8,9 @@ This file stores repository-specific architecture facts only.
 - Document architecture invariants that are verifiable in code.
 - Remove claims that are not currently implemented.
 
-**Contributors:** when adding a provider or scope, follow ADR-0011 and
-[`docs/adr/0005-metrics-runtime-composition-root.md`](adr/0005-metrics-runtime-composition-root.md).
+**Contributors:** when adding a provider or scope, follow
+[`docs/adr/0005-runtime-composition-and-provider-lifecycle.md`](adr/0005-runtime-composition-and-provider-lifecycle.md)
+and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-kubernetes-client.md).
 
 ## Current state
 
@@ -20,13 +21,14 @@ This file stores repository-specific architecture facts only.
   live in `src/metrics/core/settings.py`, optional YAML under
   `core/yaml_config.py` (file `/etc/canfar/metrics/config.yaml` by default).
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
-  selects the active platform provider via `core/provider_registry.py`, owns
+  selects the active platform provider via `core/registry.py`, owns
   provider lifecycle and cache resources, and builds the platform cache key and
-  `PlatformMetricsService`. The provider owns its injected `httpx` client.
+  `PlatformMetricsService`. The provider owns a lazily built kr8s API handle
+  (ADR-0023).
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): `KueueProvider` directly implements the
   `PlatformMetrics` read alongside provider identity, lifecycle, and cache
-  fingerprinting. One module owns URLs, startup checks, and platform
+  fingerprinting. One module owns kr8s reads, startup checks, and platform
   aggregation. Configuration rejects inactive or unknown providers.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
@@ -34,17 +36,16 @@ This file stores repository-specific architecture facts only.
 ## Layered package map
 
 - `api/v1/`: versioned HTTP routes.
-- `core/`: `Settings`, `MetricsRuntime`, `provider_registry`, `create_app`, and
+- `core/`: `Settings`, `MetricsRuntime`, `registry`, `create_app`, and
   YAML/env precedence.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
 - `providers/`: `base` defines the normal Python `Provider` and
   `PlatformMetrics` protocols; `kueue` implements both on `KueueProvider`.
-  Kueue owns its private Kubernetes HTTP helpers and uses an injected
-  `httpx.AsyncClient`.
+  Kueue reads ClusterQueues through kr8s (typed `new_class` kinds, ADR-0023).
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
-  alongside HTTP and aggregation. Shared `quantity.py` parses and accumulates
-  Kubernetes quantities with `Decimal`; malformed values fail the provider read.
+  alongside kr8s access and aggregation. Quantities parse via quantiphy
+  (ADR-0024); malformed values fail the provider read.
 
 ## Architecture invariants
 
@@ -56,8 +57,8 @@ This file stores repository-specific architecture facts only.
 - Provider boundaries stay explicit and avoid fallback indirection to removed
   legacy providers.
 - Provider construction is synchronous and network-free. `MetricsRuntime`
-  starts/stops one Kueue provider, and `KueueProvider.shutdown()` closes its
-  client exactly once.
+  starts/stops one Kueue provider, and `KueueProvider.shutdown()` releases its
+  kr8s handle (the kr8s session is process-shared).
 - Platform capability is structural: the platform binder accepts providers
   implementing `PlatformMetrics` and rejects providers without `platform()`.
 - The public API exposes only `GET /api/v1/metrics/platform` and `GET /healthz`

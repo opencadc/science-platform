@@ -65,5 +65,5 @@ Canonical decisions: [`docs/adr/README.md`](adr/README.md).
 
 ## Proposed decisions
 
-ADRs 0015–0018 and 0020–0021 remain proposed. Nothing in those ADRs is accepted
+ADRs 0015 and 0020 remain proposed. Nothing in those ADRs is accepted
 runtime configuration or a shipped route.

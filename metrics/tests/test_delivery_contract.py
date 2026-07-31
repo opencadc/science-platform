@@ -64,7 +64,7 @@ def test_current_contract_docs_have_valid_relative_links() -> None:
         METRICS_ROOT / "docs" / "kueue-platform.md",
         METRICS_ROOT / "docs" / "specs.md",
         METRICS_ROOT / "docs" / "adr" / "README.md",
-        METRICS_ROOT / "docs" / "adr" / "0022-provider-owned-client-lifecycle.md",
+        METRICS_ROOT / "docs" / "adr" / "0023-kr8s-kubernetes-client.md",
     ]
     broken: list[str] = []
     for document in docs:

@@ -20,35 +20,51 @@ decisions are also recorded under `docs/adr/`.
 ## Current entries
 
 - Date: July 31, 2026
+- Context: Kubernetes client selection for the Kueue provider (and future
+  scopes).
+- Lesson: Validate a client library in the target cluster before adopting it:
+  a throwaway in-cluster workflow (`scripts/validate-kr8s-kueue.py`) proved
+  kr8s handles service-account auth and the self-signed cluster CA with zero
+  configuration, which desk research alone could not settle.
+- Evidence: `scripts/validate-kr8s-kueue.py`, `src/metrics/providers/kueue.py`,
+  `docs/adr/0023-kr8s-kubernetes-client.md`, and
+  `docs/research/async-python-kubernetes-clients.md` (repo root).
+- Action taken: Migrated the provider to kr8s, deleted the hand-rolled
+  token/TLS/URL plumbing and its settings, and recorded kr8s as the client of
+  choice in ADR-0023.
+
+
+- Date: July 31, 2026
 - Context: Provider/runtime ownership and application lifecycle convergence.
 - Lesson: One owner per live resource removes bundle types and special test
   lifespans without requiring a generic plugin framework.
-- Evidence: `src/metrics/core/provider_registry.py`,
+- Evidence: `src/metrics/core/registry.py`,
   `src/metrics/core/runtime.py`, `src/metrics/providers/kueue.py`,
-  `src/metrics/core/factory.py`, and ADR-0022.
-- Action taken: The registry returns one client-owning Kueue provider;
-  `MetricsRuntime` owns provider/cache lifecycle, and all applications use one
-  lifespan.
+  `src/metrics/core/factory.py`, and ADR-0005 (provider lifecycle;
+  client ownership now per ADR-0023).
+- Action taken: The registry returns one Kueue provider owning its Kubernetes
+  access; `MetricsRuntime` owns provider/cache lifecycle, and all applications
+  use one lifespan.
 
 - Date: July 31, 2026
 - Context: Platform provider capability simplification.
 - Lesson: Capability metadata can drift from behavior; one provider method is
   a more reliable contract than a scope enum plus an intermediate delegate.
 - Evidence: `src/metrics/providers/base.py`,
-  `src/metrics/core/provider_registry.py`, `src/metrics/providers/kueue.py`,
-  and `tests/test_provider_registry.py`.
+  `src/metrics/core/registry.py`, `src/metrics/providers/kueue.py`,
+  and `tests/test_registry.py`.
 - Action taken: `KueueProvider` now implements `PlatformMetrics` directly, and
   the binder rejects selected providers without that capability.
 
-- Date: July 31, 2026
+- Date: July 31, 2026 (superseded same day by ADR-0024)
 - Context: Kueue platform quantity correctness.
-- Lesson: Binary floats and permissive fallback turn valid fractional
-  quantities into artifacts and corrupt quantities into false zeros. Storage
-  overflow must be checked in Kubernetes base units, before Gi presentation.
-- Evidence: `src/metrics/quantity.py`, `src/metrics/providers/kueue.py`,
-  `tests/test_quantity.py`, and `tests/test_kueue_platform.py`.
-- Action taken: Kueue quantities use exact `Decimal` parsing, accumulation, and
-  stable formatting; invalid upstream values fail closed.
+- Lesson: Permissive fallback turns corrupt quantities into false zeros, and
+  storage overflow must be checked in Kubernetes base units before Gi
+  presentation. Bit-exact `Decimal` arithmetic, however, was more numeric code
+  than the 6-decimal API contract needed.
+- Evidence: `src/metrics/providers/kueue.py` and `tests/test_kueue_platform.py`.
+- Action taken: Quantities parse via quantiphy with fail-closed guards
+  (ADR-0024); the bespoke `metrics.quantity` module was deleted.
 
 - Date: April 24, 2026
 - Context: P1 review fixes for Kueue allocated aggregation and (at the time)
@@ -110,8 +126,8 @@ decisions are also recorded under `docs/adr/`.
   client graph so startup and dependency surfaces match what operators actually
   use; upstream clients should stay on HTTP/1.1 unless an HTTP/2 requirement and
   dependency are deliberately introduced.
-- Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/provider_registry.py`,
-  and `docs/adr/0005-metrics-runtime-composition-root.md`.
+- Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/registry.py`,
+  and `docs/adr/0005-runtime-composition-and-provider-lifecycle.md`.
 - Action taken: Documented in `docs/architecture.md` and ADR-0005.
 
 - Date: April 22, 2026 (superseded June 2026)

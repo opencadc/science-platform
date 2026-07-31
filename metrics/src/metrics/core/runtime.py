@@ -10,7 +10,7 @@ from pydantic import TypeAdapter
 from redis.asyncio import Redis
 
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.core.provider_registry import bind_platform_metrics, build_platform_provider
+from metrics.core.registry import bind_platform_metrics, build_platform_provider
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.base import Provider

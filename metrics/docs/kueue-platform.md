@@ -5,13 +5,13 @@ is and **which modules** participate. It complements
 [`docs/adr/README.md`](adr/README.md) and operator-facing notes in
 [`environment-contracts.md`](environment-contracts.md). For the extension pattern
 (config, registry, provider capability), see
-[`adr/0005-metrics-runtime-composition-root.md`](adr/0005-metrics-runtime-composition-root.md)
-and ADR-0011.
+[`adr/0005-runtime-composition-and-provider-lifecycle.md`](adr/0005-runtime-composition-and-provider-lifecycle.md)
+and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-kubernetes-client.md).
 
 ## Goals
 
 - **Single Kueue seam:** Platform maps come only from `providers/kueue.py`
-  (URLs, startup checks, nominal-quota parsing, and aggregation).
+  (kr8s reads, startup checks, nominal-quota parsing, and aggregation).
 - **Fail fast:** Misconfiguration or a missing API is detected at **startup**
   when the active platform provider runs `startup()` during app lifespan.
 - **Honest aggregation:** Platform capacity and allocation are derived from the
@@ -23,9 +23,10 @@ and ADR-0011.
 
 ## Responsibility split (M4)
 
-- The **Kueue provider** (`metrics.providers.kueue`) runs startup HTTP checks
+- The **Kueue provider** (`metrics.providers.kueue`) runs startup checks
   against the Kubernetes API and performs platform capacity/allocated
-  aggregation. It owns and closes its injected `httpx` client.
+  aggregation. It owns a lazily built kr8s API handle (ADR-0023); endpoint,
+  credentials, and CA trust are discovered by kr8s, not configured.
 - **`MetricsRuntime`** owns the active provider lifecycle, cache backend, and
   platform service for `sources.platform`.
 - **Startup vs request:** validation for required upstreams runs during
@@ -38,8 +39,8 @@ and ADR-0011.
 | Module | Role |
 | --- | --- |
 | `metrics.core.runtime` | `MetricsRuntime`: registry-driven provider wiring, cache backend, platform cache keys, `get_platform_metrics`. |
-| `metrics.core.provider_registry` | Maps `sources.platform` to one concrete provider; the Kueue builder transfers its client to that provider. |
-| `metrics.providers.kueue` | TLS/token handling, Kubernetes GETs, URLs, startup, quota parsing, platform aggregation, and fingerprinting. |
+| `metrics.core.registry` | Maps `sources.platform` to one concrete provider (network-free construction). |
+| `metrics.providers.kueue` | kr8s ClusterQueue reads, startup checks, quantity parsing/formatting (quantiphy, ADR-0024), platform aggregation, and fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
 | `metrics.services.platform` | TTL cache, telemetry, and error mapping for `/platform`. |
 
@@ -48,18 +49,19 @@ and ADR-0011.
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
 2. **HTTP GET** `/api/v1/metrics/platform`: route depends on `MetricsRuntime`;
    `runtime.get_platform_metrics()` delegates to `PlatformMetricsService`.
-3. **Miss:** Service calls the bound loader → `KueueProvider.platform()`
-   parallel-fetches configured queues, sums nominal quota and usage `total`
-   fields, and formats strings.
+3. **Miss:** Concurrent misses coalesce onto one in-flight load
+   (single-flight); the loader → `KueueProvider.platform()` fetches configured
+   queues via kr8s with bounded concurrency, sums nominal quota and usage
+   `total` fields, and formats strings.
 4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;
    HTTP caching uses `Cache-Control`, `Date`, `Expires`, and `Last-Modified`
    (see `metrics.http_cache`). Keys in `allocated` match those in `capacity`.
-5. **Shutdown:** `runtime.shutdown()` stops the active platform provider (which
-   closes its `httpx` client) and closes the async Redis client when the cache
-   backend is Redis.
+5. **Shutdown:** `runtime.shutdown()` stops the active platform provider
+   (which releases its kr8s handle; the kr8s session is process-shared) and
+   closes the async Redis client when the cache backend is Redis.
 
 ## Fixtures and local testing
 
 Use `scripts/kind-smoke.sh` and `docs/dev-setup.md` for cluster-backed runs;
-unit tests patch `kube_parallel_get_json` and token resolution as in
+unit tests inject `FakeKueueApi` (see `tests/fakes.py`) as in
 `tests/test_kueue_platform.py`.

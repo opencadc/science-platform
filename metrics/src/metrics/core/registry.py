@@ -7,14 +7,12 @@ from collections.abc import Callable
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.base import PlatformMetrics, Provider
-from metrics.providers.kueue import KueueProvider, kueue_http_client
+from metrics.providers.kueue import KueueProvider
 
 
 def _build_kueue_provider(settings: Settings) -> Provider:
-    """Construct Kueue and transfer ownership of its HTTP client to it."""
-    kueue_config = settings.providers.kueue
-    client = kueue_http_client(kueue_config)
-    return KueueProvider(settings, client)
+    """Construct Kueue; it builds its kr8s API handle lazily on first use."""
+    return KueueProvider(settings)
 
 
 _PLATFORM_SOURCE_BUILDERS: dict[str, Callable[[Settings], Provider]] = {

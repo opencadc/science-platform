@@ -4,8 +4,37 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from types import SimpleNamespace
+
+import kr8s
 
 from metrics.schemas.metrics import PlatformMetricsData
+
+
+class FakeKueueApi:
+    """kr8s-shaped fake: ``get(cls, name)`` yields objects with ``.raw`` dicts.
+
+    ``docs`` maps ClusterQueue names to raw dicts, to exceptions (raised on
+    access), or to zero-argument async callables (awaited, then their return
+    value is treated the same way) for concurrency coordination in tests.
+    Missing names raise :class:`kr8s.NotFoundError` like the real client.
+    """
+
+    def __init__(self, docs: dict[str, object] | None = None) -> None:
+        self.docs = docs or {}
+        self.requested: list[str] = []
+
+    def get(self, _cls: type, name: str):
+        async def generate():
+            self.requested.append(name)
+            value = self.docs.get(name, kr8s.NotFoundError(name))
+            if callable(value):
+                value = await value()
+            if isinstance(value, BaseException):
+                raise value
+            yield SimpleNamespace(raw=value)
+
+        return generate()
 
 
 def cache_control_max_age(cache_control: str) -> int:

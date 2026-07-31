@@ -35,7 +35,7 @@ def test_environment_rejects_unknown_tokens() -> None:
         ({"sources": {"platfrom": "kueue"}}, "sources.platfrom"),
         ({"providers": {"kueee": {}}}, "providers.kueee"),
         ({"providers": {"kueue": {"cluster_queue": ["cq-a"]}}}, "providers.kueue.cluster_queue"),
-        ({"providers": {"kueue": {"http": {"htt2": True}}}}, "providers.kueue.http.htt2"),
+        ({"providers": {"kueue": {"http": {"http2": True}}}}, "providers.kueue.http"),
         ({"cache": {"ttl_second": 10}}, "cache.ttl_second"),
         ({"cache": {"scope_ttl_seconds": {"platfrom": 10}}}, "cache.scope_ttl_seconds.platfrom"),
     ],
@@ -57,30 +57,25 @@ def test_platform_source_accepts_only_kueue(provider: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "url",
+    "removed_field",
     [
-        "http://localhost:8080",
-        "https://kubernetes.default.svc",
+        "kube_api_url",
+        "kube_api_token",
+        "token_file",
+        "ca_file",
+        "kube_verify_tls",
+        "kube_clusterqueue_path",
+        "http",
     ],
 )
-def test_kueue_api_url_accepts_http_and_https(url: str) -> None:
-    assert KueueProviderConfig(kube_api_url=url).kube_api_url == url
+def test_kueue_removed_transport_fields_are_rejected(removed_field: str) -> None:
+    """Endpoint/credential/TLS discovery moved to kr8s (ADR-0023); the old keys must fail loudly."""
+    with pytest.raises(ValidationError, match=removed_field):
+        KueueProviderConfig.model_validate({removed_field: "x"})
 
 
-@pytest.mark.parametrize(
-    "url",
-    [
-        "ftp://kubernetes.example",
-        "file:///var/run/kubernetes.sock",
-        "not-a-url",
-        "https://",
-        "https://kubernetes.example:not-a-port",
-        "https://not a host",
-    ],
-)
-def test_kueue_api_url_rejects_malformed_or_unsupported_urls(url: str) -> None:
-    with pytest.raises(ValidationError, match="kube_api_url"):
-        KueueProviderConfig(kube_api_url=url)
+def test_kueue_api_version_default_is_v1beta2() -> None:
+    assert KueueProviderConfig().kueue_api_version == "kueue.x-k8s.io/v1beta2"
 
 
 def test_kueue_cluster_queues_accepts_json_array_env(
@@ -117,11 +112,6 @@ def test_kueue_cluster_queues_reject_duplicates_at_settings_boundary() -> None:
 def test_kueue_cluster_queues_plain_string_not_json_array_rejected() -> None:
     with pytest.raises(ValidationError):
         KueueProviderConfig.model_validate({"cluster_queues": "cq-single"})
-
-
-def test_kueue_http2_setting_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="http2"):
-        KueueProviderConfig.model_validate({"http": {"http2": True}})
 
 
 def test_kueue_provider_config_contract_has_no_cohort_fields() -> None:

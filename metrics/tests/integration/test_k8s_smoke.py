@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-from decimal import Decimal
 
 import httpx
 import pytest
 
-from metrics.quantity import parse_cpu_to_cores, parse_memory_to_gib
+from metrics.providers.kueue import parse_resource_amount
 
 
 pytestmark = pytest.mark.integration
@@ -56,12 +55,12 @@ def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=30.0)
     assert response.status_code == 200
     allocated = response.json()["data"]["allocated"]
-    cpu_cores = parse_cpu_to_cores(allocated.get("cpu", "0"))
-    mem_gib = parse_memory_to_gib(allocated.get("memory", "0"))
+    cpu_cores = parse_resource_amount("cpu", allocated.get("cpu", "0"))
+    mem_gib = parse_resource_amount("memory", allocated.get("memory", "0Gi"))
     # scripts/test-setup.yaml: cq-electron has 100m/100Mi nominal quota, while
     # integration-idle requests 200m/200Mi. Admission proves borrowing, and
     # ClusterQueue status.flavorsUsage total must include that borrowed usage.
-    assert cpu_cores >= Decimal("0.19"), f"expected >=200m CPU in allocated, got {allocated!r}"
-    assert mem_gib >= Decimal("0.19"), (
+    assert cpu_cores >= 0.19, f"expected >=200m CPU in allocated, got {allocated!r}"
+    assert mem_gib >= 0.19, (
         f"expected >=200Mi memory from smoke workload in allocated, got {allocated!r}"
     )

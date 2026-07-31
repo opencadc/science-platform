@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from metrics.core.provider_registry import (
+from metrics.core.registry import (
     bind_platform_metrics,
     build_platform_provider,
 )

@@ -59,7 +59,6 @@ level must include a `metrics:` mapping (see `docs/examples/metrics.config.yaml`
 (not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with
 `METRICS_` + the nested name using `__` as the delimiter, for example:
 
-- `METRICS_PROVIDERS__KUEUE__KUBE_API_URL` → `providers.kueue.kube_api_url`
 - `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` → must be a **JSON array of
   strings** (for example `'["cq-proton","cq-neutron"]'`), not a comma-separated
   plain string
