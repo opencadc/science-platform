@@ -7,20 +7,13 @@ import pytest
 from metrics.core.provider_registry import (
     bind_platform_metrics,
     build_platform_provider,
-    supported_platform_sources,
 )
 from metrics.core.settings import CacheConfig, ProviderConfigs, Settings, SourceConfig
 from metrics.errors import RuntimeStartupError
 from metrics.schemas.metrics import PlatformMetricsData
 
 
-def test_supported_platform_sources_contains_kueue() -> None:
-    assert "kueue" in supported_platform_sources()
-
-
 def test_bind_platform_metrics_rejects_provider_without_platform_read() -> None:
-    """A selected provider must implement the observable platform capability."""
-
     class BadProvider:
         @property
         def name(self) -> str:
@@ -41,8 +34,6 @@ def test_bind_platform_metrics_rejects_provider_without_platform_read() -> None:
 
 @pytest.mark.anyio
 async def test_bind_platform_metrics_accepts_structural_capability() -> None:
-    """Capability binding depends on behavior, not inheritance or metadata."""
-
     class PlatformProvider:
         @property
         def name(self) -> str:

@@ -36,12 +36,9 @@ def create_app(
     telemetry = setup_telemetry(settings)
     runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
     httpx_instrumentor = HTTPXClientInstrumentor()
-    fastapi_instrumented = False
-    httpx_instrumented = False
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        nonlocal fastapi_instrumented, httpx_instrumented
         started = False
         app.state.runtime = runtime
         app.state.api_version = f"{settings.api_group}/{settings.app_version}"
@@ -55,9 +52,8 @@ def create_app(
                 raise
             yield
         finally:
-            if fastapi_instrumented:
+            if settings.otel_metrics_enabled:
                 FastAPIInstrumentor.uninstrument_app(app)
-            if httpx_instrumented:
                 httpx_instrumentor.uninstrument()
             if started:
                 await runtime.shutdown()
@@ -100,8 +96,6 @@ def create_app(
             meter_provider=telemetry.meter_provider,
         )
         httpx_instrumentor.instrument()
-        fastapi_instrumented = True
-        httpx_instrumented = True
 
     app.include_router(router)
 
