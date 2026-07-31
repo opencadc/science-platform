@@ -36,8 +36,8 @@ This file stores repository-specific architecture facts only.
   YAML/env precedence.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
-- `providers/`: `kueue`, `base` (scope protocol), and private Kubernetes HTTP
-  helpers in `kube` using an injected `httpx.AsyncClient`.
+- `providers/`: `kueue` and `base` (scope protocol). Kueue owns its private
+  Kubernetes HTTP helpers and uses an injected `httpx.AsyncClient`.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside HTTP and aggregation; `cache.py` and `quantity.py` are shared
   supporting modules.

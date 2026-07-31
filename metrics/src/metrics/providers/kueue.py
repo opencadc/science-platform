@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -19,19 +22,91 @@ from metrics.providers.base import (
     Provider,
     ProviderMetrics,
 )
-from metrics.providers.kube import (
-    kube_auth_headers,
-    kube_get_json,
-    kube_parallel_get_json,
-    resolve_kube_token,
-    resolve_kube_verify,
-)
 from metrics.quantity import (
     format_resource_amount,
     merge_resource_totals,
     parse_resource_amount,
 )
 from metrics.schemas.metrics import PlatformMetricsData
+
+
+def resolve_kube_token(
+    explicit: str | None,
+    token_file: str | None = None,
+) -> str | None:
+    """Resolve bearer token: explicit value, then token file, then in-cluster file."""
+    if explicit:
+        return explicit
+    if token_file:
+        token_path = Path(token_file)
+        if token_path.is_file():
+            return token_path.read_text(encoding="utf-8").strip()
+    path = Path(
+        os.environ.get(
+            "METRICS_KUBE_SA_TOKEN_PATH",
+            "/var/run/secrets/kubernetes.io/serviceaccount/token",
+        )
+    )
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return None
+
+
+def resolve_kube_verify(
+    verify_tls: bool,
+    *,
+    ca_file: str | None = None,
+) -> bool | str:
+    """Return the TLS verification value for the Kueue HTTP client."""
+    if not verify_tls:
+        return False
+    if ca_file:
+        ca_path = Path(ca_file)
+        if ca_path.is_file():
+            return str(ca_path)
+    ca = Path(
+        os.environ.get(
+            "METRICS_KUBE_SA_CA_PATH",
+            "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+        )
+    )
+    if ca.is_file():
+        return str(ca)
+    return True
+
+
+def kube_auth_headers(token: str | None) -> dict[str, str]:
+    """Build Kubernetes bearer-token headers when a token exists."""
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+async def kube_parallel_get_json(
+    client: httpx.AsyncClient,
+    urls: list[str],
+    *,
+    headers: dict[str, str],
+) -> list[dict[str, Any]]:
+    """GET Kueue URLs concurrently and return parsed JSON in request order."""
+    if not urls:
+        return []
+
+    async def fetch_url(target: str) -> dict[str, Any]:
+        response = await client.get(target, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    return list(await asyncio.gather(*(fetch_url(url) for url in urls)))
+
+
+async def kube_get_json(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    headers: dict[str, str],
+) -> dict[str, Any]:
+    """GET one Kueue URL and return its parsed JSON body."""
+    docs = await kube_parallel_get_json(client, [url], headers=headers)
+    return docs[0]
 
 
 def kueue_http_client(kueue_config: KueueProviderConfig) -> httpx.AsyncClient:

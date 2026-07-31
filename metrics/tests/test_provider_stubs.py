@@ -21,7 +21,7 @@ from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
 
-from metrics.providers.kube import (
+from metrics.providers.kueue import (
     resolve_kube_token,
     resolve_kube_verify,
 )
@@ -167,7 +167,7 @@ def test_ca_file_in_verify_uses_in_cluster_or_system() -> None:
 async def test_kube_parallel_empty() -> None:
     import httpx
 
-    from metrics.providers.kube import kube_parallel_get_json
+    from metrics.providers.kueue import kube_parallel_get_json
 
     c = httpx.AsyncClient()
     try:
