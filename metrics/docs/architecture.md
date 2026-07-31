@@ -24,7 +24,9 @@ This file stores repository-specific architecture facts only.
   long-lived `httpx` clients, cache backends, platform cache keys, and the
   `PlatformMetricsService` loader.
 - Active platform metrics come only from the **Kueue** source
-  (`providers/kueue.py`): one module owns URLs, startup checks, and platform
+  (`providers/kueue.py`): `KueueProvider` directly implements the
+  `PlatformMetrics` read alongside provider identity, lifecycle, and cache
+  fingerprinting. One module owns URLs, startup checks, and platform
   aggregation. Configuration rejects inactive or unknown providers.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
@@ -36,8 +38,10 @@ This file stores repository-specific architecture facts only.
   YAML/env precedence.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
-- `providers/`: `kueue` and `base` (scope protocol). Kueue owns its private
-  Kubernetes HTTP helpers and uses an injected `httpx.AsyncClient`.
+- `providers/`: `base` defines the normal Python `Provider` and
+  `PlatformMetrics` protocols; `kueue` implements both on `KueueProvider`.
+  Kueue owns its private Kubernetes HTTP helpers and uses an injected
+  `httpx.AsyncClient`.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside HTTP and aggregation. Shared `quantity.py` parses and accumulates
   Kubernetes quantities with `Decimal`; malformed values fail the provider read.
@@ -51,6 +55,8 @@ This file stores repository-specific architecture facts only.
 - Startup validation remains fail-fast for required source dependencies.
 - Provider boundaries stay explicit and avoid fallback indirection to removed
   legacy providers.
+- Platform capability is structural: the platform binder accepts providers
+  implementing `PlatformMetrics` and rejects providers without `platform()`.
 - The public API exposes only `GET /api/v1/metrics/platform` and `GET /healthz`
   in M4; per-user and session routes are removed until full provider contracts
   return.

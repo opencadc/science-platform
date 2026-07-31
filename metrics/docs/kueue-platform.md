@@ -4,7 +4,7 @@ This document explains **why** the Kueue integration is structured the way it
 is and **which modules** participate. It complements
 [`docs/adr/README.md`](adr/README.md) and operator-facing notes in
 [`environment-contracts.md`](environment-contracts.md). For the extension pattern
-(config, registry, provider, scopes), see
+(config, registry, provider capability), see
 [`adr/0005-metrics-runtime-composition-root.md`](adr/0005-metrics-runtime-composition-root.md)
 and ADR-0011.
 
@@ -48,7 +48,7 @@ and ADR-0011.
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
 2. **HTTP GET** `/api/v1/metrics/platform`: route depends on `MetricsRuntime`;
    `runtime.get_platform_metrics()` delegates to `PlatformMetricsService`.
-3. **Miss:** Service calls the bound loader → `KueueMetrics.platform()`
+3. **Miss:** Service calls the bound loader → `KueueProvider.platform()`
    parallel-fetches configured queues, sums nominal quota and usage `total`
    fields, and formats strings.
 4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;

@@ -14,7 +14,6 @@ from metrics.core.provider_registry import (
 )
 from metrics.core.settings import CacheConfig, ProviderConfigs, Settings, SourceConfig
 from metrics.errors import RuntimeStartupError
-from metrics.providers.base import PlatformMetrics, Provider
 from metrics.schemas.metrics import PlatformMetricsData
 
 
@@ -107,7 +106,5 @@ async def test_build_platform_provider_bundle_returns_kueue_client_and_provider(
     )
     bundle = build_platform_provider_bundle(settings)
     assert bundle.provider.name == "kueue"
-    assert isinstance(bundle.provider, Provider)
-    assert isinstance(bundle.provider, PlatformMetrics)
     assert not bundle.http_client.is_closed
     await bundle.http_client.aclose()
