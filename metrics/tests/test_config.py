@@ -18,15 +18,15 @@ def test_environment_accepts_canonical_values() -> None:
 
 
 def test_environment_accepts_legacy_aliases() -> None:
-    assert Settings(environment="int").environment == "integration"
-    assert Settings(environment="INT").environment == "integration"
-    assert Settings(environment="prod").environment == "production"
-    assert Settings(environment="PROD").environment == "production"
+    assert Settings.model_validate({"environment": "int"}).environment == "integration"
+    assert Settings.model_validate({"environment": "INT"}).environment == "integration"
+    assert Settings.model_validate({"environment": "prod"}).environment == "production"
+    assert Settings.model_validate({"environment": "PROD"}).environment == "production"
 
 
 def test_environment_rejects_unknown_tokens() -> None:
     with pytest.raises(ValidationError):
-        Settings(environment="qa")
+        Settings.model_validate({"environment": "qa"})
 
 
 @pytest.mark.parametrize(
@@ -105,7 +105,7 @@ def test_kueue_cluster_queues_accepts_direct_list_in_model() -> None:
 
 def test_kueue_cluster_queues_plain_string_not_json_array_rejected() -> None:
     with pytest.raises(ValidationError):
-        KueueProviderConfig(cluster_queues="cq-single")
+        KueueProviderConfig.model_validate({"cluster_queues": "cq-single"})
 
 
 def test_kueue_provider_config_contract_has_no_cohort_fields() -> None:
@@ -115,7 +115,7 @@ def test_kueue_provider_config_contract_has_no_cohort_fields() -> None:
 
 def test_kueue_provider_config_rejects_removed_cohort_field() -> None:
     with pytest.raises(ValidationError, match="cohort"):
-        KueueProviderConfig(cluster_queues=["cq-a"], cohort="legacy-cohort")
+        KueueProviderConfig.model_validate({"cluster_queues": ["cq-a"], "cohort": "legacy-cohort"})
 
 
 @pytest.mark.parametrize("provider", ["PROMETHEUS", "KUBE"])
@@ -129,18 +129,18 @@ def test_removed_provider_env_blocks_are_rejected(
 
 
 def test_cache_scope_ttl_platform_from_dict() -> None:
-    cache = CacheConfig(ttl_seconds=300, scope_ttl_seconds={"platform": 120})
+    cache = CacheConfig.model_validate({"ttl_seconds": 300, "scope_ttl_seconds": {"platform": 120}})
     assert cache.platform_ttl() == 120
 
 
 def test_cache_scope_ttl_platform_ttl_falls_back_to_global() -> None:
-    cache = CacheConfig(ttl_seconds=300, scope_ttl_seconds={})
+    cache = CacheConfig.model_validate({"ttl_seconds": 300, "scope_ttl_seconds": {}})
     assert cache.platform_ttl() == 300
 
 
 def test_cache_scope_ttl_rejects_unknown_scope_keys() -> None:
     with pytest.raises(ValidationError):
-        CacheConfig(scope_ttl_seconds={"platform": 60, "unknown_scope": 10})
+        CacheConfig.model_validate({"scope_ttl_seconds": {"platform": 60, "unknown_scope": 10}})
 
 
 def test_cache_scope_ttl_from_env_json(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,11 +158,11 @@ def test_cache_scope_ttl_invalid_json_env_raises(monkeypatch: pytest.MonkeyPatch
 def test_cache_scope_ttl_non_json_object_string_rejected() -> None:
     for bad in ("garbage", "300", "platform=30", "[]", "null"):
         with pytest.raises(ValidationError):
-            CacheConfig(scope_ttl_seconds=bad)
+            CacheConfig.model_validate({"scope_ttl_seconds": bad})
 
 
 def test_cache_scope_ttl_empty_string_means_no_override() -> None:
-    cache = CacheConfig(ttl_seconds=300, scope_ttl_seconds="   ")
+    cache = CacheConfig.model_validate({"ttl_seconds": 300, "scope_ttl_seconds": "   "})
     assert cache.platform_ttl() == 300
 
 

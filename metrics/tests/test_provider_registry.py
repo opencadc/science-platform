@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
-
 import pytest
 
 from metrics.core.provider_registry import (
@@ -19,35 +16,6 @@ from metrics.schemas.metrics import PlatformMetricsData
 
 def test_supported_platform_sources_contains_kueue() -> None:
     assert "kueue" in supported_platform_sources()
-
-
-def test_name_only_registry_surface_does_not_import_kueue() -> None:
-    """List/validate call sites should not pay the Kueue Adapter import graph."""
-    code = r"""
-import sys
-import metrics.core.provider_registry as pr
-_ = pr.supported_platform_sources()
-if "metrics.providers.kueue" in sys.modules:
-    raise SystemExit(2)
-from metrics.core.settings import CacheConfig, ProviderConfigs, Settings, SourceConfig
-
-s = Settings(
-    cache=CacheConfig(backend="memory"),
-    sources=SourceConfig(platform="kueue"),
-    providers=ProviderConfigs(),
-)
-pr.assert_supported_platform_source(s)
-if "metrics.providers.kueue" in sys.modules:
-    raise SystemExit(2)
-print("ok")
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_bind_platform_metrics_rejects_provider_without_platform_read() -> None:

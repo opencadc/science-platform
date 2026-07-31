@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -12,10 +13,9 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from metrics.api.v1.routes import router
 from metrics.core.runtime import MetricsRuntime
-from metrics.core.settings import Settings, apply_metrics_package_log_level
+from metrics.core.settings import Settings
 from metrics.errors import AppError, RuntimeStartupError
 from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
-from metrics.services.platform import PlatformMetricsService
 from metrics.telemetry import setup_telemetry
 
 _logger = logging.getLogger(__name__)
@@ -29,45 +29,22 @@ def _metric_scope_from_path(path: str) -> str | None:
 
 def create_app(
     *,
-    settings: Settings | None = None,
-    platform_service: PlatformMetricsService | None = None,
+    settings: Settings,
+    runtime: MetricsRuntime | None = None,
 ) -> FastAPI:
     """Create and configure the metrics API application."""
-    settings = settings or Settings()
-    apply_metrics_package_log_level(settings)
     telemetry = setup_telemetry(settings)
+    runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
     httpx_instrumentor = HTTPXClientInstrumentor()
     fastapi_instrumented = False
     httpx_instrumented = False
-    _injected_platform = platform_service
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         nonlocal fastapi_instrumented, httpx_instrumented
-        if _injected_platform is not None:
-            runtime = MetricsRuntime.for_injected_platform(
-                settings,
-                _injected_platform,
-                recorder=telemetry.recorder,
-            )
-            _app.state.runtime = runtime
-            _app.state.api_version = f"{settings.api_group}/{settings.app_version}"
-            _app.state.cache_control_public = settings.cache_control_public
-            try:
-                yield
-            finally:
-                if fastapi_instrumented:
-                    FastAPIInstrumentor.uninstrument_app(_app)
-                if httpx_instrumented:
-                    httpx_instrumentor.uninstrument()
-                if telemetry.meter_provider is not None:
-                    telemetry.meter_provider.shutdown()
-            return
-
-        runtime = MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
-        _app.state.runtime = runtime
-        _app.state.api_version = f"{settings.api_group}/{settings.app_version}"
-        _app.state.cache_control_public = settings.cache_control_public
+        app.state.runtime = runtime
+        app.state.api_version = f"{settings.api_group}/{settings.app_version}"
+        app.state.cache_control_public = settings.cache_control_public
         try:
             try:
                 await runtime.start()
@@ -77,7 +54,7 @@ def create_app(
             yield
         finally:
             if fastapi_instrumented:
-                FastAPIInstrumentor.uninstrument_app(_app)
+                FastAPIInstrumentor.uninstrument_app(app)
             if httpx_instrumented:
                 httpx_instrumentor.uninstrument()
             await runtime.shutdown()
@@ -148,13 +125,13 @@ def create_app(
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+        _logger.error("Unhandled request failure", exc_info=exc)
         body = ErrorResponse(
             version=app.state.api_version,
             metadata=ResponseMetadata(),
             error=ErrorDetail(
                 code="internal_error",
                 message="Unexpected internal server error",
-                details={"exception": exc.__class__.__name__},
             ),
         )
         return JSONResponse(
@@ -164,13 +141,3 @@ def create_app(
         )
 
     return app
-
-
-def _attach_app_state(app: FastAPI, settings: Settings) -> None:
-    """Set API version and cache headers on ``app.state`` (used by the module-level app)."""
-    app.state.api_version = f"{settings.api_group}/{settings.app_version}"
-    app.state.cache_control_public = settings.cache_control_public
-
-
-app = create_app()
-_attach_app_state(app, Settings())

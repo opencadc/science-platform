@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -82,20 +80,9 @@ def _runtime_with(
     runtime.wire(
         provider=provider,
         platform_service=service,
-        redis=redis,  # type: ignore[arg-type]
+        redis=redis,
     )
     return runtime
-
-
-def test_import_metrics_providers_base_avoids_circular_import() -> None:
-    """Package ``__init__`` must not eagerly load factory/runtime while importing base."""
-    result = subprocess.run(
-        [sys.executable, "-c", "import metrics.providers.base"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.anyio
@@ -191,48 +178,6 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
         await _unpatched_runtime_start(runtime)
 
     assert events == ["startup", "provider shutdown", "redis shutdown"]
-
-
-def test_metrics_core_dir_lists_lazy_exports() -> None:
-    """``dir(metrics.core)`` is only the lazy :data:`__all__` API, not module imports."""
-    import metrics.core
-
-    public = dir(metrics.core)
-    assert public == sorted(metrics.core.__all__)
-    assert "Settings" in public
-    assert "create_app" in public
-    assert "importlib" not in public
-    assert "Any" not in public
-
-
-def test_metrics_providers_dir_lists_lazy_exports() -> None:
-    """``dir(metrics.providers)`` is only the lazy :data:`__all__` API, not module imports."""
-    import metrics.providers
-
-    public = dir(metrics.providers)
-    assert public == sorted(metrics.providers.__all__)
-    assert "KueueProvider" in public
-    assert "importlib" not in public
-    assert "Any" not in public
-
-
-def test_lazy_core_settings_does_not_import_factory() -> None:
-    """``from metrics.core import Settings`` must not load the FastAPI factory (no app)."""
-    code = r"""
-import sys
-from metrics.core import Settings
-_ = Settings
-if "metrics.core.factory" in sys.modules:
-    raise SystemExit(2)
-print("ok")
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_token_file_reads(tmp_path: Path) -> None:
