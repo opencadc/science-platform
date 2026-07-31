@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from metrics.providers.base import (
     ProviderMetrics,
 )
 from metrics.quantity import (
+    InvalidQuantityError,
     format_resource_amount,
     merge_resource_totals,
     parse_resource_amount,
@@ -146,7 +148,7 @@ def cluster_queue_object_url(kueue_config: KueueProviderConfig, queue_name: str)
     return f"{base}{kueue_config.kube_clusterqueue_path}/{queue_name}"
 
 
-def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
+def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, Decimal]:
     """Sum ``nominalQuota`` for every resource across all groups and flavors.
 
     JSON follows Kueue v1beta2 CRDs: each ``resourceGroups`` entry lists
@@ -155,19 +157,18 @@ def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
 
     Resource **names** are taken verbatim from the API (for example ``cpu``,
     ``memory``, ``nvidia.com/gpu``) so the platform contract can surface future
-    resource types without schema changes. Values are accumulated in internal
-    float units: cores for CPU, gibibytes for memory, raw float for unknown names
-    (see :func:`metrics.quantity.parse_resource_amount`).
+    resource types without schema changes. Values are exact decimals in public
+    response units: cores for CPU, gibibytes for storage, and base units for
+    extended resources.
 
     Args:
         doc: A ``ClusterQueue`` or ``Cohort`` API object (dict with ``spec``).
 
     Returns:
-        Mapping of resource name → aggregated float suitable for formatting back
-        to Kubernetes-style quantity strings.
+        Mapping of resource name to an exact aggregated amount.
 
     """
-    totals: dict[str, float] = {}
+    totals: dict[str, Decimal] = {}
     spec = doc.get("spec") or {}
     for group in spec.get("resourceGroups") or []:
         for flavor in group.get("flavors") or []:
@@ -175,33 +176,31 @@ def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
                 name = str(resource.get("name", "")).strip()
                 if not name:
                     continue
-                quota = resource.get("nominalQuota")
                 merge_resource_totals(
                     totals,
                     name,
-                    parse_resource_amount(name, str(quota) if quota is not None else ""),
+                    parse_resource_amount(name, resource.get("nominalQuota")),
                 )
     return totals
 
 
-def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
-    totals: dict[str, float] = {}
+def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, Decimal]:
+    totals: dict[str, Decimal] = {}
     status = doc.get("status") or {}
     for flavor in status.get("flavorsUsage") or []:
         for resource in flavor.get("resources") or []:
             name = str(resource.get("name", "")).strip()
             if not name:
                 continue
-            total = resource.get("total")
             merge_resource_totals(
                 totals,
                 name,
-                parse_resource_amount(name, str(total) if total is not None else ""),
+                parse_resource_amount(name, resource.get("total")),
             )
     return totals
 
 
-def _float_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
+def _resource_maps_to_strings(values: dict[str, Decimal]) -> dict[str, str]:
     return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
 
 
@@ -212,7 +211,7 @@ def _align_allocated_with_capacity(
     out = dict(allocated)
     for name in capacity:
         if name not in out:
-            out[name] = format_resource_amount(name, 0.0)
+            out[name] = format_resource_amount(name, Decimal(0))
     return dict(sorted(out.items()))
 
 
@@ -290,22 +289,27 @@ class KueueMetrics(ProviderMetrics):
                 "Failed querying Kueue objects (upstream request error)"
             ) from exc
 
-        queue_totals: dict[str, float] = {}
-        allocated_totals: dict[str, float] = {}
+        queue_totals: dict[str, Decimal] = {}
+        allocated_totals: dict[str, Decimal] = {}
 
-        for item in docs:
-            for res_name, val in sum_nominal_quotas_by_resource(item).items():
-                merge_resource_totals(queue_totals, res_name, val)
-            for res_name, val in _sum_usage_from_status(item).items():
-                merge_resource_totals(allocated_totals, res_name, val)
+        try:
+            for item in docs:
+                for res_name, val in sum_nominal_quotas_by_resource(item).items():
+                    merge_resource_totals(queue_totals, res_name, val)
+                for res_name, val in _sum_usage_from_status(item).items():
+                    merge_resource_totals(allocated_totals, res_name, val)
+        except InvalidQuantityError as exc:
+            raise ProviderExecutionError(
+                "Kueue platform data contained an invalid resource quantity"
+            ) from exc
         if not queue_totals:
             raise ProviderUnavailableError(
                 "Kueue ClusterQueue specs did not include nominal quota values"
             )
-        capacity_str = _float_maps_to_strings(queue_totals)
+        capacity_str = _resource_maps_to_strings(queue_totals)
         allocated_str = _align_allocated_with_capacity(
             capacity_str,
-            _float_maps_to_strings(allocated_totals),
+            _resource_maps_to_strings(allocated_totals),
         )
         return _PlatformResourceMaps(
             capacity=capacity_str,
