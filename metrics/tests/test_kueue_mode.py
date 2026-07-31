@@ -150,6 +150,54 @@ async def test_kueue_provider_startup_validates_clusterqueues_concurrently(
 
 
 @pytest.mark.anyio
+async def test_kueue_startup_cancels_and_awaits_siblings_before_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        cache=CacheConfig(backend="memory"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
+                kube_api_url="https://kubernetes.default.svc",
+                cluster_queues=["cq-failing", "cq-slow"],
+            )
+        ),
+    )
+    sibling_started = asyncio.Event()
+    sibling_cancelled = asyncio.Event()
+    release_sibling = asyncio.Event()
+    sibling_completed = asyncio.Event()
+    request = httpx.Request("GET", "https://kubernetes.default.svc/cq-failing")
+    response = httpx.Response(404, request=request)
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
+
+    async def fake_get_json(_client, url: str, *, headers: dict[str, str]):
+        assert headers == {"Authorization": "Bearer t"}
+        if url.endswith("/cq-failing"):
+            await sibling_started.wait()
+            raise httpx.HTTPStatusError("Not Found", request=request, response=response)
+        sibling_started.set()
+        try:
+            await release_sibling.wait()
+        except asyncio.CancelledError:
+            sibling_cancelled.set()
+            raise
+        sibling_completed.set()
+        return {"metadata": {"name": "cq-slow"}}
+
+    monkeypatch.setattr("metrics.providers.kueue.kube_get_json", fake_get_json)
+    client = kueue_http_client(settings.providers.kueue)
+    try:
+        with pytest.raises(RuntimeStartupError, match="ClusterQueue 'cq-failing'.*not found"):
+            await KueueProvider(settings, client).startup()
+        assert sibling_cancelled.is_set()
+        assert not sibling_completed.is_set()
+    finally:
+        release_sibling.set()
+        await asyncio.sleep(0)
+        await client.aclose()
+
+
+@pytest.mark.anyio
 async def test_kueue_provider_startup_fails_fast_with_missing_queue_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
