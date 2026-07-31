@@ -21,14 +21,24 @@ class StubPlatformMetrics:
     cluster: str = "prod"
     cpu_cap: str = "100"
     mem_cap: str = "200Gi"
+    gpu_cap: str = "4"
     cpu_alloc: str = "25"
     mem_alloc: str = "50Gi"
+    gpu_alloc: str = "1"
 
     async def load(self) -> PlatformMetricsData:
         return PlatformMetricsData(
             cluster=self.cluster,
-            capacity={"cpu": self.cpu_cap, "memory": self.mem_cap},
-            allocated={"cpu": self.cpu_alloc, "memory": self.mem_alloc},
+            capacity={
+                "cpu": self.cpu_cap,
+                "memory": self.mem_cap,
+                "nvidia.com/gpu": self.gpu_cap,
+            },
+            allocated={
+                "cpu": self.cpu_alloc,
+                "memory": self.mem_alloc,
+                "nvidia.com/gpu": self.gpu_alloc,
+            },
         )
 
 

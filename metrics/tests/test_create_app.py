@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,7 +16,12 @@ from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache
 from metrics.core.factory import create_app
 from metrics.core.runtime import MetricsRuntime, build_cache_backend
 from metrics.core.settings import CacheConfig, Settings
-from metrics.errors import RuntimeStartupError
+from metrics.errors import (
+    ProviderExecutionError,
+    ProviderUnavailableError,
+    RuntimeStartupError,
+)
+from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder, TelemetrySetup
 
@@ -61,9 +68,18 @@ def test_platform_endpoint() -> None:
         assert response.headers.get("expires")
         assert "x-metrics-cached" not in {h.lower() for h in response.headers}
         payload = response.json()
+        assert set(payload) == {"version", "kind", "metadata", "status", "data"}
         assert payload["version"] == "metrics.canfar.net/v1"
         assert payload["kind"] == "PlatformMetrics"
-        assert payload["metadata"]["created"] is not None
+        assert payload["status"] == "Success"
+        created = datetime.fromisoformat(payload["metadata"]["created"])
+        assert created.tzinfo is not None
+        assert (
+            abs(
+                (created - parsedate_to_datetime(response.headers["last-modified"])).total_seconds()
+            )
+            < 1
+        )
         assert "cached" not in payload["metadata"]
         assert "ttl" not in payload["metadata"]
         assert set(payload["data"].keys()) == {"scope", "cluster", "capacity", "allocated"}
@@ -76,6 +92,8 @@ def test_platform_endpoint() -> None:
         assert payload["data"]["capacity"]["memory"] == "200Gi"
         assert payload["data"]["allocated"]["cpu"] == "25"
         assert payload["data"]["allocated"]["memory"] == "50Gi"
+        assert payload["data"]["capacity"]["nvidia.com/gpu"] == "4"
+        assert payload["data"]["allocated"]["nvidia.com/gpu"] == "1"
 
         time.sleep(1.1)
         cached_response = client.get("/api/v1/metrics/platform")
@@ -232,3 +250,58 @@ def test_generic_500_response_exposes_no_exception_details() -> None:
     assert "ValueError" not in response.text
     assert "secret-token" not in response.text
     assert "internal.example" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("provider_error", "status_code", "code"),
+    [
+        (
+            ProviderUnavailableError(
+                "secret-token from https://kubernetes.default.svc unavailable"
+            ),
+            503,
+            "platform_metrics_unavailable",
+        ),
+        (
+            ProviderExecutionError("bad quantity 1Zi at https://kubernetes.default.svc"),
+            502,
+            "platform_metrics_error",
+        ),
+    ],
+)
+def test_provider_error_envelope_is_stable_and_sanitized(
+    provider_error: Exception,
+    status_code: int,
+    code: str,
+) -> None:
+    async def fail() -> PlatformMetricsData:
+        raise provider_error
+
+    service = PlatformMetricsService(
+        platform=fail,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=30),
+        key=lambda: "platform:4:proof",
+    )
+    runtime = MetricsRuntime(Settings(cache=CacheConfig(backend="memory")))
+    runtime.wire(
+        provider=LifecycleProvider(),
+        platform_service=service,
+        redis=None,
+    )
+
+    with TestClient(create_app(settings=Settings(), runtime=runtime)) as client:
+        response = client.get("/api/v1/metrics/platform")
+
+    assert response.status_code == status_code
+    assert response.headers["cache-control"] == "no-store"
+    payload = response.json()
+    assert set(payload) == {"version", "kind", "metadata", "status", "error"}
+    assert payload["version"] == "metrics.canfar.net/v1"
+    assert payload["kind"] == "Status"
+    assert payload["status"] == "Error"
+    assert payload["error"]["code"] == code
+    assert payload["error"]["details"] is None
+    assert "secret-token" not in response.text
+    assert "kubernetes.default.svc" not in response.text
+    assert "1Zi" not in response.text
+    assert provider_error.__class__.__name__ not in response.text

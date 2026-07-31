@@ -68,7 +68,7 @@ def create_app(
         title=settings.app_name,
         version=settings.app_version,
         summary="CANFAR Science Platform Metrics API",
-        description=("API for platform metrics from configured Kueue and reserved sources."),
+        description="API for platform metrics from the configured Kueue source.",
         lifespan=lifespan,
     )
 

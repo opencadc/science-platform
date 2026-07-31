@@ -12,7 +12,7 @@ from metrics.core.settings import (
     SourceConfig,
 )
 from metrics.errors import ProviderExecutionError
-from metrics.providers.kueue import KueueProvider
+from metrics.providers.kueue import KueueProvider, kube_parallel_get_json
 from metrics.schemas.metrics import PlatformMetricsData
 
 
@@ -345,3 +345,51 @@ async def test_kueue_platform_rejects_missing_allocation_quantity(
 
     with pytest.raises(ProviderExecutionError):
         await _read_platform_doc(monkeypatch, doc)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("body", "content_type"),
+    [
+        ("secret raw payload", "application/json"),
+        ('["not", "an", "object"]', "application/json"),
+    ],
+)
+async def test_kueue_http_rejects_invalid_documents_without_payload_leaks(
+    body: str,
+    content_type: str,
+) -> None:
+    async def respond(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text=body,
+            headers={"content-type": content_type},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        with pytest.raises(ProviderExecutionError) as exc_info:
+            await kube_parallel_get_json(
+                client,
+                ["https://kubernetes.default.svc/clusterqueues/cq-a"],
+                headers={"Authorization": "Bearer secret-token"},
+            )
+
+    message = str(exc_info.value)
+    assert "secret" not in message
+    assert "kubernetes.default.svc" not in message
+    assert "list" not in message
+
+
+@pytest.mark.anyio
+async def test_kueue_platform_rejects_invalid_nested_shape_without_payload_leaks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc = {"spec": {"resourceGroups": "secret-shape"}}
+
+    with pytest.raises(
+        ProviderExecutionError,
+        match="Kueue platform data contained an invalid object shape",
+    ) as exc_info:
+        await _read_platform_doc(monkeypatch, doc)
+
+    assert "secret-shape" not in str(exc_info.value)
