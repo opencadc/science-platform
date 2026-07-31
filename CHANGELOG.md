@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/opencadc/science-platform/compare/1.4.0...1.4.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* working around ci error when building helm chart ([90843e6](https://github.com/opencadc/science-platform/commit/90843e6e2693240570bbf8b24c4ec54ac35b5699))
+
 ## [1.4.0](https://github.com/opencadc/science-platform/compare/1.3.0...1.4.0) (2026-07-31)
 
 
