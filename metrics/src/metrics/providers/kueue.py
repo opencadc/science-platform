@@ -6,10 +6,11 @@ import asyncio
 import hashlib
 import json
 import os
+from collections.abc import Coroutine
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 
@@ -26,6 +27,22 @@ from metrics.quantity import (
     parse_resource_amount,
 )
 from metrics.schemas.metrics import PlatformMetricsData
+
+_Result = TypeVar("_Result")
+
+
+async def _gather_cancel_on_error(
+    *coroutines: Coroutine[Any, Any, _Result],
+) -> list[_Result]:
+    """Gather in order, cancelling and awaiting siblings before any error escapes."""
+    tasks = [asyncio.create_task(coroutine) for coroutine in coroutines]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
 
 def resolve_kube_token(
@@ -103,7 +120,7 @@ async def kube_parallel_get_json(
             )
         return document
 
-    return list(await asyncio.gather(*(fetch_url(url) for url in urls)))
+    return await _gather_cancel_on_error(*(fetch_url(url) for url in urls))
 
 
 async def kube_get_json(
@@ -368,7 +385,9 @@ class KueueProvider:
                     "Cannot reach Kubernetes API for Kueue startup checks"
                 ) from exc
 
-        await asyncio.gather(*(validate_queue(qname) for qname in kueue_config.cluster_queues))
+        await _gather_cancel_on_error(
+            *(validate_queue(qname) for qname in kueue_config.cluster_queues)
+        )
 
     async def shutdown(self) -> None:
         """Close the owned client idempotently, leaving failed closure retryable."""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 
 import httpx
@@ -14,6 +15,45 @@ from metrics.core.settings import (
 from metrics.errors import ProviderExecutionError
 from metrics.providers.kueue import KueueProvider, kube_parallel_get_json
 from metrics.schemas.metrics import PlatformMetricsData
+
+
+@pytest.mark.anyio
+async def test_parallel_get_cancels_and_awaits_siblings_before_raising() -> None:
+    sibling_started = asyncio.Event()
+    sibling_cancelled = asyncio.Event()
+    release_sibling = asyncio.Event()
+    sibling_completed = asyncio.Event()
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/failing"):
+            await sibling_started.wait()
+            return httpx.Response(500, request=request)
+        sibling_started.set()
+        try:
+            await release_sibling.wait()
+        except asyncio.CancelledError:
+            sibling_cancelled.set()
+            raise
+        sibling_completed.set()
+        return httpx.Response(200, json={"metadata": {"name": "slow"}}, request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    try:
+        with pytest.raises(httpx.HTTPStatusError):
+            await kube_parallel_get_json(
+                client,
+                [
+                    "https://kubernetes.default.svc/clusterqueues/failing",
+                    "https://kubernetes.default.svc/clusterqueues/slow",
+                ],
+                headers={},
+            )
+        assert sibling_cancelled.is_set()
+        assert not sibling_completed.is_set()
+    finally:
+        release_sibling.set()
+        await asyncio.sleep(0)
+        await client.aclose()
 
 
 async def _read_platform_doc(
