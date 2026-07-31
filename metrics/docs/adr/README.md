@@ -22,6 +22,7 @@ decision log** for durable design choices.
 | [0013](0013-sanitized-client-facing-error-responses.md) | Sanitized client-facing error responses | M4 |
 | [0014](0014-progressive-public-route-surface.md) | Progressive public route surface | M4+ |
 | [0019](0019-opentelemetry-metrics-contract.md) | OpenTelemetry metrics contract | M8 |
+| [0022](0022-provider-owned-client-lifecycle.md) | Provider-owned client lifecycle | M4 |
 
 ## Proposed (planned milestones)
 

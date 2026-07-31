@@ -3,34 +3,23 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
-
-import httpx
 
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.base import PlatformMetrics, Provider
 
 
-@dataclass(frozen=True, slots=True)
-class PlatformProviderBundle:
-    """Long-lived HTTP client and :class:`Provider` for the active platform source."""
-
-    http_client: httpx.AsyncClient
-    provider: Provider
-
-
-def _build_kueue_platform_bundle(settings: Settings) -> PlatformProviderBundle:
-    """Construct the Kueue Adapter; imports kueue only at bundle construction (Locality)."""
+def _build_kueue_provider(settings: Settings) -> Provider:
+    """Construct Kueue and transfer ownership of its HTTP client to it."""
     from metrics.providers.kueue import KueueProvider, kueue_http_client
 
     kueue_config = settings.providers.kueue
     client = kueue_http_client(kueue_config)
-    return PlatformProviderBundle(http_client=client, provider=KueueProvider(settings, client))
+    return KueueProvider(settings, client)
 
 
-_PLATFORM_SOURCE_BUILDERS: dict[str, Callable[[Settings], PlatformProviderBundle]] = {
-    "kueue": _build_kueue_platform_bundle,
+_PLATFORM_SOURCE_BUILDERS: dict[str, Callable[[Settings], Provider]] = {
+    "kueue": _build_kueue_provider,
 }
 
 
@@ -75,8 +64,8 @@ def bind_platform_metrics(provider: Provider) -> PlatformMetrics:
     return provider
 
 
-def build_platform_provider_bundle(settings: Settings) -> PlatformProviderBundle:
-    """Construct the HTTP client and provider for :attr:`Settings.sources.platform`."""
+def build_platform_provider(settings: Settings) -> Provider:
+    """Construct the provider selected by :attr:`Settings.sources.platform`."""
     assert_supported_platform_source(settings)
     name = (settings.sources.platform or "").strip().lower()
     builder = _PLATFORM_SOURCE_BUILDERS[name]

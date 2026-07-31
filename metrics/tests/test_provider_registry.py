@@ -9,7 +9,7 @@ import pytest
 
 from metrics.core.provider_registry import (
     bind_platform_metrics,
-    build_platform_provider_bundle,
+    build_platform_provider,
     supported_platform_sources,
 )
 from metrics.core.settings import CacheConfig, ProviderConfigs, Settings, SourceConfig
@@ -98,13 +98,13 @@ async def test_bind_platform_metrics_accepts_structural_capability() -> None:
 
 
 @pytest.mark.anyio
-async def test_build_platform_provider_bundle_returns_kueue_client_and_provider() -> None:
+async def test_build_platform_provider_returns_owned_kueue_provider() -> None:
     settings = Settings(
         cache=CacheConfig(backend="memory"),
         sources=SourceConfig(platform="kueue"),
         providers=ProviderConfigs(),
     )
-    bundle = build_platform_provider_bundle(settings)
-    assert bundle.provider.name == "kueue"
-    assert not bundle.http_client.is_closed
-    await bundle.http_client.aclose()
+    provider = build_platform_provider(settings)
+    assert provider.name == "kueue"
+    assert bind_platform_metrics(provider) is provider
+    await provider.shutdown()

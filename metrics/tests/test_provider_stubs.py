@@ -6,16 +6,17 @@ import subprocess
 import sys
 from pathlib import Path
 
-import httpx
 import pytest
 
 from metrics.cache import InMemoryTTLCache
+from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import (
     CacheConfig,
     ProviderConfigs,
     Settings,
     SourceConfig,
 )
+from metrics.errors import RuntimeStartupError
 from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
@@ -24,6 +25,8 @@ from metrics.providers.kueue import (
     resolve_kube_token,
     resolve_kube_verify,
 )
+
+_runtime_start = MetricsRuntime.start
 
 
 def test_import_metrics_providers_base_avoids_circular_import() -> None:
@@ -38,9 +41,10 @@ def test_import_metrics_providers_base_avoids_circular_import() -> None:
 
 
 @pytest.mark.anyio
-async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
-    """Runtime owns Adapter lifecycle: shutdown the provider Implementation before I/O close."""
+async def test_metrics_runtime_starts_and_stops_owned_provider_once() -> None:
+    """Repeated lifecycle calls still operate on the owned provider exactly once."""
 
+    startup_calls: list[str] = []
     shutdown_calls: list[str] = []
 
     class StubProvider:
@@ -49,7 +53,7 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
             return "stub-adapter"
 
         async def startup(self) -> None:
-            return
+            startup_calls.append("startup")
 
         async def shutdown(self) -> None:
             shutdown_calls.append("shutdown")
@@ -70,12 +74,9 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
         providers=ProviderConfigs(),
     )
     stub = StubProvider()
-    client = httpx.AsyncClient()
 
     async def load() -> PlatformMetricsData:
         return await stub.platform()
-
-    from metrics.core.runtime import MetricsRuntime  # local: avoid import cycle during collection
 
     svc = PlatformMetricsService(
         platform=load,
@@ -87,19 +88,129 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
     runtime = MetricsRuntime(settings)
     runtime.set_recorder(NoopMetricsRecorder())
     runtime.wire(
-        platform_client=client,
-        platform_provider=stub,  # type: ignore[arg-type]
+        provider=stub,  # type: ignore[arg-type]
         platform_service=svc,
         redis=None,
     )
+    await _runtime_start(runtime)
+    await _runtime_start(runtime)
+    await runtime.shutdown()
     await runtime.shutdown()
 
+    assert startup_calls == ["startup"]
     assert shutdown_calls == ["shutdown"]
-    assert client.is_closed
     with pytest.raises(RuntimeError, match="not initialised"):
         _ = runtime.platform_service
     with pytest.raises(RuntimeError, match="not initialised"):
         await runtime.get_platform_metrics()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("startup_error", "expected_message"),
+    [
+        (RuntimeStartupError("invalid provider configuration"), "invalid provider configuration"),
+        (ValueError("sensitive implementation detail"), "Unexpected error"),
+    ],
+)
+async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
+    startup_error: Exception,
+    expected_message: str,
+) -> None:
+    """Provider startup failures close all owned resources and hide unexpected details."""
+
+    events: list[str] = []
+
+    class FailingProvider:
+        @property
+        def name(self) -> str:
+            return "stub"
+
+        async def startup(self) -> None:
+            events.append("startup")
+            raise startup_error
+
+        async def shutdown(self) -> None:
+            events.append("provider shutdown")
+
+        def cache_fingerprint(self) -> str:
+            return "stub"
+
+        async def platform(self) -> PlatformMetricsData:
+            return PlatformMetricsData(cluster="c", capacity={}, allocated={})
+
+    class StubRedis:
+        async def aclose(self) -> None:
+            events.append("redis shutdown")
+
+    settings = Settings(cache=CacheConfig(backend="memory"))
+    service = PlatformMetricsService(
+        platform=FailingProvider().platform,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=lambda: "platform:4:c:stub",
+    )
+    runtime = MetricsRuntime(settings)
+    provider = FailingProvider()
+    runtime.wire(
+        provider=provider,  # type: ignore[arg-type]
+        platform_service=service,
+        redis=StubRedis(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(RuntimeStartupError) as error:
+        await _runtime_start(runtime)
+
+    assert expected_message in str(error.value)
+    assert "sensitive implementation detail" not in str(error.value)
+    assert events == ["startup", "provider shutdown", "redis shutdown"]
+    await runtime.shutdown()
+    assert events == ["startup", "provider shutdown", "redis shutdown"]
+
+
+@pytest.mark.anyio
+async def test_metrics_runtime_shutdown_failure_does_not_skip_remaining_cleanup() -> None:
+    """One resource failure cannot prevent cleanup of later resources."""
+
+    events: list[str] = []
+
+    class FailingShutdownProvider:
+        @property
+        def name(self) -> str:
+            return "stub"
+
+        async def startup(self) -> None:
+            return
+
+        async def shutdown(self) -> None:
+            events.append("provider shutdown")
+            raise RuntimeError("boom")
+
+        def cache_fingerprint(self) -> str:
+            return "stub"
+
+        async def platform(self) -> PlatformMetricsData:
+            return PlatformMetricsData(cluster="c", capacity={}, allocated={})
+
+    class StubRedis:
+        async def aclose(self) -> None:
+            events.append("redis shutdown")
+
+    provider = FailingShutdownProvider()
+    service = PlatformMetricsService(
+        platform=provider.platform,
+        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        key=lambda: "platform:4:c:stub",
+    )
+    runtime = MetricsRuntime(Settings(cache=CacheConfig(backend="memory")))
+    runtime.wire(
+        provider=provider,  # type: ignore[arg-type]
+        platform_service=service,
+        redis=StubRedis(),  # type: ignore[arg-type]
+    )
+
+    await runtime.shutdown()
+
+    assert events == ["provider shutdown", "redis shutdown"]
 
 
 def test_metrics_core_dir_lists_lazy_exports() -> None:
