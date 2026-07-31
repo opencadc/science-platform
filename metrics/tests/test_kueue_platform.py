@@ -11,6 +11,38 @@ from metrics.core.settings import (
 )
 from metrics.errors import ProviderExecutionError
 from metrics.providers.kueue import KueueMetrics
+from metrics.schemas.metrics import PlatformMetricsData
+
+
+async def _read_platform_doc(
+    monkeypatch: pytest.MonkeyPatch,
+    doc: dict[str, object],
+) -> PlatformMetricsData:
+    settings = Settings(
+        cluster_name="c",
+        sources=SourceConfig(platform="kueue"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
+                kube_api_url="https://kube.test",
+                cluster_queues=["cq-a"],
+            )
+        ),
+    )
+    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
+
+    async def fake_parallel(*_args, **_kwargs):
+        return [doc]
+
+    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
+    client = httpx.AsyncClient()
+    try:
+        return await KueueMetrics(
+            settings=settings,
+            client=client,
+            kueue_config=settings.providers.kueue,
+        ).platform()
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.anyio
@@ -263,47 +295,25 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
         {"name": "cpu"},
         {"name": "cpu", "nominalQuota": "bad-secret-value"},
         {"name": "cpu", "nominalQuota": "-1"},
+        {"name": "cpu", "nominalQuota": " 1 "},
+        {"name": "cpu", "nominalQuota": 1},
     ],
 )
 async def test_kueue_platform_rejects_corrupt_capacity_quantities(
     monkeypatch: pytest.MonkeyPatch,
-    resource: dict[str, str],
+    resource: dict[str, object],
 ) -> None:
-    settings = Settings(
-        cluster_name="c",
-        sources=SourceConfig(platform="kueue"),
-        providers=ProviderConfigs(
-            kueue=KueueProviderConfig(
-                kube_api_url="https://kube.test",
-                cluster_queues=["cq-a"],
-            )
-        ),
-    )
-    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
     doc = {
         "spec": {
             "resourceGroups": [{"flavors": [{"resources": [resource]}]}],
         },
     }
 
-    async def fake_parallel(*_args, **_kwargs):
-        return [doc]
-
-    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
-    client = httpx.AsyncClient()
-    try:
-        metrics = KueueMetrics(
-            settings=settings,
-            client=client,
-            kueue_config=settings.providers.kueue,
-        )
-        with pytest.raises(
-            ProviderExecutionError,
-            match="Kueue platform data contained an invalid resource quantity",
-        ) as exc_info:
-            await metrics.platform()
-    finally:
-        await client.aclose()
+    with pytest.raises(
+        ProviderExecutionError,
+        match="Kueue platform data contained an invalid resource quantity",
+    ) as exc_info:
+        await _read_platform_doc(monkeypatch, doc)
     assert "bad-secret-value" not in str(exc_info.value)
 
 
@@ -319,17 +329,6 @@ async def test_kueue_platform_rejects_missing_allocation_quantity(
     monkeypatch: pytest.MonkeyPatch,
     resource: dict[str, str],
 ) -> None:
-    settings = Settings(
-        cluster_name="c",
-        sources=SourceConfig(platform="kueue"),
-        providers=ProviderConfigs(
-            kueue=KueueProviderConfig(
-                kube_api_url="https://kube.test",
-                cluster_queues=["cq-a"],
-            )
-        ),
-    )
-    monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
     doc = {
         "spec": {
             "resourceGroups": [
@@ -349,18 +348,5 @@ async def test_kueue_platform_rejects_missing_allocation_quantity(
         },
     }
 
-    async def fake_parallel(*_args, **_kwargs):
-        return [doc]
-
-    monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
-    client = httpx.AsyncClient()
-    try:
-        metrics = KueueMetrics(
-            settings=settings,
-            client=client,
-            kueue_config=settings.providers.kueue,
-        )
-        with pytest.raises(ProviderExecutionError):
-            await metrics.platform()
-    finally:
-        await client.aclose()
+    with pytest.raises(ProviderExecutionError):
+        await _read_platform_doc(monkeypatch, doc)

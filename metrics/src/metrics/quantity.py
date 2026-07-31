@@ -53,9 +53,9 @@ class InvalidQuantityError(ValueError):
 
 
 def _parse_quantity(raw: object) -> Decimal:
-    if isinstance(raw, bool) or not isinstance(raw, (str, int, Decimal)):
+    if not isinstance(raw, str):
         raise InvalidQuantityError("invalid Kubernetes quantity")
-    value = str(raw).strip()
+    value = raw
     if not value or len(value) > 100:
         raise InvalidQuantityError("invalid Kubernetes quantity")
     match = _QUANTITY_PATTERN.fullmatch(value)
@@ -81,6 +81,18 @@ def _parse_quantity(raw: object) -> Decimal:
     if not amount.is_finite() or amount < 0 or amount > _MAX_QUANTITY:
         raise InvalidQuantityError("invalid Kubernetes quantity")
     return amount
+
+
+def _validate_resource_amount(resource_name: str, value: Decimal) -> None:
+    try:
+        with localcontext(_ARITHMETIC_CONTEXT):
+            base_value = (
+                value * _GIB if resource_name.lower() in ("memory", "ephemeral-storage") else value
+            )
+    except DecimalException as exc:
+        raise InvalidQuantityError("invalid Kubernetes quantity") from exc
+    if not base_value.is_finite() or base_value < 0 or base_value > _MAX_QUANTITY:
+        raise InvalidQuantityError("invalid Kubernetes quantity")
 
 
 def parse_cpu_to_cores(raw: object) -> Decimal:
@@ -109,8 +121,7 @@ def parse_resource_amount(resource_name: str, raw: object) -> Decimal:
 
 def format_resource_amount(resource_name: str, value: Decimal) -> str:
     """Format an exact resource total without scientific notation."""
-    if not value.is_finite() or value < 0 or value > _MAX_QUANTITY:
-        raise InvalidQuantityError("invalid Kubernetes quantity")
+    _validate_resource_amount(resource_name, value)
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -132,6 +143,5 @@ def merge_resource_totals(
             total = target.get(name, Decimal(0)) + delta
     except DecimalException as exc:
         raise InvalidQuantityError("invalid Kubernetes quantity") from exc
-    if total > _MAX_QUANTITY:
-        raise InvalidQuantityError("invalid Kubernetes quantity")
+    _validate_resource_amount(name, total)
     target[name] = total

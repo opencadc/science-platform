@@ -81,6 +81,17 @@ def test_aggregate_and_format_overflow_are_rejected() -> None:
         format_resource_amount("cpu", maximum + 1)
 
 
+@pytest.mark.parametrize("resource_name", ["memory", "ephemeral-storage"])
+def test_storage_aggregate_overflow_is_checked_in_base_units(
+    resource_name: str,
+) -> None:
+    totals: dict[str, Decimal] = {}
+    five_exbi = parse_resource_amount(resource_name, "5Ei")
+    merge_resource_totals(totals, resource_name, five_exbi)
+    with pytest.raises(InvalidQuantityError):
+        merge_resource_totals(totals, resource_name, five_exbi)
+
+
 def test_empty_resource_name_is_not_aggregated() -> None:
     totals: dict[str, Decimal] = {}
     merge_resource_totals(totals, "", Decimal(1))
@@ -99,6 +110,9 @@ def test_empty_resource_name_is_not_aggregated() -> None:
         "1e",
         "9223372036854775808",
         "1e1000",
+        " 1Gi ",
+        1,
+        Decimal("1"),
         0.1,
     ],
 )
