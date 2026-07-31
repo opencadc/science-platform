@@ -20,6 +20,17 @@ decisions are also recorded under `docs/adr/`.
 ## Current entries
 
 - Date: July 31, 2026
+- Context: Provider/runtime ownership and application lifecycle convergence.
+- Lesson: One owner per live resource removes bundle types and special test
+  lifespans without requiring a generic plugin framework.
+- Evidence: `src/metrics/core/provider_registry.py`,
+  `src/metrics/core/runtime.py`, `src/metrics/providers/kueue.py`,
+  `src/metrics/core/factory.py`, and ADR-0022.
+- Action taken: The registry returns one client-owning Kueue provider;
+  `MetricsRuntime` owns provider/cache lifecycle, and all applications use one
+  lifespan.
+
+- Date: July 31, 2026
 - Context: Platform provider capability simplification.
 - Lesson: Capability metadata can drift from behavior; one provider method is
   a more reliable contract than a scope enum plus an intermediate delegate.

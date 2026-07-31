@@ -27,9 +27,9 @@ _Avoid_: "metrics pod" in specs.
 `ClusterQueue` objects only; cohort is not part of provider configuration or
 capacity aggregation.
 
-**Metric scope**: Named read surface (for example `platform`, `quotas.interactive`)
-mapped via `sources.*` to exactly one provider. Scopes ship with routes, cache
-TTL, provider methods, and tests together.
+**Metric scope**: Named read surface mapped via `sources.*` to exactly one
+provider. The only shipped scope is `platform`. A scope ships with its route,
+cache TTL, provider method, schema, telemetry, and tests together.
 
 **Source configuration**: Typed `sources` tree selecting which provider key backs
 each scope. Distinct from `providers.*` connection settings.
@@ -40,38 +40,11 @@ does not compose fragments across providers.
 **Provider fingerprint**: Stable segment in cache keys when queue lists or
 provider config change.
 
-**Kube provider**: Proposed Kubernetes Pod/API adapter for **quota and
-user/session workload scopes**. It is not implemented or configurable and is
-not a substitute `sources.platform` source.
-
-**Interactive quota**: User-scoped observed requests/limits for interactive
-sessions, split into **fixed** and **flexible** allocation classes
-(`GET /api/v1/metrics/users/{user}/quotas/interactive`).
-
-**Logical interactive session**: Quota `count` groups Pods by one configured
-session-type label value, not by Pod count.
-
-**Private cache scope**: User/quota (and future user/session) responses use HTTP
-`Cache-Control: private`, short TTL, and user-hashed internal cache keys.
-
 **Versioned API envelope**: Responses use `version` (for example
 `metrics.canfar.net/v1`), `kind`, `metadata.created`, `status`, and `data`.
 
 **PlatformMetrics**: Cluster-wide Kueue-backed contract (`kind: PlatformMetrics`);
 route `GET /api/v1/metrics/platform`. Shipped in M4.
-
-**UserMetrics**: User-scoped contract (`kind: UserMetrics`); route
-`GET /api/v1/metrics/users/{user}`. Provider selected via `sources.users`
-(for example `kube` or `prometheus`). Proposed M6.
-
-**SessionMetrics**: Session-scoped contract (`kind: SessionMetrics`); route
-`GET /api/v1/metrics/users/{user}/sessions/{uuid}`. Provider selected via
-`sources.sessions`. Proposed M7. May eventually back Skaha session-list pod
-usage via `MetricsDAO`.
-
-**InteractiveQuota**: Quota observation contract (`kind: InteractiveQuota`); route
-`GET /api/v1/metrics/users/{user}/quotas/interactive`. Distinct from UserMetrics.
-Proposed M5.
 
 ## Relationships
 
@@ -82,30 +55,14 @@ Proposed M5.
   ([ADR-0003](docs/adr/0003-platform-capacity-allocated-unit-parity.md)).
 - Platform `allocated` sums `status.flavorsUsage.resources[].total` only;
   do not add `borrowed` separately (total already includes borrowed quota).
-- Interactive quota depends on Pod label correctness on Skaha workloads
-  ([system ADR-0004](../docs/adr/0004-interactive-workload-pod-label-contract.md)).
-
 ## Example dialogue
 
 > **Dev:** "Where does platform capacity come from?"
 > **Domain expert:** "Summed nominal quota from the configured ClusterQueues in
 > the Kueue provider — not node listing or pod aggregation."
 
-> **Dev:** "Can kube serve platform metrics if Kueue is down?"
-> **Domain expert:** "No. Platform is `sources.platform: kueue` only. A future
-> kube provider may back **UserMetrics** / **SessionMetrics**, but it is not
-> configurable today."
+## Proposed vocabulary
 
-> **Dev:** "Is UserMetrics the same as InteractiveQuota?"
-> **Domain expert:** "No. **InteractiveQuota** observes scheduled requests/limits by
-> allocation class. **UserMetrics** is a separate contract with its own `kind` and
-> provider binding (ADR-0020)."
-
-## Flagged ambiguities
-
-- **Shipped today (M4):** `GET /api/v1/metrics/platform` and `GET /healthz` only.
-- **Proposed (M5, not implemented):** interactive quota — ADRs 0015–0018, system
-  ADR-0004.
-- **Proposed (M6):** **UserMetrics** — ADR-0020.
-- **Proposed (M7):** **SessionMetrics** — ADR-0021.
-- Inactive provider types are not accepted in runtime configuration.
+ADRs 0015–0018 and 0020–0021 are proposals only. Their provider names, source
+keys, routes, schemas, cache rules, and telemetry do not exist in runtime
+configuration or the public API.

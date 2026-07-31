@@ -15,10 +15,10 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   production run through Kubernetes deployment paths. Docker Compose is not
   part of the supported service contract (see `environment-contracts.md`).
 - **Single service process, platform-only HTTP:** `MetricsRuntime` composes the
-  active platform source from `core/provider_registry.py`, owns upstream
-  `httpx.AsyncClient` instances and cache backends, and exposes platform reads
-  to versioned routes. M4 serves only `GET /api/v1/metrics/platform` and
-  `GET /healthz`; user/session metrics are out of scope until later milestones.
+  active Kueue provider from `core/provider_registry.py`, owns provider
+  lifecycle and cache resources, and exposes platform reads to versioned
+  routes. Kueue owns its injected `httpx.AsyncClient`. M4 serves only
+  `GET /api/v1/metrics/platform` and `GET /healthz`.
 - **Truthful provider configuration:** Kueue is the only configured provider
   and the only accepted `sources.platform` value.
 - **Truthful platform capability:** `Provider` owns only identity, lifecycle,
@@ -34,6 +34,9 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 - **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
   `pydantic-settings` env parsing (nested `METRICS_*` keys) and optional YAML
   under `/etc/canfar/metrics/config.yaml` (see `core/yaml_config.py`).
+- **One application lifecycle:** Production-built and test-injected runtimes
+  execute the same FastAPI lifespan. Package imports create no settings,
+  application, runtime, client, or exporter.
 
 ## Design mapping
 

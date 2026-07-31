@@ -25,9 +25,9 @@ and ADR-0011.
 
 - The **Kueue provider** (`metrics.providers.kueue`) runs startup HTTP checks
   against the Kubernetes API and performs platform capacity/allocated
-  aggregation.
-- **`MetricsRuntime`** owns the cache backend, `httpx` client lifecycle, and
-  which provider is active for `sources.platform`.
+  aggregation. It owns and closes its injected `httpx` client.
+- **`MetricsRuntime`** owns the active provider lifecycle, cache backend, and
+  platform service for `sources.platform`.
 - **Startup vs request:** validation for required upstreams runs during
   `startup()` in lifespan; the `PlatformMetricsService` path serves cached
   results and maps request-time failures to HTTP/telemetry (without exposing raw
@@ -38,10 +38,10 @@ and ADR-0011.
 | Module | Role |
 | --- | --- |
 | `metrics.core.runtime` | `MetricsRuntime`: registry-driven provider wiring, cache backend, platform cache keys, `get_platform_metrics`. |
-| `metrics.core.provider_registry` | Maps `sources.platform` to a concrete provider + HTTP client bundle. |
+| `metrics.core.provider_registry` | Maps `sources.platform` to one concrete provider; the Kueue builder transfers its client to that provider. |
 | `metrics.providers.kueue` | TLS/token handling, Kubernetes GETs, URLs, startup, quota parsing, platform aggregation, and fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
-| `metrics.services.platform_metrics` | TTL cache, telemetry, and error mapping for `/platform`. |
+| `metrics.services.platform` | TTL cache, telemetry, and error mapping for `/platform`. |
 
 ## Request flow
 
@@ -54,8 +54,8 @@ and ADR-0011.
 4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;
    HTTP caching uses `Cache-Control`, `Date`, `Expires`, and `Last-Modified`
    (see `metrics.http_cache`). Keys in `allocated` match those in `capacity`.
-5. **Shutdown:** `runtime.shutdown()` closes the active platform provider, the
-   runtime-owned `httpx` client, and the async Redis client when the cache
+5. **Shutdown:** `runtime.shutdown()` stops the active platform provider (which
+   closes its `httpx` client) and closes the async Redis client when the cache
    backend is Redis.
 
 ## Fixtures and local testing

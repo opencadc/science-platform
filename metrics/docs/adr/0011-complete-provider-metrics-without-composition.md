@@ -13,17 +13,17 @@ responses. That pattern produced incomplete contracts and unclear ownership.
 
 - Each **metric scope** is served by **one provider** returning a **complete**
   internal model for that scope.
-- `MetricsRuntime` orchestrates cache and HTTP clients; it does **not** stitch
-  partial capacity/usage results across providers.
+- `MetricsRuntime` orchestrates provider lifecycle and cache resources; it does
+  **not** stitch partial capacity/usage results across providers. Providers own
+  their injected clients per ADR-0022.
 - Adding a scope requires config (`sources.*`), provider method, route, cache
   TTL, schemas, and tests together.
 
 ## Consequences
 
-- `kube` is not an alternate `sources.platform`. Proposed **`prometheus`** and
-  **`kube`** providers may serve **UserMetrics** or **SessionMetrics** only when
-  implemented as the sole complete provider for that scope (ADR-0020,
-  ADR-0021).
+- Proposed provider/scope examples in ADRs 0015–0018 and 0020–0021 are not
+  runtime configuration. A future scope can ship only with one complete
+  provider implementation.
 - Removing a route means removing the provider method and source binding, not
   leaving stub handlers.
 

@@ -43,15 +43,27 @@ This file stores repository-specific behavioral specifications.
   use exact decimal arithmetic. Missing, whitespace-padded, malformed,
   negative, non-finite, or base-unit-overflowing values fail the provider read;
   an absent allocation for a capacity key remains a same-unit zero.
+- Successful platform responses retain the versioned envelope
+  (`version`, `kind: PlatformMetrics`, `metadata.created`, `status`, `data`),
+  open resource-name maps, deterministic resource ordering, and snapshot
+  timestamp reuse across cache hits.
+- Request-time provider unavailability maps to HTTP 503; provider execution
+  failure maps to HTTP 502. Error envelopes use `kind: Status`,
+  `status: Error`, and `Cache-Control: no-store`, without raw URLs, tokens,
+  quantity payloads, exception text, or class names.
+- Cache keys contain platform scope, schema version, cluster, and the
+  non-secret provider fingerprint. Memory and Redis backends preserve the same
+  TTL and JSON snapshot semantics. The current service has no stale-response
+  fallback: an expired/missing snapshot requires a successful provider read.
+- Custom telemetry keeps the accepted `canfar.metrics.http.requests`,
+  `canfar.metrics.provider.duration`, `canfar.metrics.cache.lookups`, and
+  `canfar.metrics.compute.duration` instruments and their bounded attributes.
 
-## Milestone linkage
+## Decision linkage
 
 Canonical decisions: [`docs/adr/README.md`](adr/README.md).
 
-## Planned target behavior (roadmap)
+## Proposed decisions
 
-- **InteractiveQuota** (M5): `sources.quotas.interactive` + kube provider — ADR-0015–0018.
-- **UserMetrics** (M6): `GET /api/v1/metrics/users/{user}`, provider e.g. kube or
-  prometheus — ADR-0020.
-- **SessionMetrics** (M7): `GET /api/v1/metrics/users/{user}/sessions/{uuid}` —
-  ADR-0021.
+ADRs 0015–0018 and 0020–0021 remain proposed. Nothing in those ADRs is accepted
+runtime configuration or a shipped route.

@@ -26,7 +26,9 @@ securityContext:
     drop:
       - ALL
 
-# Flat env map -> container env (METRICS_* keys)
+# -- Flat fail-closed Settings map. Supported provider/source keys are
+# METRICS_PROVIDERS__KUEUE__* and METRICS_SOURCES__PLATFORM=kueue; unknown
+# provider, source, cache, HTTP, and Kueue fields fail application startup.
 env: {}
 
 serviceAccount:
