@@ -315,7 +315,7 @@ class KueueProvider:
                 "endpoint": (kueue_config.kube_api_url or "").rstrip("/"),
                 "name": self.name,
                 "path": kueue_config.kube_clusterqueue_path,
-                "queues": sorted(set(kueue_config.cluster_queues)),
+                "queues": sorted(kueue_config.cluster_queues),
             },
             sort_keys=True,
             separators=(",", ":"),

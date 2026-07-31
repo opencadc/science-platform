@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from pydantic import TypeAdapter
@@ -195,6 +196,11 @@ class MetricsRuntime:
         try:
             await self._provider.startup()
             self._provider_started = True
+        except asyncio.CancelledError:
+            try:
+                await self.shutdown()
+            finally:
+                raise
         except RuntimeStartupError:
             _logger.exception("Provider startup validation failed")
             await self.shutdown()
@@ -211,17 +217,24 @@ class MetricsRuntime:
         :attr:`platform_service` surface an invalid state (raises ``RuntimeError``) instead of
         reusing closed resources or a stale :class:`PlatformMetricsService` graph.
         """
+        cancellation: asyncio.CancelledError | None = None
         provider, self._provider = self._provider, None
         self._provider_started = False
         if provider is not None:
             try:
                 await provider.shutdown()
+            except asyncio.CancelledError as exc:
+                cancellation = exc
             except Exception:
                 _logger.exception("Platform provider shutdown failed; closing remaining resources")
         redis, self._redis = self._redis, None
         if redis is not None:
             try:
                 await redis.aclose()
+            except asyncio.CancelledError as exc:
+                cancellation = cancellation or exc
             except Exception:
                 _logger.exception("Redis shutdown failed")
         self._platform = None
+        if cancellation is not None:
+            raise cancellation

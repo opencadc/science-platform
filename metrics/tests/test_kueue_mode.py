@@ -64,6 +64,7 @@ def test_kueue_provider_fingerprint_covers_provider_endpoint_path_and_queue_memb
     assert _fingerprint(resource_path="/apis/example/v1/clusterqueues") != baseline
     assert _fingerprint(queues=["cq-a", "cq-c"]) != baseline
     assert _fingerprint(queues=["cq-b", "cq-a"]) == baseline
+    assert _fingerprint(queues=["cq-a", "cq-b", "cq-b"]) != baseline
 
 
 def test_kueue_provider_fingerprint_excludes_secrets_transport_and_telemetry() -> None:
