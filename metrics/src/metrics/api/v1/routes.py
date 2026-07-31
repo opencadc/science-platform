@@ -41,14 +41,12 @@ async def get_platform_metrics(
     Response freshness (``Date``, ``Cache-Control``, etc.) is carried in headers, not
     the JSON body, per the API contract.
     """
-    result = await runtime.get_platform_metrics()
-    request.state.metrics_cache_hit = result.cached
+    result = await runtime.platform_service.get_platform_metrics()
     now = datetime.now(UTC)
     for key, value in metrics_success_cache_headers(
         snapshot_created=result.created,
-        configured_ttl=runtime.cache_ttl_seconds,
+        configured_ttl=runtime.platform_service.cache_ttl_seconds,
         shared_cache_public=request.app.state.cache_control_public,
-        user_scoped=False,
         now=now,
     ).items():
         response.headers[key] = value

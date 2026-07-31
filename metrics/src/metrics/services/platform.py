@@ -16,22 +16,20 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 logger = logging.getLogger(__name__)
 
-type MetricsData = PlatformMetricsData
-
 
 @dataclass(slots=True)
 class CachedMetrics:
     """JSON-serialisable snapshot and creation time stored in the TTL cache."""
 
-    data: MetricsData
+    data: PlatformMetricsData
     created: datetime
 
 
 @dataclass(slots=True)
-class ServiceResult[T]:
+class ServiceResult:
     """Platform metrics payload with cache hit metadata for HTTP layers."""
 
-    data: T
+    data: PlatformMetricsData
     created: datetime
     cached: bool
 
@@ -66,14 +64,14 @@ class PlatformMetricsService:
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._platform_ttl_seconds = ttl if ttl is not None else self._cache.ttl_seconds
         self._provider = provider
-        self._inflight: dict[str, asyncio.Task[ServiceResult[PlatformMetricsData]]] = {}
+        self._inflight: dict[str, asyncio.Task[ServiceResult]] = {}
 
     @property
     def cache_ttl_seconds(self) -> int:
         """Effective TTL in seconds for ``Cache-Control`` and cache writes."""
         return self._platform_ttl_seconds
 
-    async def get_platform_metrics(self) -> ServiceResult[PlatformMetricsData]:
+    async def get_platform_metrics(self) -> ServiceResult:
         """Read platform metrics, using cache on hit and the loader on miss.
 
         Concurrent cache misses coalesce onto one in-flight backend load per key
@@ -123,7 +121,7 @@ class PlatformMetricsService:
 
         return reap
 
-    async def _load_and_cache(self, cache_key: str) -> ServiceResult[PlatformMetricsData]:
+    async def _load_and_cache(self, cache_key: str) -> ServiceResult:
         scope = "platform"
         started = perf_counter()
         status = "ok"

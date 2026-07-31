@@ -44,7 +44,7 @@ bash scripts/kind-smoke-teardown.sh
 To mirror CI behavior locally (no persistent port-forward):
 
 ```bash
-KIND_SMOKE_CI=1 KIND_SMOKE_EXIT_AFTER_TESTS=1 KIND_PRELOAD_IMAGES=false \
+KIND_SMOKE_CI=1 KIND_PRELOAD_IMAGES=false \
   bash scripts/kind-smoke.sh
 ```
 

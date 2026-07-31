@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
+import logging
+
 import uvicorn
 
 from metrics.core.factory import create_app
-from metrics.core.settings import Settings, apply_metrics_package_log_level
+from metrics.core.settings import Settings
 
 
 def run() -> None:
     """Run the API server with environment configuration."""
     settings = Settings()
-    apply_metrics_package_log_level(settings)
+    # "trace" is a uvicorn level; the stdlib logger tree maps it to DEBUG.
+    stdlib_level = {"trace": "debug"}.get(settings.log_level, settings.log_level)
+    logging.getLogger("metrics").setLevel(stdlib_level.upper())
     app = create_app(settings=settings)
-    raw = str(settings.log_level).strip().lower()
     uvicorn.run(
         app,
         host=settings.host,
         port=settings.port,
-        log_level=raw,
+        log_level=settings.log_level,
     )
 
 

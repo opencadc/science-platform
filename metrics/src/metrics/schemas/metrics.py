@@ -26,10 +26,6 @@ class ErrorDetail(BaseModel):
 
     code: str = Field(description="Stable machine-readable error code.")
     message: str = Field(description="Human-readable error summary.")
-    details: dict[str, str] | None = Field(
-        default=None,
-        description="Optional key/value details for debugging and remediation.",
-    )
 
 
 class PlatformMetricsData(BaseModel):

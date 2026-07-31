@@ -18,12 +18,10 @@ and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-
   `environment-contracts.md` (same directory as this file).
 - `src/metrics/` is the Python package root. `create_app` in
   `src/metrics/core/factory.py` registers FastAPI lifespan hooks; typed settings
-  live in `src/metrics/core/settings.py`, optional YAML under
-  `core/yaml_config.py` (file `/etc/canfar/metrics/config.yaml` by default).
+  live in `src/metrics/core/settings.py` (environment-only, `METRICS_*`).
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
-  selects the active platform provider via `core/registry.py`, owns
-  provider lifecycle and cache resources, and builds the platform cache key and
-  `PlatformMetricsService`. The provider owns a lazily built kr8s API handle
+  constructs the Kueue provider, owns provider lifecycle and cache resources,
+  and builds the platform cache key and `PlatformMetricsService`. The provider owns a lazily built kr8s API handle
   (ADR-0023).
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): `KueueProvider` directly implements the
@@ -36,13 +34,11 @@ and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-
 ## Layered package map
 
 - `api/v1/`: versioned HTTP routes.
-- `core/`: `Settings`, `MetricsRuntime`, `registry`, `create_app`, and
-  YAML/env precedence.
+- `core/`: `Settings`, `MetricsRuntime`, and `create_app`.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
-- `providers/`: `base` defines the normal Python `Provider` and
-  `PlatformMetrics` protocols; `kueue` implements both on `KueueProvider`.
-  Kueue reads ClusterQueues through kr8s (typed `new_class` kinds, ADR-0023).
+- `providers/`: `KueueProvider` reads ClusterQueues through kr8s
+  (typed `new_class` kinds, ADR-0023).
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside kr8s access and aggregation. Quantities parse via quantiphy
   (ADR-0024); malformed values fail the provider read.
@@ -59,8 +55,6 @@ and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-
 - Provider construction is synchronous and network-free. `MetricsRuntime`
   starts/stops one Kueue provider, and `KueueProvider.shutdown()` releases its
   kr8s handle (the kr8s session is process-shared).
-- Platform capability is structural: the platform binder accepts providers
-  implementing `PlatformMetrics` and rejects providers without `platform()`.
 - The public API exposes only `GET /api/v1/metrics/platform` and `GET /healthz`
   in M4; per-user and session routes are removed until full provider contracts
   return.

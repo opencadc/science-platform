@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
+import functools
 import hashlib
 import json
-from collections.abc import Coroutine
 from dataclasses import dataclass
 from math import isfinite
-from typing import Any, TypeVar
+from typing import Any
 
 import httpx
 import kr8s
@@ -24,12 +23,6 @@ from metrics.errors import (
 )
 from metrics.schemas.metrics import PlatformMetricsData
 
-_Result = TypeVar("_Result")
-
-# Upper bound on concurrent GETs within one platform load; single-flight in
-# PlatformMetricsService already guarantees at most one load runs per process.
-DEFAULT_MAX_PARALLEL_KUBE_GETS = 4
-
 _MAX_QUANTITY = float(2**63)
 _GIB = float(2**30)
 _STORAGE_RESOURCES = frozenset({"memory", "ephemeral-storage"})
@@ -39,23 +32,7 @@ _KUBE_REQUEST_ERRORS = (
     kr8s.APITimeoutError,
     kr8s.ConnectionClosedError,
     httpx.HTTPError,
-    TimeoutError,
-    OSError,
 )
-
-
-async def _gather_cancel_on_error(
-    *coroutines: Coroutine[Any, Any, _Result],
-) -> list[_Result]:
-    """Gather in order, cancelling and awaiting siblings before any error escapes."""
-    tasks = [asyncio.create_task(coroutine) for coroutine in coroutines]
-    try:
-        return list(await asyncio.gather(*tasks))
-    except BaseException:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        raise
 
 
 # --- Resource quantities (quantiphy-backed, public response units) ---
@@ -105,8 +82,6 @@ def format_resource_amount(resource_name: str, value: float) -> str:
 
 def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> None:
     """Accumulate a resource total while retaining valid zero values."""
-    if not name:
-        return
     total = target.get(name, 0.0) + delta
     _validate_resource_amount(name, total)
     target[name] = total
@@ -115,15 +90,9 @@ def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> 
 # --- Kubernetes access via kr8s ---
 
 
-_cluster_queue_classes: dict[str, type] = {}
-
-
+@functools.cache
 def _cluster_queue_class(api_version: str) -> type:
-    cls = _cluster_queue_classes.get(api_version)
-    if cls is None:
-        cls = new_class(kind="ClusterQueue", version=api_version, namespaced=False)
-        _cluster_queue_classes[api_version] = cls
-    return cls
+    return new_class(kind="ClusterQueue", version=api_version, namespaced=False)
 
 
 async def create_kube_api(kueue_config: KueueProviderConfig) -> Any:
@@ -137,98 +106,53 @@ async def fetch_cluster_queue_docs(
     api: Any,
     api_version: str,
     names: list[str],
-    *,
-    max_concurrency: int = DEFAULT_MAX_PARALLEL_KUBE_GETS,
 ) -> list[dict[str, Any]]:
-    """Fetch ClusterQueue objects by name with bounded concurrency, in request order.
+    """Fetch ClusterQueue objects by name sequentially, in request order.
+
+    Platform loads are already serialized by the single-flight service, and the
+    configured queue list is small, so there is no parallel fan-out here.
 
     Raises:
         kr8s.NotFoundError: When a named ClusterQueue does not exist.
         kr8s.ServerError: For non-404 API server errors.
     """
-    if not names:
-        return []
-    semaphore = asyncio.Semaphore(max(1, max_concurrency))
     queue_class = _cluster_queue_class(api_version)
-
-    async def fetch_one(name: str) -> dict[str, Any]:
-        async with semaphore:
-            matches = [obj async for obj in api.get(queue_class, name)]
+    docs: list[dict[str, Any]] = []
+    for name in names:
+        matches = [obj async for obj in api.get(queue_class, name)]
         if not matches:
             raise kr8s.NotFoundError(f"ClusterQueue {name!r} was not found")
-        raw = matches[0].raw
-        return raw if isinstance(raw, dict) else dict(raw)
-
-    return await _gather_cancel_on_error(*(fetch_one(name) for name in names))
+        docs.append(matches[0].raw)
+    return docs
 
 
 # --- ClusterQueue document aggregation ---
 
 
-def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
-    """Sum ``nominalQuota`` for every resource across all groups and flavors.
-
-    JSON follows Kueue v1beta2 CRDs: each ``resourceGroups`` entry lists
-    ``flavors``, each flavor lists ``resources`` with ``nominalQuota`` quantities
-    compatible with Kubernetes resource.Quantity syntax.
+def _merge_resource_entries(
+    totals: dict[str, float],
+    resources: Any,
+    value_key: str,
+) -> None:
+    """Accumulate ``resources[].{value_key}`` quantities into ``totals`` by name.
 
     Resource **names** are taken verbatim from the API (for example ``cpu``,
     ``memory``, ``nvidia.com/gpu``) so the platform contract can surface future
-    resource types without schema changes. Values use public response units:
-    cores for CPU, gibibytes for storage, and base units for extended resources.
-
-    Args:
-        doc: A ``ClusterQueue`` API object (dict with ``spec``).
-
-    Returns:
-        Mapping of resource name to its aggregated amount.
-
+    resource types without schema changes; values use public response units.
     """
-    totals: dict[str, float] = {}
-    spec = doc.get("spec") or {}
-    for group in spec.get("resourceGroups") or []:
-        for flavor in group.get("flavors") or []:
-            for resource in flavor.get("resources") or []:
-                name = str(resource.get("name", "")).strip()
-                if not name:
-                    continue
-                merge_resource_totals(
-                    totals,
-                    name,
-                    parse_resource_amount(name, resource.get("nominalQuota")),
-                )
-    return totals
-
-
-def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
-    totals: dict[str, float] = {}
-    status = doc.get("status") or {}
-    for flavor in status.get("flavorsUsage") or []:
-        for resource in flavor.get("resources") or []:
-            name = str(resource.get("name", "")).strip()
-            if not name:
-                continue
-            merge_resource_totals(
-                totals,
-                name,
-                parse_resource_amount(name, resource.get("total")),
-            )
-    return totals
+    for resource in resources or []:
+        name = str(resource.get("name", "")).strip()
+        if not name:
+            continue
+        merge_resource_totals(
+            totals,
+            name,
+            parse_resource_amount(name, resource.get(value_key)),
+        )
 
 
 def _resource_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
     return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
-
-
-def _align_allocated_with_capacity(
-    capacity: dict[str, str],
-    allocated: dict[str, str],
-) -> dict[str, str]:
-    out = dict(allocated)
-    for name in capacity:
-        if name not in out:
-            out[name] = format_resource_amount(name, 0.0)
-    return dict(sorted(out.items()))
 
 
 @dataclass(slots=True)
@@ -312,11 +236,14 @@ class KueueProvider:
         allocated_totals: dict[str, float] = {}
 
         try:
-            for item in docs:
-                for resource_name, value in sum_nominal_quotas_by_resource(item).items():
-                    merge_resource_totals(queue_totals, resource_name, value)
-                for resource_name, value in _sum_usage_from_status(item).items():
-                    merge_resource_totals(allocated_totals, resource_name, value)
+            for doc in docs:
+                for group in (doc.get("spec") or {}).get("resourceGroups") or []:
+                    for flavor in group.get("flavors") or []:
+                        _merge_resource_entries(
+                            queue_totals, flavor.get("resources"), "nominalQuota"
+                        )
+                for flavor in (doc.get("status") or {}).get("flavorsUsage") or []:
+                    _merge_resource_entries(allocated_totals, flavor.get("resources"), "total")
         except (AttributeError, TypeError) as exc:
             raise ProviderExecutionError(
                 "Kueue platform data contained an invalid object shape"
@@ -326,10 +253,9 @@ class KueueProvider:
                 "Kueue ClusterQueue specs did not include nominal quota values"
             )
         capacity = _resource_maps_to_strings(queue_totals)
-        allocated = _align_allocated_with_capacity(
-            capacity,
-            _resource_maps_to_strings(allocated_totals),
-        )
+        # Allocated keys align with capacity: absent usage renders as explicit zero.
+        zeros = {name: format_resource_amount(name, 0.0) for name in queue_totals}
+        allocated = dict(sorted((zeros | _resource_maps_to_strings(allocated_totals)).items()))
         return _PlatformResourceMaps(capacity=capacity, allocated=allocated)
 
     def cache_fingerprint(self) -> str:
@@ -347,7 +273,7 @@ class KueueProvider:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """Fetch configured ClusterQueues concurrently to validate access."""
+        """Fetch each configured ClusterQueue to validate access, failing fast."""
         kueue_config = self._kueue_config
         if not kueue_config.cluster_queues:
             raise RuntimeStartupError(
@@ -360,13 +286,9 @@ class KueueProvider:
                 "Cannot configure Kubernetes API access for Kueue startup checks"
             ) from exc
 
-        async def validate_queue(qname: str) -> None:
+        for qname in kueue_config.cluster_queues:
             try:
-                await fetch_cluster_queue_docs(
-                    api,
-                    kueue_config.kueue_api_version,
-                    [qname],
-                )
+                await fetch_cluster_queue_docs(api, kueue_config.kueue_api_version, [qname])
             except kr8s.NotFoundError as exc:
                 raise RuntimeStartupError(
                     f"Configured ClusterQueue {qname!r} was not found in the cluster"
@@ -389,10 +311,6 @@ class KueueProvider:
                 raise RuntimeStartupError(
                     "Cannot reach Kubernetes API for Kueue startup checks"
                 ) from exc
-
-        await _gather_cancel_on_error(
-            *(validate_queue(qname) for qname in kueue_config.cluster_queues)
-        )
 
     async def shutdown(self) -> None:
         """Release the API handle; the kr8s session is process-shared and stays open."""

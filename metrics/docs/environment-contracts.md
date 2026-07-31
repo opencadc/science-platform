@@ -41,19 +41,10 @@ Docker Compose is not part of the supported development contract.
 
 ## 12-factor configuration model
 
-Runtime behavior is driven by `METRICS_*` environment variables, optional YAML
-from `METRICS_CONFIG_FILE`, and (when present) Kubernetes secret file sources,
+Runtime behavior is driven by `METRICS_*` environment variables and (when
+present) Kubernetes secret file sources,
 in the order `Settings` defines. For the same field, `METRICS_*` **wins** over
-both the optional YAML file and secret-file values (environment is applied
-before those lower-priority `Settings` sources).
-
-**Default file path:** `/etc/canfar/metrics/config.yaml`. If the file is
-absent, settings fall back to defaults and env unless
-`METRICS_REQUIRE_CONFIG_FILE` is set to a true value, in which case startup
-fails when the file is missing.
-
-**YAML shape:** When the file exists and the document is non-empty, the top
-level must include a `metrics:` mapping (see `docs/examples/metrics.config.yaml`).
+with environment applied over defaults (ADR-0010).
 
 **Settings model:** The root model exposes `providers`, `sources`, and `cache`
 (not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with

@@ -24,10 +24,6 @@ spec:
           ports:
             - name: redis
               containerPort: 6379
-          {{- with .Values.redis.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
 ---
 apiVersion: v1
 kind: Service

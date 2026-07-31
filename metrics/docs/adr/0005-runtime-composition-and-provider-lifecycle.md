@@ -18,10 +18,13 @@ hides misconfiguration.
 
 ## Decision
 
-- **Composition root.** `MetricsRuntime` wires the active platform provider
-  from `core/registry.py`, provider lifecycle, the cache backend, and
-  `PlatformMetricsService`. Settings use nested `METRICS_*` env keys and
-  optional YAML (ADR-0010); list-like nested env values are JSON arrays.
+- **Composition root.** `MetricsRuntime.from_settings` constructs the active
+  provider directly (Kueue is the only one; `sources.platform` is a
+  `Literal["kueue"]`, so a registry indirection earned nothing — adding a
+  provider means extending the Literal and branching here). It wires provider
+  lifecycle, the cache backend, and `PlatformMetricsService`. Settings use
+  nested `METRICS_*` env keys only (ADR-0010); list-like nested env values are
+  JSON arrays.
 - **One complete provider per scope.** Each metric scope is served by one
   provider returning a complete model. The runtime never stitches partial
   capacity/usage fragments across providers. Adding a scope requires config
@@ -47,7 +50,7 @@ hides misconfiguration.
 ## Consequences
 
 - Operators detect bad queue lists or RBAC at deploy time.
-- Adding a provider requires registry wiring, startup checks, and tests
+- Adding a provider requires `sources.*` wiring, startup checks, and tests
   before routes expose it.
 - Proposed scopes in ADR-0015 and ADR-0020 are not runtime configuration
   until a complete provider implementation ships.

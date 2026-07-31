@@ -16,9 +16,8 @@ This file stores repository-specific behavioral specifications.
 ## Service behavior specifications
 
 - The API exposes `GET /api/v1/metrics/platform` and `GET /healthz` (M4).
-- Runtime configuration is environment-driven through `METRICS_*` settings and
-  validated through Pydantic `Settings` (`providers`, `sources`, `cache`)
-  against optional YAML; see `environment-contracts.md`.
+- Runtime configuration is environment-driven through `METRICS_*` settings;
+  see `environment-contracts.md`.
 - Startup must fail fast when required source dependencies are unavailable
   for the active platform provider (Kueue in M4). Inactive provider
   configuration is rejected.

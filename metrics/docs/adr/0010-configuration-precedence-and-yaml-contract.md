@@ -1,34 +1,35 @@
-# ADR-0010: Configuration precedence and YAML contract
+# ADR-0010: Environment-only configuration
 
 ## Status
 
-Accepted (M3–M4)
+Accepted (M3–M4); amended 2026-07-31 — the optional YAML file source was
+removed with the over-engineering audit (nothing deployed mounted one).
 
 ## Context
 
-Operators configure Metrics through Helm values, optional mounted YAML, and
-direct env overrides. Precedence and secret handling must be predictable.
+Operators configure Metrics through Helm values rendering environment
+variables. The earlier optional mounted-YAML source added a custom
+pydantic-settings source, a parallel precedence contract, and a pyyaml
+dependency that no deployment used.
 
 ## Decision
 
-- Merge order: **defaults → optional YAML file → `METRICS_*` environment**, with
-  **environment winning** for the same field.
-- Default YAML path: `/etc/canfar/metrics/config.yaml`. When present and
-  non-empty, the document must include a top-level `metrics:` mapping.
-- Missing YAML is allowed unless `METRICS_REQUIRE_CONFIG_FILE=true`.
+- Configuration is **environment-only**: defaults, then `METRICS_*`
+  environment variables (environment wins), then Kubernetes secret file
+  sources when present.
 - Nested env keys use `METRICS_` + `__` delimiters. List-like nested fields
   must be JSON array strings (not comma-separated plain strings).
-- **Secrets must not live in ConfigMap-backed YAML.** Use `token_file` /
-  `ca_file` paths or env sourced from Kubernetes secrets.
+- **Secrets must not live in ConfigMaps.** Use env sourced from Kubernetes
+  secrets; Kubernetes API credentials are not configuration at all (kr8s
+  discovery, ADR-0023).
+- Legacy flat aliases (`METRICS_KUEUE_*`, `KUEUE_METRICS_*`) remain removed;
+  use nested `METRICS_PROVIDERS__*` keys only.
 
 ## Consequences
 
-- GitOps values typically render env; file-based config is optional per
-  environment.
-- Legacy flat aliases (`METRICS_KUEUE_*`, `KUEUE_METRICS_*`) are removed; use
-  nested `METRICS_PROVIDERS__*` keys only.
+- GitOps values render env vars; there is no file-based configuration path.
+- Reintroducing a file source is a new ADR, not a default.
 
 ## References
 
 - [`../environment-contracts.md`](../environment-contracts.md)
-- [`../examples/metrics.config.yaml`](../examples/metrics.config.yaml)

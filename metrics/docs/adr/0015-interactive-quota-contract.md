@@ -37,7 +37,8 @@ package exists before M5, and platform metrics must remain Kueue-backed.
 
 - RBAC must allow list/get Pods in configured namespaces, separate from Kueue
   ClusterQueue access; M5 Helm values configure both sources.
-- Skaha (or session launch) must label Pods correctly (system ADR-0004);
+- Skaha (or session launch) must label Pods with user, allocation class,
+  and exactly one session-type label;
   skipped or malformed Pods surface in provider telemetry, not API responses.
 - Quota latency scales with Pod list size; the short cache TTL bounds repeat
   load.
@@ -45,4 +46,3 @@ package exists before M5, and platform metrics must remain Kueue-backed.
 ## References
 
 - [`0005-runtime-composition-and-provider-lifecycle.md`](0005-runtime-composition-and-provider-lifecycle.md)
-- [`../../../docs/adr/0004-interactive-workload-pod-label-contract.md`](../../../docs/adr/0004-interactive-workload-pod-label-contract.md)

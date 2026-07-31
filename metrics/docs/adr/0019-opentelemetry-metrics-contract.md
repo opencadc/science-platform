@@ -13,10 +13,13 @@ signals without coupling product metrics to a specific collector implementation.
 
 - When **`METRICS_OTEL_METRICS_ENABLED=true`** (and related settings) enable OTel,
   emit custom application metrics via `OpenTelemetryMetricsRecorder`:
-  - `canfar.metrics.http.requests` — scope, HTTP status, cache hit
   - `canfar.metrics.provider.duration` — provider name, scope, status
   - `canfar.metrics.cache.lookups` — backend, hit/miss, scope
   - `canfar.metrics.compute.duration` — scope, status
+
+  Amended 2026-07-31: the former `canfar.metrics.http.requests` counter and its
+  middleware were removed; HTTP request metrics come from FastAPI
+  auto-instrumentation (`http.server.*`).
 - Settings fields (nested env `METRICS_*` + `__`): `otel_metrics_enabled`,
   `otel_service_name`, `otel_exporter_otlp_endpoint`, `otel_export_interval_millis`.
 - Disabled mode uses `NoopMetricsRecorder`.

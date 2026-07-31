@@ -17,7 +17,6 @@ dependencies = [
     "opentelemetry-sdk>=1.41.0",
     "pydantic>=2.13.1",
     "pydantic-settings>=2.13.1",
-    "pyyaml>=6.0.3",
     "quantiphy>=2.22.1",
     "redis>=7.4.0",
     "uvicorn>=0.44.0",
@@ -43,7 +42,6 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.14.2",
-    "types-pyyaml>=6.0.12.20260724",
 ]
 
 [tool.ruff]

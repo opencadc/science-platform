@@ -4,7 +4,7 @@ This document explains **why** the Kueue integration is structured the way it
 is and **which modules** participate. It complements
 [`docs/adr/README.md`](adr/README.md) and operator-facing notes in
 [`environment-contracts.md`](environment-contracts.md). For the extension pattern
-(config, registry, provider capability), see
+(config, provider lifecycle), see
 [`adr/0005-runtime-composition-and-provider-lifecycle.md`](adr/0005-runtime-composition-and-provider-lifecycle.md)
 and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-kubernetes-client.md).
 
@@ -38,8 +38,7 @@ and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-
 
 | Module | Role |
 | --- | --- |
-| `metrics.core.runtime` | `MetricsRuntime`: registry-driven provider wiring, cache backend, platform cache keys, `get_platform_metrics`. |
-| `metrics.core.registry` | Maps `sources.platform` to one concrete provider (network-free construction). |
+| `metrics.core.runtime` | `MetricsRuntime`: provider construction and lifecycle, cache backend, platform cache keys. |
 | `metrics.providers.kueue` | kr8s ClusterQueue reads, startup checks, quantity parsing/formatting (quantiphy, ADR-0024), platform aggregation, and fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
 | `metrics.services.platform` | TTL cache, telemetry, and error mapping for `/platform`. |
@@ -48,7 +47,7 @@ and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-
 
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
 2. **HTTP GET** `/api/v1/metrics/platform`: route depends on `MetricsRuntime`;
-   `runtime.get_platform_metrics()` delegates to `PlatformMetricsService`.
+   `runtime.platform_service.get_platform_metrics()` serves the read.
 3. **Miss:** Concurrent misses coalesce onto one in-flight load
    (single-flight); the loader → `KueueProvider.platform()` fetches configured
    queues via kr8s with bounded concurrency, sums nominal quota and usage

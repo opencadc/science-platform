@@ -5,20 +5,10 @@ __pycache__/
 
 .coverage
 
-# Minikube smoke state (port-forward PID from scripts/minikube-smoke.sh)
-.minikube-smoke/
-
-# Kind smoke state (port-forward PID from scripts/kind-smoke.sh)
-.kind-smoke/
-
-# Local compose overrides (secrets / developer-specific)
+# Local env overrides (secrets / developer-specific)
 .env
-compose.override.yaml
 
 # Local AI assistant / IDE adapter dirs (not part of Metrics delivery)
 .cursor/
 .claude/
 .codex/
-
-# Legacy packaged Helm subchart tarballs (file:// deps), if reintroduced
-helm/metrics-api/charts/*.tgz

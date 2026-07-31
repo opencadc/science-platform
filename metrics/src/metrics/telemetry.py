@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
@@ -14,15 +12,15 @@ from metrics.core.settings import Settings
 
 
 class MetricsRecorder:
-    """Service-level metrics recorder contract."""
+    """Service-level metrics recorder; the base implementation records nothing."""
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
         """Record one cache lookup for the given backend and scope."""
-        raise NotImplementedError
+        return
 
     def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
         """Record end-to-end compute time for a metrics read."""
-        raise NotImplementedError
+        return
 
     def record_provider_duration(
         self,
@@ -33,42 +31,19 @@ class MetricsRecorder:
         seconds: float,
     ) -> None:
         """Record time spent inside a named provider for a scope."""
-        raise NotImplementedError
-
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
-        """Record an HTTP request with status and cache hit information."""
-        raise NotImplementedError
-
-
-class NoopMetricsRecorder(MetricsRecorder):
-    """No-op metrics recorder used when OTel metrics are disabled."""
-
-    def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
-        """See :meth:`MetricsRecorder.record_cache_lookup`."""
         return
 
-    def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
-        """See :meth:`MetricsRecorder.record_compute_duration`."""
-        return
 
-    def record_provider_duration(
-        self,
-        *,
-        provider: str,
-        scope: str,
-        status: str,
-        seconds: float,
-    ) -> None:
-        """See :meth:`MetricsRecorder.record_provider_duration`."""
-        return
-
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
-        """See :meth:`MetricsRecorder.record_http_request`."""
-        return
+# The ADR-0019 name for the disabled-mode recorder.
+NoopMetricsRecorder = MetricsRecorder
 
 
 class OpenTelemetryMetricsRecorder(MetricsRecorder):
-    """OTel-backed service recorder for cache and compute metrics."""
+    """OTel-backed service recorder for cache, compute, and provider metrics.
+
+    HTTP request metrics come from FastAPI auto-instrumentation
+    (``http.server.*``), not a custom meter.
+    """
 
     def __init__(self, *, meter_name: str, meter_version: str) -> None:
         """Create counters and histograms on a named OpenTelemetry :class:`Meter`."""
@@ -87,11 +62,6 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             name="canfar.metrics.provider.duration",
             unit="s",
             description="Provider call duration by scope and status.",
-        )
-        self._http_requests = meter.create_counter(
-            name="canfar.metrics.http.requests",
-            unit="1",
-            description="HTTP request count by scope, status, and cache state.",
         )
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
@@ -133,32 +103,17 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             },
         )
 
-    def record_http_request(self, *, scope: str, status_code: int, cached: bool) -> None:
-        """See :meth:`MetricsRecorder.record_http_request`."""
-        self._http_requests.add(
-            1,
-            attributes={
-                "metrics.scope": scope,
-                "http.status_code": status_code,
-                "cache.hit": cached,
-            },
-        )
 
-
-@dataclass(slots=True)
-class TelemetrySetup:
-    """Telemetry bootstrap outputs used by app startup/shutdown logic."""
-
-    recorder: MetricsRecorder
-    meter_provider: MeterProvider | None
-
-
-def setup_telemetry(settings: Settings) -> TelemetrySetup:
-    """Build telemetry recorder and optional meter provider."""
+def setup_telemetry(settings: Settings) -> tuple[MetricsRecorder, MeterProvider | None]:
+    """Build the telemetry recorder and the optional meter provider."""
     if not settings.otel_metrics_enabled:
-        return TelemetrySetup(recorder=NoopMetricsRecorder(), meter_provider=None)
+        return NoopMetricsRecorder(), None
 
-    exporter = _build_otlp_exporter(settings)
+    exporter = (
+        OTLPMetricExporter(endpoint=settings.otel_exporter_otlp_endpoint)
+        if settings.otel_exporter_otlp_endpoint
+        else OTLPMetricExporter()
+    )
     reader = PeriodicExportingMetricReader(
         exporter=exporter,
         export_interval_millis=settings.otel_export_interval_millis,
@@ -172,10 +127,4 @@ def setup_telemetry(settings: Settings) -> TelemetrySetup:
         meter_name="metrics.service",
         meter_version=settings.app_version,
     )
-    return TelemetrySetup(recorder=recorder, meter_provider=meter_provider)
-
-
-def _build_otlp_exporter(settings: Settings) -> OTLPMetricExporter:
-    if settings.otel_exporter_otlp_endpoint:
-        return OTLPMetricExporter(endpoint=settings.otel_exporter_otlp_endpoint)
-    return OTLPMetricExporter()
+    return recorder, meter_provider

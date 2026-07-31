@@ -14,17 +14,12 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 - **Kubernetes-first service contract:** Dev, integration, staging, and
   production run through Kubernetes deployment paths. Docker Compose is not
   part of the supported service contract (see `environment-contracts.md`).
-- **Single service process, platform-only HTTP:** `MetricsRuntime` composes the
-  active Kueue provider from `core/registry.py`, owns provider
-  lifecycle and cache resources, and exposes platform reads to versioned
-  routes. Kueue reads Kubernetes through kr8s (ADR-0023). M4 serves only
+- **Single service process, platform-only HTTP:** `MetricsRuntime` constructs
+  the Kueue provider, owns provider lifecycle and cache resources, and exposes
+  platform reads to versioned routes. Kueue reads Kubernetes through kr8s (ADR-0023). M4 serves only
   `GET /api/v1/metrics/platform` and `GET /healthz`.
 - **Truthful provider configuration:** Kueue is the only configured provider
   and the only accepted `sources.platform` value.
-- **Truthful platform capability:** `Provider` owns only identity, lifecycle,
-  and cache fingerprinting. `PlatformMetrics` owns the asynchronous platform
-  read, which `KueueProvider` implements directly. The binder checks that
-  capability without separate scope metadata.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.
@@ -33,8 +28,8 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   6 decimal places. Invalid or overflowing upstream quantities fail closed
   instead of becoming zero.
 - **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
-  `pydantic-settings` env parsing (nested `METRICS_*` keys) and optional YAML
-  under `/etc/canfar/metrics/config.yaml` (see `core/yaml_config.py`).
+  `pydantic-settings` env parsing (nested `METRICS_*` keys); configuration is
+  environment-only (ADR-0010).
 - **One application lifecycle:** Production-built and test-injected runtimes
   execute the same FastAPI lifespan. Package imports create no settings,
   application, runtime, client, or exporter.

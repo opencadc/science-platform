@@ -21,20 +21,14 @@ from metrics.telemetry import setup_telemetry
 _logger = logging.getLogger(__name__)
 
 
-def _metric_scope_from_path(path: str) -> str | None:
-    if path == "/api/v1/metrics/platform":
-        return "platform"
-    return None
-
-
 def create_app(
     *,
     settings: Settings,
     runtime: MetricsRuntime | None = None,
 ) -> FastAPI:
     """Create and configure the metrics API application."""
-    telemetry = setup_telemetry(settings)
-    runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
+    recorder, meter_provider = setup_telemetry(settings)
+    runtime = runtime or MetricsRuntime.from_settings(settings, recorder=recorder)
     httpx_instrumentor = HTTPXClientInstrumentor()
 
     @asynccontextmanager
@@ -57,8 +51,8 @@ def create_app(
                 httpx_instrumentor.uninstrument()
             if started:
                 await runtime.shutdown()
-            if telemetry.meter_provider is not None:
-                telemetry.meter_provider.shutdown()
+            if meter_provider is not None:
+                meter_provider.shutdown()
 
     app = FastAPI(
         title=settings.app_name,
@@ -68,32 +62,10 @@ def create_app(
         lifespan=lifespan,
     )
 
-    @app.middleware("http")
-    async def otel_request_middleware(request: Request, call_next):
-        scope = _metric_scope_from_path(request.url.path)
-        try:
-            response = await call_next(request)
-        except Exception:
-            if scope is not None:
-                telemetry.recorder.record_http_request(
-                    scope=scope,
-                    status_code=500,
-                    cached=False,
-                )
-            raise
-
-        if scope is not None:
-            telemetry.recorder.record_http_request(
-                scope=scope,
-                status_code=response.status_code,
-                cached=getattr(request.state, "metrics_cache_hit", False),
-            )
-        return response
-
     if settings.otel_metrics_enabled:
         FastAPIInstrumentor.instrument_app(
             app,
-            meter_provider=telemetry.meter_provider,
+            meter_provider=meter_provider,
         )
         httpx_instrumentor.instrument()
 
@@ -108,11 +80,7 @@ def create_app(
         body = ErrorResponse(
             version=app.state.api_version,
             metadata=ResponseMetadata(),
-            error=ErrorDetail(
-                code=exc.code,
-                message=exc.message,
-                details=exc.details,
-            ),
+            error=ErrorDetail(code=exc.code, message=exc.message),
         )
         return JSONResponse(
             status_code=exc.status_code,

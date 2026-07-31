@@ -24,11 +24,10 @@ The API exposes:
 ## 12-factor runtime model
 
 All runtime behavior is configured via environment variables prefixed with
-`METRICS_`, merged with optional YAML (see `docs/environment-contracts.md`).
+`METRICS_` (see `docs/environment-contracts.md`).
 
-- Configuration and credentials come from environment variables and optional
-  `METRICS_CONFIG_FILE` (default `/etc/canfar/metrics/config.yaml`). A missing
-  file is allowed unless `METRICS_REQUIRE_CONFIG_FILE` is set to a true value.
+- Configuration comes from environment variables; Kubernetes access is
+  discovered by kr8s from the service account (ADR-0023).
 - Pydantic `Settings` groups options under `providers`, `sources`, and `cache`
   (nested env keys use `__`; see `docs/environment-contracts.md`).
 - The process remains stateless and uses TTL cache backends.
@@ -79,8 +78,8 @@ comma-separated list). Use this command for process-level debugging. For
 supported `dev` operation with Kueue dependencies, follow the
 Kubernetes-first setup in `docs/dev-setup.md`.
 
-For roadmap-level environment naming and how `METRICS_ENVIRONMENT` maps across
-`dev`, integration, staging, and production, see `docs/environment-contracts.md`.
+For roadmap-level environment naming across `dev`, integration, staging, and
+production, see `docs/environment-contracts.md`.
 
 Platform response expansion for borrowed/lending details is out of scope for
 this delivery; the API contract remains `capacity` and `allocated` maps only.
@@ -106,7 +105,7 @@ Docker build + `kind load`, Helm deploy, integration tests).
 ### One-shot verification (CI-style)
 
 ```bash
-KIND_SMOKE_CI=1 KIND_SMOKE_EXIT_AFTER_TESTS=1 bash scripts/kind-smoke.sh
+KIND_SMOKE_CI=1 bash scripts/kind-smoke.sh
 ```
 
 `scripts/kind-smoke.sh` runs the full kind smoke and can leave the API
@@ -139,7 +138,8 @@ helm upgrade --install metrics-api ./helm/metrics-api \
 You can also use the helper script:
 
 ```bash
-bash scripts/deploy-with-helm.sh dev
+helm upgrade --install metrics-api helm/metrics-api -n metrics \
+  --create-namespace -f helm/metrics-api/values-dev.yaml --wait
 ```
 
 ## CI workflows

@@ -18,9 +18,9 @@ another.
 - Cache behavior is communicated with HTTP headers (`Cache-Control`, `Date`,
   `Expires`, `Last-Modified`); JSON bodies carry **no** TTL or snapshot
   metadata for cacheable resources.
-- Per-scope TTLs live in `CacheConfig` (`cache.scope_ttl_seconds`); the
-  platform scope may override the global default (300s typical) and uses
-  shared cache semantics.
+- The platform scope uses the global `cache.ttl_seconds` (300s typical) with
+  shared cache semantics. Per-scope TTL overrides were removed while platform
+  is the only scope; they return with the first user-scoped cache (M5).
 - User-scoped responses (quota in M5, user/session metrics in M6/M7) use
   **`Cache-Control: private`** with short TTLs (2s default for
   `quotas.interactive`). Internal cache keys include scope, provider

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import threading
 import time
 from dataclasses import dataclass
 from typing import Callable, Generic, Protocol, TypeVar
@@ -12,16 +11,6 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 V = TypeVar("V")
-
-
-class RedisCacheClient(Protocol):
-    """Redis operations required by :class:`RedisJSONTTLCache`."""
-
-    async def get(self, key: str) -> bytes | str | None:
-        """Return a serialized cache value."""
-
-    async def set(self, key: str, value: str, *, ex: int) -> object:
-        """Store a serialized cache value with an expiry."""
 
 
 class TTLCacheBackend(Protocol, Generic[V]):
@@ -49,18 +38,11 @@ class _CacheEntry(Generic[V]):
 
 
 class InMemoryTTLCache(Generic[V]):
-    """Thread-safe in-memory TTL cache with monotonic clock semantics."""
+    """In-memory TTL cache keyed on the monotonic clock (single event loop)."""
 
-    def __init__(self, ttl_seconds: int, clock: Callable[[], float] | None = None) -> None:
-        """Create an in-memory store with a fixed positive TTL in seconds.
-
-        Args:
-            ttl_seconds: Time-to-live for each entry; clamped to ``0`` or above.
-            clock: Optional monotonic time source; defaults to :func:`time.monotonic`.
-        """
+    def __init__(self, ttl_seconds: int) -> None:
+        """Create an in-memory store with a fixed TTL clamped to ``0`` or above."""
         self._ttl_seconds = max(ttl_seconds, 0)
-        self._clock = clock or time.monotonic
-        self._lock = threading.Lock()
         self._entries: dict[str, _CacheEntry[V]] = {}
 
     @property
@@ -75,21 +57,20 @@ class InMemoryTTLCache(Generic[V]):
 
     async def get(self, key: str) -> V | None:
         """Return a live value or remove and return ``None`` when expired."""
-        now = self._clock()
-        with self._lock:
-            entry = self._entries.get(key)
-            if entry is None:
-                return None
-            if entry.expires_at < now:
-                del self._entries[key]
-                return None
-            return entry.value
+        entry = self._entries.get(key)
+        if entry is None:
+            return None
+        if entry.expires_at < time.monotonic():
+            del self._entries[key]
+            return None
+        return entry.value
 
     async def set(self, key: str, value: V) -> None:
         """Store a value with an expiry of ``now + ttl_seconds``."""
-        expires_at = self._clock() + self._ttl_seconds
-        with self._lock:
-            self._entries[key] = _CacheEntry(value=value, expires_at=expires_at)
+        self._entries[key] = _CacheEntry(
+            value=value,
+            expires_at=time.monotonic() + self._ttl_seconds,
+        )
 
 
 class RedisJSONTTLCache(Generic[V]):
@@ -99,7 +80,7 @@ class RedisJSONTTLCache(Generic[V]):
         self,
         *,
         ttl_seconds: int,
-        redis: Redis | RedisCacheClient,
+        redis: Redis,
         key_prefix: str,
         serializer: Callable[[V], str],
         deserializer: Callable[[str], V],

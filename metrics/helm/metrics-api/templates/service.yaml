@@ -5,12 +5,12 @@ metadata:
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: ClusterIP
   selector:
     {{- include "metrics-api.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: api
   ports:
     - name: http
-      port: {{ .Values.service.port }}
+      port: 8000
       targetPort: http
       protocol: TCP

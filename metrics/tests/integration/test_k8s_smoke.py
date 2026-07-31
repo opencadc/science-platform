@@ -8,28 +8,20 @@ import pytest
 from metrics.providers.kueue import parse_resource_amount
 
 
-pytestmark = pytest.mark.integration
-
-
-def _base_url() -> str | None:
-    return os.getenv("METRICS_BASE_URL")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not os.getenv("METRICS_BASE_URL"), reason="METRICS_BASE_URL not configured"),
+]
+base_url = os.getenv("METRICS_BASE_URL", "")
 
 
 def test_health_endpoint() -> None:
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/healthz", timeout=10)
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_platform_endpoint_shape() -> None:
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=10)
     assert response.status_code == 200
     payload = response.json()
@@ -48,10 +40,6 @@ def test_platform_endpoint_shape() -> None:
 
 def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     """Allocated map includes the borrowed Kueue smoke Workload total."""
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=30.0)
     assert response.status_code == 200
     allocated = response.json()["data"]["allocated"]

@@ -1,6 +1,7 @@
 # Kueue smoke: cluster objects, metrics namespace, LocalQueue, sample Workload.
 # Keep names aligned with scripts/kind-values.yaml (and any local smoke values file).
-# Apply after Kueue controller is installed.
+# Apply after Kueue controller is installed. Queueing/preemption/fungibility use
+# Kueue defaults; cq-electron's small quota forces the Workload to borrow.
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
@@ -37,15 +38,6 @@ metadata:
     app.kubernetes.io/part-of: metrics-kueue-smoke
 spec:
   cohortName: cohort-atom
-  queueingStrategy: BestEffortFIFO
-  flavorFungibility:
-    whenCanBorrow: MayStopSearch
-    whenCanPreempt: TryNextFlavor
-  preemption:
-    reclaimWithinCohort: Never
-    withinClusterQueue: Never
-    borrowWithinCohort:
-      policy: Never
   namespaceSelector: {}
   resourceGroups:
     - coveredResources:
@@ -62,50 +54,11 @@ spec:
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
-  name: cq-neutron
-  labels:
-    app.kubernetes.io/part-of: metrics-kueue-smoke
-spec:
-  cohortName: cohort-atom
-  queueingStrategy: BestEffortFIFO
-  flavorFungibility:
-    whenCanBorrow: MayStopSearch
-    whenCanPreempt: TryNextFlavor
-  preemption:
-    reclaimWithinCohort: Never
-    withinClusterQueue: Never
-    borrowWithinCohort:
-      policy: Never
-  namespaceSelector: {}
-  resourceGroups:
-    - coveredResources:
-        - cpu
-        - memory
-      flavors:
-        - name: default-flavor
-          resources:
-            - name: cpu
-              nominalQuota: "5"
-            - name: memory
-              nominalQuota: "48Gi"
----
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: ClusterQueue
-metadata:
   name: cq-electron
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
 spec:
   cohortName: cohort-atom
-  queueingStrategy: BestEffortFIFO
-  flavorFungibility:
-    whenCanBorrow: MayStopSearch
-    whenCanPreempt: TryNextFlavor
-  preemption:
-    reclaimWithinCohort: Never
-    withinClusterQueue: Never
-    borrowWithinCohort:
-      policy: Never
   namespaceSelector: {}
   resourceGroups:
     - coveredResources:
