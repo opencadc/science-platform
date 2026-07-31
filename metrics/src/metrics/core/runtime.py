@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Protocol
 
 from pydantic import TypeAdapter
 from redis.asyncio import Redis
@@ -15,11 +16,16 @@ from metrics.errors import RuntimeStartupError
 from metrics.providers.base import Provider
 from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService, ServiceResult
-from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
+from metrics.telemetry import MetricsRecorder
 
 _logger = logging.getLogger(__name__)
 
 _PLATFORM_CACHE_SCHEMA_VERSION = "4"
+
+
+class _AsyncCloser(Protocol):
+    async def aclose(self) -> None:
+        """Close an asynchronous resource."""
 
 
 def platform_metrics_cache_key(*, cluster_name: str, fingerprint: str = "") -> str:
@@ -65,7 +71,7 @@ class MetricsRuntime:
     """Own the active provider, cache resources, and platform metric reads."""
 
     def __init__(self, settings: Settings) -> None:
-        """Create an empty runtime; prefer :meth:`from_settings` or :meth:`for_injected_platform`.
+        """Create an empty runtime; production callers use :meth:`from_settings`.
 
         Args:
             settings: Validated :class:`Settings` for the process.
@@ -73,9 +79,8 @@ class MetricsRuntime:
         self._settings = settings
         self._provider: Provider | None = None
         self._provider_started = False
-        self._redis: Redis | None = None
+        self._redis: _AsyncCloser | None = None
         self._platform: PlatformMetricsService | None = None
-        self._recorder: MetricsRecorder = NoopMetricsRecorder()
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
@@ -116,27 +121,11 @@ class MetricsRuntime:
             provider=provider.name,
         )
         runtime = cls(settings)
-        runtime.set_recorder(recorder)
         runtime.wire(
             provider=provider,
             platform_service=platform_service,
             redis=redis_client,
         )
-        return runtime
-
-    @classmethod
-    def for_injected_platform(
-        cls,
-        settings: Settings,
-        platform_service: PlatformMetricsService,
-        *,
-        recorder: MetricsRecorder | None = None,
-    ) -> MetricsRuntime:
-        """Wrap a pre-built platform service (tests) without upstream HTTP clients."""
-        runtime = cls(settings)
-        runtime._platform = platform_service
-        if recorder is not None:
-            runtime.set_recorder(recorder)
         return runtime
 
     @property
@@ -152,15 +141,6 @@ class MetricsRuntime:
         """Process settings associated with this runtime."""
         return self._settings
 
-    def set_recorder(self, recorder: MetricsRecorder) -> None:
-        """Attach a :class:`MetricsRecorder` for cache and provider telemetry."""
-        self._recorder = recorder
-
-    @property
-    def recorder(self) -> MetricsRecorder:
-        """Active service-level metrics recorder (noop when OTel is off)."""
-        return self._recorder
-
     @property
     def cache_ttl_seconds(self) -> int:
         """TTL used for ``Cache-Control`` on successful platform responses."""
@@ -175,7 +155,7 @@ class MetricsRuntime:
         *,
         provider: Provider,
         platform_service: PlatformMetricsService,
-        redis: Redis | None,
+        redis: _AsyncCloser | None,
     ) -> None:
         """Inject runtime dependencies (advanced/testing); prefer :meth:`from_settings`.
 

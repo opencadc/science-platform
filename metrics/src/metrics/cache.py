@@ -14,6 +14,16 @@ from redis.exceptions import RedisError
 V = TypeVar("V")
 
 
+class RedisCacheClient(Protocol):
+    """Redis operations required by :class:`RedisJSONTTLCache`."""
+
+    async def get(self, key: str) -> bytes | str | None:
+        """Return a serialized cache value."""
+
+    async def set(self, key: str, value: str, *, ex: int) -> object:
+        """Store a serialized cache value with an expiry."""
+
+
 class TTLCacheBackend(Protocol, Generic[V]):
     """Async cache backend contract used by service code paths."""
 
@@ -89,7 +99,7 @@ class RedisJSONTTLCache(Generic[V]):
         self,
         *,
         ttl_seconds: int,
-        redis: Redis,
+        redis: Redis | RedisCacheClient,
         key_prefix: str,
         serializer: Callable[[V], str],
         deserializer: Callable[[str], V],

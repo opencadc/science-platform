@@ -30,3 +30,38 @@ class StubPlatformMetrics:
             capacity={"cpu": self.cpu_cap, "memory": self.mem_cap},
             allocated={"cpu": self.cpu_alloc, "memory": self.mem_alloc},
         )
+
+
+class LifecycleProvider:
+    """Provider double that records lifecycle events and can fail either hook."""
+
+    def __init__(
+        self,
+        events: list[str] | None = None,
+        *,
+        startup_error: BaseException | None = None,
+        shutdown_error: BaseException | None = None,
+    ) -> None:
+        self.events = events if events is not None else []
+        self._startup_error = startup_error
+        self._shutdown_error = shutdown_error
+
+    @property
+    def name(self) -> str:
+        return "stub"
+
+    async def startup(self) -> None:
+        self.events.append("startup")
+        if self._startup_error is not None:
+            raise self._startup_error
+
+    async def shutdown(self) -> None:
+        self.events.append("provider shutdown")
+        if self._shutdown_error is not None:
+            raise self._shutdown_error
+
+    def cache_fingerprint(self) -> str:
+        return "stub"
+
+    async def platform(self) -> PlatformMetricsData:
+        return PlatformMetricsData(cluster="c", capacity={}, allocated={})

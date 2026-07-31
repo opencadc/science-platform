@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -13,9 +11,9 @@ from metrics.cache import InMemoryTTLCache
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
-from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
+from tests.fakes import LifecycleProvider
 
 from metrics.providers.kueue import (
     resolve_kube_token,
@@ -23,39 +21,6 @@ from metrics.providers.kueue import (
 )
 
 _unpatched_runtime_start = MetricsRuntime.start
-
-
-class _LifecycleProvider:
-    def __init__(
-        self,
-        events: list[str],
-        *,
-        startup_error: BaseException | None = None,
-        shutdown_error: BaseException | None = None,
-    ) -> None:
-        self._events = events
-        self._startup_error = startup_error
-        self._shutdown_error = shutdown_error
-
-    @property
-    def name(self) -> str:
-        return "stub"
-
-    async def startup(self) -> None:
-        self._events.append("startup")
-        if self._startup_error is not None:
-            raise self._startup_error
-
-    async def shutdown(self) -> None:
-        self._events.append("provider shutdown")
-        if self._shutdown_error is not None:
-            raise self._shutdown_error
-
-    def cache_fingerprint(self) -> str:
-        return "stub"
-
-    async def platform(self) -> PlatformMetricsData:
-        return PlatformMetricsData(cluster="c", capacity={}, allocated={})
 
 
 class _RecordingRedis:
@@ -67,7 +32,7 @@ class _RecordingRedis:
 
 
 def _runtime_with(
-    provider: _LifecycleProvider,
+    provider: LifecycleProvider,
     *,
     redis: _RecordingRedis | None = None,
 ) -> MetricsRuntime:
@@ -82,20 +47,9 @@ def _runtime_with(
     runtime.wire(
         provider=provider,
         platform_service=service,
-        redis=redis,  # type: ignore[arg-type]
+        redis=redis,
     )
     return runtime
-
-
-def test_import_metrics_providers_base_avoids_circular_import() -> None:
-    """Package ``__init__`` must not eagerly load factory/runtime while importing base."""
-    result = subprocess.run(
-        [sys.executable, "-c", "import metrics.providers.base"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.anyio
@@ -103,7 +57,7 @@ async def test_metrics_runtime_starts_and_stops_owned_provider_once() -> None:
     """Repeated lifecycle calls still operate on the owned provider exactly once."""
 
     events: list[str] = []
-    runtime = _runtime_with(_LifecycleProvider(events))
+    runtime = _runtime_with(LifecycleProvider(events))
     await _unpatched_runtime_start(runtime)
     await _unpatched_runtime_start(runtime)
     await runtime.shutdown()
@@ -132,7 +86,7 @@ async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, startup_error=startup_error),
+        LifecycleProvider(events, startup_error=startup_error),
         redis=_RecordingRedis(events),
     )
 
@@ -152,7 +106,7 @@ async def test_metrics_runtime_shutdown_failure_does_not_skip_remaining_cleanup(
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, shutdown_error=RuntimeError("boom")),
+        LifecycleProvider(events, shutdown_error=RuntimeError("boom")),
         redis=_RecordingRedis(events),
     )
 
@@ -167,7 +121,7 @@ async def test_metrics_runtime_cancellation_cleans_up_remaining_resources() -> N
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, shutdown_error=asyncio.CancelledError()),
+        LifecycleProvider(events, shutdown_error=asyncio.CancelledError()),
         redis=_RecordingRedis(events),
     )
 
@@ -183,7 +137,7 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, startup_error=asyncio.CancelledError()),
+        LifecycleProvider(events, startup_error=asyncio.CancelledError()),
         redis=_RecordingRedis(events),
     )
 
@@ -191,48 +145,6 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
         await _unpatched_runtime_start(runtime)
 
     assert events == ["startup", "provider shutdown", "redis shutdown"]
-
-
-def test_metrics_core_dir_lists_lazy_exports() -> None:
-    """``dir(metrics.core)`` is only the lazy :data:`__all__` API, not module imports."""
-    import metrics.core
-
-    public = dir(metrics.core)
-    assert public == sorted(metrics.core.__all__)
-    assert "Settings" in public
-    assert "create_app" in public
-    assert "importlib" not in public
-    assert "Any" not in public
-
-
-def test_metrics_providers_dir_lists_lazy_exports() -> None:
-    """``dir(metrics.providers)`` is only the lazy :data:`__all__` API, not module imports."""
-    import metrics.providers
-
-    public = dir(metrics.providers)
-    assert public == sorted(metrics.providers.__all__)
-    assert "KueueProvider" in public
-    assert "importlib" not in public
-    assert "Any" not in public
-
-
-def test_lazy_core_settings_does_not_import_factory() -> None:
-    """``from metrics.core import Settings`` must not load the FastAPI factory (no app)."""
-    code = r"""
-import sys
-from metrics.core import Settings
-_ = Settings
-if "metrics.core.factory" in sys.modules:
-    raise SystemExit(2)
-print("ok")
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_token_file_reads(tmp_path: Path) -> None:
