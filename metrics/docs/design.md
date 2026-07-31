@@ -21,6 +21,10 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   `GET /healthz`; user/session metrics are out of scope until later milestones.
 - **Truthful provider configuration:** Kueue is the only configured provider
   and the only accepted `sources.platform` value.
+- **Truthful platform capability:** `Provider` owns only identity, lifecycle,
+  and cache fingerprinting. `PlatformMetrics` owns the asynchronous platform
+  read, which `KueueProvider` implements directly. The binder checks that
+  capability without separate scope metadata.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.

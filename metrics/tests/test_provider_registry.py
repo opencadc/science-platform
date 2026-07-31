@@ -8,13 +8,13 @@ import sys
 import pytest
 
 from metrics.core.provider_registry import (
-    assert_platform_metrics_scope_capability,
+    bind_platform_metrics,
     build_platform_provider_bundle,
     supported_platform_sources,
 )
-from metrics.providers.base import ProviderMetrics
 from metrics.core.settings import CacheConfig, ProviderConfigs, Settings, SourceConfig
 from metrics.errors import RuntimeStartupError
+from metrics.schemas.metrics import PlatformMetricsData
 
 
 def test_supported_platform_sources_contains_kueue() -> None:
@@ -50,19 +50,51 @@ print("ok")
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_assert_platform_metrics_scope_capability_rejects_empty_scopes() -> None:
-    """A platform Adapter's Implementation must list MetricScope.PLATFORM before serving."""
+def test_bind_platform_metrics_rejects_provider_without_platform_read() -> None:
+    """A selected provider must implement the observable platform capability."""
 
     class BadProvider:
         @property
         def name(self) -> str:
             return "bad-mock"
 
-        def metrics(self) -> ProviderMetrics:
-            return ProviderMetrics()
+        async def startup(self) -> None:
+            return
 
-    with pytest.raises(RuntimeStartupError, match="MetricScope|PLATFORM|supported_scopes"):
-        assert_platform_metrics_scope_capability(BadProvider())  # type: ignore[arg-type]
+        async def shutdown(self) -> None:
+            return
+
+        def cache_fingerprint(self) -> str:
+            return "bad"
+
+    with pytest.raises(RuntimeStartupError, match="does not provide platform metrics"):
+        bind_platform_metrics(BadProvider())
+
+
+@pytest.mark.anyio
+async def test_bind_platform_metrics_accepts_structural_capability() -> None:
+    """Capability binding depends on behavior, not inheritance or metadata."""
+
+    class PlatformProvider:
+        @property
+        def name(self) -> str:
+            return "platform-mock"
+
+        async def startup(self) -> None:
+            return
+
+        async def shutdown(self) -> None:
+            return
+
+        def cache_fingerprint(self) -> str:
+            return "platform"
+
+        async def platform(self) -> PlatformMetricsData:
+            return PlatformMetricsData(cluster="c", capacity={}, allocated={})
+
+    provider = PlatformProvider()
+    platform = bind_platform_metrics(provider)
+    assert await platform.platform() == await provider.platform()
 
 
 @pytest.mark.anyio

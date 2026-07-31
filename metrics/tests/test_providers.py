@@ -9,7 +9,7 @@ from metrics.core.settings import (
     Settings,
     SourceConfig,
 )
-from metrics.providers.kueue import KueueMetrics
+from metrics.providers.kueue import KueueProvider
 
 
 @pytest.mark.anyio
@@ -53,8 +53,7 @@ async def test_kueue_metrics_reads_nominal_for_platform(monkeypatch) -> None:
     )
     c = httpx.AsyncClient()
     try:
-        km = KueueMetrics(settings=settings, client=c, kueue_config=settings.providers.kueue)
-        data = await km.platform()
+        data = await KueueProvider(settings, c).platform()
     finally:
         await c.aclose()
     assert "cpu" in data.capacity

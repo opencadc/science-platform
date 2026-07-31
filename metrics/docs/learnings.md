@@ -20,6 +20,16 @@ decisions are also recorded under `docs/adr/`.
 ## Current entries
 
 - Date: July 31, 2026
+- Context: Platform provider capability simplification.
+- Lesson: Capability metadata can drift from behavior; one provider method is
+  a more reliable contract than a scope enum plus an intermediate delegate.
+- Evidence: `src/metrics/providers/base.py`,
+  `src/metrics/core/provider_registry.py`, `src/metrics/providers/kueue.py`,
+  and `tests/test_provider_registry.py`.
+- Action taken: `KueueProvider` now implements `PlatformMetrics` directly, and
+  the binder rejects selected providers without that capability.
+
+- Date: July 31, 2026
 - Context: Kueue platform quantity correctness.
 - Lesson: Binary floats and permissive fallback turn valid fractional
   quantities into artifacts and corrupt quantities into false zeros. Storage

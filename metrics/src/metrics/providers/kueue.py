@@ -18,11 +18,6 @@ from metrics.errors import (
     ProviderUnavailableError,
     RuntimeStartupError,
 )
-from metrics.providers.base import (
-    MetricScope,
-    Provider,
-    ProviderMetrics,
-)
 from metrics.quantity import (
     InvalidQuantityError,
     format_resource_amount,
@@ -221,28 +216,24 @@ class _PlatformResourceMaps:
     allocated: dict[str, str]
 
 
-class KueueMetrics(ProviderMetrics):
-    """Kueue implementation for the platform scope."""
+class KueueProvider:
+    """Kueue source: startup validation and platform metrics."""
 
-    supported_scopes: frozenset[MetricScope] = frozenset({MetricScope.PLATFORM})
-
-    def __init__(
-        self,
-        *,
-        settings: Settings,
-        client: httpx.AsyncClient,
-        kueue_config: KueueProviderConfig,
-    ) -> None:
-        """Build platform metrics for the given Kueue configuration and client.
+    def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
+        """Attach settings and a shared client for this provider.
 
         Args:
-            settings: App settings (e.g. cluster name for the API payload).
-            client: Injected client used for parallel Kubernetes GET requests.
-            kueue_config: Kueue provider fields (API URL, queues, token paths).
+            settings: Full app settings; Kueue fields live under ``providers.kueue``.
+            client: Async HTTP client used for Kubernetes API traffic.
         """
         self._settings = settings
         self._client = client
-        self._kueue_config = kueue_config
+        self._kueue_config = settings.providers.kueue
+
+    @property
+    def name(self) -> str:
+        """Stable provider key matching configuration."""
+        return "kueue"
 
     async def platform(self) -> PlatformMetricsData:
         """Load capacity and allocated maps from Kueue ClusterQueue data."""
@@ -269,7 +260,8 @@ class KueueMetrics(ProviderMetrics):
         headers = kube_auth_headers(token)
 
         queue_urls = [
-            cluster_queue_object_url(kueue_config, q) for q in kueue_config.cluster_queues
+            cluster_queue_object_url(kueue_config, queue_name)
+            for queue_name in kueue_config.cluster_queues
         ]
 
         try:
@@ -294,10 +286,10 @@ class KueueMetrics(ProviderMetrics):
 
         try:
             for item in docs:
-                for res_name, val in sum_nominal_quotas_by_resource(item).items():
-                    merge_resource_totals(queue_totals, res_name, val)
-                for res_name, val in _sum_usage_from_status(item).items():
-                    merge_resource_totals(allocated_totals, res_name, val)
+                for resource_name, value in sum_nominal_quotas_by_resource(item).items():
+                    merge_resource_totals(queue_totals, resource_name, value)
+                for resource_name, value in _sum_usage_from_status(item).items():
+                    merge_resource_totals(allocated_totals, resource_name, value)
         except InvalidQuantityError as exc:
             raise ProviderExecutionError(
                 "Kueue platform data contained an invalid resource quantity"
@@ -306,44 +298,12 @@ class KueueMetrics(ProviderMetrics):
             raise ProviderUnavailableError(
                 "Kueue ClusterQueue specs did not include nominal quota values"
             )
-        capacity_str = _resource_maps_to_strings(queue_totals)
-        allocated_str = _align_allocated_with_capacity(
-            capacity_str,
+        capacity = _resource_maps_to_strings(queue_totals)
+        allocated = _align_allocated_with_capacity(
+            capacity,
             _resource_maps_to_strings(allocated_totals),
         )
-        return _PlatformResourceMaps(
-            capacity=capacity_str,
-            allocated=allocated_str,
-        )
-
-
-class KueueProvider(Provider):
-    """Kueue source: startup validation and platform metrics."""
-
-    def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
-        """Attach settings and a shared client for this provider.
-
-        Args:
-            settings: Full app settings; Kueue fields live under ``providers.kueue``.
-            client: Async HTTP client used for Kubernetes API traffic.
-        """
-        self._settings = settings
-        self._client = client
-        self._kueue_config = settings.providers.kueue
-        self._metrics = KueueMetrics(
-            settings=settings,
-            client=client,
-            kueue_config=self._kueue_config,
-        )
-
-    @property
-    def name(self) -> str:
-        """Stable provider key matching configuration."""
-        return "kueue"
-
-    def metrics(self) -> KueueMetrics:
-        """Return the Kueue :class:`KueueMetrics` implementation."""
-        return self._metrics
+        return _PlatformResourceMaps(capacity=capacity, allocated=allocated)
 
     def cache_fingerprint(self) -> str:
         """Hash of configured cluster queue list for cache key segregation."""

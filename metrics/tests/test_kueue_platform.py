@@ -12,7 +12,7 @@ from metrics.core.settings import (
     SourceConfig,
 )
 from metrics.errors import ProviderExecutionError
-from metrics.providers.kueue import KueueMetrics
+from metrics.providers.kueue import KueueProvider
 from metrics.schemas.metrics import PlatformMetricsData
 
 
@@ -38,11 +38,7 @@ async def _read_platform_doc(
     monkeypatch.setattr("metrics.providers.kueue.kube_parallel_get_json", fake_parallel)
     client = httpx.AsyncClient()
     try:
-        return await KueueMetrics(
-            settings=settings,
-            client=client,
-            kueue_config=settings.providers.kueue,
-        ).platform()
+        return await KueueProvider(settings, client).platform()
     finally:
         await client.aclose()
 
@@ -147,8 +143,7 @@ async def test_kueue_platform_aggregates_configured_queues_only(
     )
     client = httpx.AsyncClient()
     try:
-        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
-        data = await km.platform()
+        data = await KueueProvider(settings, client).platform()
     finally:
         await client.aclose()
     payload = data.model_dump()
@@ -224,8 +219,7 @@ async def test_kueue_platform_subcore_cpu_uses_cores_in_capacity_and_allocated(
     )
     client = httpx.AsyncClient()
     try:
-        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
-        data = await km.platform()
+        data = await KueueProvider(settings, client).platform()
     finally:
         await client.aclose()
     assert data.capacity["cpu"] == "10"
@@ -281,8 +275,7 @@ async def test_kueue_platform_zero_allocated_when_no_flavors_usage(
     )
     client = httpx.AsyncClient()
     try:
-        km = KueueMetrics(settings=settings, client=client, kueue_config=settings.providers.kueue)
-        data = await km.platform()
+        data = await KueueProvider(settings, client).platform()
     finally:
         await client.aclose()
     assert data.allocated["cpu"] == "0"

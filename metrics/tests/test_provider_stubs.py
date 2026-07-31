@@ -16,7 +16,6 @@ from metrics.core.settings import (
     Settings,
     SourceConfig,
 )
-from metrics.providers.base import MetricScope, ProviderMetrics
 from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
@@ -42,16 +41,6 @@ def test_import_metrics_providers_base_avoids_circular_import() -> None:
 async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
     """Runtime owns Adapter lifecycle: shutdown the provider Implementation before I/O close."""
 
-    class StubMetrics(ProviderMetrics):
-        supported_scopes: frozenset[MetricScope] = frozenset({MetricScope.PLATFORM})
-
-        async def platform(self) -> PlatformMetricsData:
-            return PlatformMetricsData(
-                cluster="c",
-                capacity={},
-                allocated={},
-            )
-
     shutdown_calls: list[str] = []
 
     class StubProvider:
@@ -68,8 +57,12 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
         def cache_fingerprint(self) -> str:
             return "f"
 
-        def metrics(self) -> ProviderMetrics:
-            return StubMetrics()
+        async def platform(self) -> PlatformMetricsData:
+            return PlatformMetricsData(
+                cluster="c",
+                capacity={},
+                allocated={},
+            )
 
     settings = Settings(
         cache=CacheConfig(backend="memory"),
@@ -80,7 +73,7 @@ async def test_metrics_runtime_shutdown_awaits_provider_shutdown() -> None:
     client = httpx.AsyncClient()
 
     async def load() -> PlatformMetricsData:
-        return await stub.metrics().platform()
+        return await stub.platform()
 
     from metrics.core.runtime import MetricsRuntime  # local: avoid import cycle during collection
 

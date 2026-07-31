@@ -14,7 +14,7 @@ state.
 
 - M5 may add **`sources.quotas.interactive: kube`** only with a complete kube
   quota provider; it must not alter `sources.platform`.
-- Scope id: **`quotas.interactive`** (`MetricScope.INTERACTIVE_QUOTA`).
+- Scope id: **`quotas.interactive`**.
 - Provider method: complete **`interactive_quota(user)`** model; no platform
   aggregation in kube.
 

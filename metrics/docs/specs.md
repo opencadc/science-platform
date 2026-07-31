@@ -22,6 +22,10 @@ This file stores repository-specific behavioral specifications.
 - Startup must fail fast when required source dependencies are unavailable
   for the active platform provider (Kueue in M4). Inactive provider
   configuration is rejected.
+- A provider selected for `sources.platform` must implement the asynchronous
+  `PlatformMetrics.platform()` read. Binding fails during runtime construction
+  when that observable capability is absent; no separate scope declaration can
+  override the provider's behavior.
 - Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
   `Expires`, and `Last-Modified`) for platform responses. Per-scope TTLs are
   typed in `CacheConfig` (`cache.scope_ttl_seconds`); the platform scope can
