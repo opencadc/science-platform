@@ -77,6 +77,9 @@ through `METRICS_PROVIDERS__KUEUE__*`.
 
 Only `providers.kueue` is accepted. Unknown provider blocks and source names
 fail settings validation; `sources.platform` accepts only `kueue`.
+The shipped configuration examples under `docs/examples/`, the reference chart
+`values-dev.yaml`, and `scripts/kind-values.yaml` use this same closed Settings
+surface and are validated by the unit suite.
 
 Borrowed/lending response expansion is out of scope for this delivery; platform
 responses remain the existing `capacity` and `allocated` maps.

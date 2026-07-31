@@ -20,9 +20,9 @@ This file stores repository-specific architecture facts only.
   live in `src/metrics/core/settings.py`, optional YAML under
   `core/yaml_config.py` (file `/etc/canfar/metrics/config.yaml` by default).
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
-  selects the active platform source via `core/provider_registry.py`, builds
-  long-lived `httpx` clients, cache backends, platform cache keys, and the
-  `PlatformMetricsService` loader.
+  selects the active platform provider via `core/provider_registry.py`, owns
+  provider lifecycle and cache resources, and builds the platform cache key and
+  `PlatformMetricsService`. The provider owns its injected `httpx` client.
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): `KueueProvider` directly implements the
   `PlatformMetrics` read alongside provider identity, lifecycle, and cache
@@ -55,6 +55,9 @@ This file stores repository-specific architecture facts only.
 - Startup validation remains fail-fast for required source dependencies.
 - Provider boundaries stay explicit and avoid fallback indirection to removed
   legacy providers.
+- Provider construction is synchronous and network-free. `MetricsRuntime`
+  starts/stops one Kueue provider, and `KueueProvider.shutdown()` closes its
+  client exactly once.
 - Platform capability is structural: the platform binder accepts providers
   implementing `PlatformMetrics` and rejects providers without `platform()`.
 - The public API exposes only `GET /api/v1/metrics/platform` and `GET /healthz`

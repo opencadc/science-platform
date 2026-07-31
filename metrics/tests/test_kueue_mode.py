@@ -236,6 +236,43 @@ async def test_kueue_provider_startup_requires_kube_url() -> None:
     await c.aclose()
 
 
+@pytest.mark.anyio
+async def test_kueue_provider_startup_request_error_is_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        cache=CacheConfig(backend="memory"),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
+                kube_api_url="https://kubernetes.default.svc",
+                kube_api_token="secret-token",
+                cluster_queues=["cq-a"],
+            )
+        ),
+    )
+    request = httpx.Request(
+        "GET",
+        "https://kubernetes.default.svc/apis/kueue/clusterqueues?token=secret-token",
+    )
+
+    async def fail(*_args, **_kwargs):
+        raise httpx.ConnectError("raw transport secret", request=request)
+
+    monkeypatch.setattr("metrics.providers.kueue.kube_get_json", fail)
+    client = kueue_http_client(settings.providers.kueue)
+    try:
+        with pytest.raises(RuntimeStartupError) as exc_info:
+            await KueueProvider(settings, client).startup()
+    finally:
+        await client.aclose()
+
+    message = str(exc_info.value)
+    assert message == "Cannot reach Kubernetes API for Kueue startup checks"
+    assert "secret-token" not in message
+    assert "kubernetes.default.svc" not in message
+    assert "ConnectError" not in message
+
+
 def test_kueue_app_lifespan_invokes_runtime_start(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

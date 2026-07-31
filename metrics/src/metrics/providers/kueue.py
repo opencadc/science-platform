@@ -91,7 +91,17 @@ async def kube_parallel_get_json(
     async def fetch_url(target: str) -> dict[str, Any]:
         response = await client.get(target, headers=headers)
         response.raise_for_status()
-        return response.json()
+        try:
+            document = response.json()
+        except ValueError as exc:
+            raise ProviderExecutionError(
+                "Kubernetes returned invalid JSON querying Kueue objects"
+            ) from exc
+        if not isinstance(document, dict):
+            raise ProviderExecutionError(
+                "Kubernetes returned an invalid object querying Kueue objects"
+            )
+        return document
 
     return list(await asyncio.gather(*(fetch_url(url) for url in urls)))
 
@@ -296,6 +306,10 @@ class KueueProvider:
             raise ProviderExecutionError(
                 "Kueue platform data contained an invalid resource quantity"
             ) from exc
+        except (AttributeError, TypeError) as exc:
+            raise ProviderExecutionError(
+                "Kueue platform data contained an invalid object shape"
+            ) from exc
         if not queue_totals:
             raise ProviderUnavailableError(
                 "Kueue ClusterQueue specs did not include nominal quota values"
@@ -349,10 +363,15 @@ class KueueProvider:
                 raise RuntimeStartupError(
                     f"Kueue ClusterQueue API is not reachable or not installed (HTTP {exc.response.status_code})"
                 ) from exc
-            raise RuntimeStartupError(f"Kubernetes request failed: {exc}") from exc
+            status_code = exc.response.status_code if exc.response is not None else None
+            if status_code is not None:
+                raise RuntimeStartupError(
+                    f"Kubernetes request failed during Kueue startup (HTTP {status_code})"
+                ) from exc
+            raise RuntimeStartupError("Kubernetes request failed during Kueue startup") from exc
         except httpx.RequestError as exc:
             raise RuntimeStartupError(
-                f"Cannot reach Kubernetes API for Kueue checks: {exc}"
+                "Cannot reach Kubernetes API for Kueue startup checks"
             ) from exc
 
         for qname in kueue_config.cluster_queues:
@@ -376,7 +395,7 @@ class KueueProvider:
                 raise RuntimeStartupError(f"Failed loading ClusterQueue {qname!r}") from exc
             except httpx.RequestError as exc:
                 raise RuntimeStartupError(
-                    f"Cannot reach Kubernetes API for ClusterQueue {qname!r}: {exc}"
+                    f"Cannot reach Kubernetes API for ClusterQueue {qname!r}"
                 ) from exc
             if not isinstance(cq, dict):
                 raise RuntimeStartupError(

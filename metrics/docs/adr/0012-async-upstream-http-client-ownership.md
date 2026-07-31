@@ -12,16 +12,20 @@ dependencies. Lifecycle and connection limits must be centralized.
 ## Decision
 
 - Provider constructors stay synchronous and network-free.
-- `MetricsRuntime` owns one long-lived `httpx.AsyncClient` per **active**
-  upstream, injected into providers for startup checks and request-time reads.
-- Inactive configured providers must not open clients or run startup checks.
+- One long-lived `httpx.AsyncClient` is created per **active** upstream and
+  injected into its provider for startup checks and request-time reads.
+- ADR-0022 supersedes the original runtime-ownership part of this decision:
+  ownership transfers to the provider, which closes the client.
+- Inactive providers remain absent from configuration and therefore open no
+  clients or startup checks.
 - Optional HTTP/2 stays **off by default** to avoid an implicit `h2` install.
 
 ## Consequences
 
 - Parallel ClusterQueue GETs reuse the shared client pool configured via provider
   `http.*` settings.
-- Enabling a new provider in config implies client creation in the runtime graph.
+- Enabling a provider requires a complete registry builder and transfers its
+  client ownership to that provider.
 
 ## References
 

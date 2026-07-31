@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from metrics.cache import InMemoryTTLCache
-from metrics.core.runtime import MetricsRuntime
+from metrics.core.runtime import MetricsRuntime, platform_metrics_cache_key
 from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
@@ -21,6 +21,16 @@ from metrics.providers.kueue import (
 )
 
 _unpatched_runtime_start = MetricsRuntime.start
+
+
+def test_platform_cache_key_preserves_scope_schema_cluster_and_fingerprint() -> None:
+    assert (
+        platform_metrics_cache_key(
+            cluster_name="kind-metrics",
+            fingerprint="abc123",
+        )
+        == "platform:4:kind-metrics:abc123"
+    )
 
 
 class _RecordingRedis:

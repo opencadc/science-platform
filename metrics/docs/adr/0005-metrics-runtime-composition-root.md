@@ -12,8 +12,9 @@ surfaces must match what operators actually enable.
 ## Decision
 
 - **`MetricsRuntime`** is the composition root: active platform provider from
-  `core/provider_registry.py`, long-lived `httpx` clients, cache backend, and
-  `PlatformMetricsService`.
+  `core/provider_registry.py`, provider lifecycle, cache backend, and
+  `PlatformMetricsService`. ADR-0022 supersedes the original client-ownership
+  part of this decision: the provider owns its injected `httpx` client.
 - Only complete, active providers belong in configuration and the HTTP client
   graph. Kueue is the only active provider.
 - Settings use nested `METRICS_*` env keys and optional YAML at

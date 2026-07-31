@@ -1,4 +1,4 @@
-"""App-level :class:`MetricsRuntime`: sources, cache, HTTP clients, platform reads."""
+"""App-level :class:`MetricsRuntime`: provider lifecycle, cache, and platform reads."""
 
 from __future__ import annotations
 

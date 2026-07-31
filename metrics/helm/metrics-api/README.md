@@ -8,7 +8,7 @@ CANFAR Metrics API (minimal dev baseline)
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| env | object | `{}` |  |
+| env | object | `{}` | Flat fail-closed Settings map. Supported provider/source keys are `METRICS_PROVIDERS__KUEUE__*` and `METRICS_SOURCES__PLATFORM=kueue`; unknown provider, source, cache, HTTP, and Kueue fields fail application startup. |
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"images.opencadc.org/platform/metrics"` |  |
