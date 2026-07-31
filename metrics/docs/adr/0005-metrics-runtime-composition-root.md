@@ -20,7 +20,7 @@ surfaces must match what operators actually enable.
 - Settings use nested `METRICS_*` env keys and optional YAML at
   `/etc/canfar/metrics/config.yaml`; list-like nested env values must be JSON
   arrays (not comma-separated strings).
-- Optional HTTP/2 stays off by default to avoid an implicit `h2` dependency.
+- Upstream clients use HTTP/1.1; HTTP/2 is not a supported setting.
 
 ## Consequences
 

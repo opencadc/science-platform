@@ -20,8 +20,6 @@ from metrics.providers.kueue import (
     resolve_kube_verify,
 )
 
-_unpatched_runtime_start = MetricsRuntime.start
-
 
 def test_platform_cache_key_preserves_scope_schema_cluster_and_fingerprint() -> None:
     assert (
@@ -64,12 +62,10 @@ def _runtime_with(
 
 @pytest.mark.anyio
 async def test_metrics_runtime_starts_and_stops_owned_provider_once() -> None:
-    """Repeated lifecycle calls still operate on the owned provider exactly once."""
-
     events: list[str] = []
     runtime = _runtime_with(LifecycleProvider(events))
-    await _unpatched_runtime_start(runtime)
-    await _unpatched_runtime_start(runtime)
+    await runtime.start()
+    await runtime.start()
     await runtime.shutdown()
     await runtime.shutdown()
 
@@ -92,8 +88,6 @@ async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
     startup_error: Exception,
     expected_message: str,
 ) -> None:
-    """Provider startup failures close all owned resources and hide unexpected details."""
-
     events: list[str] = []
     runtime = _runtime_with(
         LifecycleProvider(events, startup_error=startup_error),
@@ -101,7 +95,7 @@ async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
     )
 
     with pytest.raises(RuntimeStartupError) as error:
-        await _unpatched_runtime_start(runtime)
+        await runtime.start()
 
     assert expected_message in str(error.value)
     assert "sensitive implementation detail" not in str(error.value)
@@ -112,8 +106,6 @@ async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
 
 @pytest.mark.anyio
 async def test_metrics_runtime_shutdown_failure_does_not_skip_remaining_cleanup() -> None:
-    """One resource failure cannot prevent cleanup of later resources."""
-
     events: list[str] = []
     runtime = _runtime_with(
         LifecycleProvider(events, shutdown_error=RuntimeError("boom")),
@@ -127,8 +119,6 @@ async def test_metrics_runtime_shutdown_failure_does_not_skip_remaining_cleanup(
 
 @pytest.mark.anyio
 async def test_metrics_runtime_cancellation_cleans_up_remaining_resources() -> None:
-    """Cancellation is re-raised only after all owned resources are cleaned up."""
-
     events: list[str] = []
     runtime = _runtime_with(
         LifecycleProvider(events, shutdown_error=asyncio.CancelledError()),
@@ -143,8 +133,6 @@ async def test_metrics_runtime_cancellation_cleans_up_remaining_resources() -> N
 
 @pytest.mark.anyio
 async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> None:
-    """Cancellation during startup still closes the provider and cache client."""
-
     events: list[str] = []
     runtime = _runtime_with(
         LifecycleProvider(events, startup_error=asyncio.CancelledError()),
@@ -152,7 +140,7 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
     )
 
     with pytest.raises(asyncio.CancelledError):
-        await _unpatched_runtime_start(runtime)
+        await runtime.start()
 
     assert events == ["startup", "provider shutdown", "redis shutdown"]
 

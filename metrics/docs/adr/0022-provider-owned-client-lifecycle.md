@@ -25,8 +25,8 @@ responsibility ambiguous.
   transport tuning, and telemetry settings are excluded.
 
 This supersedes only the client-ownership statements in ADR-0005 and ADR-0012.
-Their network-free construction, active-provider-only, configuration, and HTTP/2
-decisions remain in force.
+Their network-free construction, active-provider-only, configuration, and HTTP
+protocol decisions remain in force.
 
 ## Consequences
 

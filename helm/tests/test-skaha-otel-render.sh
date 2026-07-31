@@ -22,6 +22,16 @@ assert_not_contains() {
     fi
 }
 
+assert_contains() {
+    local content="$1"
+    local expected="$2"
+
+    if ! grep -Fq -- "${expected}" <<<"${content}"; then
+        printf 'Expected rendered chart to contain:\n%s\n' "${expected}" >&2
+        exit 1
+    fi
+}
+
 assert_env_value() {
     local content="$1"
     local name="$2"
@@ -101,3 +111,14 @@ assert_render_fails \
     --set telemetry.otlp.destination=http://otel-collector:4318 \
     --set deployment.skaha.extraEnv[0].name=CATALINA_OPTS \
     --set deployment.skaha.extraEnv[0].value=-Xmx1g
+
+metrics_rbac_render="$(
+    helm template metrics-rbac-test "${chart_dir}" \
+        --show-only templates/metricsBackend-rbac.yaml \
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
+        --set metricsBackend.enabled=true \
+        --set metricsBackend.rbac.enabled=true
+)"
+assert_contains "${metrics_rbac_render}" 'resources: ["clusterqueues"]'
+assert_contains "${metrics_rbac_render}" 'verbs: ["get"]'
+assert_not_contains "${metrics_rbac_render}" '"list"'

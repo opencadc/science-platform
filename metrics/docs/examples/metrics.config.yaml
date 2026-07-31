@@ -13,7 +13,6 @@ metrics:
         max_connections: 100
         max_keepalive_connections: 20
         keepalive_expiry_seconds: 30
-        http2: false
   sources:
     platform: kueue
   cache:

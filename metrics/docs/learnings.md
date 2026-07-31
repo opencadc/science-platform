@@ -108,8 +108,8 @@ decisions are also recorded under `docs/adr/`.
 - Context: M4 provider runtime — single `MetricsRuntime` composition root.
 - Lesson: Inactive providers should stay out of configuration and the HTTP
   client graph so startup and dependency surfaces match what operators actually
-  use; optional HTTP/2 should stay off by default to avoid an implicit `h2`
-  install.
+  use; upstream clients should stay on HTTP/1.1 unless an HTTP/2 requirement and
+  dependency are deliberately introduced.
 - Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/provider_registry.py`,
   and `docs/adr/0005-metrics-runtime-composition-root.md`.
 - Action taken: Documented in `docs/architecture.md` and ADR-0005.
