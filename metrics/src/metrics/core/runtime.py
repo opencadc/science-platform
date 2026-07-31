@@ -9,7 +9,7 @@ from pydantic import TypeAdapter
 from redis.asyncio import Redis
 
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.core.provider_registry import build_platform_provider_bundle
+from metrics.core.provider_registry import bind_platform_metrics, build_platform_provider_bundle
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.base import Provider
@@ -94,6 +94,7 @@ class MetricsRuntime:
             A fully wired runtime ready for :meth:`start`.
         """
         bundle = build_platform_provider_bundle(settings)
+        platform = bind_platform_metrics(bundle.provider)
         cache, redis_client = build_cache_backend(settings)
         ttl = settings.cache.platform_ttl()
         fp = bundle.provider.cache_fingerprint()
@@ -105,7 +106,7 @@ class MetricsRuntime:
             )
 
         async def load_platform() -> PlatformMetricsData:
-            return await bundle.provider.metrics().platform()
+            return await platform.platform()
 
         platform_service = PlatformMetricsService(
             platform=load_platform,

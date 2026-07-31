@@ -9,7 +9,7 @@ import httpx
 
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
-from metrics.providers.base import MetricScope, Provider
+from metrics.providers.base import PlatformMetrics, Provider
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,26 +56,23 @@ def assert_supported_platform_source(settings: Settings) -> None:
         raise RuntimeStartupError(f"Unsupported platform source {name!r}; supported: {allowed}")
 
 
-def assert_platform_metrics_scope_capability(provider: Provider) -> None:
-    """Require that the platform Adapter's metrics :class:`ProviderMetrics` list platform scope.
-
-    A provider selected for ``sources.platform`` must include :class:`MetricScope` ``PLATFORM`` in
-    the Implementation's :attr:`ProviderMetrics.supported_scopes` before the runtime
-    can serve the platform module.
+def bind_platform_metrics(provider: Provider) -> PlatformMetrics:
+    """Bind a selected provider to the platform capability.
 
     Args:
-        provider: Registry-built platform :class:`Provider` Adapter for ``sources.platform``.
+        provider: Provider selected by ``sources.platform``.
+
+    Returns:
+        The provider narrowed to the platform read interface.
 
     Raises:
-        RuntimeStartupError: If ``supported_scopes`` does not include ``MetricScope.PLATFORM``.
+        RuntimeStartupError: If the provider cannot read platform metrics.
     """
-    implementation = provider.metrics()
-    if MetricScope.PLATFORM not in implementation.supported_scopes:
-        found = ", ".join(sorted(s.value for s in implementation.supported_scopes))
+    if not isinstance(provider, PlatformMetrics):
         raise RuntimeStartupError(
-            f"Platform source {provider.name!r} must advertise {MetricScope.PLATFORM.value!r} "
-            f"in supported_scopes; found: {found or '(empty)'}"
+            f"Platform source {provider.name!r} does not provide platform metrics"
         )
+    return provider
 
 
 def build_platform_provider_bundle(settings: Settings) -> PlatformProviderBundle:
@@ -83,6 +80,4 @@ def build_platform_provider_bundle(settings: Settings) -> PlatformProviderBundle
     assert_supported_platform_source(settings)
     name = (settings.sources.platform or "").strip().lower()
     builder = _PLATFORM_SOURCE_BUILDERS[name]
-    bundle = builder(settings)
-    assert_platform_metrics_scope_capability(bundle.provider)
-    return bundle
+    return builder(settings)
