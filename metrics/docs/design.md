@@ -19,8 +19,8 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   `httpx.AsyncClient` instances and cache backends, and exposes platform reads
   to versioned routes. M4 serves only `GET /api/v1/metrics/platform` and
   `GET /healthz`; user/session metrics are out of scope until later milestones.
-- **Reserved providers:** Prometheus and kube provider types exist for typed
-  configuration; M4 does not open unused upstream HTTP clients for them.
+- **Truthful provider configuration:** Kueue is the only configured provider
+  and the only accepted `sources.platform` value.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.

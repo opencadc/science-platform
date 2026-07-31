@@ -9,7 +9,6 @@ import pytest
 
 from metrics.core.provider_registry import (
     assert_platform_metrics_scope_capability,
-    assert_supported_platform_source,
     build_platform_provider_bundle,
     supported_platform_sources,
 )
@@ -64,15 +63,6 @@ def test_assert_platform_metrics_scope_capability_rejects_empty_scopes() -> None
 
     with pytest.raises(RuntimeStartupError, match="MetricScope|PLATFORM|supported_scopes"):
         assert_platform_metrics_scope_capability(BadProvider())  # type: ignore[arg-type]
-
-
-def test_assert_supported_platform_source_rejects_unknown() -> None:
-    settings = Settings(
-        cache=CacheConfig(backend="memory"),
-        sources=SourceConfig(platform="unknown-source"),
-    )
-    with pytest.raises(RuntimeStartupError, match="Unsupported platform source"):
-        assert_supported_platform_source(settings)
 
 
 @pytest.mark.anyio

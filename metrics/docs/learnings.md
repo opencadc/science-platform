@@ -74,11 +74,11 @@ decisions are also recorded under `docs/adr/`.
 - Action taken: Documented in `metrics/README.md` and ADR-0001.
 
 - Date: April 26, 2026
-- Context: M4 provider runtime — single `MetricsRuntime` composition root and
-  inactive Prometheus/kube providers.
-- Lesson: Inactive provider packages should stay out of the HTTP client graph so
-  startup and dependency surfaces match what operators actually use; optional
-  HTTP/2 should stay off by default to avoid an implicit `h2` install.
+- Context: M4 provider runtime — single `MetricsRuntime` composition root.
+- Lesson: Inactive providers should stay out of configuration and the HTTP
+  client graph so startup and dependency surfaces match what operators actually
+  use; optional HTTP/2 should stay off by default to avoid an implicit `h2`
+  install.
 - Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/provider_registry.py`,
   and `docs/adr/0005-metrics-runtime-composition-root.md`.
 - Action taken: Documented in `docs/architecture.md` and ADR-0005.

@@ -40,8 +40,9 @@ does not compose fragments across providers.
 **Provider fingerprint**: Stable segment in cache keys when queue lists or
 provider config change.
 
-**Kube provider**: Kubernetes Pod/API adapter for **quota and user/session workload
-scopes** when configured, not a substitute `sources.platform` source.
+**Kube provider**: Proposed Kubernetes Pod/API adapter for **quota and
+user/session workload scopes**. It is not implemented or configurable and is
+not a substitute `sources.platform` source.
 
 **Interactive quota**: User-scoped observed requests/limits for interactive
 sessions, split into **fixed** and **flexible** allocation classes
@@ -91,9 +92,9 @@ Proposed M5.
 > the Kueue provider — not node listing or pod aggregation."
 
 > **Dev:** "Can kube serve platform metrics if Kueue is down?"
-> **Domain expert:** "No. Platform is `sources.platform: kueue` only. Kube may back
-> quota or future **UserMetrics** / **SessionMetrics** scopes when configured—not
-> platform totals."
+> **Domain expert:** "No. Platform is `sources.platform: kueue` only. A future
+> kube provider may back **UserMetrics** / **SessionMetrics**, but it is not
+> configurable today."
 
 > **Dev:** "Is UserMetrics the same as InteractiveQuota?"
 > **Domain expert:** "No. **InteractiveQuota** observes scheduled requests/limits by
@@ -107,5 +108,4 @@ Proposed M5.
   ADR-0004.
 - **Proposed (M6):** **UserMetrics** — ADR-0020.
 - **Proposed (M7):** **SessionMetrics** — ADR-0021.
-- Inactive provider types may appear in configuration but must not open upstream
-  HTTP clients until their milestone activates them.
+- Inactive provider types are not accepted in runtime configuration.

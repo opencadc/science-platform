@@ -1,4 +1,4 @@
-"""Convenience exports for Kueue and Prometheus provider entry points.
+"""Convenience export for the Kueue provider entry point.
 
 Eagerly importing Adapters here used to form a cycle with
 ``metrics.core`` (factory/runtime/registry). Locality is improved by
@@ -13,7 +13,6 @@ from typing import Any
 
 __all__ = [
     "KueueProvider",
-    "PrometheusProvider",
 ]
 
 
@@ -21,7 +20,7 @@ def __getattr__(name: str) -> Any:
     """Lazily load a concrete :class:`Provider` Adapter to avoid import cycles.
 
     Args:
-        name: ``KueueProvider`` or ``PrometheusProvider``.
+        name: ``KueueProvider``.
 
     Returns:
         The provider class.
@@ -32,9 +31,6 @@ def __getattr__(name: str) -> Any:
     if name == "KueueProvider":
         m = importlib.import_module("metrics.providers.kueue")
         return m.KueueProvider
-    if name == "PrometheusProvider":
-        m = importlib.import_module("metrics.providers.prometheus")
-        return m.PrometheusProvider
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
 

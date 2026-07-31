@@ -1,4 +1,4 @@
-"""Stub providers and small kube helper paths for coverage."""
+"""Provider test doubles and small Kubernetes HTTP helper paths."""
 
 from __future__ import annotations
 
@@ -16,42 +16,15 @@ from metrics.core.settings import (
     Settings,
     SourceConfig,
 )
-from metrics.providers.base import MetricScope, ProviderMetrics, UnsupportedMetricScope
+from metrics.providers.base import MetricScope, ProviderMetrics
 from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
 
-from metrics.providers.kube import KubeProvider
-from metrics.providers.kube import (
+from metrics.providers.kueue import (
     resolve_kube_token,
     resolve_kube_verify,
 )
-from metrics.providers.prometheus import PrometheusProvider
-
-
-@pytest.mark.anyio
-async def test_kube_provider_lifecycle() -> None:
-    p = KubeProvider(Settings())
-    assert p.name == "kube"
-    assert len(p.cache_fingerprint()) == 24
-    await p.startup()
-    await p.shutdown()
-
-
-@pytest.mark.anyio
-async def test_prometheus_provider_lifecycle() -> None:
-    p = PrometheusProvider(Settings())
-    assert p.name == "prometheus"
-    await p.startup()
-    await p.shutdown()
-
-
-@pytest.mark.anyio
-async def test_prometheus_metrics_default_platform_raises() -> None:
-    m = PrometheusProvider(Settings()).metrics()
-    with pytest.raises(UnsupportedMetricScope) as ei:
-        await m.platform()
-    assert ei.value.scope is MetricScope.PLATFORM
 
 
 def test_import_metrics_providers_base_avoids_circular_import() -> None:
@@ -155,7 +128,6 @@ def test_metrics_providers_dir_lists_lazy_exports() -> None:
     public = dir(metrics.providers)
     assert public == sorted(metrics.providers.__all__)
     assert "KueueProvider" in public
-    assert "PrometheusProvider" in public
     assert "importlib" not in public
     assert "Any" not in public
 
@@ -195,7 +167,7 @@ def test_ca_file_in_verify_uses_in_cluster_or_system() -> None:
 async def test_kube_parallel_empty() -> None:
     import httpx
 
-    from metrics.providers.kube import kube_parallel_get_json
+    from metrics.providers.kueue import kube_parallel_get_json
 
     c = httpx.AsyncClient()
     try:
