@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from unittest.mock import MagicMock
 
 import httpx
 import metrics.main as main_module
@@ -14,23 +15,12 @@ from metrics.core.settings import Settings
 
 
 def test_run_constructs_settings_and_app_once(monkeypatch) -> None:
-    calls: list[object] = []
     settings = Settings(host="127.0.0.1", port=9000)
     app = object()
-
-    def load_settings() -> Settings:
-        calls.append("settings")
-        return settings
-
-    def configure_logging(value: Settings) -> None:
-        calls.append(("logging", value))
-
-    def build_app(*, settings: Settings) -> object:
-        calls.append(("app", settings))
-        return app
-
-    def run_server(value: object, **kwargs: object) -> None:
-        calls.append(("uvicorn", value, kwargs))
+    load_settings = MagicMock(return_value=settings)
+    configure_logging = MagicMock()
+    build_app = MagicMock(return_value=app)
+    run_server = MagicMock()
 
     monkeypatch.setattr(main_module, "Settings", load_settings)
     monkeypatch.setattr(main_module, "apply_metrics_package_log_level", configure_logging)
@@ -39,12 +29,15 @@ def test_run_constructs_settings_and_app_once(monkeypatch) -> None:
 
     main_module.run()
 
-    assert calls == [
-        "settings",
-        ("logging", settings),
-        ("app", settings),
-        ("uvicorn", app, {"host": "127.0.0.1", "port": 9000, "log_level": "info"}),
-    ]
+    load_settings.assert_called_once_with()
+    configure_logging.assert_called_once_with(settings)
+    build_app.assert_called_once_with(settings=settings)
+    run_server.assert_called_once_with(
+        app,
+        host="127.0.0.1",
+        port=9000,
+        log_level="info",
+    )
 
 
 @pytest.mark.parametrize(

@@ -15,11 +15,11 @@ from metrics.core.factory import create_app
 from metrics.core.runtime import MetricsRuntime, build_cache_backend
 from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
-from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder, TelemetrySetup
 
 from tests.fakes import (
+    LifecycleProvider,
     StubPlatformMetrics,
     cache_control_max_age,
 )
@@ -38,28 +38,10 @@ def _service() -> PlatformMetricsService:
     )
 
 
-class _Provider:
-    @property
-    def name(self) -> str:
-        return "stub"
-
-    async def startup(self) -> None:
-        return
-
-    async def shutdown(self) -> None:
-        return
-
-    def cache_fingerprint(self) -> str:
-        return "stub"
-
-    async def platform(self) -> PlatformMetricsData:
-        return await StubPlatformMetrics().load()
-
-
-def _runtime() -> MetricsRuntime:
+def _runtime(provider: LifecycleProvider | None = None) -> MetricsRuntime:
     runtime = MetricsRuntime(Settings(cache=CacheConfig(backend="memory")))
     runtime.wire(
-        provider=_Provider(),
+        provider=provider or LifecycleProvider(),
         platform_service=_service(),
         redis=None,
     )
@@ -217,18 +199,17 @@ def test_constructed_and_injected_runtimes_use_the_same_lifecycle(monkeypatch) -
 
 
 def test_startup_failure_still_runs_application_cleanup(monkeypatch) -> None:
-    runtime = _runtime()
-    start = AsyncMock(side_effect=RuntimeStartupError("misconfigured"))
-    shutdown = AsyncMock()
-    monkeypatch.setattr(runtime, "start", start)
+    provider = LifecycleProvider(startup_error=RuntimeStartupError("misconfigured"))
+    runtime = _runtime(provider)
+    shutdown = AsyncMock(wraps=runtime.shutdown)
     monkeypatch.setattr(runtime, "shutdown", shutdown)
 
     with pytest.raises(RuntimeStartupError, match="misconfigured"):
         with TestClient(create_app(settings=Settings(), runtime=runtime)):
             pass
 
-    start.assert_awaited_once_with()
     shutdown.assert_awaited_once_with()
+    assert provider.events == ["startup", "provider shutdown"]
 
 
 def test_generic_500_response_exposes_no_exception_details() -> None:

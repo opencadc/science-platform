@@ -11,9 +11,9 @@ from metrics.cache import InMemoryTTLCache
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
-from metrics.schemas.metrics import PlatformMetricsData
 from metrics.services.platform import CachedMetrics, PlatformMetricsService
 from metrics.telemetry import NoopMetricsRecorder
+from tests.fakes import LifecycleProvider
 
 from metrics.providers.kueue import (
     resolve_kube_token,
@@ -21,39 +21,6 @@ from metrics.providers.kueue import (
 )
 
 _unpatched_runtime_start = MetricsRuntime.start
-
-
-class _LifecycleProvider:
-    def __init__(
-        self,
-        events: list[str],
-        *,
-        startup_error: BaseException | None = None,
-        shutdown_error: BaseException | None = None,
-    ) -> None:
-        self._events = events
-        self._startup_error = startup_error
-        self._shutdown_error = shutdown_error
-
-    @property
-    def name(self) -> str:
-        return "stub"
-
-    async def startup(self) -> None:
-        self._events.append("startup")
-        if self._startup_error is not None:
-            raise self._startup_error
-
-    async def shutdown(self) -> None:
-        self._events.append("provider shutdown")
-        if self._shutdown_error is not None:
-            raise self._shutdown_error
-
-    def cache_fingerprint(self) -> str:
-        return "stub"
-
-    async def platform(self) -> PlatformMetricsData:
-        return PlatformMetricsData(cluster="c", capacity={}, allocated={})
 
 
 class _RecordingRedis:
@@ -65,7 +32,7 @@ class _RecordingRedis:
 
 
 def _runtime_with(
-    provider: _LifecycleProvider,
+    provider: LifecycleProvider,
     *,
     redis: _RecordingRedis | None = None,
 ) -> MetricsRuntime:
@@ -90,7 +57,7 @@ async def test_metrics_runtime_starts_and_stops_owned_provider_once() -> None:
     """Repeated lifecycle calls still operate on the owned provider exactly once."""
 
     events: list[str] = []
-    runtime = _runtime_with(_LifecycleProvider(events))
+    runtime = _runtime_with(LifecycleProvider(events))
     await _unpatched_runtime_start(runtime)
     await _unpatched_runtime_start(runtime)
     await runtime.shutdown()
@@ -119,7 +86,7 @@ async def test_metrics_runtime_startup_failure_cleans_up_and_sanitizes(
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, startup_error=startup_error),
+        LifecycleProvider(events, startup_error=startup_error),
         redis=_RecordingRedis(events),
     )
 
@@ -139,7 +106,7 @@ async def test_metrics_runtime_shutdown_failure_does_not_skip_remaining_cleanup(
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, shutdown_error=RuntimeError("boom")),
+        LifecycleProvider(events, shutdown_error=RuntimeError("boom")),
         redis=_RecordingRedis(events),
     )
 
@@ -154,7 +121,7 @@ async def test_metrics_runtime_cancellation_cleans_up_remaining_resources() -> N
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, shutdown_error=asyncio.CancelledError()),
+        LifecycleProvider(events, shutdown_error=asyncio.CancelledError()),
         redis=_RecordingRedis(events),
     )
 
@@ -170,7 +137,7 @@ async def test_metrics_runtime_startup_cancellation_cleans_up_resources() -> Non
 
     events: list[str] = []
     runtime = _runtime_with(
-        _LifecycleProvider(events, startup_error=asyncio.CancelledError()),
+        LifecycleProvider(events, startup_error=asyncio.CancelledError()),
         redis=_RecordingRedis(events),
     )
 

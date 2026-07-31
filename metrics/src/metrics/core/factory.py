@@ -42,12 +42,14 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         nonlocal fastapi_instrumented, httpx_instrumented
+        started = False
         app.state.runtime = runtime
         app.state.api_version = f"{settings.api_group}/{settings.app_version}"
         app.state.cache_control_public = settings.cache_control_public
         try:
             try:
                 await runtime.start()
+                started = True
             except RuntimeStartupError:
                 _logger.exception("Application startup validation failed; see configuration docs")
                 raise
@@ -57,7 +59,8 @@ def create_app(
                 FastAPIInstrumentor.uninstrument_app(app)
             if httpx_instrumented:
                 httpx_instrumentor.uninstrument()
-            await runtime.shutdown()
+            if started:
+                await runtime.shutdown()
             if telemetry.meter_provider is not None:
                 telemetry.meter_provider.shutdown()
 
