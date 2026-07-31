@@ -40,6 +40,20 @@ def test_shipped_values_env_validates_against_settings(
         assert settings.providers.kueue.cluster_queues
 
 
+@pytest.mark.parametrize(
+    "rbac_template",
+    [
+        METRICS_ROOT / "helm" / "metrics-api" / "templates" / "rbac.yaml",
+        METRICS_ROOT.parent / "helm" / "templates" / "metricsBackend-rbac.yaml",
+    ],
+)
+def test_shipped_clusterqueue_rbac_requires_get_only(rbac_template: Path) -> None:
+    manifest = rbac_template.read_text(encoding="utf-8")
+
+    assert 'resources: ["clusterqueues"' in manifest
+    assert 'verbs: ["get"]' in manifest
+
+
 def test_current_contract_docs_have_valid_relative_links() -> None:
     docs = [
         METRICS_ROOT / "CONTEXT.md",

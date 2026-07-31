@@ -30,7 +30,8 @@ every environment. Deployment and RBAC should stay in one Helm release.
   (`metricsBackend.env` map, Redis URL from shared Bitnami subchart when
   enabled).
 - When `metricsBackend.rbac.enabled` is false, deployers must pre-provision
-  Kueue `ClusterQueue` and `Cohort` get/list for the shared ServiceAccount.
+  Kueue `ClusterQueue` get access for the configured queues on the shared
+  ServiceAccount.
 
 ## References
 

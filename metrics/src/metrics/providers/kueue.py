@@ -371,7 +371,7 @@ class KueueProvider:
         await asyncio.gather(*(validate_queue(qname) for qname in kueue_config.cluster_queues))
 
     async def shutdown(self) -> None:
-        """Close this provider's injected HTTP client exactly once."""
+        """Close the owned client idempotently, leaving failed closure retryable."""
         if self._client_closed:
             return
         await self._client.aclose()
