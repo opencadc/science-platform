@@ -19,14 +19,13 @@ from metrics.core.yaml_config import MetricsYamlSettingsSource
 
 
 class HttpClientConfig(BaseModel):
-    """Connection pool and HTTP/2 options for upstream httpx clients."""
+    """Connection pool options for upstream HTTP/1.1 clients."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     max_connections: int = Field(default=100, ge=1)
     max_keepalive_connections: int = Field(default=20, ge=1)
     keepalive_expiry_seconds: float = Field(default=30.0, gt=0)
-    http2: bool = False
 
 
 class KueueProviderConfig(BaseModel):
@@ -78,8 +77,8 @@ class KueueProviderConfig(BaseModel):
         if value is None or value == "":
             return []
         if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        if isinstance(value, str):
+            queue_names = [str(item).strip() for item in value if str(item).strip()]
+        elif isinstance(value, str):
             stripped = value.strip()
             if not stripped:
                 return []
@@ -94,9 +93,19 @@ class KueueProviderConfig(BaseModel):
             if not isinstance(parsed, list):
                 msg = "cluster_queues must be a JSON array of strings (nested env uses JSON only)"
                 raise TypeError(msg)
-            return [str(x).strip() for x in parsed if str(x).strip()]
-        msg = f"cluster_queues must be a list or JSON array string, got {type(value).__name__}"
-        raise TypeError(msg)
+            queue_names = [str(x).strip() for x in parsed if str(x).strip()]
+        else:
+            msg = f"cluster_queues must be a list or JSON array string, got {type(value).__name__}"
+            raise TypeError(msg)
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for queue_name in queue_names:
+            if queue_name in seen:
+                duplicates.add(queue_name)
+            seen.add(queue_name)
+        if duplicates:
+            raise ValueError(f"duplicate ClusterQueue names: {', '.join(sorted(duplicates))}")
+        return queue_names
 
 
 class ProviderConfigs(BaseModel):

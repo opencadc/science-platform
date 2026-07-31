@@ -18,7 +18,7 @@ dependencies. Lifecycle and connection limits must be centralized.
   ownership transfers to the provider, which closes the client.
 - Inactive providers remain absent from configuration and therefore open no
   clients or startup checks.
-- Optional HTTP/2 stays **off by default** to avoid an implicit `h2` install.
+- Upstream clients use HTTP/1.1; HTTP/2 is not a supported setting or dependency.
 
 ## Consequences
 

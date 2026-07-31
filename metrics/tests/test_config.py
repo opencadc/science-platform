@@ -103,9 +103,25 @@ def test_kueue_cluster_queues_accepts_direct_list_in_model() -> None:
     assert cfg.cluster_queues == ["cq-x", "cq-y"]
 
 
+def test_kueue_cluster_queues_reject_duplicates_at_settings_boundary() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        Settings.model_validate(
+            {"providers": {"kueue": {"cluster_queues": ["cq-a", "cq-b", "cq-a"]}}}
+        )
+
+    message = str(excinfo.value).replace("\n", ".")
+    assert "providers.kueue.cluster_queues" in message
+    assert "duplicate ClusterQueue names: cq-a" in message
+
+
 def test_kueue_cluster_queues_plain_string_not_json_array_rejected() -> None:
     with pytest.raises(ValidationError):
         KueueProviderConfig.model_validate({"cluster_queues": "cq-single"})
+
+
+def test_kueue_http2_setting_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="http2"):
+        KueueProviderConfig.model_validate({"http": {"http2": True}})
 
 
 def test_kueue_provider_config_contract_has_no_cohort_fields() -> None:

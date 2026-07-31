@@ -118,10 +118,10 @@ async def kube_get_json(
 
 
 def kueue_http_client(kueue_config: KueueProviderConfig) -> httpx.AsyncClient:
-    """Build a shared ``httpx.AsyncClient`` for Kueue and Kubernetes list/get calls.
+    """Build a shared HTTP/1.1 client for Kueue and Kubernetes GET calls.
 
     Args:
-        kueue_config: Kueue provider settings (timeouts, TLS, pool sizes, HTTP/2).
+        kueue_config: Kueue provider settings (timeouts, TLS, and pool sizes).
 
     Returns:
         A configured async client; callers own lifecycle and must call ``aclose()``.
@@ -134,18 +134,9 @@ def kueue_http_client(kueue_config: KueueProviderConfig) -> httpx.AsyncClient:
             max_keepalive_connections=http_config.max_keepalive_connections,
             keepalive_expiry=http_config.keepalive_expiry_seconds,
         ),
-        http2=http_config.http2,
         timeout=httpx.Timeout(kueue_config.kube_request_timeout_seconds),
         verify=verify,
     )
-
-
-def kueue_clusterqueues_list_url(
-    kueue_config: KueueProviderConfig,
-) -> str:
-    """Return the Kubernetes API list URL for ClusterQueue objects."""
-    base = (kueue_config.kube_api_url or "").rstrip("/")
-    return f"{base}{kueue_config.kube_clusterqueue_path}"
 
 
 def cluster_queue_object_url(kueue_config: KueueProviderConfig, queue_name: str) -> str:
@@ -337,7 +328,7 @@ class KueueProvider:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """List ClusterQueues and fetch configured queues to validate RBAC."""
+        """Fetch configured ClusterQueues concurrently to validate access."""
         kueue_config = self._kueue_config
         if not kueue_config.kube_api_url:
             raise RuntimeStartupError(
@@ -355,31 +346,12 @@ class KueueProvider:
             )
         headers = kube_auth_headers(token)
 
-        list_url = kueue_clusterqueues_list_url(kueue_config)
-        try:
-            await kube_get_json(self._client, list_url, headers=headers)
-        except httpx.HTTPStatusError as exc:
-            if exc.response is not None and exc.response.status_code in (403, 404):
-                raise RuntimeStartupError(
-                    f"Kueue ClusterQueue API is not reachable or not installed (HTTP {exc.response.status_code})"
-                ) from exc
-            status_code = exc.response.status_code if exc.response is not None else None
-            if status_code is not None:
-                raise RuntimeStartupError(
-                    f"Kubernetes request failed during Kueue startup (HTTP {status_code})"
-                ) from exc
-            raise RuntimeStartupError("Kubernetes request failed during Kueue startup") from exc
-        except httpx.RequestError as exc:
-            raise RuntimeStartupError(
-                "Cannot reach Kubernetes API for Kueue startup checks"
-            ) from exc
-
-        for qname in kueue_config.cluster_queues:
+        async def validate_queue(qname: str) -> None:
             queue_url = cluster_queue_object_url(kueue_config, qname)
             try:
-                cq = await kube_get_json(self._client, queue_url, headers=headers)
+                await kube_get_json(self._client, queue_url, headers=headers)
             except httpx.HTTPStatusError as exc:
-                status_code = exc.response.status_code if exc.response is not None else None
+                status_code = exc.response.status_code
                 if status_code == 404:
                     raise RuntimeStartupError(
                         f"Configured ClusterQueue {qname!r} was not found in the cluster"
@@ -388,23 +360,19 @@ class KueueProvider:
                     raise RuntimeStartupError(
                         f"Configured ClusterQueue {qname!r} is forbidden (HTTP 403)"
                     ) from exc
-                if status_code is not None:
-                    raise RuntimeStartupError(
-                        f"Failed loading ClusterQueue {qname!r} (HTTP {status_code})"
-                    ) from exc
-                raise RuntimeStartupError(f"Failed loading ClusterQueue {qname!r}") from exc
+                raise RuntimeStartupError(
+                    f"Failed loading ClusterQueue {qname!r} (HTTP {status_code})"
+                ) from exc
             except httpx.RequestError as exc:
                 raise RuntimeStartupError(
-                    f"Cannot reach Kubernetes API for ClusterQueue {qname!r}"
+                    "Cannot reach Kubernetes API for Kueue startup checks"
                 ) from exc
-            if not isinstance(cq, dict):
-                raise RuntimeStartupError(
-                    f"Unexpected response when loading ClusterQueue {qname!r}"
-                )
+
+        await asyncio.gather(*(validate_queue(qname) for qname in kueue_config.cluster_queues))
 
     async def shutdown(self) -> None:
         """Close this provider's injected HTTP client exactly once."""
         if self._client_closed:
             return
-        self._client_closed = True
         await self._client.aclose()
+        self._client_closed = True

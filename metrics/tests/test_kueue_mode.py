@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import httpx
@@ -19,7 +20,6 @@ from metrics.errors import RuntimeStartupError
 from metrics.providers.kueue import KueueProvider, kueue_http_client
 
 
-@pytest.mark.anyio
 def _fingerprint(
     *,
     provider_name: str = "kueue",
@@ -64,7 +64,6 @@ def test_kueue_provider_fingerprint_covers_provider_endpoint_path_and_queue_memb
     assert _fingerprint(resource_path="/apis/example/v1/clusterqueues") != baseline
     assert _fingerprint(queues=["cq-a", "cq-c"]) != baseline
     assert _fingerprint(queues=["cq-b", "cq-a"]) == baseline
-    assert _fingerprint(queues=["cq-a", "cq-b", "cq-b"]) != baseline
 
 
 def test_kueue_provider_fingerprint_excludes_secrets_transport_and_telemetry() -> None:
@@ -89,7 +88,24 @@ async def test_kueue_provider_closes_owned_client_once() -> None:
 
 
 @pytest.mark.anyio
-async def test_kueue_provider_startup_validates_list_then_each_clusterqueue(
+@pytest.mark.parametrize("close_error", [RuntimeError("boom"), asyncio.CancelledError()])
+async def test_kueue_provider_shutdown_can_retry_after_close_failure(
+    close_error: BaseException,
+) -> None:
+    settings = Settings(cache=CacheConfig(backend="memory"))
+    client = AsyncMock(spec=httpx.AsyncClient)
+    client.aclose.side_effect = [close_error, None]
+    provider = KueueProvider(settings, client)
+
+    with pytest.raises(type(close_error)):
+        await provider.shutdown()
+    await provider.shutdown()
+
+    assert client.aclose.await_count == 2
+
+
+@pytest.mark.anyio
+async def test_kueue_provider_startup_validates_clusterqueues_concurrently(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(
@@ -103,14 +119,16 @@ async def test_kueue_provider_startup_validates_list_then_each_clusterqueue(
         ),
     )
     calls: list[str] = []
+    both_started = asyncio.Event()
     list_path = settings.providers.kueue.kube_clusterqueue_path
     monkeypatch.setattr("metrics.providers.kueue.resolve_kube_token", lambda *a, **k: "t")
 
     async def fake_get_json(_client, url: str, *, headers: dict[str, str]):
         assert headers == {"Authorization": "Bearer t"}
         calls.append(url)
-        if url.endswith(list_path):
-            return {"items": []}
+        if len(calls) == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), timeout=0.5)
         if url.endswith(f"{list_path}/cq-a"):
             return {"metadata": {"name": "cq-a"}}
         if url.endswith(f"{list_path}/cq-b"):
@@ -121,12 +139,11 @@ async def test_kueue_provider_startup_validates_list_then_each_clusterqueue(
     client = kueue_http_client(settings.providers.kueue)
     try:
         provider = KueueProvider(settings, client)
-        await provider.startup()
+        await asyncio.wait_for(provider.startup(), timeout=1)
     finally:
         await client.aclose()
 
     assert calls == [
-        f"https://kubernetes.default.svc{list_path}",
         f"https://kubernetes.default.svc{list_path}/cq-a",
         f"https://kubernetes.default.svc{list_path}/cq-b",
     ]
@@ -156,8 +173,6 @@ async def test_kueue_provider_startup_fails_fast_with_missing_queue_name(
 
     async def fake_get_json(_client, url: str, *, headers: dict[str, str]):
         assert headers == {"Authorization": "Bearer t"}
-        if url.endswith(list_path):
-            return {"items": []}
         if url.endswith(f"{list_path}/cq-a"):
             return {"metadata": {"name": "cq-a"}}
         if url.endswith(f"{list_path}/cq-missing"):
@@ -198,8 +213,6 @@ async def test_kueue_provider_startup_fails_fast_with_forbidden_queue_name(
 
     async def fake_get_json(_client, url: str, *, headers: dict[str, str]):
         assert headers == {"Authorization": "Bearer t"}
-        if url.endswith(list_path):
-            return {"items": []}
         if url.endswith(f"{list_path}/cq-forbidden"):
             raise httpx.HTTPStatusError("Forbidden", request=request, response=response)
         raise AssertionError(f"unexpected url {url}")
