@@ -19,6 +19,16 @@ decisions are also recorded under `docs/adr/`.
 
 ## Current entries
 
+- Date: July 31, 2026
+- Context: Kueue platform quantity correctness.
+- Lesson: Binary floats and permissive fallback turn valid fractional
+  quantities into artifacts and corrupt quantities into false zeros. Storage
+  overflow must be checked in Kubernetes base units, before Gi presentation.
+- Evidence: `src/metrics/quantity.py`, `src/metrics/providers/kueue.py`,
+  `tests/test_quantity.py`, and `tests/test_kueue_platform.py`.
+- Action taken: Kueue quantities use exact `Decimal` parsing, accumulation, and
+  stable formatting; invalid upstream values fail closed.
+
 - Date: April 24, 2026
 - Context: P1 review fixes for Kueue allocated aggregation and (at the time)
   user/session cache isolation.

@@ -15,6 +15,11 @@ defects.
 - For each resource name present in `data.capacity`, the same name appears in
   `data.allocated` using the **same unit** (CPU as decimal core counts, memory
   as `Gi` binary quantities, consistent rules for other resources).
+- Kueue quantity strings are parsed and accumulated with `Decimal`, never
+  binary floating point. Missing, malformed, negative, non-finite, and
+  overflowing quantities fail the provider read rather than becoming zero.
+- Overflow checks use Kubernetes base units before memory or ephemeral storage
+  is presented in Gi.
 
 ## Consequences
 

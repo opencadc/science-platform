@@ -34,6 +34,11 @@ This file stores repository-specific behavioral specifications.
 - Platform `data.allocated` is summed from
   `status.flavorsUsage.resources[].total`; do not add `borrowed` separately
   because Kueue total already includes borrowed quota.
+- Kueue resource quantities must be strings matching Kubernetes decimal SI,
+  binary SI through `Ei`, or signed-exponent syntax. Parsing and accumulation
+  use exact decimal arithmetic. Missing, whitespace-padded, malformed,
+  negative, non-finite, or base-unit-overflowing values fail the provider read;
+  an absent allocation for a capacity key remains a same-unit zero.
 
 ## Milestone linkage
 

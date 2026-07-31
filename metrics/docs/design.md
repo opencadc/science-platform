@@ -24,6 +24,9 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.
+- **Exact quantity semantics:** Kueue quantity strings are parsed and summed
+  with `Decimal`, then formatted as CPU cores or storage Gi. Invalid or
+  overflowing upstream quantities fail closed instead of becoming zero.
 - **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
   `pydantic-settings` env parsing (nested `METRICS_*` keys) and optional YAML
   under `/etc/canfar/metrics/config.yaml` (see `core/yaml_config.py`).
