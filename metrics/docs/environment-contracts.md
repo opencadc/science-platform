@@ -75,9 +75,8 @@ prefix without extra nesting. Legacy flat aliases such as `METRICS_KUEUE_*` and
 `KUEUE_METRICS_*` are **not** part of the M4 settings surface; configure Kueue
 through `METRICS_PROVIDERS__KUEUE__*`.
 
-`providers.prometheus` and `providers.kube` may be present in YAML and pass
-validation, but M4 does not open HTTP clients to them; only the active
-platform source (Kueue) runs startup checks and platform aggregation.
+Only `providers.kueue` is accepted. Unknown provider blocks and source names
+fail settings validation; `sources.platform` accepts only `kueue`.
 
 Borrowed/lending response expansion is out of scope for this delivery; platform
 responses remain the existing `capacity` and `allocated` maps.

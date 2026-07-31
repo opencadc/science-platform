@@ -1,6 +1,5 @@
 # Example CANFAR Metrics API configuration (deployed to /etc/canfar/metrics/config.yaml).
 # `METRICS_*` overrides the same fields; non-empty files must have a top-level `metrics:` map.
-# In M4, `prometheus` and `kube` may be present for validation but have no live metric HTTP path.
 # Default container path: /etc/canfar/metrics/config.yaml; override with METRICS_CONFIG_FILE.
 metrics:
   providers:
@@ -15,10 +14,6 @@ metrics:
         max_keepalive_connections: 20
         keepalive_expiry_seconds: 30
         http2: false
-    prometheus:
-      url: null
-    kube:
-      enabled: false
   sources:
     platform: kueue
   cache:

@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -21,7 +21,7 @@ from metrics.core.yaml_config import MetricsYamlSettingsSource
 class HttpClientConfig(BaseModel):
     """Connection pool and HTTP/2 options for upstream httpx clients."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     max_connections: int = Field(default=100, ge=1)
     max_keepalive_connections: int = Field(default=20, ge=1)
@@ -46,6 +46,16 @@ class KueueProviderConfig(BaseModel):
     kube_request_timeout_seconds: float = Field(default=10.0, gt=0)
     kube_clusterqueue_path: str = "/apis/kueue.x-k8s.io/v1beta2/clusterqueues"
     http: HttpClientConfig = Field(default_factory=HttpClientConfig)
+
+    @field_validator("kube_api_url")
+    @classmethod
+    def _validate_kube_api_url(cls, value: str | None) -> str | None:
+        """Require a complete HTTP or HTTPS Kubernetes API URL when configured."""
+        if value is None:
+            return None
+        url = value.strip()
+        HttpUrl(url)
+        return url
 
     @field_validator("cluster_queues", mode="before")
     @classmethod
@@ -89,54 +99,20 @@ class KueueProviderConfig(BaseModel):
         raise TypeError(msg)
 
 
-class PrometheusProviderConfig(BaseModel):
-    """Prometheus provider settings (reserved for future metric scopes)."""
-
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-    url: str | None = None
-    verify_tls: bool = True
-    timeout_seconds: float = Field(default=10.0, gt=0)
-    resource_requests_metric_name: str = "kube_pod_container_resource_requests"
-    promql_requested_cpu_cores: str = (
-        'sum(kube_pod_container_resource_requests{resource="cpu",unit="core"})'
-    )
-    promql_requested_memory_bytes: str = (
-        'sum(kube_pod_container_resource_requests{resource="memory",unit="byte"})'
-    )
-    http: HttpClientConfig = Field(default_factory=HttpClientConfig)
-
-
-class KubeProviderConfig(BaseModel):
-    """Reserved for future kube-metrics; must remain disabled for now."""
-
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-    enabled: bool = False
-
-    @model_validator(mode="after")
-    def _kube_must_stay_disabled(self) -> KubeProviderConfig:
-        if self.enabled:
-            raise ValueError("METRICS_PROVIDERS__KUBE is reserved; leave kube provider disabled")
-        return self
-
-
 class ProviderConfigs(BaseModel):
-    """Container for all optional upstream provider configuration blocks."""
+    """Container for active upstream provider configuration blocks."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     kueue: KueueProviderConfig = Field(default_factory=KueueProviderConfig)
-    prometheus: PrometheusProviderConfig = Field(default_factory=PrometheusProviderConfig)
-    kube: KubeProviderConfig = Field(default_factory=KubeProviderConfig)
 
 
 class SourceConfig(BaseModel):
     """Which provider powers each metric source (platform only for now)."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    platform: str = "kueue"
+    platform: Literal["kueue"] = "kueue"
 
 
 class ScopeTTLConfig(BaseModel):
@@ -150,7 +126,7 @@ class ScopeTTLConfig(BaseModel):
 class CacheConfig(BaseModel):
     """TTL cache backend and optional per-scope overrides."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     backend: Literal["memory", "redis"] = "redis"
     ttl_seconds: int = Field(default=300, ge=0)

@@ -25,8 +25,7 @@ This file stores repository-specific architecture facts only.
   `PlatformMetricsService` loader.
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): one module owns URLs, startup checks, and platform
-  aggregation. **Prometheus** and **kube** provider packages exist for
-  configuration and M5+ scopes; M4 does not open unused upstream HTTP clients.
+  aggregation. Configuration rejects inactive or unknown providers.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 
@@ -37,8 +36,8 @@ This file stores repository-specific architecture facts only.
   YAML/env precedence.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
-- `providers/`: `kueue`, `prometheus`, `kube`, `base` (scope protocol), and
-  `kube_http` (Kubernetes GETs with an injected `httpx.AsyncClient`).
+- `providers/`: `kueue`, `base` (scope protocol), and private Kubernetes HTTP
+  helpers in `kube` using an injected `httpx.AsyncClient`.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside HTTP and aggregation; `cache.py` and `quantity.py` are shared
   supporting modules.

@@ -20,10 +20,10 @@ responses. That pattern produced incomplete contracts and unclear ownership.
 
 ## Consequences
 
-- `kube` is not an alternate `sources.platform`; it serves quota/workload scopes
-  (ADR-0015). **`prometheus`** and **`kube`** may serve **UserMetrics** or
-  **SessionMetrics** when configured as the sole provider for that scope
-  (ADR-0020, ADR-0021)—each must return the complete contract alone.
+- `kube` is not an alternate `sources.platform`. Proposed **`prometheus`** and
+  **`kube`** providers may serve **UserMetrics** or **SessionMetrics** only when
+  implemented as the sole complete provider for that scope (ADR-0020,
+  ADR-0021).
 - Removing a route means removing the provider method and source binding, not
   leaving stub handlers.
 

@@ -49,7 +49,7 @@ class Provider(Protocol):
 
     @property
     def name(self) -> str:
-        """Configuration key for this provider (e.g. kueue, prometheus)."""
+        """Configuration key for this provider (for example, ``kueue``)."""
 
     def metrics(self) -> ProviderMetrics:
         """Return scope implementations for this provider."""

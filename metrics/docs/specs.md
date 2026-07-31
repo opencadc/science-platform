@@ -20,8 +20,8 @@ This file stores repository-specific behavioral specifications.
   validated through Pydantic `Settings` (`providers`, `sources`, `cache`)
   against optional YAML; see `environment-contracts.md`.
 - Startup must fail fast when required source dependencies are unavailable
-  for the active platform provider (Kueue in M4). Inactive config-only providers
-  do not trigger upstream HTTP at startup.
+  for the active platform provider (Kueue in M4). Inactive provider
+  configuration is rejected.
 - Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
   `Expires`, and `Last-Modified`) for platform responses. Per-scope TTLs are
   typed in `CacheConfig` (`cache.scope_ttl_seconds`); the platform scope can

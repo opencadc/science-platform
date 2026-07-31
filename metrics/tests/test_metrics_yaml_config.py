@@ -161,3 +161,38 @@ def test_metrics_yaml_empty_file_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.setenv("METRICS_CONFIG_FILE", str(cfg))
     s = Settings()
     assert s.sources.platform == "kueue"
+
+
+@pytest.mark.parametrize("provider", ["prometheus", "kube"])
+def test_metrics_yaml_removed_provider_block_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    provider: str,
+) -> None:
+    cfg = tmp_path / "removed-provider.yaml"
+    cfg.write_text(
+        textwrap.dedent(
+            f"""
+            metrics:
+              providers:
+                {provider}: {{}}
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("METRICS_CONFIG_FILE", str(cfg))
+
+    with pytest.raises(ValidationError, match=provider):
+        Settings()
+
+
+def test_example_configuration_is_valid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    example = Path(__file__).parents[1] / "docs" / "examples" / "metrics.config.yaml"
+    monkeypatch.setenv("METRICS_CONFIG_FILE", str(example))
+
+    settings = Settings()
+
+    assert settings.sources.platform == "kueue"
+    assert settings.providers.kueue.cluster_queues == ["cq-proton"]

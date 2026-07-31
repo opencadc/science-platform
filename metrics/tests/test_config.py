@@ -6,9 +6,7 @@ from pydantic_settings.exceptions import SettingsError
 
 from metrics.core.settings import (
     CacheConfig,
-    KubeProviderConfig,
     KueueProviderConfig,
-    ProviderConfigs,
     Settings,
 )
 
@@ -31,13 +29,58 @@ def test_environment_rejects_unknown_tokens() -> None:
         Settings(environment="qa")
 
 
-def test_kube_provider_enabled_rejected() -> None:
-    with pytest.raises(ValidationError, match="reserved"):
-        Settings(
-            providers=ProviderConfigs(
-                kube=KubeProviderConfig(enabled=True),
-            ),
-        )
+@pytest.mark.parametrize(
+    ("settings", "path"),
+    [
+        ({"sources": {"platfrom": "kueue"}}, "sources.platfrom"),
+        ({"providers": {"kueee": {}}}, "providers.kueee"),
+        ({"providers": {"kueue": {"cluster_queue": ["cq-a"]}}}, "providers.kueue.cluster_queue"),
+        ({"providers": {"kueue": {"http": {"htt2": True}}}}, "providers.kueue.http.htt2"),
+        ({"cache": {"ttl_second": 10}}, "cache.ttl_second"),
+        ({"cache": {"scope_ttl_seconds": {"platfrom": 10}}}, "cache.scope_ttl_seconds.platfrom"),
+    ],
+)
+def test_unknown_nested_settings_identify_rejected_path(
+    settings: dict[str, object],
+    path: str,
+) -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        Settings.model_validate(settings)
+
+    assert path in str(excinfo.value).replace("\n", ".")
+
+
+@pytest.mark.parametrize("provider", ["prometheus", "kube", "unknown"])
+def test_platform_source_accepts_only_kueue(provider: str) -> None:
+    with pytest.raises(ValidationError, match="kueue"):
+        Settings.model_validate({"sources": {"platform": provider}})
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost:8080",
+        "https://kubernetes.default.svc",
+    ],
+)
+def test_kueue_api_url_accepts_http_and_https(url: str) -> None:
+    assert KueueProviderConfig(kube_api_url=url).kube_api_url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://kubernetes.example",
+        "file:///var/run/kubernetes.sock",
+        "not-a-url",
+        "https://",
+        "https://kubernetes.example:not-a-port",
+        "https://not a host",
+    ],
+)
+def test_kueue_api_url_rejects_malformed_or_unsupported_urls(url: str) -> None:
+    with pytest.raises(ValidationError, match="kube_api_url"):
+        KueueProviderConfig(kube_api_url=url)
 
 
 def test_kueue_cluster_queues_accepts_json_array_env(
@@ -75,11 +118,14 @@ def test_kueue_provider_config_rejects_removed_cohort_field() -> None:
         KueueProviderConfig(cluster_queues=["cq-a"], cohort="legacy-cohort")
 
 
-def test_nested_prometheus_url_from_env(
+@pytest.mark.parametrize("provider", ["PROMETHEUS", "KUBE"])
+def test_removed_provider_env_blocks_are_rejected(
     monkeypatch: pytest.MonkeyPatch,
+    provider: str,
 ) -> None:
-    monkeypatch.setenv("METRICS_PROVIDERS__PROMETHEUS__URL", "http://prom.example:9090")
-    assert Settings().providers.prometheus.url == "http://prom.example:9090"
+    monkeypatch.setenv(f"METRICS_PROVIDERS__{provider}__ENABLED", "true")
+    with pytest.raises((ValidationError, SettingsError), match=provider.lower()):
+        Settings()
 
 
 def test_cache_scope_ttl_platform_from_dict() -> None:

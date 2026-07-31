@@ -39,7 +39,7 @@ and ADR-0011.
 | --- | --- |
 | `metrics.core.runtime` | `MetricsRuntime`: registry-driven provider wiring, cache backend, platform cache keys, `get_platform_metrics`. |
 | `metrics.core.provider_registry` | Maps `sources.platform` to a concrete provider + HTTP client bundle. |
-| `metrics.providers.kube_http` | Shared TLS/token handling and parallel `httpx` GET helper (injected client). |
+| `metrics.providers.kube` | Private TLS/token handling and parallel `httpx` GET helpers (injected client). |
 | `metrics.providers.kueue` | URLs, startup, `sum_nominal_quotas_by_resource`, platform aggregation, fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
 | `metrics.services.platform_metrics` | TTL cache, telemetry, and error mapping for `/platform`. |
