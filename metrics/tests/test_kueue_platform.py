@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import httpx
 import pytest
 
@@ -16,7 +18,7 @@ from metrics.schemas.metrics import PlatformMetricsData
 
 async def _read_platform_doc(
     monkeypatch: pytest.MonkeyPatch,
-    doc: dict[str, object],
+    doc: Mapping[str, object],
 ) -> PlatformMetricsData:
     settings = Settings(
         cluster_name="c",
