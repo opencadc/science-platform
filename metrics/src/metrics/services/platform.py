@@ -57,7 +57,7 @@ class PlatformMetricsService:
             telemetry: Optional cache/provider timing recorder.
             ttl: Override cache TTL; defaults to the backend's TTL.
             provider: Adapter name for :meth:`MetricsRecorder.record_provider_duration`
-                (``bundle.provider.name`` at the :class:`MetricsRuntime` / registry Seam).
+                (the provider selected by :class:`MetricsRuntime`).
         """
         self._platform = platform
         self._cache = cache

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 from dataclasses import dataclass
 from decimal import Decimal
@@ -220,7 +221,7 @@ class KueueProvider:
     """Kueue source: startup validation and platform metrics."""
 
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
-        """Attach settings and a shared client for this provider.
+        """Attach settings and the client owned by this provider.
 
         Args:
             settings: Full app settings; Kueue fields live under ``providers.kueue``.
@@ -229,6 +230,7 @@ class KueueProvider:
         self._settings = settings
         self._client = client
         self._kueue_config = settings.providers.kueue
+        self._client_closed = False
 
     @property
     def name(self) -> str:
@@ -306,9 +308,18 @@ class KueueProvider:
         return _PlatformResourceMaps(capacity=capacity, allocated=allocated)
 
     def cache_fingerprint(self) -> str:
-        """Hash of configured cluster queue list for cache key segregation."""
+        """Hash non-secret provider identity for cache key segregation."""
         kueue_config = self._kueue_config
-        raw = "|".join(sorted(kueue_config.cluster_queues))
+        raw = json.dumps(
+            {
+                "endpoint": (kueue_config.kube_api_url or "").rstrip("/"),
+                "name": self.name,
+                "path": kueue_config.kube_clusterqueue_path,
+                "queues": sorted(kueue_config.cluster_queues),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     async def startup(self) -> None:
@@ -373,5 +384,8 @@ class KueueProvider:
                 )
 
     async def shutdown(self) -> None:
-        """Kueue does not hold resources beyond the shared client; no-op."""
-        return None
+        """Close this provider's injected HTTP client exactly once."""
+        if self._client_closed:
+            return
+        self._client_closed = True
+        await self._client.aclose()

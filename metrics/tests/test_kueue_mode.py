@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import hashlib
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -20,25 +20,72 @@ from metrics.providers.kueue import KueueProvider, kueue_http_client
 
 
 @pytest.mark.anyio
-async def test_kueue_provider_fingerprint_uses_queue_set_only() -> None:
+def _fingerprint(
+    *,
+    provider_name: str = "kueue",
+    kube_api_url: str = "https://kubernetes.default.svc",
+    resource_path: str = "/apis/kueue.x-k8s.io/v1beta2/clusterqueues",
+    queues: list[str] | None = None,
+    token: str | None = None,
+    ca_file: str | None = None,
+    timeout: float = 10.0,
+    telemetry_enabled: bool = False,
+) -> str:
     settings = Settings(
         cache=CacheConfig(backend="memory"),
         sources=SourceConfig(platform="kueue"),
         providers=ProviderConfigs(
             kueue=KueueProviderConfig(
-                kube_api_url="https://kubernetes.default.svc",
-                cluster_queues=["cq-b", "cq-a"],
+                kube_api_url=kube_api_url,
+                kube_clusterqueue_path=resource_path,
+                cluster_queues=queues or ["cq-a", "cq-b"],
+                kube_api_token=token,
+                ca_file=ca_file,
+                kube_request_timeout_seconds=timeout,
             )
         ),
+        otel_metrics_enabled=telemetry_enabled,
     )
-    client = httpx.AsyncClient()
-    try:
-        provider = KueueProvider(settings, client)
-        expected_raw = "|".join(sorted(["cq-b", "cq-a"]))
-        expected = hashlib.sha256(expected_raw.encode("utf-8")).hexdigest()[:24]
-        assert provider.cache_fingerprint() == expected
-    finally:
-        await client.aclose()
+
+    class NamedKueueProvider(KueueProvider):
+        @property
+        def name(self) -> str:
+            return provider_name
+
+    provider = NamedKueueProvider(settings, AsyncMock(spec=httpx.AsyncClient))
+    return provider.cache_fingerprint()
+
+
+def test_kueue_provider_fingerprint_covers_provider_endpoint_path_and_queue_membership() -> None:
+    baseline = _fingerprint()
+
+    assert _fingerprint(provider_name="other") != baseline
+    assert _fingerprint(kube_api_url="https://other.example") != baseline
+    assert _fingerprint(resource_path="/apis/example/v1/clusterqueues") != baseline
+    assert _fingerprint(queues=["cq-a", "cq-c"]) != baseline
+    assert _fingerprint(queues=["cq-b", "cq-a"]) == baseline
+    assert _fingerprint(queues=["cq-a", "cq-b", "cq-b"]) != baseline
+
+
+def test_kueue_provider_fingerprint_excludes_secrets_transport_and_telemetry() -> None:
+    baseline = _fingerprint()
+
+    assert _fingerprint(token="secret") == baseline
+    assert _fingerprint(ca_file="/secret/ca.crt") == baseline
+    assert _fingerprint(timeout=99.0) == baseline
+    assert _fingerprint(telemetry_enabled=True) == baseline
+
+
+@pytest.mark.anyio
+async def test_kueue_provider_closes_owned_client_once() -> None:
+    settings = Settings(cache=CacheConfig(backend="memory"))
+    client = AsyncMock(spec=httpx.AsyncClient)
+    provider = KueueProvider(settings, client)
+
+    await provider.shutdown()
+    await provider.shutdown()
+
+    client.aclose.assert_awaited_once_with()
 
 
 @pytest.mark.anyio
