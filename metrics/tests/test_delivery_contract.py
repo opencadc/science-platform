@@ -50,7 +50,7 @@ def test_shipped_values_env_validates_against_settings(
 def test_shipped_clusterqueue_rbac_requires_get_only(rbac_template: Path) -> None:
     manifest = rbac_template.read_text(encoding="utf-8")
 
-    assert 'resources: ["clusterqueues"' in manifest
+    assert 'resources: ["clusterqueues"]' in manifest
     assert 'verbs: ["get"]' in manifest
 
 
