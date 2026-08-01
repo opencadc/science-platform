@@ -129,7 +129,6 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": [
             "All"
@@ -163,7 +162,6 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": [
             "All"
@@ -1324,12 +1322,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "red",
-                "value": 0
+                "color": "green",
+                "value": 1
               }
             ]
           }
@@ -1421,12 +1419,14 @@
       "description": "Share of requests answered 5xx over the selected range. No 5xx series exists until the first failure, hence the `or vector(0)`: without it this would read as no data rather than as healthy.",
       "targets": [
         {
-          "expr": "(sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ clamp_min(sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])), 0.0000001)",
+          "expr": "(sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ (sum(rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])) > 0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1489,7 +1489,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1722,7 +1724,7 @@
           "format": "table"
         },
         {
-          "expr": "(\n  sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"[45]..\"}[$__range]))\n  or\n  (sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])), 0.0000001)",
+          "expr": "(\n  sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\",\"http.response.status_code\"=~\"5..\"}[$__range]))\n  or\n  (sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.route\") (rate({\"http.server.request.duration_seconds_count\",job=~\"$skaha_job\"}[$__range])), 0.0000001)",
           "refId": "C",
           "datasource": {
             "type": "prometheus",
@@ -2506,12 +2508,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "red",
-                "value": 0
+                "color": "green",
+                "value": 1
               }
             ]
           }
@@ -2600,15 +2602,17 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Share of requests answered 5xx over the selected range. No 5xx series exists until the first failure, hence the `or vector(0)`: without it this reads as no data rather than as healthy.",
+      "description": "Share of real requests answered 5xx over the selected range, readiness probe excluded so the ratio is not diluted by probe traffic that can never fail. Reads No data rather than 0% when no real request arrived in range.",
       "targets": [
         {
-          "expr": "(sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ clamp_min(sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])), 0.0000001)",
+          "expr": "(sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\",\"http.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ (sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__range])) > 0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2671,7 +2675,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2904,7 +2910,7 @@
           "format": "table"
         },
         {
-          "expr": "(\n  sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.status_code\"=~\"[45]..\"}[$__range]))\n  or\n  (sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])), 0.0000001)",
+          "expr": "(\n  sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.status_code\"=~\"5..\"}[$__range]))\n  or\n  (sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])), 0.0000001)",
           "refId": "C",
           "datasource": {
             "type": "prometheus",
@@ -3205,7 +3211,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -3215,12 +3223,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
-              },
-              {
                 "color": "red",
-                "value": 0
+                "value": null
               },
               {
                 "color": "yellow",
@@ -3272,7 +3276,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -3335,7 +3341,9 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "{{provider.name}}"
+          "legendFormat": "{{provider.name}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {

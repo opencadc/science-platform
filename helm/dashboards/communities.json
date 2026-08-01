@@ -738,24 +738,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "User"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open Session Drilldown for this user",
-                    "url": "/d/canfar-drilldown/canfar-session-drilldown?var-user=${__value.text}&var-namespace=${namespace}&${__url_time_range}",
-                    "targetBlank": false
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "CPU requested"
             },
             "properties": [
@@ -1287,24 +1269,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "User"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open Session Drilldown for this user",
-                    "url": "/d/canfar-drilldown/canfar-session-drilldown?var-user=${__value.text}&var-namespace=${namespace}&${__url_time_range}",
-                    "targetBlank": false
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "CPU requested"
             },
             "properties": [
@@ -1833,24 +1797,6 @@
           }
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "User"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open Session Drilldown for this user",
-                    "url": "/d/canfar-drilldown/canfar-session-drilldown?var-user=${__value.text}&var-namespace=${namespace}&${__url_time_range}",
-                    "targetBlank": false
-                  }
-                ]
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",

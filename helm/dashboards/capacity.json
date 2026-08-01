@@ -400,7 +400,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"})\n/ sum(kube_node_status_allocatable{resource=\"cpu\", node=~\"$node\"})",
+          "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}\n  * on (namespace, pod) group_left (node) kube_pod_info{node=~\"$node\"})\n/ sum(kube_node_status_allocatable{resource=\"cpu\", node=~\"$node\"})",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,
@@ -473,7 +473,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"})\n/ sum(kube_node_status_allocatable{resource=\"memory\", node=~\"$node\"})",
+          "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"}\n  * on (namespace, pod) group_left (node) kube_pod_info{node=~\"$node\"})\n/ sum(kube_node_status_allocatable{resource=\"memory\", node=~\"$node\"})",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": true,

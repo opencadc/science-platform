@@ -846,7 +846,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 27,
         "w": 24,
         "h": 1
       },
@@ -1050,7 +1050,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -1148,7 +1148,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -1257,7 +1257,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 36,
         "w": 12,
         "h": 8
       },
@@ -1266,7 +1266,7 @@
     {
       "type": "timeseries",
       "title": "Average I/O latency",
-      "description": "Service time per operation. The clamp keeps idle devices from producing a divide-by-zero spike instead of a flat line.",
+      "description": "Service time per completed operation. A device with no completed operations in the window drops out of the series rather than being divided by a floor, so the line gaps instead of reporting a fabricated near-zero latency.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1274,7 +1274,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(node_disk_read_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ clamp_min(rate(node_disk_reads_completed_total{device=~\"$device\"}[$__rate_interval]), 1)",
+          "expr": "rate(node_disk_read_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ (rate(node_disk_reads_completed_total{device=~\"$device\"}[$__rate_interval]) > 0)",
           "legendFormat": "read \u00b7 {{instance}} {{device}}",
           "editorMode": "code",
           "range": true,
@@ -1285,7 +1285,7 @@
         },
         {
           "refId": "B",
-          "expr": "rate(node_disk_write_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ clamp_min(rate(node_disk_writes_completed_total{device=~\"$device\"}[$__rate_interval]), 1)",
+          "expr": "rate(node_disk_write_time_seconds_total{device=~\"$device\"}[$__rate_interval])\n/ (rate(node_disk_writes_completed_total{device=~\"$device\"}[$__rate_interval]) > 0)",
           "legendFormat": "write \u00b7 {{instance}} {{device}}",
           "editorMode": "code",
           "range": true,
@@ -1374,7 +1374,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 26,
+        "y": 36,
         "w": 12,
         "h": 8
       },

@@ -485,7 +485,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(kueue_evicted_workloads_total[$__range]))\nor vector(0)",
+          "expr": "sum(increase(kueue_evicted_workloads_total{cluster_queue=~\"$cluster_queue\"}[$__range]))\nor vector(0)",
           "legendFormat": "__auto",
           "editorMode": "code",
           "range": false,
@@ -896,7 +896,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (reason) (rate(kueue_evicted_workloads_total[$__rate_interval]))",
+          "expr": "sum by (reason) (rate(kueue_evicted_workloads_total{cluster_queue=~\"$cluster_queue\"}[$__rate_interval]))",
           "legendFormat": "{{reason}}",
           "editorMode": "code",
           "range": true,

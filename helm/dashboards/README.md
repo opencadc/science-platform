@@ -85,18 +85,27 @@ kube-state-metrics drops object labels by default since v2.0, so the CANFAR keys
 named in `--metric-labels-allowlist`. Today's contract needs at least:
 
 ```
-pods=[canfar.net/id,canfar.net/username,canfar.net/name,canfar.net/kind,canfar.net/job,canfar.net/flavor,canfar.net/accelerator,canfar.net/community,canfar.net/project,canfar.net/app-id]
+pods=[canfar.net/id,canfar.net/username,canfar.net/name,canfar.net/kind,canfar.net/job,canfar.net/flavor,canfar.net/accelerator,canfar.net/community,canfar.net/project,canfar.net/app-id,kueue.x-k8s.io/cluster-queue-name,kueue.x-k8s.io/local-queue-name]
 jobs=[<same list>]
 ```
 
 Pods and jobs are separate allowlists in kube-state-metrics; the Sessions lifecycle and
-duration panels read Job labels, so both must be populated. Verify with two queries that
+duration panels read Job labels, so both must be populated. Verify with three queries that
 should each return a non-zero count:
 
 ```promql
 count(kube_pod_labels{label_canfar_net_username!=""})
 count(kube_job_labels{label_canfar_net_username!=""})
+count(kube_pod_labels{label_kueue_x_k8s_io_cluster_queue_name!=""})
 ```
+
+The last two Kueue keys are worth calling out because they are easy to mistake for a
+mistake. They are **not** written by Skaha — `skaha/docs/labels.md` correctly lists only
+`kueue.x-k8s.io/queue-name` and `kueue.x-k8s.io/priority-class`, and only on the Job.
+`cluster-queue-name` and `local-queue-name` are added to the *pod* by Kueue itself at
+admission, which is why the queue panels on Communities & Projects can join them to
+`kube_pod_labels`. Omit them from the allowlist and those five panels collapse to a single
+unnamed bucket without erroring.
 
 The four dashboards that touch no CANFAR labels — queue, capacity, storage, services —
 do not depend on this, which makes them a useful control: if those have data and the
@@ -127,13 +136,13 @@ disambiguates them, and Grafana keys panels by id, not title.
 
 | Panel | Expression shape |
 |---|---|
-| Replicas reporting | `count(group by (instance) (target_info{job=~"$job"}))` |
+| Replicas reporting | `count(group by (instance) (target_info{job=~"$job"}))` — the job variable must **not** set `allValue`, since `target_info` is emitted by every OTLP service |
 | Requests per second | `sum(rate({"<count metric>"}[$__rate_interval]))` |
-| Server error ratio | 5xx over total, `or vector(0)` so no-errors reads as healthy |
+| Server error ratio | 5xx over total, numerator `or vector(0)` so no-errors reads as 0%, denominator guarded `> 0` so no-traffic reads as No data |
 | p95 | `histogram_quantile(0.95, …[$__range])` — whole range, since sparse traffic empties a short window |
 | Requests by route | `sum by ("<route label>") (rate(…))`, stacked |
 | Latency percentiles | p50 / p90 / p99 |
-| Route breakdown | table: volume, p95, error share, sortable |
+| Route breakdown | table: volume, p95, 5xx share, sortable — same 5xx basis as the headline stat, so a colour means the same thing in both |
 | Outbound dependency | `http.client.*` p95 by peer |
 
 Each service then gets its own row for the instruments it chooses to record — the
@@ -147,7 +156,21 @@ Two traps in that template, both learned the hard way:
   empty for every route. The fallback is `total * 0` instead, which keeps the route label.
 - **Do not clamp a ratio's denominator to 1.** It converts "nothing happened" into a real
   zero — a cache hit ratio of 0% reads as a cache that never hits. Guard with
-  `/ (denominator > 0)` so the sample drops and the panel says No data.
+  `/ (denominator > 0)` so the sample drops and the panel says No data. Clamping to `1`
+  rather than an epsilon is worse still: it silently rewrites every denominator below one,
+  so a disk doing 0.05 operations a second reported its latency multiplied by its rate.
+- **`allValue` must not widen a matcher past the metric's own scope.** Where the metric
+  name already identifies the subject the wildcard is harmless, but `target_info` is
+  emitted by every instrumented service, so `allValue: ".*"` made both Replicas panels
+  count every service on the cluster.
+- **`avg_over_time` over a subquery averages the samples that exist, not the window.**
+  Where the inner expression is ungrouped it produces no sample at all for an idle step, so
+  a result later multiplied by `$__range_s` extrapolates a busy period across the whole
+  range. Measured on one deployment: a 7-day window had samples for 1228 of 2016 steps and
+  the waste figure was overstated by 64%. Put `or vector(0)` *inside* the subquery.
+- **A stat whose window is `$__range` should set `"instant": true`.** Otherwise Grafana
+  issues a range query and evaluates a full-range window at every step, to display one
+  reduced number.
 
 These rows are optional. Everything else on the dashboard works without them; if
 telemetry is disabled or the OTLP endpoint is unreachable, these panels are empty and
