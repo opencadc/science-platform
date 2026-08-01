@@ -114,7 +114,9 @@ class MetricsRuntime:
             ttl=settings.cache.ttl_seconds,
             provider=provider.name,
         )
-        return cls(settings, provider=provider, platform_service=platform_service, redis=redis_client)
+        return cls(
+            settings, provider=provider, platform_service=platform_service, redis=redis_client
+        )
 
     @property
     def platform_service(self) -> PlatformMetricsService:

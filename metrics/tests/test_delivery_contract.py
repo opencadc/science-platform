@@ -51,4 +51,3 @@ def test_shipped_clusterqueue_rbac_requires_get_only(rbac_template: Path) -> Non
 
     assert 'resources: ["clusterqueues"]' in manifest
     assert 'verbs: ["get"]' in manifest
-

@@ -128,7 +128,9 @@ async def test_concurrent_misses_coalesce_and_share_results_even_when_cancelled(
     provider_names: list[str] = []
 
     class CaptureRecorder(NoopMetricsRecorder):
-        def record_provider_duration(self, *, provider: str, scope: str, status: str, seconds: float) -> None:
+        def record_provider_duration(
+            self, *, provider: str, scope: str, status: str, seconds: float
+        ) -> None:
             provider_names.append(provider)
 
     async def counting() -> PlatformMetricsData:

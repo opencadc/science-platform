@@ -16,7 +16,6 @@ from opentelemetry.sdk.metrics import MeterProvider
 import metrics.core.factory as factory_module
 import metrics.main as main_module
 from metrics.cache import InMemoryTTLCache
-from metrics.core.factory import create_app
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
 from metrics.errors import RuntimeStartupError
@@ -101,7 +100,7 @@ def _runtime(
 
 
 def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> None:
-    with TestClient(create_app(settings=_settings(), runtime=_runtime())) as client:
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
         response = client.get("/api/v1/metrics/platform")
         assert response.status_code == 200
 
@@ -176,7 +175,9 @@ def test_provider_errors_map_to_sanitized_error_envelopes(
     # Healthy at startup; the upstream breaks afterwards, on the request path.
     api = FakeKueueApi({"cq-a": CQ_A, "cq-b": CQ_B})
     provider = KueueProvider(_settings(), api=api)
-    with TestClient(create_app(settings=_settings(), runtime=_runtime(provider=provider))) as client:
+    with TestClient(
+        factory_module.create_app(settings=_settings(), runtime=_runtime(provider=provider))
+    ) as client:
         api.docs = {"cq-a": broken_doc, "cq-b": broken_doc}
         response = client.get("/api/v1/metrics/platform")
 
@@ -192,7 +193,7 @@ def test_provider_errors_map_to_sanitized_error_envelopes(
 
 
 def test_generic_500_response_exposes_no_exception_details() -> None:
-    app = create_app(settings=_settings(), runtime=_runtime())
+    app = factory_module.create_app(settings=_settings(), runtime=_runtime())
 
     @app.get("/boom")
     async def boom() -> None:
@@ -240,7 +241,7 @@ def test_constructed_and_injected_runtimes_share_lifecycle_and_cleanup(monkeypat
         monkeypatch.setattr(runtime, "shutdown", shutdown)
         monkeypatch.setattr(MetricsRuntime, "from_settings", build_runtime)
 
-        app = create_app(settings=settings, runtime=runtime if injected else None)
+        app = factory_module.create_app(settings=settings, runtime=runtime if injected else None)
         with TestClient(app) as client:
             assert client.get("/healthz").status_code == 200
             assert app.state.runtime is runtime
@@ -257,7 +258,7 @@ def test_constructed_and_injected_runtimes_share_lifecycle_and_cleanup(monkeypat
     provider = LifecycleProvider(startup_error=RuntimeStartupError("misconfigured"))
     runtime = _runtime(provider=provider)
     with pytest.raises(RuntimeStartupError, match="misconfigured"):
-        with TestClient(create_app(settings=settings, runtime=runtime)):
+        with TestClient(factory_module.create_app(settings=settings, runtime=runtime)):
             pass
     assert provider.events == ["startup", "provider shutdown"]
 
@@ -275,7 +276,7 @@ def test_otel_wiring_instruments_and_uninstruments(monkeypatch) -> None:
     monkeypatch.setattr(factory_module, "HTTPXClientInstrumentor", httpx_instrumentor)
 
     settings = Settings(otel_metrics_enabled=True, cache=CacheConfig(backend="memory"))
-    with TestClient(create_app(settings=settings, runtime=_runtime())) as client:
+    with TestClient(factory_module.create_app(settings=settings, runtime=_runtime())) as client:
         assert client.get("/healthz").status_code == 200
 
     fastapi_instrumentor.instrument_app.assert_called_once()

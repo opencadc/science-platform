@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import metrics.telemetry as telemetry_module
 from metrics.core.settings import Settings
 from metrics.telemetry import (
     NoopMetricsRecorder,
@@ -17,9 +16,7 @@ def test_setup_telemetry_defaults_to_noop_when_disabled() -> None:
     # The base recorder is the no-op: every call records nothing and returns.
     recorder.record_cache_lookup(backend="redis", hit=True, scope="platform")
     recorder.record_compute_duration(seconds=1.0, status="ok", scope="platform")
-    recorder.record_provider_duration(
-        provider="kueue", scope="platform", status="ok", seconds=0.01
-    )
+    recorder.record_provider_duration(provider="kueue", scope="platform", status="ok", seconds=0.01)
 
 
 def test_otel_instrument_names_and_attribute_keys_remain_stable(monkeypatch) -> None:
@@ -45,11 +42,7 @@ def test_otel_instrument_names_and_attribute_keys_remain_stable(monkeypatch) -> 
             instruments[name] = FakeInstrument(name)
             return instruments[name]
 
-    monkeypatch.setattr(
-        telemetry_module.metrics,
-        "get_meter",
-        lambda *_args: FakeMeter(),
-    )
+    monkeypatch.setattr("metrics.telemetry.metrics.get_meter", lambda *_args: FakeMeter())
 
     recorder = OpenTelemetryMetricsRecorder(meter_name="metrics.service", meter_version="v1")
     recorder.record_provider_duration(
