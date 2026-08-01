@@ -10,6 +10,28 @@ from opentelemetry.sdk.resources import Resource
 
 from metrics.core.settings import Settings
 
+# These histograms record seconds. The SDK's default boundaries run 0, 5, 10 … 10000,
+# which are sized for milliseconds, so every observation we make lands in the first
+# real bucket and any quantile over them is bucket interpolation rather than a
+# measurement: an observed mean of 44 ms reported a p95 of 4.75 s. These bounds match
+# what the OpenTelemetry HTTP semantic conventions use for second-valued durations.
+_SECONDS_BUCKETS = (
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    7.5,
+    10.0,
+)
+
 
 class MetricsRecorder:
     """Service-level metrics recorder; the base implementation records nothing."""
@@ -57,11 +79,13 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             name="canfar.metrics.compute.duration",
             unit="s",
             description="End-to-end compute duration for platform metrics reads.",
+            explicit_bucket_boundaries_advisory=_SECONDS_BUCKETS,
         )
         self._provider_duration = meter.create_histogram(
             name="canfar.metrics.provider.duration",
             unit="s",
             description="Provider call duration by scope and status.",
+            explicit_bucket_boundaries_advisory=_SECONDS_BUCKETS,
         )
 
     def record_cache_lookup(self, *, backend: str, hit: bool, scope: str) -> None:
