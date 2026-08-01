@@ -4,7 +4,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Chart | AppVersion | Type |
 |:-----:|:----------:|:----:|
-|1.6.1-rc.1<!-- x-release-please-version --> | 1.3.1 | application |
+|1.7.0<!-- x-release-please-version --> | 1.3.1 | application |
 
 ## Requirements
 
@@ -73,10 +73,10 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | metricsBackend.enabled | bool | `false` | When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden). |
-| metricsBackend.env | object | `{}` | Map of environment variables for the Metrics container (typically METRICS_*). GitOps should supply the full map per environment. |
+| metricsBackend.env | object | `{}` | Map of METRICS_* environment variables for the Metrics container; configuration is environment-only. GitOps supplies per-environment values — at minimum METRICS_CLUSTER_NAME and METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES (JSON array string, for example '["cq-a"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings; images after v0.1.5 fail startup on the removed keys (METRICS_PROVIDERS__KUEUE__KUBE_API_URL / KUBE_API_TOKEN / TOKEN_FILE / CA_FILE / KUBE_VERIFY_TLS / KUBE_CLUSTERQUEUE_PATH / HTTP__*, METRICS_CACHE__SCOPE_TTL_SECONDS, METRICS_CONFIG_FILE). See metrics/docs/environment-contracts.md. |
 | metricsBackend.image.pullPolicy | string | `"IfNotPresent"` | imagePullPolicy for the Metrics API container. |
 | metricsBackend.image.repository | string | `"images.opencadc.org/platform/metrics"` | Metrics container image repository. |
-| metricsBackend.image.tag | string | `"v0.1.5"` | Metrics container image tag. |
+| metricsBackend.image.tag | string | `"v0.1.5"` | Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metricsBackend.env`. |
 | metricsBackend.ingress.enabled | bool | `false` | When true and top-level ingress.enabled is true, add a path on the same host routing to the Metrics Service. |
 | metricsBackend.ingress.path | string | `"/metrics"` | Ingress path prefix for the Metrics API (Traefik). |
 | metricsBackend.rbac.enabled | bool | `true` | When true, create metricsBackend Kueue-read ClusterRole/ClusterRoleBinding. Set false to disable cluster-scoped RBAC while keeping the metrics workload enabled. |
@@ -224,6 +224,6 @@ Omit `existingSecret.name` (leave default empty) when you do not use this stack�
 
 ## metricsBackend install ordering
 
-When `metricsBackend.enabled` is true, the chart emits `ClusterRole`, `ClusterRoleBinding`, `Service`, and `Deployment` for metrics. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go) so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
+When `metricsBackend.enabled` is true, the chart emits `ClusterRole`, `ClusterRoleBinding`, `Service`, and `Deployment` for metrics. The Metrics API authenticates to the Kubernetes API through the pod ServiceAccount (kr8s discovery); the chart's `automountServiceAccountToken: true` plus the Kueue-read RBAC below are its entire Kubernetes access contract — no endpoint, token, or CA configuration exists. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go) so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
 
-If `metricsBackend.enabled=true` and `metricsBackend.rbac.enabled=false`, this chart will not create the metrics ClusterRole/ClusterRoleBinding. In that mode, the deployer is responsible for ensuring the Skaha ServiceAccount (`deployment.skaha.serviceAccountName`) already has `get` permission on the configured Kueue `ClusterQueue` objects before installation.
+If `metricsBackend.enabled=true` and `metricsBackend.rbac.enabled=false`, this chart will not create the metrics ClusterRole/ClusterRoleBinding. In that mode, the deployer is responsible for ensuring the Skaha ServiceAccount (`deployment.skaha.serviceAccountName`) already has `get` permission on the Kueue `ClusterQueue` API before installation (the Metrics API reads configured queues by name only).
