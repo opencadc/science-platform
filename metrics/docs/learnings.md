@@ -20,6 +20,20 @@ decisions are also recorded under `docs/adr/`.
 ## Current entries
 
 - Date: July 31, 2026
+- Context: kind-smoke crashloop after the kr8s migration (PR #1161).
+- Lesson: Validate the exact access pattern production RBAC allows, not just
+  the library: kr8s resolves named objects with a LIST plus
+  `metadata.name` field selector, so `api.get(cls, name)` needs the `list`
+  verb, which the get-only ClusterQueue RBAC denies. The staging validation
+  passed only because that service account also had `list`.
+- Evidence: `src/metrics/providers/kueue.py::fetch_cluster_queue_docs`,
+  `scripts/validate-kr8s-kueue.py` (named-GET check), kr8s `_api.py`
+  `_async_get_single`, and the metrics-kind-smoke failure on PR #1161.
+- Action taken: Named reads use `api.call_api` GETs
+  (`.../clusterqueues/{name}`); ADR-0023 records the constraint and the
+  validation workflow now exercises the get-only path explicitly.
+
+- Date: July 31, 2026
 - Context: Kubernetes client selection for the Kueue provider (and future
   scopes).
 - Lesson: Validate a client library in the target cluster before adopting it:

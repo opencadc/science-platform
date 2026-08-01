@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import json
 from dataclasses import dataclass
@@ -12,7 +11,6 @@ from typing import Any
 import httpx
 import kr8s
 import kr8s.asyncio
-from kr8s.asyncio.objects import new_class
 from quantiphy import QuantiPhyError, Quantity
 
 from metrics.core.settings import KueueProviderConfig, Settings
@@ -90,11 +88,6 @@ def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> 
 # --- Kubernetes access via kr8s ---
 
 
-@functools.cache
-def _cluster_queue_class(api_version: str) -> type:
-    return new_class(kind="ClusterQueue", version=api_version, namespaced=False)
-
-
 async def create_kube_api(kueue_config: KueueProviderConfig) -> Any:
     """Build a kr8s API handle using its own discovery (in-cluster SA or kubeconfig)."""
     api = await kr8s.asyncio.api()
@@ -109,20 +102,25 @@ async def fetch_cluster_queue_docs(
 ) -> list[dict[str, Any]]:
     """Fetch ClusterQueue objects by name sequentially, in request order.
 
+    Uses named GETs (``.../clusterqueues/{name}``) via ``call_api`` so the
+    get-only RBAC contract holds: kr8s's object helpers resolve names with a
+    LIST plus field selector, which would demand the ``list`` verb.
+
     Platform loads are already serialized by the single-flight service, and the
     configured queue list is small, so there is no parallel fan-out here.
 
     Raises:
-        kr8s.NotFoundError: When a named ClusterQueue does not exist.
-        kr8s.ServerError: For non-404 API server errors.
+        kr8s.ServerError: For API server errors, including HTTP 404 when a
+            named ClusterQueue does not exist.
     """
-    queue_class = _cluster_queue_class(api_version)
     docs: list[dict[str, Any]] = []
     for name in names:
-        matches = [obj async for obj in api.get(queue_class, name)]
-        if not matches:
-            raise kr8s.NotFoundError(f"ClusterQueue {name!r} was not found")
-        docs.append(matches[0].raw)
+        async with api.call_api(
+            method="GET",
+            version=api_version,
+            url=f"clusterqueues/{name}",
+        ) as response:
+            docs.append(response.json())
     return docs
 
 
@@ -215,10 +213,6 @@ class KueueProvider:
                 kueue_config.kueue_api_version,
                 kueue_config.cluster_queues,
             )
-        except kr8s.NotFoundError as exc:
-            raise ProviderExecutionError(
-                "Kubernetes returned HTTP 404 querying Kueue objects"
-            ) from exc
         except kr8s.ServerError as exc:
             status_code = getattr(exc.response, "status_code", None)
             detail = f"HTTP {status_code}" if status_code else "a server error"
@@ -289,10 +283,6 @@ class KueueProvider:
         for qname in kueue_config.cluster_queues:
             try:
                 await fetch_cluster_queue_docs(api, kueue_config.kueue_api_version, [qname])
-            except kr8s.NotFoundError as exc:
-                raise RuntimeStartupError(
-                    f"Configured ClusterQueue {qname!r} was not found in the cluster"
-                ) from exc
             except kr8s.ServerError as exc:
                 status_code = getattr(exc.response, "status_code", None)
                 if status_code == 404:

@@ -29,9 +29,12 @@ client survey lives in `docs/research/async-python-kubernetes-clients.md`
 - Endpoint, credential, and CA discovery belong to kr8s (in-cluster service
   account or kubeconfig). They are not application settings; the removed keys
   above fail validation loudly.
-- Custom resources are addressed as typed `new_class` kinds pinned to an
-  explicit `apiVersion` from settings (`kueue_api_version`), never by
-  hand-built URL paths.
+- Named custom-resource reads go through `api.call_api` GETs
+  (``.../clusterqueues/{name}``) pinned to an explicit `apiVersion` from
+  settings (`kueue_api_version`). kr8s's object helpers (`new_class` /
+  `api.get`) resolve names with a LIST plus field selector, which would demand
+  the `list` verb; the RBAC contract is `get`-only, so the provider must not
+  use them for named reads.
 - Providers own a lazily built kr8s API handle and accept an injected fake in
   tests (`tests/fakes.py::FakeKueueApi`). The kr8s HTTP session is
   process-shared, so provider shutdown releases the handle without closing

@@ -14,7 +14,7 @@ Run it with (from metrics/scripts/):
     kubectl apply -f validate-kr8s-kueue-pod.yaml
     kubectl logs -f kr8s-kueue-validation -n canfar-system-staging
 
-Last run 2026-07-31 against keel-prod (K8s v1.30.11, kr8s 0.20.15): 5/5 passed.
+Last full run 2026-07-31 against keel-prod (K8s v1.30.11, kr8s 0.20.15).
 Clean up with:
 
     kubectl delete pod/kr8s-kueue-validation \
@@ -99,7 +99,27 @@ async def main() -> int:
             traceback.print_exc()
             record("GET ClusterQueue by name + spec/status shape", False)
 
-    # 5. Short watch: proves long-poll/streaming works through the same TLS path.
+    # 5. Named GET via call_api: the production access pattern (get-only RBAC).
+    #    Checks 3-4 use kr8s object helpers, which LIST with a field selector
+    #    and therefore also require the `list` verb.
+    if queues:
+        try:
+            async with api.call_api(
+                method="GET",
+                version=api_version,
+                url=f"clusterqueues/{queues[0].name}",
+            ) as response:
+                doc = response.json()
+            record(
+                "named GET via call_api (get-only RBAC path)",
+                True,
+                f"kind={doc.get('kind')} name={doc.get('metadata', {}).get('name')}",
+            )
+        except Exception:
+            traceback.print_exc()
+            record("named GET via call_api (get-only RBAC path)", False)
+
+    # 6. Short watch: proves long-poll/streaming works through the same TLS path.
     try:
         ClusterQueue = new_class(
             kind="ClusterQueue", version=api_version, namespaced=False

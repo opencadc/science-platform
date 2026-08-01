@@ -81,15 +81,17 @@ def test_formatting_units_precision_and_overflow() -> None:
 # --- fetch_cluster_queue_docs (kr8s access) ---
 
 
-async def test_fetch_orders_results_and_raises_not_found() -> None:
+async def test_fetch_orders_results_and_maps_missing_to_http_404() -> None:
     api = FakeKueueApi(
         {"cq-a": {"metadata": {"name": "cq-a"}}, "cq-b": {"metadata": {"name": "cq-b"}}}
     )
     assert await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", []) == []
     docs = await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", ["cq-b", "cq-a"])
     assert [d["metadata"]["name"] for d in docs] == ["cq-b", "cq-a"]
-    with pytest.raises(kr8s.NotFoundError):
+    with pytest.raises(kr8s.ServerError) as exc_info:
         await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", ["cq-a", "cq-gone"])
+    assert exc_info.value.response is not None
+    assert exc_info.value.response.status_code == 404
 
 
 # --- platform() rejects corrupt upstream data without leaking payloads ---
@@ -104,11 +106,7 @@ async def test_fetch_orders_results_and_raises_not_found() -> None:
                     "resourceGroups": [
                         {
                             "flavors": [
-                                {
-                                    "resources": [
-                                        {"name": "cpu", "nominalQuota": "bad-secret-value"}
-                                    ]
-                                }
+                                {"resources": [{"name": "cpu", "nominalQuota": "bad-secret-value"}]}
                             ]
                         }
                     ]
@@ -124,9 +122,7 @@ async def test_fetch_orders_results_and_raises_not_found() -> None:
                     ]
                 },
                 "status": {
-                    "flavorsUsage": [
-                        {"resources": [{"name": "cpu", "total": "bad-secret-value"}]}
-                    ]
+                    "flavorsUsage": [{"resources": [{"name": "cpu", "total": "bad-secret-value"}]}]
                 },
             },
             "invalid resource quantity",
@@ -153,7 +149,7 @@ async def test_platform_rejects_corrupt_documents(doc: dict, match: str) -> None
             "Kubernetes returned HTTP 500 querying Kueue objects",
         ),
         (
-            kr8s.NotFoundError("cq-a"),
+            kr8s.ServerError("cq-a not found", response=httpx.Response(404)),
             "Kubernetes returned HTTP 404 querying Kueue objects",
         ),
     ],
@@ -213,7 +209,9 @@ async def test_startup_api_construction_failure_is_sanitized(
 
 
 def test_fingerprint_covers_identity_and_excludes_transport() -> None:
-    def fingerprint(*, api_version: str = "kueue.x-k8s.io/v1beta2", queues=("cq-a", "cq-b"), timeout=10.0):
+    def fingerprint(
+        *, api_version: str = "kueue.x-k8s.io/v1beta2", queues=("cq-a", "cq-b"), timeout=10.0
+    ):
         settings = Settings(
             providers=ProviderConfigs(
                 kueue=KueueProviderConfig(

@@ -2,35 +2,38 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
-from types import SimpleNamespace
 
+import httpx
 import kr8s
 
 from metrics.schemas.metrics import PlatformMetricsData
 
 
 class FakeKueueApi:
-    """kr8s-shaped fake: ``get(cls, name)`` yields objects with ``.raw`` dicts.
+    """kr8s-shaped fake for the ``call_api`` named-GET path the provider uses.
 
     ``docs`` maps ClusterQueue names to raw dicts or to exceptions (raised on
-    access). Missing names raise :class:`kr8s.NotFoundError` like the real
-    client.
+    access). Missing names raise :class:`kr8s.ServerError` with an HTTP 404
+    response, matching ``call_api`` against the real API server.
     """
 
     def __init__(self, docs: dict[str, object] | None = None) -> None:
         self.docs = docs or {}
         self.requested: list[str] = []
 
-    def get(self, _cls: type, name: str):
-        async def generate():
-            self.requested.append(name)
-            value = self.docs.get(name, kr8s.NotFoundError(name))
-            if isinstance(value, BaseException):
-                raise value
-            yield SimpleNamespace(raw=value)
-
-        return generate()
+    @contextlib.asynccontextmanager
+    async def call_api(self, *, method: str = "GET", version: str = "", url: str = ""):
+        name = url.rsplit("/", 1)[-1]
+        self.requested.append(name)
+        value = self.docs.get(
+            name,
+            kr8s.ServerError(f"{name} not found", response=httpx.Response(404)),
+        )
+        if isinstance(value, BaseException):
+            raise value
+        yield httpx.Response(200, json=value)
 
 
 def cache_control_max_age(cache_control: str) -> int:
