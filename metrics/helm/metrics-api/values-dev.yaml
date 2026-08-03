@@ -11,7 +11,7 @@ env:
   METRICS_CACHE__TTL_SECONDS: "15"
   METRICS_OTEL_METRICS_ENABLED: "false"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
-  # service account (ADR-0023); no transport settings are configured here.
+  # service account (ADR-0001); no transport settings are configured here.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-example"]'
 
 redis:

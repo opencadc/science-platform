@@ -34,7 +34,7 @@ class MetricsRecorder:
         return
 
 
-# The ADR-0019 name for the disabled-mode recorder.
+# The ADR-0002 name for the disabled-mode recorder.
 NoopMetricsRecorder = MetricsRecorder
 
 

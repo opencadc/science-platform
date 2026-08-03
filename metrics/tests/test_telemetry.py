@@ -54,7 +54,7 @@ def test_otel_instrument_names_and_attribute_keys_remain_stable(monkeypatch) -> 
     recorder.record_cache_lookup(backend="redis", hit=False, scope="platform")
     recorder.record_compute_duration(seconds=0.2, status="ok", scope="platform")
 
-    # ADR-0019 meter names; HTTP request metrics come from FastAPI
+    # ADR-0002 meter names; HTTP request metrics come from FastAPI
     # auto-instrumentation (http.server.*), not a custom meter.
     assert set(instruments) == {
         "canfar.metrics.provider.duration",

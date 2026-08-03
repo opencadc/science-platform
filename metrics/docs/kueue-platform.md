@@ -5,8 +5,8 @@ is and **which modules** participate. It complements
 [`docs/adr/README.md`](adr/README.md) and operator-facing notes in
 [`environment-contracts.md`](environment-contracts.md). For the extension pattern
 (config, provider lifecycle), see
-[`adr/0005-runtime-composition-and-provider-lifecycle.md`](adr/0005-runtime-composition-and-provider-lifecycle.md)
-and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-kubernetes-client.md).
+[`adr/0001-runtime-architecture.md`](adr/0001-runtime-architecture.md)
+and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime-architecture.md).
 
 ## Goals
 
@@ -25,7 +25,7 @@ and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-
 
 - The **Kueue provider** (`metrics.providers.kueue`) runs startup checks
   against the Kubernetes API and performs platform capacity/allocated
-  aggregation. It owns a lazily built kr8s API handle (ADR-0023); endpoint,
+  aggregation. It owns a lazily built kr8s API handle (ADR-0001); endpoint,
   credentials, and CA trust are discovered by kr8s, not configured.
 - **`MetricsRuntime`** owns the active provider lifecycle, cache backend, and
   platform service for `sources.platform`.
@@ -39,7 +39,7 @@ and the client standard in [`adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-
 | Module | Role |
 | --- | --- |
 | `metrics.core.runtime` | `MetricsRuntime`: provider construction and lifecycle, cache backend, platform cache keys. |
-| `metrics.providers.kueue` | kr8s ClusterQueue reads, startup checks, quantity parsing/formatting (quantiphy, ADR-0024), platform aggregation, and fingerprinting. |
+| `metrics.providers.kueue` | kr8s ClusterQueue reads, startup checks, quantity parsing/formatting (quantiphy, ADR-0001), platform aggregation, and fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
 | `metrics.services.platform` | TTL cache, telemetry, and error mapping for `/platform`. |
 

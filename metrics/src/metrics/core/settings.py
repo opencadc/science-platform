@@ -13,7 +13,7 @@ class KueueProviderConfig(BaseModel):
 
     Kubernetes API discovery (endpoint, credentials, CA trust) is owned by the
     kr8s client, which reads the in-cluster service account or a kubeconfig;
-    it is intentionally not configurable here (see ADR-0023).
+    it is intentionally not configurable here (see ADR-0001).
     """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)

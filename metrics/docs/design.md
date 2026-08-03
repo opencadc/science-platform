@@ -16,7 +16,7 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   part of the supported service contract (see `environment-contracts.md`).
 - **Single service process, platform-only HTTP:** `MetricsRuntime` constructs
   the Kueue provider, owns provider lifecycle and cache resources, and exposes
-  platform reads to versioned routes. Kueue reads Kubernetes through kr8s (ADR-0023). M4 serves only
+  platform reads to versioned routes. Kueue reads Kubernetes through kr8s (ADR-0001). M4 serves only
   `GET /api/v1/metrics/platform` and `GET /healthz`.
 - **Truthful provider configuration:** Kueue is the only configured provider
   and the only accepted `sources.platform` value.
@@ -24,19 +24,15 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.
 - **Honest quantity semantics:** Kueue quantity strings are parsed with
-  quantiphy (ADR-0024), summed, and formatted as CPU cores or storage Gi to
+  quantiphy (ADR-0001), summed, and formatted as CPU cores or storage Gi to
   6 decimal places. Invalid or overflowing upstream quantities fail closed
   instead of becoming zero.
 - **Pydantic-first contracts:** `Settings` and HTTP schemas use Pydantic with
   `pydantic-settings` env parsing (nested `METRICS_*` keys); configuration is
-  environment-only (ADR-0010).
+  environment-only (ADR-0001).
 - **One application lifecycle:** Production-built and test-injected runtimes
   execute the same FastAPI lifespan. Package imports create no settings,
   application, runtime, client, or exporter.
-
-## Design mapping
-
-Milestone-to-decision mapping (M3–M11): [`docs/adr/README.md`](adr/README.md).
 
 ## Ownership
 

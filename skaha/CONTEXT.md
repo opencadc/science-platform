@@ -42,7 +42,7 @@ cluster totals (legacy Skaha used "requested" for pod sums).
 carry user, allocation class (`fixed` / `flexible`), and exactly one configured
 session-type label. Label keys are configured in Metrics; values are set at
 session launch (see the Metrics interactive-quota ADR,
-`metrics/docs/adr/0015-interactive-quota-contract.md`).
+`metrics/docs/adr/0003-proposed-scopes.md`).
 
 ## Relationships
 

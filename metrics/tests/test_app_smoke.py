@@ -104,7 +104,7 @@ def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> 
         response = client.get("/api/v1/metrics/platform")
         assert response.status_code == 200
 
-        # HTTP caching is header-based (ADR-0004): shared, bounded by TTL.
+        # HTTP caching is header-based (ADR-0002): shared, bounded by TTL.
         cache_control = response.headers["cache-control"]
         assert "public" in cache_control
         assert 25 <= cache_control_max_age(cache_control) <= 30
@@ -141,7 +141,7 @@ def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> 
         second = client.get("/api/v1/metrics/platform")
         assert second.headers["last-modified"] == response.headers["last-modified"]
 
-        # Removed route surface stays removed (ADR-0013).
+        # Removed route surface stays removed (ADR-0002).
         assert client.get("/api/v1/metrics/users/u1").status_code == 404
         assert client.get("/api/v1/metrics/users/u1/sessions/s1").status_code == 404
         assert client.get("/metrics").status_code == 404
@@ -151,7 +151,7 @@ def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> 
     ("broken_doc", "status_code", "code", "message"),
     [
         # Upstream failure -> 502; unavailable data -> 503. Raw upstream text
-        # and URLs must never reach the response body (ADR-0013).
+        # and URLs must never reach the response body (ADR-0002).
         (
             httpx.ConnectError("secret at https://kubernetes.default.svc"),
             502,

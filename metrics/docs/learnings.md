@@ -30,7 +30,7 @@ decisions are also recorded under `docs/adr/`.
   `scripts/validate-kr8s-kueue.py` (named-GET check), kr8s `_api.py`
   `_async_get_single`, and the metrics-kind-smoke failure on PR #1161.
 - Action taken: Named reads use `api.call_api` GETs
-  (`.../clusterqueues/{name}`); ADR-0023 records the constraint and the
+  (`.../clusterqueues/{name}`); ADR-0001 records the constraint and the
   validation workflow now exercises the get-only path explicitly.
 
 - Date: July 31, 2026
@@ -41,11 +41,11 @@ decisions are also recorded under `docs/adr/`.
   kr8s handles service-account auth and the self-signed cluster CA with zero
   configuration, which desk research alone could not settle.
 - Evidence: `scripts/validate-kr8s-kueue.py`, `src/metrics/providers/kueue.py`,
-  `docs/adr/0023-kr8s-kubernetes-client.md`, and
-  `docs/research/async-python-kubernetes-clients.md` (repo root).
+  and `docs/adr/0001-runtime-architecture.md` (client survey summarized there;
+  full research note removed, in git history).
 - Action taken: Migrated the provider to kr8s, deleted the hand-rolled
   token/TLS/URL plumbing and its settings, and recorded kr8s as the client of
-  choice in ADR-0023.
+  choice in ADR-0001.
 
 
 - Date: July 31, 2026
@@ -54,8 +54,7 @@ decisions are also recorded under `docs/adr/`.
   lifespans without requiring a generic plugin framework.
 - Evidence: `src/metrics/core/registry.py`,
   `src/metrics/core/runtime.py`, `src/metrics/providers/kueue.py`,
-  `src/metrics/core/factory.py`, and ADR-0005 (provider lifecycle;
-  client ownership now per ADR-0023).
+  `src/metrics/core/factory.py`, and ADR-0001.
 - Action taken: The registry returns one Kueue provider owning its Kubernetes
   access; `MetricsRuntime` owns provider/cache lifecycle, and all applications
   use one lifespan.
@@ -70,7 +69,7 @@ decisions are also recorded under `docs/adr/`.
 - Action taken: `KueueProvider` now implements `PlatformMetrics` directly, and
   the binder rejects selected providers without that capability.
 
-- Date: July 31, 2026 (superseded same day by ADR-0024)
+- Date: July 31, 2026 (superseded same day by ADR-0001)
 - Context: Kueue platform quantity correctness.
 - Lesson: Permissive fallback turns corrupt quantities into false zeros, and
   storage overflow must be checked in Kubernetes base units before Gi
@@ -78,7 +77,7 @@ decisions are also recorded under `docs/adr/`.
   than the 6-decimal API contract needed.
 - Evidence: `src/metrics/providers/kueue.py` and `tests/test_kueue_platform.py`.
 - Action taken: Quantities parse via quantiphy with fail-closed guards
-  (ADR-0024); the bespoke `metrics.quantity` module was deleted.
+  (ADR-0001); the bespoke `metrics.quantity` module was deleted.
 
 - Date: April 24, 2026
 - Context: P1 review fixes for Kueue allocated aggregation and (at the time)
@@ -141,8 +140,8 @@ decisions are also recorded under `docs/adr/`.
   use; upstream clients should stay on HTTP/1.1 unless an HTTP/2 requirement and
   dependency are deliberately introduced.
 - Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/registry.py`,
-  and `docs/adr/0005-runtime-composition-and-provider-lifecycle.md`.
-- Action taken: Documented in `docs/architecture.md` and ADR-0005.
+  and `docs/adr/0001-runtime-architecture.md`.
+- Action taken: Documented in `docs/architecture.md` and ADR-0001.
 
 - Date: April 22, 2026 (superseded June 2026)
 - Context: M3 documentation realignment and roadmap cleanup.

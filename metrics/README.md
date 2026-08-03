@@ -27,7 +27,7 @@ All runtime behavior is configured via environment variables prefixed with
 `METRICS_` (see `docs/environment-contracts.md`).
 
 - Configuration comes from environment variables; Kubernetes access is
-  discovered by kr8s from the service account (ADR-0023).
+  discovered by kr8s from the service account (ADR-0001).
 - Pydantic `Settings` groups options under `providers`, `sources`, and `cache`
   (nested env keys use `__`; see `docs/environment-contracts.md`).
 - The process remains stateless and uses TTL cache backends.

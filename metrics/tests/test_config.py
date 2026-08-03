@@ -43,7 +43,7 @@ def test_unknown_nested_settings_identify_rejected_path(
     ],
 )
 def test_kueue_removed_transport_fields_are_rejected(removed_field: str) -> None:
-    """Endpoint/credential/TLS discovery moved to kr8s (ADR-0023); old keys fail loudly."""
+    """Endpoint/credential/TLS discovery moved to kr8s (ADR-0001); old keys fail loudly."""
     with pytest.raises(ValidationError, match=removed_field):
         KueueProviderConfig.model_validate({removed_field: "x"})
 

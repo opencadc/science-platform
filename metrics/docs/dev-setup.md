@@ -32,11 +32,11 @@ Default runtime values:
 - `NAMESPACE=metrics`
 - `PORT_FORWARD_PORT=18080`
 
-After a successful local run, the API port-forward stays up for debugging.
-Stop it with:
+The port-forward used by the tests is torn down when the script exits; for
+debugging afterwards, run:
 
 ```bash
-bash scripts/kind-smoke-teardown.sh
+kubectl -n metrics port-forward svc/metrics-api-metrics-api 18080:8000
 ```
 
 ## CI-parity run
@@ -55,13 +55,7 @@ docker build -t canfar-metrics-local:dev-local .
 KIND_SMOKE_SKIP_BUILD=1 METRICS_IMAGE_TAG=dev-local bash scripts/kind-smoke.sh
 ```
 
-## Teardown options
-
-Non-destructive (stop only the background port-forward):
-
-```bash
-bash scripts/kind-smoke-teardown.sh
-```
+## Teardown
 
 Delete Helm releases, fixtures, the Metrics images loaded into the kind node,
 and the kind cluster:
@@ -76,7 +70,6 @@ The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
 
 - `default-flavor`
 - `cq-proton`
-- `cq-neutron`
 - `cq-electron`
 - `lq-smoke`
 - `integration-idle`

@@ -26,9 +26,9 @@ This file stores repository-specific behavioral specifications.
   when that observable capability is absent; no separate scope declaration can
   override the provider's behavior.
 - Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
-  `Expires`, and `Last-Modified`) for platform responses. Per-scope TTLs are
-  typed in `CacheConfig` (`cache.scope_ttl_seconds`); the platform scope can
-  override the default TTL.
+  `Expires`, and `Last-Modified`) for platform responses. The platform scope
+  uses `cache.ttl_seconds`; per-scope overrides return with the first
+  user-scoped cache (ADR-0002).
 - For `GET /api/v1/metrics/platform`, each key present in `data.capacity` is
   also present in `data.allocated`, and the **same resource name must use the
   same unit in both maps** (CPU as decimal core counts, memory as `Gi` binary
@@ -38,10 +38,11 @@ This file stores repository-specific behavioral specifications.
   `status.flavorsUsage.resources[].total`; do not add `borrowed` separately
   because Kueue total already includes borrowed quota.
 - Kueue resource quantities must be strings matching Kubernetes decimal SI,
-  binary SI through `Ei`, or signed-exponent syntax. Parsing and accumulation
-  use exact decimal arithmetic. Missing, whitespace-padded, malformed,
-  negative, non-finite, or base-unit-overflowing values fail the provider read;
-  an absent allocation for a capacity key remains a same-unit zero.
+  binary SI through `Ei`, or signed-exponent syntax. Parsing uses quantiphy;
+  values agree to the 6-decimal API formatting (ADR-0001). Missing,
+  whitespace-padded, malformed, negative, non-finite, or base-unit-overflowing
+  values fail the provider read; an absent allocation for a capacity key
+  remains a same-unit zero.
 - Successful platform responses retain the versioned envelope
   (`version`, `kind: PlatformMetrics`, `metadata.created`, `status`, `data`),
   open resource-name maps, deterministic resource ordering, and snapshot
@@ -54,9 +55,10 @@ This file stores repository-specific behavioral specifications.
   non-secret provider fingerprint. Memory and Redis backends preserve the same
   TTL and JSON snapshot semantics. The current service has no stale-response
   fallback: an expired/missing snapshot requires a successful provider read.
-- Custom telemetry keeps the accepted `canfar.metrics.http.requests`,
-  `canfar.metrics.provider.duration`, `canfar.metrics.cache.lookups`, and
-  `canfar.metrics.compute.duration` instruments and their bounded attributes.
+- Custom telemetry keeps the accepted `canfar.metrics.provider.duration`,
+  `canfar.metrics.cache.lookups`, and `canfar.metrics.compute.duration`
+  instruments and their bounded attributes; HTTP request metrics come from
+  FastAPI auto-instrumentation (ADR-0002).
 
 ## Decision linkage
 
@@ -64,5 +66,5 @@ Canonical decisions: [`docs/adr/README.md`](adr/README.md).
 
 ## Proposed decisions
 
-ADRs 0015 and 0020 remain proposed. Nothing in those ADRs is accepted
-runtime configuration or a shipped route.
+ADR-0003 remains proposed. Nothing in it is accepted runtime configuration or
+a shipped route.

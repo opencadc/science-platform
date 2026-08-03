@@ -52,7 +52,7 @@ route `GET /api/v1/metrics/platform`. Shipped in M4.
   not cache Metrics responses.
 - Each key in `data.capacity` must also appear in `data.allocated` using the
   **same unit** for that resource name
-  ([ADR-0002](docs/adr/0002-platform-metrics-contract.md)).
+  ([ADR-0002](docs/adr/0002-platform-api-contract.md)).
 - Platform `allocated` sums `status.flavorsUsage.resources[].total` only;
   do not add `borrowed` separately (total already includes borrowed quota).
 ## Example dialogue
@@ -63,6 +63,6 @@ route `GET /api/v1/metrics/platform`. Shipped in M4.
 
 ## Proposed vocabulary
 
-ADRs 0015 and 0020 are proposals only. Their provider names, source
+ADR-0003 are proposals only. Their provider names, source
 keys, routes, schemas, cache rules, and telemetry do not exist in runtime
 configuration or the public API.

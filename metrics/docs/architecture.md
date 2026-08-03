@@ -9,8 +9,7 @@ This file stores repository-specific architecture facts only.
 - Remove claims that are not currently implemented.
 
 **Contributors:** when adding a provider or scope, follow
-[`docs/adr/0005-runtime-composition-and-provider-lifecycle.md`](adr/0005-runtime-composition-and-provider-lifecycle.md)
-and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-kr8s-kubernetes-client.md).
+[`docs/adr/0001-runtime-architecture.md`](adr/0001-runtime-architecture.md).
 
 ## Current state
 
@@ -22,7 +21,7 @@ and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
   constructs the Kueue provider, owns provider lifecycle and cache resources,
   and builds the platform cache key and `PlatformMetricsService`. The provider owns a lazily built kr8s API handle
-  (ADR-0023).
+  (ADR-0001).
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): `KueueProvider` directly implements the
   `PlatformMetrics` read alongside provider identity, lifecycle, and cache
@@ -37,11 +36,11 @@ and the client standard in [`docs/adr/0023-kr8s-kubernetes-client.md`](adr/0023-
 - `core/`: `Settings`, `MetricsRuntime`, and `create_app`.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `PlatformMetricsService` and cache-aware orchestration.
-- `providers/`: `KueueProvider` reads ClusterQueues through kr8s
-  (typed `new_class` kinds, ADR-0023).
+- `providers/`: `KueueProvider` reads ClusterQueues through kr8s named
+  `call_api` GETs (get-only RBAC, ADR-0001).
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside kr8s access and aggregation. Quantities parse via quantiphy
-  (ADR-0024); malformed values fail the provider read.
+  (ADR-0001); malformed values fail the provider read.
 
 ## Architecture invariants
 

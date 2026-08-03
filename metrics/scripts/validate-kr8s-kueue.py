@@ -1,7 +1,7 @@
 """In-cluster kr8s validation: zero-config auth/TLS + Kueue ClusterQueue reads.
 
 Runs as serviceaccount canfar-skaha-staging in canfar-system-staging.
-Validates the three things kueue.py hand-rolled with httpx before ADR-0023:
+Validates the three things kueue.py hand-rolled with httpx before ADR-0001:
   1. Auth: bearer token discovery from the mounted serviceaccount.
   2. TLS: trusting the cluster's self-signed CA from the mounted ca.crt.
   3. CRD access: GET/LIST/WATCH ClusterQueues (cluster-scoped custom resources).
