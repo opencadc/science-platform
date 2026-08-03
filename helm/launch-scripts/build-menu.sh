@@ -4,6 +4,7 @@ HOST=$1
 
 # Callback token
 TOKEN="${DESKTOP_SESSION_APP_TOKEN}"
+DEFAULT_ICON_PROJECT="${DESKTOP_DEFAULT_ICON_PROJECT:-}"
 
 ICON_DIR="/headless/.icons"
 STARTUP_DIR="/desktopstartup"
@@ -208,13 +209,23 @@ build_menu_item () {
   rm -f $tmp_executable
   rm -f $tmp_start_executable
   rm -f $tmp_desktop
-  if [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]]; then
-    if [[ ${image_id} == *"/${category}/${short_name}:"* ]] && [[ "${name}" > "${app_version[${short_name}]}" ]]; then
-      # pick the latest version
-      app_version[${short_name}]="${name}"
-      # accessed via icon on desktop
-      update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
-    fi
+  short_name_is_icon_candidate=false
+  image_id_matches_category_app=false
+  category_matches_default_icon_project=false
+  name_is_newer_than_tracked_version=false
+  [[ "${candidates[@]}" =~ (" "|^)${short_name}(" "|$) ]] && short_name_is_icon_candidate=true
+  [[ ${image_id} == *"/${category}/${short_name}:"* ]] && image_id_matches_category_app=true
+  [[ -z "${DEFAULT_ICON_PROJECT}" || "${category}" == "${DEFAULT_ICON_PROJECT}" ]] \
+    && category_matches_default_icon_project=true
+  [[ "${name}" > "${app_version[${short_name}]}" ]] && name_is_newer_than_tracked_version=true
+  if [[ "${short_name_is_icon_candidate}" == true \
+    && "${image_id_matches_category_app}" == true \
+    && "${category_matches_default_icon_project}" == true \
+    && "${name_is_newer_than_tracked_version}" == true ]]; then
+    # pick the latest version
+    app_version[${short_name}]="${name}"
+    # accessed via icon on desktop
+    update_desktop /headless/Desktop/${short_name}.desktop ${short_name} ${name}
   fi
   rm -f ${EXECUTABLE_DIR}/*-e
   rm -f ${DESKTOP_DIR}/*-e

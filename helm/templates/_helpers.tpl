@@ -291,7 +291,7 @@ The Projects Directory base absolute path.
 {{- end -}}
 
 {{/*
-Volume source YAML for the session "cavern-volume" (content below volume name in a Pod spec).
+Volume source YAML for the session "user-storage-volume" (content below volume name in a Pod spec).
 Uses userStorage.spec when non-empty; else persistentVolumeClaimName or default claim skaha-workload-cavern-pvc.
 */}}
 {{- define "skaha.session.userStorageVolumeSpec" -}}
@@ -389,4 +389,64 @@ Common security context settings for User Session Jobs
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+{{- end }}
+
+{{/**
+Fragment of Pod .spec.volumes for user sessions. `userStorage.spec` is a Kubernetes volume
+source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, etc.), mounted as `user-storage-volume`.
+*/}}
+{{- define "skaha.session.commonVolumes" -}}
+      {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+      {{- range . }}
+      - name: {{ .name }}
+        {{- if eq .volume.type "PVC" }}
+        persistentVolumeClaim:
+          claimName: {{ .volume.name }}
+        {{- else if eq .volume.type "HOST_PATH" }}
+        hostPath:
+          path: {{ .volume.hostPath }}
+          type: {{ .volume.hostPathType }}
+        {{- else if eq .volume.type "CONFIG_MAP" }}
+        configMap:
+          name: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- else if eq .volume.type "SECRET" }}
+        secret:
+          secretName: {{ .volume.name }}
+          {{- if .volumeMount.defaultMode }}
+          defaultMode: {{ .volume.defaultMode }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      - name: user-storage-volume
+{{ include "skaha.session.userStorageVolumeSpec" . }}
+      - name: scratch-dir
+        emptyDir: {}
+{{- end }}
+
+{{- define "skaha.session.commonVolumeMounts" -}}
+        {{- with .Values.deployment.skaha.sessions.extraVolumes }}
+        {{- range . }}
+        - name: {{ .name }}
+          mountPath: {{ .volumeMount.mountPath }}
+          {{- if .volumeMount.subPath }}
+          subPath: {{ .volumeMount.subPath }}
+          {{- end }}
+          {{- if .volumeMount.readOnly }}
+          readOnly: {{ .volumeMount.readOnly }}
+          {{- end }}
+          {{- if .volumeMount.mountPropagation }}
+          mountPropagation: {{ .volumeMount.mountPropagation }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+        - mountPath: "${SKAHA_USER_HOME_DIR}"
+          name: user-storage-volume
+          subPath: ".${SKAHA_USER_HOME_DIR}"
+        - mountPath: "/scratch"
+          name: scratch-dir
+          subPath: "${skaha.sessionid}"
 {{- end }}
