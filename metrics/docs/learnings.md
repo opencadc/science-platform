@@ -19,6 +19,66 @@ decisions are also recorded under `docs/adr/`.
 
 ## Current entries
 
+- Date: July 31, 2026
+- Context: kind-smoke crashloop after the kr8s migration (PR #1161).
+- Lesson: Validate the exact access pattern production RBAC allows, not just
+  the library: kr8s resolves named objects with a LIST plus
+  `metadata.name` field selector, so `api.get(cls, name)` needs the `list`
+  verb, which the get-only ClusterQueue RBAC denies. The staging validation
+  passed only because that service account also had `list`.
+- Evidence: `src/metrics/providers/kueue.py::fetch_cluster_queue_docs`,
+  `scripts/validate-kr8s-kueue.py` (named-GET check), kr8s `_api.py`
+  `_async_get_single`, and the metrics-kind-smoke failure on PR #1161.
+- Action taken: Named reads use `api.call_api` GETs
+  (`.../clusterqueues/{name}`); ADR-0001 records the constraint and the
+  validation workflow now exercises the get-only path explicitly.
+
+- Date: July 31, 2026
+- Context: Kubernetes client selection for the Kueue provider (and future
+  scopes).
+- Lesson: Validate a client library in the target cluster before adopting it:
+  a throwaway in-cluster workflow (`scripts/validate-kr8s-kueue.py`) proved
+  kr8s handles service-account auth and the self-signed cluster CA with zero
+  configuration, which desk research alone could not settle.
+- Evidence: `scripts/validate-kr8s-kueue.py`, `src/metrics/providers/kueue.py`,
+  and `docs/adr/0001-runtime-architecture.md` (client survey summarized there;
+  full research note removed, in git history).
+- Action taken: Migrated the provider to kr8s, deleted the hand-rolled
+  token/TLS/URL plumbing and its settings, and recorded kr8s as the client of
+  choice in ADR-0001.
+
+
+- Date: July 31, 2026
+- Context: Provider/runtime ownership and application lifecycle convergence.
+- Lesson: One owner per live resource removes bundle types and special test
+  lifespans without requiring a generic plugin framework.
+- Evidence: `src/metrics/core/registry.py`,
+  `src/metrics/core/runtime.py`, `src/metrics/providers/kueue.py`,
+  `src/metrics/core/factory.py`, and ADR-0001.
+- Action taken: The registry returns one Kueue provider owning its Kubernetes
+  access; `MetricsRuntime` owns provider/cache lifecycle, and all applications
+  use one lifespan.
+
+- Date: July 31, 2026
+- Context: Platform provider capability simplification.
+- Lesson: Capability metadata can drift from behavior; one provider method is
+  a more reliable contract than a scope enum plus an intermediate delegate.
+- Evidence: `src/metrics/providers/base.py`,
+  `src/metrics/core/registry.py`, `src/metrics/providers/kueue.py`,
+  and `tests/test_registry.py`.
+- Action taken: `KueueProvider` now implements `PlatformMetrics` directly, and
+  the binder rejects selected providers without that capability.
+
+- Date: July 31, 2026 (superseded same day by ADR-0001)
+- Context: Kueue platform quantity correctness.
+- Lesson: Permissive fallback turns corrupt quantities into false zeros, and
+  storage overflow must be checked in Kubernetes base units before Gi
+  presentation. Bit-exact `Decimal` arithmetic, however, was more numeric code
+  than the 6-decimal API contract needed.
+- Evidence: `src/metrics/providers/kueue.py` and `tests/test_kueue_platform.py`.
+- Action taken: Quantities parse via quantiphy with fail-closed guards
+  (ADR-0001); the bespoke `metrics.quantity` module was deleted.
+
 - Date: April 24, 2026
 - Context: P1 review fixes for Kueue allocated aggregation and (at the time)
   user/session cache isolation.
@@ -74,14 +134,14 @@ decisions are also recorded under `docs/adr/`.
 - Action taken: Documented in `metrics/README.md` and ADR-0001.
 
 - Date: April 26, 2026
-- Context: M4 provider runtime — single `MetricsRuntime` composition root and
-  inactive Prometheus/kube providers.
-- Lesson: Inactive provider packages should stay out of the HTTP client graph so
-  startup and dependency surfaces match what operators actually use; optional
-  HTTP/2 should stay off by default to avoid an implicit `h2` install.
-- Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/provider_registry.py`,
-  and `docs/adr/0005-metrics-runtime-composition-root.md`.
-- Action taken: Documented in `docs/architecture.md` and ADR-0005.
+- Context: M4 provider runtime — single `MetricsRuntime` composition root.
+- Lesson: Inactive providers should stay out of configuration and the HTTP
+  client graph so startup and dependency surfaces match what operators actually
+  use; upstream clients should stay on HTTP/1.1 unless an HTTP/2 requirement and
+  dependency are deliberately introduced.
+- Evidence: `src/metrics/core/runtime.py`, `src/metrics/core/registry.py`,
+  and `docs/adr/0001-runtime-architecture.md`.
+- Action taken: Documented in `docs/architecture.md` and ADR-0001.
 
 - Date: April 22, 2026 (superseded June 2026)
 - Context: M3 documentation realignment and roadmap cleanup.

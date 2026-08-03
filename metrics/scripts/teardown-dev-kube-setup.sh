@@ -91,7 +91,7 @@ if [[ "${DELETE_FIXTURES}" == "true" ]]; then
     "${KUBECTL[@]}" delete workloads.kueue.x-k8s.io integration-idle -n "${NAMESPACE}" --ignore-not-found --wait=false || true
     "${KUBECTL[@]}" delete localqueues.kueue.x-k8s.io lq-smoke -n "${NAMESPACE}" --ignore-not-found --wait=false || true
   fi
-  "${KUBECTL[@]}" delete clusterqueues.kueue.x-k8s.io cq-electron cq-neutron cq-proton --ignore-not-found --wait=false || true
+  "${KUBECTL[@]}" delete clusterqueues.kueue.x-k8s.io cq-electron cq-proton --ignore-not-found --wait=false || true
   "${KUBECTL[@]}" delete cohorts.kueue.x-k8s.io cohort-atom --ignore-not-found --wait=false || true
   "${KUBECTL[@]}" delete resourceflavors.kueue.x-k8s.io default-flavor --ignore-not-found --wait=false || true
 fi

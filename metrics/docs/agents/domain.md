@@ -57,5 +57,5 @@ Cross-context work: read both glossaries and the system ADRs under `docs/adr/`.
 If your output contradicts an existing ADR, surface it explicitly rather than
 silently overriding:
 
-> _Contradicts ADR-0003 (platform capacity/allocated unit parity) — but worth
+> _Contradicts ADR-0002 (platform metrics contract: unit parity) — but worth
 > reopening because…_

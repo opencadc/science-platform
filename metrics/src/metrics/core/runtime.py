@@ -1,21 +1,19 @@
-"""App-level :class:`MetricsRuntime`: sources, cache, HTTP clients, platform reads."""
+"""App-level :class:`MetricsRuntime`: provider lifecycle, cache, and platform reads."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
-import httpx
 from pydantic import TypeAdapter
 from redis.asyncio import Redis
 
 from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
-from metrics.core.provider_registry import build_platform_provider_bundle
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
-from metrics.providers.base import Provider
-from metrics.schemas.metrics import PlatformMetricsData
-from metrics.services.platform import CachedMetrics, PlatformMetricsService, ServiceResult
-from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
+from metrics.providers.kueue import KueueProvider
+from metrics.services.platform import CachedMetrics, PlatformMetricsService
+from metrics.telemetry import MetricsRecorder
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def build_cache_backend(
     settings: Settings,
 ) -> tuple[TTLCacheBackend[CachedMetrics], Redis | None]:
     """Construct the TTL cache backend selected by ``settings.cache``."""
-    ttl = settings.cache.platform_ttl()
+    ttl = settings.cache.ttl_seconds
     if settings.cache.backend == "memory":
         return (InMemoryTTLCache[CachedMetrics](ttl_seconds=ttl), None)
 
@@ -62,28 +60,37 @@ def build_cache_backend(
 
 
 class MetricsRuntime:
-    """Selects the platform source, owns upstream clients, cache, and metric reads."""
+    """Own the active provider, cache resources, and platform metric reads."""
 
-    def __init__(self, settings: Settings) -> None:
-        """Create an empty runtime; prefer :meth:`from_settings` or :meth:`for_injected_platform`.
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        provider: KueueProvider,
+        platform_service: PlatformMetricsService,
+        redis: Redis | None = None,
+    ) -> None:
+        """Attach the provider, platform service, and optional Redis client.
+
+        Production callers use :meth:`from_settings`; tests may inject doubles.
 
         Args:
             settings: Validated :class:`Settings` for the process.
+            provider: Active provider; it owns its Kubernetes access handle.
+            platform_service: Cached platform metrics service exposed to HTTP.
+            redis: Redis client when the cache backend is Redis; closed on shutdown.
         """
         self._settings = settings
-        self._platform_http_client: httpx.AsyncClient | None = None
-        self._platform_provider: Provider | None = None
-        self._redis: Redis | None = None
-        self._platform: PlatformMetricsService | None = None
-        self._recorder: MetricsRecorder = NoopMetricsRecorder()
+        self._provider: KueueProvider | None = provider
+        self._provider_started = False
+        self._redis: Redis | None = redis
+        self._platform: PlatformMetricsService | None = platform_service
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
-        """Wire cache, platform provider bundle, and :class:`PlatformMetricsService`.
+        """Wire the Kueue provider, cache, and :class:`PlatformMetricsService`.
 
-        Constructs one long-lived ``httpx.AsyncClient`` for the active platform
-        source (via the typed registry), builds the cache backend, and binds the
-        platform loader. Does not run provider startup; call :meth:`start` during
+        This method does not run provider startup; call :meth:`start` during the
         application lifespan.
 
         Args:
@@ -93,52 +100,23 @@ class MetricsRuntime:
         Returns:
             A fully wired runtime ready for :meth:`start`.
         """
-        bundle = build_platform_provider_bundle(settings)
         cache, redis_client = build_cache_backend(settings)
-        ttl = settings.cache.platform_ttl()
-        fp = bundle.provider.cache_fingerprint()
-
-        def cache_key() -> str:
-            return platform_metrics_cache_key(
-                cluster_name=settings.cluster_name,
-                fingerprint=fp,
-            )
-
-        async def load_platform() -> PlatformMetricsData:
-            return await bundle.provider.metrics().platform()
-
+        provider = KueueProvider(settings)
+        fingerprint = provider.cache_fingerprint()
         platform_service = PlatformMetricsService(
-            platform=load_platform,
+            platform=provider.platform,
             cache=cache,
-            key=cache_key,
+            key=lambda: platform_metrics_cache_key(
+                cluster_name=settings.cluster_name,
+                fingerprint=fingerprint,
+            ),
             telemetry=recorder,
-            ttl=ttl,
-            provider=bundle.provider.name,
+            ttl=settings.cache.ttl_seconds,
+            provider=provider.name,
         )
-        runtime = cls(settings)
-        runtime.set_recorder(recorder)
-        runtime.wire(
-            platform_client=bundle.http_client,
-            platform_provider=bundle.provider,
-            platform_service=platform_service,
-            redis=redis_client,
+        return cls(
+            settings, provider=provider, platform_service=platform_service, redis=redis_client
         )
-        return runtime
-
-    @classmethod
-    def for_injected_platform(
-        cls,
-        settings: Settings,
-        platform_service: PlatformMetricsService,
-        *,
-        recorder: MetricsRecorder | None = None,
-    ) -> MetricsRuntime:
-        """Wrap a pre-built platform service (tests) without upstream HTTP clients."""
-        runtime = cls(settings)
-        runtime._platform = platform_service
-        if recorder is not None:
-            runtime.set_recorder(recorder)
-        return runtime
 
     @property
     def platform_service(self) -> PlatformMetricsService:
@@ -153,84 +131,52 @@ class MetricsRuntime:
         """Process settings associated with this runtime."""
         return self._settings
 
-    def set_recorder(self, recorder: MetricsRecorder) -> None:
-        """Attach a :class:`MetricsRecorder` for cache and provider telemetry."""
-        self._recorder = recorder
-
-    @property
-    def recorder(self) -> MetricsRecorder:
-        """Active service-level metrics recorder (noop when OTel is off)."""
-        return self._recorder
-
-    @property
-    def cache_ttl_seconds(self) -> int:
-        """TTL used for ``Cache-Control`` on successful platform responses."""
-        return self.platform_service.cache_ttl_seconds
-
-    async def get_platform_metrics(self) -> ServiceResult[PlatformMetricsData]:
-        """Return cached or fresh platform metrics (same contract as the inner service)."""
-        return await self.platform_service.get_platform_metrics()
-
-    def wire(
-        self,
-        *,
-        platform_client: httpx.AsyncClient,
-        platform_provider: Provider,
-        platform_service: PlatformMetricsService,
-        redis: Redis | None,
-    ) -> None:
-        """Inject runtime dependencies (advanced/testing); prefer :meth:`from_settings`.
-
-        Args:
-            platform_client: Long-lived client used by the platform metrics provider
-                for upstream HTTP.
-            platform_provider: Adapter that implements :class:`~metrics.providers.base.Provider`
-                (startup checks and platform metrics).
-            platform_service: Cached platform metrics service exposed to HTTP.
-            redis: Optional Redis client when the cache backend is Redis; closed on
-                shutdown.
-        """
-        self._platform_http_client = platform_client
-        self._platform_provider = platform_provider
-        self._platform = platform_service
-        self._redis = redis
-
     async def start(self) -> None:
-        """Run the active platform provider's startup checks when one is wired."""
-        if self._platform_provider is None:
+        """Start the active provider once, cleaning up all resources on failure."""
+        if self._provider is None or self._provider_started:
             return
         try:
-            await self._platform_provider.startup()
+            await self._provider.startup()
+            self._provider_started = True
+        except asyncio.CancelledError:
+            try:
+                await self.shutdown()
+            finally:
+                raise
         except RuntimeStartupError:
-            _logger.exception("Platform provider startup validation failed")
+            _logger.exception("Provider startup validation failed")
+            await self.shutdown()
             raise
         except Exception as exc:
-            raise RuntimeStartupError(
-                f"Unexpected error during platform provider startup: {exc}"
-            ) from exc
+            _logger.exception("Unexpected provider startup failure")
+            await self.shutdown()
+            raise RuntimeStartupError("Unexpected error during metrics runtime startup") from exc
 
     async def shutdown(self) -> None:
-        """Close the platform provider (Adapter), then HTTP and Redis, then clear platform service.
+        """Close each owned resource once without allowing one failure to skip another.
 
-        After this returns, :attr:`_platform` is ``None`` so :meth:`get_platform_metrics` and
-        :attr:`platform_service` surface an invalid state (raises ``RuntimeError``) instead of
-        reusing closed clients or a stale :class:`PlatformMetricsService` graph.
+        After this returns, :attr:`_platform` is ``None`` so :attr:`platform_service`
+        surfaces an invalid state (raises ``RuntimeError``) instead of reusing closed
+        resources or a stale :class:`PlatformMetricsService` graph.
         """
-        if self._platform_provider is not None:
+        cancellation: asyncio.CancelledError | None = None
+        provider, self._provider = self._provider, None
+        self._provider_started = False
+        if provider is not None:
             try:
-                await self._platform_provider.shutdown()
+                await provider.shutdown()
+            except asyncio.CancelledError as exc:
+                cancellation = exc
             except Exception:
                 _logger.exception("Platform provider shutdown failed; closing remaining resources")
-        self._platform_provider = None
-        if self._platform_http_client is not None:
+        redis, self._redis = self._redis, None
+        if redis is not None:
             try:
-                if not self._platform_http_client.is_closed:
-                    await self._platform_http_client.aclose()
-            finally:
-                self._platform_http_client = None
-        if self._redis is not None:
-            try:
-                await self._redis.aclose()
-            finally:
-                self._redis = None
+                await redis.aclose()
+            except asyncio.CancelledError as exc:
+                cancellation = cancellation or exc
+            except Exception:
+                _logger.exception("Redis shutdown failed")
         self._platform = None
+        if cancellation is not None:
+            raise cancellation

@@ -603,7 +603,7 @@ metricsBackend:
   image:
     # -- Metrics container image repository.
     repository: images.opencadc.org/platform/metrics
-    # -- Metrics container image tag.
+    # -- Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metricsBackend.env`.
     tag: v0.1.5
     # -- imagePullPolicy for the Metrics API container.
     pullPolicy: IfNotPresent
@@ -615,7 +615,7 @@ metricsBackend:
     limits:
       cpu: "1"
       memory: 1Gi
-  # -- Map of environment variables for the Metrics container (typically METRICS_*). GitOps should supply the full map per environment.
+  # -- Map of METRICS_* environment variables for the Metrics container; configuration is environment-only. GitOps supplies per-environment values — at minimum METRICS_CLUSTER_NAME and METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES (JSON array string, for example '["cq-a"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings; images after v0.1.5 fail startup on the removed keys (METRICS_PROVIDERS__KUEUE__KUBE_API_URL / KUBE_API_TOKEN / TOKEN_FILE / CA_FILE / KUBE_VERIFY_TLS / KUBE_CLUSTERQUEUE_PATH / HTTP__*, METRICS_CACHE__SCOPE_TTL_SECONDS, METRICS_CONFIG_FILE). See metrics/docs/environment-contracts.md.
   env: {}
   redis:
     # -- When true, set METRICS_REDIS_URL to this release's Bitnami Redis master Service (<release>-redis-master), same instance Skaha uses. Set false and supply METRICS_REDIS_URL in env if Metrics should use another Redis.

@@ -5,31 +5,23 @@ import os
 import httpx
 import pytest
 
-from metrics.quantity import parse_cpu_to_cores, parse_memory_to_gib
+from metrics.providers.kueue import parse_resource_amount
 
 
-pytestmark = pytest.mark.integration
-
-
-def _base_url() -> str | None:
-    return os.getenv("METRICS_BASE_URL")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not os.getenv("METRICS_BASE_URL"), reason="METRICS_BASE_URL not configured"),
+]
+base_url = os.getenv("METRICS_BASE_URL", "")
 
 
 def test_health_endpoint() -> None:
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/healthz", timeout=10)
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_platform_endpoint_shape() -> None:
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=10)
     assert response.status_code == 200
     payload = response.json()
@@ -48,15 +40,11 @@ def test_platform_endpoint_shape() -> None:
 
 def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     """Allocated map includes the borrowed Kueue smoke Workload total."""
-    base_url = _base_url()
-    if not base_url:
-        pytest.skip("METRICS_BASE_URL not configured")
-
     response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=30.0)
     assert response.status_code == 200
     allocated = response.json()["data"]["allocated"]
-    cpu_cores = parse_cpu_to_cores(allocated.get("cpu", "0"))
-    mem_gib = parse_memory_to_gib(allocated.get("memory", "0"))
+    cpu_cores = parse_resource_amount("cpu", allocated.get("cpu", "0"))
+    mem_gib = parse_resource_amount("memory", allocated.get("memory", "0Gi"))
     # scripts/test-setup.yaml: cq-electron has 100m/100Mi nominal quota, while
     # integration-idle requests 200m/200Mi. Admission proves borrowing, and
     # ClusterQueue status.flavorsUsage total must include that borrowed usage.

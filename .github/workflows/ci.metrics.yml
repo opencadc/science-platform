@@ -119,7 +119,6 @@ jobs:
           KIND_CLUSTER_NAME: metrics
           KUBE_CONTEXT: kind-metrics
           KIND_SMOKE_CI: "1"
-          KIND_SMOKE_EXIT_AFTER_TESTS: "1"
           KIND_SMOKE_SKIP_BUILD: "1"
           KIND_IMAGE_LOAD_TIMEOUT_SECONDS: "900"
           KIND_PRELOAD_IMAGES: "false"
@@ -137,7 +136,4 @@ jobs:
         run: |
           set +e
           bash scripts/kind-smoke-teardown.sh --all --kind
-          if command -v kind >/dev/null 2>&1; then
-            kind delete cluster --name "${KIND_CLUSTER_NAME}" 2>/dev/null || true
-          fi
           exit 0

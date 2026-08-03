@@ -1,12 +1,17 @@
-"""Kueue-backed platform metrics, startup checks, URL building, and spec parsing."""
+"""Kueue-backed platform metrics: kr8s reads, quantity handling, startup checks."""
 
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 import httpx
+import kr8s
+import kr8s.asyncio
+from quantiphy import QuantiPhyError, Quantity
 
 from metrics.core.settings import KueueProviderConfig, Settings
 from metrics.errors import (
@@ -14,131 +19,138 @@ from metrics.errors import (
     ProviderUnavailableError,
     RuntimeStartupError,
 )
-from metrics.providers.base import (
-    MetricScope,
-    Provider,
-    ProviderMetrics,
-)
-from metrics.providers.kube import (
-    kube_auth_headers,
-    kube_get_json,
-    kube_parallel_get_json,
-    resolve_kube_token,
-    resolve_kube_verify,
-)
-from metrics.quantity import (
-    format_resource_amount,
-    merge_resource_totals,
-    parse_resource_amount,
-)
 from metrics.schemas.metrics import PlatformMetricsData
 
+_MAX_QUANTITY = float(2**63)
+_GIB = float(2**30)
+_STORAGE_RESOURCES = frozenset({"memory", "ephemeral-storage"})
+_INVALID_QUANTITY_MESSAGE = "Kueue platform data contained an invalid resource quantity"
 
-def kueue_http_client(kueue_config: KueueProviderConfig) -> httpx.AsyncClient:
-    """Build a shared ``httpx.AsyncClient`` for Kueue and Kubernetes list/get calls.
+_KUBE_REQUEST_ERRORS = (
+    kr8s.APITimeoutError,
+    kr8s.ConnectionClosedError,
+    httpx.HTTPError,
+)
 
-    Args:
-        kueue_config: Kueue provider settings (timeouts, TLS, pool sizes, HTTP/2).
 
-    Returns:
-        A configured async client; callers own lifecycle and must call ``aclose()``.
+# --- Resource quantities (quantiphy-backed, public response units) ---
+
+
+def parse_resource_amount(resource_name: str, raw: object) -> float:
+    """Parse a Kubernetes quantity string into its public response unit.
+
+    Units follow the platform contract: cores for CPU, gibibytes for storage
+    resources, and base units for extended resources. Parsing is delegated to
+    ``quantiphy`` (SI and binary suffixes, scientific notation); values are
+    floats, so totals are accurate to well past the 6 decimal places the API
+    formats, not bit-exact.
+
+    Raises:
+        ProviderExecutionError: For non-strings, malformed syntax, surrounding
+            whitespace, negatives, non-finite values, or values at or beyond
+            2**63 in base units.
     """
-    http_config = kueue_config.http
-    verify = resolve_kube_verify(kueue_config.kube_verify_tls, ca_file=kueue_config.ca_file)
-    return httpx.AsyncClient(
-        limits=httpx.Limits(
-            max_connections=http_config.max_connections,
-            max_keepalive_connections=http_config.max_keepalive_connections,
-            keepalive_expiry=http_config.keepalive_expiry_seconds,
-        ),
-        http2=http_config.http2,
-        timeout=httpx.Timeout(kueue_config.kube_request_timeout_seconds),
-        verify=verify,
-    )
+    if not isinstance(raw, str) or not raw or raw != raw.strip() or len(raw) > 100:
+        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
+    try:
+        value = float(Quantity(raw, binary=True))
+    except (QuantiPhyError, ValueError) as exc:
+        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE) from exc
+    if not isfinite(value) or value < 0 or value >= _MAX_QUANTITY:
+        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
+    if resource_name.lower() in _STORAGE_RESOURCES:
+        return value / _GIB
+    return value
 
 
-def kueue_clusterqueues_list_url(
-    kueue_config: KueueProviderConfig,
-) -> str:
-    """Return the Kubernetes API list URL for ClusterQueue objects."""
-    base = (kueue_config.kube_api_url or "").rstrip("/")
-    return f"{base}{kueue_config.kube_clusterqueue_path}"
+def _validate_resource_amount(resource_name: str, value: float) -> None:
+    base_value = value * _GIB if resource_name.lower() in _STORAGE_RESOURCES else value
+    if not isfinite(base_value) or base_value < 0 or base_value >= _MAX_QUANTITY:
+        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
 
 
-def cluster_queue_object_url(kueue_config: KueueProviderConfig, queue_name: str) -> str:
-    """Return the get-by-name URL for a ``ClusterQueue`` custom resource."""
-    base = (kueue_config.kube_api_url or "").rstrip("/")
-    return f"{base}{kueue_config.kube_clusterqueue_path}/{queue_name}"
+def format_resource_amount(resource_name: str, value: float) -> str:
+    """Format a resource total for API payloads: ≤6 decimals, no scientific notation."""
+    _validate_resource_amount(resource_name, value)
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    if resource_name.lower() in _STORAGE_RESOURCES:
+        return f"{text}Gi"
+    return text
 
 
-def sum_nominal_quotas_by_resource(doc: dict[str, Any]) -> dict[str, float]:
-    """Sum ``nominalQuota`` for every resource across all groups and flavors.
+def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> None:
+    """Accumulate a resource total while retaining valid zero values."""
+    total = target.get(name, 0.0) + delta
+    _validate_resource_amount(name, total)
+    target[name] = total
 
-    JSON follows Kueue v1beta2 CRDs: each ``resourceGroups`` entry lists
-    ``flavors``, each flavor lists ``resources`` with ``nominalQuota`` quantities
-    compatible with Kubernetes resource.Quantity syntax.
+
+# --- Kubernetes access via kr8s ---
+
+
+async def create_kube_api(kueue_config: KueueProviderConfig) -> Any:
+    """Build a kr8s API handle using its own discovery (in-cluster SA or kubeconfig)."""
+    api = await kr8s.asyncio.api()
+    api.timeout = kueue_config.kube_request_timeout_seconds
+    return api
+
+
+async def fetch_cluster_queue_docs(
+    api: Any,
+    api_version: str,
+    names: list[str],
+) -> list[dict[str, Any]]:
+    """Fetch ClusterQueue objects by name sequentially, in request order.
+
+    Uses named GETs (``.../clusterqueues/{name}``) via ``call_api`` so the
+    get-only RBAC contract holds: kr8s's object helpers resolve names with a
+    LIST plus field selector, which would demand the ``list`` verb.
+
+    Platform loads are already serialized by the single-flight service, and the
+    configured queue list is small, so there is no parallel fan-out here.
+
+    Raises:
+        kr8s.ServerError: For API server errors, including HTTP 404 when a
+            named ClusterQueue does not exist.
+    """
+    docs: list[dict[str, Any]] = []
+    for name in names:
+        async with api.call_api(
+            method="GET",
+            version=api_version,
+            url=f"clusterqueues/{name}",
+        ) as response:
+            docs.append(response.json())
+    return docs
+
+
+# --- ClusterQueue document aggregation ---
+
+
+def _merge_resource_entries(
+    totals: dict[str, float],
+    resources: Any,
+    value_key: str,
+) -> None:
+    """Accumulate ``resources[].{value_key}`` quantities into ``totals`` by name.
 
     Resource **names** are taken verbatim from the API (for example ``cpu``,
     ``memory``, ``nvidia.com/gpu``) so the platform contract can surface future
-    resource types without schema changes. Values are accumulated in internal
-    float units: cores for CPU, gibibytes for memory, raw float for unknown names
-    (see :func:`metrics.quantity.parse_resource_amount`).
-
-    Args:
-        doc: A ``ClusterQueue`` or ``Cohort`` API object (dict with ``spec``).
-
-    Returns:
-        Mapping of resource name → aggregated float suitable for formatting back
-        to Kubernetes-style quantity strings.
-
+    resource types without schema changes; values use public response units.
     """
-    totals: dict[str, float] = {}
-    spec = doc.get("spec") or {}
-    for group in spec.get("resourceGroups") or []:
-        for flavor in group.get("flavors") or []:
-            for resource in flavor.get("resources") or []:
-                name = str(resource.get("name", "")).strip()
-                if not name:
-                    continue
-                quota = resource.get("nominalQuota")
-                merge_resource_totals(
-                    totals,
-                    name,
-                    parse_resource_amount(name, str(quota) if quota is not None else ""),
-                )
-    return totals
+    for resource in resources or []:
+        name = str(resource.get("name", "")).strip()
+        if not name:
+            continue
+        merge_resource_totals(
+            totals,
+            name,
+            parse_resource_amount(name, resource.get(value_key)),
+        )
 
 
-def _sum_usage_from_status(doc: dict[str, Any]) -> dict[str, float]:
-    totals: dict[str, float] = {}
-    status = doc.get("status") or {}
-    for flavor in status.get("flavorsUsage") or []:
-        for resource in flavor.get("resources") or []:
-            name = str(resource.get("name", "")).strip()
-            if not name:
-                continue
-            total = resource.get("total")
-            merge_resource_totals(
-                totals,
-                name,
-                parse_resource_amount(name, str(total) if total is not None else ""),
-            )
-    return totals
-
-
-def _float_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
+def _resource_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
     return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
-
-
-def _align_allocated_with_capacity(
-    capacity: dict[str, str],
-    allocated: dict[str, str],
-) -> dict[str, str]:
-    out = dict(allocated)
-    for name in capacity:
-        if name not in out:
-            out[name] = format_resource_amount(name, 0.0)
-    return dict(sorted(out.items()))
 
 
 @dataclass(slots=True)
@@ -147,28 +159,36 @@ class _PlatformResourceMaps:
     allocated: dict[str, str]
 
 
-class KueueMetrics(ProviderMetrics):
-    """Kueue implementation for the platform scope."""
+class KueueProvider:
+    """Kueue source: startup validation and platform metrics."""
 
-    supported_scopes: frozenset[MetricScope] = frozenset({MetricScope.PLATFORM})
-
-    def __init__(
-        self,
-        *,
-        settings: Settings,
-        client: httpx.AsyncClient,
-        kueue_config: KueueProviderConfig,
-    ) -> None:
-        """Build platform metrics for the given Kueue configuration and client.
+    def __init__(self, settings: Settings, api: Any | None = None) -> None:
+        """Attach settings and an optional pre-built Kubernetes API handle.
 
         Args:
-            settings: App settings (e.g. cluster name for the API payload).
-            client: Injected client used for parallel Kubernetes GET requests.
-            kueue_config: Kueue provider fields (API URL, queues, token paths).
+            settings: Full app settings; Kueue fields live under ``providers.kueue``.
+            api: kr8s-compatible API object. Production leaves this ``None`` and the
+                provider builds one lazily on first use; tests inject fakes.
         """
         self._settings = settings
-        self._client = client
-        self._kueue_config = kueue_config
+        self._kueue_config = settings.providers.kueue
+        self._api = api
+
+    @property
+    def name(self) -> str:
+        """Stable provider key matching configuration."""
+        return "kueue"
+
+    async def _ensure_api(self) -> Any:
+        if self._api is None:
+            try:
+                self._api = await create_kube_api(self._kueue_config)
+            except Exception as exc:
+                # Do not embed str(exc): discovery errors can include paths/URLs.
+                raise ProviderUnavailableError(
+                    "Could not configure a Kubernetes API client for Kueue calls"
+                ) from exc
+        return self._api
 
     async def platform(self) -> PlatformMetricsData:
         """Load capacity and allocated maps from Kueue ClusterQueue data."""
@@ -181,36 +201,27 @@ class KueueMetrics(ProviderMetrics):
 
     async def _collect_resource_maps(self) -> _PlatformResourceMaps:
         kueue_config = self._kueue_config
-        if not kueue_config.kube_api_url:
-            raise ProviderUnavailableError("Kueue kube_api_url is not configured")
         if not kueue_config.cluster_queues:
             raise ProviderUnavailableError(
                 "Kueue cluster_queues must be configured for platform metrics"
             )
-        token = resolve_kube_token(kueue_config.kube_api_token, kueue_config.token_file)
-        if not token:
-            raise ProviderUnavailableError(
-                "No Kubernetes API bearer token available for Kueue calls"
-            )
-        headers = kube_auth_headers(token)
-
-        queue_urls = [
-            cluster_queue_object_url(kueue_config, q) for q in kueue_config.cluster_queues
-        ]
+        api = await self._ensure_api()
 
         try:
-            docs = await kube_parallel_get_json(
-                self._client,
-                queue_urls,
-                headers=headers,
+            docs = await fetch_cluster_queue_docs(
+                api,
+                kueue_config.kueue_api_version,
+                kueue_config.cluster_queues,
             )
-        except httpx.HTTPStatusError as exc:
+        except kr8s.ServerError as exc:
+            status_code = getattr(exc.response, "status_code", None)
+            detail = f"HTTP {status_code}" if status_code else "a server error"
             raise ProviderExecutionError(
-                f"Kubernetes returned HTTP {exc.response.status_code} querying Kueue objects"
+                f"Kubernetes returned {detail} querying Kueue objects"
             ) from exc
-        except httpx.RequestError as exc:
-            # Do not embed str(exc) here: httpx may include the request URL, which
-            # must not propagate into API error payloads.
+        except _KUBE_REQUEST_ERRORS as exc:
+            # Do not embed str(exc) here: transports may include the request URL,
+            # which must not propagate into API error payloads.
             raise ProviderExecutionError(
                 "Failed querying Kueue objects (upstream request error)"
             ) from exc
@@ -218,99 +229,62 @@ class KueueMetrics(ProviderMetrics):
         queue_totals: dict[str, float] = {}
         allocated_totals: dict[str, float] = {}
 
-        for item in docs:
-            for res_name, val in sum_nominal_quotas_by_resource(item).items():
-                merge_resource_totals(queue_totals, res_name, val)
-            for res_name, val in _sum_usage_from_status(item).items():
-                merge_resource_totals(allocated_totals, res_name, val)
+        try:
+            for doc in docs:
+                for group in (doc.get("spec") or {}).get("resourceGroups") or []:
+                    for flavor in group.get("flavors") or []:
+                        _merge_resource_entries(
+                            queue_totals, flavor.get("resources"), "nominalQuota"
+                        )
+                for flavor in (doc.get("status") or {}).get("flavorsUsage") or []:
+                    _merge_resource_entries(allocated_totals, flavor.get("resources"), "total")
+        except (AttributeError, TypeError) as exc:
+            raise ProviderExecutionError(
+                "Kueue platform data contained an invalid object shape"
+            ) from exc
         if not queue_totals:
             raise ProviderUnavailableError(
                 "Kueue ClusterQueue specs did not include nominal quota values"
             )
-        capacity_str = _float_maps_to_strings(queue_totals)
-        allocated_str = _align_allocated_with_capacity(
-            capacity_str,
-            _float_maps_to_strings(allocated_totals),
-        )
-        return _PlatformResourceMaps(
-            capacity=capacity_str,
-            allocated=allocated_str,
-        )
-
-
-class KueueProvider(Provider):
-    """Kueue source: startup validation and platform metrics."""
-
-    def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
-        """Attach settings and a shared client for this provider.
-
-        Args:
-            settings: Full app settings; Kueue fields live under ``providers.kueue``.
-            client: Async HTTP client used for Kubernetes API traffic.
-        """
-        self._settings = settings
-        self._client = client
-        self._kueue_config = settings.providers.kueue
-        self._metrics = KueueMetrics(
-            settings=settings,
-            client=client,
-            kueue_config=self._kueue_config,
-        )
-
-    @property
-    def name(self) -> str:
-        """Stable provider key matching configuration."""
-        return "kueue"
-
-    def metrics(self) -> KueueMetrics:
-        """Return the Kueue :class:`KueueMetrics` implementation."""
-        return self._metrics
+        capacity = _resource_maps_to_strings(queue_totals)
+        # Allocated keys align with capacity: absent usage renders as explicit zero.
+        zeros = {name: format_resource_amount(name, 0.0) for name in queue_totals}
+        allocated = dict(sorted((zeros | _resource_maps_to_strings(allocated_totals)).items()))
+        return _PlatformResourceMaps(capacity=capacity, allocated=allocated)
 
     def cache_fingerprint(self) -> str:
-        """Hash of configured cluster queue list for cache key segregation."""
+        """Hash non-secret provider identity for cache key segregation."""
         kueue_config = self._kueue_config
-        raw = "|".join(sorted(kueue_config.cluster_queues))
+        raw = json.dumps(
+            {
+                "api_version": kueue_config.kueue_api_version,
+                "name": self.name,
+                "queues": sorted(kueue_config.cluster_queues),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """List ClusterQueues and fetch configured queues to validate RBAC."""
+        """Fetch each configured ClusterQueue to validate access, failing fast."""
         kueue_config = self._kueue_config
-        if not kueue_config.kube_api_url:
-            raise RuntimeStartupError(
-                "METRICS_PROVIDERS__KUEUE__KUBE_API_URL is required when platform source is kueue"
-            )
         if not kueue_config.cluster_queues:
             raise RuntimeStartupError(
                 "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES must list at least one ClusterQueue"
             )
-        token = resolve_kube_token(kueue_config.kube_api_token, kueue_config.token_file)
-        if not token:
-            raise RuntimeStartupError(
-                "No Kubernetes API bearer token: set token_file or "
-                "METRICS_PROVIDERS__KUEUE__KUBE_API_TOKEN or mount a service account token"
-            )
-        headers = kube_auth_headers(token)
-
-        list_url = kueue_clusterqueues_list_url(kueue_config)
         try:
-            await kube_get_json(self._client, list_url, headers=headers)
-        except httpx.HTTPStatusError as exc:
-            if exc.response is not None and exc.response.status_code in (403, 404):
-                raise RuntimeStartupError(
-                    f"Kueue ClusterQueue API is not reachable or not installed (HTTP {exc.response.status_code})"
-                ) from exc
-            raise RuntimeStartupError(f"Kubernetes request failed: {exc}") from exc
-        except httpx.RequestError as exc:
+            api = await self._ensure_api()
+        except ProviderUnavailableError as exc:
             raise RuntimeStartupError(
-                f"Cannot reach Kubernetes API for Kueue checks: {exc}"
+                "Cannot configure Kubernetes API access for Kueue startup checks"
             ) from exc
 
         for qname in kueue_config.cluster_queues:
-            queue_url = cluster_queue_object_url(kueue_config, qname)
             try:
-                cq = await kube_get_json(self._client, queue_url, headers=headers)
-            except httpx.HTTPStatusError as exc:
-                status_code = exc.response.status_code if exc.response is not None else None
+                await fetch_cluster_queue_docs(api, kueue_config.kueue_api_version, [qname])
+            except kr8s.ServerError as exc:
+                status_code = getattr(exc.response, "status_code", None)
                 if status_code == 404:
                     raise RuntimeStartupError(
                         f"Configured ClusterQueue {qname!r} was not found in the cluster"
@@ -319,20 +293,15 @@ class KueueProvider(Provider):
                     raise RuntimeStartupError(
                         f"Configured ClusterQueue {qname!r} is forbidden (HTTP 403)"
                     ) from exc
-                if status_code is not None:
-                    raise RuntimeStartupError(
-                        f"Failed loading ClusterQueue {qname!r} (HTTP {status_code})"
-                    ) from exc
-                raise RuntimeStartupError(f"Failed loading ClusterQueue {qname!r}") from exc
-            except httpx.RequestError as exc:
+                detail = f"HTTP {status_code}" if status_code else "a server error"
                 raise RuntimeStartupError(
-                    f"Cannot reach Kubernetes API for ClusterQueue {qname!r}: {exc}"
+                    f"Failed loading ClusterQueue {qname!r} ({detail})"
                 ) from exc
-            if not isinstance(cq, dict):
+            except _KUBE_REQUEST_ERRORS as exc:
                 raise RuntimeStartupError(
-                    f"Unexpected response when loading ClusterQueue {qname!r}"
-                )
+                    "Cannot reach Kubernetes API for Kueue startup checks"
+                ) from exc
 
     async def shutdown(self) -> None:
-        """Kueue does not hold resources beyond the shared client; no-op."""
-        return None
+        """Release the API handle; the kr8s session is process-shared and stays open."""
+        self._api = None

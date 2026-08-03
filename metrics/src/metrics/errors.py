@@ -12,7 +12,6 @@ class AppError(Exception):
     code: str
     message: str
     status_code: int
-    details: dict[str, str] | None = None
 
 
 class ProviderUnavailableError(Exception):

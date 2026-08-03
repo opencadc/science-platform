@@ -1,19 +1,8 @@
 # Default chart values (override with values-dev.yaml for local/dev flows)
-replicaCount: 1
-
-nameOverride: ""
-fullnameOverride: ""
-
 image:
   repository: images.opencadc.org/platform/metrics
   tag: latest
   pullPolicy: IfNotPresent
-
-service:
-  type: ClusterIP
-  port: 8000
-
-resources: {}
 
 podSecurityContext:
   runAsNonRoot: true
@@ -26,7 +15,9 @@ securityContext:
     drop:
       - ALL
 
-# Flat env map -> container env (METRICS_* keys)
+# -- Flat fail-closed Settings map. Supported provider/source keys are
+# METRICS_PROVIDERS__KUEUE__* and METRICS_SOURCES__PLATFORM=kueue; unknown
+# provider, source, cache, and Kueue fields fail application startup.
 env: {}
 
 serviceAccount:
@@ -43,19 +34,3 @@ rbac:
 redis:
   enabled: true
   image: redis:7-alpine
-  resources: {}
-
-# HTTP probes (API listens only after Kueue lifespan validation in kueue mode).
-probes:
-  startup:
-    failureThreshold: 40
-    periodSeconds: 3
-    timeoutSeconds: 3
-  liveness:
-    initialDelaySeconds: 0
-    periodSeconds: 20
-    timeoutSeconds: 5
-  readiness:
-    initialDelaySeconds: 0
-    periodSeconds: 10
-    timeoutSeconds: 3

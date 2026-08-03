@@ -5,15 +5,14 @@ image:
   pullPolicy: IfNotPresent
 
 env:
-  METRICS_ENVIRONMENT: "dev"
   METRICS_CLUSTER_NAME: "dev-cluster"
   METRICS_SOURCES__PLATFORM: "kueue"
   METRICS_CACHE__BACKEND: "redis"
   METRICS_CACHE__TTL_SECONDS: "15"
   METRICS_OTEL_METRICS_ENABLED: "false"
-  METRICS_PROVIDERS__KUEUE__KUBE_API_URL: "https://kubernetes.default.svc"
+  # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
+  # service account (ADR-0001); no transport settings are configured here.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-example"]'
-  METRICS_PROVIDERS__PROMETHEUS__URL: "http://prometheus.monitoring.svc:9090"
 
 redis:
   enabled: true

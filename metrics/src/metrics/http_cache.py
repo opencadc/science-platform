@@ -37,16 +37,11 @@ def metrics_success_cache_headers(
     snapshot_created: datetime,
     configured_ttl: int,
     shared_cache_public: bool,
-    user_scoped: bool,
     now: datetime | None = None,
 ) -> dict[str, str]:
     """Build Date, Cache-Control, Expires, and Last-Modified for a successful metrics GET.
 
-    Platform metrics GETs are ``public`` when ``shared_cache_public`` is true and
-    ``user_scoped`` is false; otherwise they are ``private``. When ``user_scoped``
-    is true, responses stay ``private`` even if ``shared_cache_public`` is true, so
-    user-scoped or other private snapshot policies never opt into shared public caches.
-
+    * Visibility is ``public`` when ``shared_cache_public`` is true, else ``private``.
     * ``max-age`` is **remaining** freshness (configured TTL minus snapshot age).
     * When ``configured_ttl == 0``, sends ``Cache-Control: no-store``.
     """
@@ -67,8 +62,7 @@ def metrics_success_cache_headers(
         configured_ttl,
         now=now,
     )
-    visibility_public = shared_cache_public and not user_scoped
-    vis = "public" if visibility_public else "private"
+    vis = "public" if shared_cache_public else "private"
     headers["Cache-Control"] = f"{vis}, max-age={remaining}"
     expires_at = now + timedelta(seconds=remaining)
     headers["Expires"] = http_date(expires_at)

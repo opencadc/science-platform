@@ -7,8 +7,8 @@ metadata:
     {{- include "metrics-api.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["kueue.x-k8s.io"]
-    resources: ["clusterqueues", "cohorts"]
-    verbs: ["get", "list"]
+    resources: ["clusterqueues"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

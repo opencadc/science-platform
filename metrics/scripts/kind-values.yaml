@@ -12,17 +12,16 @@ rbac:
   create: true
 
 env:
-  METRICS_ENVIRONMENT: "dev"
   METRICS_CLUSTER_NAME: "kind-metrics"
   METRICS_SOURCES__PLATFORM: "kueue"
   METRICS_CACHE__BACKEND: "redis"
   # Short TTL for CI and local integration so platform snapshots refresh quickly.
   METRICS_CACHE__TTL_SECONDS: "1"
   METRICS_OTEL_METRICS_ENABLED: "false"
-  METRICS_PROVIDERS__KUEUE__KUBE_API_URL: "https://kubernetes.default.svc"
-  METRICS_PROVIDERS__KUEUE__KUBE_VERIFY_TLS: "true"
+  # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
+  # service account (ADR-0001); no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
-  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-neutron","cq-electron"]'
+  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron"]'
 
 redis:
   enabled: true
