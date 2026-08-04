@@ -35,9 +35,29 @@ grafanaDashboards:
   datasourceName: Mimir
 ```
 
-Enable on **one** release only. Two releases pointing at the same Grafana would render
-ConfigMaps carrying identical dashboard uids, and the sidecar would import whichever it
-wrote last.
+Enable on **one** release only. Dashboard uids are fixed strings, and a uid is global to
+a Grafana organisation, so two releases pointing at the same Grafana render ConfigMaps
+carrying identical uids and the sidecar imports whichever it wrote last. The
+`grafana_folder` annotation files them differently but does **not** disambiguate a uid —
+installing per environment into separate folders does not work without templating the
+uids as well.
+
+That is why the ConfigMaps default to a namespace of their own rather than a release's.
+Where several environments share one cluster and one Grafana, their metrics are already
+in one backend and differ only by namespace, so the right shape is one install whose
+`$namespace` picker spans the environments — not one install per environment. The
+dashboards are a cluster-scoped artifact, and `canfar-dashboards` says so.
+
+```yaml
+grafanaDashboards:
+  namespace: canfar-dashboards   # "" falls back to the release namespace
+  namespaceCreate: false         # true to have the chart create it
+```
+
+The namespace must be one the Grafana sidecar watches. If the sidecar is namespace-scoped
+(`SIDECAR_DASHBOARDS_NAMESPACE`, or `sidecar.dashboards.searchNamespace` in the Grafana
+chart) and does not watch it, the ConfigMaps are collected by nobody and **nothing reports
+an error** — the dashboards simply never appear.
 
 `datasourceUid` must name a Prometheus-type data source that exists in the target
 Grafana. See the note on the seeded data source under [Conventions](#conventions-worth-preserving-when-editing)

@@ -18,6 +18,21 @@ them.
 {{- if not $files }}
   {{- fail "grafanaDashboards.enabled is true but no dashboard JSON was found under helm/dashboards" -}}
 {{- end -}}
+{{/*
+The dashboards span every environment sharing one Grafana, so they default to their own
+namespace rather than a release's. Created here only on request and only when it is not
+the release namespace, mirroring templates/namespace.yaml for the workload namespace.
+Helm installs a Namespace before the ConfigMaps that go in it, so one file is enough.
+*/}}
+{{- if and $cfg.namespaceCreate (not (eq $ctx.Release.Namespace $namespace)) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $namespace }}
+  labels:
+    {{- include "skaha.labels" $ctx | nindent 4 }}
+{{- end }}
 {{- range $path, $_ := $files }}
 {{- $stem := trimSuffix ".json" (base $path) }}
 {{- $body := $ctx.Files.Get $path

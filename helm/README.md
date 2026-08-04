@@ -74,7 +74,9 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | grafanaDashboards.datasourceUid | string | `"mimir"` | Uid of the Prometheus-compatible data source the dashboards query. |
 | grafanaDashboards.enabled | bool | `false` | Render the CANFAR Grafana dashboard ConfigMaps. |
 | grafanaDashboards.folder | string | `"CANFAR Science Platform"` | Grafana folder the dashboards are filed under, via the `grafana_folder` annotation. |
-| grafanaDashboards.namespace | string | `""` | Namespace to create the ConfigMaps in. Defaults to the release namespace; set this when the Grafana sidecar only watches a specific namespace. |
+| grafanaDashboards.namespace | string | `"canfar-dashboards"` | Namespace the dashboard ConfigMaps are created in. Empty falls back to the release namespace. |
+| grafanaDashboards.namespaceCreate | bool | `false` | Create `namespace` if it differs from the release namespace. Leave false where namespaces are managed externally. |
+| grafanaDashboards.scrapeIntervalSeconds | int | `15` | Scrape interval of container metrics, in seconds, used to integrate gauges into hours. |
 | grafanaDashboards.sidecarLabel | string | `"grafana_dashboard"` | Label the Grafana sidecar selects on. |
 | grafanaDashboards.sidecarLabelValue | string | `"1"` | Value for `sidecarLabel`. |
 | ingress.enabled | bool | `true` | Enable ingress routing for the Skaha API. |

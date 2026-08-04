@@ -671,9 +671,15 @@ grafanaDashboards:
   enabled: false
   # -- Grafana folder the dashboards are filed under, via the `grafana_folder` annotation.
   folder: CANFAR Science Platform
-  # -- Namespace to create the ConfigMaps in. Defaults to the release namespace; set this
-  # when the Grafana sidecar only watches a specific namespace.
-  namespace: ""
+  # The dashboards describe every environment that shares a Grafana, not one release, so
+  # they default to their own namespace rather than the release's. Set to "" to fall back
+  # to the release namespace, or to any namespace the Grafana sidecar watches. If the
+  # sidecar is namespace-scoped and does not watch this one, the dashboards are collected
+  # by nobody and nothing reports an error.
+  # -- Namespace the dashboard ConfigMaps are created in. Empty falls back to the release namespace.
+  namespace: canfar-dashboards
+  # -- Create `namespace` if it differs from the release namespace. Leave false where namespaces are managed externally.
+  namespaceCreate: false
   # -- Label the Grafana sidecar selects on.
   sidecarLabel: grafana_dashboard
   # -- Value for `sidecarLabel`.
