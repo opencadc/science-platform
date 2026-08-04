@@ -5,14 +5,6 @@
 /**/bin
 .vscode
 
-# Local AI assistant / IDE tool directories (repo root only)
-/.cursor/
-/.claude/
-/.codex/
-/.aider/
-/.continue/
-/.windsurf/
-
 /**/charts/
 
 # Coding agents / local AI tooling

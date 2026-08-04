@@ -22,3 +22,5 @@
 *.tmproj
 .vscode/
 *-values.yaml
+# Dashboard docs; only dashboards/*.json is read at render time.
+dashboards/README.md

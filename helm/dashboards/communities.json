@@ -1,0 +1,2276 @@
+{
+  "uid": "canfar-communities",
+  "title": "CANFAR \u00b7 Communities & Projects",
+  "description": "Attribution of platform usage to communities and projects. canfar.net/community is the Kueue ClusterQueue / fair-share dimension and canfar.net/project the LocalQueue dimension, per CADC-15910. Both default to `default` when a session supplies none, so the Kueue queue labels are shown alongside as the working segmentation until launch-time attribution is populated.",
+  "tags": [
+    "canfar",
+    "attribution",
+    "community",
+    "project"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "1m",
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "preload": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "pluginId": "prometheus",
+        "refresh": 1,
+        "current": {
+          "text": "__CANFAR_DS_NAME__",
+          "value": "__CANFAR_DS_UID__"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "regex": "",
+        "skipUrlSync": false,
+        "description": "Metrics backend the panels query. Seeded at install time from grafanaDashboards.datasourceName; any other Prometheus-type datasource stays selectable here."
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "label": "Namespace",
+        "description": "Namespace holding CANFAR session workloads. Set at install time from the chart's resolved workload namespace.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_info, namespace)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "namespace-variable-query"
+        },
+        "refresh": 2,
+        "regex": "/^__CANFAR_WORKLOAD_NS__$/",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "__CANFAR_WORKLOAD_NS__",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "community",
+        "type": "query",
+        "label": "Community",
+        "description": "CANFAR `canfar.net/community` pod label. Kueue ClusterQueue / fair-share grouping dimension. Defaults to `default` when a session supplies none.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_community!=\"\"}, label_canfar_net_community)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_community!=\"\"}, label_canfar_net_community)",
+          "refId": "community-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "description": "CANFAR `canfar.net/project` pod label. Kueue LocalQueue dimension. Defaults to `default` when a session supplies none.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_project!=\"\"}, label_canfar_net_project)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_project!=\"\"}, label_canfar_net_project)",
+          "refId": "project-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "user",
+        "type": "query",
+        "label": "User",
+        "description": "CANFAR `canfar-net-userid` pod label.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}, label_canfar_net_username)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}, label_canfar_net_username)",
+          "refId": "user-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "kind",
+        "type": "query",
+        "label": "Session kind",
+        "description": "CANFAR `canfar-net-sessionType` pod label.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_kind!=\"\"}, label_canfar_net_kind)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_kind!=\"\"}, label_canfar_net_kind)",
+          "refId": "kind-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "flavor",
+        "type": "query",
+        "label": "Flavor",
+        "description": "`fixed` when the memory request equals the limit, otherwise `flexible`.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_flavor!=\"\"}, label_canfar_net_flavor)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_flavor!=\"\"}, label_canfar_net_flavor)",
+          "refId": "flavor-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      },
+      {
+        "name": "accelerator",
+        "type": "query",
+        "label": "Accelerator",
+        "description": "`gpu` when the session requested GPUs, otherwise `none`. Exact GPU count comes from the nvidia.com/gpu resource request, not from this label.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_accelerator!=\"\"}, label_canfar_net_accelerator)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_accelerator!=\"\"}, label_canfar_net_accelerator)",
+          "refId": "accelerator-variable-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false,
+        "allowCustomValue": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "CANFAR",
+      "tags": [
+        "canfar"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true,
+      "targetBlank": false,
+      "icon": "external link",
+      "tooltip": "Other CANFAR Science Platform dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Communities \u2014 Kueue ClusterQueue / fair-share dimension",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Communities",
+      "description": "Distinct canfar.net/community values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "__auto",
+          "expr": "count(\n  count by (label_canfar_net_community) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)\n)\nor vector(0)"
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Projects",
+      "description": "Distinct canfar.net/project values on running sessions. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "__auto",
+          "expr": "count(\n  count by (label_canfar_net_project) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)\n)\nor vector(0)"
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "ClusterQueues in use",
+      "description": "Distinct Kueue ClusterQueues actually carrying sessions. Today this is where real segmentation lives, while community is still default.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "__auto",
+          "expr": "count(\n  count by (label_kueue_x_k8s_io_cluster_queue_name) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)\n)\nor vector(0)"
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "LocalQueues in use",
+      "description": "Distinct Kueue LocalQueues actually carrying sessions.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "__auto",
+          "expr": "count(\n  count by (label_kueue_x_k8s_io_local_queue_name) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)\n)\nor vector(0)"
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "id": 5
+    },
+    {
+      "type": "table",
+      "title": "Per-community footprint",
+      "description": "Resource footprint and efficiency per community, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_canfar_net_community) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (label_canfar_net_community) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_community)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (label_canfar_net_community) (\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_community)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "(\n  sum by (label_canfar_net_community) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_community)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_community) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_community)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "expr": "sum by (label_canfar_net_community) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_community)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "F",
+          "expr": "sum by (label_canfar_net_community) (\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_community)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "G",
+          "expr": "(\n  sum by (label_canfar_net_community) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_community)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_community) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_community)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "H",
+          "expr": "sum by (label_canfar_net_community) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_community)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{label_canfar_net_community}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPUs requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "sortBy": [
+          {
+            "displayName": "CPU requested",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "label_canfar_net_community",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "Sessions",
+              "Value #B": "CPU requested",
+              "Value #C": "CPU used",
+              "Value #D": "CPU efficiency",
+              "Value #E": "RAM requested",
+              "Value #F": "RAM used",
+              "Value #G": "RAM efficiency",
+              "Value #H": "GPUs requested",
+              "label_canfar_net_community": "Community"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "Time 8": true
+            },
+            "indexByName": {
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5,
+              "Value #F": 6,
+              "Value #G": 7,
+              "Value #H": 8,
+              "label_canfar_net_community": 0
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 10
+      },
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Active sessions by community",
+      "description": "Running sessions per community. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_canfar_net_community) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_canfar_net_community}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 8
+      },
+      "id": 7
+    },
+    {
+      "type": "row",
+      "title": "Projects \u2014 Kueue LocalQueue dimension",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 1
+      },
+      "id": 8
+    },
+    {
+      "type": "table",
+      "title": "Per-project footprint",
+      "description": "Resource footprint and efficiency per project, over sessions running now. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_canfar_net_project) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (label_canfar_net_project) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_project)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (label_canfar_net_project) (\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_project)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "(\n  sum by (label_canfar_net_project) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_project)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_project) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_project)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "expr": "sum by (label_canfar_net_project) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_project)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "F",
+          "expr": "sum by (label_canfar_net_project) (\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_project)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "G",
+          "expr": "(\n  sum by (label_canfar_net_project) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_project)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_project) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_project)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "H",
+          "expr": "sum by (label_canfar_net_project) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_canfar_net_project)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{label_canfar_net_project}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPUs requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "sortBy": [
+          {
+            "displayName": "CPU requested",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "label_canfar_net_project",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "Sessions",
+              "Value #B": "CPU requested",
+              "Value #C": "CPU used",
+              "Value #D": "CPU efficiency",
+              "Value #E": "RAM requested",
+              "Value #F": "RAM used",
+              "Value #G": "RAM efficiency",
+              "Value #H": "GPUs requested",
+              "label_canfar_net_project": "Project"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "Time 8": true
+            },
+            "indexByName": {
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5,
+              "Value #F": 6,
+              "Value #G": 7,
+              "Value #H": 8,
+              "label_canfar_net_project": 0
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 10
+      },
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Active sessions by project",
+      "description": "Running sessions per project. Sessions that supply no value are labelled `default`, per the Skaha label contract \u2014 a large `default` bucket means attribution is not being set at launch, not that the dimension is unused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_canfar_net_project) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_canfar_net_project}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 8
+      },
+      "id": 10
+    },
+    {
+      "type": "row",
+      "title": "Kueue queue attribution",
+      "collapsed": false,
+      "panels": [],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 1
+      },
+      "id": 11
+    },
+    {
+      "type": "table",
+      "title": "Per-ClusterQueue footprint",
+      "description": "The same footprint grouped by the Kueue ClusterQueue a session was admitted through. CADC-15910 maps community onto this dimension, so until community is populated at launch this is the working substitute.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_kueue_x_k8s_io_cluster_queue_name) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  (\n    sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "(\n  sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "expr": "sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "F",
+          "expr": "sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  (\n    sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "G",
+          "expr": "(\n  sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "H",
+          "expr": "sum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  (\n    sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"})\n    and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n  )\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name)\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n)",
+          "editorMode": "code",
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM used"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM efficiency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1.25
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.25
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPUs requested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "enablePagination": true,
+        "sortBy": [
+          {
+            "displayName": "CPU requested",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "label_kueue_x_k8s_io_cluster_queue_name",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "Sessions",
+              "Value #B": "CPU requested",
+              "Value #C": "CPU used",
+              "Value #D": "CPU efficiency",
+              "Value #E": "RAM requested",
+              "Value #F": "RAM used",
+              "Value #G": "RAM efficiency",
+              "Value #H": "GPUs requested",
+              "label_kueue_x_k8s_io_cluster_queue_name": "ClusterQueue"
+            },
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "Time 8": true
+            },
+            "indexByName": {
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5,
+              "Value #F": 6,
+              "Value #G": 7,
+              "Value #H": 8,
+              "label_kueue_x_k8s_io_cluster_queue_name": 0
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 9
+      },
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "Active sessions by ClusterQueue",
+      "description": "Running sessions per Kueue ClusterQueue.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_kueue_x_k8s_io_cluster_queue_name) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_cluster_queue_name}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 12,
+        "h": 8
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Active sessions by LocalQueue",
+      "description": "Running sessions per Kueue LocalQueue. CADC-15910 maps project onto this dimension.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (label_kueue_x_k8s_io_local_queue_name) (\n  kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n)",
+          "legendFormat": "{{label_kueue_x_k8s_io_local_queue_name}}",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 52,
+        "w": 12,
+        "h": 8
+      },
+      "id": 14
+    }
+  ]
+}

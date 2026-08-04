@@ -645,6 +645,61 @@ secrets:
   # skaha-cacert-secret:
   #   ca.crt: <base64 encoded CA crt>
 
+# Grafana dashboards for the CANFAR Science Platform.
+#
+# When enabled, one ConfigMap per dashboard in helm/dashboards is rendered. The Grafana
+# sidecar discovers them by label and files them under the folder named in `folder`.
+#
+# Enable this on ONE release only. Two releases pointing at the same Grafana would
+# render ConfigMaps carrying identical dashboard uids and the sidecar would import
+# whichever it wrote last.
+#
+# Nothing about a particular installation is baked into the dashboard JSON. The session
+# panels are scoped to this release's resolved workload namespace, and the storage panels
+# default to this release's namespaces, all substituted at render time. A release
+# therefore reports on its own sessions: where several releases each own a workload
+# namespace, enable this on the one whose sessions you want to see, or widen the
+# `$namespace` picker in Grafana after import.
+#
+# The session dashboards read the `canfar.net/*` labels Skaha writes at launch (see
+# skaha/docs/labels.md). kube-state-metrics only exposes object labels named in
+# `--metric-labels-allowlist`, and pods and jobs are separate allowlists there: the
+# lifecycle and duration panels read Job labels, so both must include the keys.
+# See helm/dashboards/README.md.
+grafanaDashboards:
+  # -- Render the CANFAR Grafana dashboard ConfigMaps.
+  enabled: false
+  # -- Grafana folder the dashboards are filed under, via the `grafana_folder` annotation.
+  folder: CANFAR Science Platform
+  # The dashboards describe every environment that shares a Grafana, not one release, so
+  # they default to their own namespace rather than the release's. Set to "" to fall back
+  # to the release namespace, or to any namespace the Grafana sidecar watches. If the
+  # sidecar is namespace-scoped and does not watch this one, the dashboards are collected
+  # by nobody and nothing reports an error.
+  # -- Namespace the dashboard ConfigMaps are created in. Empty falls back to the release namespace.
+  namespace: canfar-dashboards
+  # -- Create `namespace` if it differs from the release namespace. Leave false where namespaces are managed externally.
+  namespaceCreate: false
+  # -- Label the Grafana sidecar selects on.
+  sidecarLabel: grafana_dashboard
+  # -- Value for `sidecarLabel`.
+  sidecarLabelValue: "1"
+  # The dashboards' data source picker is seeded with this uid. A picker whose selection
+  # does not resolve leaves every panel silently empty on a provisioned dashboard, so this
+  # must name a Prometheus-type data source that exists in the target Grafana.
+  # -- Uid of the Prometheus-compatible data source the dashboards query.
+  datasourceUid: mimir
+  # -- Display name shown for `datasourceUid` in the data source picker.
+  datasourceName: Mimir
+  # Scrape interval of the container metrics, in seconds. The Usage dashboard integrates
+  # gauge-based figures (memory, GPU, session-hours) as sum_over_time x this value, so a
+  # wrong setting scales those by exactly the wrong factor. CPU is counter-based and
+  # unaffected. Exposed as a visible dashboard variable so it can be corrected in place.
+  # -- Scrape interval of container metrics, in seconds, used to integrate gauges into hours.
+  scrapeIntervalSeconds: 15
+  # -- Extra annotations added to every dashboard ConfigMap.
+  annotations: {}
+
 # For caching images from the Image Repository and for the writing the POSIX Users and Groups to be shared with Job files
 redis:
   image:

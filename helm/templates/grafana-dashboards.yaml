@@ -1,0 +1,70 @@
+{{/*
+CANFAR Science Platform Grafana dashboards.
+
+One ConfigMap per dashboard in helm/dashboards, labelled for the Grafana sidecar to
+collect and annotated with the folder to file it under.
+
+The dashboards carry namespace placeholders so nothing about one installation's naming
+is baked into the JSON. They are substituted with `replace` rather than `tpl`: Grafana
+legend formats are written as {{ "{{" }}label{{ "}}" }} and Helm would try to evaluate
+them.
+*/}}
+{{- $cfg := .Values.grafanaDashboards | default dict -}}
+{{- if $cfg.enabled -}}
+{{- $ctx := . -}}
+{{- $namespace := $cfg.namespace | default $ctx.Release.Namespace -}}
+{{- $workloadNamespace := include "skaha.workloadNamespace" $ctx -}}
+{{- $files := $ctx.Files.Glob "dashboards/*.json" -}}
+{{- if not $files }}
+  {{- fail "grafanaDashboards.enabled is true but no dashboard JSON was found under helm/dashboards" -}}
+{{- end -}}
+{{/*
+The dashboards span every environment sharing one Grafana, so they default to their own
+namespace rather than a release's. Created here only on request and only when it is not
+the release namespace, mirroring templates/namespace.yaml for the workload namespace.
+Helm installs a Namespace before the ConfigMaps that go in it, so one file is enough.
+*/}}
+{{- if and $cfg.namespaceCreate (not (eq $ctx.Release.Namespace $namespace)) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $namespace }}
+  labels:
+    {{- include "skaha.labels" $ctx | nindent 4 }}
+{{- end }}
+{{- range $path, $_ := $files }}
+{{- $stem := trimSuffix ".json" (base $path) }}
+{{- $body := $ctx.Files.Get $path
+      | replace "__CANFAR_WORKLOAD_NS__" $workloadNamespace
+      | replace "__CANFAR_RELEASE_NS__" $ctx.Release.Namespace
+      | replace "__CANFAR_DS_UID__" ($cfg.datasourceUid | default "mimir")
+      | replace "__CANFAR_DS_NAME__" ($cfg.datasourceName | default "Mimir")
+      | replace "__CANFAR_SCRAPE_S__" ($cfg.scrapeIntervalSeconds | default 15 | toString) }}
+{{- if regexMatch "__CANFAR_[A-Z_]+__" $body }}
+  {{- fail (printf "%s still contains an unsubstituted __CANFAR_*__ placeholder; add it to the replace chain in templates/grafana-dashboards.yaml" $path) -}}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-grafana-dashboard-%s" $ctx.Release.Name $stem | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "skaha.labels" $ctx | nindent 4 }}
+    {{ $cfg.sidecarLabel | default "grafana_dashboard" }}: {{ $cfg.sidecarLabelValue | default "1" | quote }}
+  {{- if or $cfg.folder $cfg.annotations }}
+  annotations:
+    {{- with $cfg.folder }}
+    grafana_folder: {{ . | quote }}
+    {{- end }}
+    {{- with $cfg.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+data:
+  {{/* Prefixed so the key is unique in the sidecar's shared dashboard directory. */}}
+  canfar-{{ $stem }}.json: |-
+    {{- $body | nindent 4 }}
+{{- end }}
+{{- end }}

@@ -69,6 +69,16 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.sessions.userStorage.projectsDirectory | string | `"projects"` | Relative path under topLevelDirectory for shared projects storage. |
 | deployment.skaha.sessions.userStorage.topLevelDirectory | string | `"/cavern"` | Absolute mount path containing user home and projects directories. |
 | experimentalFeatures.enabled | bool | `false` | Enable processing of experimental feature gates. |
+| grafanaDashboards.annotations | object | `{}` | Extra annotations added to every dashboard ConfigMap. |
+| grafanaDashboards.datasourceName | string | `"Mimir"` | Display name shown for `datasourceUid` in the data source picker. |
+| grafanaDashboards.datasourceUid | string | `"mimir"` | Uid of the Prometheus-compatible data source the dashboards query. |
+| grafanaDashboards.enabled | bool | `false` | Render the CANFAR Grafana dashboard ConfigMaps. |
+| grafanaDashboards.folder | string | `"CANFAR Science Platform"` | Grafana folder the dashboards are filed under, via the `grafana_folder` annotation. |
+| grafanaDashboards.namespace | string | `"canfar-dashboards"` | Namespace the dashboard ConfigMaps are created in. Empty falls back to the release namespace. |
+| grafanaDashboards.namespaceCreate | bool | `false` | Create `namespace` if it differs from the release namespace. Leave false where namespaces are managed externally. |
+| grafanaDashboards.scrapeIntervalSeconds | int | `15` | Scrape interval of container metrics, in seconds, used to integrate gauges into hours. |
+| grafanaDashboards.sidecarLabel | string | `"grafana_dashboard"` | Label the Grafana sidecar selects on. |
+| grafanaDashboards.sidecarLabelValue | string | `"1"` | Value for `sidecarLabel`. |
 | ingress.enabled | bool | `true` | Enable ingress routing for the Skaha API. |
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
