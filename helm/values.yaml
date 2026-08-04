@@ -685,6 +685,12 @@ grafanaDashboards:
   datasourceUid: mimir
   # -- Display name shown for `datasourceUid` in the data source picker.
   datasourceName: Mimir
+  # Scrape interval of the container metrics, in seconds. The Usage dashboard integrates
+  # gauge-based figures (memory, GPU, session-hours) as sum_over_time x this value, so a
+  # wrong setting scales those by exactly the wrong factor. CPU is counter-based and
+  # unaffected. Exposed as a visible dashboard variable so it can be corrected in place.
+  # -- Scrape interval of container metrics, in seconds, used to integrate gauges into hours.
+  scrapeIntervalSeconds: 15
   # -- Extra annotations added to every dashboard ConfigMap.
   annotations: {}
 

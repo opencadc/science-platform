@@ -1,7 +1,8 @@
 # CANFAR Science Platform Grafana dashboards
 
-Ten dashboards covering platform health, session usage, resource efficiency, queue
-throughput, cluster capacity, storage, and the CANFAR control plane itself.
+Eleven dashboards covering platform health, session usage, cumulative consumption,
+resource efficiency, queue throughput, cluster capacity, storage, and the CANFAR
+control plane itself.
 
 Plain Grafana JSON. Edit here, or edit in the Grafana UI and export back over the file.
 The Helm chart turns each one into a ConfigMap that the Grafana sidecar collects.
@@ -12,14 +13,15 @@ The Helm chart turns each one into a ConfigMap that the Grafana sidecar collects
 | **Platform Health** | `canfar-platform-health` | Is the platform healthy, and is any node in an OOM loop? |
 | **Communities & Projects** | `canfar-communities` | Which community and project is consuming what? |
 | **Sessions & Users** | `canfar-sessions` | Who is on the platform, what did they launch, how long did it run? |
-| **Efficiency & Waste** | `canfar-efficiency` | Where are we holding capacity nobody is using, and who do we talk to? |
+| **Usage** | `canfar-usage` | Who consumed what over the last day, week, month or all time? |
+| **Efficiency & Waste** | `canfar-efficiency` | Where are we holding capacity nobody is using, right now? |
 | **Session Drilldown** | `canfar-drilldown` | What exactly did this one session do? |
 | **Queue & Scheduling** | `canfar-queue` | Is Kueue admitting work, and is the fair-share policy sane? |
 | **Cluster Capacity** | `canfar-capacity` | Do we have room, and where is capacity stranded? |
 | **Storage** | `canfar-storage` | Are volumes filling up, and is the disk keeping up? |
 | **Platform Services** | `canfar-services` | Is the Skaha API and its supporting deployment healthy, and what is the application itself reporting? |
 
-165 panels across ten dashboards.
+182 panels across eleven dashboards.
 
 ## Deploying
 
@@ -77,6 +79,43 @@ workload namespaces never appeared there — but its panels read `kube_pod_*` an
 `container_*`, and the picker defaults to All, which resolves to `.*` and swept user
 sessions in. That is the mirror of the session dashboards, which scope *to* the workload
 namespace.
+
+## Usage is cumulative, and deliberately has no time picker
+
+Every other dashboard answers "what is happening now". **Usage** answers "who consumed
+what over a period", which needs different mechanics, so it is a separate dashboard
+rather than a mode of Efficiency & Waste. Its time picker is hidden; a `$window`
+variable offers exactly four values (1 day, 1 week, 1 month, all time) and every query
+uses `[$window]`.
+
+Four properties are load-bearing:
+
+- **Every panel is an instant query.** Nothing on this dashboard is a time series, so a
+  range query would evaluate the same window at every step to render one number. Measured
+  cost per panel: 0.3 s at one day, 1.9 s at the widest window.
+- **CPU is exact; the rest are integrals.** CPU comes from `increase()` on a counter, so
+  it is true core-seconds. Memory, GPU and wall-clock have no counter, so they are
+  `sum_over_time(...) * $scrape / 3600` — a Riemann sum where a missing sample
+  contributes zero, which is correct because the session did not exist then. `$scrape`
+  is the scrape interval, exposed as a visible variable: set it wrong and every
+  gauge-derived figure scales by exactly the wrong factor, so it must not be buried.
+- **Labels are joined through the window, not instantaneously.** The join uses
+  `max_over_time(kube_pod_labels[$window])`, because sessions that have ended no longer
+  exist as an instant series. On one deployment that was the difference between 17 pods
+  and about 2000 — a cumulative view built on the instant join would silently drop every
+  finished session.
+- **Headline totals carry the same session filter as the breakdowns.** They are checked
+  to equal the sum of their parts; a total that does not reconcile with its own
+  breakdown is worse than no total.
+
+Two honest limits. **"All time" means as far back as the backend retains these series** —
+on a deployment where the labels were only recently allowlisted, all time and one month
+return the same figures. And **GPU-hours measure allocation, not utilisation**: a held
+GPU may be idle, and real utilisation needs a DCGM exporter.
+
+Efficiency & Waste keeps only the live view. Its two cumulative "wasted" stats moved
+here, where they are recomputed from the request gauge and the usage counter directly
+rather than from an average over the range.
 
 ## Prerequisite: kube-state-metrics must expose the CANFAR labels
 

@@ -24,7 +24,8 @@ them.
       | replace "__CANFAR_WORKLOAD_NS__" $workloadNamespace
       | replace "__CANFAR_RELEASE_NS__" $ctx.Release.Namespace
       | replace "__CANFAR_DS_UID__" ($cfg.datasourceUid | default "mimir")
-      | replace "__CANFAR_DS_NAME__" ($cfg.datasourceName | default "Mimir") }}
+      | replace "__CANFAR_DS_NAME__" ($cfg.datasourceName | default "Mimir")
+      | replace "__CANFAR_SCRAPE_S__" ($cfg.scrapeIntervalSeconds | default 15 | toString) }}
 {{- if regexMatch "__CANFAR_[A-Z_]+__" $body }}
   {{- fail (printf "%s still contains an unsubstituted __CANFAR_*__ placeholder; add it to the replace chain in templates/grafana-dashboards.yaml" $path) -}}
 {{- end }}

@@ -1,7 +1,7 @@
 {
   "uid": "canfar-efficiency",
   "title": "CANFAR \u00b7 Efficiency & Waste",
-  "description": "Where the platform is holding capacity that nobody is using, and who to talk to about it.",
+  "description": "Where capacity is being held but not used, right now. Cumulative consumption and waste totals live on CANFAR \u00b7 Usage, which accumulates over a fixed window; this dashboard is the live view and follows the time picker.",
   "tags": [
     "canfar",
     "efficiency"
@@ -351,7 +351,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Waste headline",
+      "title": "Live efficiency",
       "collapsed": false,
       "panels": [],
       "datasource": {
@@ -365,138 +365,6 @@
         "h": 1
       },
       "id": 1
-    },
-    {
-      "type": "stat",
-      "title": "CPU wasted",
-      "description": "Requested-minus-used CPU integrated over the dashboard range. This is capacity the scheduler could not give to anyone else.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg_over_time(\n  (\n\n  clamp_min(\n    sum(\n      (\n        sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      )\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n      and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n    )\n    -\n    sum(\n      (\n        sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[5m]))\n      )\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n      and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n    ),\n    0\n  )\n    or vector(0)\n  )[$__range:5m]\n) * $__range_s / 3600",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "suffix:core\u00b7h",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 4,
-        "h": 5
-      },
-      "id": 2
-    },
-    {
-      "type": "stat",
-      "title": "Memory wasted",
-      "description": "Requested-minus-used memory integrated over the dashboard range.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg_over_time(\n  (\n\n  clamp_min(\n    sum(\n      (\n        sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      )\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n      and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n    )\n    -\n    sum(\n      (\n        sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      )\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n      and on (namespace, pod) kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n    ),\n    0\n  )\n    or vector(0)\n  )[$__range:5m]\n) * $__range_s / 3600 / 1024^3",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "suffix:GiB\u00b7h",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
-      },
-      "gridPos": {
-        "x": 4,
-        "y": 1,
-        "w": 4,
-        "h": 5
-      },
-      "id": 3
     },
     {
       "type": "gauge",
@@ -568,9 +436,9 @@
         "orientation": "auto"
       },
       "gridPos": {
-        "x": 8,
+        "x": 0,
         "y": 1,
-        "w": 4,
+        "w": 6,
         "h": 5
       },
       "id": 4
@@ -645,9 +513,9 @@
         "orientation": "auto"
       },
       "gridPos": {
-        "x": 12,
+        "x": 6,
         "y": 1,
-        "w": 4,
+        "w": 6,
         "h": 5
       },
       "id": 5
@@ -718,9 +586,9 @@
         }
       },
       "gridPos": {
-        "x": 16,
+        "x": 12,
         "y": 1,
-        "w": 4,
+        "w": 6,
         "h": 5
       },
       "id": 6
@@ -791,9 +659,9 @@
         }
       },
       "gridPos": {
-        "x": 20,
+        "x": 18,
         "y": 1,
-        "w": 4,
+        "w": 6,
         "h": 5
       },
       "id": 7
