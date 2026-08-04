@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/opencadc/science-platform/compare/1.4.0...1.5.0) (2026-08-04)
+
+
+### Features
+
+* CANFAR Science Platform Grafana dashboards ([#1147](https://github.com/opencadc/science-platform/issues/1147)) ([faca289](https://github.com/opencadc/science-platform/commit/faca289eb5ae3da86f0342fcaef5a282e5078c49))
+
+
+### Bug Fixes
+
+* working around ci error when building helm chart ([90843e6](https://github.com/opencadc/science-platform/commit/90843e6e2693240570bbf8b24c4ec54ac35b5699))
+
 ## [1.4.0](https://github.com/opencadc/science-platform/compare/1.3.0...1.4.0) (2026-07-31)
 
 
