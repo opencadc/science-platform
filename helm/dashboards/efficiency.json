@@ -10,7 +10,7 @@
   "graphTooltip": 1,
   "schemaVersion": 41,
   "version": 1,
-  "refresh": "1m",
+  "refresh": "5m",
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "preload": false,
@@ -437,9 +437,9 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 1,
+        "y": 6,
         "w": 6,
-        "h": 5
+        "h": 9
       },
       "id": 4
     },
@@ -513,10 +513,10 @@
         "orientation": "auto"
       },
       "gridPos": {
-        "x": 6,
-        "y": 1,
+        "x": 0,
+        "y": 15,
         "w": 6,
-        "h": 5
+        "h": 9
       },
       "id": 5
     },
@@ -552,7 +552,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 1
               },
               {
@@ -586,10 +586,10 @@
         }
       },
       "gridPos": {
-        "x": 12,
+        "x": 0,
         "y": 1,
-        "w": 6,
-        "h": 5
+        "w": 12,
+        "h": 4
       },
       "id": 6
     },
@@ -625,7 +625,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 1
               },
               {
@@ -659,10 +659,10 @@
         }
       },
       "gridPos": {
-        "x": 18,
+        "x": 12,
         "y": 1,
-        "w": 6,
-        "h": 5
+        "w": 12,
+        "h": 4
       },
       "id": 7
     },
@@ -677,7 +677,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 6,
+        "y": 5,
         "w": 24,
         "h": 1
       },
@@ -784,9 +784,9 @@
         }
       },
       "gridPos": {
-        "x": 0,
-        "y": 7,
-        "w": 12,
+        "x": 6,
+        "y": 6,
+        "w": 18,
         "h": 9
       },
       "id": 9
@@ -892,9 +892,9 @@
         }
       },
       "gridPos": {
-        "x": 12,
-        "y": 7,
-        "w": 12,
+        "x": 6,
+        "y": 15,
+        "w": 18,
         "h": 9
       },
       "id": 10
@@ -910,7 +910,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 24,
         "w": 24,
         "h": 1
       },
@@ -951,7 +951,7 @@
             ]
           },
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "continuous-BlPu"
           },
           "min": 0,
           "custom": {
@@ -1020,7 +1020,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 25,
         "w": 12,
         "h": 9
       },
@@ -1096,7 +1096,7 @@
             ]
           },
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "continuous-BlPu"
           },
           "min": 0,
           "custom": {
@@ -1165,7 +1165,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 17,
+        "y": 25,
         "w": 12,
         "h": 9
       },
@@ -1248,10 +1248,10 @@
         "cellGap": 1,
         "color": {
           "mode": "scheme",
-          "scheme": "Turbo",
+          "scheme": "Cool",
           "steps": 64,
           "reverse": false,
-          "fill": "dark-orange",
+          "fill": "dark-blue",
           "exponent": 0.5,
           "scale": "exponential"
         },
@@ -1280,7 +1280,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 34,
         "w": 12,
         "h": 9
       },
@@ -1328,10 +1328,10 @@
         "cellGap": 1,
         "color": {
           "mode": "scheme",
-          "scheme": "Turbo",
+          "scheme": "Cool",
           "steps": 64,
           "reverse": false,
-          "fill": "dark-orange",
+          "fill": "dark-blue",
           "exponent": 0.5,
           "scale": "exponential"
         },
@@ -1360,7 +1360,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 26,
+        "y": 34,
         "w": 12,
         "h": 9
       },
@@ -1377,7 +1377,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 43,
         "w": 24,
         "h": 1
       },
@@ -1808,7 +1808,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 44,
         "w": 24,
         "h": 12
       },
@@ -1825,7 +1825,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 56,
         "w": 24,
         "h": 1
       },
@@ -2062,7 +2062,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 57,
         "w": 24,
         "h": 8
       },
@@ -2299,7 +2299,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 65,
         "w": 24,
         "h": 8
       },

@@ -10,7 +10,7 @@
   "graphTooltip": 1,
   "schemaVersion": 41,
   "version": 1,
-  "refresh": "1m",
+  "refresh": "5m",
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "preload": false,
@@ -863,7 +863,7 @@
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",

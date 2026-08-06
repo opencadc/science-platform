@@ -691,6 +691,14 @@ grafanaDashboards:
   datasourceUid: mimir
   # -- Display name shown for `datasourceUid` in the data source picker.
   datasourceName: Mimir
+  # Session Drilldown reads container logs from Loki. Only that one panel needs it; every
+  # other dashboard is metrics-only, so an install without Loki loses one panel and nothing
+  # else. As with the metrics source, a uid that does not resolve leaves the panel silently
+  # empty rather than reporting an error.
+  # -- Uid of the Loki data source backing the Session Drilldown logs panel.
+  lokiDatasourceUid: loki
+  # -- Display name shown for `lokiDatasourceUid` in the logs source picker.
+  lokiDatasourceName: Loki
   # Scrape interval of the container metrics, in seconds. The Usage dashboard integrates
   # gauge-based figures (memory, GPU, session-hours) as sum_over_time x this value, so a
   # wrong setting scales those by exactly the wrong factor. CPU is counter-based and

@@ -11,7 +11,7 @@
   "graphTooltip": 1,
   "schemaVersion": 41,
   "version": 1,
-  "refresh": "1m",
+  "refresh": "5m",
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "preload": false,
@@ -462,7 +462,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 1
               },
               {
@@ -1572,6 +1572,9 @@
               "group": "A"
             },
             "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
           }
         },
         "overrides": []
@@ -1666,7 +1669,10 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
@@ -1942,7 +1948,10 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
@@ -2210,7 +2219,10 @@
                 "lineInterpolation": "smooth",
                 "pointSize": 5
               },
-              "min": 0
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
@@ -2269,7 +2281,10 @@
                 "lineInterpolation": "smooth",
                 "pointSize": 5
               },
-              "min": 0
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
@@ -2354,7 +2369,10 @@
                   }
                 ]
               },
-              "min": 0
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": [
               {
@@ -2438,7 +2456,10 @@
                 },
                 "pointSize": 5
               },
-              "min": 0
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
@@ -2758,6 +2779,9 @@
               "mode": "normal",
               "group": "A"
             }
+          },
+          "color": {
+            "mode": "palette-classic"
           }
         },
         "overrides": []
@@ -2852,7 +2876,10 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
@@ -3137,7 +3164,10 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
@@ -3424,6 +3454,9 @@
               "mode": "normal",
               "group": "A"
             }
+          },
+          "color": {
+            "mode": "palette-classic"
           }
         },
         "overrides": []
@@ -3509,7 +3542,10 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
