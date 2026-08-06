@@ -12,7 +12,7 @@
   "graphTooltip": 1,
   "schemaVersion": 41,
   "version": 1,
-  "refresh": "1m",
+  "refresh": "5m",
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "preload": false,
@@ -289,7 +289,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 10
               },
               {
@@ -361,7 +361,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 1
               },
               {
@@ -434,7 +434,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 60
               },
               {
@@ -507,7 +507,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 1
               },
               {
@@ -590,7 +590,7 @@
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -1037,7 +1037,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 0.75
               },
               {
@@ -1055,7 +1055,7 @@
         "overrides": []
       },
       "options": {
-        "displayMode": "lcd",
+        "displayMode": "gradient",
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -1080,96 +1080,84 @@
       "gridPos": {
         "x": 0,
         "y": 26,
-        "w": 12,
-        "h": 10
+        "w": 24,
+        "h": 8
       },
       "id": 14
     },
     {
       "type": "table",
-      "title": "CPU quota ledger per ClusterQueue",
-      "description": "The passive accounting view: what each queue is guaranteed, what it has reserved, and what it is actually burning.",
+      "title": "Quota per ClusterQueue",
+      "description": "Each ClusterQueue's position at a glance. The CPU and RAM columns are saturation \u2014 usage against the queue's own nominal quota \u2014 so a full red bar reading above 100% means the queue is running beyond its own allocation. Borrowing is the absolute amount carried above nominal. Kueue publishes no borrowed metric, so borrowing is derived as usage minus nominal. Note neither queue currently sets a borrowing limit, which in Kueue means unbounded borrowing within a cohort.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "targets": [
         {
+          "expr": "sum by (cluster_queue) (kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"})\n/ (sum by (cluster_queue) (kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"}) > 0)\n* 100",
           "refId": "A",
-          "expr": "sum by (cluster_queue) (kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         },
         {
+          "expr": "sum by (cluster_queue) (kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\", resource=\"memory\"})\n/ (sum by (cluster_queue) (kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\", resource=\"memory\"}) > 0)\n* 100",
           "refId": "B",
-          "expr": "sum by (cluster_queue) (kueue_cluster_queue_resource_reservation{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         },
         {
+          "expr": "sum by (cluster_queue) (\n  clamp_min(\n    kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"}\n    - on (cluster_queue, flavor) kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"},\n    0)\n)",
           "refId": "C",
-          "expr": "sum by (cluster_queue) (kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         },
         {
+          "expr": "sum by (cluster_queue) (\n  clamp_min(\n    kueue_cluster_queue_resource_usage{cluster_queue=~\"$cluster_queue\", resource=\"memory\"}\n    - on (cluster_queue, flavor) kueue_cluster_queue_nominal_quota{cluster_queue=~\"$cluster_queue\", resource=\"memory\"},\n    0)\n)",
           "refId": "D",
-          "expr": "sum by (cluster_queue) (kueue_cluster_queue_borrowing_limit{cluster_queue=~\"$cluster_queue\", resource=\"cpu\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         },
         {
-          "refId": "E",
           "expr": "sum by (cluster_queue) (kueue_pending_workloads{cluster_queue=~\"$cluster_queue\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
+          "refId": "E",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         },
         {
-          "refId": "F",
           "expr": "sum by (cluster_queue) (kueue_admitted_active_workloads{cluster_queue=~\"$cluster_queue\"})",
-          "legendFormat": "__auto",
-          "editorMode": "code",
-          "range": false,
+          "refId": "F",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "instant": true,
+          "range": false,
           "format": "table"
         }
       ],
@@ -1201,60 +1189,51 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Nominal quota"
+              "options": "CPU"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "suffix:cores"
+                "value": "percent"
               },
               {
                 "id": "decimals",
-                "value": 1
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Reserved"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "suffix:cores"
+                "value": 0
               },
               {
-                "id": "decimals",
-                "value": 1
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Used"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "suffix:cores"
+                "id": "min",
+                "value": 0
               },
               {
-                "id": "decimals",
-                "value": 1
+                "id": "max",
+                "value": 100
               },
               {
                 "id": "custom.cellOptions",
                 "value": {
-                  "type": "color-background",
-                  "mode": "gradient"
+                  "type": "gauge",
+                  "mode": "gradient",
+                  "valueDisplayMode": "text"
                 }
               },
               {
-                "id": "color",
+                "id": "thresholds",
                 "value": {
-                  "mode": "continuous-GrYlRd"
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 100
+                    }
+                  ]
                 }
               }
             ]
@@ -1262,12 +1241,80 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Borrowing limit"
+              "options": "RAM"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient",
+                  "valueDisplayMode": "text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 100
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU borrowing"
             },
             "properties": [
               {
                 "id": "unit",
                 "value": "suffix:cores"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAM borrowing"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
               },
               {
                 "id": "decimals",
@@ -1293,7 +1340,12 @@
             "sum"
           ],
           "countRows": false,
-          "fields": ""
+          "fields": [
+            "CPU borrowing",
+            "RAM borrowing",
+            "Pending",
+            "Admitted"
+          ]
         }
       },
       "transformations": [
@@ -1309,10 +1361,10 @@
           "options": {
             "renameByName": {
               "cluster_queue": "ClusterQueue",
-              "Value #A": "Nominal quota",
-              "Value #B": "Reserved",
-              "Value #C": "Used",
-              "Value #D": "Borrowing limit",
+              "Value #A": "CPU",
+              "Value #B": "RAM",
+              "Value #C": "CPU borrowing",
+              "Value #D": "RAM borrowing",
               "Value #E": "Pending",
               "Value #F": "Admitted"
             },
@@ -1338,10 +1390,10 @@
         }
       ],
       "gridPos": {
-        "x": 12,
-        "y": 26,
-        "w": 12,
-        "h": 10
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 8
       },
       "id": 15
     },
@@ -1458,7 +1510,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 42,
         "w": 24,
         "h": 9
       },

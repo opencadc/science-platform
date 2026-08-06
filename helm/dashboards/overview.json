@@ -10,7 +10,7 @@
   "graphTooltip": 1,
   "schemaVersion": 41,
   "version": 1,
-  "refresh": "1m",
+  "refresh": "5m",
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "preload": false,
@@ -490,7 +490,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 5
               },
               {
@@ -563,7 +563,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 10
               },
               {
@@ -635,7 +635,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 0.75
               },
               {
@@ -708,7 +708,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 0.75
               },
               {
@@ -1442,7 +1442,7 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 0.75
               },
               {
@@ -1676,7 +1676,7 @@
     {
       "type": "gauge",
       "title": "CPU efficiency",
-      "description": "Used \u00f7 requested CPU across all running sessions. Above 100% the session is bursting beyond what it reserved.",
+      "description": "Used \u00f7 requested CPU across all running sessions. Above 100% the session is bursting beyond what it reserved. The per-kind breakdown behind this number lives on Efficiency & Waste.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1745,123 +1745,15 @@
       "gridPos": {
         "x": 0,
         "y": 37,
-        "w": 4,
-        "h": 8
+        "w": 12,
+        "h": 6
       },
       "id": 20
     },
     {
-      "type": "timeseries",
-      "title": "CPU efficiency by session kind",
-      "description": "Working-set CPU divided by requested CPU, for running sessions only. Sustained values under 25% mean the platform is holding capacity that nobody is using.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "(\n  sum by (label_canfar_net_kind) (\n    (\n      sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$__rate_interval]))\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_kind)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_kind) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_kind)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
-          "legendFormat": "{{label_canfar_net_kind}}",
-          "editorMode": "code",
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.25
-              },
-              {
-                "color": "green",
-                "value": 0.5
-              }
-            ]
-          },
-          "min": 0,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 4,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "pointSize": 5,
-            "spanNulls": false,
-            "insertNulls": false,
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "axisColorMode": "text",
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max",
-            "lastNotNull"
-          ],
-          "sortBy": "Mean",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc",
-          "hideZeros": false
-        }
-      },
-      "gridPos": {
-        "x": 4,
-        "y": 37,
-        "w": 20,
-        "h": 8
-      },
-      "id": 21
-    },
-    {
       "type": "gauge",
       "title": "RAM efficiency",
-      "description": "Working set \u00f7 requested memory across all running sessions. Above 100% the session is bursting beyond what it reserved.",
+      "description": "Working set \u00f7 requested memory across all running sessions. Above 100% the session is bursting beyond what it reserved. The per-kind breakdown behind this number lives on Efficiency & Waste.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1928,120 +1820,12 @@
         "orientation": "auto"
       },
       "gridPos": {
-        "x": 0,
-        "y": 45,
-        "w": 4,
-        "h": 8
+        "x": 12,
+        "y": 37,
+        "w": 12,
+        "h": 6
       },
       "id": 22
-    },
-    {
-      "type": "timeseries",
-      "title": "RAM efficiency by session kind",
-      "description": "Working-set RAM divided by requested RAM, for running sessions only. Sustained values under 25% mean the platform is holding capacity that nobody is using.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "(\n  sum by (label_canfar_net_kind) (\n    (\n      sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_kind)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)\n/\n(\n  sum by (label_canfar_net_kind) (\n    (\n      sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"})\n      and on (namespace, pod) (kube_pod_status_phase{phase=\"Running\"} == 1)\n    )\n    * on (namespace, pod) group_left (label_canfar_net_kind)\n    kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community=~\"$community\", label_canfar_net_project=~\"$project\", label_canfar_net_username=~\"$user\", label_canfar_net_kind=~\"$kind\", label_canfar_net_flavor=~\"$flavor\", label_canfar_net_accelerator=~\"$accelerator\"}\n  )\n)",
-          "legendFormat": "{{label_canfar_net_kind}}",
-          "editorMode": "code",
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.25
-              },
-              {
-                "color": "green",
-                "value": 0.5
-              }
-            ]
-          },
-          "min": 0,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 4,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "pointSize": 5,
-            "spanNulls": false,
-            "insertNulls": false,
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "axisColorMode": "text",
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max",
-            "lastNotNull"
-          ],
-          "sortBy": "Mean",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc",
-          "hideZeros": false
-        }
-      },
-      "gridPos": {
-        "x": 4,
-        "y": 45,
-        "w": 20,
-        "h": 8
-      },
-      "id": 23
     }
   ]
 }

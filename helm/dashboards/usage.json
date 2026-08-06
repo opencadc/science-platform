@@ -163,7 +163,7 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -186,12 +186,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -200,7 +200,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -218,9 +218,9 @@
       "type": "stat",
       "title": "Memory GiB-hours",
       "gridPos": {
-        "x": 5,
+        "x": 4,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -243,12 +243,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -257,7 +257,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -275,9 +275,9 @@
       "type": "stat",
       "title": "GPU-hours",
       "gridPos": {
-        "x": 10,
+        "x": 8,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -300,12 +300,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -314,7 +314,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -332,9 +332,9 @@
       "type": "stat",
       "title": "Session-hours",
       "gridPos": {
-        "x": 15,
+        "x": 12,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -357,12 +357,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -371,7 +371,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -389,7 +389,7 @@
       "type": "stat",
       "title": "Sessions launched",
       "gridPos": {
-        "x": 20,
+        "x": 16,
         "y": 1,
         "w": 4,
         "h": 4
@@ -414,12 +414,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -428,7 +428,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -448,7 +448,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 10,
         "w": 24,
         "h": 1
       },
@@ -461,18 +461,18 @@
       "title": "CPU core-hours by user",
       "gridPos": {
         "x": 0,
-        "y": 6,
+        "y": 11,
         "w": 12,
-        "h": 10
+        "h": 14
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "CPU core-hours consumed per user over the window, largest first.",
+      "description": "CPU core-hours consumed per user over the window, largest first. Ranked highest first and capped at the top 25; on a busy window far more users than that will have usage, so read this as the leaderboard rather than the whole population.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -512,7 +512,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -562,18 +562,18 @@
       "title": "Memory GiB-hours by user",
       "gridPos": {
         "x": 12,
-        "y": 6,
+        "y": 11,
         "w": 12,
-        "h": 10
+        "h": 14
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Memory GiB-hours consumed per user over the window, largest first.",
+      "description": "Memory GiB-hours consumed per user over the window, largest first. Ranked highest first and capped at the top 25; on a busy window far more users than that will have usage, so read this as the leaderboard rather than the whole population.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -613,7 +613,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -663,18 +663,18 @@
       "title": "GPU-hours by user",
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 25,
         "w": 12,
-        "h": 10
+        "h": 14
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "GPU-hours consumed per user over the window, largest first.",
+      "description": "GPU-hours consumed per user over the window, largest first. Ranked highest first and capped at the top 25; on a busy window far more users than that will have usage, so read this as the leaderboard rather than the whole population.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -764,18 +764,18 @@
       "title": "Session-hours by user",
       "gridPos": {
         "x": 12,
-        "y": 16,
+        "y": 25,
         "w": 12,
-        "h": 10
+        "h": 14
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Session-hours consumed per user over the window, largest first.",
+      "description": "Session-hours consumed per user over the window, largest first. Ranked highest first and capped at the top 25; on a busy window far more users than that will have usage, so read this as the leaderboard rather than the whole population.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Running\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_username) (\n  sum_over_time(kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Running\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_username) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -815,7 +815,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -866,7 +866,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 39,
         "w": 24,
         "h": 1
       },
@@ -879,9 +879,9 @@
       "title": "CPU core-hours by community",
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 40,
         "w": 12,
-        "h": 10
+        "h": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -890,7 +890,7 @@
       "description": "CPU core-hours per community, largest first. A single `default` bar means attribution is not being set at launch, not that the dimension is unused.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_community) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_community) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_community) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_community) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community!=\"\"}[$window])\n) / 3600\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -930,7 +930,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -980,9 +980,9 @@
       "title": "CPU core-hours by ClusterQueue",
       "gridPos": {
         "x": 12,
-        "y": 27,
+        "y": 40,
         "w": 12,
-        "h": 10
+        "h": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -991,7 +991,7 @@
       "description": "CPU core-hours per ClusterQueue, largest first. Kueue adds this label to the pod at admission; it is not written by Skaha.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600\n)",
+          "expr": "topk(25,\nsum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_kueue_x_k8s_io_cluster_queue_name!=\"\"}[$window])\n) / 3600\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1031,7 +1031,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1081,9 +1081,9 @@
       "title": "Memory GiB-hours by community",
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 46,
         "w": 12,
-        "h": 10
+        "h": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -1092,7 +1092,7 @@
       "description": "Memory GiB-hours per community, largest first. A single `default` bar means attribution is not being set at launch, not that the dimension is unused.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_canfar_net_community) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_community) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n)",
+          "expr": "topk(25,\nsum by (label_canfar_net_community) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_community) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_community!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1132,7 +1132,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1182,9 +1182,9 @@
       "title": "Memory GiB-hours by ClusterQueue",
       "gridPos": {
         "x": 12,
-        "y": 37,
+        "y": 46,
         "w": 12,
-        "h": 10
+        "h": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -1193,7 +1193,7 @@
       "description": "Memory GiB-hours per ClusterQueue, largest first. Kueue adds this label to the pod at admission; it is not written by Skaha.",
       "targets": [
         {
-          "expr": "topk(25,\nsum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n)",
+          "expr": "topk(25,\nsum by (label_kueue_x_k8s_io_cluster_queue_name) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_kueue_x_k8s_io_cluster_queue_name) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_kueue_x_k8s_io_cluster_queue_name!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n\n> 0\n)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1233,7 +1233,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1284,7 +1284,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 47,
+        "y": 52,
         "w": 24,
         "h": 1
       },
@@ -1297,7 +1297,7 @@
       "title": "CPU core-hours by session kind",
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 53,
         "w": 12,
         "h": 10
       },
@@ -1308,7 +1308,7 @@
       "description": "CPU core-hours per session kind over the window, largest first.",
       "targets": [
         {
-          "expr": "sum by (label_canfar_net_kind) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600",
+          "expr": "sum by (label_canfar_net_kind) (\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_kind!=\"\"}[$window])\n) / 3600\n> 0",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1348,7 +1348,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1398,7 +1398,7 @@
       "title": "Memory GiB-hours by session kind",
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 53,
         "w": 12,
         "h": 10
       },
@@ -1409,7 +1409,7 @@
       "description": "Memory GiB-hours per session kind over the window, largest first.",
       "targets": [
         {
-          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3",
+          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_kind!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n> 0",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1449,7 +1449,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1499,7 +1499,7 @@
       "title": "GPU-hours by session kind",
       "gridPos": {
         "x": 0,
-        "y": 58,
+        "y": 63,
         "w": 12,
         "h": 10
       },
@@ -1510,7 +1510,7 @@
       "description": "GPU-hours per session kind over the window, largest first.",
       "targets": [
         {
-          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600",
+          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"nvidia_com_gpu\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_kind!=\"\"}[$window])\n) * $scrape / 3600\n> 0",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1600,7 +1600,7 @@
       "title": "Session-hours by session kind",
       "gridPos": {
         "x": 12,
-        "y": 58,
+        "y": 63,
         "w": 12,
         "h": 10
       },
@@ -1611,7 +1611,7 @@
       "description": "Session-hours per session kind over the window, largest first.",
       "targets": [
         {
-          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Running\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600",
+          "expr": "sum by (label_canfar_net_kind) (\n  sum_over_time(kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Running\"}[$window])\n  * on (namespace, pod) group_left (label_canfar_net_kind) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\", label_canfar_net_kind!=\"\"}[$window])\n) * $scrape / 3600\n> 0",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1651,7 +1651,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -1696,27 +1696,13 @@
       }
     },
     {
-      "id": 22,
-      "type": "row",
-      "title": "Waste over the window",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 68,
-        "w": 24,
-        "h": 1
-      },
-      "panels": [],
-      "description": "Moved here from Efficiency & Waste, which now holds only the live view. Waste is requested minus consumed, so it is cumulative and belongs with the other cumulative figures."
-    },
-    {
       "id": 23,
       "type": "stat",
       "title": "CPU core-hours wasted",
       "gridPos": {
-        "x": 0,
-        "y": 69,
-        "w": 12,
+        "x": 12,
+        "y": 6,
+        "w": 6,
         "h": 4
       },
       "datasource": {
@@ -1739,12 +1725,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
@@ -1753,7 +1739,7 @@
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "textMode": "value",
@@ -1771,9 +1757,9 @@
       "type": "stat",
       "title": "Memory GiB-hours wasted",
       "gridPos": {
-        "x": 12,
-        "y": 69,
-        "w": 12,
+        "x": 18,
+        "y": 6,
+        "w": 6,
         "h": 4
       },
       "datasource": {
@@ -1796,13 +1782,230 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "Mean session length",
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Session-hours divided by distinct sessions launched. A platform of many short sessions behaves very differently from one of few long ones, and the two totals beside this cannot show which you have.",
+      "targets": [
+        {
+          "expr": "(\nsum(\n  sum_over_time(kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Running\"}[$window])\n  and on (namespace, pod) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n)\n/ (count(count by (label_canfar_net_id) (max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window]))) > 0) * 3600",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
           "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "row",
+      "title": "Efficiency over the window",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "description": "What fraction of the resource reserved for sessions was actually used. This is the ratio the totals above and the waste figures below imply but never state. Low is bad here, so unlike the volume counters these are coloured."
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "CPU efficiency",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "CPU consumed divided by CPU requested, over the window. Sessions reserve cores at launch and are charged for them whether or not they burn them; this says how much of that reservation did any work.",
+      "targets": [
+        {
+          "expr": "(\nsum(\n  increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  and on (namespace, pod) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) / 3600\n)\n/ (\nsum(\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"cpu\"}[$window])\n  and on (namespace, pod) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600\n> 0)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Memory efficiency",
+      "gridPos": {
+        "x": 6,
+        "y": 6,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Working set held divided by memory requested, over the window. Lower than CPU efficiency usually means sessions are sized for a peak they rarely reach.",
+      "targets": [
+        {
+          "expr": "(\nsum(\n  sum_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}[$window])\n  and on (namespace, pod) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n)\n/ (\nsum(\n  sum_over_time(kube_pod_container_resource_requests{namespace=~\"$namespace\", resource=\"memory\"}[$window])\n  and on (namespace, pod) max_over_time(kube_pod_labels{namespace=~\"$namespace\", label_canfar_net_username!=\"\"}[$window])\n) * $scrape / 3600 / 1024^3\n> 0)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.75
               }
             ]
           }
