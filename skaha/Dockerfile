@@ -2,14 +2,14 @@
 #   git clone https://github.com/opencadc/science-platform.git
 #   cd science-platform && docker build -t skaha:local -f skaha/Dockerfile .
 # Note: The build requires the .git directory to be included in the build context.
-FROM eclipse-temurin:21-alpine AS base
+FROM eclipse-temurin:25-alpine AS base
 
 FROM base AS builder
 COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
 
-FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.30.0@sha256:b287abd409152bfc395bf86ad453eca76473760bc9f76d88c423210d73290ee8 AS otel-javaagent
+FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.30.0@sha256:2f72eab291fef045b0e3dc225d9de57d46617af5412b7214802e5dcea833ff59 AS otel-javaagent
 
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
 
