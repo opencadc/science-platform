@@ -4,6 +4,14 @@
 **Target:** `keel-deploy@main` — `manifests/kueue/**`, `helm/values/*/kueue/**`
 **Companion:** [`kueue-fairshare-design.md`](kueue-fairshare-design.md) — read §0 and §1 first.
 
+> **Point-in-time record (2026-07-31).** This audits the system as deployed at the time
+> (Kueue v0.17.0, `336h/5m`). The design has since moved to [`kueue-afs-design.md`](kueue-afs-design.md)
+> targeting Kueue ≥ v0.20.0, which obsoletes findings F1 (truncation — fixed upstream) and F6
+> (version). The remaining findings — unbounded borrowing (F2), dead `borrowWithinCohort` (F7),
+> priority ladder (F8), single flavor (F9), no drain runbook (F10) — stay live against production
+> until the upgrade ships.
+
+
 > **Status update — 2026-08-03.** Two findings below have moved.
 >
 > **F1 (GPU ledger reads zero) is fixed upstream**, not by configuration.

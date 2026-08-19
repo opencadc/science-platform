@@ -1,10 +1,8 @@
 # Fair Share on the CANFAR Science Platform
 
-> **Draft — not yet for circulation.** Accurate for the *target* platform: a Kueue build carrying
-> the fair-share precision fix (PR #13621), with a **14-day half-life**. Two things must land before
-> this is published, because users would notice both: **flexible-profile sessions are currently
-> under-charged ~8×**, and on the currently-deployed Kueue version **neither CPU nor GPU usage
-> registers at all** — the ledger is memory-only. See `kueue-fairshare-design.md` §0.
+> **Draft for user-group review.** Numbers reflect the current proposal: a **5-day** half-life, a
+> **7-day session limit with one-click renewal**, and five standing bands. Please read with the
+> design document's open questions in mind.
 
 *A guide for science users, and for the people who run communities on the platform.*
 
@@ -114,30 +112,33 @@ A notebook left open for three days costs about as much as five hours of a 200-c
 
 A community owns 2,800 cores, 12,400 GiB of memory and 112 GPUs. Converted to credits, that pool is worth about **22,000 credits** held continuously.
 
-Suppose 20 members of that community are active this fortnight. Each person's fair share is roughly 22,000 ÷ 20 ≈ **1,100 credits**. That is the reference line: hold about 1,100 credits continuously and you are using exactly your share.
+Suppose 20 members of that community are active this week. Each person's fair share is roughly 22,000 ÷ 20 ≈ **1,100 credits**. That is the reference line: hold about 1,100 credits continuously and you are using exactly your share.
 
 | | Recent activity | Average hold | Compared to share | Standing |
 | --- | --- | --- | --- | --- |
-| **Ana** | one GPU desktop plus a couple of small notebooks | ~120 credits | 0.11× | **Ahead in line** |
-| **Ben** | a reprocessing run, 600 cores + 2,400 GiB, for 4 of the last 14 days | ~860 credits | 0.78× | **Normal** |
-| **Cara** | the same size run, but held for 12 of the last 14 days | ~2,570 credits | 2.3× | **Well behind** |
+| **Ana** | one GPU desktop plus a couple of small notebooks | ~120 credits | 0.11× | **Near the front of the line** |
+| **Ben** | a reprocessing run, 600 cores + 2,400 GiB, for 2 of the last 5 days | ~860 credits | 0.78× | **In the middle of the line** |
+| **Cara** | the same size run, but held for 4 of the last 5 days | ~2,570 credits | 2.3× | **At the back of the line** |
 
 When all three submit at the same moment into a busy platform, Ana starts first, then Ben, then Cara. Not because of who they are or what they submitted, but because of what each of them has been holding.
 
 Note what this example does *not* say. Cara is not being punished, and nothing has been taken away from her. She used more than her share, so for a while other people go first. As her recent usage fades she moves back up.
 
-### The four standing bands
+### The five standing bands
 
-You will see one of four labels rather than a raw number:
+Your standing is shown as a **place in the line**, ranked among the members of your community who
+are currently active:
 
 | Band | Meaning |
 | --- | --- |
-| **Ahead in line** | You have used less than your share recently. Your work starts before people who have used more. |
-| **Normal** | You are close to your share. Ordinary position in the line. |
-| **Behind in line** | You have used roughly one to two times your share recently. Lighter users go first for a while. |
-| **Well behind in line** | You have used more than twice your share recently. Expect noticeably longer waits until your recent usage fades. |
+| **Next in line** | You have used the least among active members. Your work starts as soon as anything frees up. |
+| **Near the front of the line** | You have used less than most. Your work starts before theirs. |
+| **In the middle of the line** | Around the middle of the pack. Work starts in the usual order. |
+| **Toward the back of the line** | You have used more than most active members recently. Lighter users go first for a while. |
+| **At the back of the line** | You have used more than almost everyone recently. Expect noticeably longer waits until your recent usage fades. |
 
-The band is relative to the people currently active in your community. If the platform is quiet, almost everyone is "ahead" — which is correct, because under light load there is no contention to arbitrate.
+When there is no line at all — you have nothing waiting and neither does anyone else — no band is
+shown. The display simply says **"no line — jobs start immediately."**
 
 ---
 
@@ -145,16 +146,16 @@ The band is relative to the people currently active in your community. If the pl
 
 Usage does not accumulate forever. It decays. What you did yesterday counts much more than what you did last month, and what you did three months ago counts for essentially nothing.
 
-The decay is set by a **half-life** — **two weeks**. Every two weeks, half of any given burst of usage has faded from your standing.
+The decay is set by a **half-life** — **five days**. Every five days, half of any given burst of usage has faded from your standing.
 
 | Time since a burst of usage | How much of it still counts |
 | --- | --- |
-| 3 days | 86% |
-| 1 week | 71% |
-| **2 weeks** | **50%** |
-| 4 weeks | 25% |
-| 6 weeks | 12.5% |
-| 3 months | 1% |
+| 1 day | 87% |
+| 3 days | 66% |
+| **5 days** | **50%** |
+| 1 week | 38% |
+| 2 weeks | 14% |
+| 4 weeks | 2% |
 
 ![how usage fades](kueue-decay.png)
 
@@ -163,7 +164,7 @@ The decay is set by a **half-life** — **two weeks**. Every two weeks, half of 
 - **A big run today does not follow you around forever.** It follows you for about a month, fading the whole time.
 - **Recovery starts immediately and is gradual.** There is no cliff, no reset day, no "your allocation refills on the 1st". The moment you stop holding hardware, your standing starts climbing.
 - **You cannot game it by pausing briefly.** Stopping for an afternoon does almost nothing. The timescale is days to weeks.
-- **A month-long campaign is genuinely expensive.** If you hold a large amount for two weeks, expect reduced standing for roughly the following month. That is not a bug — you used a month's worth of somebody's share. Section 5 has advice on structuring long campaigns.
+- **A long campaign is genuinely expensive.** If you hold a large amount for a week, expect reduced standing for roughly the following two. That is not a bug — you used that much of somebody's share. Section 5 has advice on structuring long campaigns.
 
 Two weeks is a deliberate choice: it is longer than the longest normal piece of work (so nobody can cycle campaigns faster than the system notices), and short enough that a single busy week does not define your whole term. Your community administrators can see the current value and it may be adjusted; if it changes, the platform will say so.
 
@@ -193,8 +194,9 @@ The *accounting* is identical. The *treatment* is not.
 
 Interactive sessions are much harder to interrupt than batch jobs — killing a notebook loses unsaved work and interrupts a person mid-thought, whereas a batch job can usually just be run again. So the platform does not use fair share as a reason to kill running sessions. Instead:
 
-- Interactive sessions are protected from being interrupted by other work.
-- Interactive sessions may have a **time limit** and an **idle timeout**, so that a session which has been forgotten is returned to the pool rather than held indefinitely. If your community has these enabled, the limits are published alongside the session launcher.
+- Ordinary work never interrupts a running session — nothing in the everyday pool can displace anything else.
+- The one narrow exception: when the platform is completely full, a member claiming their **guaranteed session** (a small, community-configured allotment that is always available) may displace work from the heaviest recent users. In practice that lands overwhelmingly on batch jobs, and it is bounded to the size of one guaranteed session.
+- Interactive sessions have a **7-day time limit** with one-click renewal, and an **idle timeout**, so that a session which has been forgotten is returned to the pool rather than held indefinitely. Renewing takes one click; your files on persistent storage are never affected — only the session itself recycles.
 - Your fair-share standing affects **when a new session starts**, not whether a running one keeps running.
 
 The practical upshot for you: if you want a GPU and you want it soon, the best thing you can do is close the GPU session you finished with yesterday.
@@ -209,7 +211,7 @@ Being clear about this saves a lot of frustration.
 
 **It does not give you a guaranteed start time.** There is no estimate of when your job will start, and this is deliberate. Start-time predictions on shared clusters are notoriously wrong — published measurements on comparable systems put minute-accurate predictions in the single-digit percentages — and a confident prediction that is wrong is worse than no prediction. The platform will tell you your position in the line once you have waited long enough for that to be meaningful. It will not tell you a time.
 
-**It is not an allocation or a budget.** Fair share is turn-taking, not entitlement. You do not have a quota of core-hours to spend and you cannot run out. Being "well behind in line" is not a penalty, a strike, or a bill — it is a statement that you were recently ahead of other people and it is now their turn. If the platform empties out, a "well behind" user starts immediately.
+**It is not an allocation or a budget.** Fair share is turn-taking, not entitlement. You do not have a quota of core-hours to spend and you cannot run out. Being "at the back of the line" is not a penalty, a strike, or a bill — it is a statement that you were recently ahead of other people and it is now their turn. If the platform empties out, a user at the back of the line starts immediately.
 
 **It does not reach into running work.** Your standing affects the order in which waiting work starts. It does not shut down something that is already running.
 
@@ -251,7 +253,7 @@ It is worth saying that this cuts both ways: on the days when *you* have been li
 
 Check three things, in this order.
 
-1. **Your standing.** If you are "well behind in line", that is your answer, and it will improve over the coming days.
+1. **Your standing.** If you are "at the back of the line", that is your answer, and it will improve over the coming days.
 2. **Your request size.** A very large request can wait a long time even with excellent standing, simply because a gap that size rarely opens. If a smaller version of the job would do, submit that.
 3. **Your position.** Once you have been waiting more than about ten minutes, the platform shows your position in the line. If it is not moving at all over an hour while the platform is clearly busy, something may be stuck — report it.
 
@@ -267,9 +269,10 @@ The other common case: you have a session you forgot about. Check your running s
 
 Sessions end on their own for a small number of reasons, and the platform tells you which one:
 
-- **Time limit reached.** If your community sets a maximum session length, your session ends when it expires. You can normally extend it before it expires, or simply start a new one.
+- **Time limit reached.** Sessions run for up to 7 days; renewing before expiry takes one click. If it expires, simply start a new one — your files are untouched.
 - **Idle timeout.** A session with no activity for an extended period is closed and its hardware returned to the pool. An open browser tab is not activity — a running kernel, a terminal you are typing in, or GPU utilisation is.
 - **Node maintenance or hardware failure.** Occasionally a machine has to be drained.
+- **Displaced by a guaranteed session.** Rare: the platform was completely full and a member claimed their guaranteed allotment. Displacement falls on the heaviest recent users first, and batch work is overwhelmingly what gets displaced.
 
 **Fair share is not on this list.** Being behind in line does not shut anything down. It only affects when your *next* session starts.
 
@@ -338,7 +341,7 @@ If your community is expected to have GPUs, that must be reflected in your nomin
 | **Lending limit** | How much of your pool is offered out | Lower it to reserve headroom, at the cost of utilisation. |
 | **Member weights** | Relative share between your members | Default is equal. Raise a weight to give a member a larger share of your community's pool — this changes turn order within your community only, never at the expense of another community. |
 | **Session limits** | Maximum session length, idle timeout, maximum concurrent sessions, maximum concurrent GPU sessions per member | The main tool for interactive fairness. Tight enough to prevent squatting, loose enough to be invisible to normal users. |
-| **Priority classes** | Which work may be interrupted by which | Currently interactive runs high, batch runs low. Changing this has non-obvious side effects — discuss before adjusting. |
+| **Guaranteed floor** | The always-available allotment per member | The community's main protection lever. Size it so `floor × expected simultaneous claimants ≤ your pool`. Everything beyond the floor competes in one pool — there is no interactive-over-batch priority to tune. |
 | **Half-life and pricing** | How fast usage fades; what a GPU costs relative to a core | Platform-wide, not per community. Changes here affect everyone and should be announced. |
 
 ### What you can see
@@ -353,7 +356,7 @@ Ask for the administrator view; it is separate from the user-facing display and 
 
 ### When a member complains — a triage order
 
-1. **Look at their standing.** If they are well behind and the platform is busy, the system is working as designed. Explain it with the numbers: "you've been holding about 2.3× your share over the last fortnight, and it halves every two weeks."
+1. **Look at their standing.** If they are well behind and the platform is busy, the system is working as designed. Explain it with the numbers: "you've been holding about 2.3× your share recently, and it halves every five days."
 2. **Look at their request size.** Very large or very wide requests wait a long time regardless of standing. Frequently the fix is a smaller request, and frequently the member did not realise they were asking for more than they use.
 3. **Look at what they are holding.** More often than you would expect, the complaint and the cause are the same person's forgotten GPU desktop.
 4. **Look at community-level contention.** Is your community above its pool and borrowing? Is another community holding capacity you own? Is your pool simply too small for your membership? These are your problems to escalate, not the member's.
@@ -417,7 +420,7 @@ Plain-language terms used in this document, mapped to the technical vocabulary u
 | Your job / your session | Workload (a suspended Kubernetes Job managed by Kueue) |
 | Waiting | Pending, i.e. quota not yet reserved |
 | Recent use fades | Exponentially weighted moving average with a configured half-life (`usageHalfLifeTime`) |
-| Half-life | `admissionFairSharing.usageHalfLifeTime` — **336h (14 days)** |
+| Half-life | `admissionFairSharing.usageHalfLifeTime` — **120h (5 days)** |
 | How often usage is measured | `admissionFairSharing.usageSamplingInterval` |
 | Owning | `nominalQuota` |
 | Lending | `lendingLimit` |
@@ -425,9 +428,9 @@ Plain-language terms used in this document, mapped to the technical vocabulary u
 | Reclaiming | `preemption.reclaimWithinCohort` |
 | Being interrupted | Preemption |
 | Member weight | `LocalQueue.spec.fairSharing.weight` |
-| Priority class | `WorkloadPriorityClass` (low 10,000 / medium 100,000 / high 1,000,000) |
+| Guaranteed vs normal tier | `WorkloadPriorityClass` (`normal` 10,000 / `guaranteed` 1,000,000) |
 | Position in line | Visibility API `positionInClusterQueue` / `positionInLocalQueue` |
-| Session time limit | Session TTL, enforced by skaha |
+| Session time limit | Session TTL — 7 days with renewal, enforced by skaha |
 | Idle timeout | Idle culling, enforced by skaha |
 | The thing that launches your session | skaha |
 | The thing that decides turn order | Kueue |

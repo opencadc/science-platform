@@ -1,38 +1,16 @@
-# CANFAR Kueue fair-share — design
+# CANFAR fair share — technical reference
 
-**Status:** Design, for decision · **Updated:** 2026-08-03
-**Supersedes:** the recommendation in [`research/kueue-fairshare-tenancy.md`](research/kueue-fairshare-tenancy.md)
-**Companions:** [`kueue-keel-deploy-audit.md`](kueue-keel-deploy-audit.md) · [`kueue-fairshare-guide.md`](kueue-fairshare-guide.md)
-**Verified against:** Kueue source at v0.19.0 and `main`, plus a live cluster running a build that
-contains the AFS precision fix ([`5eae484`](https://github.com/kubernetes-sigs/kueue/commit/5eae48454bc8bea30fe2b1842cc3b9be81c95893),
-PR #13621).
+**Status:** Implementation reference · **Updated:** 2026-08-09
+**Companions:** [`kueue-afs-design.md`](kueue-afs-design.md) (the design, normative for all policy and
+parameters) · [`kueue-afs-userguide.md`](kueue-afs-userguide.md) (science users)
+**Assumed parameters** (normative copies live in the design doc §1): `usageHalfLifeTime H = 120h`,
+`usageSamplingInterval Δt = 5m`, `α = 1 − 0.5^(Δt/H) ≈ 4.81×10⁻⁴`, session TTL 7 d, five percentile
+standing bands.
+**Target platform:** Kubernetes ≥ 1.33, Kueue ≥ v0.19.1 (carries the sub-milli AFS precision fix,
+backported as PR #13761), `waitForPodsReady` disabled.
 
-> **Target platform.** Kueue **≥ v0.20.0**, or any build carrying `5eae484`. On such a build the
-> Admission Fair Sharing ledger records every resource — including whole-unit resources such as GPUs —
-> to full precision, and `kueue_local_queue_admission_fair_sharing_usage` is exported. This document
-> assumes that baseline throughout and describes a single design, not a set of version-conditional
-> variants.
-
----
-
-## 1. Parameters
-
-| Parameter | Value | Rationale |
-|---|---|---|
-| Kueue version | **≥ v0.20.0** (any build with `5eae484`) | Whole-unit resources record exactly. Accuracy no longer constrains any other parameter. |
-| `usageHalfLifeTime` | **120h — 5 days** | Long enough to span a multi-day campaign so nobody can cycle work faster than the ledger sees it; short enough that a heavy week is substantially forgiven inside a fortnight. A burst is 50 % gone in 5 days, 90 % in 16.6, 99 % in 33.2. |
-| `usageSamplingInterval` | **5m** | Resolution only — see below. Short interval keeps the reported number close to reality and makes the entry-penalty quantum small. |
-| `resourceWeights` | derived from a **target share of the weighted pool**, not unit equivalence | Anchor `cpu: 1.0` and solve `weight_r = (pool × target_r) / capacity_r`. Choosing weights by "1 GiB ≈ 1 core" silently hands most of the pool to memory. |
-| `clientConnection.qps` / `burst` | sized to the ledger population | Not a fixed constraint. See §1.3 of Part A. |
-
-**The sampling interval does not affect decay.** The tick cancels exactly:
-`(1−α)^{t/Δt} = (2^{−Δt/H})^{t/Δt} = 2^{−t/H}`. It governs how often the ledger is written and how
-finely concurrency is sampled — nothing else. Choose it on write rate and staleness, never on
-fairness semantics.
-
-**`usageHalfLifeTime` is a one-way door.** The stored value is an EWMA whose meaning is *defined* by
-the half-life; changing it silently rescales everyone's standing with no migration path. Set it
-before the user-facing display ships, not after.
+This document holds the implementation-level material: exact API semantics, source-verified
+mechanics, the statistic's computation and serving contract, and the adversarial review record.
 
 ---
 
@@ -45,7 +23,7 @@ The entry penalty is `α × requests` — precisely what one full tick of holdin
 for *n* intervals costs about `n` times that, converging on the true EWMA.
 
 **Charging is quantised upward to one interval.** Sub-interval work is over-charged relative to its
-true hold time. This is deliberate anti-burst design from KEP-4136, and it is what makes a long
+true hold time. This is deliberate anti-burst design from Kueue, and it is what makes a long
 sampling interval safe: **a 1-hour interval does not let short jobs slip between ticks, because every
 admission pays a penalty regardless of how briefly it runs.** Long intervals alias *concurrency
 sampling*, never *admissions*.
@@ -68,6 +46,7 @@ ValidatingAdmissionPolicy / Kyverno rule rejecting label-less Jobs and non-`batc
 the platform after B1.
 
 ---
+
 
 ## 3. The metrics contract
 
@@ -98,17 +77,17 @@ only**, and even then Prometheus-only rather than an API object.
 
 ### 3.2 The Visibility API — real output, and how to poll it at scale
 
-Queried live. Both `v1beta1` and `v1beta2` are served (`v1beta2` is preferred). Scenario: one
+Queried live. All requests use **`v1beta2`** (the preferred version; this document assumes it throughout). Scenario: one
 ClusterQueue with `cpu: 2` nominal, three per-user LocalQueues, four 1-CPU jobs each — 2 admitted,
 10 pending.
 
 ```
-GET /apis/visibility.kueue.x-k8s.io/v1beta1/clusterqueues/cq-vis/pendingworkloads
+GET /apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/cq-vis/pendingworkloads
 ```
 ```json
 {
   "kind": "PendingWorkloadsSummary",
-  "apiVersion": "visibility.kueue.x-k8s.io/v1beta1",
+  "apiVersion": "visibility.kueue.x-k8s.io/v1beta2",
   "metadata": {},
   "items": [
     { "metadata": { "name": "job-bob-2-60299", "namespace": "afs-test",
@@ -134,6 +113,15 @@ non-zero; `bob` and `carol` are at zero. Every one of bob's and carol's jobs is 
 alice's, and alice's first pending job sits at global position **8**. All twelve jobs are identical
 and were submitted within one second of each other, so submission order explains none of it. The
 ledger does.
+
+**This *is* a direct Kubernetes API-server query.** `visibility.kueue.x-k8s.io` is an aggregated
+API: the request goes to the ordinary kube-apiserver with ordinary kubeconfig auth and RBAC, and the
+apiserver proxies it to the Kueue controller, which computes the answer from its in-memory queue.
+Nothing besides standard Kubernetes plumbing is involved. The *other* direct route — `LIST`ing
+`Workload` objects straight from etcd via the apiserver — returns workload *state* cheaply and
+watchably, but not positions: deriving order client-side means re-implementing the scheduler's
+comparator, which breaks the guarantee that the displayed order is the real one. Use the visibility
+API for positions and a `Workload` watch for states.
 
 Three fields matter:
 
@@ -202,66 +190,43 @@ minutes is negligible; the failure mode is a poller that ignores the cache. Rate
 alert if the call rate exceeds one per ClusterQueue per interval. Kueue takes no lock across the
 sort (`buildSnapshotSort` deep-copies AFS state first), so the cost is CPU, not contention.
 
-#### Augmenting *eviction* with AFS — what is and is not possible
+#### Eviction and the ledger
 
-This deserves stating plainly because it is a common and reasonable expectation, and it is wrong.
+Two independent fair-share systems exist, and only one has memory:
 
-**There are two independent fair-share systems in Kueue, and only one of them is the decayed ledger:**
-
-| | Admission Fair Sharing | Cohort Fair Sharing |
+| | Admission Fair Sharing (AFS) | Cohort Fair Sharing (CFS) |
 |---|---|---|
 | Object | **LocalQueue** | **ClusterQueue / Cohort** |
-| Quantity | decayed EWMA of held usage (`consumedResources`) | instantaneous usage **above nominal quota**, ÷ weight (`weightedShare`) |
+| Quantity | decayed usage ledger (`consumedResources`) | instantaneous usage **above nominal quota**, ÷ weight (`weightedShare`) |
 | Has memory? | **yes** — half-life `H` | **no** — a live gauge |
-| What it drives | **admission ordering only** | **preemption** (`fairSharing.preemptionStrategies`) |
+| What it drives | **admission ordering** | **cross-queue preemption** |
 | Config | `admissionFairSharing`, `admissionScope.admissionMode` | `fairSharing` block, `preemption.*` |
 
-**The preemption package has zero AFS awareness.** Grepping `pkg/scheduler/preemption/` for
-`admissionfairsharing` / `AdmissionScope` / `AdmissionMode` returns no non-test hits. So:
+Plainly: **cross-ClusterQueue eviction ignores the ledger entirely.** When one community reclaims
+capacity another borrowed, victims are selected by current borrowing (`weightedShare`), then
+priority, then recency — a user who has been 10× over share for a fortnight is no likelier a victim
+across queues than one who started an hour ago.
 
-- **Within a ClusterQueue**, eviction is decided by `WorkloadPriorityClass` alone
-  (`withinClusterQueue: LowerPriority` ⇒ strictly-lower-priority candidates only). A user with a
-  terrible ledger is *never* preferentially evicted.
-- **Across ClusterQueues in a cohort**, eviction is decided by `weightedShare` — borrowing above
-  nominal quota — which is a *current* measure with no history.
+**Within a ClusterQueue, victim selection on the target platform IS ledger-aware.** Verified at
+`main` (`pkg/scheduler/preemption/common/ordering.go`, `CandidatesOrdering`): among
+strictly-lower-priority candidates, workloads are ordered by (0) already-being-evicted first,
+(1) other-ClusterQueues-in-cohort first, (2) **the LocalQueue's fair-share usage — heavier-ledger
+queues' workloads preferred as victims**, (3) lower priority, (4) most recent admission. So when a
+guaranteed session preempts to make room, it takes the heaviest user's batch job first — the tier
+design in the design doc §3 leans on exactly this.
 
-**Worked example.** Two communities in one cohort; `cq-a` nominal 100 CPU, `cq-b` nominal 100 CPU.
-
-- `cq-b` is idle. `cq-a` borrows to 180 CPU. `cq-a.status.fairSharing.weightedShare` > 0,
-  `cq-b`'s is 0.
-- `cq-b` submits. Cohort FS preempts `cq-a`'s **borrowed** workloads — correctly, and with no regard
-  to which *user* inside `cq-a` has been heavy.
-- Inside `cq-a`, the user evicted is whichever workload the preemption策 picks by priority and
-  timestamp. **A user who has held 10× their share for a fortnight is no more likely to be evicted
-  than one who started an hour ago.**
-
-**If eviction must be AFS-aware, it has to be built.** The only supported lever is
-`Workload.spec.active = false`, which deactivates a workload and returns its quota. A small
-controller can: read each LocalQueue's `consumedResources`, compute `f`, and deactivate the
-newest/cheapest workloads of queues above a threshold when the ClusterQueue is saturated and a
-lower-`f` queue has been pending beyond an SLO. Two constraints make this narrower than it sounds —
-it must never touch interactive workloads (deactivation is a user-visible outage), and it must be
-strictly rate-limited or it becomes an eviction storm. **Recommendation: do not build this initially.**
-Bounded batch runtime (§4.1) achieves most of the same effect — capacity recycles on a known
-timescale, so AFS ordering gets frequent opportunities to act — without any eviction authority.
+Worked example: `cq-a` and `cq-b` share a cohort, 100 CPU nominal each. `cq-a` borrows to 180 while
+`cq-b` is idle; when `cq-b` submits, CFS preempts `cq-a`'s borrowed workloads (no ledger involved).
+Inside `cq-a`, a guaranteed session preempting batch picks the batch job belonging to the
+heaviest-ledger user (ledger involved, step 2 above).
 
 ### 3.3 Where the authoritative number comes from
 
-**This was previously "compute it ourselves". That conclusion is now conditional, and the condition
-has flipped.** The original case rested on Kueue's ledger being untrustworthy — whole-unit resources
-truncating to zero. With the precision fix that is no longer true:
-`LocalQueue.status.fairSharing.admissionFairSharingStatus.consumedResources` is accurate to
-nanounits, is a first-class API object, and is exactly what the scheduler sorts on.
-
-**The decision now turns entirely on LocalQueue granularity:**
-
-| LocalQueue granularity | Where the per-user number comes from |
-|---|---|
-| **per `(user, community)`** — the design in Part A | **Read Kueue's ledger.** It *is* the per-user ledger. Do not reimplement. |
-| per project or per community | **Must compute our own**, because Kueue's ledger aggregates the users we need to separate. |
-
-Since Part A targets per-`(user, community)` queues, **read Kueue's ledger.** The reasons are not
-merely economy:
+**The authoritative number is
+`LocalQueue.status.fairSharing.admissionFairSharingStatus.consumedResources`.** It is accurate to
+nano-units, a first-class API object written every sampling tick, and exactly the quantity the
+scheduler sorts on. With one LocalQueue per `(user, community)`, Kueue's ledger *is* the per-user
+ledger — we read it; we do not recompute it. Three reasons beyond economy:
 
 - **Order-isomorphism is the entire value of the number.** The point of showing a standing is that it
   explains admission order. A reimplementation is only faithful if it is exact — and it cannot be,
@@ -286,7 +251,7 @@ merely economy:
 
 - The persisted value **omits the in-memory entry penalty**, so it lags the scheduler's own number by
   up to one sampling interval during a submission burst. Surface this via `Last-Modified`.
-- KEP-4136 explicitly non-goals *"precise shared resource usage accounting or billing."* This is a
+- Kueue explicitly declares precise accounting and billing out of scope for this field. This is a
   scheduling signal, never an invoice — it must not be used for cost recovery or grant reporting.
 
 **Never surface `LocalQueue.status.fairSharing.weightedShare`.** No controller writes it for a
@@ -308,7 +273,7 @@ pool. It exists because the raw scalar is unreadable ("412.7 CPU-core-equivalent
 publishing a precise float invites argument about the number rather than acceptance of the rule.
 Thresholds are in §2 of Part B. Four levels, not more: enough to distinguish "you are fine" from
 "this is why you are waiting", few enough that a user never has to reason about a boundary.
-**The band is relative to the peers currently active** — under light load almost everyone is `ahead`,
+**The band is a rank among the peers currently active** — and when there is no line at all the display says so instead of ranking,
 which is correct, because with no contention there is nothing to arbitrate.
 
 **Per-user payload**, refreshed at `usageSamplingInterval`, cached in the existing metrics service
@@ -317,7 +282,7 @@ which is correct, because with no contention there is nothing to arbitrate.
 ```jsonc
 {
   "user": "jdoe", "community": "cadc",
-  "standing": { "band": "normal",      // ahead | normal | behind | far_behind
+  "standing": { "band": "middle",     // next | front | middle | behind | lagging
                 "ratio": 0.78,          // your usage ÷ community median  <- the headline
                 "halfLifeHours": 120, "lastUpdate": "2026-08-03T16:40:00Z" },
   "holding":  { "cpu": 12, "memory_gib": 48, "gpu": 1, "credits": 95 },
@@ -351,7 +316,801 @@ synthesised.
 
 ---
 
-## 4. Social dynamics — how this gets gamed
+
+## Resize capture — why the admitted Workload is sealed, and what to do instead
+
+Design doc §4 states the conclusion; this section carries the evidence and the reconciler contract.
+
+### The three locks on the admitted Workload (source-verified, `main` 2026-08)
+
+**Lock 1 — `spec.podSets` is immutable under quota.** `pkg/webhooks/workload_webhook.go`:
+
+```go
+if workload.HasQuotaReservation(oldObj) {
+    allErrs = append(allErrs, validateImmutablePodSets(newObj.Spec.PodSets, oldObj.Spec.PodSets, ...)...)
+}
+```
+
+**Lock 2 — `status.admission` contents are immutable.** Same file, comment verbatim:
+
+```go
+// validateAdmissionUpdate validates that admission can be set or unset, but the
+// fields within can't change.
+```
+
+`status.admission.podSetAssignments[].resourceUsage` — the exact field `GetAdmittedUsage()` and the
+ledger derive from — cannot be edited on a live admission.
+
+**Lock 3 — divergence is terminal.** `pkg/controller/jobframework/reconciler.go`,
+`ensurePrebuiltWorkloadInSync`: a Workload that no longer matches its Job is not corrected —
+
+```go
+msg := "The prebuilt workload is out of sync with its user job"
+return false, workloadfinish.Finish(ctx, r.client, wl, kueue.WorkloadFinishedReasonOutOfSync, msg, r.clock)
+```
+
+— it is **finished**, ending the admission. Any "patch both the pod and the Workload" scheme
+therefore fails even if it slips past the webhook.
+
+**Lock 4 — the ledger itself is write-only from outside.**
+`LocalQueue.status.fairSharing.admissionFairSharingStatus.consumedResources` is written every tick
+from Kueue's in-memory accumulator and read back **exactly once** — in `initializeAfsIfNeeded` on
+controller restart, the only read in `pkg/controller/core/localqueue_controller.go`. An external
+edit is overwritten at the next tick; if it survived to a restart it would seed a corrupted history.
+The ledger is an output, never an input.
+
+And the principled fourth objection: a direct patch injects usage without passing admission — no
+quota check, no entry penalty, no arbitration against other users. The seal is a feature.
+
+### The resize reconciler
+
+One controller, one rule: **the truth about a session's size lives on the pod; the *charge* for any
+excess over the admitted size lives in a companion delta Workload that passed admission.**
+
+```
+observe:   session pods (Kueue-managed, canfar.net/* labels)
+compare:   actual container requests  vs  admitted Workload podSet requests
+reconcile: positive delta  -> ensure delta Workload `resize-<session>` of exactly that size
+           zero delta      -> ensure no delta Workload
+           session gone    -> garbage-collected via ownerReference
+```
+
+Ordering differs by initiator, deliberately:
+
+| initiator | ordering | failure mode |
+|---|---|---|
+| **UI/API RAM arrow** (skaha) | **delta Workload first**; pod patched only after it admits | fail-closed: un-admittable growth is refused with a queue-aware message |
+| **VPA CPU auto-grow** | pod resizes first; reconciler mirrors after | fail-open by policy — CPU growth is the declared uncharged subsidy; the mirror records drift rather than charging it |
+
+Notes that matter in implementation:
+
+- The delta Workload is podless. `GetAdmittedUsage()` counts *admitted* workloads regardless of
+  pods, so it charges and reserves correctly; `waitForPodsReady` must remain off (target-platform
+  requirement) or podless workloads would be evicted on timeout.
+- **Eviction of a delta Workload** (a guaranteed session displaced it): the grown RAM is still
+  physically held. The reconciler treats this as a platform-initiated shrink request — best-effort
+  in-place memory decrease; if the kernel cannot reclaim, flag the session, alert, and re-create
+  the delta when capacity frees. Drift is bounded by the reconcile interval and surfaced as a
+  metric (`resize_uncharged_bytes`).
+- **Optional hardening:** Kubernetes ≥ 1.33 exposes resizes through the `pods/resize` subresource;
+  a validating webhook on that subresource can gate *all* resize sources — including VPA — on the
+  existence of an admitted delta Workload, turning fail-open mirroring into fail-closed
+  authorisation. Costs a webhook on the resize path; adopt only if uncharged drift proves material.
+- RBAC: skaha and the reconciler need create/delete on `workloads.kueue.x-k8s.io` and (for the
+  hardening) `pods/resize`.
+
+---
+
+### Delta Workload — live verification
+
+Prototyped on a kind cluster running a Kueue build with the sub-milli precision fix, AFS at
+`H = 300s / Δt = 30s` (short, so the ledger moves visibly within minutes), `waitForPodsReady`
+absent. Two per-user LocalQueues, each with one admitted 1-CPU session; a podless delta Workload
+requesting `cpu: 1, memory: 1Gi` created against `u-jdoe`.
+
+| property | evidence |
+|---|---|
+| **Admits with zero pods** | `QuotaReserved=True`, `Admitted=True` within seconds; pod count in namespace unchanged (2). |
+| **Reserves quota** | ClusterQueue `flavorsUsage.cpu` `2 → 3`, `memory 1Gi → 2Gi` — exactly the delta. |
+| **Charged identically to a running pod** | jdoe (2 CPU held) vs peer (1 CPU held), five consecutive ticks: `0.3765/0.1878 = 2.005`, `0.4853/0.2422 = 2.004`, `0.5867/0.2930 = 2.003` … **ratio 2.00 to three digits.** |
+| **Fails closed on quota** | A 2-CPU delta against 1 free CPU: `QuotaReserved=False`, `reason=Pending`, *"insufficient unused quota for cpu in flavor default-flavor, 1 more needed"*; CQ usage unchanged. |
+| **Releases on delete** | Deleting the delta: CQ usage `3 → 2` within seconds; jdoe's ledger stops accruing and the ratio to peer falls `2.00 → 1.87 → 1.71` on successive ticks — decay on the half-life, as designed. |
+| **Update = delete + recreate** | In-place `PATCH` of the delta's requests is rejected by the webhook — `spec.podSets.0: field is immutable`. Delete → recreate at the new size → admitted measured at **0.1 s**; quota re-reserved atomically. Shrink (1Gi → 512Mi) released the difference within one tick. |
+| **Garbage-collected with the session** | Delta owner-referenced to a session Job; deleting the Job removed the delta within 12 s with no other action. |
+
+The oversized-delta rejection message is the exact string skaha surfaces to a user whose RAM
+up-arrow cannot be honoured. Nothing here required a Kueue change, a CRD, or a controller: the
+prototype was six `kubectl apply/delete` operations.
+
+## Appendix A — Per-user LocalQueue mechanics
+
+### 1.1 Diagram
+
+```mermaid
+flowchart TB
+  subgraph ID["CADC GMS — identity"]
+    U["user <b>jsmith</b><br/>groups: unions, canucs"]
+  end
+
+  U --> SK["<b>skaha</b><br/>router + interactive actuator<br/>(labels, suspend, TTL, caps, cull)"]
+
+  SK -->|"small session<br/>≤1 CPU / 4 GiB / 0 GPU<br/>and 0 floor sessions held"| LQF["LocalQueue<br/><b>q-floor-unions</b><br/>(one per community,<br/>shared, FIFO)"]
+  SK -->|"everything else"| LQU["LocalQueue<br/><b>q-unions-jsmith</b><br/><i>THE LEDGER</i><br/>status.fairSharing.<br/>admissionFairSharingStatus"]
+  SK -.->|"same user,<br/>other community"| LQU2["LocalQueue<br/><b>q-canucs-jsmith</b><br/><i>independent ledger</i>"]
+
+  PIPE["community service account<br/>(reprocessing campaign)"] --> LQC["LocalQueue<br/><b>q-campaign-unions</b><br/>(no person's ledger)"]
+
+  LQF --> CQF["ClusterQueue <b>canfar-floor</b><br/>admissionMode: <b>NoAdmissionFairSharing</b><br/>nominal 140 cpu / 620Gi / <b>0 gpu</b><br/>lendingLimit <b>0</b> (hard reserve)<br/>withinClusterQueue: Never"]
+  LQU --> CQ1["ClusterQueue <b>cq-unions</b><br/>admissionMode: <b>UsageBasedAdmissionFairSharing</b><br/>nominal = community grant<br/>lendingLimit = 100%<br/><b>withinClusterQueue: Never</b><br/>reclaimWithinCohort: LowerPriority"]
+  LQU2 --> CQ2["ClusterQueue <b>cq-canucs</b><br/>(same shape)"]
+  LQC --> CQC["ClusterQueue <b>canfar-campaign</b><br/>nominalQuota <b>0</b> — pure borrower<br/>lendingLimit 0<br/>workloads at priority 10000"]
+
+  CQF --> COH["Cohort <b>canfar</b><br/>fairSharing.preemptionStrategies<br/>(community-vs-community)"]
+  CQ1 --> COH
+  CQ2 --> COH
+  CQC --> COH
+
+  FC["<b>fairshare-controller</b><br/>(new, ~300 LOC)"] -.->|"writes spec.fairSharing.weight<br/>= entitlement × starvation boost"| LQU
+  MET["<b>metrics service</b><br/>GET /api/v1/metrics/fairshare"] -.->|"reads status"| LQU
+  MET --> SK
+```
+
+### 1.2 The ledger lives on the LocalQueue, and its granularity is `(user, community)`
+
+Verified fact that forces this: Kueue's Admission Fair Sharing ledger is keyed by `utilqueue.LocalQueueReference = namespace/name` (`pkg/util/queue/local_queue.go:KeyFromWorkload`). There is no per-user dimension anywhere in the AFS code path. If you want Kueue's own scheduler to order admission by per-user history, the LocalQueue **must** be the user.
+
+Naming and placement:
+
+| Object | Name | Namespace | Count |
+|---|---|---|---|
+| User ledger | `q-{community}-{user}` | `canfar-workloads` | users × communities-they-use |
+| Floor queue | `q-floor-{community}` | `canfar-workloads` | # communities |
+| Campaign queue | `q-campaign-{community}` | `canfar-workloads` | # communities |
+| SRC mirror | `q-src-{community}-{user}` | `canfar-src-workloads` | as above |
+
+`{user}` and `{community}` are DNS-1123-sanitised (lowercase, `[^a-z0-9-] → -`), truncated to 40 chars each, with an 8-hex-char FNV-1a suffix of the raw pair appended whenever sanitisation or truncation is lossy. skaha stores the canonical pair in labels `canfar.net/username` / `canfar.net/community` so the name is never parsed to recover identity.
+
+**LocalQueues are created lazily on first submission and are NEVER deleted.** This is not a preference. Verified: `LocalQueueReconciler.Delete()` purges both `AfsConsumedResources` and `AfsEntryPenalties`, and the only durable copy of the ledger is the object's own `.status` subresource — so delete-then-recreate is an unrecoverable fair-share reset, identical at every Kueue version. A cron job that reaps idle LocalQueues would be a self-service amnesty button. Add `localqueues.kueue.x-k8s.io` to etcd backup scope and to any admission-webhook deny list for `DELETE` by non-admins.
+
+### 1.3 Why this is affordable
+
+The AFS status write rate is exactly `N_localqueues / usageSamplingInterval` — the LocalQueue
+reconciler self-requeues at that interval and writes `.status` on each tick.
+
+| `usageSamplingInterval` | 850 ledgers | 3 000 ledgers | 10 000 ledgers |
+|---|---|---|---|
+| **5m** | **2.8 w/s** | 10.0 w/s | 33.3 w/s |
+| 15m | 0.94 w/s | 3.3 w/s | 11.1 w/s |
+| 60m | 0.24 w/s | 0.83 w/s | 2.8 w/s |
+
+At the platform's expected ceiling — **no more than ~1 000 users**, each with a ledger per community
+they belong to, so order 1 000–1 500 LocalQueues — 5-minute sampling costs **3–5 status writes per
+second** on a small object's status subresource, spread evenly rather than bursty. At that population
+the object count is unremarkable for etcd and the ledger set is comfortably manageable.
+
+This is a **capacity-planning input, not a ceiling.** `clientConnection.qps` and `burst` on the Kueue
+controller are tunable and should be raised to suit the ledger population rather than lengthening the
+sampling interval to fit a default. The interval is better spent on freshness. Two guard rails:
+
+- Alert on `rest_client_rate_limiter_duration_seconds` for the Kueue client. If the limiter is
+  actually delaying requests, raise `qps`/`burst` before touching the interval.
+- Alert on API-server write latency and etcd fsync. Status writes are cheap individually; the failure
+  mode on a loaded control plane is latency, not QPS exhaustion.
+
+If the ledger population grows by an order of magnitude, lengthening `usageSamplingInterval` is the
+cheapest lever and costs nothing in fairness semantics — the tick cancels out of the decay (§1).
+
+```yaml
+admissionFairSharing:
+  usageHalfLifeTime: 120h        # 5 days
+  usageSamplingInterval: 5m
+  resourceWeights:               # set from a target share of the weighted pool
+    cpu: 1.0
+    memory: <derived>
+    ephemeral-storage: <derived>
+    nvidia.com/gpu: <derived>
+```
+
+---
+
+
+
+---
+
+# Part B — The user-facing fair-share statistic
+
+> Parameter values in this part predate §1. **§1 is normative.**
+
+# The CANFAR Fair-Share Statistic
+
+**Answers:** *"We have to report a statistic to a user, e.g. their fairshare value. How do we do that?"*
+
+**Status:** design, ready to implement. Targets `metrics/` (compute + contract) and `skaha/` (identity + proxy).
+
+---
+
+## 0. Decision summary
+
+| Question | Decision |
+| --- | --- |
+| **The number** | `standing.score` = **f = 2⁻⁽ᵁ/ˢ⁾** — bounded in (0, 1], 1.0 = unused, 0.5 = exactly your share. |
+| **Why f** | It is **order-isomorphic to Kueue's own admission sort key**. Ranking users by f descending is byte-for-byte the same order the scheduler admits in. No other candidate has this property. |
+| **Headline shown to user** | Not f. A **4-band badge** derived from f, plus one sentence. f is drill-down only. |
+| **Read from** | `LocalQueue.status.fairSharing.admissionFairSharingStatus.consumedResources` — authoritative, already written every sampling tick. **Not Prometheus.** |
+| **Computed in** | `metrics/` — new `fairshare` scope, one shared cluster snapshot, O(1) API reads regardless of user count. |
+| **Cache** | Shared snapshot TTL = `usageSamplingInterval`; per-user response `Cache-Control: private, max-age=15`. |
+| **Scope honesty** | Standing is per `(user, community)` — one `FairShareStanding` object per ledger. |
+| **ETA** | Never shown. |
+| **Queue position** | Shown only after 10 min pending, **monotonically clamped** so it can never move backwards. |
+
+## 1. The number
+
+### 1.1 The candidates, and why f wins
+
+Kueue admits pending work in ascending order of
+
+```
+U_q = ( Σ_r  resourceWeights[r] · consumedResources_q[r] ) / fairSharing.weight_q
+```
+
+(`pkg/util/admissionfairsharing/admission_fair_sharing.go:CalculateUsage`). That is the *only* number the scheduler acts on. Any statistic we display must be a **strictly monotone function of U**, or the UI will contradict the queue.
+
+| Candidate | Bounded? | Monotone in U? | Verdict |
+| --- | --- | --- | --- |
+| Raw `consumedResources` weighted scalar (`U`) | No | Trivially | **Reject as headline.** "412.7 CPU-core-equivalents" is unreadable, unit-confusing (1 GPU = 35 cores = 35 GiB RAM = 1225 GiB disk), and has no reference point. Keep as drill-down. |
+| `U / median(U over active peers)` | No (→∞) | Yes, but **only at fixed peers** | **Reject.** The denominator moves when *other people* act, so a user's badge changes while they do nothing — the exact opposite of Munichor & Rafaeli's progress requirement. Also degenerate when peers are idle. |
+| Slurm `LevelFS = NormShares / EffectvUsage` | No (→∞ as usage→0) | Yes (inverted) | **Reject.** Unbounded means no stable bucket boundaries and no renderable bar. Slurm shows it to sysadmins, not scientists. |
+| **FASRC `f = 2^(−U/S)`** | **Yes, (0,1]** | **Yes, strictly decreasing** | **Adopt.** |
+
+### 1.2 Definition
+
+```
+f_q  =  2 ^ ( − U_q / S_q )
+```
+
+where `S_q` is queue *q*'s **entitlement** expressed in the same weighted CPU-core-equivalent units:
+
+```
+S_q  =  ( weight_q / Σ_p weight_p )  ·  Σ_r  resourceWeights[r] · nominalQuota_CQ[r]
+```
+
+Σ over `p` runs over the **active** LocalQueues attached to the same ClusterQueue (see §3.4 for "active").
+
+### 1.3 Why this shape is right for astronomers
+
+- **Bounded and anchored.** `f = 1.0` you have used nothing. `f = 0.5` you have been holding *exactly* your entitled share, continuously. `f → 0` you are far above it. There is a natural, explainable midpoint — LevelFS and the raw scalar have none.
+- **Band boundaries are powers of two of your share.** `f = 0.75 → U/S = 0.415`, `f = 0.50 → U/S = 1`, `f = 0.25 → U/S = 2`, `f = 0.125 → U/S = 3`. Each band drop is "one more multiple of your share". That is a story you can tell in one sentence.
+- **Unitless.** It never forces us to explain that 1 GPU costs 35 cores.
+- **Order-preserving.** `f_a > f_b ⟺ U_a < U_b ⟺ a's next job is admitted before b's`. So the badge *predicts the slip* — which is precisely what Larson (1987) says you must do, because a fair-share system is by construction a slip generator.
+
+> **Kueue does not compute f.** f is our monotone re-expression of Kueue's `CalculateUsage`. That is a feature: we present a legible number without ever disagreeing with the scheduler. It also means we can compute it entirely client-side from published API fields.
+
+---
+
+## 2. Bands and thresholds
+
+Bands are **percentile ranks among active peers in the community**, cut on the normal curve, best
+standing first (rank by `f` descending — equivalently `U/S` ascending):
+
+| band key | percentile of active peers | badge | one-sentence explanation |
+| --- | --- | --- | --- |
+| `next` | top 2.5 % | **Next in line** | "You're next — your jobs start as soon as anything frees up." |
+| `front` | 2.5 – 16 % | **Near the front of the line** | "You've used less than most active members recently, so your jobs start before theirs." |
+| `middle` | 16 – 50 % | **In the middle of the line** | "You're around the middle — jobs start in the usual order." |
+| `behind` | 50 – 84 % | **Toward the back of the line** | "You've used about {ratio}× your share recently, so jobs from lighter users start first. This eases as your recent usage fades — it halves every 5 days." |
+| `lagging` | bottom 16 % | **At the back of the line** | "You've used more than almost all active members recently. Jobs from lighter users start first until your recent usage fades; it halves every 5 days." |
+
+Two rules that keep the labels honest:
+
+- **The no-line override.** If the user has nothing pending *and* the community's pending queue is
+  empty, no band is shown at all — the display reads **"no line — jobs start immediately"**. A band
+  describes your place in a line that exists; ranking five nearly-idle users and telling one of them
+  they are "at the back" generates tickets and is not information.
+- **"Active peers"** = members with running or pending work, or a ledger above a noise floor
+  (1 credit). Dormant members are excluded from the denominator.
+
+`{ratio}` = `round(U/S, 1)` — the only number in the copy, a multiple of the user's own share, never
+a scheduler internal. `f` remains the underlying score (§1); bands are cut on its *rank*, not on
+fixed thresholds, so the bands automatically track whatever the community's current usage
+distribution looks like.
+
+## 3. How it is computed
+
+### 3.1 The decay
+
+Kueue's ledger is an EWMA over **currently held** admitted resources, resampled every `usageSamplingInterval` and folded in with
+
+```
+α        = 1 − 2^(−Δt / H)                     Δt = actual elapsed since last sample
+consumed = consumed_prev·(1−α) + held_now·α
+```
+
+`α` is computed from **actual elapsed wall time**, not the nominal interval. Two consequences that matter for us:
+
+- The decay's **time constant is `H` and only `H`**. Changing `usageSamplingInterval` changes sampling resolution — it does **not** change how fast usage is forgotten. The tick cancels exactly out of the decay.
+- The ledger accrues for the **whole time** a workload holds resources, not once at admission. A 3-day GPU notebook is counted in every sample for 3 days. This is the mechanical reason the platform owners' constraint — *interactive must be charged to the same ledger as batch* — is already satisfied by AFS accounting, with no skaha-side workaround needed.
+
+### 3.2 What H = 120h (5 days) actually means
+
+| how much of a burst is forgotten | elapsed |
+| --- | --- |
+| 50% | **5.0 days** |
+| 75% | 10.0 days |
+| 90% | 16.6 days |
+| 95% | 21.6 days |
+| 99% | 33.2 days |
+
+Five days is chosen against two opposing pressures.
+
+- **Long enough to be un-gameable.** The half-life must exceed the longest legitimate unit of work,
+  or a user can alternate campaigns faster than the ledger can see them and stay permanently in good
+  standing. Multi-day campaigns are spanned; a weekend pause buys almost nothing.
+- **Short enough to be explicable.** A user who runs one large campaign is materially affected for
+  about a week and effectively clear inside three. That is a timescale a person can hold in their
+  head, and it is short enough that the recovery is visible week to week rather than being an
+  invisible month-long tail.
+
+**The obligation this creates:** because the tail is measured in weeks, the UI is *required* to state
+the half-life. "It halves every 5 days" is not decoration — it is what converts an otherwise
+inexplicable multi-week penalty into a rule. This is why the half-life appears in the band copy and
+in `standing.basis.halfLifeHours`.
+
+### 3.4 Choosing the entitlement denominator
+
+`S_q` needs `Σ_p weight_p` over **active** peers. Definition:
+
+> A LocalQueue is **active** if `consumedResources` is non-empty **or** it has ≥ 1 admitted or pending workload.
+
+Rationale: dividing by *all configured* queues understates everyone's share whenever a project is dormant, and the whole point of the number is contention. With CANFAR's four static LocalQueues all carrying `fairSharing.weight: "1"`, `Σ weight` is just the active count.
+
+**Clamp:** `S_q ≥ ε` (use `ε = 1.0`) so a misconfigured zero-weight queue cannot produce `f = 0` or a division by zero. Kueue itself returns `MaxInt64` for zero-weight borrowing queues; we return band `lagging` with `score: 0.0` and a `degraded` entry rather than propagating a sentinel.
+
+### 3.5 The complete algorithm
+
+```python
+GIB = 2 ** 30
+
+def weighted(resources: dict[str, float], weights: dict[str, float]) -> float:
+    """Σ_r weight_r · amount_r, in base units. Unlisted resources weigh 1.0 (Kueue's rule)."""
+    return sum(weights.get(name, 1.0) * amount for name, amount in resources.items())
+
+def standing(lq_consumed, lq_weight, cq_nominal_quota, sum_active_weights, weights):
+    U = weighted(lq_consumed, weights) / max(lq_weight, 1e-9)
+    C = weighted(cq_nominal_quota, weights)
+    S = max(C * lq_weight / max(sum_active_weights, 1e-9), 1.0)
+    ratio = U / S
+    return {"usage": U, "entitlement": S, "ratio": ratio, "score": 2.0 ** (-ratio)}
+```
+
+`lq_consumed` and `cq_nominal_quota` are parsed to **base units** (cores, bytes, whole GPUs) — reuse `metrics.providers.kueue.parse_resource_amount`, but note it converts `memory` / `ephemeral-storage` to **GiB**; the weighted sum needs **bytes**, so multiply those back by `2**30` before applying `resourceWeights`. Getting this backwards silently inflates memory's contribution by 10⁹.
+
+---
+
+## 4. Where it is read from
+
+### 4.1 Authoritative source — the Kubernetes API, not Prometheus
+
+| | GVR | Scope | Field path | Purpose |
+| --- | --- | --- | --- | --- |
+| **A** | `kueue.x-k8s.io/v1beta2` · `localqueues` | ns `canfar-workloads`, `canfar-src-workloads` | `.status.fairSharing.admissionFairSharingStatus.consumedResources`<br>`.status.fairSharing.admissionFairSharingStatus.lastUpdate`<br>`.spec.clusterQueue`<br>`.spec.fairSharing.weight` | `U`, freshness, peer grouping, weight |
+| **B** | `kueue.x-k8s.io/v1beta2` · `clusterqueues` | cluster | `.spec.resourceGroups[].flavors[].resources[].nominalQuota` | `C` → `S`. **Already read by `KueueProvider`.** |
+| **C** | `kueue.x-k8s.io/v1beta2` · `workloads` | ns `canfar-workloads`, `canfar-src-workloads` | `.metadata.labels["canfar.net/username"]`, `.status.conditions[]`, `.spec.priorityClassName` | per-session "why pending" (§6.3) and user attribution |
+| **D** | `visibility.kueue.x-k8s.io/v1beta2` · `localqueues/pendingworkloads` | ns-scoped, `get` | `.items[].positionInClusterQueue` | queue position, background-polled only |
+
+**Do not put `LocalQueue.status.fairSharing.weightedShare` in any UI.** No controller writes it. It is a `+required` field, so it always serialises as `0`. It is the field whose name most sounds like the answer, and even Kueue's own docs show it as `0`. `weightedShare` *is* populated on ClusterQueue and Cohort — admin surface only (§8).
+
+**Prometheus is not used for the user-facing path.**
+- `kueue_local_queue_admission_fair_sharing_usage` is exported and is the scalar the scheduler itself sorts on (penalty included); use it for admin dashboards and alerting.
+- It is Prometheus-only, which would make a portal page render depend on the metrics pipeline; an API-object GET is served from etcd/watch cache and is strictly better coupling for a hot user path.
+- Every Kueue metric comes from the **leader replica's in-memory cache** — the same component whose write path the April 2026 benchmark identified as the bottleneck.
+
+**Divergence to accept and document:** the scheduler's in-memory sort key includes **pending entry penalties**, which are never persisted to `status`. Our number therefore under-reports during a submission burst and lags by up to one sampling interval. At `H = 120h` and a 5-minute tick a single penalty is a small fraction of a steady-state ledger — immaterial for a band, and surfaced honestly via `Last-Modified`.
+
+### 4.2 RBAC
+
+`metrics-api` today holds only `clusterqueues: [get]`. Extend `metrics/helm/metrics-api/templates/rbac.yaml`:
+
+```yaml
+rules:
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["clusterqueues"]
+    verbs: ["get", "list"]
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["localqueues", "workloads"]
+    verbs: ["get", "list", "watch"]
+  # Optional: only if queue position (§5.3) is enabled.
+  - apiGroups: ["visibility.kueue.x-k8s.io"]
+    resources: ["localqueues/pendingworkloads"]
+    verbs: ["get"]
+```
+
+`localqueues` and `workloads` may be narrowed to namespaced `Role`s in `canfar-workloads` and `canfar-src-workloads`; `clusterqueues` must stay cluster-scoped. **skaha needs no new RBAC** — it already has `localqueues: [get, list]` in both namespaces (`helm/templates/kueue-rbac.yaml`), and under this design skaha does not read Kueue for this feature at all; it proxies Metrics.
+
+### 4.3 Identity boundary
+
+The Metrics service has **no authentication**. It is reachable only on the in-cluster Service (`SKAHA_METRICS_BACKEND_URL`), never the edge hostname. Therefore:
+
+- **skaha injects the identity.** It substitutes the authenticated CADC/GMS principal into the `{user}` path segment. It must never forward a client-supplied username.
+- The admin route (§8) is gated by skaha on GMS group membership before the proxy call.
+- Do not expose `/api/v1/metrics/users/...` through any ingress.
+
+---
+
+## 5. Caching and refresh
+
+### 5.1 Two-tier, one shared snapshot
+
+The critical architectural move: **all per-user responses are computed from one shared cluster snapshot.** The number of Kubernetes reads is independent of the number of users.
+
+| Tier | Contents | Reads | TTL | Redis key |
+| --- | --- | --- | --- | --- |
+| **Snapshot** (shared) | all LocalQueues + their consumed/weight/CQ, all ClusterQueue nominal quotas, derived `U`, `S`, `f`, band, rank for every queue | 4 LocalQueue + 2 ClusterQueue GETs **for the whole platform** | `= usageSamplingInterval` | `metrics:fairshare:snap:{fingerprint}` |
+| **Pending** (per user) | that user's pending Workload conditions + clamped positions | 1 label-selected Workload list | **15s** | `metrics:fairshare:pend:{fingerprint}:{sha256(user)[:16]}` |
+
+Polling faster than `usageSamplingInterval` is pure waste — `consumedResources` provably does not change in between, and `.lastUpdate` tells you exactly when it did. Reuse the existing `PlatformMetricsService` single-flight pattern verbatim so concurrent misses coalesce onto one load.
+
+**Bound the snapshot TTL:** `min(usageSamplingInterval, 900s)`. If the sampling interval is ever lengthened, this stops a cold-start snapshot sitting with a stale active-peer set.
+
+### 5.2 HTTP headers (ADR-0002)
+
+```
+Cache-Control: private, max-age=15
+Last-Modified: <LocalQueue .status...lastUpdate>     # the real freshness of the standing
+Date:          <now>
+Expires:       <now + 15s>
+```
+
+`Cache-Control: private` per ADR-0002's user-scope rule — this response must never populate a shared cache. `max-age` follows the **fastest-changing** component (position, 15s), while `Last-Modified` reports the **substantive** freshness (the ledger). `metrics.http_cache.metrics_success_cache_headers` already implements exactly this given `snapshot_created` and `shared_cache_public=False`.
+
+### 5.3 Queue position: background poll, never on page load
+
+The Visibility API takes a **full copy of the ClusterQueue's pending heap and sorts it** on every request. At CANFAR's target 100×-capacity backlog that is an O(N log N) snapshot inside the leader controller, per call.
+
+- A single background poller in the Metrics service hits `localqueues/{lq}/pendingworkloads` **once per 60s per LocalQueue** (4 calls/min platform-wide) and caches the ordered list in Redis (TTL 90s).
+- Page loads read Redis only.
+- Page with `limit=1000`, `offset` stepping, capped at `offset ≤ 20000`; beyond that report `position: null` rather than paging the whole backlog.
+- If the poller fails, `position` is `null` and the UI silently omits it. Position is an enhancement, never a dependency.
+
+---
+
+## 6. What the user sees
+
+### 6.1 Design constraints, applied
+
+| Evidence | Applied as |
+| --- | --- |
+| Slurm backfill ETA accurate to 1 min for 5.13% of jobs (ARCHER2) / 0.42% (Cirrus); Kueue has **no** start-time predictor; Antonides et al. 2002 — an exceeded ETA amplifies dissatisfaction | **No ETA field exists in the API.** Not "hidden by default" — absent, so no client can render one. |
+| Hui & Tse 1996 — short waits: say nothing; intermediate: duration; long: position | `position` is emitted **only** when `pendingSeconds > 600`. Below that the UI shows the band and nothing else. |
+| Munichor & Rafaeli 2007 — position works via *progress*; backwards movement is worse than no information | **Monotonic clamp** (§6.4). Under AFS, cross-LocalQueue order genuinely recomputes and *can* move backwards. |
+| Raw fair-share float as headline invites argument about the number | `standing.score` is present in the payload but the UI **must not** render it above the fold. Headline is the band + one sentence. |
+| Larson 1987 — perceived unfairness is driven by observed **slips** | The **always-on slip pre-explanation** (§6.2) is rendered persistently next to any pending session, in every band, including `next`. |
+
+### 6.2 The always-on slip pre-explanation
+
+Rendered persistently wherever pending sessions are listed — not in a tooltip, not behind a "learn more":
+
+> **CANFAR starts jobs from the users who have used the least recently — not in the order jobs were submitted.** Someone who submitted after you may start first. Your standing recovers as your recent usage fades; it halves every 5 days.
+
+This is the single highest-value piece of copy in the design. Larson's finding is that a slip you were warned about is not perceived as unfair; a slip you were not warned about is. A fair-share scheduler generates slips by construction.
+
+### 6.3 Per-session "why is this pending"
+
+**Approved user-facing vocabulary — exactly five values. No sixth is ever added without a contract revision.**
+
+| `reason` | user-facing `message` |
+| --- | --- |
+| `fair_share_position` | "Waiting behind other users' fair-share position" |
+| `own_higher_priority` | "Waiting behind higher-priority work of your own" |
+| `awaiting_resources` | "Waiting for resources" |
+| `blocked_by_policy` | "Blocked by policy" |
+| `platform_degraded` | "Platform degraded" |
+
+**Mapping from Kueue Workload conditions.** Granular reasons require `UnadmittedWorkloadsObservability=true` (Beta, **default false** — must be enabled explicitly, together with `UnadmittedWorkloadsExplicitStatus=true` or the field is often simply absent).
+
+| Kueue condition / reason | CANFAR reason |
+| --- | --- |
+| `QuotaReserved=False` · `WaitingForQuota` **and** a pending workload from another LocalQueue is ordered ahead | `fair_share_position` |
+| `QuotaReserved=False` · `WaitingForQuota`, no such peer ahead | `awaiting_resources` |
+| `QuotaReserved=False` · `WaitingForQuota`, and a higher-`EffectivePriority` pending Workload with the **same** `canfar.net/username` is ahead in the same LocalQueue | `own_higher_priority` |
+| `WaitingForPreemptedWorkloads`, `TopologyPlacementFailed`, `PendingEvaluation`, `PendingDelayedTopologyRequests`, `Admitted=False`·`NoReservation` | `awaiting_resources` |
+| `Suspended`, `UnsatisfiedAdmissionChecks`, `Evicted`·`Deactivated`, `AdmissionGated`, `OnHold` | `blocked_by_policy` |
+| `ExceedsMaxQuota`, `NoMatchingFlavor` | `platform_bug` — unreachable if skaha's `LimitRange` validation and the ClusterQueue agree; alert rather than display |
+| `Misconfigured`, `Evicted`·`ClusterQueueStopped`/`LocalQueueStopped`/`NodeFailures` | `platform_degraded` |
+| `Preempted`·`InCohortFairSharing` / `InClusterQueue` (re-queued after preemption) | `fair_share_position` |
+
+### 6.4 Monotonic position clamp
+
+```python
+key      = f"metrics:fairshare:pos:{workload_uid}"
+previous = redis.get(key)                       # int | None
+shown    = observed if previous is None else min(observed, int(previous))
+redis.set(key, shown, ex=86_400)
+```
+
+- Reset **only** on a workload state transition (admitted / failed / deleted), never on a re-poll.
+- Render `shown` when `≤ 100`; render `"100+"` above that. Once it crosses below 100 it becomes a number and thereafter only decreases.
+- If the observed position rises, hold the previous value and let the true value catch down. Displaying a stale-but-monotone position is strictly better than an accurate one that moves backwards.
+
+### 6.5 Drill-down (power users)
+
+Behind a "How is this calculated?" disclosure:
+
+- `score` (f), `ratio` (U/S) — with the sentence *"Your recent weighted usage is {ratio}× your share of this queue."*
+- `consumed` per resource in native units, and the `weights` used, with the conversions spelled out: **1 GPU = 35 cores = 35 GiB memory = 1 225 GiB scratch.**
+- `halfLifeHours: 120` rendered as "halves every 5 days".
+- `lastUpdate` as "as of HH:MM".
+- **Anonymised peer context only:** your band vs the distribution of bands across active queues. Never another project's or user's name or number.
+
+---
+
+## 7. The API contract
+
+### 7.1 Shape: a declarative Kubernetes-style object
+
+The payload is shaped as a Kubernetes API object — `apiVersion` / `kind` / `metadata` / `spec` /
+`status` — with everything computed living under **`status`**, per the declarative convention
+(spec = identity/desired, status = observed). This is deliberate: today the object is *served* by
+the metrics service over REST; the moment it graduates to a CRD reconciled by a controller, the
+schema, clients, and UI carry over unchanged.
+
+```
+GET /api/v1/metrics/users/{user}/fairshare      ->  FairShareStanding (JSON)
+```
+
+Served initially by the metrics service (provider `KueueProvider.fairshare(user)`, scope
+`fairshare`). **skaha side:** `FairShareDAO` mirroring `PlatformMetricsDAO`, calling the metrics
+backend with the authenticated username; a `null` DAO (env unset) means the portal renders no badge
+— the feature degrades to absent, never to an error.
+
+### 7.2 Example object
+
+```yaml
+apiVersion: fairshare.canfar.net/v1alpha1
+kind: FairShareStanding
+metadata:
+  name: jdoe.cadc                  # <user>.<community> — one object per ledger
+  labels:
+    canfar.net/username: jdoe
+    canfar.net/community: cadc
+spec:
+  user: jdoe
+  community: cadc
+  localQueue: u-jdoe-cadc          # the ledger this standing is read from
+status:
+  band: behind                     # next | front | middle | behind | lagging
+  headline: "Toward the back of the line"
+  explanation: >-
+    You've used about 1.9x your share recently, so jobs from lighter users
+    start first. This eases as your recent usage fades - it halves every 5 days.
+  slipNotice: >-
+    CANFAR starts jobs from the users who have used the least recently - not in
+    the order jobs were submitted. Someone who submitted after you may start first.
+  ratio: 1.85                      # U/S — the only number surfaced in copy
+  score: 0.2774                    # f — drill-down only
+  rank: { position: 71, of: 87 }   # among active peers, best standing first
+  credits:
+    held: 95                       # what you are holding right now
+    ledger: 610.4                  # decayed time-averaged holding (U)
+  holding: { cpu: 12, memoryGiB: 48, gpu: 1 }
+  sessions:
+    - id: abc123
+      kind: notebook
+      state: running
+      creditsPerHour: 75
+      heldFor: 3d4h
+      guaranteed: true             # admitted through the guaranteed tier
+    - id: 8f2c1a94
+      kind: headless
+      state: pending
+      reason: fair_share_position
+      message: "Waiting behind other users' fair-share position"
+      position: 7
+      trend: improving             # monotonic clamp applied
+  summary: { running: 4, pending: 3, pendingExplained: "3 waiting behind other users" }
+  basis:
+    halfLifeHours: 120
+    samplingIntervalSeconds: 300
+    sessionTTLDays: 7
+    lastUpdate: "2026-08-09T14:00:07Z"
+    activePeers: 87
+    explanationFidelity: granular
+  conditions:
+    - type: Fresh                  # ledger sampled within 3 intervals
+      status: "True"
+      lastTransitionTime: "2026-08-09T14:00:07Z"
+```
+
+Deliberate exclusions from the user-facing object, both security-relevant: per-resource
+`consumedResources` and the `resourceWeights` table. Publishing the weights hands every user a
+closed-form cost optimiser ("RAM is priced n× CPU — minimise RAM, maximise cores"); the weighted
+aggregates above carry all the information a user legitimately needs. Both appear in the admin
+object only (§8).
+
+### 7.3 Field contract
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `spec.user` / `spec.community` | strings | Identity of the ledger; `metadata.name` is `<user>.<community>`. |
+| `standing.band` | enum(4) | The only thing rendered above the fold. |
+| `standing.score` | float (0,1] | f. Drill-down only. |
+| `standing.ratio` | float ≥ 0 | U/S, rounded to 1 dp. The one number allowed in user copy. |
+| `basis.explanationFidelity` | `"granular" \| "coarse"` | `"coarse"` when the observability gates are off; UI softens wording. |
+| `usage.weighted`, `usage.entitlement` | string | Strings, not floats — matches the `PlatformMetrics` convention for resource quantities. Unit is `usage.unit`. |
+| `usage.consumed` | open `dict[str,str]` | Open map per ADR-0002. Clients must tolerate unknown resource names. Same units as `PlatformMetrics` (cores, `Gi`, base units). |
+| `pending[].reason` | enum(5) | Closed vocabulary. Unmappable Kueue reasons fall back to `awaiting_resources` and increment a telemetry counter — they never leak upstream strings (ADR-0002). |
+| `pending[].position` | int \| null | Monotonically clamped. `null` when `pendingSeconds ≤ 600`, when the poller is unavailable, or beyond the paging cap. |
+| **absent** | — | **No `eta`, `estimatedStart`, `expectedWait`, or equivalent — by design.** |
+| `degraded[]` | list of `{code, message}` | Non-fatal source problems: `ledger_stale` (`lastUpdate` older than 2× sampling interval), `position_unavailable`, `zero_weight_queue`, `ledger_reset_suspected`. The response still returns `200`; the UI hides position and adds "as of {lastUpdate}". |
+
+### 7.4 Pydantic models (drop into `src/metrics/schemas/metrics.py`)
+
+```python
+Band  = Literal["next", "front", "middle", "behind", "lagging"]
+Reason = Literal[
+    "fair_share_position", "own_higher_priority",
+    "awaiting_resources", "blocked_by_policy", "platform_degraded",
+]
+
+class FairShareSubject(BaseModel):
+    kind: Literal["project", "user"]
+    user: str
+    queue: str
+    cluster_queue: str = Field(alias="clusterQueue")
+
+class FairShareStandingBlock(BaseModel):
+    band: Band
+    score: float = Field(ge=0.0, le=1.0)
+    ratio: float = Field(ge=0.0)
+    headline: str
+    explanation: str
+    slip_notice: str = Field(alias="slipNotice")
+
+class PendingSession(BaseModel):
+    session_id: str = Field(alias="sessionId")
+    session_kind: str = Field(alias="sessionKind")
+    submitted: datetime
+    pending_seconds: int = Field(alias="pendingSeconds", ge=0)
+    reason: Reason
+    message: str
+    position: int | None = None
+    position_display: str | None = Field(default=None, alias="positionDisplay")
+
+class FairShareData(BaseModel):
+    scope: Literal["fairshare"] = "fairshare"
+    cluster: str
+    subject: FairShareSubject
+    standing: FairShareStandingBlock
+    basis: FairShareBasis
+    usage: FairShareUsage
+    pending: list[PendingSession] = Field(default_factory=list)
+    degraded: list[ErrorDetail] = Field(default_factory=list)
+```
+
+---
+
+## 8. Admin surface
+
+```
+GET /api/v1/metrics/fairshare      ->  kind: FairShareLeaderboard
+```
+
+skaha gates this on GMS group membership before proxying. Contains everything users never see:
+
+**Per-LocalQueue ranking table** — `name`, `clusterQueue`, `weight`, `consumedResources`, `U`, `S`, `f`, `band`, `rank`, `admittedWorkloads`, `pendingWorkloads`, `lastUpdate`. Rank is the scheduler's true admission order.
+
+**Per-community rollup** — group LocalQueues by `canfar.net/community` (already copied onto every Workload via `integrations.labelKeysToCopy`), and show ClusterQueue `.status.fairSharing.weightedShare` — the one place `weightedShare` is real, since it *is* populated for ClusterQueue and Cohort.
+
+**Per-user attribution inside each project** — sum admitted Workload requests grouped by `canfar.net/username`, weighted with the same `resourceWeights`. This is **informational, not the ledger**: it answers "who inside `cadc-canucs` drove the project's standing" without inventing a second scheduling authority. It is admin-only precisely because it is *not* order-isomorphic with admission.
+
+**Config echo and health** — `usageHalfLifeTime`, `usageSamplingInterval`, `resourceWeights`, `admissionMode`, `stopPolicy`, per-ClusterQueue `preemption` policies, and the WorkloadPriorityClass in use per queue.
+
+**Two computed health flags that only admins can act on:**
+
+| flag | meaning |
+| --- | --- |
+| `ledgerStale` | `now − lastUpdate > 3 × usageSamplingInterval` on any active queue — the reconciler has stopped sampling, so every standing figure is frozen and must not be shown as current. |
+| `ledgerResetSuspected` | true when a queue's `U` shows a step discontinuity larger than one tick's α could produce. Catches an accidental LocalQueue delete/recreate, which is an unrecoverable ledger wipe at every Kueue version. |
+
+**Override state** — any skaha-side per-user session or GPU caps in force, and any LocalQueue with `stopPolicy != None`.
+
+**Weights sanity, worth surfacing prominently:** show each resource's share of the ClusterQueue's total weighted capacity, `weight_r × capacity_r / Σ`. Setting weights by unit equivalence — "1 GiB of RAM costs 1 core" — hands most of the pool to memory, because a cluster ships several GiB per core. The dashboard should make the resulting split visible so it is a deliberate policy choice rather than an accident of the weight constants.
+
+---
+
+## 9. Worked example — CANFAR's real numbers
+
+### 9.1 ClusterQueue `cadc` total weighted capacity
+
+`nominalQuota`: cpu 2800, memory 12400Gi, ephemeral-storage 99200Gi, nvidia.com/gpu 112.
+`resourceWeights`: cpu 1.0, memory 9.31323e-10, ephemeral-storage 2.6609e-11, nvidia.com/gpu 35.
+
+| resource | quota | weighted (CPU-eq) | share of C |
+| --- | --- | ---: | ---: |
+| cpu | 2 800 cores | 2 800.00 | 12.75% |
+| memory | 12 400 GiB | 12 400.01 | **56.48%** |
+| ephemeral-storage | 99 200 GiB | 2 834.26 | 12.91% |
+| nvidia.com/gpu | 112 | 3 920.00 | 17.86% |
+| | | **C = 21 954.27** | |
+
+Implied conversions: **1 GiB memory = 1.000 cores · 1 GiB scratch = 1/35 core · 1 GPU = 35 cores = 35 GiB RAM = 1 225 GiB scratch.**
+
+### 9.2 Three LocalQueues, all `fairSharing.weight: "1"`, all active
+
+`S = 21 954.27 × 1/3 = 7 318.1` CPU-equivalents each.
+
+| LocalQueue | cpu | memory | gpu | ephemeral | **U** | **U/S** | **f** | band |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `cadc-default` | 120 | 480 Gi | 2 | 1 400 Gi | 710.0 | 0.097 | **0.9350** | `front` |
+| `cadc-unions` | 240 | 960 Gi | 8 | 3 500 Gi | 1 580.0 | 0.216 | **0.8610** | `front` |
+| `cadc-canucs` | 1 900 | 8 200 Gi | 64 | 42 000 Gi | 13 540.0 | 1.850 | **0.2774** | `behind` |
+
+Admission order: `cadc-default` → `cadc-unions` → `cadc-canucs`, which is exactly f descending. Cluster is at 72% of weighted capacity, so the two lighter queues rank `front` — and had nothing been pending, the no-line override would suppress bands entirely.
+
+**Interpretation for an admin:** `U = 13 540` means "over the trailing half-life the queue has held, on average, the concurrent equivalent of 13 540 CPU cores" — 1.85× its entitled 7 318.
+
+**What `jdoe` in `cadc-canucs` sees:**
+
+> **Behind in line**
+> You've used about 1.9× your share recently, so jobs from lighter users start first. This eases as your recent usage fades — it halves every 5 days.
+>
+> *CANFAR starts jobs from the users who have used the least recently — not in the order jobs were submitted. Someone who submitted after you may start first.*
+>
+> `sess-8f2c1a94` — Waiting behind other users' fair-share position · position 7
+
+### 9.3 Recovery dynamics — what H = 120h costs
+
+The heaviest queue stops all work at t = 0. `U(t) = 13 540 · 2^(−t/120h)`:
+
+| target | condition | elapsed |
+| --- | --- | --- |
+| recover to f = 0.50 | U ≤ 7 318.1 | **106.5 h = 4.4 days** |
+| recover to f = 0.75 | U ≤ 3 037.2 | **258.8 h = 10.8 days** |
+
+One large campaign costs roughly a fortnight of reduced standing, and is effectively clear inside a month. This is exactly why the half-life must appear in the user copy — an unexplained multi-week penalty reads as a bug.
+
+---
+
+## 10. Implementation plan
+
+| Step | Where | Notes |
+| --- | --- | --- |
+| 1 | `keel-deploy` | Kueue **≥ v0.19.1** (carries the AFS precision fix, PR #13761). |
+| 2 | `keel-deploy` | `admissionFairSharing.usageHalfLifeTime: 120h`, `usageSamplingInterval: 5m`; `resourceWeights` derived from a target share. |
+| 3 | `metrics/` | `KueueProvider.fairshare(user)`; add `localqueues` + `workloads` reads via `kr8s` (`new_class(kind="LocalQueue", version=..., namespaced=True)`). Reuse `parse_resource_amount` — **convert memory/ephemeral back from GiB to bytes before weighting** (§3.5). |
+| 4 | `metrics/` | `FairShareData` schema; `sources.fairshare: kueue`; new `FairShareService` cloning `PlatformMetricsService`'s single-flight + telemetry; two-tier cache keys (§5.1). |
+| 5 | `metrics/` | Route + `Cache-Control: private, max-age=15`, `Last-Modified` = ledger `lastUpdate`. |
+| 6 | `metrics/helm/metrics-api` | RBAC per §4.2. |
+| 7 | `skaha/` | `FairShareDAO` mirroring `PlatformMetricsDAO`; authenticated route injecting the GMS principal; **never** trust a client-supplied `{user}`. |
+| 8 | Portal | Badge + slip notice + drill-down. |
+| 9 | `keel-deploy` (optional, later) | `UnadmittedWorkloadsObservability=true` + `UnadmittedWorkloadsExplicitStatus=true` ⇒ `explanationFidelity: "granular"`, real per-session reasons instead of the §6.3 fallback. |
+| 10 | `metrics/` | Admin `FairShareLeaderboard` (§8). |
+
+Steps 3–8 ship a complete, useful feature without step 9. Step 9 upgrades the *explanation* fidelity without touching the contract. Docs to update per the repo convention: new ADR (`0025-fairshare-standing-contract.md`), `metrics/CONTEXT.md` vocabulary (add **fair-share standing**, **entitlement**, **band**), `docs/architecture.md`, `docs/specs.md`.
+
+### Telemetry to add (ADR-0002)
+
+`fairshare_band{band}` counter · `fairshare_reason{reason}` counter · `fairshare_reason_unmapped{kueue_reason}` counter (catches upstream reason drift) · `fairshare_ledger_age_seconds` gauge · `fairshare_position_clamped` counter (how often the clamp fires — if it is high, cross-queue churn is high and position may be worth disabling entirely).
+
+---
+
+## 11. The one thing to say to the platform owners
+
+Their instinct — *"users will spawn only interactive jobs to get around fair-share limits"* — is **mechanically wrong for admission ordering and right for preemption.**
+
+Under `UsageBasedAdmissionFairSharing`, the sort key is LocalQueue fair-share usage **first**; `WorkloadPriorityClass` is only reached as a tiebreaker, which in practice means only *within* the same LocalQueue. `cmp.Compare(lqAUsage, lqBUsage)` returns before priority is ever consulted. So a high interactive priority cannot buy a larger share at admission — it only reorders that user's own work. And AFS accrues continuously for the whole time a session holds resources, with **no priority filter and no workload-kind filter** in the accrual path. Interactive is already charged identically to batch, and that is already live in production.
+
+The preemption channel is closed structurally by the two-tier model (design doc §3): every normal-pool workload — interactive and batch alike — carries the same priority, and `withinClusterQueue: LowerPriority` only ever targets *strictly lower* priority, so nothing in the normal pool can evict anything. Only guaranteed sessions (floor claims) preempt, and on the target platform victim selection is ledger-aware — the heaviest user's workloads are displaced first.
+
+For the statistic itself, the practical consequence is good news: **the number is already being written to `LocalQueue.status` every sampling tick, on the version deployed today, and it already charges interactive work.** The work is presentation, one Kueue patch bump, one config value, and one route.
+
+
+---
+
+
+
+---
+
+## Appendix B — gaming-vector inventory
 
 Fair share works in production not because it is incentive-compatible — it is not, and neither Slurm
 nor Kueue claims otherwise — but because of two **policy** properties that must be preserved
@@ -480,1127 +1239,6 @@ scheduling mechanism into a social one and invites exactly the arguments the ban
 
 ---
 
-## 5. Sequencing
-
-| # | Change | Evidence gate |
-|---|---|---|
-| 0 | **Fix the flex profile** (B1) | A flex and a fixed session of the same shape charge the same. **Blocking for any display.** |
-| 1 | **Close the bypasses** — admission policy | A label-less Job in `canfar-workloads` is rejected, loudly |
-| 2 | **Run a build carrying `5eae484`** | `consumedResources` shows **non-zero `cpu` and `nvidia.com/gpu`** for a queue holding one of each, and the two record identically at equal holdings. No step discontinuity across a controller restart. |
-| 3 | **Deletion protection on LocalQueues** (B3) | Simulated Argo prune in staging leaves them intact |
-| 4 | **Per-community LocalQueue routing** — the step that makes AFS arbitrate at all | Two LocalQueues report *materially different* `consumedResources`. Until then AFS is decorative. |
-| 5 | **Starvation floor** (§4.1) | Worst-case wait for a heavy user is bounded and measured |
-| 6 | **User-facing statistic** (§3.4) | Ratio and band match the ordering Kueue actually applies |
-
-Steps 0–3 are independently revertible. Step 4 is not.
-
----
-# Part A — The corrected fairness model
-
-> Parameter values in this part predate §1. **§1 is normative.**
-
-# The Corrected CANFAR Fairness Model
-
-## 0. The one-sentence design
-
-**Every workload — interactive or batch — charges the submitting user's ledger in the community it ran in, through a per-`(user, community)` Kueue LocalQueue; what the platform *does* about an over-share user differs by workload class, because admission ordering and preemption are the wrong actuators for a JupyterLab session and time-to-live is the right one.**
-
-The rejected two-plane design split by **workload class** and exempted interactive from the ledger. This design splits by **entitlement tier** — a small guaranteed floor and a large contested plane — and *both tiers carry both classes*. The floor is hard-capped at 1 CPU / 4 GiB / 0 GPU per user, so "do all my computing in interactive sessions" buys a user exactly one core more than everyone else gets. That is the structural difference, and it is the reason this design does not reintroduce the gaming vector the platform owners identified.
-
----
-
-## 1. Object model
-
-### 1.1 Diagram
-
-```mermaid
-flowchart TB
-  subgraph ID["CADC GMS — identity"]
-    U["user <b>jsmith</b><br/>groups: unions, canucs"]
-  end
-
-  U --> SK["<b>skaha</b><br/>router + interactive actuator<br/>(labels, suspend, TTL, caps, cull)"]
-
-  SK -->|"small session<br/>≤1 CPU / 4 GiB / 0 GPU<br/>and 0 floor sessions held"| LQF["LocalQueue<br/><b>q-floor-unions</b><br/>(one per community,<br/>shared, FIFO)"]
-  SK -->|"everything else"| LQU["LocalQueue<br/><b>q-unions-jsmith</b><br/><i>THE LEDGER</i><br/>status.fairSharing.<br/>admissionFairSharingStatus"]
-  SK -.->|"same user,<br/>other community"| LQU2["LocalQueue<br/><b>q-canucs-jsmith</b><br/><i>independent ledger</i>"]
-
-  PIPE["community service account<br/>(reprocessing campaign)"] --> LQC["LocalQueue<br/><b>q-campaign-unions</b><br/>(no person's ledger)"]
-
-  LQF --> CQF["ClusterQueue <b>canfar-floor</b><br/>admissionMode: <b>NoAdmissionFairSharing</b><br/>nominal 140 cpu / 620Gi / <b>0 gpu</b><br/>lendingLimit <b>0</b> (hard reserve)<br/>withinClusterQueue: Never"]
-  LQU --> CQ1["ClusterQueue <b>cq-unions</b><br/>admissionMode: <b>UsageBasedAdmissionFairSharing</b><br/>nominal = community grant<br/>lendingLimit = 100%<br/><b>withinClusterQueue: Never</b><br/>reclaimWithinCohort: LowerPriority"]
-  LQU2 --> CQ2["ClusterQueue <b>cq-canucs</b><br/>(same shape)"]
-  LQC --> CQC["ClusterQueue <b>canfar-campaign</b><br/>nominalQuota <b>0</b> — pure borrower<br/>lendingLimit 0<br/>workloads at priority 10000"]
-
-  CQF --> COH["Cohort <b>canfar</b><br/>fairSharing.preemptionStrategies<br/>(community-vs-community)"]
-  CQ1 --> COH
-  CQ2 --> COH
-  CQC --> COH
-
-  FC["<b>fairshare-controller</b><br/>(new, ~300 LOC)"] -.->|"writes spec.fairSharing.weight<br/>= entitlement × starvation boost"| LQU
-  MET["<b>metrics service</b><br/>GET /api/v1/metrics/fairshare"] -.->|"reads status"| LQU
-  MET --> SK
-```
-
-### 1.2 The ledger lives on the LocalQueue, and its granularity is `(user, community)`
-
-Verified fact that forces this: Kueue's Admission Fair Sharing ledger is keyed by `utilqueue.LocalQueueReference = namespace/name` (`pkg/util/queue/local_queue.go:KeyFromWorkload`). There is no per-user dimension anywhere in the AFS code path. If you want Kueue's own scheduler to order admission by per-user history, the LocalQueue **must** be the user.
-
-Naming and placement:
-
-| Object | Name | Namespace | Count |
-|---|---|---|---|
-| User ledger | `q-{community}-{user}` | `canfar-workloads` | users × communities-they-use |
-| Floor queue | `q-floor-{community}` | `canfar-workloads` | # communities |
-| Campaign queue | `q-campaign-{community}` | `canfar-workloads` | # communities |
-| SRC mirror | `q-src-{community}-{user}` | `canfar-src-workloads` | as above |
-
-`{user}` and `{community}` are DNS-1123-sanitised (lowercase, `[^a-z0-9-] → -`), truncated to 40 chars each, with an 8-hex-char FNV-1a suffix of the raw pair appended whenever sanitisation or truncation is lossy. skaha stores the canonical pair in labels `canfar.net/username` / `canfar.net/community` so the name is never parsed to recover identity.
-
-**LocalQueues are created lazily on first submission and are NEVER deleted.** This is not a preference. Verified: `LocalQueueReconciler.Delete()` purges both `AfsConsumedResources` and `AfsEntryPenalties`, and the only durable copy of the ledger is the object's own `.status` subresource — so delete-then-recreate is an unrecoverable fair-share reset, identical at every Kueue version. A cron job that reaps idle LocalQueues would be a self-service amnesty button. Add `localqueues.kueue.x-k8s.io` to etcd backup scope and to any admission-webhook deny list for `DELETE` by non-admins.
-
-### 1.3 Why this is affordable
-
-The AFS status write rate is exactly `N_localqueues / usageSamplingInterval` — the LocalQueue
-reconciler self-requeues at that interval and writes `.status` on each tick.
-
-| `usageSamplingInterval` | 850 ledgers | 3 000 ledgers | 10 000 ledgers |
-|---|---|---|---|
-| **5m** | **2.8 w/s** | 10.0 w/s | 33.3 w/s |
-| 15m | 0.94 w/s | 3.3 w/s | 11.1 w/s |
-| 60m | 0.24 w/s | 0.83 w/s | 2.8 w/s |
-
-At the platform's expected ceiling — **no more than ~1 000 users**, each with a ledger per community
-they belong to, so order 1 000–1 500 LocalQueues — 5-minute sampling costs **3–5 status writes per
-second** on a small object's status subresource, spread evenly rather than bursty. At that population
-the object count is unremarkable for etcd and the ledger set is comfortably manageable.
-
-This is a **capacity-planning input, not a ceiling.** `clientConnection.qps` and `burst` on the Kueue
-controller are tunable and should be raised to suit the ledger population rather than lengthening the
-sampling interval to fit a default. The interval is better spent on freshness. Two guard rails:
-
-- Alert on `rest_client_rate_limiter_duration_seconds` for the Kueue client. If the limiter is
-  actually delaying requests, raise `qps`/`burst` before touching the interval.
-- Alert on API-server write latency and etcd fsync. Status writes are cheap individually; the failure
-  mode on a loaded control plane is latency, not QPS exhaustion.
-
-If the ledger population grows by an order of magnitude, lengthening `usageSamplingInterval` is the
-cheapest lever and costs nothing in fairness semantics — the tick cancels out of the decay (§1).
-
-```yaml
-admissionFairSharing:
-  usageHalfLifeTime: 120h        # 5 days
-  usageSamplingInterval: 5m
-  resourceWeights:               # set from a target share of the weighted pool
-    cpu: 1.0
-    memory: <derived>
-    ephemeral-storage: <derived>
-    nvidia.com/gpu: <derived>
-```
-
----
-
-## 2. How interactive work is charged
-
-**It is charged automatically, continuously, and for the entire time it holds resources. Nothing needs to be built.**
-
-Verified from source: the LocalQueue reconciler samples `cacheLq.GetAdmittedUsage()` — the LocalQueue's *currently held* admitted resources, a live gauge incremented on workload add and decremented on workload delete — every `usageSamplingInterval`, and folds it into an EWMA. A workload admitted for 24 h is counted in all of its samples, not once at t=0. There is *additionally* a one-shot entry penalty at admission equal to `alpha × totalRequests` — exactly one tick's worth — which bridges the gap between admission and the next sample and is settled into `consumedResources` on the Pending→Admitted transition. This behaviour is stable across releases.
-
-So the accounting half of the platform owners' requirement is satisfied by configuration alone. The only skaha requirement is that interactive sessions remain Kueue-managed Jobs — which they already are (`spec.suspend: true` plus `kueue.x-k8s.io/queue-name`).
-
-Concrete arithmetic on the recommended parameters (`H = 120h`, `Δt = 5m`, so `α = 2.888e-5`):
-
-| Workload | Weighted size | Held for | Ledger contribution |
-|---|---|---|---|
-| JupyterLab, 8 CPU + 32 GiB | 8 + 32 = **40** CPU-eq | 72 h | 40 × (1 − 0.5^(72/168)) = **10.3** |
-| Batch, 200 cores | **200** CPU-eq | 1 h | 200 × 0.0041 + entry 0.41 = **1.2** |
-| GPU desktop, 1 GPU + 8 CPU + 32 GiB | 35 + 8 + 32 = **75** CPU-eq | 7 d | 75 × 0.50 = **37.5** |
-| GPU desktop, same | 75 | 14 d | 75 × 0.75 = **56.3** |
-
-A three-day notebook already costs **~10× a 200-core-hour batch job**. A parked GPU desktop costs ~30× more again, and sheds only half of it per idle week. The deterrent the owners want is not something to be built — it is already the arithmetic, and once alpha is fixed it will actually fire.
-
----
-
-## 3. Why a user cannot evade by going all-interactive
-
-### 3.1 The admission-ordering argument (the owners' fear is mechanically wrong here)
-
-Under `admissionMode: UsageBasedAdmissionFairSharing`, `queueOrderingFunc` compares **LocalQueue fair-share usage first** and only falls through to `baseCompareFunc` — which is where `WorkloadPriorityClass` lives — when the two usage floats are *equal*:
-
-```go
-// pkg/cache/queue/cluster_queue.go — queueOrderingFunc
-lqAUsage, errA := a.CalcLocalQueueFSUsage(...)
-lqBUsage, errB := b.CalcLocalQueueFSUsage(...)
-if cmpResult := cmp.Compare(lqAUsage, lqBUsage); cmpResult != 0 {
-    return cmpResult          // <-- returns HERE; priority never consulted
-}
-return baseCmp(a, b)          // priority only as a tiebreaker
-```
-
-Because the usage ledger is keyed per-LocalQueue, and this design gives every user their own LocalQueue, **two different users' workloads never have equal usage and therefore never reach the priority tiebreaker.** Priority reorders a user's own work and nothing else. A user who runs everything as high-priority interactive gets *zero* additional share of the cluster from admission ordering.
-
-**A five-minute experiment the owners can run to confirm it:**
-
-1. Users A and B in the same community CQ. Seed A's LocalQueue with real usage (`kubectl get lq q-unions-a -o jsonpath='{.status.fairSharing.admissionFairSharingStatus.consumedResources}'` shows a large value); B's is fresh.
-2. Drain the CQ to exactly one job's worth of free quota.
-3. A submits with `kueue.x-k8s.io/priority-class: urgent` (1000000). B submits with `opportunistic` (10000).
-4. **B is admitted first.** Upstream's own integration tests assert this shape (`fair_sharing_test.go`: *"prioritizes workloads from less active LocalQueues"*, *"admits workload from new LocalQueue when all others have high usage"*).
-
-There is also no per-workload AFS exemption to reach for: `AdmissionMode` is a ClusterQueue-level field, and usage accrual is a flat sum of admitted resources with no priority filter and no workload-kind filter. Interactive is charged identically to batch of the same size, by construction.
-
-### 3.2 The real hole, and how it is closed
-
-The preemption package is **entirely AFS-blind** — `grep -rni 'admissionfairsharing|AdmissionScope|AdmissionMode' pkg/scheduler/preemption/` returns zero non-test hits. `findCandidates` iterates `cq.Workloads` — *every* admitted workload in the ClusterQueue, with no LocalQueue filter — and `SatisfiesPreemptionPolicy` under `LowerPriority` is a pure priority comparison.
-
-So on today's config (`withinClusterQueue: LowerPriority` on both ClusterQueues), a high-priority interactive workload **can** evict a lower-priority workload belonging to a *different user's* LocalQueue, on priority alone, with fair share contributing nothing. That is the actual and only gaming channel, and it is exactly the one the owners are worried about — they have the right instinct and the wrong mechanism.
-
-**Fix — one line per ClusterQueue:**
-
-```yaml
-preemption:
-  withinClusterQueue: Never             # <-- closes the evasion channel
-  reclaimWithinCohort: LowerPriority    # keep: reclaims quota lent to campaigns/other communities
-  borrowWithinCohort:
-    policy: LowerPriority
-    maxPriorityThreshold: 10000         # only opportunistic/campaign work is preemptible while borrowing
-```
-
-The principle: **priority in CANFAR must encode *cost of eviction*, not *importance*, and the class with the highest eviction cost must not also carry preemption power.** Until `preemptionGates` is generally available there is no way to say "hard to evict but cannot evict", so within-CQ preemption goes away entirely. What is given up is batch-preempts-batch fairness inside a community; what compensates is (a) AFS admission ordering, which is the primary fairness mechanism anyway, and (b) bounded batch runtime (§4.1), which caps how long a light user waits for a heavy user's held capacity to recycle.
-
-**Upgrade path:** `Workload.spec.preemptionGates` is close to purpose-built for this. A gate named only in `.spec` counts as closed (`HasClosedPreemptionGate`), so skaha can stamp a closed gate on every interactive Workload atomically at creation. That decouples "hard to evict" (priority — protects notebooks) from "may evict others" (the gate — the gaming vector), letting `withinClusterQueue: LowerPriority` come back for batch. Caveat to verify before committing: enforcement at `scheduler.go:436` is currently reachable only behind the `ConcurrentAdmission` or `MultiKueueOrchestratedPreemption` feature gates.
-
----
-
-## 4. Actuation per class
-
-Accounting is universal. Actuation is not.
-
-### 4.1 Batch: AFS ordering + cohort reclamation + bounded runtime
-
-| Knob | Value | Why |
-|---|---|---|
-| `queueingStrategy` | `BestEffortFIFO` | unchanged; AFS supplies the ordering |
-| `admissionScope.admissionMode` | `UsageBasedAdmissionFairSharing` | unchanged |
-| `withinClusterQueue` | **`Never`** | §3.2 |
-| `reclaimWithinCohort` | `LowerPriority` | reclaims quota lent to `canfar-campaign` and to other communities |
-| `borrowWithinCohort` | `LowerPriority`, threshold `10000` | only opportunistic/campaign work is evictable while borrowing |
-| `stopPolicy` | `None` | unchanged |
-| **Max execution time** | **default 24 h, ceiling 72 h** | bounds how long a light user waits for held capacity; skaha stamps `kueue.x-k8s.io/max-exec-time-seconds` on every headless Job |
-
-That is the whole of batch actuation, and almost all of it is already deployed. Batch is the easy case precisely because evicting a batch job is normal and re-running it is cheap.
-
-### 4.2 Interactive: **not preemption**
-
-Preempting a notebook is a user-visible outage and destroys unsaved state; CANFAR should never do it as a fairness action. The actuators are, in order of when they fire:
-
-**(a) Admission-time caps in skaha.** Enforced before the Job is created, from skaha's own session inventory — no Kueue feature involved. Per user, **summed across all communities** (this is the one bound Kueue cannot express, see §8):
-
-```
-max concurrent interactive sessions        : 3
-max concurrent GPU interactive sessions    : 1
-max total interactive CPU-equivalents held : 64
-max floor-plane sessions                   : 1
-```
-
-Precedent: NERSC's `jupyter` QOS is 6 h / 4 nodes / **1 concurrent job**. These caps are deliberately loose enough to be invisible to normal users and tight enough that "run everything in interactive" is not a strategy.
-
-**(b) Hard TTL with explicit renewal.** Default **12 h**, renewable in 12 h increments to a **72 h** ceiling. Renewal requires a human action in the UI within the preceding 30 minutes — not an API poll, not a keep-alive from a script. Precedent: 2i2c production runs `maxAge: 43200` (12 h). Z2JH's shipped defaults are `timeout: 3600` with **`maxAge: 0`** (no maximum age) and `cull_connected: false` — *that combination is the reason notebooks squat everywhere*, and CANFAR must not inherit it.
-
-**(c) Idle culling with real activity detection.** `timeout: 1800` (30 min) for CPU sessions, `900` (15 min) for GPU sessions, and **`cull_connected: true`** — an open browser tab is not activity. "Activity" means kernel busy, terminal stdin, or non-heartbeat websocket traffic; for GPU sessions add "DCGM utilisation ≥ 5% in the window". Precedent: 2i2c runs `timeout: 1800, cull_connected: true`.
-
-**(d) Renewal is fair-share-aware — this is where actuation and accounting meet.** At `TTL − 30 min` skaha evaluates:
-
-```
-renew  if  user requested renewal in the last 30 min
-       and (   user's 7-day weighted usage ≤ 3 × community median
-            or contested CQ has zero pending workloads          )   # no contention → no reason to say no
-       or   user has had no grace renewal in the last 24 h          # nobody ever loses work unwarned
-```
-
-Refusal is not a kill: the session enters a 30-minute read-only wind-down with a banner, then terminates.
-
-### 4.3 The pilot-job problem, head on
-
-**A long-lived interactive session is functionally a pilot job.** Capacity is acquired once through admission and then used for arbitrary work indefinitely — a notebook kernel, a Dask `LocalCluster`, a `nohup` loop. Kueue admits a Workload once and never re-contests it. So although the ledger keeps rising for the whole session lifetime (§2), **the ledger's only actuator is admission, and an already-admitted session is never admitted again.** The debt accrues but has no consequence until the user's *next* start. Fair share would govern session STARTS and nothing else. This is the single most important gap in a naive "just put interactive on the ledger" design, and charging alone does not close it.
-
-**The TTL closes it, and that is its primary purpose.** A 12-hour TTL converts one indefinite admission into a sequence of admissions — every interactive session re-contests **twice a day**, and each re-contest passes through a fair-share-aware decision (§4.2(d)) using the ledger the session itself has been inflating. Reframe the policy accordingly in all documentation and code comments:
-
-> **The interactive TTL is not a resource-reclamation policy. It is the re-contest interval, and it is what gives fair share teeth over interactive work.**
-
-Two corollaries follow. First, the TTL must be shorter than the timescale over which a user could accumulate a decisive advantage — 12 h against a 168 h half-life means a squatter re-contests ~14 times per half-life, which is ample. Second, renewal must not be automatable: a renewal that a script can issue is not a re-contest, it is a lease renewal, and the pilot-job hole reopens immediately.
-
----
-
-## 5. The guaranteed floor that history cannot erode
-
-NVIDIA KAI-Scheduler's documented property: historical usage affects **only over-quota allocation** and never the deserved quota. Kueue has no per-user nominal quota — quota lives on ClusterQueues, and LocalQueues have none. The Kueue-native way to express "history does not apply here" is therefore not a quota at all; it is `admissionMode: NoAdmissionFairSharing` on a ClusterQueue.
-
-**`canfar-floor`: a small ClusterQueue in the `canfar` cohort with AFS switched off, hard-reserved quota, and no GPU.**
-
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: ClusterQueue
-metadata:
-  name: canfar-floor
-spec:
-  cohortName: canfar
-  namespaceSelector:
-    matchLabels: {kubernetes.io/metadata.name: canfar-workloads}
-  queueingStrategy: BestEffortFIFO
-  admissionScope:
-    admissionMode: NoAdmissionFairSharing      # history is invisible here — the KAI property
-  resourceGroups:
-  - coveredResources: [cpu, memory, ephemeral-storage]
-    flavors:
-    - name: default
-      resources:
-      - {name: cpu,               nominalQuota: "140",    lendingLimit: "0"}   # 5% of 2800, hard reserve
-      - {name: memory,            nominalQuota: 620Gi,    lendingLimit: "0"}
-      - {name: ephemeral-storage, nominalQuota: 4960Gi,   lendingLimit: "0"}
-      # nvidia.com/gpu deliberately absent: GPU work is ALWAYS fully fair-shared
-  preemption:
-    reclaimWithinCohort: Never
-    borrowWithinCohort: {policy: Never}
-    withinClusterQueue: Never
-  stopPolicy: None
-```
-
-**Per-user floor envelope `F` = 1 CPU / 4 GiB / 0 GPU, 1 concurrent session**, enforced by skaha at admission. 140 cores / 1 core = **140 concurrent guaranteed small sessions**.
-
-Design decisions that matter:
-
-- **`lendingLimit: "0"` is deliberate.** A floor that can be lent out and then reclaimed by eviction is not a floor. The cost is that up to 5% of CPU may sit idle in the worst case; the benefit is a guarantee that is actually a guarantee. In practice the floor is rarely idle, because skaha makes it visible: when a full-size session cannot be admitted, the UI offers *"start a small session now (always available) or wait for full size"*.
-- **Floor usage is recorded but does not order the contested plane.** AFS accrual is gated on `afs.Enabled(config)` — a *config-level* switch — not on the ClusterQueue's admission scope, so floor LocalQueues still accumulate `consumedResources` and the number remains visible in the user's reported statistic, labelled "guaranteed". It simply does not feed the contested sort. **That is precisely KAI's semantics — deserved-quota consumption does not count against you — not an accounting gap.**
-- **The floor plane uses one shared LocalQueue per community, not one per user.** AFS is off there, so per-user LocalQueues would buy nothing while doubling the object population; per-user fairness inside the floor is enforced by skaha's hard cap of one floor session per user, and FIFO handles the rest.
-- **No GPU in the floor.** This is what bounds the entire escape hatch. The most a user can extract from the un-fair-shared plane is 1 core and 4 GiB — enough to edit a notebook, read data, submit batch, and keep working when the cluster is full; nowhere near enough to be a substitute for the contested plane.
-
-**This is the sharp answer to "isn't this the rejected two-plane design again?"** It is not, on three counts: the split is by entitlement tier and not by workload class (batch and interactive both use both planes); the exempt plane is hard-capped per user at 1/2800th of cluster CPU and zero GPU rather than being unbounded; and every workload in *both* planes is still charged to the user's ledger. The rejected design let a user move an entire session's worth of CPU and GPU off the books. This one lets them move one core.
-
----
-
-## 6. The starvation problem
-
-**The gap is real.** Kueue's admission sort is: LocalQueue fair-share usage → (tiebreak) sticky, effective priority, queue-order timestamp, UID. The timestamp is reached only when the usage floats are *equal*, which across distinct users is never. **There is no age-accrual term.** Unlike Slurm, where `PriorityWeightAge` guarantees that a job's priority rises without bound and admission is therefore eventually certain regardless of fairshare, a persistently heavy CANFAR user can in principle be deferred indefinitely behind a stream of lighter users. Kueue has no native remedy.
-
-**The lever exists, and it is `LocalQueue.spec.fairSharing.weight`.** `CalculateUsage` ends with `return usage / lqWeight` — raising a LocalQueue's weight lowers its effective usage and pulls it forward in the sort. The weight is a `spec` field, is a `Quantity` (so fractional values like `"1500m"` are expressible), is mutable, and is read live: the reconciler calls `RebuildClusterQueue` on LocalQueue update and `CalcLocalQueueFSUsage` re-reads it from the informer cache on every comparison. So an age term can be implemented *outside* Kueue while acting directly on Kueue's own sort key.
-
-**Stated guarantee:** *no workload in the contested plane waits more than ~7 days while its ClusterQueue is admitting work, and eventual admission is unconditional.*
-
-**Implementation — `fairshare-controller`, the only new controller in this design (~300 LOC):**
-
-```
-for each LocalQueue lq with at least one Workload where QuotaReserved=False:
-    waitAge   = now − min(creationTimestamp of lq's pending Workloads)
-    boost     = 2 ^ (max(0, waitAge − 24h) / 24h)          # doubles every day after the first
-    boost     = min(boost, 2^20)                            # numeric guard, not a policy limit
-    desired   = entitlement(lq) × boost
-    if |desired − lq.spec.fairSharing.weight| / desired > 0.05:
-        patch lq.spec.fairSharing.weight = desired
-    # reset to entitlement(lq) when the oldest pending Workload is younger than 24h
-```
-
-| Waited | Boost | Effective usage divided by |
-|---|---|---|
-| ≤ 24 h | 1× | 1 |
-| 48 h | 2× | 2 |
-| 72 h | 4× | 4 |
-| 96 h | 8× | 8 |
-| 7 d | 64× | 64 |
-| 10 d | 512× | 512 |
-
-The boost is unbounded in time and every ledger is finite (an EWMA of admitted usage is bounded above by the ClusterQueue's quota), so effective usage → 0 and the workload becomes first in the sort with certainty. Against the realistic worst case — heaviest ledger ≈ 3000 CPU-equivalents versus a median of 30, a 100:1 spread — the crossover occurs at **~7.7 days**. That is the practical number to publish.
-
-Cost: only LocalQueues with pending work older than 24 h are ever written, at most once per hour each, with a 5% hysteresis band. On any plausible backlog this is well under 0.1 writes/s. Two safety rules: **never write weight 0** (`LQWeightAsFloat64` divides by it) and always reset to `entitlement` rather than to the boosted value, so a starvation episode never leaves a permanent discount.
-
-**No-controller fallback**, if CANFAR wants the guarantee before building anything: skaha, which already knows submission times, re-labels any Workload that has waited > 48 h into the floor plane if it fits within `F`, and otherwise raises an operator alert. Weaker, but it is a floor and it costs one `if` statement.
-
----
-
-## 7. Community-owned pipeline campaigns
-
-Whole-community reprocessing belongs to no person, so it must not touch a person's ledger — and it must not be able to bury a community's members for a half-life.
-
-**Where it lives:** ClusterQueue `canfar-campaign`, one LocalQueue per community (`q-campaign-unions`), owned by a community service account.
-
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: ClusterQueue
-metadata:
-  name: canfar-campaign
-spec:
-  cohortName: canfar
-  namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: canfar-workloads}}
-  queueingStrategy: BestEffortFIFO
-  admissionScope:
-    admissionMode: UsageBasedAdmissionFairSharing   # campaigns compete against each other
-  resourceGroups:
-  - coveredResources: [cpu, memory, ephemeral-storage, nvidia.com/gpu]
-    flavors:
-    - name: default
-      resources:                                     # pure borrower: owns nothing, lends nothing
-      - {name: cpu,               nominalQuota: "0", lendingLimit: "0", borrowingLimit: "1400"}
-      - {name: memory,            nominalQuota: "0", lendingLimit: "0", borrowingLimit: 6000Gi}
-      - {name: ephemeral-storage, nominalQuota: "0", lendingLimit: "0", borrowingLimit: 48000Gi}
-      - {name: nvidia.com/gpu,    nominalQuota: "0", lendingLimit: "0", borrowingLimit: "40"}
-  preemption:
-    reclaimWithinCohort: Never
-    borrowWithinCohort: {policy: Never}
-    withinClusterQueue: LowerPriority
-  stopPolicy: None
----
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: LocalQueue
-metadata:
-  name: q-campaign-unions
-  namespace: canfar-workloads
-  labels: {canfar.net/community: unions, canfar.net/ledger: campaign}
-spec:
-  clusterQueue: canfar-campaign
-  fairSharing:
-    weight: "3"      # == the community's grant weight; splits campaign capacity between communities
-```
-
-All campaign Workloads run at priority class `opportunistic` (10000).
-
-Why this satisfies both halves of the requirement:
-
-- **It cannot bury the community's users.** Campaign consumption accrues to `q-campaign-{community}`, which lives in a *different ClusterQueue* with its own AFS sort. It never enters any person's ledger and never orders the contested plane. Contested ClusterQueues carry `reclaimWithinCohort: LowerPriority`, and campaign work is always the lowest-priority candidate at 10000, so the moment a user needs capacity the campaign is reclaimed. Note this reclamation works across ClusterQueues and is therefore *unaffected* by `withinClusterQueue: Never` from §3.2 — the two settings compose cleanly and that is deliberate.
-- **It is still accounted.** `canfar-campaign` runs AFS, so campaigns are ordered against one another by their own decayed history, weighted by each community's grant. A community that ran a 10 M-core-hour campaign last week goes behind a community that has run nothing — which is the correct fairness unit for work that is a community obligation rather than a personal one.
-- **Governance answer:** campaign consumption deliberately does **not** count against the community's individual members. The campaign is budgeted at the community level, via the LocalQueue weight and the CQ's `borrowingLimit`, and it should be visible to community admins in the reporting surface (§9) as a separate line so the community can see its own trade-off between campaign and member capacity.
-
----
-
-## 8. Cross-community budget multiplication
-
-**A user in N communities gets N independent ledgers. This is acceptable, and it should be adopted deliberately rather than tolerated.**
-
-The precedent is unambiguous. Slurm's fairshare is per **association** — `(user, account, partition)` — and a user in three accounts carries three separate `RawUsage` values and three separate `FairShare` factors; HTCondor's accounting groups behave identically. Sites have run this for decades without erosion, for one reason: **the budgeted entity is the ACCOUNT, not the person.** A user spending an account's allocation is spending something that account's PI chose to give them. Making the person the budgeted entity would be *wrong* — it would mean a grant awarded to UNIONS could be throttled by what the same astronomer did with a CANUCS grant, which is not what either grant intended.
-
-**What bounds it — four mechanisms, in order of strength:**
-
-1. **Per-community ClusterQueue with a real nominal quota.** Replace the single `cadc` ClusterQueue with one per community. A user in N communities can reach at most N grants, and each grant is separately budgeted, separately sized, and separately visible to that community's admins. This is the Kueue-native way to budget a community, and it makes CANFAR's implicit allocations explicit for the first time.
-
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: ClusterQueue
-metadata: {name: cq-unions}
-spec:
-  cohortName: canfar
-  namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: canfar-workloads}}
-  queueingStrategy: BestEffortFIFO
-  admissionScope: {admissionMode: UsageBasedAdmissionFairSharing}
-  fairSharing: {weight: "3"}                    # community entitlement at the cohort level
-  resourceGroups:
-  - coveredResources: [cpu, memory, ephemeral-storage, nvidia.com/gpu]
-    flavors:
-    - name: default
-      resources:                                 # lends 100%, borrows freely: entitlement without fragmentation
-      - {name: cpu,               nominalQuota: "700",   lendingLimit: "700"}
-      - {name: memory,            nominalQuota: 3100Gi,  lendingLimit: 3100Gi}
-      - {name: ephemeral-storage, nominalQuota: 24800Gi, lendingLimit: 24800Gi}
-      - {name: nvidia.com/gpu,    nominalQuota: "40",    lendingLimit: "40"}
-  preemption:
-    reclaimWithinCohort: LowerPriority
-    borrowWithinCohort: {policy: LowerPriority, maxPriorityThreshold: 10000}
-    withinClusterQueue: Never
-  stopPolicy: None
-```
-
-   This yields **two-level fairness for free**: users compete inside their community via AFS, communities compete for surplus via the cohort-level fair sharing CANFAR has already configured (`fairSharing.preemptionStrategies`). Because every community lends 100% and borrows freely, entitlement is expressed without fragmenting utilisation. Communities change on a human timescale, so these stay static YAML in keel-deploy — sum of `nominalQuota` across `canfar-floor` + all `cq-{community}` must equal today's `cadc` totals.
-
-2. **Cohort fair sharing** prevents any community from durably exceeding its grant while others want capacity — already deployed, no change.
-3. **skaha's global per-user interactive caps** (§4.2(a)) are summed **across all communities**. This is the one bound that *must* be cross-community, and it *must* live in skaha, because Kueue has no cross-ClusterQueue per-user notion at any version. Without it, a user in 4 communities could hold 12 interactive sessions and 4 GPUs.
-4. **The floor is per user, not per (user, community).** One guaranteed small session total, regardless of group membership. Otherwise group membership would multiply the un-fair-shared allocation.
-
-**What is deliberately *not* bounded:** a user in 4 communities can run 4× the batch work of a user in 1, if all 4 communities are idle. That is correct — they are spending four grants, each community can see it, and each community can revoke membership. The reporting surface must expose per-member consumption to community admins so that governance can act where the scheduler deliberately does not.
-
----
-
-## 9. The number reported to users
-
-`LocalQueue.status.fairSharing.**weightedShare**` is a trap: no controller ever writes it, it is a `+required` field, and it therefore always serialises as `0`. The docs' own example output shows it as 0. Never put it in a UI.
-
-The correct number is the same scalar the scheduler sorts on, recomputed from the persisted ledger:
-
-```
-FS(user, community) = Σ_r  resourceWeights[r] × consumedResources[r]
-                      ─────────────────────────────────────────────
-                              lq.spec.fairSharing.weight
-
-read from:  q-{community}-{user}.status.fairSharing.admissionFairSharingStatus.{consumedResources, lastUpdate}
-```
-
-Its unit is **time-averaged CPU-equivalents held over the trailing half-life** — not core-hours, not an allocation. Serve it from the **metrics service** (which already has a Kueue provider, kr8s, and the versioned-envelope convention), not from Prometheus: an API-object read is served by the kube-apiserver from a watch cache, whereas `kueue_local_queue_admission_fair_sharing_usage` (a) would make a portal page render depend on the metrics pipeline and on the single leader replica whose write path is already the measured bottleneck.
-
-```jsonc
-// GET /api/v1/metrics/fairshare?community=unions&user=jsmith
-{
-  "version": "metrics.canfar.net/v1",
-  "kind": "FairShareStanding",
-  "metadata": {"created": "2026-07-31T18:04:00Z"},
-  "status": "ok",
-  "data": {
-    "community": "unions",
-    "user": "jsmith",
-    "contested":   {"weightedUsage": 12.4, "consumedResources": {"cpu": "8200m", "memory": "4.3Gi"}},
-    "guaranteed":  {"weightedUsage": 1.0, "note": "floor plane; excluded from ordering"},
-    "communityMedian": 3.1,
-    "ratioToMedian": 4.0,
-    "halfLifeHours": 168,
-    "lastUpdate": "2026-07-31T17:50:11Z",
-    "queuePosition": {"pending": 3, "aheadOfYou": 6, "inCommunity": 412}
-  }
-}
-```
-
-User-facing copy: *"Your effective share in **unions**: **12.4 core-equivalents** (7-day weighted average, halves every 7 days). Community median: 3.1 — you are **4× the median**, so jobs from lighter users start ahead of yours. Your guaranteed small-session capacity is unaffected."*
-
-Two honest caveats to encode: the persisted value **omits the in-memory entry penalty**, so it lags the scheduler's own number by up to one sampling interval during submission bursts; and KEP-4136 explicitly disclaims *"precise shared resource usage accounting or billing"* — this is a scheduling signal, never an invoice. Cache with TTL = `usageSamplingInterval` and key on `lastUpdate`. Queue position comes from the Visibility API (`localqueues/pendingworkloads`), polled on a timer into a metrics-service cache — **never on page load**, since each call snapshots and sorts the entire ClusterQueue pending heap inside the leader controller.
-
----
-
-## 10. Build list
-
-### What Kueue gives for free (zero code)
-
-- Continuous lifetime accrual of **interactive and batch alike** into a decayed per-LocalQueue ledger (§2)
-- Usage-first admission ordering that `WorkloadPriorityClass` **cannot** override (§3.1)
-- A persisted, readable ledger at `.status.fairSharing.admissionFairSharingStatus`, refreshed every sampling interval, needing **no new RBAC** — skaha already has `get`/`list` on `localqueues` via `helm/templates/kueue-rbac.yaml`
-- Entry-penalty anti-burst pricing at admission
-- Cross-ClusterQueue reclamation of borrowed capacity (campaign eviction, §7)
-- Cohort-level fair sharing between communities (§8)
-- Visibility API queue positions
-- `spec.suspend` admission semantics, already used by skaha
-
-### keel-deploy (config only, no code)
-
-| # | Change | Blocking? |
-|---|---|---|
-| K1 | **Kueue ≥ v0.20.0** (build carrying the AFS precision fix) | **Yes — blocks everything** |
-| K2 | `usageHalfLifeTime: 120h`, `usageSamplingInterval: 5m` (§1) | **Yes — set before any user-facing display** |
-| K3 | `withinClusterQueue: LowerPriority → Never` on all contested CQs (§3.2) | **Yes — closes the evasion channel** |
-| K4 | Split `cadc` into `canfar-floor` + `cq-{community}` × N + `canfar-campaign` (§5, §7, §8) | Yes |
-| K5 | `metrics.localQueueMetrics.localQueueSelector` restricted to floor/campaign LQs — per-user LQs would emit ~127k Prometheus series at 500 users from the wait-time histograms alone | Yes |
-| K6 | `localqueues.kueue.x-k8s.io` added to etcd backup scope; `DELETE` restricted to cluster admins (§1.2) | Yes |
-| K7 | Mirror the topology in `canfar-src-workloads` for the SRC tenant | No |
-
-### skaha (Java)
-
-| # | Change | Files |
-|---|---|---|
-| S1 | Replace per-session-type queue routing with per-`(user, community)` resolution; lazy `create-if-absent` of the LocalQueue | `QueueConfiguration.java`, `SessionJobBuilder.java`, `PostAction.java` |
-| S2 | **Delete** the boot-time "validate every configured LocalQueue exists, refuse to boot on 404" check — untenable with dynamic queues. Replace with "validate every configured **ClusterQueue** exists" | `InitializationAction.java` |
-| S3 | Floor routing rule: `requests ≤ F && user holds 0 floor sessions → q-floor-{community}` | `SessionJobBuilder.java` |
-| S4 | Global per-user interactive caps, summed across communities (3 sessions / 1 GPU / 64 CPU-eq / 1 floor) | new `InteractiveAdmissionPolicy` |
-| S5 | TTL + renewal state machine with fair-share-aware refusal and a 24 h grace renewal (§4.2d) | new `SessionLifecyclePolicy` |
-| S6 | Idle culling with real activity detection; `cull_connected: true` semantics; DCGM utilisation probe for GPU sessions | new `ActivityProbe` per session image |
-| S7 | Stamp `kueue.x-k8s.io/max-exec-time-seconds` on headless Jobs (default 24 h, ceiling 72 h) | `SessionJobBuilder.java` |
-| S8 | Surface the pending reason: replace bare "Pending" with position + share standing from the metrics service | `GetAction.java`, `SessionDAO.java` |
-| S9 | RBAC: add `create`, `watch` on `localqueues` (currently `get`, `list` only) | `helm/templates/kueue-rbac.yaml` |
-
-### metrics service (Python)
-
-| # | Change |
-|---|---|
-| M1 | `GET /api/v1/metrics/fairshare` — read LocalQueue status, compute the weighted scalar, community median/percentile, versioned envelope, cache TTL = `usageSamplingInterval` (§9) |
-| M2 | Poll the Visibility API on a timer into a cache; serve queue position from the cache, never on page load |
-| M3 | Emit per-user fair-share Prometheus series **from the metrics service**, not from Kueue (Kueue's `CustomMetricLabels` caps Workload-sourced labels at 2 with a closed 12-value allow-list — unusable for usernames) |
-| M4 | Per-community admin view: member consumption breakdown + campaign line (§7, §8) |
-
-### New component
-
-| # | Component | Scope |
-|---|---|---|
-| C1 | **`fairshare-controller`** — watches LocalQueues and pending Workloads; writes `spec.fairSharing.weight = entitlement × starvation_boost`, 5% hysteresis, never 0 (§6). ~300 LOC. It is the *only* new controller, and it is what supplies the age term Kueue lacks. |
-
-### Rollout order
-
-1. **K1** — nothing else is safe first.
-2. **K2 + K3** on the existing per-project queues. Observe for two weeks: confirm whole-unit resources (GPU) move in `consumedResources`, and confirm the ledger survives a deliberate controller restart.
-3. **K4** ClusterQueue topology; floor plane live with the existing per-project LocalQueues.
-4. **S1–S3, S9, M1** — per-user LocalQueues and the reported statistic. **Shadow mode first:** create the queues and route to them, but report the number read-only for four weeks before any actuation depends on it.
-5. **S4–S8, C1, M2–M4** — actuation and the starvation floor.
-
-
----
-
-# Part B — The user-facing fair-share statistic
-
-> Parameter values in this part predate §1. **§1 is normative.**
-
-# The CANFAR Fair-Share Statistic
-
-**Answers:** *"We have to report a statistic to a user, e.g. their fairshare value. How do we do that?"*
-
-**Status:** design, ready to implement. Targets `metrics/` (compute + contract) and `skaha/` (identity + proxy).
-
----
-
-## 0. Decision summary
-
-| Question | Decision |
-| --- | --- |
-| **The number** | `standing.score` = **f = 2⁻⁽ᵁ/ˢ⁾** — bounded in (0, 1], 1.0 = unused, 0.5 = exactly your share. |
-| **Why f** | It is **order-isomorphic to Kueue's own admission sort key**. Ranking users by f descending is byte-for-byte the same order the scheduler admits in. No other candidate has this property. |
-| **Headline shown to user** | Not f. A **4-band badge** derived from f, plus one sentence. f is drill-down only. |
-| **Read from** | `LocalQueue.status.fairSharing.admissionFairSharingStatus.consumedResources` — authoritative, already written every sampling tick. **Not Prometheus.** |
-| **Computed in** | `metrics/` — new `fairshare` scope, one shared cluster snapshot, O(1) API reads regardless of user count. |
-| **Cache** | Shared snapshot TTL = `usageSamplingInterval`; per-user response `Cache-Control: private, max-age=15`. |
-| **Scope honesty** | Today this is a **project** standing (LocalQueues are per-project). The contract carries `subject.kind` so it becomes a user standing with no API version bump. |
-| **ETA** | Never shown. |
-| **Queue position** | Shown only after 10 min pending, **monotonically clamped** so it can never move backwards. |
-
-## 1. The number
-
-### 1.1 The candidates, and why f wins
-
-Kueue admits pending work in ascending order of
-
-```
-U_q = ( Σ_r  resourceWeights[r] · consumedResources_q[r] ) / fairSharing.weight_q
-```
-
-(`pkg/util/admissionfairsharing/admission_fair_sharing.go:CalculateUsage`). That is the *only* number the scheduler acts on. Any statistic we display must be a **strictly monotone function of U**, or the UI will contradict the queue.
-
-| Candidate | Bounded? | Monotone in U? | Verdict |
-| --- | --- | --- | --- |
-| Raw `consumedResources` weighted scalar (`U`) | No | Trivially | **Reject as headline.** "412.7 CPU-core-equivalents" is unreadable, unit-confusing (1 GPU = 35 cores = 35 GiB RAM = 1225 GiB disk), and has no reference point. Keep as drill-down. |
-| `U / median(U over active peers)` | No (→∞) | Yes, but **only at fixed peers** | **Reject.** The denominator moves when *other people* act, so a user's badge changes while they do nothing — the exact opposite of Munichor & Rafaeli's progress requirement. Also degenerate when peers are idle. |
-| Slurm `LevelFS = NormShares / EffectvUsage` | No (→∞ as usage→0) | Yes (inverted) | **Reject.** Unbounded means no stable bucket boundaries and no renderable bar. Slurm shows it to sysadmins, not scientists. |
-| **FASRC `f = 2^(−U/S)`** | **Yes, (0,1]** | **Yes, strictly decreasing** | **Adopt.** |
-
-### 1.2 Definition
-
-```
-f_q  =  2 ^ ( − U_q / S_q )
-```
-
-where `S_q` is queue *q*'s **entitlement** expressed in the same weighted CPU-core-equivalent units:
-
-```
-S_q  =  ( weight_q / Σ_p weight_p )  ·  Σ_r  resourceWeights[r] · nominalQuota_CQ[r]
-```
-
-Σ over `p` runs over the **active** LocalQueues attached to the same ClusterQueue (see §3.4 for "active").
-
-### 1.3 Why this shape is right for astronomers
-
-- **Bounded and anchored.** `f = 1.0` you have used nothing. `f = 0.5` you have been holding *exactly* your entitled share, continuously. `f → 0` you are far above it. There is a natural, explainable midpoint — LevelFS and the raw scalar have none.
-- **Band boundaries are powers of two of your share.** `f = 0.75 → U/S = 0.415`, `f = 0.50 → U/S = 1`, `f = 0.25 → U/S = 2`, `f = 0.125 → U/S = 3`. Each band drop is "one more multiple of your share". That is a story you can tell in one sentence.
-- **Unitless.** It never forces us to explain that 1 GPU costs 35 cores.
-- **Order-preserving.** `f_a > f_b ⟺ U_a < U_b ⟺ a's next job is admitted before b's`. So the badge *predicts the slip* — which is precisely what Larson (1987) says you must do, because a fair-share system is by construction a slip generator.
-
-> **Kueue does not compute f.** f is our monotone re-expression of Kueue's `CalculateUsage`. That is a feature: we present a legible number without ever disagreeing with the scheduler. It also means we can compute it entirely client-side from published API fields.
-
----
-
-## 2. Bands and thresholds
-
-| band key | `U/S` | `f` | badge | one-sentence explanation |
-| --- | --- | --- | --- | --- |
-| `ahead` | ≤ 0.42 | 0.75 – 1.00 | **Ahead in line** | "You've used less than your share recently, so your jobs start before users who have used more." |
-| `normal` | 0.42 – 1.0 | 0.50 – 0.75 | **Normal** | "You're close to your share. Jobs start in the usual order." |
-| `behind` | 1.0 – 2.0 | 0.25 – 0.50 | **Behind in line** | "You've used about {ratio}× your share recently, so jobs from lighter users start first. This eases as your recent usage fades — it halves every 5 days." |
-| `far_behind` | > 2.0 | < 0.25 | **Well behind in line** | "You've used about {ratio}× your share recently. Jobs from lighter users will start first until your recent usage fades; it halves every 5 days." |
-
-`{ratio}` = `round(U/S, 1)`. It is the *only* number in the copy, and it is a multiple of the user's own share — not a scheduler internal.
-
----
-
-## 3. How it is computed
-
-### 3.1 The decay
-
-Kueue's ledger is an EWMA over **currently held** admitted resources, resampled every `usageSamplingInterval` and folded in with
-
-```
-α        = 1 − 2^(−Δt / H)                     Δt = actual elapsed since last sample
-consumed = consumed_prev·(1−α) + held_now·α
-```
-
-`α` is computed from **actual elapsed wall time**, not the nominal interval. Two consequences that matter for us:
-
-- The decay's **time constant is `H` and only `H`**. Changing `usageSamplingInterval` changes sampling resolution — it does **not** change how fast usage is forgotten. The tick cancels exactly out of the decay.
-- The ledger accrues for the **whole time** a workload holds resources, not once at admission. A 3-day GPU notebook is counted in every sample for 3 days. This is the mechanical reason the platform owners' constraint — *interactive must be charged to the same ledger as batch* — is already satisfied by AFS accounting, with no skaha-side workaround needed.
-
-### 3.2 What H = 120h (5 days) actually means
-
-| how much of a burst is forgotten | elapsed |
-| --- | --- |
-| 50% | **5.0 days** |
-| 75% | 10.0 days |
-| 90% | 16.6 days |
-| 95% | 21.6 days |
-| 99% | 33.2 days |
-
-Five days is chosen against two opposing pressures.
-
-- **Long enough to be un-gameable.** The half-life must exceed the longest legitimate unit of work,
-  or a user can alternate campaigns faster than the ledger can see them and stay permanently in good
-  standing. Multi-day campaigns are spanned; a weekend pause buys almost nothing.
-- **Short enough to be explicable.** A user who runs one large campaign is materially affected for
-  about two weeks and effectively clear in a month. That is a timescale a person can hold in their
-  head, and it is short enough that the recovery is visible week to week rather than being an
-  invisible month-long tail.
-
-**The obligation this creates:** because the tail is measured in weeks, the UI is *required* to state
-the half-life. "It halves every 5 days" is not decoration — it is what converts an otherwise
-inexplicable multi-week penalty into a rule. This is why the half-life appears in the band copy and
-in `standing.basis.halfLifeHours`.
-
-### 3.4 Choosing the entitlement denominator
-
-`S_q` needs `Σ_p weight_p` over **active** peers. Definition:
-
-> A LocalQueue is **active** if `consumedResources` is non-empty **or** it has ≥ 1 admitted or pending workload.
-
-Rationale: dividing by *all configured* queues understates everyone's share whenever a project is dormant, and the whole point of the number is contention. With CANFAR's four static LocalQueues all carrying `fairSharing.weight: "1"`, `Σ weight` is just the active count.
-
-**Clamp:** `S_q ≥ ε` (use `ε = 1.0`) so a misconfigured zero-weight queue cannot produce `f = 0` or a division by zero. Kueue itself returns `MaxInt64` for zero-weight borrowing queues; we return band `far_behind` with `score: 0.0` and a `degraded` entry rather than propagating a sentinel.
-
-### 3.5 The complete algorithm
-
-```python
-GIB = 2 ** 30
-
-def weighted(resources: dict[str, float], weights: dict[str, float]) -> float:
-    """Σ_r weight_r · amount_r, in base units. Unlisted resources weigh 1.0 (Kueue's rule)."""
-    return sum(weights.get(name, 1.0) * amount for name, amount in resources.items())
-
-def standing(lq_consumed, lq_weight, cq_nominal_quota, sum_active_weights, weights):
-    U = weighted(lq_consumed, weights) / max(lq_weight, 1e-9)
-    C = weighted(cq_nominal_quota, weights)
-    S = max(C * lq_weight / max(sum_active_weights, 1e-9), 1.0)
-    ratio = U / S
-    return {"usage": U, "entitlement": S, "ratio": ratio, "score": 2.0 ** (-ratio)}
-```
-
-`lq_consumed` and `cq_nominal_quota` are parsed to **base units** (cores, bytes, whole GPUs) — reuse `metrics.providers.kueue.parse_resource_amount`, but note it converts `memory` / `ephemeral-storage` to **GiB**; the weighted sum needs **bytes**, so multiply those back by `2**30` before applying `resourceWeights`. Getting this backwards silently inflates memory's contribution by 10⁹.
-
----
-
-## 4. Where it is read from
-
-### 4.1 Authoritative source — the Kubernetes API, not Prometheus
-
-| | GVR | Scope | Field path | Purpose |
-| --- | --- | --- | --- | --- |
-| **A** | `kueue.x-k8s.io/v1beta2` · `localqueues` | ns `canfar-workloads`, `canfar-src-workloads` | `.status.fairSharing.admissionFairSharingStatus.consumedResources`<br>`.status.fairSharing.admissionFairSharingStatus.lastUpdate`<br>`.spec.clusterQueue`<br>`.spec.fairSharing.weight` | `U`, freshness, peer grouping, weight |
-| **B** | `kueue.x-k8s.io/v1beta2` · `clusterqueues` | cluster | `.spec.resourceGroups[].flavors[].resources[].nominalQuota` | `C` → `S`. **Already read by `KueueProvider`.** |
-| **C** | `kueue.x-k8s.io/v1beta2` · `workloads` | ns `canfar-workloads`, `canfar-src-workloads` | `.metadata.labels["canfar.net/username"]`, `.status.conditions[]`, `.spec.priorityClassName` | per-session "why pending" (§6.3) and user attribution |
-| **D** | `visibility.kueue.x-k8s.io/v1beta2` · `localqueues/pendingworkloads` | ns-scoped, `get` | `.items[].positionInClusterQueue` | queue position, background-polled only |
-
-**Do not put `LocalQueue.status.fairSharing.weightedShare` in any UI.** No controller writes it. It is a `+required` field, so it always serialises as `0`. It is the field whose name most sounds like the answer, and even Kueue's own docs show it as `0`. `weightedShare` *is* populated on ClusterQueue and Cohort — admin surface only (§8).
-
-**Prometheus is not used for the user-facing path.**
-- `kueue_local_queue_admission_fair_sharing_usage` is exported and is the scalar the scheduler itself sorts on (penalty included); use it for admin dashboards and alerting.
-- It is Prometheus-only, which would make a portal page render depend on the metrics pipeline; an API-object GET is served from etcd/watch cache and is strictly better coupling for a hot user path.
-- Every Kueue metric comes from the **leader replica's in-memory cache** — the same component whose write path the April 2026 benchmark identified as the bottleneck.
-
-**Divergence to accept and document:** the scheduler's in-memory sort key includes **pending entry penalties**, which are never persisted to `status`. Our number therefore under-reports during a submission burst and lags by up to one sampling interval. At `H = 120h` and a 5-minute tick a single penalty is a small fraction of a steady-state ledger — immaterial for a band, and surfaced honestly via `Last-Modified`.
-
-### 4.2 RBAC
-
-`metrics-api` today holds only `clusterqueues: [get]`. Extend `metrics/helm/metrics-api/templates/rbac.yaml`:
-
-```yaml
-rules:
-  - apiGroups: ["kueue.x-k8s.io"]
-    resources: ["clusterqueues"]
-    verbs: ["get", "list"]
-  - apiGroups: ["kueue.x-k8s.io"]
-    resources: ["localqueues", "workloads"]
-    verbs: ["get", "list", "watch"]
-  # Optional: only if queue position (§5.3) is enabled.
-  - apiGroups: ["visibility.kueue.x-k8s.io"]
-    resources: ["localqueues/pendingworkloads"]
-    verbs: ["get"]
-```
-
-`localqueues` and `workloads` may be narrowed to namespaced `Role`s in `canfar-workloads` and `canfar-src-workloads`; `clusterqueues` must stay cluster-scoped. **skaha needs no new RBAC** — it already has `localqueues: [get, list]` in both namespaces (`helm/templates/kueue-rbac.yaml`), and under this design skaha does not read Kueue for this feature at all; it proxies Metrics.
-
-### 4.3 Identity boundary
-
-The Metrics service has **no authentication**. It is reachable only on the in-cluster Service (`SKAHA_METRICS_BACKEND_URL`), never the edge hostname. Therefore:
-
-- **skaha injects the identity.** It substitutes the authenticated CADC/GMS principal into the `{user}` path segment. It must never forward a client-supplied username.
-- The admin route (§8) is gated by skaha on GMS group membership before the proxy call.
-- Do not expose `/api/v1/metrics/users/...` through any ingress.
-
----
-
-## 5. Caching and refresh
-
-### 5.1 Two-tier, one shared snapshot
-
-The critical architectural move: **all per-user responses are computed from one shared cluster snapshot.** The number of Kubernetes reads is independent of the number of users.
-
-| Tier | Contents | Reads | TTL | Redis key |
-| --- | --- | --- | --- | --- |
-| **Snapshot** (shared) | all LocalQueues + their consumed/weight/CQ, all ClusterQueue nominal quotas, derived `U`, `S`, `f`, band, rank for every queue | 4 LocalQueue + 2 ClusterQueue GETs **for the whole platform** | `= usageSamplingInterval` | `metrics:fairshare:snap:{fingerprint}` |
-| **Pending** (per user) | that user's pending Workload conditions + clamped positions | 1 label-selected Workload list | **15s** | `metrics:fairshare:pend:{fingerprint}:{sha256(user)[:16]}` |
-
-Polling faster than `usageSamplingInterval` is pure waste — `consumedResources` provably does not change in between, and `.lastUpdate` tells you exactly when it did. Reuse the existing `PlatformMetricsService` single-flight pattern verbatim so concurrent misses coalesce onto one load.
-
-**Bound the snapshot TTL:** `min(usageSamplingInterval, 900s)`. If the sampling interval is ever lengthened, this stops a cold-start snapshot sitting with a stale active-peer set.
-
-### 5.2 HTTP headers (ADR-0002)
-
-```
-Cache-Control: private, max-age=15
-Last-Modified: <LocalQueue .status...lastUpdate>     # the real freshness of the standing
-Date:          <now>
-Expires:       <now + 15s>
-```
-
-`Cache-Control: private` per ADR-0002's user-scope rule — this response must never populate a shared cache. `max-age` follows the **fastest-changing** component (position, 15s), while `Last-Modified` reports the **substantive** freshness (the ledger). `metrics.http_cache.metrics_success_cache_headers` already implements exactly this given `snapshot_created` and `shared_cache_public=False`.
-
-### 5.3 Queue position: background poll, never on page load
-
-The Visibility API takes a **full copy of the ClusterQueue's pending heap and sorts it** on every request. At CANFAR's target 100×-capacity backlog that is an O(N log N) snapshot inside the leader controller, per call.
-
-- A single background poller in the Metrics service hits `localqueues/{lq}/pendingworkloads` **once per 60s per LocalQueue** (4 calls/min platform-wide) and caches the ordered list in Redis (TTL 90s).
-- Page loads read Redis only.
-- Page with `limit=1000`, `offset` stepping, capped at `offset ≤ 20000`; beyond that report `position: null` rather than paging the whole backlog.
-- If the poller fails, `position` is `null` and the UI silently omits it. Position is an enhancement, never a dependency.
-
----
-
-## 6. What the user sees
-
-### 6.1 Design constraints, applied
-
-| Evidence | Applied as |
-| --- | --- |
-| Slurm backfill ETA accurate to 1 min for 5.13% of jobs (ARCHER2) / 0.42% (Cirrus); Kueue has **no** start-time predictor; Antonides et al. 2002 — an exceeded ETA amplifies dissatisfaction | **No ETA field exists in the API.** Not "hidden by default" — absent, so no client can render one. |
-| Hui & Tse 1996 — short waits: say nothing; intermediate: duration; long: position | `position` is emitted **only** when `pendingSeconds > 600`. Below that the UI shows the band and nothing else. |
-| Munichor & Rafaeli 2007 — position works via *progress*; backwards movement is worse than no information | **Monotonic clamp** (§6.4). Under AFS, cross-LocalQueue order genuinely recomputes and *can* move backwards. |
-| Raw fair-share float as headline invites argument about the number | `standing.score` is present in the payload but the UI **must not** render it above the fold. Headline is the band + one sentence. |
-| Larson 1987 — perceived unfairness is driven by observed **slips** | The **always-on slip pre-explanation** (§6.2) is rendered persistently next to any pending session, in every band, including `ahead`. |
-
-### 6.2 The always-on slip pre-explanation
-
-Rendered persistently wherever pending sessions are listed — not in a tooltip, not behind a "learn more":
-
-> **CANFAR starts jobs from the users who have used the least recently — not in the order jobs were submitted.** Someone who submitted after you may start first. Your standing recovers as your recent usage fades; it halves every 14 days.
-
-This is the single highest-value piece of copy in the design. Larson's finding is that a slip you were warned about is not perceived as unfair; a slip you were not warned about is. A fair-share scheduler generates slips by construction.
-
-### 6.3 Per-session "why is this pending"
-
-**Approved user-facing vocabulary — exactly five values. No sixth is ever added without a contract revision.**
-
-| `reason` | user-facing `message` |
-| --- | --- |
-| `fair_share_position` | "Waiting behind other users' fair-share position" |
-| `own_higher_priority` | "Waiting behind higher-priority work of your own" |
-| `awaiting_resources` | "Waiting for resources" |
-| `blocked_by_policy` | "Blocked by policy" |
-| `platform_degraded` | "Platform degraded" |
-
-**Mapping from Kueue Workload conditions.** Granular reasons require `UnadmittedWorkloadsObservability=true` (Beta, **default false** — must be enabled explicitly, together with `UnadmittedWorkloadsExplicitStatus=true` or the field is often simply absent).
-
-| Kueue condition / reason | CANFAR reason |
-| --- | --- |
-| `QuotaReserved=False` · `WaitingForQuota` **and** a pending workload from another LocalQueue is ordered ahead | `fair_share_position` |
-| `QuotaReserved=False` · `WaitingForQuota`, no such peer ahead | `awaiting_resources` |
-| `QuotaReserved=False` · `WaitingForQuota`, and a higher-`EffectivePriority` pending Workload with the **same** `canfar.net/username` is ahead in the same LocalQueue | `own_higher_priority` |
-| `WaitingForPreemptedWorkloads`, `TopologyPlacementFailed`, `PendingEvaluation`, `PendingDelayedTopologyRequests`, `Admitted=False`·`NoReservation` | `awaiting_resources` |
-| `Suspended`, `UnsatisfiedAdmissionChecks`, `Evicted`·`Deactivated`, `AdmissionGated`, `OnHold` | `blocked_by_policy` |
-| `ExceedsMaxQuota`, `NoMatchingFlavor` | `platform_bug` — unreachable if skaha's `LimitRange` validation and the ClusterQueue agree; alert rather than display |
-| `Misconfigured`, `Evicted`·`ClusterQueueStopped`/`LocalQueueStopped`/`NodeFailures` | `platform_degraded` |
-| `Preempted`·`InCohortFairSharing` / `InClusterQueue` (re-queued after preemption) | `fair_share_position` |
-
-### 6.4 Monotonic position clamp
-
-```python
-key      = f"metrics:fairshare:pos:{workload_uid}"
-previous = redis.get(key)                       # int | None
-shown    = observed if previous is None else min(observed, int(previous))
-redis.set(key, shown, ex=86_400)
-```
-
-- Reset **only** on a workload state transition (admitted / failed / deleted), never on a re-poll.
-- Render `shown` when `≤ 100`; render `"100+"` above that. Once it crosses below 100 it becomes a number and thereafter only decreases.
-- If the observed position rises, hold the previous value and let the true value catch down. Displaying a stale-but-monotone position is strictly better than an accurate one that moves backwards.
-
-### 6.5 Drill-down (power users)
-
-Behind a "How is this calculated?" disclosure:
-
-- `score` (f), `ratio` (U/S) — with the sentence *"Your recent weighted usage is {ratio}× your share of this queue."*
-- `consumed` per resource in native units, and the `weights` used, with the conversions spelled out: **1 GPU = 35 cores = 35 GiB memory = 1 225 GiB scratch.**
-- `halfLifeHours: 336` rendered as "halves every 14 days".
-- `lastUpdate` as "as of HH:MM".
-- **Anonymised peer context only:** your band vs the distribution of bands across active queues. Never another project's or user's name or number.
-
----
-
-## 7. The API contract
-
-### 7.1 Route
-
-```
-GET /api/v1/metrics/users/{user}/fairshare      ->  kind: FairShareStanding
-```
-
-New scope `fairshare`, selected by `sources.fairshare: kueue` (ADR-0001 single-provider rule; ADR-0002 progressive routes — ship only when the provider returns the complete model). Provider method `KueueProvider.fairshare(user: str) -> FairShareData`.
-
-**skaha side:** `FairShareDAO` mirroring `PlatformMetricsDAO`, calling `SKAHA_METRICS_BACKEND_URL + /api/v1/metrics/users/{authenticatedUser}/fairshare`, surfaced on an authenticated skaha route. A `null` DAO (env unset) means the portal renders no badge — the feature degrades to absent, never to an error.
-
-### 7.2 Example response
-
-```json
-{
-  "version": "metrics.canfar.net/v1",
-  "kind": "FairShareStanding",
-  "status": "Success",
-  "metadata": { "created": "2026-07-31T14:05:12Z" },
-  "data": {
-    "scope": "fairshare",
-    "cluster": "canfar-prod",
-    "subject": {
-      "kind": "project",
-      "user": "jdoe",
-      "queue": "cadc-canucs",
-      "clusterQueue": "cadc"
-    },
-    "standing": {
-      "band": "behind",
-      "score": 0.2774,
-      "ratio": 1.85,
-      "headline": "Behind in line",
-      "explanation": "You've used about 1.9x your share over the last two weeks, so jobs from lighter users start first. This eases as your recent usage fades - it halves every 14 days.",
-      "slipNotice": "CANFAR starts jobs from the users who have used the least recently - not in the order jobs were submitted. Someone who submitted after you may start first."
-    },
-    "basis": {
-      "halfLifeHours": 120,
-      "samplingIntervalSeconds": 3600,
-      "lastUpdate": "2026-07-31T14:00:07Z",
-      "activePeerQueues": 3,
-      "weight": 1.0,
-      "explanationFidelity": "granular"
-    },
-    "usage": {
-      "unit": "cpu-core-equivalents",
-      "weighted": "13540.0",
-      "entitlement": "7318.1",
-      "consumed": {
-        "cpu": "1900",
-        "memory": "8200Gi",
-        "ephemeral-storage": "42000Gi",
-        "nvidia.com/gpu": "64"
-      },
-      "weights": {
-        "cpu": 1.0,
-        "memory": 9.31323e-10,
-        "ephemeral-storage": 2.6609e-11,
-        "nvidia.com/gpu": 35.0
-      }
-    },
-    "pending": [
-      {
-        "sessionId": "8f2c1a94",
-        "sessionKind": "headless",
-        "submitted": "2026-07-31T13:41:55Z",
-        "pendingSeconds": 1397,
-        "reason": "fair_share_position",
-        "message": "Waiting behind other users' fair-share position",
-        "position": 7,
-        "positionDisplay": "7"
-      },
-      {
-        "sessionId": "b31d77e0",
-        "sessionKind": "notebook",
-        "submitted": "2026-07-31T14:04:40Z",
-        "pendingSeconds": 32,
-        "reason": "awaiting_resources",
-        "message": "Waiting for resources",
-        "position": null,
-        "positionDisplay": null
-      }
-    ],
-    "degraded": []
-  }
-}
-```
-
-### 7.3 Field contract
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `subject.kind` | `"project" \| "user"` | **The forward-compatibility hinge.** `"project"` today; flips to `"user"` if per-user LocalQueues are adopted, with **no schema or version change**. The UI selects copy from this ("your project's standing" vs "your standing"). |
-| `standing.band` | enum(4) | The only thing rendered above the fold. |
-| `standing.score` | float (0,1] | f. Drill-down only. |
-| `standing.ratio` | float ≥ 0 | U/S, rounded to 1 dp. The one number allowed in user copy. |
-| `basis.explanationFidelity` | `"granular" \| "coarse"` | `"coarse"` when the observability gates are off; UI softens wording. |
-| `usage.weighted`, `usage.entitlement` | string | Strings, not floats — matches the `PlatformMetrics` convention for resource quantities. Unit is `usage.unit`. |
-| `usage.consumed` | open `dict[str,str]` | Open map per ADR-0002. Clients must tolerate unknown resource names. Same units as `PlatformMetrics` (cores, `Gi`, base units). |
-| `pending[].reason` | enum(5) | Closed vocabulary. Unmappable Kueue reasons fall back to `awaiting_resources` and increment a telemetry counter — they never leak upstream strings (ADR-0002). |
-| `pending[].position` | int \| null | Monotonically clamped. `null` when `pendingSeconds ≤ 600`, when the poller is unavailable, or beyond the paging cap. |
-| **absent** | — | **No `eta`, `estimatedStart`, `expectedWait`, or equivalent — by design.** |
-| `degraded[]` | list of `{code, message}` | Non-fatal source problems: `ledger_stale` (`lastUpdate` older than 2× sampling interval), `position_unavailable`, `zero_weight_queue`, `ledger_reset_suspected`. The response still returns `200`; the UI hides position and adds "as of {lastUpdate}". |
-
-### 7.4 Pydantic models (drop into `src/metrics/schemas/metrics.py`)
-
-```python
-Band  = Literal["ahead", "normal", "behind", "far_behind"]
-Reason = Literal[
-    "fair_share_position", "own_higher_priority",
-    "awaiting_resources", "blocked_by_policy", "platform_degraded",
-]
-
-class FairShareSubject(BaseModel):
-    kind: Literal["project", "user"]
-    user: str
-    queue: str
-    cluster_queue: str = Field(alias="clusterQueue")
-
-class FairShareStandingBlock(BaseModel):
-    band: Band
-    score: float = Field(ge=0.0, le=1.0)
-    ratio: float = Field(ge=0.0)
-    headline: str
-    explanation: str
-    slip_notice: str = Field(alias="slipNotice")
-
-class PendingSession(BaseModel):
-    session_id: str = Field(alias="sessionId")
-    session_kind: str = Field(alias="sessionKind")
-    submitted: datetime
-    pending_seconds: int = Field(alias="pendingSeconds", ge=0)
-    reason: Reason
-    message: str
-    position: int | None = None
-    position_display: str | None = Field(default=None, alias="positionDisplay")
-
-class FairShareData(BaseModel):
-    scope: Literal["fairshare"] = "fairshare"
-    cluster: str
-    subject: FairShareSubject
-    standing: FairShareStandingBlock
-    basis: FairShareBasis
-    usage: FairShareUsage
-    pending: list[PendingSession] = Field(default_factory=list)
-    degraded: list[ErrorDetail] = Field(default_factory=list)
-```
-
----
-
-## 8. Admin surface
-
-```
-GET /api/v1/metrics/fairshare      ->  kind: FairShareLeaderboard
-```
-
-skaha gates this on GMS group membership before proxying. Contains everything users never see:
-
-**Per-LocalQueue ranking table** — `name`, `clusterQueue`, `weight`, `consumedResources`, `U`, `S`, `f`, `band`, `rank`, `admittedWorkloads`, `pendingWorkloads`, `lastUpdate`. Rank is the scheduler's true admission order.
-
-**Per-community rollup** — group LocalQueues by `canfar.net/community` (already copied onto every Workload via `integrations.labelKeysToCopy`), and show ClusterQueue `.status.fairSharing.weightedShare` — the one place `weightedShare` is real, since it *is* populated for ClusterQueue and Cohort.
-
-**Per-user attribution inside each project** — sum admitted Workload requests grouped by `canfar.net/username`, weighted with the same `resourceWeights`. This is **informational, not the ledger**: it answers "who inside `cadc-canucs` drove the project's standing" without inventing a second scheduling authority. It is admin-only precisely because it is *not* order-isomorphic with admission.
-
-**Config echo and health** — `usageHalfLifeTime`, `usageSamplingInterval`, `resourceWeights`, `admissionMode`, `stopPolicy`, per-ClusterQueue `preemption` policies, and the WorkloadPriorityClass in use per queue.
-
-**Two computed health flags that only admins can act on:**
-
-| flag | meaning |
-| --- | --- |
-| `ledgerStale` | `now − lastUpdate > 3 × usageSamplingInterval` on any active queue — the reconciler has stopped sampling, so every standing figure is frozen and must not be shown as current. |
-| `ledgerResetSuspected` | true when a queue's `U` shows a step discontinuity larger than one tick's α could produce. Catches an accidental LocalQueue delete/recreate, which is an unrecoverable ledger wipe at every Kueue version. |
-
-**Override state** — any skaha-side per-user session or GPU caps in force, and any LocalQueue with `stopPolicy != None`.
-
-**Weights sanity, worth surfacing prominently:** show each resource's share of the ClusterQueue's total weighted capacity, `weight_r × capacity_r / Σ`. Setting weights by unit equivalence — "1 GiB of RAM costs 1 core" — hands most of the pool to memory, because a cluster ships several GiB per core. The dashboard should make the resulting split visible so it is a deliberate policy choice rather than an accident of the weight constants.
-
----
-
-## 9. Worked example — CANFAR's real numbers
-
-### 9.1 ClusterQueue `cadc` total weighted capacity
-
-`nominalQuota`: cpu 2800, memory 12400Gi, ephemeral-storage 99200Gi, nvidia.com/gpu 112.
-`resourceWeights`: cpu 1.0, memory 9.31323e-10, ephemeral-storage 2.6609e-11, nvidia.com/gpu 35.
-
-| resource | quota | weighted (CPU-eq) | share of C |
-| --- | --- | ---: | ---: |
-| cpu | 2 800 cores | 2 800.00 | 12.75% |
-| memory | 12 400 GiB | 12 400.01 | **56.48%** |
-| ephemeral-storage | 99 200 GiB | 2 834.26 | 12.91% |
-| nvidia.com/gpu | 112 | 3 920.00 | 17.86% |
-| | | **C = 21 954.27** | |
-
-Implied conversions: **1 GiB memory = 1.000 cores · 1 GiB scratch = 1/35 core · 1 GPU = 35 cores = 35 GiB RAM = 1 225 GiB scratch.**
-
-### 9.2 Three LocalQueues, all `fairSharing.weight: "1"`, all active
-
-`S = 21 954.27 × 1/3 = 7 318.1` CPU-equivalents each.
-
-| LocalQueue | cpu | memory | gpu | ephemeral | **U** | **U/S** | **f** | band |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `cadc-default` | 120 | 480 Gi | 2 | 1 400 Gi | 710.0 | 0.097 | **0.9350** | `ahead` |
-| `cadc-unions` | 240 | 960 Gi | 8 | 3 500 Gi | 1 580.0 | 0.216 | **0.8610** | `ahead` |
-| `cadc-canucs` | 1 900 | 8 200 Gi | 64 | 42 000 Gi | 13 540.0 | 1.850 | **0.2774** | `behind` |
-
-Admission order: `cadc-default` → `cadc-unions` → `cadc-canucs`, which is exactly f descending. Cluster is at 72% of weighted capacity, so two of three queues sit in `ahead` — correct behaviour: under light contention almost everyone *is* below their share.
-
-**Interpretation for an admin:** `U = 13 540` means "over the last ~14 days `cadc-canucs` has held, on average, the concurrent equivalent of 13 540 CPU cores" — 1.85× its entitled 7 318.
-
-**What `jdoe` in `cadc-canucs` sees:**
-
-> **Behind in line**
-> You've used about 1.9× your share recently, so jobs from lighter users start first. This eases as your recent usage fades — it halves every 5 days.
->
-> *CANFAR starts jobs from the users who have used the least recently — not in the order jobs were submitted. Someone who submitted after you may start first.*
->
-> `sess-8f2c1a94` — Waiting behind other users' fair-share position · position 7
-
-### 9.3 Recovery dynamics — what H = 120h costs
-
-The heaviest queue stops all work at t = 0. `U(t) = 13 540 · 2^(−t/120h)`:
-
-| target | condition | elapsed |
-| --- | --- | --- |
-| return to `normal` (f ≥ 0.50) | U ≤ 7 318.1 | **106.5 h = 4.4 days** |
-| return to `ahead` (f ≥ 0.75) | U ≤ 3 037.2 | **258.8 h = 10.8 days** |
-
-One large campaign costs roughly a fortnight of reduced standing, and is effectively clear inside a month. This is exactly why the half-life must appear in the user copy — an unexplained multi-week penalty reads as a bug.
-
----
-
-## 10. Implementation plan
-
-| Step | Where | Notes |
-| --- | --- | --- |
-| 1 | `keel-deploy` | Kueue **≥ v0.20.0** (build carrying the AFS precision fix). |
-| 2 | `keel-deploy` | `admissionFairSharing.usageHalfLifeTime: 120h`, `usageSamplingInterval: 5m`; `resourceWeights` derived from a target share. |
-| 3 | `metrics/` | `KueueProvider.fairshare(user)`; add `localqueues` + `workloads` reads via `kr8s` (`new_class(kind="LocalQueue", version=..., namespaced=True)`). Reuse `parse_resource_amount` — **convert memory/ephemeral back from GiB to bytes before weighting** (§3.5). |
-| 4 | `metrics/` | `FairShareData` schema; `sources.fairshare: kueue`; new `FairShareService` cloning `PlatformMetricsService`'s single-flight + telemetry; two-tier cache keys (§5.1). |
-| 5 | `metrics/` | Route + `Cache-Control: private, max-age=15`, `Last-Modified` = ledger `lastUpdate`. |
-| 6 | `metrics/helm/metrics-api` | RBAC per §4.2. |
-| 7 | `skaha/` | `FairShareDAO` mirroring `PlatformMetricsDAO`; authenticated route injecting the GMS principal; **never** trust a client-supplied `{user}`. |
-| 8 | Portal | Badge + slip notice + drill-down. |
-| 9 | `keel-deploy` (optional, later) | `UnadmittedWorkloadsObservability=true` + `UnadmittedWorkloadsExplicitStatus=true` ⇒ `explanationFidelity: "granular"`, real per-session reasons instead of the §6.3 fallback. |
-| 10 | `metrics/` | Admin `FairShareLeaderboard` (§8). |
-
-Steps 3–8 ship a complete, useful feature without step 9. Step 9 upgrades the *explanation* fidelity without touching the contract. Docs to update per the repo convention: new ADR (`0025-fairshare-standing-contract.md`), `metrics/CONTEXT.md` vocabulary (add **fair-share standing**, **entitlement**, **band**), `docs/architecture.md`, `docs/specs.md`.
-
-### Telemetry to add (ADR-0002)
-
-`fairshare_band{band}` counter · `fairshare_reason{reason}` counter · `fairshare_reason_unmapped{kueue_reason}` counter (catches upstream reason drift) · `fairshare_ledger_age_seconds` gauge · `fairshare_position_clamped` counter (how often the clamp fires — if it is high, cross-queue churn is high and position may be worth disabling entirely).
-
----
-
-## 11. The one thing to say to the platform owners
-
-Their instinct — *"users will spawn only interactive jobs to get around fair-share limits"* — is **mechanically wrong for admission ordering and right for preemption.**
-
-Under `UsageBasedAdmissionFairSharing`, the sort key is LocalQueue fair-share usage **first**; `WorkloadPriorityClass` is only reached as a tiebreaker, which in practice means only *within* the same LocalQueue. `cmp.Compare(lqAUsage, lqBUsage)` returns before priority is ever consulted. So a high interactive priority cannot buy a larger share at admission — it only reorders that user's own work. And AFS accrues continuously for the whole time a session holds resources, with **no priority filter and no workload-kind filter** in the accrual path. Interactive is already charged identically to batch, and that is already live in production.
-
-The real gaming channel is elsewhere: `withinClusterQueue: LowerPriority` (currently set on both ClusterQueues) lets a high-priority interactive workload **evict** a lower-priority workload belonging to a *different* LocalQueue on priority alone. The preemption package has zero AFS awareness. Keeping interactive on the same ledger — which is correct and already true — closes the admission channel completely and closes the preemption channel not at all. That is a separate decision, and `preemptionGates` is close to purpose-built for it: it decouples "hard to evict" (priority, which protects notebooks) from "may evict others" (the gate, which is what enables gaming).
-
-For the statistic itself, the practical consequence is good news: **the number is already being written to `LocalQueue.status` every sampling tick, on the version deployed today, and it already charges interactive work.** The work is presentation, one Kueue patch bump, one config value, and one route.
 
 
 ---
