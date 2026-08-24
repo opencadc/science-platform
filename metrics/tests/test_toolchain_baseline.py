@@ -1,4 +1,4 @@
-"""Toolchain and image baseline contracts for CADC-16066."""
+"""Toolchain and image baseline contracts."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from metrics.dev.cli import _COMMANDS, build_parser, main
+from metrics.dev.cli import _COMMANDS, build_parser
 
 METRICS_ROOT = Path(__file__).parents[1]
 
@@ -26,7 +26,6 @@ def test_metrics_dev_exposes_approved_commands() -> None:
     help_text = parser.format_help()
     for name in _COMMANDS:
         assert name in help_text
-    assert main(["up"]) == 2
 
 
 def test_dockerfile_uses_slim_uv_and_non_root() -> None:

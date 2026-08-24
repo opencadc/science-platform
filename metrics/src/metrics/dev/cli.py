@@ -1,13 +1,10 @@
-"""``metrics-dev`` entrypoint declared in ``pyproject.toml``.
-
-Package 01 exposes the approved subcommands. Package 03 (CADC-16068) owns the
-kind/Helm lifecycle implementations behind these names.
-"""
+"""Installed ``metrics-dev`` kind and Helm lifecycle entrypoint."""
 
 from __future__ import annotations
 
 import argparse
-import sys
+
+from metrics.dev import stack
 
 _COMMANDS = (
     "up",
@@ -29,24 +26,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     for name in _COMMANDS:
-        subparsers.add_parser(name, help=f"Run the {name} lifecycle step.")
+        command = subparsers.add_parser(name, help=f"Run the {name} lifecycle step.")
+        if name == "destroy":
+            command.add_argument(
+                "--confirm",
+                metavar="CONTEXT",
+                help=f"required exact confirmation: {stack.KUBE_CONTEXT}",
+            )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Parse argv and dispatch a lifecycle command.
-
-    Returns:
-        Process exit status. Until the kind/Helm loop lands, unknown
-        implementations exit non-zero so callers do not treat stubs as success.
-    """
+    """Parse argv and dispatch one finite lifecycle command."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    print(
-        f"metrics-dev {args.command}: lifecycle implementation lands in CADC-16068",
-        file=sys.stderr,
-    )
-    return 2
+    actions = {
+        "up": stack.up,
+        "run": stack.run_host,
+        "image": stack.image,
+        "fixtures": stack.fixtures,
+        "smoke": stack.smoke,
+        "down": stack.down,
+        "reset": stack.reset,
+        "destroy": lambda: stack.destroy(args.confirm),
+    }
+    try:
+        actions[args.command]()
+    except stack.DevStackError as error:
+        parser.error(str(error))
+    return 0
 
 
 if __name__ == "__main__":

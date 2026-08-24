@@ -103,7 +103,7 @@ For **module responsibilities** and the **startup vs request** flow for
 Kueue-backed platform metrics, see `docs/kueue-platform.md` (aligned with M4
 provider runtime behavior).
 
-**Cluster dev setup** — one script, `docs/dev-setup.md`.
+**Cluster dev setup** — installed `metrics-dev` commands; see `docs/dev-setup.md`.
 
 ## Local Kubernetes integration loop
 
@@ -111,19 +111,21 @@ Local and CI both use a one-node **kind** cluster for smoke validation.
 
 ### Iterative dev (keep your cluster)
 
-See `docs/dev-setup.md`. The supported flow is
-**`bash scripts/kind-smoke.sh`** (Helm Kueue, `scripts/test-setup.yaml`,
-Docker build + `kind load`, Helm deploy, integration tests).
+See `docs/dev-setup.md`. Start or converge the pinned reusable stack with:
+
+```bash
+uv run metrics-dev up
+```
 
 ### One-shot verification (CI-style)
 
 ```bash
-KIND_SMOKE_CI=1 bash scripts/kind-smoke.sh
+uv run metrics-dev smoke
 ```
 
-`scripts/kind-smoke.sh` runs the full kind smoke and can leave the API
-port-forward up for local debugging. Stop it with
-`bash scripts/kind-smoke-teardown.sh`.
+`scripts/kind-smoke.sh` remains a thin wrapper around `metrics-dev smoke`.
+Use `uv run metrics-dev down`, `reset`, or `destroy --confirm kind-metrics`
+for lifecycle cleanup.
 
 ## Container image
 

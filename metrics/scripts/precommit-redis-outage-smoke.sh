@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Manual pre-commit / CI stage placeholder until Redis coordination lands
-# (CADC-16070). Exits non-zero so the stage is never treated as vacuously green.
+# Manual pre-commit / CI stage for Redis outage behavior.
+# Fails closed until the Redis coordination package lands a real proof.
 set -euo pipefail
-echo "metrics Redis-outage smoke is owned by CADC-16070; refuse empty pass." >&2
+echo "Redis outage smoke is not implemented yet; refusing empty pass." >&2
 exit 2

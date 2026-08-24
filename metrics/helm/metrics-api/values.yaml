@@ -34,3 +34,7 @@ rbac:
 redis:
   enabled: true
   image: redis:7-alpine
+
+collector:
+  enabled: false
+  image: otel/opentelemetry-collector:0.123.0

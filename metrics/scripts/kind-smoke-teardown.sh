@@ -25,6 +25,18 @@ NAMESPACE="${NAMESPACE:-metrics}"
 DO_ALL=0
 DO_KIND=0
 
+if [[ "${KIND_CLUSTER_NAME}" != "metrics" || "${KUBE_CONTEXT}" != "kind-metrics" ]]; then
+  echo "error: teardown only supports cluster metrics / context kind-metrics" >&2
+  exit 1
+fi
+require kind
+if [[ "$(kubectl --context kind-metrics get nodes \
+  -l node-role.kubernetes.io/control-plane \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)" != "metrics-control-plane" ]]; then
+  echo "error: refusing teardown; kind-metrics is not the metrics kind cluster" >&2
+  exit 1
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --all) DO_ALL=1 ;;

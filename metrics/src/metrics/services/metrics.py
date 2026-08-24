@@ -68,7 +68,7 @@ class MetricsService:
         (single-flight). Cancelling one waiter does not cancel the shared load.
 
         Args:
-            subject: Subject selector. Only ``platform`` is supported in package 02.
+            subject: Subject selector. Only ``platform`` is supported initially.
 
         Returns:
             Observation, snapshot creation time, and whether it came from cache.

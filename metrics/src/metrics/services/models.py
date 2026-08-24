@@ -11,7 +11,7 @@ from typing import Literal
 class MetricsSubject:
     """Subject selector for :meth:`metrics.services.metrics.MetricsService.get`.
 
-    Package 02 only serves ``platform``. User and community land in later packages.
+    Only ``platform`` is served initially; user and community follow later.
     """
 
     kind: Literal["platform", "user", "community"]

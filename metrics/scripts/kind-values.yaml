@@ -17,11 +17,16 @@ env:
   METRICS_CACHE__BACKEND: "redis"
   # Short TTL for CI and local integration so platform snapshots refresh quickly.
   METRICS_CACHE__TTL_SECONDS: "1"
-  METRICS_OTEL_METRICS_ENABLED: "false"
+  METRICS_OTEL_METRICS_ENABLED: "true"
+  METRICS_OTEL_EXPORTER_OTLP_ENDPOINT: "http://metrics-api-collector:4318/v1/metrics"
+  METRICS_OTEL_EXPORT_INTERVAL_MILLIS: "1000"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
-  # service account (ADR-0001); no transport settings are configured here.
+  # service account; no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron"]'
 
 redis:
+  enabled: true
+
+collector:
   enabled: true
