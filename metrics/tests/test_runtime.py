@@ -12,8 +12,8 @@ from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache
 from metrics.core.runtime import MetricsRuntime, build_cache_backend, platform_metrics_cache_key
 from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
-from metrics.schemas.metrics import PlatformMetricsData
-from metrics.services.platform import CachedMetrics, PlatformMetricsService
+from metrics.services.metrics import MetricsService
+from metrics.services.models import PLATFORM_SUBJECT, CachedSnapshot, PlatformObservation
 from metrics.telemetry import NoopMetricsRecorder
 from tests.fakes import LifecycleProvider
 
@@ -39,9 +39,9 @@ class _RecordingRedis:
 
 
 def _runtime_with(provider: LifecycleProvider, *, redis: _RecordingRedis | None = None):
-    service = PlatformMetricsService(
-        platform=provider.platform,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+    service = MetricsService(
+        platform=provider.read_platform,
+        cache=InMemoryTTLCache[CachedSnapshot](ttl_seconds=60),
         key=lambda: "platform:4:c:stub",
         telemetry=NoopMetricsRecorder(),
         provider=provider.name,
@@ -49,7 +49,7 @@ def _runtime_with(provider: LifecycleProvider, *, redis: _RecordingRedis | None 
     return MetricsRuntime(
         Settings(cache=CacheConfig(backend="memory")),
         provider=provider,
-        platform_service=service,
+        metrics_service=service,
         redis=redis,
     )
 
@@ -64,7 +64,7 @@ async def test_runtime_starts_and_stops_owned_provider_once() -> None:
 
     assert events == ["startup", "provider shutdown"]
     with pytest.raises(RuntimeError, match="not initialised"):
-        _ = runtime.platform_service
+        _ = runtime.metrics_service
 
 
 @pytest.mark.parametrize(
@@ -133,21 +133,21 @@ async def test_concurrent_misses_coalesce_and_share_results_even_when_cancelled(
         ) -> None:
             provider_names.append(provider)
 
-    async def counting() -> PlatformMetricsData:
+    async def counting() -> PlatformObservation:
         nonlocal loads
         loads += 1
         await release.wait()
-        return PlatformMetricsData(cluster="c", capacity={"cpu": "1"}, allocated={"cpu": "0"})
+        return PlatformObservation(cluster="c", capacity={"cpu": "1"}, allocated={"cpu": "0"})
 
-    service = PlatformMetricsService(
+    service = MetricsService(
         platform=counting,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        cache=InMemoryTTLCache[CachedSnapshot](ttl_seconds=60),
         key=lambda: "platform:4:c:",
         telemetry=CaptureRecorder(),
         provider="my-adapter",
     )
 
-    tasks = [asyncio.create_task(service.get_platform_metrics()) for _ in range(10)]
+    tasks = [asyncio.create_task(service.get(PLATFORM_SUBJECT)) for _ in range(10)]
     await asyncio.sleep(0)  # let every request reach the miss path
     tasks[0].cancel()  # cancelling one waiter must not kill the shared load
     await asyncio.gather(tasks[0], return_exceptions=True)
@@ -155,8 +155,8 @@ async def test_concurrent_misses_coalesce_and_share_results_even_when_cancelled(
     results = await asyncio.gather(*tasks[1:])
 
     assert loads == 1
-    assert all(r.data.capacity["cpu"] == "1" and r.cached is False for r in results)
-    assert (await service.get_platform_metrics()).cached is True
+    assert all(r.observation.capacity["cpu"] == "1" and r.cached is False for r in results)
+    assert (await service.get(PLATFORM_SUBJECT)).cached is True
     assert provider_names == ["my-adapter"]  # one timed load, injected provider name
 
 
@@ -165,19 +165,19 @@ async def test_concurrent_misses_share_the_same_mapped_error() -> None:
 
     loads = 0
 
-    async def failing() -> PlatformMetricsData:
+    async def failing() -> PlatformObservation:
         nonlocal loads
         loads += 1
         await asyncio.sleep(0)
         raise ProviderUnavailableError("down")
 
-    service = PlatformMetricsService(
+    service = MetricsService(
         platform=failing,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=60),
+        cache=InMemoryTTLCache[CachedSnapshot](ttl_seconds=60),
         key=lambda: "platform:4:c:",
     )
 
-    tasks = [asyncio.create_task(service.get_platform_metrics()) for _ in range(5)]
+    tasks = [asyncio.create_task(service.get(PLATFORM_SUBJECT)) for _ in range(5)]
     await asyncio.sleep(0)
     results = await asyncio.gather(*tasks, return_exceptions=True)
 

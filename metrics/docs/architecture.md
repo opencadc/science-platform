@@ -20,13 +20,12 @@ This file stores repository-specific architecture facts only.
   live in `src/metrics/core/settings.py` (environment-only, `METRICS_*`).
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
   constructs the Kueue provider, owns provider lifecycle and cache resources,
-  and builds the platform cache key and `PlatformMetricsService`. The provider owns a lazily built kr8s API handle
+  and builds the platform cache key and `MetricsService`. The provider owns a lazily built kr8s API handle
   (ADR-0001).
 - Active platform metrics come only from the **Kueue** source
-  (`providers/kueue.py`): `KueueProvider` directly implements the
-  `PlatformMetrics` read alongside provider identity, lifecycle, and cache
-  fingerprinting. One module owns kr8s reads, startup checks, and platform
-  aggregation. Configuration rejects inactive or unknown providers.
+  (`providers/kueue.py`): `KueueProvider.read_platform` returns a transport-neutral
+  `PlatformObservation`. Routes call `MetricsService.get(subject)` only.
+  Configuration rejects inactive or unknown providers.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 
@@ -35,7 +34,7 @@ This file stores repository-specific architecture facts only.
 - `api/v1/`: versioned HTTP routes.
 - `core/`: `Settings`, `MetricsRuntime`, and `create_app`.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
-- `services/`: `PlatformMetricsService` and cache-aware orchestration.
+- `services/`: `MetricsService.get(subject)` plus transport-neutral models/sources.
 - `providers/`: `KueueProvider` reads ClusterQueues through kr8s named
   `call_api` GETs (get-only RBAC, ADR-0001).
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``

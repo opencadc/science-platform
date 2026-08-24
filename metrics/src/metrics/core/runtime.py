@@ -1,4 +1,4 @@
-"""App-level :class:`MetricsRuntime`: provider lifecycle, cache, and platform reads."""
+"""App-level :class:`MetricsRuntime`: provider lifecycle, cache, and Metrics service."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from metrics.cache import InMemoryTTLCache, RedisJSONTTLCache, TTLCacheBackend
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.kueue import KueueProvider
-from metrics.services.platform import CachedMetrics, PlatformMetricsService
+from metrics.services.metrics import MetricsService
+from metrics.services.models import CachedSnapshot
 from metrics.telemetry import MetricsRecorder
 
 _logger = logging.getLogger(__name__)
@@ -39,16 +40,16 @@ def platform_metrics_cache_key(*, cluster_name: str, fingerprint: str = "") -> s
 
 def build_cache_backend(
     settings: Settings,
-) -> tuple[TTLCacheBackend[CachedMetrics], Redis | None]:
+) -> tuple[TTLCacheBackend[CachedSnapshot], Redis | None]:
     """Construct the TTL cache backend selected by ``settings.cache``."""
     ttl = settings.cache.ttl_seconds
     if settings.cache.backend == "memory":
-        return (InMemoryTTLCache[CachedMetrics](ttl_seconds=ttl), None)
+        return (InMemoryTTLCache[CachedSnapshot](ttl_seconds=ttl), None)
 
     redis_client = Redis.from_url(settings.redis_url)
-    adapter = TypeAdapter(CachedMetrics)
+    adapter = TypeAdapter(CachedSnapshot)
     return (
-        RedisJSONTTLCache[CachedMetrics](
+        RedisJSONTTLCache[CachedSnapshot](
             ttl_seconds=ttl,
             redis=redis_client,
             key_prefix=settings.redis_key_prefix,
@@ -60,35 +61,35 @@ def build_cache_backend(
 
 
 class MetricsRuntime:
-    """Own the active provider, cache resources, and platform metric reads."""
+    """Own the active provider, cache resources, and Metrics service."""
 
     def __init__(
         self,
         settings: Settings,
         *,
         provider: KueueProvider,
-        platform_service: PlatformMetricsService,
+        metrics_service: MetricsService,
         redis: Redis | None = None,
     ) -> None:
-        """Attach the provider, platform service, and optional Redis client.
+        """Attach the provider, Metrics service, and optional Redis client.
 
         Production callers use :meth:`from_settings`; tests may inject doubles.
 
         Args:
             settings: Validated :class:`Settings` for the process.
             provider: Active provider; it owns its Kubernetes access handle.
-            platform_service: Cached platform metrics service exposed to HTTP.
+            metrics_service: Shared Metrics service exposed to HTTP adapters.
             redis: Redis client when the cache backend is Redis; closed on shutdown.
         """
         self._settings = settings
         self._provider: KueueProvider | None = provider
         self._provider_started = False
         self._redis: Redis | None = redis
-        self._platform: PlatformMetricsService | None = platform_service
+        self._metrics: MetricsService | None = metrics_service
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
-        """Wire the Kueue provider, cache, and :class:`PlatformMetricsService`.
+        """Wire the Kueue provider, cache, and :class:`MetricsService`.
 
         This method does not run provider startup; call :meth:`start` during the
         application lifespan.
@@ -103,8 +104,8 @@ class MetricsRuntime:
         cache, redis_client = build_cache_backend(settings)
         provider = KueueProvider(settings)
         fingerprint = provider.cache_fingerprint()
-        platform_service = PlatformMetricsService(
-            platform=provider.platform,
+        metrics_service = MetricsService(
+            platform=provider.read_platform,
             cache=cache,
             key=lambda: platform_metrics_cache_key(
                 cluster_name=settings.cluster_name,
@@ -114,17 +115,15 @@ class MetricsRuntime:
             ttl=settings.cache.ttl_seconds,
             provider=provider.name,
         )
-        return cls(
-            settings, provider=provider, platform_service=platform_service, redis=redis_client
-        )
+        return cls(settings, provider=provider, metrics_service=metrics_service, redis=redis_client)
 
     @property
-    def platform_service(self) -> PlatformMetricsService:
-        """Return the platform metrics service, once wired and available."""
-        if self._platform is None:
-            msg = "Platform service is not initialised for this runtime"
+    def metrics_service(self) -> MetricsService:
+        """Return the shared Metrics service, once wired and available."""
+        if self._metrics is None:
+            msg = "Metrics service is not initialised for this runtime"
             raise RuntimeError(msg)
-        return self._platform
+        return self._metrics
 
     @property
     def settings(self) -> Settings:
@@ -155,9 +154,8 @@ class MetricsRuntime:
     async def shutdown(self) -> None:
         """Close each owned resource once without allowing one failure to skip another.
 
-        After this returns, :attr:`_platform` is ``None`` so :attr:`platform_service`
-        surfaces an invalid state (raises ``RuntimeError``) instead of reusing closed
-        resources or a stale :class:`PlatformMetricsService` graph.
+        After this returns, :attr:`_metrics` is ``None`` so :attr:`metrics_service`
+        surfaces an invalid state instead of reusing closed resources.
         """
         cancellation: asyncio.CancelledError | None = None
         provider, self._provider = self._provider, None
@@ -177,6 +175,6 @@ class MetricsRuntime:
                 cancellation = cancellation or exc
             except Exception:
                 _logger.exception("Redis shutdown failed")
-        self._platform = None
+        self._metrics = None
         if cancellation is not None:
             raise cancellation

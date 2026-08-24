@@ -19,7 +19,7 @@ from metrics.errors import (
     ProviderUnavailableError,
     RuntimeStartupError,
 )
-from metrics.schemas.metrics import PlatformMetricsData
+from metrics.services.models import PlatformObservation
 
 _MAX_QUANTITY = float(2**63)
 _GIB = float(2**30)
@@ -190,10 +190,10 @@ class KueueProvider:
                 ) from exc
         return self._api
 
-    async def platform(self) -> PlatformMetricsData:
+    async def read_platform(self) -> PlatformObservation:
         """Load capacity and allocated maps from Kueue ClusterQueue data."""
         maps = await self._collect_resource_maps()
-        return PlatformMetricsData(
+        return PlatformObservation(
             cluster=self._settings.cluster_name,
             capacity=maps.capacity,
             allocated=maps.allocated,

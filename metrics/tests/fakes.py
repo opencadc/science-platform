@@ -8,7 +8,7 @@ import re
 import httpx
 import kr8s
 
-from metrics.schemas.metrics import PlatformMetricsData
+from metrics.services.models import PlatformObservation
 
 
 class FakeKueueApi:
@@ -73,5 +73,5 @@ class LifecycleProvider:
     def cache_fingerprint(self) -> str:
         return "stub"
 
-    async def platform(self) -> PlatformMetricsData:
-        return PlatformMetricsData(cluster="c", capacity={}, allocated={})
+    async def read_platform(self) -> PlatformObservation:
+        return PlatformObservation(cluster="c", capacity={}, allocated={})

@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from metrics.core.runtime import MetricsRuntime
 from metrics.http_cache import metrics_success_cache_headers
-from metrics.schemas.metrics import PlatformMetricsResponse, ResponseMetadata
+from metrics.schemas.metrics import PlatformMetricsData, PlatformMetricsResponse, ResponseMetadata
+from metrics.services.models import PLATFORM_SUBJECT
 
 router = APIRouter(tags=["metrics"])
 
@@ -41,17 +42,22 @@ async def get_platform_metrics(
     Response freshness (``Date``, ``Cache-Control``, etc.) is carried in headers, not
     the JSON body, per the API contract.
     """
-    result = await runtime.platform_service.get_platform_metrics()
+    result = await runtime.metrics_service.get(PLATFORM_SUBJECT)
     now = datetime.now(UTC)
     for key, value in metrics_success_cache_headers(
         snapshot_created=result.created,
-        configured_ttl=runtime.platform_service.cache_ttl_seconds,
+        configured_ttl=runtime.metrics_service.cache_ttl_seconds,
         shared_cache_public=request.app.state.cache_control_public,
         now=now,
     ).items():
         response.headers[key] = value
+    observation = result.observation
     return PlatformMetricsResponse(
         version=_version(request),
         metadata=ResponseMetadata(created=result.created),
-        data=result.data,
+        data=PlatformMetricsData(
+            cluster=observation.cluster,
+            capacity=observation.capacity,
+            allocated=observation.allocated,
+        ),
     )

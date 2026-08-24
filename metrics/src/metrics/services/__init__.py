@@ -1,1 +1,19 @@
-"""Orchestration and cache-aware metric computation."""
+"""Services package: Metrics orchestration and transport-neutral models."""
+
+from metrics.services.metrics import MetricsService
+from metrics.services.models import (
+    PLATFORM_SUBJECT,
+    CachedSnapshot,
+    MetricsResult,
+    MetricsSubject,
+    PlatformObservation,
+)
+
+__all__ = [
+    "PLATFORM_SUBJECT",
+    "CachedSnapshot",
+    "MetricsResult",
+    "MetricsService",
+    "MetricsSubject",
+    "PlatformObservation",
+]
