@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed (M5 quota; M6 UserMetrics; M7 SessionMetrics). Consolidates former
+Superseded by [ADR-0004](0004-canfar-metrics-resource.md). The separate
+`InteractiveQuota`, `UserMetrics`, and `SessionMetrics` kinds and the
+one-complete-provider-per-scope model are not the future API.
+
+This ADR originally proposed M5 quota, M6 UserMetrics, and M7 SessionMetrics. It consolidates former
 ADRs 0015 (itself 0015/0016/0018) and 0020 (itself 0020/0021); originals in
 git history. Nothing here is runtime configuration until a complete provider
 ships (ADR-0001).

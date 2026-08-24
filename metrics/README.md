@@ -21,6 +21,19 @@ The API exposes:
 - `GET /api/v1/metrics/platform`
 - `GET /healthz`
 
+## Accepted `v1alpha1` transition
+
+The routes above describe the current implementation. The unreleased service
+will hard-cut to the shared `canfar.net/v1alpha1` `Metrics` contract; the
+implementation has not started yet. The design set is:
+
+- [`docs/canfar-metrics-v1alpha1-design.md`](docs/canfar-metrics-v1alpha1-design.md) — public wire and HTTP contract;
+- [`docs/canfar-metrics-backend-technical-design.md`](docs/canfar-metrics-backend-technical-design.md) — async runtime, Redis, OTel, container, and local-stack design; and
+- [`docs/canfar-metrics-v1alpha1-tickets.mdx`](docs/canfar-metrics-v1alpha1-tickets.mdx) — dependency-ordered delivery specification.
+
+The transition grows the existing `src/metrics` package in place and retains
+its `api`, `core`, `providers`, `schemas`, and `services` seams.
+
 ## 12-factor runtime model
 
 All runtime behavior is configured via environment variables prefixed with
