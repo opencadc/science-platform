@@ -1,16 +1,134 @@
-# Metrics Python checks (run from repo root or metrics/); generic file hooks
-# and the unit-test gate run in the root pre-commit config and CI respectively.
+# Metrics quality gate (uv-managed). Root pre-commit invokes this config for
+# metrics/ changes. Manual stages are invoked by CI / metrics-dev, not on every
+# commit.
+#
 #   pre-commit run --config metrics/.pre-commit-config.yaml --all-files
+#   pre-commit run --config metrics/.pre-commit-config.yaml --hook-stage manual --all-files
 ---
 default_language_version:
   python: python3.13
 
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.2
+  - repo: local
     hooks:
-      - id: ruff-check
-        args: [--fix]
+      - id: metrics-uv-lock
+        name: metrics uv lock --check
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            uv lock --check
+        language: system
+        pass_filenames: false
+        files: ^metrics/(pyproject\.toml|uv\.lock)$
+
+      - id: metrics-ruff-check
+        name: metrics ruff check --fix
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            uv run ruff check --fix src tests
+        language: system
+        pass_filenames: false
         files: ^metrics/(src|tests)/
-      - id: ruff-format
+
+      - id: metrics-ruff-format
+        name: metrics ruff format
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            uv run ruff format src tests
+        language: system
+        pass_filenames: false
         files: ^metrics/(src|tests)/
+
+      - id: metrics-ty
+        name: metrics ty check
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            uv run ty check
+        language: system
+        pass_filenames: false
+        files: ^metrics/(src|tests|pyproject\.toml)/
+
+      - id: metrics-pytest-fast
+        name: metrics fast TestClient smoke
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            uv run pytest -m "not integration" -q
+        language: system
+        pass_filenames: false
+        files: ^metrics/(src|tests|pyproject\.toml|uv\.lock)/
+
+      # Manual / CI stages (not run on every commit).
+      - id: metrics-image-smoke
+        name: metrics image smoke (manual)
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            bash scripts/precommit-image-smoke.sh
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        files: ^metrics/(Dockerfile|pyproject\.toml|uv\.lock|src)/
+
+      - id: metrics-kind-smoke
+        name: metrics kind smoke (manual)
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            bash scripts/kind-smoke.sh
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        files: ^metrics/
+
+      - id: metrics-redis-outage-smoke
+        name: metrics Redis outage smoke (manual)
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            bash scripts/precommit-redis-outage-smoke.sh
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        files: ^metrics/
+
+      - id: metrics-otel-smoke
+        name: metrics OTel smoke (manual)
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            cd metrics
+            bash scripts/precommit-otel-smoke.sh
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        files: ^metrics/

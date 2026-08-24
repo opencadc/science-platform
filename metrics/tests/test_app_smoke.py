@@ -296,7 +296,13 @@ def test_main_run_wires_settings_logging_app_and_server(monkeypatch) -> None:
 
     main_module.run()
 
-    run_server.assert_called_once_with(app, host="127.0.0.1", port=9000, log_level="info")
+    run_server.assert_called_once_with(
+        app,
+        host="127.0.0.1",
+        port=9000,
+        log_level="info",
+        workers=1,
+    )
 
 
 @pytest.mark.parametrize(
