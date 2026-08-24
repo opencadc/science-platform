@@ -133,7 +133,8 @@ async def test_fetch_orders_results_and_maps_missing_to_http_404() -> None:
 async def test_platform_rejects_corrupt_documents(doc: dict, match: str) -> None:
     provider = KueueProvider(_settings(["cq-a"]), api=FakeKueueApi({"cq-a": doc}))
     with pytest.raises(ProviderExecutionError, match=match) as exc_info:
-        await provider.platform()
+        await provider.read_platform()
+
     assert "secret" not in str(exc_info.value)
 
 
@@ -157,7 +158,8 @@ async def test_platform_rejects_corrupt_documents(doc: dict, match: str) -> None
 async def test_platform_sanitizes_upstream_errors(error: Exception, expected_message: str) -> None:
     provider = KueueProvider(_settings(["cq-a"]), api=FakeKueueApi({"cq-a": error}))
     with pytest.raises(ProviderExecutionError) as exc_info:
-        await provider.platform()
+        await provider.read_platform()
+
     assert str(exc_info.value) == expected_message
 
 

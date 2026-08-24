@@ -21,7 +21,8 @@ from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConf
 from metrics.errors import RuntimeStartupError
 from metrics.http_cache import metrics_success_cache_headers, remaining_freshness_seconds
 from metrics.providers.kueue import KueueProvider
-from metrics.services.platform import CachedMetrics, PlatformMetricsService
+from metrics.services.metrics import MetricsService
+from metrics.services.models import CachedSnapshot
 from metrics.telemetry import NoopMetricsRecorder
 from tests.fakes import FakeKueueApi, LifecycleProvider, cache_control_max_age
 
@@ -91,12 +92,12 @@ def _runtime(
     active = provider or KueueProvider(
         settings, api=FakeKueueApi(docs or {"cq-a": CQ_A, "cq-b": CQ_B})
     )
-    service = PlatformMetricsService(
-        platform=active.platform,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=30),
+    service = MetricsService(
+        platform=active.read_platform,
+        cache=InMemoryTTLCache[CachedSnapshot](ttl_seconds=30),
         key=lambda: "platform:4:prod:",
     )
-    return MetricsRuntime(settings, provider=active, platform_service=service)
+    return MetricsRuntime(settings, provider=active, metrics_service=service)
 
 
 def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> None:
