@@ -1,0 +1,74 @@
+{{- if .Values.collector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "metrics-api.fullname" . }}-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4318
+    exporters:
+      debug:
+        verbosity: basic
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          exporters: [debug]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "metrics-api.fullname" . }}-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "metrics-api.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collector
+  template:
+    metadata:
+      labels:
+        {{- include "metrics-api.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: collector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector
+          image: {{ .Values.collector.image | quote }}
+          args: ["--config=/etc/otelcol/config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: otlp-http
+              containerPort: 4318
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "metrics-api.fullname" . }}-collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "metrics-api.fullname" . }}-collector
+spec:
+  selector:
+    {{- include "metrics-api.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+  ports:
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+{{- end }}

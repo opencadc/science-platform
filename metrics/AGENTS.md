@@ -36,6 +36,8 @@ Multi-context monorepo: start at `CONTEXT-MAP.md` at the science-platform repo r
 ## Learned User Preferences
 
 - Write git commits using Conventional Commits (`type(scope): subject`, with optional body and footer).
+- Prefer direct, concise names for modules, classes, functions, and docs; do not encode Jira keys, ADR numbers, or package ordinals into identifiers (for example prefer `do_x` over `do_x_adr_01`).
+- For parallel package work, run each task branch in its own `git worktree` so agents cannot collide on a shared checkout.
 - When the user requests a staged-only commit (for example from a diff-tab flow), treat their staged file list as authoritative: commit only what is already staged and do not stage additional files; when handling subagent completion notifications, do not restate user-visible subagent output unless the user asks or cross-agent synthesis is required.
 - Before local cluster-backed or kubectl-driven checks, confirm the intended
   Kubernetes context is selected (for example

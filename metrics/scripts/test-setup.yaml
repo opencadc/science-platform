@@ -1,4 +1,4 @@
-# Kueue smoke: cluster objects, metrics namespace, LocalQueue, sample Workload.
+# Kueue smoke: cluster objects, workload namespace, LocalQueue, and busy Job.
 # Keep names aligned with scripts/kind-values.yaml (and any local smoke values file).
 # Apply after Kueue controller is installed. Queueing/preemption/fungibility use
 # Kueue defaults; cq-electron's small quota forces the Workload to borrow.
@@ -77,15 +77,16 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: metrics
+  name: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    pod-security.kubernetes.io/enforce: restricted
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: lq-smoke
-  namespace: metrics
+  namespace: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
 spec:
@@ -95,7 +96,7 @@ apiVersion: kueue.x-k8s.io/v1beta2
 kind: Workload
 metadata:
   name: integration-idle
-  namespace: metrics
+  namespace: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
 spec:
@@ -116,3 +117,47 @@ spec:
                 requests:
                   cpu: "200m"
                   memory: "200Mi"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: integration-busy
+  namespace: canfar-workloads
+  labels:
+    app.kubernetes.io/managed-by: skaha
+    app.kubernetes.io/part-of: canfar
+    canfar.net/username: metrics-user
+    canfar.net/community: metrics-community
+    kueue.x-k8s.io/queue-name: lq-smoke
+spec:
+  suspend: true
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/managed-by: skaha
+        app.kubernetes.io/part-of: canfar
+        canfar.net/username: metrics-user
+        canfar.net/community: metrics-community
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busy
+          image: alpine:3.20
+          command: ["sh", "-c", "while true; do :; done"]
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
