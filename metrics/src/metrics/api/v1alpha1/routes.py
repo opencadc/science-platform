@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import UTC, datetime
+from decimal import Decimal, ROUND_HALF_UP
 from email.utils import parsedate_to_datetime
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -23,6 +24,7 @@ from metrics.schemas.metrics import (
 from metrics.schemas.status import Status
 from metrics.services.models import (
     PLATFORM_SUBJECT,
+    AccountingState,
     CommunityObservation,
     MetricsSubject,
     PlatformObservation,
@@ -32,6 +34,7 @@ from metrics.services.models import (
 _LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 
 router = APIRouter(tags=["metrics"])
+_EFFICIENCY_QUANTUM = Decimal("0.000001")
 
 
 def _cache_response(
@@ -161,6 +164,41 @@ def _subject_name(kind: str, value: str) -> str:
     return f"{kind}-{slug[:48].rstrip('-')}-{digest}"
 
 
+def _decimal_string(value: Decimal) -> str:
+    """Serialize a finite decimal without exponent notation or trailing zeros."""
+    rendered = format(value, "f")
+    return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
+
+
+def _user_resources(observation: UserObservation) -> list[ResourceMetrics]:
+    """Combine current requests with complete additive lifetime accounting."""
+    accounting = observation.accounting
+    names = set(observation.requests)
+    if accounting is not None:
+        names.update(accounting.resources)
+    resources = []
+    for name in sorted(names):
+        hours = accounting.resources.get(name) if accounting is not None else None
+        efficiency = None
+        if hours is not None and hours.requested != 0:
+            efficiency = _decimal_string(
+                (hours.usage / hours.requested).quantize(
+                    _EFFICIENCY_QUANTUM,
+                    rounding=ROUND_HALF_UP,
+                )
+            )
+        resources.append(
+            ResourceMetrics(
+                name=name,
+                requests=observation.requests.get(name),
+                usage_hours=_decimal_string(hours.usage) if hours is not None else None,
+                requested_hours=(_decimal_string(hours.requested) if hours is not None else None),
+                efficiency=efficiency,
+            )
+        )
+    return resources
+
+
 @router.get(
     "/apis/canfar.net/v1alpha1/metrics/user/{user:path}",
     response_model=Metrics,
@@ -201,11 +239,13 @@ async def get_user_metrics(
         spec=MetricsSpec(user=user),
         status=MetricsStatus(
             observed_at=result.created,
+            accounting_period=(
+                "ActiveWorkloadLifetime"
+                if observation.accounting_state is not AccountingState.DISABLED
+                else None
+            ),
             running_pods=observation.running_pods,
-            resources=[
-                ResourceMetrics(name=name, requests=observation.requests[name])
-                for name in sorted(observation.requests)
-            ],
+            resources=_user_resources(observation),
             conditions=[
                 Condition(
                     type="Ready",

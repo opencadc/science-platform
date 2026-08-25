@@ -90,6 +90,19 @@ def scheduler_requests(pod: dict[str, Any]) -> dict[str, float]:
         ) from exc
 
 
+def _pod_uids(pods: list[dict[str, Any]]) -> frozenset[str]:
+    """Return the selected immutable Pod identities."""
+    try:
+        values = [pod["metadata"]["uid"] for pod in pods]
+    except (KeyError, TypeError) as exc:
+        raise ProviderExecutionError("Kubernetes Pod data omitted a Pod UID") from exc
+    if any(not isinstance(value, str) or not value for value in values):
+        raise ProviderExecutionError("Kubernetes Pod data contained an invalid Pod UID")
+    if len(values) != len(set(values)):
+        raise ProviderExecutionError("Kubernetes Pod data contained duplicate Pod UIDs")
+    return frozenset(values)
+
+
 async def fetch_running_pods(
     api: Any,
     namespaces: list[str],
@@ -144,7 +157,12 @@ class KubernetesProvider:
     async def read_user(self, username: str) -> UserObservation:
         """Aggregate scheduler-effective requests for one exact username."""
         pods, requests = await self._read_subject(_USERNAME_LABEL, username)
-        return UserObservation(user=username, running_pods=len(pods), requests=requests)
+        return UserObservation(
+            user=username,
+            running_pods=len(pods),
+            requests=requests,
+            pod_uids=_pod_uids(pods),
+        )
 
     async def read_community(self, community: str) -> CommunityObservation:
         """Aggregate scheduler-effective requests for one exact community."""

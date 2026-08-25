@@ -245,6 +245,40 @@ class MetricsRuntime:
         user_provider = KubernetesProvider(settings)
         fingerprint = provider.cache_fingerprint()
         user_fingerprint = user_provider.cache_fingerprint()
+        accounting_provider = None
+        accounting_service = None
+        accounting_caches = None
+        if settings.providers.promql.enabled:
+            accounting_provider = PromQLProvider(settings, telemetry=recorder)
+            accounting_caches = (
+                build_accounting_cache(
+                    settings, surface="user", redis=redis_client, recorder=recorder
+                ),
+                build_accounting_cache(
+                    settings, surface="community", redis=redis_client, recorder=recorder
+                ),
+            )
+            accounting_fingerprint = accounting_provider.cache_fingerprint()
+            accounting_service = AccountingService(
+                user=accounting_provider.read_user,
+                community=accounting_provider.read_community,
+                user_cache=accounting_caches[0],
+                community_cache=accounting_caches[1],
+                user_identity=lambda username: CacheIdentity(
+                    subject_kind="user",
+                    subject_value=username,
+                    cluster=settings.cluster_name,
+                    source=accounting_provider.name,
+                    fingerprint=accounting_fingerprint,
+                ),
+                community_identity=lambda community: CacheIdentity(
+                    subject_kind="community",
+                    subject_value=community,
+                    cluster=settings.cluster_name,
+                    source=accounting_provider.name,
+                    fingerprint=accounting_fingerprint,
+                ),
+            )
         metrics_service = MetricsService(
             platform=provider.read_platform,
             cache=cache,
@@ -262,6 +296,9 @@ class MetricsRuntime:
                 source=user_provider.name,
                 fingerprint=user_fingerprint,
             ),
+            user_accounting=(
+                accounting_service.get_user if accounting_service is not None else None
+            ),
             community=user_provider.read_community,
             community_cache=community_cache,
             community_identity=lambda community: CacheIdentity(
@@ -275,40 +312,6 @@ class MetricsRuntime:
             provider=provider.name,
             user_provider=user_provider.name,
         )
-        accounting_provider = None
-        accounting_service = None
-        accounting_caches = None
-        if settings.providers.promql.enabled:
-            accounting_provider = PromQLProvider(settings, telemetry=recorder)
-            accounting_caches = (
-                build_accounting_cache(
-                    settings, surface="user", redis=redis_client, recorder=recorder
-                ),
-                build_accounting_cache(
-                    settings, surface="community", redis=redis_client, recorder=recorder
-                ),
-            )
-            fingerprint = accounting_provider.cache_fingerprint()
-            accounting_service = AccountingService(
-                user=accounting_provider.read_user,
-                community=accounting_provider.read_community,
-                user_cache=accounting_caches[0],
-                community_cache=accounting_caches[1],
-                user_identity=lambda username: CacheIdentity(
-                    subject_kind="user",
-                    subject_value=username,
-                    cluster=settings.cluster_name,
-                    source=accounting_provider.name,
-                    fingerprint=fingerprint,
-                ),
-                community_identity=lambda community: CacheIdentity(
-                    subject_kind="community",
-                    subject_value=community,
-                    cluster=settings.cluster_name,
-                    source=accounting_provider.name,
-                    fingerprint=fingerprint,
-                ),
-            )
         return cls(
             settings,
             provider=provider,

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, InMemoryCoordinator
+from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, CacheResult, InMemoryCoordinator
 from metrics.core.factory import create_app
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import (
@@ -18,11 +21,17 @@ from metrics.core.settings import (
     ProviderConfigs,
     Settings,
 )
-from metrics.errors import ProviderExecutionError
+from metrics.errors import ProviderExecutionError, ProviderUnavailableError
 from metrics.providers.kubernetes import KubernetesProvider, scheduler_requests
 from metrics.providers.kueue import KueueProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import CachedSnapshot
+from metrics.services.models import (
+    AccountingSnapshot,
+    ActiveWorkloadLifetime,
+    CachedSnapshot,
+    LifetimeIssue,
+    ResourceHours,
+)
 from tests.fakes import FakeKueueApi
 
 LABELS = {
@@ -117,7 +126,11 @@ def _settings() -> Settings:
     )
 
 
-def _runtime(api: FakePodApi) -> MetricsRuntime:
+def _runtime(
+    api: FakePodApi,
+    *,
+    user_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
+) -> MetricsRuntime:
     settings = _settings()
     platform = KueueProvider(
         settings,
@@ -152,6 +165,7 @@ def _runtime(api: FakePodApi) -> MetricsRuntime:
         user_identity=lambda username: CacheIdentity(
             "user", username, "kind-metrics", "kubernetes", "work-a-work-b"
         ),
+        user_accounting=user_accounting,
         community=users.read_community,
         community_cache=community_cache,
         community_identity=lambda community: CacheIdentity(
@@ -238,6 +252,183 @@ def test_user_route_selects_exact_running_skaha_pods_and_returns_no_inventory() 
         }
         for _, params in api.requests[:2]
     )
+
+
+def test_user_route_adds_aggregate_lifetime_hours_and_efficiency() -> None:
+    async def accounting(_username: str) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={
+                        "cpu": ResourceHours("core-hours", Decimal("10.9"), Decimal("35")),
+                        "memory": ResourceHours("GiB-hours", Decimal("118.4"), Decimal("470")),
+                        "nvidia.com/gpu": ResourceHours("GPU-hours", Decimal("1"), Decimal("0")),
+                    },
+                    incomplete={},
+                    pod_uids=frozenset({"uid-selected"}),
+                    coverage={
+                        resource: frozenset({"uid-selected"})
+                        for resource in ("cpu", "memory", "nvidia.com/gpu")
+                    },
+                ),
+                created=datetime.now(UTC),
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=accounting),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    assert response.status_code == 200
+    status = response.json()["status"]
+    assert status["accountingPeriod"] == "ActiveWorkloadLifetime"
+    assert status["resources"] == [
+        {
+            "name": "cpu",
+            "requests": "0.2",
+            "usageHours": "10.9",
+            "requestedHours": "35",
+            "efficiency": "0.311429",
+        },
+        {"name": "example.com/fpga", "requests": "1"},
+        {
+            "name": "memory",
+            "requests": "0.195312Gi",
+            "usageHours": "118.4",
+            "requestedHours": "470",
+            "efficiency": "0.251915",
+        },
+        {
+            "name": "nvidia.com/gpu",
+            "usageHours": "1",
+            "requestedHours": "0",
+        },
+    ]
+    assert status["conditions"][0]["reason"] == "Available"
+
+
+def test_incomplete_accounting_omits_only_affected_resource_fields() -> None:
+    async def accounting(_username: str) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={"cpu": ResourceHours("core-hours", Decimal("2"), Decimal("1"))},
+                    incomplete={
+                        "memory": frozenset({LifetimeIssue.COUNTER_RESET}),
+                    },
+                    pod_uids=frozenset({"uid-selected"}),
+                    coverage={"cpu": frozenset({"uid-selected"})},
+                ),
+                created=datetime.now(UTC),
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=accounting),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    resources = {item["name"]: item for item in response.json()["status"]["resources"]}
+    assert resources["cpu"]["efficiency"] == "2"
+    assert resources["memory"] == {"name": "memory", "requests": "0.195312Gi"}
+    assert response.json()["status"]["conditions"][0]["reason"] == "AccountingIncomplete"
+
+
+def test_accounting_for_a_different_running_pod_set_is_omitted() -> None:
+    async def misaligned(_username: str) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={"cpu": ResourceHours("core-hours", Decimal("2"), Decimal("1"))},
+                    incomplete={},
+                    pod_uids=frozenset({"uid-replaced"}),
+                    coverage={"cpu": frozenset({"uid-replaced"})},
+                ),
+                created=datetime.now(UTC),
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=misaligned),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    status = response.json()["status"]
+    assert all("usageHours" not in resource for resource in status["resources"])
+    assert status["conditions"][0]["reason"] == "AccountingIncomplete"
+
+
+def test_unavailable_accounting_preserves_current_requests_as_partial_data() -> None:
+    async def unavailable(_username: str) -> CacheResult:
+        raise ProviderUnavailableError("prometheus unavailable")
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=unavailable),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    status = response.json()["status"]
+    assert response.status_code == 200
+    assert status["accountingPeriod"] == "ActiveWorkloadLifetime"
+    assert all("usageHours" not in resource for resource in status["resources"])
+    assert status["conditions"][0]["type"] == "Ready"
+    assert status["conditions"][0]["status"] == "False"
+    assert status["conditions"][0]["reason"] == "PartialData"
+
+
+def test_stale_accounting_makes_the_combined_user_report_stale() -> None:
+    created = datetime.now(UTC) - timedelta(minutes=3)
+
+    async def accounting(_username: str) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={},
+                    incomplete={},
+                    pod_uids=frozenset({"uid-selected"}),
+                ),
+                created=created,
+            ),
+            cached=True,
+            stale=True,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=accounting),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    conditions = response.json()["status"]["conditions"]
+    assert int(response.headers["age"]) >= 180
+    assert conditions[0]["reason"] == "StaleData"
+    assert conditions[1]["reason"] == "StaleHit"
 
 
 def test_community_route_aggregates_mixed_users_in_one_direct_scan() -> None:
