@@ -61,7 +61,7 @@ class InMemoryCoordinator(Generic[Value]):
         self,
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         """Return a serviceable value or fill synchronously."""
         key = identity.canonical().decode()
         cached = self._values.get(key)

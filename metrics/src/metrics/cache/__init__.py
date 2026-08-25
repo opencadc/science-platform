@@ -36,7 +36,7 @@ class CacheCoordinator(Protocol[Value]):
         self,
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         """Return a serviceable snapshot or coordinate one fill."""
 
 

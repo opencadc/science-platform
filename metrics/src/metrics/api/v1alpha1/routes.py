@@ -26,6 +26,7 @@ from metrics.services.models import (
     PLATFORM_SUBJECT,
     AccountingState,
     CommunityObservation,
+    MetricsResult,
     MetricsSubject,
     PlatformObservation,
     UserObservation,
@@ -201,6 +202,45 @@ def _subject_resources(
     return resources
 
 
+def _subject_response(
+    kind: str,
+    value: str,
+    observation: UserObservation | CommunityObservation,
+    result: MetricsResult,
+) -> Metrics:
+    """Assemble the shared user/community response contract."""
+    ready_status, ready_reason = result.ready_condition
+    cached_status, cached_reason = result.cached_condition
+    return Metrics(
+        metadata=ObjectMetadata(name=_subject_name(kind, value)),
+        spec=MetricsSpec(user=value) if kind == "user" else MetricsSpec(community=value),
+        status=MetricsStatus(
+            observed_at=result.created,
+            accounting_period=(
+                "ActiveWorkloadLifetime"
+                if observation.accounting_state is not AccountingState.DISABLED
+                else None
+            ),
+            running_pods=observation.running_pods,
+            resources=_subject_resources(observation),
+            conditions=[
+                Condition(
+                    type="Ready",
+                    status=ready_status,
+                    reason=ready_reason,
+                    last_transition_time=result.created,
+                ),
+                Condition(
+                    type="Cached",
+                    status=cached_status,
+                    reason=cached_reason,
+                    last_transition_time=result.created,
+                ),
+            ],
+        ),
+    )
+
+
 @router.get(
     "/apis/canfar.net/v1alpha1/metrics/user/{user:path}",
     response_model=Metrics,
@@ -234,36 +274,7 @@ async def get_user_metrics(
     )
     if conditional is not None:
         return conditional
-    ready_status, ready_reason = result.ready_condition
-    cached_status, cached_reason = result.cached_condition
-    return Metrics(
-        metadata=ObjectMetadata(name=_subject_name("user", user)),
-        spec=MetricsSpec(user=user),
-        status=MetricsStatus(
-            observed_at=result.created,
-            accounting_period=(
-                "ActiveWorkloadLifetime"
-                if observation.accounting_state is not AccountingState.DISABLED
-                else None
-            ),
-            running_pods=observation.running_pods,
-            resources=_subject_resources(observation),
-            conditions=[
-                Condition(
-                    type="Ready",
-                    status=ready_status,
-                    reason=ready_reason,
-                    last_transition_time=result.created,
-                ),
-                Condition(
-                    type="Cached",
-                    status=cached_status,
-                    reason=cached_reason,
-                    last_transition_time=result.created,
-                ),
-            ],
-        ),
-    )
+    return _subject_response("user", user, observation, result)
 
 
 @router.get(
@@ -299,33 +310,4 @@ async def get_community_metrics(
     )
     if conditional is not None:
         return conditional
-    ready_status, ready_reason = result.ready_condition
-    cached_status, cached_reason = result.cached_condition
-    return Metrics(
-        metadata=ObjectMetadata(name=_subject_name("community", community)),
-        spec=MetricsSpec(community=community),
-        status=MetricsStatus(
-            observed_at=result.created,
-            accounting_period=(
-                "ActiveWorkloadLifetime"
-                if observation.accounting_state is not AccountingState.DISABLED
-                else None
-            ),
-            running_pods=observation.running_pods,
-            resources=_subject_resources(observation),
-            conditions=[
-                Condition(
-                    type="Ready",
-                    status=ready_status,
-                    reason=ready_reason,
-                    last_transition_time=result.created,
-                ),
-                Condition(
-                    type="Cached",
-                    status=cached_status,
-                    reason=cached_reason,
-                    last_transition_time=result.created,
-                ),
-            ],
-        ),
-    )
+    return _subject_response("community", community, observation, result)

@@ -29,7 +29,7 @@ Value = TypeVar("Value")
 @dataclass(slots=True)
 class _LocalFill(Generic[Value]):
     event: asyncio.Event
-    result: CacheResult | None = None
+    result: CacheResult[Value] | None = None
     error: BaseException | None = None
 
 
@@ -66,6 +66,7 @@ class RedisCoordinator(Generic[Value]):
         self._poll_max = poll_max
         self._l1 = MemorySnapshots[StoredSnapshot[Value]](max_l1_entries)
         self._fills: dict[str, _LocalFill[Value]] = {}
+        self._fill_tasks: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
         self._capacity = asyncio.Semaphore(max(1, max_fills))
         self._available = True
@@ -100,7 +101,7 @@ class RedisCoordinator(Generic[Value]):
         if state in {Freshness.FRESH, Freshness.STALE}:
             self._l1.put(base, snapshot)
 
-    def _fallback(self, base: str) -> CacheResult | None:
+    def _fallback(self, base: str) -> CacheResult[Value] | None:
         snapshot = self._l1.get(base)
         if snapshot is None:
             return None
@@ -122,7 +123,7 @@ class RedisCoordinator(Generic[Value]):
         self,
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         """Read a snapshot or coordinate exactly one bounded downstream fill."""
         with self._telemetry.span(
             "cache.get_or_fill",
@@ -137,7 +138,7 @@ class RedisCoordinator(Generic[Value]):
         self,
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         keys = self._keys(identity)
         scope = identity.subject_kind
         try:
@@ -164,7 +165,7 @@ class RedisCoordinator(Generic[Value]):
         stale: StoredSnapshot[Value],
         fill: Callable[[], Awaitable[Value]],
         scope: str,
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
         try:
@@ -178,56 +179,32 @@ class RedisCoordinator(Generic[Value]):
         except RedisUnavailable:
             self._available = False
             return CacheResult(stale.value, cached=True, stale=True)
-        if not won or self._capacity.locked():
+        if not won:
             self._telemetry.record_lease(outcome="contended", scope=scope)
             return CacheResult(stale.value, cached=True, stale=True)
         self._telemetry.record_lease(outcome="acquired", scope=scope)
-        started = time.perf_counter()
-        outcome = "ok"
         try:
-            async with self._capacity, asyncio.timeout(self._fill_timeout):
-                value = await fill()
-            created = self._created(value)
-            snapshot_id = uuid.uuid4().hex
-            await self._store.publish(
-                keys=keys,
-                snapshot_id=snapshot_id,
-                created=created,
-                value=value,
-            )
-            self._available = True
-            self._remember(keys.base, StoredSnapshot(snapshot_id, value, created))
-            return CacheResult(value, cached=False, stale=False)
+            return await self._fill_under_lease(keys, fill, scope, bucket, token)
         except RedisUnavailable:
-            outcome = "error"
             self._available = False
             return CacheResult(stale.value, cached=True, stale=True)
         except Exception:
-            outcome = "error"
             return CacheResult(stale.value, cached=True, stale=True)
-        finally:
-            self._telemetry.record_fill_duration(
-                seconds=time.perf_counter() - started,
-                outcome=outcome,
-                scope=scope,
-            )
-            try:
-                await self._store.release_lease(keys=keys, bucket=bucket, token=token)
-            except RedisUnavailable:
-                self._available = False
 
     async def _join_cold(
         self,
         keys,
         fill: Callable[[], Awaitable[Value]],
         scope: str,
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         async with self._lock:
             local = self._fills.get(keys.base)
             if local is None:
                 local = _LocalFill(event=asyncio.Event())
                 self._fills[keys.base] = local
-                asyncio.create_task(self._run_cold(keys, fill, local, scope))
+                task = asyncio.create_task(self._run_cold(keys, fill, local, scope))
+                self._fill_tasks.add(task)
+                task.add_done_callback(self._fill_tasks.discard)
         try:
             async with asyncio.timeout(self._cold_timeout):
                 await local.event.wait()
@@ -262,7 +239,7 @@ class RedisCoordinator(Generic[Value]):
         keys,
         fill: Callable[[], Awaitable[Value]],
         scope: str,
-    ) -> CacheResult:
+    ) -> CacheResult[Value]:
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
         try:
@@ -285,6 +262,24 @@ class RedisCoordinator(Generic[Value]):
             self._telemetry.record_lease(outcome="contended", scope=scope)
             return await self._poll(keys, baseline)
         self._telemetry.record_lease(outcome="acquired", scope=scope)
+        try:
+            return await self._fill_under_lease(keys, fill, scope, bucket, token)
+        except RedisUnavailable as exc:
+            self._available = False
+            fallback = self._fallback(keys.base)
+            if fallback is not None:
+                return fallback
+            raise CacheUnavailable("Redis unavailable while publishing snapshot") from exc
+
+    async def _fill_under_lease(
+        self,
+        keys,
+        fill: Callable[[], Awaitable[Value]],
+        scope: str,
+        bucket: int,
+        token: str,
+    ) -> CacheResult[Value]:
+        """Publish one bounded fill while holding a distributed lease."""
         started = time.perf_counter()
         outcome = "ok"
         try:
@@ -301,14 +296,7 @@ class RedisCoordinator(Generic[Value]):
             self._available = True
             self._remember(keys.base, StoredSnapshot(snapshot_id, value, created))
             return CacheResult(value, cached=False, stale=False)
-        except RedisUnavailable as exc:
-            outcome = "error"
-            self._available = False
-            fallback = self._fallback(keys.base)
-            if fallback is not None:
-                return fallback
-            raise CacheUnavailable("Redis unavailable while publishing snapshot") from exc
-        except Exception:
+        except BaseException:
             outcome = "error"
             raise
         finally:
@@ -322,7 +310,7 @@ class RedisCoordinator(Generic[Value]):
             except RedisUnavailable:
                 self._available = False
 
-    async def _poll(self, keys, baseline: str | None) -> CacheResult:
+    async def _poll(self, keys, baseline: str | None) -> CacheResult[Value]:
         """Poll the durable pointer until another replica publishes."""
         while True:
             await asyncio.sleep(random.uniform(self._poll_min, self._poll_max))
@@ -339,3 +327,11 @@ class RedisCoordinator(Generic[Value]):
             if state in {Freshness.FRESH, Freshness.STALE}:
                 self._remember(keys.base, snapshot)
                 return CacheResult(snapshot.value, cached=True, stale=state is Freshness.STALE)
+
+    async def shutdown(self) -> None:
+        """Cancel and await process-local cache fills."""
+        tasks = tuple(self._fill_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)

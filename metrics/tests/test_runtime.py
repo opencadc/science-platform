@@ -34,13 +34,13 @@ def test_platform_cache_identity_preserves_source_dimensions() -> None:
     assert identity == CacheIdentity("platform", "canfar", "kind-metrics", "kueue", "abc123")
 
 
-def test_runtime_wires_accounting_only_when_promql_is_enabled() -> None:
+def test_runtime_wires_promql_provider_only_when_enabled() -> None:
     recorder = NoopMetricsRecorder()
     core = MetricsRuntime.from_settings(
         Settings(cache=CacheConfig(backend="memory")),
         recorder=recorder,
     )
-    assert core.accounting_service is None
+    assert len(core._providers) == 2
 
     accounting = MetricsRuntime.from_settings(
         Settings.model_validate(
@@ -51,7 +51,7 @@ def test_runtime_wires_accounting_only_when_promql_is_enabled() -> None:
         ),
         recorder=recorder,
     )
-    assert accounting.accounting_service is not None
+    assert len(accounting._providers) == 3
 
 
 class _RecordingRedis:

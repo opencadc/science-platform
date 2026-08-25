@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -9,7 +8,6 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, InMemoryCoordinator
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
 from metrics.providers.promql import (
@@ -19,8 +17,6 @@ from metrics.providers.promql import (
     USAGE_METRIC,
     PromQLProvider,
 )
-from metrics.services.accounting import AccountingService
-from metrics.services.models import AccountingSnapshot, ActiveWorkloadLifetime
 from metrics.telemetry import NoopMetricsRecorder
 
 pytestmark = pytest.mark.anyio
@@ -86,11 +82,12 @@ def _complete_payload(*, timestamp: datetime | None = None) -> dict[str, object]
 
 async def test_named_template_uses_only_form_post_and_optional_mimir_tenant() -> None:
     request: httpx.Request | None = None
+    observed = datetime.now(UTC).replace(microsecond=123000)
 
     async def respond(current: httpx.Request) -> httpx.Response:
         nonlocal request
         request = current
-        return httpx.Response(200, json=_complete_payload())
+        return httpx.Response(200, json=_complete_payload(timestamp=observed))
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
     provider = PromQLProvider(
@@ -105,19 +102,21 @@ async def test_named_template_uses_only_form_post_and_optional_mimir_tenant() ->
         ).cache_fingerprint()
     )
     assert "tenant-a" not in provider.cache_fingerprint()
-    result = await provider.read_user("ada")
+    result = await provider.read_user("ada", observed)
 
-    assert result.ready
-    assert result.resources["cpu"].usage == Decimal("1.5")
-    assert result.pod_uids == frozenset({"pod-1"})
-    assert result.coverage["cpu"] == frozenset({"pod-1"})
+    assert result.created == observed
+    assert result.lifetime.ready
+    assert result.lifetime.resources["cpu"].usage == Decimal("1.5")
+    assert result.lifetime.pod_uids == frozenset({"pod-1"})
+    assert result.lifetime.coverage["cpu"] == frozenset({"pod-1"})
     assert request is not None
     assert request.method == "POST"
     assert request.url.path == "/api/v1/query"
     assert request.url.query == b""
     assert request.headers["X-Scope-OrgID"] == "tenant-a"
     form = parse_qs(request.content.decode())
-    assert set(form) == {"query"}
+    assert set(form) == {"query", "time"}
+    assert float(form["time"][0]) == observed.timestamp()
     assert 'canfar_username="ada"' in form["query"][0]
     assert 'kube_pod_status_phase{phase="Running"}' in form["query"][0]
     assert "and on (namespace,pod_uid)" in form["query"][0]
@@ -154,8 +153,8 @@ async def test_community_template_aggregates_direct_series_and_rejects_cross_com
     provider = PromQLProvider(_settings(), client=client)
     result = await provider.read_community("science")
 
-    assert result.resources["cpu"].usage == Decimal("10")
-    assert result.resources["cpu"].requested == Decimal("12")
+    assert result.lifetime.resources["cpu"].usage == Decimal("10")
+    assert result.lifetime.resources["cpu"].requested == Decimal("12")
     assert request is not None
     query = parse_qs(request.content.decode())["query"][0]
     assert 'canfar_community="science"' in query
@@ -264,40 +263,6 @@ async def test_incomplete_population_omits_resource_with_reason() -> None:
         )
     )
     result = await PromQLProvider(_settings(), client=client).read_user("ada")
-    assert result.resources == {}
-    assert {issue.value for issue in result.incomplete["cpu"]} == {"sampling-gap"}
+    assert result.lifetime.resources == {}
+    assert {issue.value for issue in result.lifetime.incomplete["cpu"]} == {"sampling-gap"}
     await client.aclose()
-
-
-async def test_accounting_cache_reuses_one_validated_snapshot() -> None:
-    calls = 0
-
-    async def load(_subject: str) -> ActiveWorkloadLifetime:
-        nonlocal calls
-        calls += 1
-        await asyncio.sleep(0)
-        return ActiveWorkloadLifetime(resources={}, incomplete={})
-
-    def cache() -> InMemoryCoordinator[AccountingSnapshot]:
-        return InMemoryCoordinator(
-            policy=FRESHNESS_POLICIES["user"],
-            created=lambda snapshot: snapshot.created,
-        )
-
-    service = AccountingService(
-        user=load,
-        community=load,
-        user_cache=cache(),
-        community_cache=cache(),
-        user_identity=lambda username: CacheIdentity("user", username, "c", "promql"),
-        community_identity=lambda community: CacheIdentity("community", community, "c", "promql"),
-    )
-    first = await service.get_user("ada")
-    second = await service.get_user("ada")
-    assert calls == 1
-    assert first.value is second.value
-
-    first.value.created = datetime.now(UTC) - timedelta(minutes=3)
-    stale = await service.get_user("ada")
-    assert stale.cached and stale.stale
-    assert calls == 1

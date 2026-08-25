@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -29,6 +30,12 @@ _REQUEST_ERRORS = (
     kr8s.ConnectionClosedError,
     httpx.HTTPError,
 )
+
+
+def _observation_time() -> datetime:
+    """Return a Prometheus-compatible millisecond observation cutoff."""
+    now = datetime.now(UTC)
+    return now.replace(microsecond=now.microsecond // 1000 * 1000)
 
 
 async def create_kube_api(config: KubernetesProviderConfig) -> Any:
@@ -156,21 +163,25 @@ class KubernetesProvider:
 
     async def read_user(self, username: str) -> UserObservation:
         """Aggregate scheduler-effective requests for one exact username."""
+        observed_at = _observation_time()
         pods, requests = await self._read_subject(_USERNAME_LABEL, username)
         return UserObservation(
             user=username,
             running_pods=len(pods),
             requests=requests,
+            observed_at=observed_at,
             pod_uids=_pod_uids(pods),
         )
 
     async def read_community(self, community: str) -> CommunityObservation:
         """Aggregate scheduler-effective requests for one exact community."""
+        observed_at = _observation_time()
         pods, requests = await self._read_subject(_COMMUNITY_LABEL, community)
         return CommunityObservation(
             community=community,
             running_pods=len(pods),
             requests=requests,
+            observed_at=observed_at,
             pod_uids=_pod_uids(pods),
         )
 

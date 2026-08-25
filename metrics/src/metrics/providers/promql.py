@@ -15,8 +15,8 @@ import httpx
 
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
-from metrics.services.models import ActiveWorkloadLifetime, LifetimeIssue
-from metrics.services.resources import aggregate_active_workload_hours
+from metrics.services.models import AccountingSnapshot, LifetimeIssue
+from metrics.services.resources import RESOURCE_UNITS, aggregate_active_workload_hours
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 SOURCE_REVISION = "1"
@@ -34,11 +34,6 @@ _BASE_LABELS = {
     "canfar_community",
     "source_revision",
     "unit",
-}
-_UNITS = {
-    "cpu": "core-hours",
-    "memory": "GiB-hours",
-    "nvidia.com/gpu": "GPU-hours",
 }
 _ISSUES = {issue.value: issue for issue in LifetimeIssue}
 
@@ -139,19 +134,32 @@ class PromQLProvider:
         if client is not None and self._owns_client:
             await client.aclose()
 
-    async def read_user(self, username: str) -> ActiveWorkloadLifetime:
+    async def read_user(
+        self, username: str, observed_at: datetime | None = None
+    ) -> AccountingSnapshot:
         """Read one exact user's validated accounting snapshot."""
-        return await self._read(QueryTemplate.USER_ACTIVE_LIFETIME, username)
+        return await self._read(
+            QueryTemplate.USER_ACTIVE_LIFETIME,
+            username,
+            observed_at or datetime.now(UTC),
+        )
 
-    async def read_community(self, community: str) -> ActiveWorkloadLifetime:
+    async def read_community(
+        self, community: str, observed_at: datetime | None = None
+    ) -> AccountingSnapshot:
         """Read one exact community's validated accounting snapshot."""
-        return await self._read(QueryTemplate.COMMUNITY_ACTIVE_LIFETIME, community)
+        return await self._read(
+            QueryTemplate.COMMUNITY_ACTIVE_LIFETIME,
+            community,
+            observed_at or datetime.now(UTC),
+        )
 
     async def _read(
         self,
         template: QueryTemplate,
         subject: str,
-    ) -> ActiveWorkloadLifetime:
+        observed_at: datetime,
+    ) -> AccountingSnapshot:
         if not subject:
             raise ProviderExecutionError("Accounting subject must not be empty")
         if self._client is None:
@@ -170,11 +178,11 @@ class PromQLProvider:
             ):
                 response = await self._client.post(
                     self._endpoint,
-                    data={"query": _query(template, subject)},
+                    data={"query": _query(template, subject), "time": observed_at.timestamp()},
                     headers=self._headers,
                 )
                 response.raise_for_status()
-            return self._validate(response.json(), template, subject)
+            return self._validate(response.json(), template, subject, observed_at)
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
             status = "error"
             raise ProviderUnavailableError("PromQL backend unavailable") from exc
@@ -205,7 +213,8 @@ class PromQLProvider:
         payload: Any,
         template: QueryTemplate,
         subject: str,
-    ) -> ActiveWorkloadLifetime:
+        cutoff: datetime,
+    ) -> AccountingSnapshot:
         """Validate one vector completely before returning a normalized value."""
         if not isinstance(payload, dict) or payload.get("status") != "success":
             raise ProviderExecutionError("PromQL query did not succeed")
@@ -253,7 +262,7 @@ class PromQLProvider:
                 )
 
             resource = labels["resource"]
-            unit = "boolean" if metric == COMPLETE_METRIC else _UNITS.get(resource)
+            unit = "boolean" if metric == COMPLETE_METRIC else RESOURCE_UNITS.get(resource)
             if unit is None or labels["unit"] != unit:
                 raise ProviderExecutionError("PromQL returned an invalid resource unit")
             timestamp = _sample_time(sample[0])
@@ -311,4 +320,8 @@ class PromQLProvider:
                 )
             else:
                 raise ProviderExecutionError("PromQL returned invalid completeness state")
-        return aggregate_active_workload_hours(normalized)
+        created = observed_at or cutoff
+        return AccountingSnapshot(
+            lifetime=aggregate_active_workload_hours(normalized),
+            created=created,
+        )

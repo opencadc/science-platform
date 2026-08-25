@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -129,8 +129,8 @@ def _settings() -> Settings:
 def _runtime(
     api: FakePodApi,
     *,
-    user_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
-    community_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
+    user_accounting: Callable[[str, datetime], Awaitable[CacheResult]] | None = None,
+    community_accounting: Callable[[str, datetime], Awaitable[CacheResult]] | None = None,
 ) -> MetricsRuntime:
     settings = _settings()
     platform = KueueProvider(
@@ -209,6 +209,20 @@ def test_scheduler_effective_requests_include_sidecars_init_and_overhead() -> No
     assert requests["memory"] == pytest.approx(152 / 1024)
 
 
+@pytest.mark.anyio
+async def test_workload_observation_records_read_cutoff() -> None:
+    provider = KubernetesProvider(
+        _settings(),
+        api=FakePodApi({"work-a": [_pod("selected")], "work-b": []}),
+    )
+    before = datetime.now().astimezone()
+    observation = await provider.read_user("alice")
+    after = datetime.now().astimezone()
+
+    assert before - timedelta(milliseconds=1) <= observation.observed_at <= after
+    assert observation.observed_at.microsecond % 1000 == 0
+
+
 def test_user_route_selects_exact_running_skaha_pods_and_returns_no_inventory() -> None:
     api = FakePodApi(
         {
@@ -257,7 +271,7 @@ def test_user_route_selects_exact_running_skaha_pods_and_returns_no_inventory() 
 
 
 def test_user_route_adds_aggregate_lifetime_hours_and_efficiency() -> None:
-    async def accounting(_username: str) -> CacheResult:
+    async def accounting(_username: str, observed_at: datetime) -> CacheResult:
         return CacheResult(
             AccountingSnapshot(
                 lifetime=ActiveWorkloadLifetime(
@@ -273,7 +287,7 @@ def test_user_route_adds_aggregate_lifetime_hours_and_efficiency() -> None:
                         for resource in ("cpu", "memory", "nvidia.com/gpu")
                     },
                 ),
-                created=datetime.now(UTC),
+                created=observed_at,
             ),
             cached=False,
             stale=False,
@@ -317,7 +331,7 @@ def test_user_route_adds_aggregate_lifetime_hours_and_efficiency() -> None:
 
 
 def test_incomplete_accounting_omits_only_affected_resource_fields() -> None:
-    async def accounting(_username: str) -> CacheResult:
+    async def accounting(_username: str, observed_at: datetime) -> CacheResult:
         return CacheResult(
             AccountingSnapshot(
                 lifetime=ActiveWorkloadLifetime(
@@ -328,7 +342,7 @@ def test_incomplete_accounting_omits_only_affected_resource_fields() -> None:
                     pod_uids=frozenset({"uid-selected"}),
                     coverage={"cpu": frozenset({"uid-selected"})},
                 ),
-                created=datetime.now(UTC),
+                created=observed_at,
             ),
             cached=False,
             stale=False,
@@ -350,7 +364,7 @@ def test_incomplete_accounting_omits_only_affected_resource_fields() -> None:
 
 
 def test_accounting_for_a_different_running_pod_set_is_omitted() -> None:
-    async def misaligned(_username: str) -> CacheResult:
+    async def misaligned(_username: str, observed_at: datetime) -> CacheResult:
         return CacheResult(
             AccountingSnapshot(
                 lifetime=ActiveWorkloadLifetime(
@@ -359,7 +373,37 @@ def test_accounting_for_a_different_running_pod_set_is_omitted() -> None:
                     pod_uids=frozenset({"uid-replaced"}),
                     coverage={"cpu": frozenset({"uid-replaced"})},
                 ),
-                created=datetime.now(UTC),
+                created=observed_at,
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, user_accounting=misaligned),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
+
+    status = response.json()["status"]
+    assert all("usageHours" not in resource for resource in status["resources"])
+    assert status["conditions"][0]["reason"] == "AccountingIncomplete"
+
+
+def test_accounting_for_a_different_observation_cutoff_is_omitted() -> None:
+    async def misaligned(_username: str, observed_at: datetime) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={"cpu": ResourceHours("core-hours", Decimal("2"), Decimal("1"))},
+                    incomplete={},
+                    pod_uids=frozenset({"uid-selected"}),
+                    coverage={"cpu": frozenset({"uid-selected"})},
+                ),
+                created=observed_at - timedelta(seconds=1),
             ),
             cached=False,
             stale=False,
@@ -380,7 +424,7 @@ def test_accounting_for_a_different_running_pod_set_is_omitted() -> None:
 
 
 def test_unavailable_accounting_preserves_current_requests_as_partial_data() -> None:
-    async def unavailable(_username: str) -> CacheResult:
+    async def unavailable(_username: str, _observed_at: datetime) -> CacheResult:
         raise ProviderUnavailableError("prometheus unavailable")
 
     api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
@@ -402,9 +446,7 @@ def test_unavailable_accounting_preserves_current_requests_as_partial_data() -> 
 
 
 def test_stale_accounting_makes_the_combined_user_report_stale() -> None:
-    created = datetime.now(UTC) - timedelta(minutes=3)
-
-    async def accounting(_username: str) -> CacheResult:
+    async def accounting(_username: str, observed_at: datetime) -> CacheResult:
         return CacheResult(
             AccountingSnapshot(
                 lifetime=ActiveWorkloadLifetime(
@@ -412,7 +454,7 @@ def test_stale_accounting_makes_the_combined_user_report_stale() -> None:
                     incomplete={},
                     pod_uids=frozenset({"uid-selected"}),
                 ),
-                created=created,
+                created=observed_at,
             ),
             cached=True,
             stale=True,
@@ -428,7 +470,6 @@ def test_stale_accounting_makes_the_combined_user_report_stale() -> None:
         response = client.get("/apis/canfar.net/v1alpha1/metrics/user/alice")
 
     conditions = response.json()["status"]["conditions"]
-    assert int(response.headers["age"]) >= 180
     assert conditions[0]["reason"] == "StaleData"
     assert conditions[1]["reason"] == "StaleHit"
 
@@ -481,7 +522,7 @@ def test_community_route_aggregates_mixed_users_in_one_direct_scan() -> None:
 def test_community_lifetime_sums_direct_inputs_before_efficiency_without_members() -> None:
     calls: list[str] = []
 
-    async def accounting(community: str) -> CacheResult:
+    async def accounting(community: str, observed_at: datetime) -> CacheResult:
         calls.append(community)
         return CacheResult(
             AccountingSnapshot(
@@ -498,7 +539,7 @@ def test_community_lifetime_sums_direct_inputs_before_efficiency_without_members
                         "memory": frozenset({"uid-alice", "uid-carol"}),
                     },
                 ),
-                created=datetime.now(UTC),
+                created=observed_at,
             ),
             cached=False,
             stale=False,
@@ -541,7 +582,7 @@ def test_community_lifetime_sums_direct_inputs_before_efficiency_without_members
 
 
 def test_incomplete_community_accounting_preserves_requests_and_readiness() -> None:
-    async def accounting(_community: str) -> CacheResult:
+    async def accounting(_community: str, observed_at: datetime) -> CacheResult:
         return CacheResult(
             AccountingSnapshot(
                 lifetime=ActiveWorkloadLifetime(
@@ -550,7 +591,7 @@ def test_incomplete_community_accounting_preserves_requests_and_readiness() -> N
                     pod_uids=frozenset({"uid-selected"}),
                     coverage={"cpu": frozenset({"uid-selected"})},
                 ),
-                created=datetime.now(UTC),
+                created=observed_at,
             ),
             cached=False,
             stale=False,
