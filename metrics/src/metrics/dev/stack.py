@@ -11,6 +11,8 @@ import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 
+from metrics.dev.fixtures import apply_fixtures
+
 KIND_VERSION = "0.32.0"
 KIND_CLUSTER = "metrics"
 KUBE_CONTEXT = "kind-metrics"
@@ -25,6 +27,8 @@ WORKLOAD_NAMESPACE = "canfar-workloads"
 
 METRICS_ROOT = Path(__file__).parents[3]
 FIXTURES = METRICS_ROOT / "scripts" / "test-setup.yaml"
+WORKLOAD_FIXTURES = METRICS_ROOT / "scripts" / "workload-fixtures.yaml"
+KUEUE_CONFIG = METRICS_ROOT / "scripts" / "kueue-config.yaml"
 KIND_VALUES = METRICS_ROOT / "scripts" / "kind-values.yaml"
 CHART = METRICS_ROOT / "helm" / "metrics-api"
 
@@ -178,6 +182,8 @@ def _install_kueue() -> None:
         "--namespace",
         "kueue-system",
         "--create-namespace",
+        "--set-file",
+        f"managerConfig.controllerManagerConfigYaml={KUEUE_CONFIG}",
         "--atomic",
         "--timeout",
         "10m",
@@ -194,16 +200,7 @@ def _install_kueue() -> None:
 
 def fixtures() -> None:
     """Converge deterministic core Kueue fixtures."""
-    assert_safe_context()
-    _kubectl("apply", "-f", str(FIXTURES))
-    _kubectl(
-        "--namespace",
-        WORKLOAD_NAMESPACE,
-        "wait",
-        "workload/integration-idle",
-        "--for=jsonpath={.status.admission.clusterQueue}=cq-electron",
-        "--timeout=180s",
-    )
+    apply_fixtures(FIXTURES, WORKLOAD_FIXTURES)
 
 
 def _build_and_load_image() -> tuple[str, str]:

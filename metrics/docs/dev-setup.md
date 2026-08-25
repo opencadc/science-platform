@@ -69,15 +69,35 @@ uv run metrics-dev destroy --confirm kind-metrics
 The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
 
 - `default-flavor`
+- `cohort-atom`
 - `cq-proton`
 - `cq-electron`
+- `cq-fair`
 - `lq-smoke`
+- `lq-fair-high`
+- `lq-fair-low`
 - `integration-idle`
 
-The sample workload targets `cq-electron`, which has `100m` CPU and `100Mi`
-memory nominal quota. The workload requests `200m` CPU and `200Mi` memory, so
-the smoke test verifies admitted usage totals in platform `allocated`. Borrowed
-and lending response-field expansion is out of scope for this delivery.
+`metrics-dev fixtures` applies `scripts/workload-fixtures.yaml` in condition-
+driven phases. `integration-idle` targets `cq-electron`, whose `100m` CPU and
+`100Mi` memory nominal quota is smaller than the Job's `200m`/`200Mi` request.
+The command requires an admitted Workload and ClusterQueue usage above nominal
+quota before continuing.
+
+The separate `cq-fair` scenario uses two equal LocalQueues. The command admits
+`fair-warm-high`, waits for non-zero LocalQueue consumed CPU, queues equivalent
+high- and low-use contenders, releases the warm Job, and requires
+`fair-next-low` to be admitted while `fair-next-high` remains without quota.
+The controller uses a one-minute usage half-life and a one-second test sampling
+interval from `scripts/kueue-config.yaml`; no fixture assertion depends on a
+fixed sleep.
+
+The remaining finite Jobs cover two or more users and communities, Pending and
+terminal states, missing and empty subject labels, multiple containers, init
+containers, and RuntimeClass Pod overhead. Every normal Job and Pod template
+uses the current Skaha labels from `skaha/docs/labels.md`; exclusion controls
+omit or empty labels intentionally. Borrowed, Pending, and fair-share state is
+fixture evidence and does not expand the Metrics API.
 
 ## Troubleshooting
 
@@ -86,7 +106,7 @@ and lending response-field expansion is out of scope for this delivery.
   `kubectl --context kind-metrics -n metrics logs deploy/metrics-api-metrics-api --tail=200`.
 - Workload not admitted: check Kueue status and fixture objects:
   `kubectl --context kind-metrics get clusterqueue` and
-  `kubectl --context kind-metrics -n metrics get localqueue,workload`.
+  `kubectl --context kind-metrics -n canfar-workloads get localqueue,workload`.
 - Redis cache data stale during iterative tests:
   `kubectl --context kind-metrics exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`.
 
