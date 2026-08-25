@@ -21,17 +21,17 @@ The API exposes:
 
 - `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`
 - `GET /apis/canfar.net/v1alpha1/metrics/user/{user}`
+- `GET /apis/canfar.net/v1alpha1/metrics/community/{community}`
 - `GET /healthz`
 
 ## `v1alpha1` contract
 
-The Platform and User routes return the shared `canfar.net/v1alpha1` `Metrics` kind.
+The Platform, User, and Community routes return the shared
+`canfar.net/v1alpha1` `Metrics` kind.
 Freshness is described by `Last-Modified`, `Age`, and `Cache-Status`; all API
-responses use `Cache-Control: no-store`. The design set is:
-
-- [`docs/canfar-metrics-v1alpha1-design.md`](docs/canfar-metrics-v1alpha1-design.md) — public wire and HTTP contract;
-- [`docs/canfar-metrics-backend-technical-design.md`](docs/canfar-metrics-backend-technical-design.md) — async runtime, Redis, OTel, container, and local-stack design; and
-- [`docs/canfar-metrics-v1alpha1-tickets.mdx`](docs/canfar-metrics-v1alpha1-tickets.mdx) — dependency-ordered delivery specification.
+responses use `Cache-Control: no-store`. The code-backed reference set is
+[`docs/architecture.md`](docs/architecture.md), [`docs/design.md`](docs/design.md),
+and [`docs/specs.md`](docs/specs.md).
 
 The transition grows the existing `src/metrics` package in place and retains
 its `api`, `core`, `providers`, `schemas`, and `services` seams.
@@ -126,6 +126,13 @@ uv run metrics-dev smoke
 Use `uv run metrics-dev down`, `reset`, or `destroy --confirm kind-metrics`
 for lifecycle cleanup.
 
+The smoke runs the chart-built image with two API replicas and embedded Redis.
+Over real forwarded sockets it proves cold and fresh cache reads, conditional
+`304` responses, stale fallback, fail-closed errors, empty User/Community
+responses, all three current-metrics routes, legacy-route absence, and graceful
+SIGTERM shutdown. The reported warm duration excludes prerequisite and image
+pulls; use `metrics-dev up` to record cold setup separately.
+
 ## Container image
 
 Build the image from the service directory:
@@ -166,5 +173,4 @@ Release container images (`linux/amd64`, `linux/arm64`) publish only on Git tags
 matching `metrics-v*` via `.github/workflows/cd.metrics.release.build.yml`.
 
 Release notes and versioning for Metrics follow the separate Metrics package in
-root `release-please-config.json`, using tags like `metrics-v0.1.0`. See
-`docs/releasing.md` for the Release Please and first-tag `0.1.0` workflow.
+root `release-please-config.json`, using tags like `metrics-v0.1.0`.

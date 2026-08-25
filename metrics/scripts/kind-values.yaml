@@ -5,6 +5,8 @@ image:
   tag: latest
   pullPolicy: Never
 
+replicaCount: 2
+
 serviceAccount:
   create: true
 

@@ -61,6 +61,11 @@ This file stores repository-specific architecture facts only.
   HMAC-protected subject cache keys. The legacy `/api/v1` route is absent.
 - Snapshot freshness is exposed only through `Last-Modified`, `Age`, and
   `Cache-Status`; successful and error responses use `Cache-Control: no-store`.
+- `If-Modified-Since` is evaluated against the snapshot creation second and
+  returns an empty `304` while preserving the same snapshot headers.
+- The production process runs one Uvicorn worker. The chart controls Pod
+  replicas and gives each Pod a numeric non-root identity, resource bounds,
+  probes, and a graceful termination window.
 
 ## Update rules
 

@@ -17,13 +17,31 @@ spec:
         {{- include "metrics-api.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: redis
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: redis
           image: {{ .Values.redis.image | quote }}
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
           ports:
             - name: redis
               containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: redis
+          livenessProbe:
+            tcpSocket:
+              port: redis
 ---
 apiVersion: v1
 kind: Service

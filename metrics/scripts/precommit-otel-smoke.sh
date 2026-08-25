@@ -45,7 +45,7 @@ import urllib.request
 
 trace_id = sys.argv[1]
 request = urllib.request.Request(
-    "http://127.0.0.1:18086/api/v1/metrics/platform",
+    "http://127.0.0.1:18086/apis/canfar.net/v1alpha1/metrics/platform/canfar",
     headers={"traceparent": f"00-{trace_id}-0123456789abcdef-01"},
 )
 deadline = time.monotonic() + 30
@@ -65,7 +65,8 @@ PY
 collector_pod="$(
   kubectl --context "$context" --namespace "$namespace" get pods \
     -l app.kubernetes.io/component=collector \
-    -o jsonpath='{.items[0].metadata.name}'
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}'
 )"
 kubectl --context "$context" --namespace "$namespace" \
   cp -c evidence "$collector_pod:/var/lib/otel/evidence.json" "$tmp/evidence.json"
@@ -112,7 +113,7 @@ for forbidden in (
     "/metrics/user/",
     "/metrics/community/",
     "metrics-cache-v1",
-    "metrics:4:",
+    "metrics:",
     "PromQL",
 ):
     if forbidden.lower() in raw.lower():

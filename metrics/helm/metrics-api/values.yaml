@@ -4,16 +4,30 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+replicaCount: 1
+terminationGracePeriodSeconds: 30
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
+  runAsGroup: 65532
   fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
 
 # -- Flat fail-closed Settings map. Supported provider/source keys are
 # METRICS_PROVIDERS__KUEUE__*, METRICS_PROVIDERS__KUBERNETES__*,
@@ -43,6 +57,13 @@ redis:
   # Embedded Redis is local-only. Production supplies urlSecret.
   enabled: false
   image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   urlSecret:
     name: ""
     key: redis-url

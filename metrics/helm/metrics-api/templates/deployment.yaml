@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "metrics-api.selectorLabels" . | nindent 6 }}
@@ -16,6 +16,7 @@ spec:
         {{- include "metrics-api.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "metrics-api.serviceAccountName" . }}
       automountServiceAccountToken: true
@@ -36,6 +37,8 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
             - name: METRICS_OTEL__POD_UID
               valueFrom:

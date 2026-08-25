@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 from fastapi import APIRouter, Depends, Request, Response
 
@@ -33,6 +34,38 @@ _LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 router = APIRouter(tags=["metrics"])
 
 
+def _cache_response(
+    *,
+    request: Request,
+    response: Response,
+    created: datetime,
+    ttl: int,
+    cached: bool,
+    stale: bool,
+    available: bool,
+) -> Response | None:
+    """Set snapshot headers and return an empty conditional response on a hit."""
+    headers = metrics_success_cache_headers(
+        snapshot_created=created,
+        configured_ttl=ttl,
+        cached=cached,
+        stale=stale,
+        cache_available=available,
+        now=datetime.now(UTC),
+    )
+    response.headers.update(headers)
+    validator = request.headers.get("if-modified-since")
+    if validator:
+        try:
+            modified_since = parsedate_to_datetime(validator)
+        except (TypeError, ValueError):
+            return None
+        snapshot_second = created.astimezone(UTC).replace(microsecond=0)
+        if modified_since.astimezone(UTC) >= snapshot_second:
+            return Response(status_code=304, headers=headers)
+    return None
+
+
 def get_runtime(request: Request) -> MetricsRuntime:
     """Return the runtime owned by the application lifespan."""
     return request.app.state.runtime
@@ -46,20 +79,23 @@ def get_runtime(request: Request) -> MetricsRuntime:
     summary="Get CANFAR platform metrics",
 )
 async def get_platform_metrics(
+    request: Request,
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics:
+) -> Metrics | Response:
     """Return Kueue-backed platform capacity and admitted allocation."""
     result = await runtime.metrics_service.get(PLATFORM_SUBJECT)
-    for key, value in metrics_success_cache_headers(
-        snapshot_created=result.created,
-        configured_ttl=runtime.metrics_service.cache_ttl_seconds,
+    conditional = _cache_response(
+        request=request,
+        response=response,
+        created=result.created,
+        ttl=runtime.metrics_service.cache_ttl_seconds,
         cached=result.cached,
         stale=result.stale,
-        cache_available=result.cache_available,
-        now=datetime.now(UTC),
-    ).items():
-        response.headers[key] = value
+        available=result.cache_available,
+    )
+    if conditional is not None:
+        return conditional
 
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
@@ -137,24 +173,27 @@ def _subject_name(kind: str, value: str) -> str:
 )
 async def get_user_metrics(
     user: str,
+    request: Request,
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics:
+) -> Metrics | Response:
     """Return scheduler-effective requests held by one user's Running Pods."""
     user = _subject_value(user, "user")
     result = await runtime.metrics_service.get(MetricsSubject(kind="user", value=user))
     observation = result.observation
     if not isinstance(observation, UserObservation):
         raise RuntimeError("User route received a non-user observation")
-    for key, value in metrics_success_cache_headers(
-        snapshot_created=result.created,
-        configured_ttl=runtime.metrics_service.user_cache_ttl_seconds,
+    conditional = _cache_response(
+        request=request,
+        response=response,
+        created=result.created,
+        ttl=runtime.metrics_service.user_cache_ttl_seconds,
         cached=result.cached,
         stale=result.stale,
-        cache_available=result.cache_available,
-        now=datetime.now(UTC),
-    ).items():
-        response.headers[key] = value
+        available=result.cache_available,
+    )
+    if conditional is not None:
+        return conditional
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
     return Metrics(
@@ -197,24 +236,27 @@ async def get_user_metrics(
 )
 async def get_community_metrics(
     community: str,
+    request: Request,
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics:
+) -> Metrics | Response:
     """Return requests held by one community's Running Pods."""
     community = _subject_value(community, "community")
     result = await runtime.metrics_service.get(MetricsSubject(kind="community", value=community))
     observation = result.observation
     if not isinstance(observation, CommunityObservation):
         raise RuntimeError("Community route received a non-community observation")
-    for key, value in metrics_success_cache_headers(
-        snapshot_created=result.created,
-        configured_ttl=runtime.metrics_service.community_cache_ttl_seconds,
+    conditional = _cache_response(
+        request=request,
+        response=response,
+        created=result.created,
+        ttl=runtime.metrics_service.community_cache_ttl_seconds,
         cached=result.cached,
         stale=result.stale,
-        cache_available=result.cache_available,
-        now=datetime.now(UTC),
-    ).items():
-        response.headers[key] = value
+        available=result.cache_available,
+    )
+    if conditional is not None:
+        return conditional
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
     return Metrics(
