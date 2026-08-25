@@ -106,6 +106,8 @@ async def test_named_template_uses_only_form_post_and_optional_mimir_tenant() ->
 
     assert result.ready
     assert result.resources["cpu"].usage == Decimal("1.5")
+    assert result.pod_uids == frozenset({"pod-1"})
+    assert result.coverage["cpu"] == frozenset({"pod-1"})
     assert request is not None
     assert request.method == "POST"
     assert request.url.path == "/api/v1/query"

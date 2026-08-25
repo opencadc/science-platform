@@ -41,6 +41,9 @@ class ResourceMetrics(WireModel):
     capacity: str | None = None
     allocated: str | None = None
     requests: str | None = None
+    usage_hours: str | None = Field(default=None, serialization_alias="usageHours")
+    requested_hours: str | None = Field(default=None, serialization_alias="requestedHours")
+    efficiency: str | None = None
 
 
 class Condition(WireModel):
@@ -65,6 +68,10 @@ class MetricsStatus(WireModel):
     """Observed resources and exactly Ready/Cached conditions."""
 
     observed_at: datetime = Field(serialization_alias="observedAt")
+    accounting_period: Literal["ActiveWorkloadLifetime"] | None = Field(
+        default=None,
+        serialization_alias="accountingPeriod",
+    )
     running_pods: int | None = Field(default=None, serialization_alias="runningPods")
     resources: list[ResourceMetrics]
     conditions: list[Condition]

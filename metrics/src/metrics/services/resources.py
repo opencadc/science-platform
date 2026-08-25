@@ -122,16 +122,27 @@ def integrate_active_workload(
     return ActiveWorkloadLifetime(
         resources=resources,
         incomplete={resource: frozenset(issues) for resource, issues in sorted(incomplete.items())},
+        pod_uids=frozenset(pod_uid for pod_uid, _resource in identities),
+        coverage={
+            resource: frozenset(pod_uid for pod_uid, current in identities if current == resource)
+            for resource in sorted({resource for _pod_uid, resource in identities})
+        },
     )
 
 
 def aggregate_active_workload_hours(
-    samples: Iterable[tuple[str, Decimal, Decimal, frozenset[LifetimeIssue]]],
+    samples: Iterable[tuple[str, str, Decimal, Decimal, frozenset[LifetimeIssue]]],
 ) -> ActiveWorkloadLifetime:
     """Aggregate validated producer totals, omitting any incomplete resource."""
     totals: dict[str, tuple[Decimal, Decimal]] = {}
     incomplete: dict[str, set[LifetimeIssue]] = {}
-    for resource, usage, requested, issues in samples:
+    pod_uids: set[str] = set()
+    coverage: dict[str, set[str]] = {}
+    for pod_uid, resource, usage, requested, issues in samples:
+        if not pod_uid:
+            raise ValueError("Pod UID is required")
+        pod_uids.add(pod_uid)
+        coverage.setdefault(resource, set()).add(pod_uid)
         if resource not in _RESOURCE_UNITS:
             raise ValueError(f"unsupported resource unit: {resource}")
         if any(not value.is_finite() or value < 0 for value in (usage, requested)):
@@ -153,4 +164,9 @@ def aggregate_active_workload_hours(
             if resource not in incomplete
         },
         incomplete={resource: frozenset(issues) for resource, issues in sorted(incomplete.items())},
+        pod_uids=frozenset(pod_uids),
+        coverage={
+            resource: frozenset(resource_pods)
+            for resource, resource_pods in sorted(coverage.items())
+        },
     )

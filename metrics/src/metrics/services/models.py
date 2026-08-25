@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
@@ -32,6 +32,15 @@ class PlatformObservation:
     allocated: dict[str, str]
 
 
+class AccountingState(StrEnum):
+    """Availability of requested lifetime accounting."""
+
+    DISABLED = "disabled"
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+    UNAVAILABLE = "unavailable"
+
+
 @dataclass(frozen=True, slots=True)
 class UserObservation:
     """Scheduler-effective requests held by one user's Running Pods."""
@@ -39,6 +48,10 @@ class UserObservation:
     user: str
     running_pods: int
     requests: dict[str, str]
+    pod_uids: frozenset[str] = frozenset()
+    accounting: ActiveWorkloadLifetime | None = None
+    accounting_state: AccountingState = AccountingState.DISABLED
+    accounting_stale: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +112,8 @@ class ActiveWorkloadLifetime:
 
     resources: dict[str, ResourceHours]
     incomplete: dict[str, frozenset[LifetimeIssue]]
+    pod_uids: frozenset[str] = frozenset()
+    coverage: dict[str, frozenset[str]] = field(default_factory=dict)
 
     @property
     def ready(self) -> bool:
@@ -135,9 +150,19 @@ class MetricsResult:
     @property
     def ready_condition(
         self,
-    ) -> tuple[Literal["True", "False"], Literal["Available", "StaleData"]]:
+    ) -> tuple[
+        Literal["True", "False"],
+        Literal["Available", "PartialData", "AccountingIncomplete", "StaleData"],
+    ]:
         """Return the public Ready status and reason."""
-        return ("False", "StaleData") if self.stale else ("True", "Available")
+        if self.stale:
+            return "False", "StaleData"
+        if isinstance(self.observation, UserObservation):
+            if self.observation.accounting_state is AccountingState.UNAVAILABLE:
+                return "False", "PartialData"
+            if self.observation.accounting_state is AccountingState.INCOMPLETE:
+                return "False", "AccountingIncomplete"
+        return "True", "Available"
 
     @property
     def cached_condition(

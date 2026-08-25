@@ -282,7 +282,7 @@ class PromQLProvider:
                 raise ProviderExecutionError("PromQL returned duplicate accounting series")
             groups[identity][metric] = (labels, _decimal(sample[1]))
 
-        normalized: list[tuple[str, Decimal, Decimal, frozenset[LifetimeIssue]]] = []
+        normalized: list[tuple[str, str, Decimal, Decimal, frozenset[LifetimeIssue]]] = []
         for identity, metrics in groups.items():
             resource = identity[2]
             if set(metrics) != {USAGE_METRIC, REQUESTED_METRIC, COMPLETE_METRIC}:
@@ -292,6 +292,7 @@ class PromQLProvider:
             if complete_value == 1 and reason == "complete":
                 normalized.append(
                     (
+                        identity[1],
                         resource,
                         metrics[USAGE_METRIC][1],
                         metrics[REQUESTED_METRIC][1],
@@ -301,6 +302,7 @@ class PromQLProvider:
             elif complete_value == 0 and reason in _ISSUES:
                 normalized.append(
                     (
+                        identity[1],
                         resource,
                         metrics[USAGE_METRIC][1],
                         metrics[REQUESTED_METRIC][1],
