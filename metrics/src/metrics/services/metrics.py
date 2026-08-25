@@ -12,6 +12,7 @@ from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailable
 from metrics.services.models import (
     PLATFORM_SUBJECT,
     CachedSnapshot,
+    CommunityObservation,
     MetricsResult,
     MetricsSubject,
     PlatformObservation,
@@ -37,6 +38,9 @@ class MetricsService:
         user: Callable[[str], Awaitable[UserObservation]] | None = None,
         user_cache: CacheCoordinator[CachedSnapshot] | None = None,
         user_identity: Callable[[str], CacheIdentity] | None = None,
+        community: Callable[[str], Awaitable[CommunityObservation]] | None = None,
+        community_cache: CacheCoordinator[CachedSnapshot] | None = None,
+        community_identity: Callable[[str], CacheIdentity] | None = None,
         telemetry: MetricsRecorder | None = None,
         provider: str = "unknown",
         user_provider: str = "kubernetes",
@@ -50,6 +54,9 @@ class MetricsService:
             user: Optional callable that fetches one user observation.
             user_cache: Coordinator using the User freshness policy.
             user_identity: Callable returning an opaque user cache identity.
+            community: Optional callable that fetches one community observation.
+            community_cache: Coordinator using the Community freshness policy.
+            community_identity: Callable returning an opaque community cache identity.
             telemetry: Optional cache/provider timing recorder.
             provider: Adapter name for provider duration telemetry.
             user_provider: User adapter name for provider duration telemetry.
@@ -60,6 +67,9 @@ class MetricsService:
         self._user = user
         self._user_cache = user_cache
         self._user_identity = user_identity
+        self._community = community
+        self._community_cache = community_cache
+        self._community_identity = community_identity
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
         self._user_provider = user_provider
@@ -73,6 +83,11 @@ class MetricsService:
     def user_cache_ttl_seconds(self) -> int:
         """Return the User report freshness window."""
         return self._user_cache.policy.fresh_seconds if self._user_cache else 0
+
+    @property
+    def community_cache_ttl_seconds(self) -> int:
+        """Return the Community report freshness window."""
+        return self._community_cache.policy.fresh_seconds if self._community_cache else 0
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
         """Return Metrics for ``subject``, using cache on hit and the source on miss.
@@ -103,6 +118,13 @@ class MetricsService:
                 and self._user_identity is not None
             ):
                 return await self._get_user(subject.value)
+            if (
+                subject.kind == "community"
+                and self._community is not None
+                and self._community_cache is not None
+                and self._community_identity is not None
+            ):
+                return await self._get_community(subject.value)
             raise AppError(
                 code="subject_unsupported",
                 message="Requested metrics subject is not supported",
@@ -182,6 +204,31 @@ class MetricsService:
             cache_available=self._user_cache.available,
         )
 
+    async def _get_community(self, community: str) -> MetricsResult:
+        assert self._community_cache is not None
+        assert self._community_identity is not None
+        try:
+            result = await self._community_cache.get_or_fill(
+                self._community_identity(community),
+                lambda: self._load_community_snapshot(community),
+            )
+        except CacheUnavailable as exc:
+            raise AppError(
+                code="metrics_cache_unavailable",
+                message="Community metrics are temporarily unavailable",
+                status_code=503,
+                retry_after=1,
+            ) from exc
+        snapshot = result.value
+        self._record_cache_result("community", snapshot, result.cached, result.stale)
+        return MetricsResult(
+            observation=snapshot.observation,
+            created=snapshot.created,
+            cached=result.cached,
+            stale=result.stale,
+            cache_available=self._community_cache.available,
+        )
+
     def _record_cache_result(
         self,
         scope: str,
@@ -189,7 +236,11 @@ class MetricsService:
         cached: bool,
         stale: bool,
     ) -> None:
-        cache = self._user_cache if scope == "user" else self._cache
+        cache = {
+            "platform": self._cache,
+            "user": self._user_cache,
+            "community": self._community_cache,
+        }[scope]
         assert cache is not None
         cache_result = "stale" if stale else ("hit" if cached else "miss")
         self._metrics_recorder.record_cache_lookup(
@@ -218,6 +269,25 @@ class MetricsService:
                 scope="user",
             )
 
+    async def _load_community_snapshot(self, community: str) -> CachedSnapshot:
+        started = perf_counter()
+        status = "ok"
+        try:
+            observation = await self._timed_community_load(community)
+            return CachedSnapshot(observation=observation, created=datetime.now(UTC))
+        except AppError as exc:
+            status = exc.code
+            raise
+        except Exception:
+            status = "unexpected_error"
+            raise
+        finally:
+            self._metrics_recorder.record_compute_duration(
+                seconds=perf_counter() - started,
+                status=status,
+                scope="community",
+            )
+
     async def _timed_user_load(self, username: str) -> UserObservation:
         assert self._user is not None
         started = perf_counter()
@@ -244,6 +314,36 @@ class MetricsService:
             self._metrics_recorder.record_provider_duration(
                 provider=self._user_provider,
                 scope="user",
+                status=status,
+                seconds=perf_counter() - started,
+            )
+
+    async def _timed_community_load(self, community: str) -> CommunityObservation:
+        assert self._community is not None
+        started = perf_counter()
+        status = "ok"
+        try:
+            with self._metrics_recorder.span(
+                "source.read",
+                {
+                    "metrics.scope": "community",
+                    "provider.name": self._user_provider,
+                    "source.operation": "read",
+                },
+            ):
+                return await self._community(community)
+        except (ProviderUnavailableError, ProviderExecutionError) as exc:
+            status = "error"
+            logger.warning("Community metrics collection failed")
+            raise AppError(
+                code="community_metrics_unavailable",
+                message="Could not load community metrics from Kubernetes",
+                status_code=503,
+            ) from exc
+        finally:
+            self._metrics_recorder.record_provider_duration(
+                provider=self._user_provider,
+                scope="community",
                 status=status,
                 seconds=perf_counter() - started,
             )

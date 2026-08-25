@@ -224,6 +224,7 @@ def test_openapi_contains_only_v1alpha1_metrics_contract() -> None:
 
     assert "/apis/canfar.net/v1alpha1/metrics/platform/canfar" in schema["paths"]
     assert "/apis/canfar.net/v1alpha1/metrics/user/{user}" in schema["paths"]
+    assert "/apis/canfar.net/v1alpha1/metrics/community/{community}" in schema["paths"]
     assert "/api/v1/metrics/platform" not in schema["paths"]
     assert "Metrics" in schema["components"]["schemas"]
     assert "Status" in schema["components"]["schemas"]

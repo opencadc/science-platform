@@ -15,9 +15,8 @@ This file stores repository-specific behavioral specifications.
 
 ## Service behavior specifications
 
-- The metrics API exposes Platform and
-  `GET /apis/canfar.net/v1alpha1/metrics/user/{user}`; probes remain available
-  at `/healthz`, `/livez`, and `/readyz`.
+- The metrics API exposes Platform, User, and Community subject routes; probes
+  remain available at `/healthz`, `/livez`, and `/readyz`.
 - Runtime configuration is environment-driven through `METRICS_*` settings;
   see `environment-contracts.md`.
 - Startup must fail fast when Kueue or any configured workload namespace is
@@ -56,6 +55,10 @@ This file stores repository-specific behavioral specifications.
   expose only aggregate named resources, never Pod or member inventory.
 - User cache freshness is 2 minutes, stale serviceability is 10 minutes, and
   retention is 15 minutes. Redis keys contain only an HMAC subject digest.
+- Community reads use the same provenance, namespace completeness, Running-Pod,
+  scheduler request, cache, and validation semantics as User reads, selecting
+  exact `canfar.net/community` values in one provider scan. Responses expose only
+  community totals, never member identities or Pod inventory.
 - Request-time source failures map to HTTP 503. Errors use Kubernetes
   `apiVersion: v1`, `kind: Status`, `status: Failure` payloads without raw URLs,
   tokens, quantity payloads, exception text, or class names.

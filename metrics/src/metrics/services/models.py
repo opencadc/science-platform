@@ -13,7 +13,7 @@ from typing import Literal
 class MetricsSubject:
     """Subject selector for :meth:`metrics.services.metrics.MetricsService.get`.
 
-    Platform and user are served; community follows later.
+    Platform, user, and community are served.
     """
 
     kind: Literal["platform", "user", "community"]
@@ -37,6 +37,15 @@ class UserObservation:
     """Scheduler-effective requests held by one user's Running Pods."""
 
     user: str
+    running_pods: int
+    requests: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class CommunityObservation:
+    """Scheduler-effective requests held by one community's Running Pods."""
+
+    community: str
     running_pods: int
     requests: dict[str, str]
 
@@ -101,7 +110,7 @@ class ActiveWorkloadLifetime:
 class CachedSnapshot:
     """Versioned cache payload for a supported observation."""
 
-    observation: PlatformObservation | UserObservation
+    observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
 
 
@@ -109,7 +118,7 @@ class CachedSnapshot:
 class MetricsResult:
     """Outcome of a Metrics get, including cache provenance for HTTP headers."""
 
-    observation: PlatformObservation | UserObservation
+    observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
     cached: bool
     stale: bool = False

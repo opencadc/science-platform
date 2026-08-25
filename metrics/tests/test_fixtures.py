@@ -120,6 +120,12 @@ def test_skaha_jobs_carry_the_canonical_session_labels() -> None:
         assert job["spec"]["template"]["metadata"]["labels"] == labels
     assert len({job["metadata"]["labels"]["canfar.net/username"] for job in included}) >= 2
     assert len({job["metadata"]["labels"]["canfar.net/community"] for job in included}) >= 2
+    astronomy_users = {
+        job["metadata"]["labels"]["canfar.net/username"]
+        for job in included
+        if job["metadata"]["labels"]["canfar.net/community"] == "astronomy"
+    }
+    assert {"alice", "carol"} <= astronomy_users
 
 
 def test_fixture_cpu_quantity_comparison() -> None:

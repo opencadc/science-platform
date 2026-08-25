@@ -16,13 +16,14 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   part of the supported service contract (see `environment-contracts.md`).
 - **Single service process, bounded subject HTTP:** `MetricsRuntime` constructs
   Kueue and Kubernetes providers and owns per-surface cache resources. Platform
-  reads Kueue; User phase 1 lists Running Pods in configured namespaces.
+  reads Kueue; User and Community phase 1 list Running Pods in configured namespaces.
 - **Truthful provider configuration:** `sources.platform` accepts only `kueue`;
   `sources.user` accepts only `kubernetes`.
-- **Server-owned User selection:** Route values are validated Kubernetes label
-  values. The provider constructs fixed provenance, exact username, and Running
-  selectors; callers cannot supply selector syntax. Every namespace must succeed.
-- **Scheduler request semantics:** User totals sum regular containers and
+- **Server-owned subject selection:** Route values are validated Kubernetes label
+  values. The provider constructs fixed provenance, exact username or community,
+  and Running selectors; callers cannot supply selector syntax. Every namespace
+  must succeed.
+- **Scheduler request semantics:** User and Community totals sum regular containers and
   restartable sidecars, compare with effective init peaks, then add Pod overhead
   while preserving arbitrary extended resources.
 - **Kueue allocated semantics:** Platform `allocated` values come from

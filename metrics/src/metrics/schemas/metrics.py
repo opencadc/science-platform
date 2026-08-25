@@ -25,10 +25,11 @@ class MetricsSpec(WireModel):
 
     platform: str | None = None
     user: str | None = None
+    community: str | None = None
 
     @model_validator(mode="after")
     def _exactly_one_subject(self) -> MetricsSpec:
-        if sum(value is not None for value in (self.platform, self.user)) != 1:
+        if sum(value is not None for value in (self.platform, self.user, self.community)) != 1:
             raise ValueError("spec must contain exactly one subject")
         return self
 

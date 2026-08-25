@@ -22,6 +22,7 @@ from metrics.schemas.metrics import (
 from metrics.schemas.status import Status
 from metrics.services.models import (
     PLATFORM_SUBJECT,
+    CommunityObservation,
     MetricsSubject,
     PlatformObservation,
     UserObservation,
@@ -96,7 +97,7 @@ async def get_platform_metrics(
     )
 
 
-def _user_value(value: str) -> str:
+def _subject_value(value: str, kind: str) -> str:
     """Validate one decoded canonical Kubernetes label value."""
     if (
         not value
@@ -107,21 +108,21 @@ def _user_value(value: str) -> str:
         or not _LABEL_VALUE.fullmatch(value)
     ):
         raise AppError(
-            code="invalid_user",
-            message="The requested user is invalid",
+            code=f"invalid_{kind}",
+            message=f"The requested {kind} is invalid",
             status_code=400,
         )
     return value
 
 
-def _user_name(user: str) -> str:
+def _subject_name(kind: str, value: str) -> str:
     """Build a deterministic DNS-safe presentation name."""
-    candidate = f"user-{user.lower()}"
+    candidate = f"{kind}-{value.lower()}"
     if re.fullmatch(r"[a-z0-9](?:[-a-z0-9.]{0,61}[a-z0-9])?", candidate):
         return candidate
-    slug = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-") or "subject"
-    digest = hashlib.sha256(user.encode()).hexdigest()[:8]
-    return f"user-{slug[:48].rstrip('-')}-{digest}"
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "subject"
+    digest = hashlib.sha256(value.encode()).hexdigest()[:8]
+    return f"{kind}-{slug[:48].rstrip('-')}-{digest}"
 
 
 @router.get(
@@ -140,7 +141,7 @@ async def get_user_metrics(
     runtime: MetricsRuntime = Depends(get_runtime),
 ) -> Metrics:
     """Return scheduler-effective requests held by one user's Running Pods."""
-    user = _user_value(user)
+    user = _subject_value(user, "user")
     result = await runtime.metrics_service.get(MetricsSubject(kind="user", value=user))
     observation = result.observation
     if not isinstance(observation, UserObservation):
@@ -157,8 +158,68 @@ async def get_user_metrics(
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
     return Metrics(
-        metadata=ObjectMetadata(name=_user_name(user)),
+        metadata=ObjectMetadata(name=_subject_name("user", user)),
         spec=MetricsSpec(user=user),
+        status=MetricsStatus(
+            observed_at=result.created,
+            running_pods=observation.running_pods,
+            resources=[
+                ResourceMetrics(name=name, requests=observation.requests[name])
+                for name in sorted(observation.requests)
+            ],
+            conditions=[
+                Condition(
+                    type="Ready",
+                    status=ready_status,
+                    reason=ready_reason,
+                    last_transition_time=result.created,
+                ),
+                Condition(
+                    type="Cached",
+                    status=cached_status,
+                    reason=cached_reason,
+                    last_transition_time=result.created,
+                ),
+            ],
+        ),
+    )
+
+
+@router.get(
+    "/apis/canfar.net/v1alpha1/metrics/community/{community:path}",
+    response_model=Metrics,
+    response_model_exclude_none=True,
+    responses={
+        400: {"model": Status, "description": "Malformed community value."},
+        503: {"model": Status, "description": "No serviceable report is available."},
+    },
+    summary="Get current community requests",
+)
+async def get_community_metrics(
+    community: str,
+    response: Response,
+    runtime: MetricsRuntime = Depends(get_runtime),
+) -> Metrics:
+    """Return requests held by one community's Running Pods."""
+    community = _subject_value(community, "community")
+    result = await runtime.metrics_service.get(MetricsSubject(kind="community", value=community))
+    observation = result.observation
+    if not isinstance(observation, CommunityObservation):
+        raise RuntimeError("Community route received a non-community observation")
+    for key, value in metrics_success_cache_headers(
+        snapshot_created=result.created,
+        configured_ttl=runtime.metrics_service.community_cache_ttl_seconds,
+        cached=result.cached,
+        stale=result.stale,
+        cache_available=result.cache_available,
+        now=datetime.now(UTC),
+    ).items():
+        response.headers[key] = value
+    ready_status, ready_reason = result.ready_condition
+    cached_status, cached_reason = result.cached_condition
+    return Metrics(
+        metadata=ObjectMetadata(name=_subject_name("community", community)),
+        spec=MetricsSpec(community=community),
         status=MetricsStatus(
             observed_at=result.created,
             running_pods=observation.running_pods,

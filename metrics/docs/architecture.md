@@ -26,10 +26,10 @@ This file stores repository-specific architecture facts only.
   (`providers/kueue.py`): `KueueProvider.read_platform` returns a transport-neutral
   `PlatformObservation`. Routes call `MetricsService.get(subject)` only.
   Configuration rejects inactive or unknown providers.
-- User phase-1 metrics come from namespaced Pod LISTs in
+- User and Community phase-1 metrics come from namespaced Pod LISTs in
   `providers/kubernetes.py`. The provider applies fixed Skaha/CANFAR provenance,
-  exact username, and Running-phase selectors, then computes scheduler-effective
-  requests.
+  an exact canonical subject label, and Running-phase selectors, then computes
+  scheduler-effective requests.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 
@@ -56,10 +56,9 @@ This file stores repository-specific architecture facts only.
   legacy providers.
 - Provider construction is synchronous and network-free. `MetricsRuntime`
   starts/stops both providers and validates every configured workload namespace.
-- The public API exposes Platform and
-  `GET /apis/canfar.net/v1alpha1/metrics/user/{user}` through the shared
-  `Metrics` kind. User snapshots use 2/10/15-minute freshness and HMAC-protected
-  subject cache keys. The legacy `/api/v1` route is absent.
+- The public API exposes Platform, User, and Community routes through the shared
+  `Metrics` kind. User and Community snapshots use 2/10/15-minute freshness and
+  HMAC-protected subject cache keys. The legacy `/api/v1` route is absent.
 - Snapshot freshness is exposed only through `Last-Modified`, `Age`, and
   `Cache-Status`; successful and error responses use `Cache-Control: no-store`.
 

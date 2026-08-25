@@ -22,9 +22,7 @@ def test_health_endpoint() -> None:
 
 
 def test_platform_endpoint_shape() -> None:
-    response = httpx.get(
-        f"{base_url}/apis/canfar.net/v1alpha1/metrics/platform/canfar", timeout=10
-    )
+    response = httpx.get(f"{base_url}/apis/canfar.net/v1alpha1/metrics/platform/canfar", timeout=10)
     assert response.status_code == 200
     payload = response.json()
     assert payload["apiVersion"] == "canfar.net/v1alpha1"
@@ -77,3 +75,20 @@ def test_user_endpoint_matches_running_resource_shape_fixture() -> None:
     ]
     assert "pending-demand" not in response.text
     assert "resource-shapes" not in response.text
+
+
+def test_community_endpoint_reconciles_mixed_users_without_member_inventory() -> None:
+    """Astronomy combines Alice and Carol while exposing aggregate values only."""
+    response = httpx.get(
+        f"{base_url}/apis/canfar.net/v1alpha1/metrics/community/astronomy",
+        timeout=30.0,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["spec"] == {"community": "astronomy"}
+    assert payload["status"]["runningPods"] == 2
+    assert payload["status"]["resources"] == [
+        {"name": "cpu", "requests": "0.5"},
+        {"name": "memory", "requests": "0.320312Gi"},
+    ]
+    assert all(member not in response.text for member in ("alice", "carol"))

@@ -37,6 +37,25 @@ def test_subject_keys_redact_values_and_rotate_with_secret() -> None:
     assert first.base != rotated.base
 
 
+def test_community_keys_are_hmac_redacted_and_isolated() -> None:
+    astronomy = CacheIdentity("community", "astronomy", "prod", "kubernetes")
+    physics = CacheIdentity("community", "physics", "prod", "kubernetes")
+    keys = [
+        cache_keys(
+            prefix="metrics:",
+            identity=identity,
+            secret=b"a" * 32,
+            schema_revision="1",
+            source_revision="1",
+            query_revision="0",
+        ).base
+        for identity in (astronomy, physics)
+    ]
+
+    assert keys[0] != keys[1]
+    assert all(subject not in key for key in keys for subject in ("astronomy", "physics"))
+
+
 def test_all_subject_freshness_windows_match_policy() -> None:
     now = datetime.now(UTC)
     expected = {
