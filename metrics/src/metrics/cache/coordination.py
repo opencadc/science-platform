@@ -139,6 +139,7 @@ class RedisCoordinator(Generic[Value]):
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult:
         keys = self._keys(identity)
+        scope = identity.subject_kind
         try:
             snapshot = await self._read(keys)
         except RedisUnavailable as exc:
@@ -153,15 +154,16 @@ class RedisCoordinator(Generic[Value]):
             if state is Freshness.FRESH:
                 return CacheResult(snapshot.value, cached=True, stale=False)
             if state is Freshness.STALE:
-                return await self._refresh_stale(keys, snapshot, fill)
+                return await self._refresh_stale(keys, snapshot, fill, scope)
 
-        return await self._join_cold(keys, fill)
+        return await self._join_cold(keys, fill, scope)
 
     async def _refresh_stale(
         self,
         keys,
         stale: StoredSnapshot[Value],
         fill: Callable[[], Awaitable[Value]],
+        scope: str,
     ) -> CacheResult:
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
@@ -177,9 +179,9 @@ class RedisCoordinator(Generic[Value]):
             self._available = False
             return CacheResult(stale.value, cached=True, stale=True)
         if not won or self._capacity.locked():
-            self._telemetry.record_lease(outcome="contended", scope="platform")
+            self._telemetry.record_lease(outcome="contended", scope=scope)
             return CacheResult(stale.value, cached=True, stale=True)
-        self._telemetry.record_lease(outcome="acquired", scope="platform")
+        self._telemetry.record_lease(outcome="acquired", scope=scope)
         started = time.perf_counter()
         outcome = "ok"
         try:
@@ -207,7 +209,7 @@ class RedisCoordinator(Generic[Value]):
             self._telemetry.record_fill_duration(
                 seconds=time.perf_counter() - started,
                 outcome=outcome,
-                scope="platform",
+                scope=scope,
             )
             try:
                 await self._store.release_lease(keys=keys, bucket=bucket, token=token)
@@ -218,13 +220,14 @@ class RedisCoordinator(Generic[Value]):
         self,
         keys,
         fill: Callable[[], Awaitable[Value]],
+        scope: str,
     ) -> CacheResult:
         async with self._lock:
             local = self._fills.get(keys.base)
             if local is None:
                 local = _LocalFill(event=asyncio.Event())
                 self._fills[keys.base] = local
-                asyncio.create_task(self._run_cold(keys, fill, local))
+                asyncio.create_task(self._run_cold(keys, fill, local, scope))
         try:
             async with asyncio.timeout(self._cold_timeout):
                 await local.event.wait()
@@ -241,10 +244,11 @@ class RedisCoordinator(Generic[Value]):
         keys,
         fill: Callable[[], Awaitable[Value]],
         local: _LocalFill[Value],
+        scope: str,
     ) -> None:
         try:
             async with asyncio.timeout(self._cold_timeout):
-                local.result = await self._fill_or_poll(keys, fill)
+                local.result = await self._fill_or_poll(keys, fill, scope)
         except BaseException as exc:
             local.error = exc
         finally:
@@ -257,6 +261,7 @@ class RedisCoordinator(Generic[Value]):
         self,
         keys,
         fill: Callable[[], Awaitable[Value]],
+        scope: str,
     ) -> CacheResult:
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
@@ -277,9 +282,9 @@ class RedisCoordinator(Generic[Value]):
             raise CacheUnavailable("Redis unavailable during cold fill") from exc
 
         if not won:
-            self._telemetry.record_lease(outcome="contended", scope="platform")
+            self._telemetry.record_lease(outcome="contended", scope=scope)
             return await self._poll(keys, baseline)
-        self._telemetry.record_lease(outcome="acquired", scope="platform")
+        self._telemetry.record_lease(outcome="acquired", scope=scope)
         started = time.perf_counter()
         outcome = "ok"
         try:
@@ -310,7 +315,7 @@ class RedisCoordinator(Generic[Value]):
             self._telemetry.record_fill_duration(
                 seconds=time.perf_counter() - started,
                 outcome=outcome,
-                scope="platform",
+                scope=scope,
             )
             try:
                 await self._store.release_lease(keys=keys, bucket=bucket, token=token)

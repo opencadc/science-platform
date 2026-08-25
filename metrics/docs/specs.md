@@ -15,14 +15,13 @@ This file stores repository-specific behavioral specifications.
 
 ## Service behavior specifications
 
-- The metrics API exposes only
-  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`; probes remain
-  available at `/healthz`, `/livez`, and `/readyz`.
+- The metrics API exposes Platform and
+  `GET /apis/canfar.net/v1alpha1/metrics/user/{user}`; probes remain available
+  at `/healthz`, `/livez`, and `/readyz`.
 - Runtime configuration is environment-driven through `METRICS_*` settings;
   see `environment-contracts.md`.
-- Startup must fail fast when required source dependencies are unavailable
-  for the active platform provider (Kueue in M4). Inactive provider
-  configuration is rejected.
+- Startup must fail fast when Kueue or any configured workload namespace is
+  unavailable. Inactive provider configuration is rejected.
 - The Kueue provider implements asynchronous `read_platform()` and returns a
   transport-neutral observation to `MetricsService`.
 - Every metrics response uses `Cache-Control: no-store`. `Last-Modified`, `Age`,
@@ -45,11 +44,23 @@ This file stores repository-specific behavioral specifications.
   `kind: Metrics`, `metadata.name: platform-canfar`, `spec.platform: canfar`,
   deterministic named resources, `status.observedAt`, and exactly `Ready` and
   `Cached` conditions.
+- User route values must be non-empty canonical Kubernetes label values after
+  one URL decode. Slashes, dot segments, percent/double encoding, and selector
+  syntax are rejected before a provider call.
+- User reads select exact `canfar.net/username`, `managed-by=skaha`,
+  `part-of=canfar`, and phase `Running` Pods from every configured namespace.
+  Unknown users return `runningPods: 0` with no resources; partial namespace
+  observations return 503 and are never cached.
+- Each User resource request is the maximum of steady regular/restartable
+  sidecar requests and effective init requests, plus Pod overhead. Responses
+  expose only aggregate named resources, never Pod or member inventory.
+- User cache freshness is 2 minutes, stale serviceability is 10 minutes, and
+  retention is 15 minutes. Redis keys contain only an HMAC subject digest.
 - Request-time source failures map to HTTP 503. Errors use Kubernetes
   `apiVersion: v1`, `kind: Status`, `status: Failure` payloads without raw URLs,
   tokens, quantity payloads, exception text, or class names.
-- Cache keys contain platform scope, schema version, cluster, and the
-  non-secret provider fingerprint. Memory and Redis backends preserve the same
+- Cache keys contain subject scope, schema version, cluster, and the non-secret
+  provider fingerprint. Memory and Redis backends preserve the same
   freshness and JSON snapshot semantics. Stale-serviceable reports retain their
   original observation time; unserviceable reads return 503.
 - Custom telemetry keeps the accepted `canfar.metrics.provider.duration`,

@@ -24,4 +24,34 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "metrics-api.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- range .Values.rbac.workloadNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "metrics-api.fullname" $ }}-pod-read
+  namespace: {{ . }}
+  labels:
+    {{- include "metrics-api.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "metrics-api.fullname" $ }}-pod-read
+  namespace: {{ . }}
+  labels:
+    {{- include "metrics-api.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "metrics-api.fullname" $ }}-pod-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "metrics-api.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
 {{- end }}

@@ -14,13 +14,17 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 - **Kubernetes-first service contract:** Dev, integration, staging, and
   production run through Kubernetes deployment paths. Docker Compose is not
   part of the supported service contract (see `environment-contracts.md`).
-- **Single service process, platform-only HTTP:** `MetricsRuntime` constructs
-  the Kueue provider, owns provider lifecycle and cache resources, and exposes
-  platform reads to the versioned route. Kueue reads Kubernetes through kr8s
-  (ADR-0001). The metrics API serves only
-  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`.
-- **Truthful provider configuration:** Kueue is the only configured provider
-  and the only accepted `sources.platform` value.
+- **Single service process, bounded subject HTTP:** `MetricsRuntime` constructs
+  Kueue and Kubernetes providers and owns per-surface cache resources. Platform
+  reads Kueue; User phase 1 lists Running Pods in configured namespaces.
+- **Truthful provider configuration:** `sources.platform` accepts only `kueue`;
+  `sources.user` accepts only `kubernetes`.
+- **Server-owned User selection:** Route values are validated Kubernetes label
+  values. The provider constructs fixed provenance, exact username, and Running
+  selectors; callers cannot supply selector syntax. Every namespace must succeed.
+- **Scheduler request semantics:** User totals sum regular containers and
+  restartable sidecars, compare with effective init peaks, then add Pod overhead
+  while preserving arbitrary extended resources.
 - **Kueue allocated semantics:** Platform `allocated` values come from
   `status.flavorsUsage.resources[].total`. Kueue total already includes
   borrowed quota, so borrowed values are not added again.

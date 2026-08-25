@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Request, Response
 
 from metrics.core.runtime import MetricsRuntime
+from metrics.errors import AppError
 from metrics.http_cache import metrics_success_cache_headers
 from metrics.schemas.metrics import (
     Condition,
@@ -17,7 +20,14 @@ from metrics.schemas.metrics import (
     ResourceMetrics,
 )
 from metrics.schemas.status import Status
-from metrics.services.models import PLATFORM_SUBJECT
+from metrics.services.models import (
+    PLATFORM_SUBJECT,
+    MetricsSubject,
+    PlatformObservation,
+    UserObservation,
+)
+
+_LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 
 router = APIRouter(tags=["metrics"])
 
@@ -30,6 +40,7 @@ def get_runtime(request: Request) -> MetricsRuntime:
 @router.get(
     "/apis/canfar.net/v1alpha1/metrics/platform/canfar",
     response_model=Metrics,
+    response_model_exclude_none=True,
     responses={503: {"model": Status, "description": "No serviceable report is available."}},
     summary="Get CANFAR platform metrics",
 )
@@ -52,6 +63,8 @@ async def get_platform_metrics(
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
     observation = result.observation
+    if not isinstance(observation, PlatformObservation):
+        raise RuntimeError("Platform route received a non-platform observation")
     return Metrics(
         metadata=ObjectMetadata(name="platform-canfar"),
         spec=MetricsSpec(platform="canfar"),
@@ -64,6 +77,94 @@ async def get_platform_metrics(
                     allocated=observation.allocated[name],
                 )
                 for name in sorted(observation.capacity)
+            ],
+            conditions=[
+                Condition(
+                    type="Ready",
+                    status=ready_status,
+                    reason=ready_reason,
+                    last_transition_time=result.created,
+                ),
+                Condition(
+                    type="Cached",
+                    status=cached_status,
+                    reason=cached_reason,
+                    last_transition_time=result.created,
+                ),
+            ],
+        ),
+    )
+
+
+def _user_value(value: str) -> str:
+    """Validate one decoded canonical Kubernetes label value."""
+    if (
+        not value
+        or value in {".", ".."}
+        or "/" in value
+        or "\\" in value
+        or "%" in value
+        or not _LABEL_VALUE.fullmatch(value)
+    ):
+        raise AppError(
+            code="invalid_user",
+            message="The requested user is invalid",
+            status_code=400,
+        )
+    return value
+
+
+def _user_name(user: str) -> str:
+    """Build a deterministic DNS-safe presentation name."""
+    candidate = f"user-{user.lower()}"
+    if re.fullmatch(r"[a-z0-9](?:[-a-z0-9.]{0,61}[a-z0-9])?", candidate):
+        return candidate
+    slug = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-") or "subject"
+    digest = hashlib.sha256(user.encode()).hexdigest()[:8]
+    return f"user-{slug[:48].rstrip('-')}-{digest}"
+
+
+@router.get(
+    "/apis/canfar.net/v1alpha1/metrics/user/{user:path}",
+    response_model=Metrics,
+    response_model_exclude_none=True,
+    responses={
+        400: {"model": Status, "description": "Malformed user value."},
+        503: {"model": Status, "description": "No serviceable report is available."},
+    },
+    summary="Get current user requests",
+)
+async def get_user_metrics(
+    user: str,
+    response: Response,
+    runtime: MetricsRuntime = Depends(get_runtime),
+) -> Metrics:
+    """Return scheduler-effective requests held by one user's Running Pods."""
+    user = _user_value(user)
+    result = await runtime.metrics_service.get(MetricsSubject(kind="user", value=user))
+    observation = result.observation
+    if not isinstance(observation, UserObservation):
+        raise RuntimeError("User route received a non-user observation")
+    for key, value in metrics_success_cache_headers(
+        snapshot_created=result.created,
+        configured_ttl=runtime.metrics_service.user_cache_ttl_seconds,
+        cached=result.cached,
+        stale=result.stale,
+        cache_available=result.cache_available,
+        now=datetime.now(UTC),
+    ).items():
+        response.headers[key] = value
+    ready_status, ready_reason = result.ready_condition
+    cached_status, cached_reason = result.cached_condition
+    return Metrics(
+        metadata=ObjectMetadata(name=_user_name(user)),
+        spec=MetricsSpec(user=user),
+        status=MetricsStatus(
+            observed_at=result.created,
+            running_pods=observation.running_pods,
+            resources=[
+                ResourceMetrics(name=name, requests=observation.requests[name])
+                for name in sorted(observation.requests)
             ],
             conditions=[
                 Condition(

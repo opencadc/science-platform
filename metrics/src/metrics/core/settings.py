@@ -41,20 +41,44 @@ class KueueProviderConfig(BaseModel):
         return names
 
 
+class KubernetesProviderConfig(BaseModel):
+    """Kubernetes settings for namespaced Running workload observations."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    workload_namespaces: list[str] = Field(
+        default_factory=list,
+        description="Namespaces queried completely for subject workloads.",
+    )
+    kube_request_timeout_seconds: float = Field(default=5.0, gt=0)
+
+    @field_validator("workload_namespaces")
+    @classmethod
+    def _strip_and_reject_duplicates(cls, value: list[str]) -> list[str]:
+        """Normalize namespaces and reject duplicates."""
+        names = [str(item).strip() for item in value if str(item).strip()]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate workload namespaces: {', '.join(duplicates)}")
+        return names
+
+
 class ProviderConfigs(BaseModel):
     """Container for active upstream provider configuration blocks."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     kueue: KueueProviderConfig = Field(default_factory=KueueProviderConfig)
+    kubernetes: KubernetesProviderConfig = Field(default_factory=KubernetesProviderConfig)
 
 
 class SourceConfig(BaseModel):
-    """Which provider powers each metric source (platform only for now)."""
+    """Which provider powers each metric source."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     platform: Literal["kueue"] = "kueue"
+    user: Literal["kubernetes"] = "kubernetes"
 
 
 class CacheConfig(BaseModel):
