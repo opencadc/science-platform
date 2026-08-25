@@ -223,6 +223,7 @@ def test_openapi_contains_only_v1alpha1_metrics_contract() -> None:
         schema = client.get("/openapi.json").json()
 
     assert "/apis/canfar.net/v1alpha1/metrics/platform/canfar" in schema["paths"]
+    assert "/apis/canfar.net/v1alpha1/metrics/user/{user}" in schema["paths"]
     assert "/api/v1/metrics/platform" not in schema["paths"]
     assert "Metrics" in schema["components"]["schemas"]
     assert "Status" in schema["components"]["schemas"]
@@ -382,6 +383,7 @@ def test_main_run_wires_settings_logging_app_and_server(monkeypatch) -> None:
         host="127.0.0.1",
         port=9000,
         log_level="info",
+        access_log=False,
         workers=1,
     )
 

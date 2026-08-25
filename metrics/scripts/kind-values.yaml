@@ -10,10 +10,13 @@ serviceAccount:
 
 rbac:
   create: true
+  workloadNamespaces:
+    - canfar-workloads
 
 env:
   METRICS_CLUSTER_NAME: "kind-metrics"
   METRICS_SOURCES__PLATFORM: "kueue"
+  METRICS_SOURCES__USER: "kubernetes"
   METRICS_CACHE__BACKEND: "redis"
   # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
   METRICS_CACHE__KEY_SECRET: "kind-metrics-cache-key-32-bytes!!"
@@ -28,6 +31,7 @@ env:
   # service account; no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron"]'
+  METRICS_PROVIDERS__KUBERNETES__WORKLOAD_NAMESPACES: '["canfar-workloads"]'
 
 redis:
   enabled: true

@@ -22,6 +22,7 @@ def run() -> None:
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level,
+        access_log=False,
         workers=1,
     )
 

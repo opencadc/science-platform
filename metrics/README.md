@@ -4,10 +4,11 @@ This service collects and serves CANFAR platform metrics through a versioned
 REST API. It is built as a 12-factor FastAPI service and packaged as a single
 container process.
 
-## Kueue mode and RBAC
+## Kubernetes access and RBAC
 
 When running in-cluster, the workload needs read access
-to `clusterqueues` in the `kueue.x-k8s.io` API group. Prefer
+to `clusterqueues` in the `kueue.x-k8s.io` API group and namespaced Pod `list`
+access for each configured workload namespace. Prefer
 creating a dedicated Kubernetes `ServiceAccount` via the chart
 (`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
 permissions are not bound to the namespace `default` ServiceAccount. See
@@ -19,11 +20,12 @@ permissions are not bound to the namespace `default` ServiceAccount. See
 The API exposes:
 
 - `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`
+- `GET /apis/canfar.net/v1alpha1/metrics/user/{user}`
 - `GET /healthz`
 
 ## `v1alpha1` contract
 
-The platform route returns the shared `canfar.net/v1alpha1` `Metrics` kind.
+The Platform and User routes return the shared `canfar.net/v1alpha1` `Metrics` kind.
 Freshness is described by `Last-Modified`, `Age`, and `Cache-Status`; all API
 responses use `Cache-Control: no-store`. The design set is:
 

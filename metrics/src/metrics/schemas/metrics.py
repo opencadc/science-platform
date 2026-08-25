@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class WireModel(BaseModel):
@@ -23,15 +23,23 @@ class ObjectMetadata(WireModel):
 class MetricsSpec(WireModel):
     """One compact Metrics subject selector."""
 
-    platform: str
+    platform: str | None = None
+    user: str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_subject(self) -> MetricsSpec:
+        if sum(value is not None for value in (self.platform, self.user)) != 1:
+            raise ValueError("spec must contain exactly one subject")
+        return self
 
 
 class ResourceMetrics(WireModel):
     """Named Kubernetes resource observation."""
 
     name: str
-    capacity: str
-    allocated: str
+    capacity: str | None = None
+    allocated: str | None = None
+    requests: str | None = None
 
 
 class Condition(WireModel):
@@ -56,6 +64,7 @@ class MetricsStatus(WireModel):
     """Observed resources and exactly Ready/Cached conditions."""
 
     observed_at: datetime = Field(serialization_alias="observedAt")
+    running_pods: int | None = Field(default=None, serialization_alias="runningPods")
     resources: list[ResourceMetrics]
     conditions: list[Condition]
 

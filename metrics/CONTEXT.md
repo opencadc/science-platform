@@ -1,8 +1,7 @@
 # Metrics
 
-The Metrics service exposes cluster-wide **platform capacity** and **platform
-allocation** derived from Kueue. Skaha and other in-cluster consumers call it
-via `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`.
+The Metrics service exposes Kueue-backed **platform capacity/allocation** and
+Kubernetes-backed **current requested resources** for one User's Running Pods.
 
 Shared cross-context vocabulary: [`../CONTEXT-MAP.md`](../CONTEXT-MAP.md).
 
@@ -28,7 +27,7 @@ _Avoid_: "metrics pod" in specs.
 capacity aggregation.
 
 **Metric scope**: Named read surface mapped via `sources.*` to exactly one
-provider. The only shipped scope is `platform`. A scope ships with its route,
+provider. The shipped scopes are `platform` and `user`. A scope ships with its route,
 cache TTL, provider method, schema, telemetry, and tests together.
 
 **Source configuration**: Typed `sources` tree selecting which provider key backs
@@ -61,8 +60,8 @@ named resources, and exactly `Ready` and `Cached` conditions.
 
 ## Shared vocabulary
 
-ADRs 0004–0009 own these terms. Platform is implemented; User, Community, and
-accounting terms describe later packages.
+ADRs 0004–0009 own these terms. Platform and User phase 1 are implemented;
+Community and accounting terms describe later packages.
 
 **Metrics**: Kubernetes API kind for one bounded metrics report about
 a `Platform`, `User`, or `Community` subject. The API group `canfar.net`

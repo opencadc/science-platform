@@ -59,3 +59,21 @@ def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     assert mem_gib >= 0.19, (
         f"expected >=200Mi memory from smoke workload in allocated, got {allocated!r}"
     )
+
+
+def test_user_endpoint_matches_running_resource_shape_fixture() -> None:
+    """Bob includes resource-shapes but excludes the independent Pending control."""
+    response = httpx.get(
+        f"{base_url}/apis/canfar.net/v1alpha1/metrics/user/bob",
+        timeout=30.0,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["spec"] == {"user": "bob"}
+    assert payload["status"]["runningPods"] == 1
+    assert payload["status"]["resources"] == [
+        {"name": "cpu", "requests": "0.21"},
+        {"name": "memory", "requests": "0.101562Gi"},
+    ]
+    assert "pending-demand" not in response.text
+    assert "resource-shapes" not in response.text

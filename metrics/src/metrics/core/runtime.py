@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from time import perf_counter
+from typing import Literal
 
 from redis.asyncio import Redis
 
@@ -19,6 +20,7 @@ from metrics.cache import (
 )
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
+from metrics.providers.kubernetes import KubernetesProvider
 from metrics.providers.kueue import KueueProvider
 from metrics.services.metrics import MetricsService
 from metrics.services.models import CachedSnapshot
@@ -59,9 +61,12 @@ def platform_cache_identity(
 def build_cache(
     settings: Settings,
     recorder: MetricsRecorder | None = None,
+    *,
+    surface: Literal["platform", "user"] = "platform",
+    redis: Redis | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
     """Construct the configured cache coordinator and owned Redis client."""
-    policy = FRESHNESS_POLICIES["platform"]
+    policy = FRESHNESS_POLICIES[surface]
     if settings.cache.backend == "memory":
         return (
             InMemoryCoordinator[CachedSnapshot](
@@ -75,7 +80,7 @@ def build_cache(
     if secret is None:  # Settings validation owns the user-facing error.
         raise RuntimeStartupError("Redis cache key secret is not configured")
     secret_bytes = secret.get_secret_value().encode()
-    redis_client = Redis.from_url(
+    redis_client = redis or Redis.from_url(
         settings.redis_url,
         socket_connect_timeout=settings.cache.redis_command_timeout_seconds,
         socket_timeout=settings.cache.redis_command_timeout_seconds,
@@ -104,7 +109,7 @@ def build_cache(
             max_fills=settings.cache.max_fills,
             telemetry=recorder,
         ),
-        redis_client,
+        None if redis is not None else redis_client,
     )
 
 
@@ -118,6 +123,8 @@ class MetricsRuntime:
         provider: KueueProvider,
         metrics_service: MetricsService,
         cache: CacheCoordinator[CachedSnapshot],
+        user_provider: KubernetesProvider | None = None,
+        user_cache: CacheCoordinator[CachedSnapshot] | None = None,
         redis: Redis | None = None,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
@@ -130,13 +137,17 @@ class MetricsRuntime:
             provider: Active provider; it owns its Kubernetes access handle.
             metrics_service: Shared Metrics service exposed to HTTP adapters.
             cache: Cache coordinator and readiness dependency.
+            user_provider: Optional Kubernetes workload provider.
+            user_cache: Cache coordinator using User freshness boundaries.
             redis: Redis client when configured; closed on shutdown.
             telemetry: Bounded lifecycle and readiness recorder.
         """
         self._settings = settings
         self._provider: KueueProvider | None = provider
+        self._user_provider = user_provider
         self._provider_started = False
         self._cache = cache
+        self._user_cache = user_cache
         self._redis: Redis | None = redis
         self._metrics: MetricsService | None = metrics_service
         self._telemetry = telemetry or NoopMetricsRecorder()
@@ -156,8 +167,16 @@ class MetricsRuntime:
             A fully wired runtime ready for :meth:`start`.
         """
         cache, redis_client = build_cache(settings, recorder)
+        user_cache, _ = build_cache(
+            settings,
+            recorder,
+            surface="user",
+            redis=redis_client,
+        )
         provider = KueueProvider(settings)
+        user_provider = KubernetesProvider(settings)
         fingerprint = provider.cache_fingerprint()
+        user_fingerprint = user_provider.cache_fingerprint()
         metrics_service = MetricsService(
             platform=provider.read_platform,
             cache=cache,
@@ -166,14 +185,26 @@ class MetricsRuntime:
                 source=provider.name,
                 fingerprint=fingerprint,
             ),
+            user=user_provider.read_user,
+            user_cache=user_cache,
+            user_identity=lambda username: CacheIdentity(
+                subject_kind="user",
+                subject_value=username,
+                cluster=settings.cluster_name,
+                source=user_provider.name,
+                fingerprint=user_fingerprint,
+            ),
             telemetry=recorder,
             provider=provider.name,
+            user_provider=user_provider.name,
         )
         return cls(
             settings,
             provider=provider,
+            user_provider=user_provider,
             metrics_service=metrics_service,
             cache=cache,
+            user_cache=user_cache,
             redis=redis_client,
             telemetry=recorder,
         )
@@ -194,7 +225,10 @@ class MetricsRuntime:
     @property
     def ready(self) -> bool:
         """Whether Redis is reachable and the provider completed startup."""
-        return self._cache.available and self._provider_started
+        caches_available = self._cache.available and (
+            self._user_cache is None or self._user_cache.available
+        )
+        return caches_available and self._provider_started
 
     async def start(self) -> None:
         """Start the active provider once, cleaning up all resources on failure."""
@@ -206,7 +240,11 @@ class MetricsRuntime:
             with self._telemetry.span("application.startup"):
                 if isinstance(self._cache, RedisCoordinator):
                     await self._cache.ping()
+                if isinstance(self._user_cache, RedisCoordinator):
+                    await self._user_cache.ping()
                 await self._provider.startup()
+                if self._user_provider is not None:
+                    await self._user_provider.startup()
                 self._provider_started = True
                 self._telemetry.record_readiness(True)
                 _logger.info("Runtime startup completed")
@@ -253,6 +291,7 @@ class MetricsRuntime:
         cancellation: asyncio.CancelledError | None = None
         self._telemetry.record_readiness(False)
         provider, self._provider = self._provider, None
+        user_provider, self._user_provider = self._user_provider, None
         self._provider_started = False
         if provider is not None:
             try:
@@ -263,6 +302,15 @@ class MetricsRuntime:
             except Exception:
                 outcome = "error"
                 _logger.error("Platform provider shutdown failed; closing remaining resources")
+        if user_provider is not None:
+            try:
+                await user_provider.shutdown()
+            except asyncio.CancelledError as exc:
+                outcome = "cancelled"
+                cancellation = cancellation or exc
+            except Exception:
+                outcome = "error"
+                _logger.error("User provider shutdown failed; closing remaining resources")
         redis, self._redis = self._redis, None
         if redis is not None:
             try:

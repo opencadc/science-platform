@@ -15,6 +15,7 @@ from metrics.services.models import (
     MetricsResult,
     MetricsSubject,
     PlatformObservation,
+    UserObservation,
 )
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
@@ -33,8 +34,12 @@ class MetricsService:
         platform: Callable[[], Awaitable[PlatformObservation]],
         cache: CacheCoordinator[CachedSnapshot],
         identity: Callable[[], CacheIdentity],
+        user: Callable[[str], Awaitable[UserObservation]] | None = None,
+        user_cache: CacheCoordinator[CachedSnapshot] | None = None,
+        user_identity: Callable[[str], CacheIdentity] | None = None,
         telemetry: MetricsRecorder | None = None,
         provider: str = "unknown",
+        user_provider: str = "kubernetes",
     ) -> None:
         """Wire cache, platform loader, and optional telemetry.
 
@@ -42,19 +47,32 @@ class MetricsService:
             platform: Async callable that fetches a fresh platform observation.
             cache: Required cache coordinator storing :class:`CachedSnapshot`.
             identity: Sync callable returning the platform cache identity.
+            user: Optional callable that fetches one user observation.
+            user_cache: Coordinator using the User freshness policy.
+            user_identity: Callable returning an opaque user cache identity.
             telemetry: Optional cache/provider timing recorder.
             provider: Adapter name for provider duration telemetry.
+            user_provider: User adapter name for provider duration telemetry.
         """
         self._platform = platform
         self._cache = cache
         self._identity = identity
+        self._user = user
+        self._user_cache = user_cache
+        self._user_identity = user_identity
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
+        self._user_provider = user_provider
 
     @property
     def cache_ttl_seconds(self) -> int:
         """Return the Platform report freshness window."""
         return self._cache.policy.fresh_seconds
+
+    @property
+    def user_cache_ttl_seconds(self) -> int:
+        """Return the User report freshness window."""
+        return self._user_cache.policy.fresh_seconds if self._user_cache else 0
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
         """Return Metrics for ``subject``, using cache on hit and the source on miss.
@@ -76,13 +94,20 @@ class MetricsService:
             "metrics.get",
             {"metrics.operation": "get", "metrics.subject.type": subject.kind},
         ):
-            if subject != PLATFORM_SUBJECT:
-                raise AppError(
-                    code="subject_unsupported",
-                    message="Requested metrics subject is not supported",
-                    status_code=404,
-                )
-            return await self._get_platform()
+            if subject == PLATFORM_SUBJECT:
+                return await self._get_platform()
+            if (
+                subject.kind == "user"
+                and self._user is not None
+                and self._user_cache is not None
+                and self._user_identity is not None
+            ):
+                return await self._get_user(subject.value)
+            raise AppError(
+                code="subject_unsupported",
+                message="Requested metrics subject is not supported",
+                status_code=404,
+            )
 
     async def _get_platform(self) -> MetricsResult:
         try:
@@ -130,6 +155,97 @@ class MetricsService:
                 seconds=perf_counter() - started,
                 status=status,
                 scope=scope,
+            )
+
+    async def _get_user(self, username: str) -> MetricsResult:
+        assert self._user_cache is not None
+        assert self._user_identity is not None
+        try:
+            result = await self._user_cache.get_or_fill(
+                self._user_identity(username),
+                lambda: self._load_user_snapshot(username),
+            )
+        except CacheUnavailable as exc:
+            raise AppError(
+                code="metrics_cache_unavailable",
+                message="User metrics are temporarily unavailable",
+                status_code=503,
+                retry_after=1,
+            ) from exc
+        snapshot = result.value
+        self._record_cache_result("user", snapshot, result.cached, result.stale)
+        return MetricsResult(
+            observation=snapshot.observation,
+            created=snapshot.created,
+            cached=result.cached,
+            stale=result.stale,
+            cache_available=self._user_cache.available,
+        )
+
+    def _record_cache_result(
+        self,
+        scope: str,
+        snapshot: CachedSnapshot,
+        cached: bool,
+        stale: bool,
+    ) -> None:
+        cache = self._user_cache if scope == "user" else self._cache
+        assert cache is not None
+        cache_result = "stale" if stale else ("hit" if cached else "miss")
+        self._metrics_recorder.record_cache_lookup(
+            backend=cache.backend_name,
+            result=cache_result,
+            scope=scope,
+            age_seconds=(datetime.now(UTC) - snapshot.created).total_seconds(),
+        )
+
+    async def _load_user_snapshot(self, username: str) -> CachedSnapshot:
+        started = perf_counter()
+        status = "ok"
+        try:
+            observation = await self._timed_user_load(username)
+            return CachedSnapshot(observation=observation, created=datetime.now(UTC))
+        except AppError as exc:
+            status = exc.code
+            raise
+        except Exception:
+            status = "unexpected_error"
+            raise
+        finally:
+            self._metrics_recorder.record_compute_duration(
+                seconds=perf_counter() - started,
+                status=status,
+                scope="user",
+            )
+
+    async def _timed_user_load(self, username: str) -> UserObservation:
+        assert self._user is not None
+        started = perf_counter()
+        status = "ok"
+        try:
+            with self._metrics_recorder.span(
+                "source.read",
+                {
+                    "metrics.scope": "user",
+                    "provider.name": self._user_provider,
+                    "source.operation": "read",
+                },
+            ):
+                return await self._user(username)
+        except (ProviderUnavailableError, ProviderExecutionError) as exc:
+            status = "error"
+            logger.warning("User metrics collection failed")
+            raise AppError(
+                code="user_metrics_unavailable",
+                message="Could not load user metrics from Kubernetes",
+                status_code=503,
+            ) from exc
+        finally:
+            self._metrics_recorder.record_provider_duration(
+                provider=self._user_provider,
+                scope="user",
+                status=status,
+                seconds=perf_counter() - started,
             )
 
     async def _timed_platform_load(self) -> PlatformObservation:

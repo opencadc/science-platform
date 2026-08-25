@@ -16,8 +16,9 @@ securityContext:
       - ALL
 
 # -- Flat fail-closed Settings map. Supported provider/source keys are
-# METRICS_PROVIDERS__KUEUE__* and METRICS_SOURCES__PLATFORM=kueue; unknown
-# provider, source, cache, and Kueue fields fail application startup.
+# METRICS_PROVIDERS__KUEUE__*, METRICS_PROVIDERS__KUBERNETES__*,
+# METRICS_SOURCES__PLATFORM=kueue, and METRICS_SOURCES__USER=kubernetes;
+# unknown provider, source, or cache fields fail application startup.
 env: {}
 
 # Existing Secret containing the required cache HMAC/integrity key.
@@ -31,6 +32,8 @@ serviceAccount:
 
 rbac:
   create: false
+  # Namespaces receiving Pod list access for User metrics.
+  workloadNamespaces: []
 
 # When enabling rbac.create, set serviceAccount.create: true (and optionally
 # serviceAccount.name) so the ClusterRoleBinding does not attach read access to

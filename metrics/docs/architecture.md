@@ -19,13 +19,17 @@ This file stores repository-specific architecture facts only.
   `src/metrics/core/factory.py` registers FastAPI lifespan hooks; typed settings
   live in `src/metrics/core/settings.py` (environment-only, `METRICS_*`).
   `src/metrics/core/runtime.py` (`MetricsRuntime`) is the composition root: it
-  constructs the Kueue provider, owns provider lifecycle and cache resources,
-  and builds the platform cache key and `MetricsService`. The provider owns a lazily built kr8s API handle
-  (ADR-0001).
+  constructs the Kueue and Kubernetes providers, owns their lifecycle and
+  per-surface cache resources, and builds `MetricsService`. Providers own
+  lazily built kr8s API handles (ADR-0001).
 - Active platform metrics come only from the **Kueue** source
   (`providers/kueue.py`): `KueueProvider.read_platform` returns a transport-neutral
   `PlatformObservation`. Routes call `MetricsService.get(subject)` only.
   Configuration rejects inactive or unknown providers.
+- User phase-1 metrics come from namespaced Pod LISTs in
+  `providers/kubernetes.py`. The provider applies fixed Skaha/CANFAR provenance,
+  exact username, and Running-phase selectors, then computes scheduler-effective
+  requests.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 
@@ -35,8 +39,8 @@ This file stores repository-specific architecture facts only.
 - `core/`: `Settings`, `MetricsRuntime`, and `create_app`.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `MetricsService.get(subject)` plus transport-neutral models/sources.
-- `providers/`: `KueueProvider` reads ClusterQueues through kr8s named
-  `call_api` GETs (get-only RBAC, ADR-0001).
+- `providers/`: `KueueProvider` reads named ClusterQueues and
+  `KubernetesProvider` lists Pods only in configured workload namespaces.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside kr8s access and aggregation. Quantities parse via quantiphy
   (ADR-0001); malformed values fail the provider read.
@@ -51,12 +55,11 @@ This file stores repository-specific architecture facts only.
 - Provider boundaries stay explicit and avoid fallback indirection to removed
   legacy providers.
 - Provider construction is synchronous and network-free. `MetricsRuntime`
-  starts/stops one Kueue provider, and `KueueProvider.shutdown()` releases its
-  kr8s handle (the kr8s session is process-shared).
-- The public metrics API exposes only
-  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`. It returns the shared
-  `Metrics` kind with Kueue capacity/allocation resources and exactly `Ready`
-  and `Cached` conditions. The legacy `/api/v1` route is absent.
+  starts/stops both providers and validates every configured workload namespace.
+- The public API exposes Platform and
+  `GET /apis/canfar.net/v1alpha1/metrics/user/{user}` through the shared
+  `Metrics` kind. User snapshots use 2/10/15-minute freshness and HMAC-protected
+  subject cache keys. The legacy `/api/v1` route is absent.
 - Snapshot freshness is exposed only through `Last-Modified`, `Age`, and
   `Cache-Status`; successful and error responses use `Cache-Control: no-store`.
 

@@ -7,6 +7,7 @@ from metrics.services.models import (
     MetricsResult,
     MetricsSubject,
     PlatformObservation,
+    UserObservation,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "MetricsService",
     "MetricsSubject",
     "PlatformObservation",
+    "UserObservation",
 ]
