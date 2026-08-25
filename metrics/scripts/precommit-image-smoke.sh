@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manual pre-commit / CI stage: build the production image and prove non-root
-# runtime, package metadata, /healthz, and the current legacy Platform API.
+# runtime, package metadata, /healthz, and the three v1alpha1 GET routes.
 #
 # Entrypoint smoke reaches the existing kind ``metrics`` cluster through a
 # rewritten kubeconfig (host.docker.internal + insecure-skip-tls-verify) so
@@ -11,7 +11,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
 IMAGE_TAG="${METRICS_IMAGE_SMOKE_TAG:-metrics:toolchain-smoke}"
-PLATFORM_PATH="${METRICS_PLATFORM_PATH:-/api/v1/metrics/platform}"
 KIND_CLUSTER="${METRICS_KIND_CLUSTER:-metrics}"
 KIND_CONTEXT="${METRICS_KIND_CONTEXT:-kind-metrics}"
 HOST_PORT="${METRICS_IMAGE_SMOKE_PORT:-18000}"
@@ -86,6 +85,7 @@ container_id="$(
     -e METRICS_CACHE__BACKEND=memory \
     -e METRICS_CLUSTER_NAME=kind-metrics \
     -e 'METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-proton","cq-electron"]' \
+    -e 'METRICS_PROVIDERS__KUBERNETES__WORKLOAD_NAMESPACES=["canfar-workloads"]' \
     -v "${kubeconfig_path}:/kubeconfig/config:ro" \
     -p "${HOST_PORT}:8000" \
     "${IMAGE_TAG}"
@@ -121,10 +121,16 @@ if [[ "${ready}" -ne 1 ]]; then
 fi
 
 curl -fsS "http://127.0.0.1:${HOST_PORT}/healthz" >/dev/null
-status="$(curl -sS -o "${tmp_dir}/platform.body" -w '%{http_code}' \
-  "http://127.0.0.1:${HOST_PORT}${PLATFORM_PATH}" || true)"
-if [[ "${status}" == "404" ]]; then
-  echo "legacy Platform route missing (HTTP 404)" >&2
+for route in \
+  /apis/canfar.net/v1alpha1/metrics/platform/canfar \
+  /apis/canfar.net/v1alpha1/metrics/user/bob \
+  /apis/canfar.net/v1alpha1/metrics/community/astronomy; do
+  curl -fsS "http://127.0.0.1:${HOST_PORT}${route}" >/dev/null
+done
+legacy_status="$(curl -sS -o /dev/null -w '%{http_code}' \
+  "http://127.0.0.1:${HOST_PORT}/api/v1/metrics/platform" || true)"
+if [[ "${legacy_status}" != "404" ]]; then
+  echo "expected legacy Platform route to be absent, got HTTP ${legacy_status}" >&2
   exit 1
 fi
-echo "image smoke ok (healthz=200, platform=${status})"
+echo "image smoke ok (healthz=200, platform=200, user=200, community=200, legacy=404)"

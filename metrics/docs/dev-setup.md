@@ -29,6 +29,10 @@ UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev up
 UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev smoke
 ```
 
+Time `up` separately when it must pull the pinned kind, Kueue, Redis,
+Collector, fixture, or Python images. `smoke` is the warm gate and fails if it
+exceeds 120 seconds; its final line reports the measured warm duration.
+
 Other finite lifecycle commands are:
 
 ```bash
@@ -43,6 +47,13 @@ uv run metrics-dev reset
 the Helm workload uses only its Kubernetes ServiceAccount. `reset` preserves
 the cluster and image cache while recreating fixtures and flushing local Redis.
 The core profile does not install Prometheus or Mimir.
+
+The Helm release uses two API replicas for this gate. The warm smoke flushes
+Redis and restarts those replicas, then exercises Platform, User, and Community
+over a local HTTP socket. It checks cold fill, fresh hit, `If-Modified-Since`
+`304`, empty subjects, stale serve during a Kueue permission failure, the
+stable fail-closed `Status` response with no snapshot, legacy-route absence,
+and a graceful SIGTERM restart with shutdown-log evidence.
 
 The compatibility script delegates to the installed command:
 
@@ -109,6 +120,10 @@ fixture evidence and does not expand the Metrics API.
   `kubectl --context kind-metrics -n canfar-workloads get localqueue,workload`.
 - Redis cache data stale during iterative tests:
   `kubectl --context kind-metrics exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`.
+- Smoke fails after interrupting the stale/error scenario: rerun
+  `uv run metrics-dev image` to reconcile the chart-owned ClusterRoleBinding.
+- Warm smoke exceeds 120 seconds: inspect Pod restarts and local CPU pressure;
+  image and prerequisite pulls belong to the separately timed `metrics-dev up`.
 
 ## Related files
 

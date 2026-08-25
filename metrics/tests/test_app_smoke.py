@@ -158,6 +158,15 @@ def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> 
         assert second.json()["status"]["conditions"][1]["reason"] == "FreshHit"
         assert second.headers["cache-status"].startswith("metrics; hit; ttl=")
 
+        conditional = client.get(
+            "/apis/canfar.net/v1alpha1/metrics/platform/canfar",
+            headers={"If-Modified-Since": second.headers["last-modified"]},
+        )
+        assert conditional.status_code == 304
+        assert conditional.content == b""
+        assert conditional.headers["last-modified"] == second.headers["last-modified"]
+        assert conditional.headers["cache-control"] == "no-store"
+
         legacy = client.get("/api/v1/metrics/platform")
         assert legacy.status_code == 404
         assert legacy.json()["kind"] == "Status"

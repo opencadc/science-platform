@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import socket
 import subprocess
 import tempfile
 import time
@@ -323,6 +324,31 @@ def smoke() -> None:
     assert_safe_context()
     started = time.monotonic()
     port = "18080"
+    redis_port = "16380"
+    _kubectl(
+        "--namespace",
+        METRICS_NAMESPACE,
+        "exec",
+        "deployment/metrics-api-redis",
+        "--",
+        "redis-cli",
+        "FLUSHDB",
+    )
+    _kubectl(
+        "--namespace",
+        METRICS_NAMESPACE,
+        "rollout",
+        "restart",
+        "deployment/metrics-api-metrics-api",
+    )
+    _kubectl(
+        "--namespace",
+        METRICS_NAMESPACE,
+        "rollout",
+        "status",
+        "deployment/metrics-api-metrics-api",
+        "--timeout=120s",
+    )
     forward = subprocess.Popen(
         [
             "kubectl",
@@ -333,6 +359,21 @@ def smoke() -> None:
             "port-forward",
             "service/metrics-api-metrics-api",
             f"{port}:8000",
+        ],
+        cwd=METRICS_ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    redis_forward = subprocess.Popen(
+        [
+            "kubectl",
+            "--context",
+            KUBE_CONTEXT,
+            "--namespace",
+            METRICS_NAMESPACE,
+            "port-forward",
+            "service/metrics-api-redis",
+            f"{redis_port}:6379",
         ],
         cwd=METRICS_ROOT,
         stdout=subprocess.DEVNULL,
@@ -351,20 +392,106 @@ def smoke() -> None:
                 if forward.poll() is not None or time.monotonic() >= deadline:
                     raise DevStackError("metrics API did not become healthy within 60s")
                 time.sleep(1)
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/apis/canfar.net/v1alpha1/metrics/platform/canfar",
-            timeout=15,
-        ) as response:
-            if response.status != 200:
-                raise DevStackError(f"platform API returned HTTP {response.status}")
-        env = os.environ | {"METRICS_BASE_URL": f"http://127.0.0.1:{port}"}
+        while True:
+            try:
+                with socket.create_connection(("127.0.0.1", int(redis_port)), timeout=1):
+                    break
+            except OSError:
+                if redis_forward.poll() is not None or time.monotonic() >= deadline:
+                    raise DevStackError("Redis port-forward did not become ready")
+                time.sleep(0.25)
+        env = os.environ | {
+            "METRICS_BASE_URL": f"http://127.0.0.1:{port}",
+            "METRICS_TEST_REDIS_URL": f"redis://127.0.0.1:{redis_port}/0",
+        }
         _run(["uv", "run", "pytest", "tests/integration", "-m", "integration", "-q"], env=env)
+        pod = _output(
+            [
+                "kubectl",
+                "--context",
+                KUBE_CONTEXT,
+                "--namespace",
+                METRICS_NAMESPACE,
+                "get",
+                "pod",
+                "-l",
+                "app.kubernetes.io/component=api",
+                "-o",
+                "jsonpath={.items[0].metadata.name}",
+            ]
+        )
+        before = int(
+            _output(
+                [
+                    "kubectl",
+                    "--context",
+                    KUBE_CONTEXT,
+                    "--namespace",
+                    METRICS_NAMESPACE,
+                    "get",
+                    f"pod/{pod}",
+                    "-o",
+                    "jsonpath={.status.containerStatuses[0].restartCount}",
+                ]
+            )
+        )
+        _kubectl(
+            "--namespace",
+            METRICS_NAMESPACE,
+            "exec",
+            f"pod/{pod}",
+            "--",
+            "/bin/sh",
+            "-c",
+            "kill -TERM 1",
+        )
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            restarts = int(
+                _output(
+                    [
+                        "kubectl",
+                        "--context",
+                        KUBE_CONTEXT,
+                        "--namespace",
+                        METRICS_NAMESPACE,
+                        "get",
+                        f"pod/{pod}",
+                        "-o",
+                        "jsonpath={.status.containerStatuses[0].restartCount}",
+                    ]
+                )
+            )
+            if restarts > before:
+                break
+            time.sleep(0.5)
+        else:
+            raise DevStackError("API container did not restart after SIGTERM")
+        previous_logs = _output(
+            [
+                "kubectl",
+                "--context",
+                KUBE_CONTEXT,
+                "--namespace",
+                METRICS_NAMESPACE,
+                "logs",
+                f"pod/{pod}",
+                "--previous",
+            ]
+        )
+        if "Runtime shutdown completed" not in previous_logs:
+            raise DevStackError("graceful shutdown log was not emitted")
     finally:
         forward.terminate()
+        redis_forward.terminate()
         try:
             forward.wait(timeout=5)
         except subprocess.TimeoutExpired:
             forward.kill()
+        try:
+            redis_forward.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            redis_forward.kill()
     elapsed = time.monotonic() - started
     print(f"warm smoke completed in {elapsed:.1f}s (budget: 120s)")
     if elapsed > 120:
