@@ -13,11 +13,22 @@ data:
     exporters:
       debug:
         verbosity: basic
+{{ if .Values.collector.file.enabled }}
+      file:
+        path: /var/lib/otel/evidence.json
+        format: json
+{{ end }}
     service:
       pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [debug{{ if .Values.collector.file.enabled }}, file{{ end }}]
         metrics:
           receivers: [otlp]
-          exporters: [debug]
+          exporters: [debug{{ if .Values.collector.file.enabled }}, file{{ end }}]
+        logs:
+          receivers: [otlp]
+          exporters: [debug{{ if .Values.collector.file.enabled }}, file{{ end }}]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,6 +48,7 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -45,6 +57,8 @@ spec:
           args: ["--config=/etc/otelcol/config.yaml"]
           securityContext:
             allowPrivilegeEscalation: false
+            runAsUser: 65532
+            runAsGroup: 65532
             capabilities:
               drop: ["ALL"]
           ports:
@@ -54,10 +68,33 @@ spec:
             - name: config
               mountPath: /etc/otelcol
               readOnly: true
+            {{ if .Values.collector.file.enabled }}
+            - name: evidence
+              mountPath: /var/lib/otel
+            {{ end }}
+        {{ if .Values.collector.file.enabled }}
+        - name: evidence
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          command: ["sleep", "infinity"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: evidence
+              mountPath: /var/lib/otel
+              readOnly: true
+        {{ end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "metrics-api.fullname" . }}-collector
+        {{ if .Values.collector.file.enabled }}
+        - name: evidence
+          emptyDir: {}
+        {{ end }}
 ---
 apiVersion: v1
 kind: Service

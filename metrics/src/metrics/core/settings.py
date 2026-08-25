@@ -79,6 +79,30 @@ class CacheConfig(BaseModel):
         return self
 
 
+class OTelConfig(BaseModel):
+    """OpenTelemetry signal controls and bounded resource identity."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    metrics_enabled: bool = False
+    traces_enabled: bool = False
+    logs_enabled: bool = False
+    exporter_otlp_endpoint: str | None = None
+    service_name: str = "canfar-metrics"
+    export_interval_millis: int = Field(default=60_000, gt=0)
+    deployment_environment: str = "unknown"
+    kubernetes_namespace: str = "unknown"
+    pod_uid: str = "unknown"
+
+    @model_validator(mode="after")
+    def _require_endpoint_when_enabled(self) -> OTelConfig:
+        if (
+            self.metrics_enabled or self.traces_enabled or self.logs_enabled
+        ) and not self.exporter_otlp_endpoint:
+            raise ValueError("exporter_otlp_endpoint is required when an OTel signal is enabled")
+        return self
+
+
 class Settings(BaseSettings):
     """Process configuration: defaults overridden by ``METRICS_*`` environment."""
 
@@ -102,12 +126,8 @@ class Settings(BaseSettings):
     providers: ProviderConfigs = Field(default_factory=ProviderConfigs)
     sources: SourceConfig = Field(default_factory=SourceConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
+    otel: OTelConfig = Field(default_factory=OTelConfig)
 
     redis_url: str = "redis://localhost:6379/0"
     redis_key_prefix: str = "metrics:"
     cache_control_public: bool = True
-
-    otel_metrics_enabled: bool = False
-    otel_service_name: str = "canfar-metrics"
-    otel_exporter_otlp_endpoint: str | None = None
-    otel_export_interval_millis: int = Field(default=60_000, gt=0)

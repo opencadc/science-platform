@@ -8,12 +8,14 @@ import hmac
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from time import perf_counter
 from typing import Any, Generic, TypeVar
 
 from pydantic import TypeAdapter, ValidationError
 from redis.exceptions import RedisError
 
 from metrics.cache.models import CacheKeys, SnapshotEnvelope
+from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 Value = TypeVar("Value")
 
@@ -60,6 +62,7 @@ class RedisSnapshots(Generic[Value]):
         schema_revision: str,
         source_revision: str,
         query_revision: str,
+        telemetry: MetricsRecorder | None = None,
     ) -> None:
         """Configure revisions, integrity key, deadlines, and retention."""
         self._redis = redis
@@ -70,13 +73,23 @@ class RedisSnapshots(Generic[Value]):
         self.schema_revision = schema_revision
         self.source_revision = source_revision
         self.query_revision = query_revision
+        self._telemetry = telemetry or NoopMetricsRecorder()
 
-    async def _command(self, awaitable: Any) -> Any:
+    async def _command(self, operation: str, awaitable: Any) -> Any:
+        started = perf_counter()
+        outcome = "ok"
         try:
             async with asyncio.timeout(self._command_timeout):
                 return await awaitable
         except (RedisError, TimeoutError) as exc:
+            outcome = "error"
             raise RedisUnavailable("Redis command failed") from exc
+        finally:
+            self._telemetry.record_redis(
+                operation=operation,
+                outcome=outcome,
+                seconds=perf_counter() - started,
+            )
 
     @staticmethod
     def _text(raw: Any) -> str:
@@ -88,12 +101,12 @@ class RedisSnapshots(Generic[Value]):
 
     async def ping(self) -> None:
         """Require a successful bounded Redis health check."""
-        if not await self._command(self._redis.ping()):
+        if not await self._command("ping", self._redis.ping()):
             raise RedisUnavailable("Redis ping failed")
 
     async def pointer(self, keys: CacheKeys) -> str | None:
         """Read the latest immutable snapshot ID."""
-        raw = await self._command(self._redis.get(keys.latest))
+        raw = await self._command("get", self._redis.get(keys.latest))
         if raw is None:
             return None
         try:
@@ -106,7 +119,7 @@ class RedisSnapshots(Generic[Value]):
         snapshot_id = await self.pointer(keys)
         if snapshot_id is None:
             return None
-        raw = await self._command(self._redis.get(keys.snapshot(snapshot_id)))
+        raw = await self._command("get", self._redis.get(keys.snapshot(snapshot_id)))
         if raw is None:
             return None
         try:
@@ -150,6 +163,7 @@ class RedisSnapshots(Generic[Value]):
         ).hexdigest()
         payload = envelope.model_dump_json()
         await self._command(
+            "publish",
             self._redis.eval(
                 _PUBLISH,
                 2,
@@ -158,7 +172,7 @@ class RedisSnapshots(Generic[Value]):
                 payload,
                 snapshot_id,
                 self._retention_seconds,
-            )
+            ),
         )
 
     async def acquire_lease(
@@ -171,15 +185,19 @@ class RedisSnapshots(Generic[Value]):
     ) -> bool:
         """Acquire one refresh-bucket lease with a unique owner token."""
         result = await self._command(
+            "lease_acquire",
             self._redis.set(
                 keys.lease(bucket),
                 token,
                 nx=True,
                 px=max(1, int(lease_seconds * 1000)),
-            )
+            ),
         )
         return bool(result)
 
     async def release_lease(self, *, keys: CacheKeys, bucket: int, token: str) -> None:
         """Delete a lease only when ``token`` still owns it."""
-        await self._command(self._redis.eval(_RELEASE, 1, keys.lease(bucket), token))
+        await self._command(
+            "lease_release",
+            self._redis.eval(_RELEASE, 1, keys.lease(bucket), token),
+        )

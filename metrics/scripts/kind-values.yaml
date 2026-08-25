@@ -17,9 +17,13 @@ env:
   METRICS_CACHE__BACKEND: "redis"
   # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
   METRICS_CACHE__KEY_SECRET: "kind-metrics-cache-key-32-bytes!!"
-  METRICS_OTEL_METRICS_ENABLED: "true"
-  METRICS_OTEL_EXPORTER_OTLP_ENDPOINT: "http://metrics-api-collector:4318/v1/metrics"
-  METRICS_OTEL_EXPORT_INTERVAL_MILLIS: "1000"
+  METRICS_OTEL__METRICS_ENABLED: "true"
+  METRICS_OTEL__TRACES_ENABLED: "true"
+  METRICS_OTEL__LOGS_ENABLED: "true"
+  METRICS_OTEL__EXPORTER_OTLP_ENDPOINT: "http://metrics-api-collector:4318"
+  METRICS_OTEL__EXPORT_INTERVAL_MILLIS: "1000"
+  METRICS_OTEL__DEPLOYMENT_ENVIRONMENT: "development"
+  METRICS_OTEL__KUBERNETES_NAMESPACE: "metrics"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
   # service account; no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
@@ -30,3 +34,5 @@ redis:
 
 collector:
   enabled: true
+  file:
+    enabled: true
