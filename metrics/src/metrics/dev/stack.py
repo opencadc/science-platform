@@ -308,6 +308,7 @@ def run_host() -> None:
                 "KUBECONFIG": str(kubeconfig),
                 "METRICS_CLUSTER_NAME": KUBE_CONTEXT,
                 "METRICS_CACHE__BACKEND": "redis",
+                "METRICS_CACHE__KEY_SECRET": "metrics-dev-ephemeral-cache-key!!",
                 "METRICS_REDIS_URL": "redis://127.0.0.1:16379/0",
                 "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES": '["cq-proton","cq-electron"]',
             }

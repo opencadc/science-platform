@@ -71,9 +71,17 @@ def create_app(
 
     app.include_router(router)
 
+    @app.get("/livez", include_in_schema=False)
     @app.get("/healthz", include_in_schema=False)
     async def healthcheck() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/readyz", include_in_schema=False)
+    async def readiness() -> JSONResponse:
+        status = 200 if runtime.ready else 503
+        return JSONResponse(
+            status_code=status, content={"status": "ready" if status == 200 else "not ready"}
+        )
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
@@ -82,10 +90,13 @@ def create_app(
             metadata=ResponseMetadata(),
             error=ErrorDetail(code=exc.code, message=exc.message),
         )
+        headers = {"Cache-Control": "no-store"}
+        if exc.retry_after is not None:
+            headers["Retry-After"] = str(exc.retry_after)
         return JSONResponse(
             status_code=exc.status_code,
             content=body.model_dump(mode="json", by_alias=True),
-            headers={"Cache-Control": "no-store"},
+            headers=headers,
         )
 
     @app.exception_handler(Exception)

@@ -8,7 +8,8 @@ env:
   METRICS_CLUSTER_NAME: "dev-cluster"
   METRICS_SOURCES__PLATFORM: "kueue"
   METRICS_CACHE__BACKEND: "redis"
-  METRICS_CACHE__TTL_SECONDS: "15"
+  # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
+  METRICS_CACHE__KEY_SECRET: "local-development-cache-key-32bytes"
   METRICS_OTEL_METRICS_ENABLED: "false"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
   # service account (ADR-0001); no transport settings are configured here.

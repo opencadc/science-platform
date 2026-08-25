@@ -40,6 +40,19 @@ spec:
             {{- if .Values.redis.enabled }}
             - name: METRICS_REDIS_URL
               value: {{ printf "redis://%s-redis:6379/0" (include "metrics-api.fullname" .) | quote }}
+            {{- else if .Values.redis.urlSecret.name }}
+            - name: METRICS_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.urlSecret.name | quote }}
+                  key: {{ .Values.redis.urlSecret.key | quote }}
+            {{- end }}
+            {{- if .Values.cacheKeySecret.name }}
+            - name: METRICS_CACHE__KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cacheKeySecret.name | quote }}
+                  key: {{ .Values.cacheKeySecret.key | quote }}
             {{- end }}
             {{- range $k, $v := .Values.env }}
             - name: {{ $k }}

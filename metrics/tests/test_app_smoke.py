@@ -15,7 +15,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 
 import metrics.core.factory as factory_module
 import metrics.main as main_module
-from metrics.cache import InMemoryTTLCache
+from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, InMemoryCoordinator
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
 from metrics.errors import RuntimeStartupError
@@ -78,7 +78,7 @@ CQ_B = {
 def _settings() -> Settings:
     return Settings(
         cluster_name="prod",
-        cache=CacheConfig(backend="memory", ttl_seconds=30),
+        cache=CacheConfig(backend="memory"),
         providers=ProviderConfigs(kueue=KueueProviderConfig(cluster_queues=["cq-a", "cq-b"])),
     )
 
@@ -92,12 +92,16 @@ def _runtime(
     active = provider or KueueProvider(
         settings, api=FakeKueueApi(docs or {"cq-a": CQ_A, "cq-b": CQ_B})
     )
+    cache = InMemoryCoordinator[CachedSnapshot](
+        policy=FRESHNESS_POLICIES["platform"],
+        created=lambda snapshot: snapshot.created,
+    )
     service = MetricsService(
         platform=active.read_platform,
-        cache=InMemoryTTLCache[CachedSnapshot](ttl_seconds=30),
-        key=lambda: "platform:4:prod:",
+        cache=cache,
+        identity=lambda: CacheIdentity("platform", "", "prod", "kueue", "test"),
     )
-    return MetricsRuntime(settings, provider=active, metrics_service=service)
+    return MetricsRuntime(settings, provider=active, metrics_service=service, cache=cache)
 
 
 def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> None:
@@ -108,7 +112,7 @@ def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> 
         # HTTP caching is header-based (ADR-0002): shared, bounded by TTL.
         cache_control = response.headers["cache-control"]
         assert "public" in cache_control
-        assert 25 <= cache_control_max_age(cache_control) <= 30
+        assert 295 <= cache_control_max_age(cache_control) <= 300
         assert response.headers.get("date")
         assert response.headers.get("expires")
         created = datetime.fromisoformat(response.json()["metadata"]["created"])
@@ -288,7 +292,7 @@ def test_otel_wiring_instruments_and_uninstruments(monkeypatch) -> None:
 
 
 def test_main_run_wires_settings_logging_app_and_server(monkeypatch) -> None:
-    settings = Settings(host="127.0.0.1", port=9000)
+    settings = Settings(host="127.0.0.1", port=9000, cache=CacheConfig(backend="memory"))
     app = object()
     monkeypatch.setattr(main_module, "Settings", MagicMock(return_value=settings))
     monkeypatch.setattr(main_module, "create_app", MagicMock(return_value=app))

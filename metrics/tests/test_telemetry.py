@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from metrics.core.settings import Settings
+from metrics.core.settings import CacheConfig, Settings
 from metrics.telemetry import (
     NoopMetricsRecorder,
     OpenTelemetryMetricsRecorder,
@@ -9,7 +9,9 @@ from metrics.telemetry import (
 
 
 def test_setup_telemetry_defaults_to_noop_when_disabled() -> None:
-    recorder, meter_provider = setup_telemetry(Settings(otel_metrics_enabled=False))
+    recorder, meter_provider = setup_telemetry(
+        Settings(otel_metrics_enabled=False, cache=CacheConfig(backend="memory"))
+    )
     assert isinstance(recorder, NoopMetricsRecorder)
     assert meter_provider is None
 

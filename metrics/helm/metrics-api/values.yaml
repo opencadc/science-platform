@@ -20,6 +20,11 @@ securityContext:
 # provider, source, cache, and Kueue fields fail application startup.
 env: {}
 
+# Existing Secret containing the required cache HMAC/integrity key.
+cacheKeySecret:
+  name: ""
+  key: key-secret
+
 serviceAccount:
   create: false
   name: ""
@@ -32,8 +37,12 @@ rbac:
 # the namespace default ServiceAccount by accident.
 
 redis:
-  enabled: true
+  # Embedded Redis is local-only. Production supplies urlSecret.
+  enabled: false
   image: redis:7-alpine
+  urlSecret:
+    name: ""
+    key: redis-url
 
 collector:
   enabled: false

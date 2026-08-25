@@ -80,16 +80,12 @@ pre-commit run --all-files
 Run the API locally:
 
 ```bash
-METRICS_CACHE__BACKEND=memory \
-METRICS_PROVIDERS__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
-METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-proton"]' \
-uv run python -m metrics.main
+uv run metrics-dev up
+uv run metrics-dev run
 ```
 
-`METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` must be a JSON array string (not a
-comma-separated list). Use this command for process-level debugging. For
-supported `dev` operation with Kueue dependencies, follow the
-Kubernetes-first setup in `docs/dev-setup.md`.
+This starts the host process against the local Redis and Kueue dependencies.
+For the full Kubernetes-first workflow, follow `docs/dev-setup.md`.
 
 For roadmap-level environment naming across `dev`, integration, staging, and
 production, see `docs/environment-contracts.md`.

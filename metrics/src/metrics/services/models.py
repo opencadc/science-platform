@@ -45,3 +45,4 @@ class MetricsResult:
     observation: PlatformObservation
     created: datetime
     cached: bool
+    stale: bool = False

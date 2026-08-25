@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from metrics.core.settings import Settings
 
@@ -33,6 +34,10 @@ def test_shipped_values_env_validates_against_settings(
     for name, value in values.get("env", {}).items():
         monkeypatch.setenv(name, str(value))
 
+    if not values.get("env"):
+        with pytest.raises(ValidationError, match="key_secret"):
+            Settings()
+        return
     settings = Settings()
     assert settings.sources.platform == "kueue"
     if values.get("env"):
