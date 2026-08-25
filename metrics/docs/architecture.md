@@ -31,7 +31,7 @@ This file stores repository-specific architecture facts only.
 
 ## Layered package map
 
-- `api/v1/`: versioned HTTP routes.
+- `api/v1alpha1/`: versioned HTTP routes.
 - `core/`: `Settings`, `MetricsRuntime`, and `create_app`.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `MetricsService.get(subject)` plus transport-neutral models/sources.
@@ -53,9 +53,12 @@ This file stores repository-specific architecture facts only.
 - Provider construction is synchronous and network-free. `MetricsRuntime`
   starts/stops one Kueue provider, and `KueueProvider.shutdown()` releases its
   kr8s handle (the kr8s session is process-shared).
-- The public API exposes only `GET /api/v1/metrics/platform` and `GET /healthz`
-  in M4; per-user and session routes are removed until full provider contracts
-  return.
+- The public metrics API exposes only
+  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`. It returns the shared
+  `Metrics` kind with Kueue capacity/allocation resources and exactly `Ready`
+  and `Cached` conditions. The legacy `/api/v1` route is absent.
+- Snapshot freshness is exposed only through `Last-Modified`, `Age`, and
+  `Cache-Status`; successful and error responses use `Cache-Control: no-store`.
 
 ## Update rules
 

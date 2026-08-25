@@ -15,26 +15,24 @@ This file stores repository-specific behavioral specifications.
 
 ## Service behavior specifications
 
-- The API exposes `GET /api/v1/metrics/platform` and `GET /healthz` (M4).
+- The metrics API exposes only
+  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`; probes remain
+  available at `/healthz`, `/livez`, and `/readyz`.
 - Runtime configuration is environment-driven through `METRICS_*` settings;
   see `environment-contracts.md`.
 - Startup must fail fast when required source dependencies are unavailable
   for the active platform provider (Kueue in M4). Inactive provider
   configuration is rejected.
-- A provider selected for `sources.platform` must implement the asynchronous
-  `PlatformMetrics.platform()` read. Binding fails during runtime construction
-  when that observable capability is absent; no separate scope declaration can
-  override the provider's behavior.
-- Cache behavior is communicated via HTTP headers (`Cache-Control`, `Date`,
-  `Expires`, and `Last-Modified`) for platform responses. The platform scope
-  uses `cache.ttl_seconds`; per-scope overrides return with the first
-  user-scoped cache (ADR-0002).
-- For `GET /api/v1/metrics/platform`, each key present in `data.capacity` is
-  also present in `data.allocated`, and the **same resource name must use the
+- The Kueue provider implements asynchronous `read_platform()` and returns a
+  transport-neutral observation to `MetricsService`.
+- Every metrics response uses `Cache-Control: no-store`. `Last-Modified`, `Age`,
+  and RFC 9211 `Cache-Status` describe the internal snapshot.
+- For the platform route, each named `status.resources` entry contains both
+  `capacity` and `allocated`, and the **same resource name must use the
   same unit in both maps** (CPU as decimal core counts, memory as `Gi` binary
   quantities, other resources with the same formatting rules in both). Callers
   can compare the two without converting between millicores and cores.
-- Platform `data.allocated` is summed from
+- Platform `allocated` is summed from
   `status.flavorsUsage.resources[].total`; do not add `borrowed` separately
   because Kueue total already includes borrowed quota.
 - Kueue resource quantities must be strings matching Kubernetes decimal SI,
@@ -43,18 +41,17 @@ This file stores repository-specific behavioral specifications.
   whitespace-padded, malformed, negative, non-finite, or base-unit-overflowing
   values fail the provider read; an absent allocation for a capacity key
   remains a same-unit zero.
-- Successful platform responses retain the versioned envelope
-  (`version`, `kind: PlatformMetrics`, `metadata.created`, `status`, `data`),
-  open resource-name maps, deterministic resource ordering, and snapshot
-  timestamp reuse across cache hits.
-- Request-time provider unavailability maps to HTTP 503; provider execution
-  failure maps to HTTP 502. Error envelopes use `kind: Status`,
-  `status: Error`, and `Cache-Control: no-store`, without raw URLs, tokens,
-  quantity payloads, exception text, or class names.
+- Successful platform responses use `apiVersion: canfar.net/v1alpha1`,
+  `kind: Metrics`, `metadata.name: platform-canfar`, `spec.platform: canfar`,
+  deterministic named resources, `status.observedAt`, and exactly `Ready` and
+  `Cached` conditions.
+- Request-time source failures map to HTTP 503. Errors use Kubernetes
+  `apiVersion: v1`, `kind: Status`, `status: Failure` payloads without raw URLs,
+  tokens, quantity payloads, exception text, or class names.
 - Cache keys contain platform scope, schema version, cluster, and the
   non-secret provider fingerprint. Memory and Redis backends preserve the same
-  TTL and JSON snapshot semantics. The current service has no stale-response
-  fallback: an expired/missing snapshot requires a successful provider read.
+  freshness and JSON snapshot semantics. Stale-serviceable reports retain their
+  original observation time; unserviceable reads return 503.
 - Custom telemetry keeps the accepted `canfar.metrics.provider.duration`,
   `canfar.metrics.cache.lookups`, and `canfar.metrics.compute.duration`
   instruments and their bounded attributes; HTTP request metrics come from

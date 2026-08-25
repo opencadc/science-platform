@@ -1,8 +1,8 @@
-"""HTTP caching helpers for metrics responses (Cache-Control, Date, Expires, Last-Modified)."""
+"""HTTP metadata describing internal Metrics snapshots."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from email.utils import format_datetime
 
 
@@ -29,41 +29,33 @@ def remaining_freshness_seconds(
     created = _ensure_utc(snapshot_created)
     clock = _ensure_utc(now)
     age_seconds = max(0.0, (clock - created).total_seconds())
-    return max(0, int(configured_ttl - age_seconds))
+    return int(configured_ttl - age_seconds)
 
 
 def metrics_success_cache_headers(
     *,
     snapshot_created: datetime,
     configured_ttl: int,
-    shared_cache_public: bool,
+    cached: bool,
+    stale: bool,
+    cache_available: bool,
     now: datetime | None = None,
 ) -> dict[str, str]:
-    """Build Date, Cache-Control, Expires, and Last-Modified for a successful metrics GET.
-
-    * Visibility is ``public`` when ``shared_cache_public`` is true, else ``private``.
-    * ``max-age`` is **remaining** freshness (configured TTL minus snapshot age).
-    * When ``configured_ttl == 0``, sends ``Cache-Control: no-store``.
-    """
+    """Build no-store, age, modification, and RFC 9211 cache-status headers."""
     now = _ensure_utc(now or datetime.now(UTC))
     created = _ensure_utc(snapshot_created)
-
-    headers: dict[str, str] = {
+    age = max(0, int((now - created).total_seconds()))
+    ttl = remaining_freshness_seconds(snapshot_created, configured_ttl, now=now)
+    if not cache_available:
+        cache_status = f'metrics; hit; ttl={ttl}; detail="redis-unavailable"'
+    elif stale or cached:
+        cache_status = f"metrics; hit; ttl={ttl}"
+    else:
+        cache_status = f"metrics; fwd=uri-miss; ttl={ttl}"
+    return {
         "Date": http_date(now),
+        "Cache-Control": "no-store",
         "Last-Modified": http_date(created),
+        "Age": str(age),
+        "Cache-Status": cache_status,
     }
-
-    if configured_ttl <= 0:
-        headers["Cache-Control"] = "no-store"
-        return headers
-
-    remaining = remaining_freshness_seconds(
-        snapshot_created,
-        configured_ttl,
-        now=now,
-    )
-    vis = "public" if shared_cache_public else "private"
-    headers["Cache-Control"] = f"{vis}, max-age={remaining}"
-    expires_at = now + timedelta(seconds=remaining)
-    headers["Expires"] = http_date(expires_at)
-    return headers

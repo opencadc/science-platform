@@ -22,27 +22,34 @@ def test_health_endpoint() -> None:
 
 
 def test_platform_endpoint_shape() -> None:
-    response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=10)
+    response = httpx.get(
+        f"{base_url}/apis/canfar.net/v1alpha1/metrics/platform/canfar", timeout=10
+    )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["kind"] == "PlatformMetrics"
-    assert payload["data"]["scope"] == "platform"
-    assert isinstance(payload["data"]["capacity"], dict)
-    assert isinstance(payload["data"]["allocated"], dict)
-    assert "cpu" in payload["data"]["capacity"]
-    assert "memory" in payload["data"]["capacity"]
-    assert "created" in payload["metadata"]
-    assert "ttl" not in payload["metadata"]
-    assert "cached" not in payload["metadata"]
-    assert "Cache-Control" in response.headers
-    assert "Date" in response.headers or "date" in response.headers
+    assert payload["apiVersion"] == "canfar.net/v1alpha1"
+    assert payload["kind"] == "Metrics"
+    assert payload["spec"] == {"platform": "canfar"}
+    resources = {resource["name"]: resource for resource in payload["status"]["resources"]}
+    assert {"cpu", "memory"} <= resources.keys()
+    assert [condition["type"] for condition in payload["status"]["conditions"]] == [
+        "Ready",
+        "Cached",
+    ]
+    assert response.headers["cache-control"] == "no-store"
+    assert {"last-modified", "age", "cache-status"} <= response.headers.keys()
 
 
 def test_platform_endpoint_allocated_includes_kueue_smoke_workload() -> None:
     """Allocated map includes the borrowed Kueue smoke Workload total."""
-    response = httpx.get(f"{base_url}/api/v1/metrics/platform", timeout=30.0)
+    response = httpx.get(
+        f"{base_url}/apis/canfar.net/v1alpha1/metrics/platform/canfar", timeout=30.0
+    )
     assert response.status_code == 200
-    allocated = response.json()["data"]["allocated"]
+    allocated = {
+        resource["name"]: resource["allocated"]
+        for resource in response.json()["status"]["resources"]
+    }
     cpu_cores = parse_resource_amount("cpu", allocated.get("cpu", "0"))
     mem_gib = parse_resource_amount("memory", allocated.get("memory", "0Gi"))
     # scripts/test-setup.yaml: cq-electron has 100m/100Mi nominal quota, while

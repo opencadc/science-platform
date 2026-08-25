@@ -7,18 +7,26 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from starlette.exceptions import HTTPException
 
-from metrics.api.v1.routes import router
+from metrics.api.v1alpha1.routes import router
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import Settings
 from metrics.errors import AppError, RuntimeStartupError
-from metrics.schemas.metrics import ErrorDetail, ErrorResponse, ResponseMetadata
+from metrics.schemas.status import Status, StatusReason
 from metrics.telemetry import setup_telemetry
 
 _logger = logging.getLogger(__name__)
+_STATUS_REASONS: dict[int, tuple[StatusReason, str]] = {
+    400: ("BadRequest", "The request is malformed."),
+    404: ("NotFound", "The requested resource was not found."),
+    422: ("Invalid", "The requested subject is not supported."),
+    503: ("ServiceUnavailable", "The requested metrics report could not be produced."),
+}
 
 
 def _sanitize_http_span(span, scope: dict, _message: dict | None = None) -> None:
@@ -62,8 +70,6 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         started = False
         app.state.runtime = runtime
-        app.state.api_version = f"{settings.api_group}/{settings.app_version}"
-        app.state.cache_control_public = settings.cache_control_public
         try:
             try:
                 with telemetry.recorder.span("application.lifespan"):
@@ -124,11 +130,10 @@ def create_app(
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
-        body = ErrorResponse(
-            version=app.state.api_version,
-            metadata=ResponseMetadata(),
-            error=ErrorDetail(code=exc.code, message=exc.message),
+        reason, message = _STATUS_REASONS.get(
+            exc.status_code, ("InternalError", "The request could not be completed.")
         )
+        body = Status(reason=reason, message=message, code=exc.status_code)
         headers = {"Cache-Control": "no-store"}
         if exc.retry_after is not None:
             headers["Retry-After"] = str(exc.retry_after)
@@ -138,17 +143,38 @@ def create_app(
             headers=headers,
         )
 
+    @app.exception_handler(HTTPException)
+    async def http_error_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+        reason, message = _STATUS_REASONS.get(
+            exc.status_code, ("InternalError", "The request could not be completed.")
+        )
+        body = Status(reason=reason, message=message, code=exc.status_code)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=body.model_dump(mode="json", by_alias=True),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        _request: Request, _exc: RequestValidationError
+    ) -> JSONResponse:
+        reason, message = _STATUS_REASONS[400]
+        body = Status(reason=reason, message=message, code=400)
+        return JSONResponse(
+            status_code=400,
+            content=body.model_dump(mode="json", by_alias=True),
+            headers={"Cache-Control": "no-store"},
+        )
+
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
         del exc
         _logger.error("Unhandled request failure")
-        body = ErrorResponse(
-            version=app.state.api_version,
-            metadata=ResponseMetadata(),
-            error=ErrorDetail(
-                code="internal_error",
-                message="Unexpected internal server error",
-            ),
+        body = Status(
+            reason="InternalError",
+            message="The request could not be completed.",
+            code=500,
         )
         return JSONResponse(
             status_code=500,

@@ -30,7 +30,7 @@ def test_platform_cache_identity_preserves_source_dimensions() -> None:
         source="kueue",
         fingerprint="abc123",
     )
-    assert identity == CacheIdentity("platform", "", "kind-metrics", "kueue", "abc123")
+    assert identity == CacheIdentity("platform", "canfar", "kind-metrics", "kueue", "abc123")
 
 
 class _RecordingRedis:
@@ -46,7 +46,7 @@ def _runtime_with(provider: LifecycleProvider, *, redis: _RecordingRedis | None 
     service = MetricsService(
         platform=provider.read_platform,
         cache=cache,
-        identity=lambda: CacheIdentity("platform", "", "c", "stub"),
+        identity=lambda: CacheIdentity("platform", "canfar", "c", "stub"),
         provider=provider.name,
     )
     return MetricsRuntime(
@@ -135,7 +135,7 @@ async def test_metrics_service_reads_through_coordinator() -> None:
     service = MetricsService(
         platform=counting,
         cache=_memory_cache(),
-        identity=lambda: CacheIdentity("platform", "", "c", "stub"),
+        identity=lambda: CacheIdentity("platform", "canfar", "c", "stub"),
     )
 
     first = await service.get(PLATFORM_SUBJECT)

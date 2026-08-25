@@ -114,8 +114,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CANFAR Metrics API"
-    app_version: str = "v1"
-    api_group: str = "metrics.canfar.net"
+    app_version: str = "v1alpha1"
 
     host: str = "0.0.0.0"
     port: int = 8000
@@ -130,4 +129,3 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
     redis_key_prefix: str = "metrics:"
-    cache_control_public: bool = True

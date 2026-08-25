@@ -18,14 +18,14 @@ permissions are not bound to the namespace `default` ServiceAccount. See
 
 The API exposes:
 
-- `GET /api/v1/metrics/platform`
+- `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`
 - `GET /healthz`
 
-## Accepted `v1alpha1` transition
+## `v1alpha1` contract
 
-The routes above describe the current implementation. The unreleased service
-will hard-cut to the shared `canfar.net/v1alpha1` `Metrics` contract; the
-implementation has not started yet. The design set is:
+The platform route returns the shared `canfar.net/v1alpha1` `Metrics` kind.
+Freshness is described by `Last-Modified`, `Age`, and `Cache-Status`; all API
+responses use `Cache-Control: no-store`. The design set is:
 
 - [`docs/canfar-metrics-v1alpha1-design.md`](docs/canfar-metrics-v1alpha1-design.md) — public wire and HTTP contract;
 - [`docs/canfar-metrics-backend-technical-design.md`](docs/canfar-metrics-backend-technical-design.md) — async runtime, Redis, OTel, container, and local-stack design; and
@@ -91,7 +91,8 @@ For roadmap-level environment naming across `dev`, integration, staging, and
 production, see `docs/environment-contracts.md`.
 
 Platform response expansion for borrowed/lending details is out of scope for
-this delivery; the API contract remains `capacity` and `allocated` maps only.
+this delivery; each resource reports normalized `capacity` and `allocated`
+quantities.
 
 ### Kueue-backed platform metrics
 

@@ -18,7 +18,7 @@ class MetricsSubject:
     value: str = ""
 
 
-PLATFORM_SUBJECT = MetricsSubject(kind="platform")
+PLATFORM_SUBJECT = MetricsSubject(kind="platform", value="canfar")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,3 +46,25 @@ class MetricsResult:
     created: datetime
     cached: bool
     stale: bool = False
+    cache_available: bool = True
+
+    @property
+    def ready_condition(
+        self,
+    ) -> tuple[Literal["True", "False"], Literal["Available", "StaleData"]]:
+        """Return the public Ready status and reason."""
+        return ("False", "StaleData") if self.stale else ("True", "Available")
+
+    @property
+    def cached_condition(
+        self,
+    ) -> tuple[
+        Literal["True", "False", "Unknown"],
+        Literal["FreshHit", "StaleHit", "Refreshed", "RedisUnavailable"],
+    ]:
+        """Return the public Cached status and reason."""
+        if not self.cache_available:
+            return "Unknown", "RedisUnavailable"
+        if self.stale:
+            return "True", "StaleHit"
+        return ("True", "FreshHit") if self.cached else ("False", "Refreshed")

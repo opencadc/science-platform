@@ -30,7 +30,7 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
 - **`MetricsRuntime`** owns the active provider lifecycle, cache backend, and
   platform service for `sources.platform`.
 - **Startup vs request:** validation for required upstreams runs during
-  `startup()` in lifespan; the `PlatformMetricsService` path serves cached
+  `startup()` in lifespan; the `MetricsService` path serves cached
   results and maps request-time failures to HTTP/telemetry (without exposing raw
   upstream error strings in response bodies where security review disallows it).
 
@@ -46,13 +46,13 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
 ## Request flow
 
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
-2. **HTTP GET** `/api/v1/metrics/platform`: route depends on `MetricsRuntime`;
+2. **HTTP GET** `/apis/canfar.net/v1alpha1/metrics/platform/canfar`: route depends on `MetricsRuntime`;
    `runtime.platform_service.get_platform_metrics()` serves the read.
 3. **Miss:** Concurrent misses coalesce onto one in-flight load
    (single-flight); the loader → `KueueProvider.platform()` fetches configured
    queues via kr8s with bounded concurrency, sums nominal quota and usage
    `total` fields, and formats strings.
-4. **Response:** `PlatformMetricsData` carries `capacity` / `allocated` dicts;
+4. **Response:** `Metrics.status.resources` carries named `capacity` / `allocated` quantities;
    HTTP caching uses `Cache-Control`, `Date`, `Expires`, and `Last-Modified`
    (see `metrics.http_cache`). Keys in `allocated` match those in `capacity`.
 5. **Shutdown:** `runtime.shutdown()` stops the active platform provider

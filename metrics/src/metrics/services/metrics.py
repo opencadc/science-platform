@@ -53,7 +53,7 @@ class MetricsService:
 
     @property
     def cache_ttl_seconds(self) -> int:
-        """Freshness window retained by the legacy Platform HTTP adapter."""
+        """Return the Platform report freshness window."""
         return self._cache.policy.fresh_seconds
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
@@ -76,7 +76,7 @@ class MetricsService:
             "metrics.get",
             {"metrics.operation": "get", "metrics.subject.type": subject.kind},
         ):
-            if subject.kind != PLATFORM_SUBJECT.kind:
+            if subject != PLATFORM_SUBJECT:
                 raise AppError(
                     code="subject_unsupported",
                     message="Requested metrics subject is not supported",
@@ -108,6 +108,7 @@ class MetricsService:
             created=snapshot.created,
             cached=result.cached,
             stale=result.stale,
+            cache_available=self._cache.available,
         )
 
     async def _load_snapshot(self) -> CachedSnapshot:
@@ -158,7 +159,7 @@ class MetricsService:
                 raise AppError(
                     code="platform_metrics_error",
                     message="Platform metrics collection failed",
-                    status_code=502,
+                    status_code=503,
                 ) from exc
             raise
         finally:
