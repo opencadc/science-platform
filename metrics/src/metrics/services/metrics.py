@@ -474,7 +474,7 @@ class MetricsService:
 
     async def _timed_platform_load(self) -> PlatformObservation:
         started = perf_counter()
-        pstatus = "ok"
+        status = "ok"
         try:
             with self._metrics_recorder.span(
                 "source.read",
@@ -485,27 +485,29 @@ class MetricsService:
                 },
             ):
                 return await self._platform()
-        except Exception as exc:
-            pstatus = "error"
-            if isinstance(exc, ProviderUnavailableError):
-                logger.warning("Platform metrics unavailable")
-                raise AppError(
-                    code="platform_metrics_unavailable",
-                    message="Could not load platform metrics from Kubernetes",
-                    status_code=503,
-                ) from exc
-            if isinstance(exc, ProviderExecutionError):
-                logger.error("Platform metrics collection failed")
-                raise AppError(
-                    code="platform_metrics_error",
-                    message="Platform metrics collection failed",
-                    status_code=503,
-                ) from exc
+        except ProviderUnavailableError as exc:
+            status = "error"
+            logger.warning("Platform metrics unavailable")
+            raise AppError(
+                code="platform_metrics_unavailable",
+                message="Could not load platform metrics from Kubernetes",
+                status_code=503,
+            ) from exc
+        except ProviderExecutionError as exc:
+            status = "error"
+            logger.error("Platform metrics collection failed")
+            raise AppError(
+                code="platform_metrics_error",
+                message="Platform metrics collection failed",
+                status_code=503,
+            ) from exc
+        except Exception:
+            status = "error"
             raise
         finally:
             self._metrics_recorder.record_provider_duration(
                 provider=self._provider,
                 scope="platform",
-                status=pstatus,
+                status=status,
                 seconds=perf_counter() - started,
             )
