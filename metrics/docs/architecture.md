@@ -26,10 +26,15 @@ This file stores repository-specific architecture facts only.
   (`providers/kueue.py`): `KueueProvider.read_platform` returns a transport-neutral
   `PlatformObservation`. Routes call `MetricsService.get(subject)` only.
   Configuration rejects inactive or unknown providers.
-- User and Community phase-1 metrics come from namespaced Pod LISTs in
+- User and Community current metrics come from namespaced Pod LISTs in
   `providers/kubernetes.py`. The provider applies fixed Skaha/CANFAR provenance,
   an exact canonical subject label, and Running-phase selectors, then computes
   scheduler-effective requests.
+- Optional lifetime accounting comes from fixed instant-query templates in
+  `providers/promql.py`. `services/accounting.py` coordinates separate User and
+  Community snapshots through Redis; `MetricsService` joins them only when the
+  accounting Pod UID set and per-resource coverage match the current Running
+  Pod observation.
 - Runtime dependencies are defined in `pyproject.toml`.
 - Test dependencies are in the `dev` dependency group.
 
@@ -40,7 +45,8 @@ This file stores repository-specific architecture facts only.
 - `schemas/`: Pydantic API and internal transfer models (`schemas/metrics.py`).
 - `services/`: `MetricsService.get(subject)` plus transport-neutral models/sources.
 - `providers/`: `KueueProvider` reads named ClusterQueues and
-  `KubernetesProvider` lists Pods only in configured workload namespaces.
+  `KubernetesProvider` lists Pods only in configured workload namespaces;
+  `PromQLProvider` validates controlled accounting vectors.
 - `providers/kueue.py` includes nominal-quota parsing from ``spec.resourceGroups``
   alongside kr8s access and aggregation. Quantities parse via quantiphy
   (ADR-0001); malformed values fail the provider read.
@@ -59,6 +65,10 @@ This file stores repository-specific architecture facts only.
 - The public API exposes Platform, User, and Community routes through the shared
   `Metrics` kind. User and Community snapshots use 2/10/15-minute freshness and
   HMAC-protected subject cache keys. The legacy `/api/v1` route is absent.
+- Complete lifetime data adds `ActiveWorkloadLifetime` resource hours and a
+  ratio derived from summed numerator and denominator. Missing coverage omits
+  those fields and returns current requests with `Ready=False`; Community
+  responses remain aggregate-only.
 - Snapshot freshness is exposed only through `Last-Modified`, `Age`, and
   `Cache-Status`; successful and error responses use `Cache-Control: no-store`.
 - `If-Modified-Since` is evaluated against the snapshot creation second and

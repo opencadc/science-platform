@@ -89,7 +89,9 @@ uv run metrics-dev run
 This starts the host process against the local Redis and Kueue dependencies.
 Use `uv run metrics-dev up --profile accounting` to add pinned
 kube-state-metrics, Prometheus, recording rules, and producer fixtures; the
-default core profile remains unchanged.
+default core profile remains unchanged. Run
+`uv run metrics-dev smoke --profile accounting` for the separate lifetime
+reconciliation, restart, and provider-outage gate.
 For the full Kubernetes-first workflow, follow `docs/dev-setup.md`.
 
 For roadmap-level environment naming across `dev`, integration, staging, and
@@ -135,6 +137,11 @@ Over real forwarded sockets it proves cold and fresh cache reads, conditional
 responses, all three current-metrics routes, legacy-route absence, and graceful
 SIGTERM shutdown. The reported warm duration excludes prerequisite and image
 pulls; use `metrics-dev up` to record cold setup separately.
+
+The accounting profile adds aggregate active-workload lifetime fields to the
+same User and Community routes. Incomplete or unavailable accounting is omitted
+while serviceable current requests return with `Ready=False`; Community output
+never includes users, Pods, or sessions.
 
 ## Container image
 

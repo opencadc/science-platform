@@ -129,6 +129,16 @@ def _prepare(topology: Path) -> None:
     stack._kubectl(
         "--namespace",
         stack.WORKLOAD_NAMESPACE,
+        "wait",
+        "pod",
+        "-l",
+        WORKLOAD_LABEL,
+        "--for=delete",
+        f"--timeout={TIMEOUT}",
+    )
+    stack._kubectl(
+        "--namespace",
+        stack.WORKLOAD_NAMESPACE,
         "delete",
         "job/integration-busy",
         "workload/integration-idle",
@@ -178,16 +188,21 @@ def _assert_borrowing(manifest: Path) -> None:
     _apply_phase(manifest, "borrowing")
     _wait_admitted("integration-idle")
     _wait_running("integration-idle")
-    used = _kubectl_output(
-        "get",
-        "clusterqueue/cq-electron",
-        "-o",
-        "jsonpath={.status.flavorsUsage[?(@.name=='default-flavor')].resources[?(@.name=='cpu')].total}",
-    )
-    if _millicpu(used) <= 100:
-        raise stack.DevStackError(
-            f"borrowing assertion failed: cq-electron CPU usage is {used}, expected more than 100m"
+    deadline = time.monotonic() + 30
+    while True:
+        used = _kubectl_output(
+            "get",
+            "clusterqueue/cq-electron",
+            "-o",
+            "jsonpath={.status.flavorsUsage[?(@.name=='default-flavor')].resources[?(@.name=='cpu')].total}",
         )
+        if _millicpu(used) > 100:
+            return
+        if time.monotonic() >= deadline:
+            raise stack.DevStackError(
+                f"borrowing assertion failed: cq-electron CPU usage is {used}, expected more than 100m"
+            )
+        time.sleep(0.25)
 
 
 def _apply_controls(manifest: Path) -> None:
@@ -264,6 +279,16 @@ def _assert_fair_sharing(manifest: Path) -> None:
         "delete",
         "job/fair-warm-high",
         "--wait",
+        f"--timeout={TIMEOUT}",
+    )
+    stack._kubectl(
+        "--namespace",
+        stack.WORKLOAD_NAMESPACE,
+        "wait",
+        "pod",
+        "-l",
+        "job-name=fair-warm-high",
+        "--for=delete",
         f"--timeout={TIMEOUT}",
     )
     _wait_admitted("fair-next-low")

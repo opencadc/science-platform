@@ -86,4 +86,23 @@ def test_accounting_profile_is_explicit_and_core_remains_default() -> None:
     parser = build_parser()
     assert parser.parse_args(["up"]).profile == "core"
     assert parser.parse_args(["up", "--profile", "accounting"]).profile == "accounting"
+    assert parser.parse_args(["smoke"]).profile == "core"
+    assert parser.parse_args(["smoke", "--profile", "accounting"]).profile == "accounting"
     assert stack.ACCOUNTING_PROFILE.name == "accounting-profile.yaml"
+
+
+def test_deploy_selects_accounting_without_leaking_into_core(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(stack, "_helm", lambda *args: calls.append(args))
+
+    stack._deploy("metrics", "test", "accounting")
+    stack._deploy("metrics", "test", "core")
+
+    assert "env.METRICS_PROVIDERS__PROMQL__ENABLED=true" in calls[0]
+    assert (
+        "env.METRICS_PROVIDERS__PROMQL__BASE_URL=http://metrics-accounting-prometheus.metrics.svc:9090"
+        in calls[0]
+    )
+    assert "env.METRICS_PROVIDERS__PROMQL__ENABLED=false" in calls[1]

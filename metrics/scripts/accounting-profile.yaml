@@ -12,11 +12,15 @@ kind: ServiceAccount
 metadata:
   name: metrics-kube-state-metrics
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: metrics-kube-state-metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 rules:
   - apiGroups: [""]
     resources: [pods]
@@ -26,6 +30,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: metrics-kube-state-metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -40,6 +46,8 @@ kind: Deployment
 metadata:
   name: metrics-kube-state-metrics
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   replicas: 1
   selector:
@@ -75,6 +83,8 @@ kind: Service
 metadata:
   name: metrics-kube-state-metrics
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   selector:
     app: metrics-kube-state-metrics
@@ -87,40 +97,124 @@ kind: ConfigMap
 metadata:
   name: metrics-accounting-producer
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 data:
   producer.py: |
+    import json
     import os
+    import ssl
     from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.request import Request, urlopen
 
-    labels = (
-        f'cluster="kind-metrics",namespace="metrics",pod_uid="{os.environ["POD_UID"]}",'
-        'resource="cpu",canfar_username="ada",canfar_community="science",'
-        'source_revision="1"'
-    )
-    payload = (
-        f'metrics_fixture_active_workload_usage_hours{{{labels},unit="core-hours"}} 1.5\n'
-        f'metrics_fixture_active_workload_requested_hours{{{labels},unit="core-hours"}} 4\n'
-        f'metrics_fixture_active_workload_accounting_complete'
-        f'{{{labels},unit="boolean",reason="complete"}} 1\n'
-    ).encode()
+    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    api = "https://kubernetes.default.svc/api/v1/namespaces/canfar-workloads/pods"
+    values = {
+        "cpu": ("core-hours", "0.1", "0.2"),
+        "memory": ("GiB-hours", "0.05", "0.1"),
+    }
+
+    def active_pods():
+        token = open(token_path, encoding="utf-8").read()
+        request = Request(api, headers={"Authorization": f"Bearer {token}"})
+        with urlopen(request, context=ssl.create_default_context(cafile=ca_path), timeout=5) as response:
+            pods = json.load(response)["items"]
+        for pod in pods:
+            labels = pod["metadata"].get("labels", {})
+            if (
+                pod.get("status", {}).get("phase") == "Running"
+                and labels.get("app.kubernetes.io/managed-by") == "skaha"
+                and labels.get("app.kubernetes.io/part-of") == "canfar"
+                and labels.get("canfar.net/username")
+                and labels.get("canfar.net/community")
+            ):
+                yield pod["metadata"]["uid"], labels
+
+    def fixture_payload():
+        lines = []
+        for uid, pod_labels in active_pods():
+            for resource, (unit, usage, requested) in values.items():
+                labels = {
+                    "cluster": "kind-metrics",
+                    "namespace": "canfar-workloads",
+                    "pod_uid": uid,
+                    "resource": resource,
+                    "canfar_username": pod_labels["canfar.net/username"],
+                    "canfar_community": pod_labels["canfar.net/community"],
+                    "source_revision": "1",
+                }
+                encoded = ",".join(f"{key}={json.dumps(value)}" for key, value in labels.items())
+                lines.extend(
+                    (
+                        f'metrics_fixture_active_workload_usage_hours{{{encoded},unit="{unit}"}} {usage}',
+                        f'metrics_fixture_active_workload_requested_hours{{{encoded},unit="{unit}"}} {requested}',
+                        f'metrics_fixture_active_workload_accounting_complete'
+                        f'{{{encoded},unit="boolean",reason="complete"}} 1',
+                    )
+                )
+        return ("\n".join(lines) + "\n").encode()
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; version=0.0.4")
-            self.end_headers()
-            self.wfile.write(payload)
+            try:
+                payload = fixture_payload()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; version=0.0.4")
+                self.end_headers()
+                self.wfile.write(payload)
+            except Exception:
+                self.send_response(503)
+                self.end_headers()
 
         def log_message(self, *_):
             pass
 
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-accounting-producer
+  namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: metrics-accounting-producer
+  namespace: canfar-workloads
+  labels:
+    metrics.canfar.net/profile: accounting
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-accounting-producer
+  namespace: canfar-workloads
+  labels:
+    metrics.canfar.net/profile: accounting
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: metrics-accounting-producer
+subjects:
+  - kind: ServiceAccount
+    name: metrics-accounting-producer
+    namespace: metrics
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: metrics-accounting-producer
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   replicas: 1
   strategy:
@@ -133,6 +227,7 @@ spec:
       labels:
         app: metrics-accounting-producer
     spec:
+      serviceAccountName: metrics-accounting-producer
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -144,11 +239,6 @@ spec:
           command:
             - python
             - /fixture/producer.py
-          env:
-            - name: POD_UID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.uid
           ports:
             - name: http
               containerPort: 8080
@@ -170,6 +260,8 @@ kind: Service
 metadata:
   name: metrics-accounting-producer
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   selector:
     app: metrics-accounting-producer
@@ -182,6 +274,8 @@ kind: ConfigMap
 metadata:
   name: metrics-accounting-prometheus
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 data:
   prometheus.yml: |
     global:
@@ -213,6 +307,8 @@ kind: Deployment
 metadata:
   name: metrics-accounting-prometheus
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   replicas: 1
   strategy:
@@ -262,6 +358,8 @@ kind: Service
 metadata:
   name: metrics-accounting-prometheus
   namespace: metrics
+  labels:
+    metrics.canfar.net/profile: accounting
 spec:
   selector:
     app: metrics-accounting-prometheus

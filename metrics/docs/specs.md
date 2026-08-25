@@ -59,6 +59,13 @@ This file stores repository-specific behavioral specifications.
   scheduler request, cache, and validation semantics as User reads, selecting
   exact `canfar.net/community` values in one provider scan. Responses expose only
   community totals, never member identities or Pod inventory.
+- When controlled PromQL accounting is enabled, User and Community responses
+  include `ActiveWorkloadLifetime` values only for resources covered by every
+  currently Running Pod UID. Usage and requested hours are summed before
+  efficiency is derived.
+- Missing or unavailable lifetime coverage never becomes zero. Current
+  requests remain serviceable with omitted accounting fields and
+  `Ready=False`; no useful current section returns a sanitized 503.
 - Request-time source failures map to HTTP 503. Errors use Kubernetes
   `apiVersion: v1`, `kind: Status`, `status: Failure` payloads without raw URLs,
   tokens, quantity payloads, exception text, or class names.
@@ -75,7 +82,3 @@ This file stores repository-specific behavioral specifications.
 
 Canonical decisions: [`docs/adr/README.md`](adr/README.md).
 
-## Proposed decisions
-
-ADR-0003 remains proposed. Nothing in it is accepted runtime configuration or
-a shipped route.

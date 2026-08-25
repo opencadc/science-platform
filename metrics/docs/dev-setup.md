@@ -59,13 +59,19 @@ Use the optional accounting profile when changing the lifetime source:
 
 ```bash
 UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev up --profile accounting
+UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev smoke --profile accounting
 ```
 
 It adds pinned kube-state-metrics and Prometheus workloads plus the
 Metrics-owned recording rules and deterministic producer fixture in
 `scripts/accounting-profile.yaml`. The default `core` profile remains
-unchanged. Mimir is not part of this local gate; the same provider contract can
-target Mimir by setting its server-owned base URL and optional tenant ID.
+unchanged. The accounting smoke reconciles User and Community lifetime fields
+with the controlled per-Pod series, recreates the producer and Prometheus data,
+and proves a Prometheus outage returns current requests as partial data. Its
+separate warm budget is 300 seconds. Running `metrics-dev up` without the
+profile removes the optional accounting resources and reconverges core. Mimir
+is not part of this local gate; the same provider contract can target Mimir by
+setting its server-owned base URL and optional tenant ID.
 
 The compatibility script delegates to the installed command:
 
@@ -136,6 +142,8 @@ fixture evidence and does not expand the Metrics API.
   `uv run metrics-dev image` to reconcile the chart-owned ClusterRoleBinding.
 - Warm smoke exceeds 120 seconds: inspect Pod restarts and local CPU pressure;
   image and prerequisite pulls belong to the separately timed `metrics-dev up`.
+- Accounting smoke exceeds 300 seconds: inspect producer and Prometheus
+  rollouts separately from the core two-minute gate.
 
 ## Related files
 

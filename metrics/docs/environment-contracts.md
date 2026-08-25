@@ -41,6 +41,9 @@ present) Kubernetes secret file sources; environment values override defaults
 - `METRICS_SOURCES__PLATFORM` → `sources.platform` (which provider key backs
   platform metrics; M4 uses `kueue`)
 - `METRICS_CACHE__KEY_SECRET` → required for Redis and at least 32 UTF-8 bytes
+- `METRICS_PROVIDERS__PROMQL__ENABLED` and
+  `METRICS_PROVIDERS__PROMQL__BASE_URL` → opt into the controlled
+  Prometheus-compatible accounting source
 - `METRICS_CACHE__REDIS_COMMAND_TIMEOUT_SECONDS` /
   `METRICS_CACHE__FILL_TIMEOUT_SECONDS` /
   `METRICS_CACHE__COLD_GET_TIMEOUT_SECONDS` → finite cache deadlines
@@ -50,8 +53,9 @@ prefix without extra nesting. Legacy flat aliases such as `METRICS_KUEUE_*` and
 `KUEUE_METRICS_*` are **not** part of the M4 settings surface; configure Kueue
 through `METRICS_PROVIDERS__KUEUE__*`.
 
-Only `providers.kueue` is accepted. Unknown provider blocks and source names
-fail settings validation; `sources.platform` accepts only `kueue`. Kubernetes
+The implemented provider blocks are `kueue`, `kubernetes`, and optional
+`promql`. Unknown provider fields and source names fail settings validation;
+`sources.platform` accepts only `kueue`. Kubernetes
 endpoint, credentials, and CA are discovered by kr8s from the service account
 or kubeconfig (ADR-0001) and are not settings. The reference chart
 `values-dev.yaml` and `scripts/kind-values.yaml` use this same closed Settings
@@ -64,6 +68,12 @@ and Community use 2/10/15-minute boundaries.
 
 Borrowed/lending response expansion is out of scope for this delivery; platform
 responses remain the existing `capacity` and `allocated` maps.
+
+When PromQL is enabled, its base URL is server-owned and Metrics issues only
+the built-in User and Community instant-query templates. Optional
+`METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID` sets the single typed Mimir tenant
+header. Raw queries, arbitrary headers, and caller-selected endpoints are not
+configuration surfaces.
 
 ## Cluster RBAC (Helm)
 

@@ -25,6 +25,52 @@ routes = {
     "user": "/apis/canfar.net/v1alpha1/metrics/user/bob",
     "community": "/apis/canfar.net/v1alpha1/metrics/community/astronomy",
 }
+accounting = pytest.mark.skipif(
+    os.getenv("METRICS_TEST_PROFILE") != "accounting",
+    reason="accounting profile not configured",
+)
+
+
+def _wait_for_accounting_series() -> None:
+    forward = subprocess.Popen(
+        [
+            "kubectl",
+            "--context",
+            "kind-metrics",
+            "-n",
+            "metrics",
+            "port-forward",
+            "service/metrics-accounting-prometheus",
+            "19090:9090",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 30
+    try:
+        while forward.poll() is None and time.monotonic() < deadline:
+            try:
+                response = httpx.post(
+                    "http://127.0.0.1:19090/api/v1/query",
+                    data={"query": "count(canfar_active_workload_accounting_complete)"},
+                    timeout=2,
+                )
+                result = response.json()["data"]["result"]
+                if result and float(result[0]["value"][1]) > 0:
+                    return
+            except (httpx.HTTPError, KeyError, ValueError):
+                pass
+            time.sleep(0.25)
+        raise AssertionError("accounting series did not become ready within 30s")
+    finally:
+        forward.terminate()
+        forward.wait(timeout=5)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def accounting_series_ready() -> None:
+    if os.getenv("METRICS_TEST_PROFILE") == "accounting":
+        _wait_for_accounting_series()
 
 
 def test_health_endpoint() -> None:
@@ -146,10 +192,10 @@ def test_user_endpoint_matches_running_resource_shape_fixture() -> None:
     payload = response.json()
     assert payload["spec"] == {"user": "bob"}
     assert payload["status"]["runningPods"] == 1
-    assert payload["status"]["resources"] == [
-        {"name": "cpu", "requests": "0.21"},
-        {"name": "memory", "requests": "0.101562Gi"},
-    ]
+    assert [
+        {"name": resource["name"], "requests": resource["requests"]}
+        for resource in payload["status"]["resources"]
+    ] == [{"name": "cpu", "requests": "0.21"}, {"name": "memory", "requests": "0.101562Gi"}]
     assert "pending-demand" not in response.text
     assert "resource-shapes" not in response.text
 
@@ -164,11 +210,160 @@ def test_community_endpoint_reconciles_mixed_users_without_member_inventory() ->
     payload = response.json()
     assert payload["spec"] == {"community": "astronomy"}
     assert payload["status"]["runningPods"] == 2
-    assert payload["status"]["resources"] == [
-        {"name": "cpu", "requests": "0.5"},
-        {"name": "memory", "requests": "0.320312Gi"},
-    ]
+    assert [
+        {"name": resource["name"], "requests": resource["requests"]}
+        for resource in payload["status"]["resources"]
+    ] == [{"name": "cpu", "requests": "0.5"}, {"name": "memory", "requests": "0.320312Gi"}]
     assert all(member not in response.text for member in ("alice", "carol"))
+
+
+@accounting
+@pytest.mark.parametrize(
+    ("route", "running_pods", "expected"),
+    [
+        (
+            routes["user"],
+            1,
+            {
+                "cpu": ("0.1", "0.2", "0.5"),
+                "memory": ("0.05", "0.1", "0.5"),
+            },
+        ),
+        (
+            routes["community"],
+            2,
+            {
+                "cpu": ("0.2", "0.4", "0.5"),
+                "memory": ("0.1", "0.2", "0.5"),
+            },
+        ),
+    ],
+    ids=("user", "community"),
+)
+def test_accounting_profile_reconciles_complete_lifetime_values(
+    route: str,
+    running_pods: int,
+    expected: dict[str, tuple[str, str, str]],
+) -> None:
+    response = httpx.get(f"{base_url}{route}", timeout=30)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"]["accountingPeriod"] == "ActiveWorkloadLifetime"
+    assert payload["status"]["runningPods"] == running_pods
+    resources = {resource["name"]: resource for resource in payload["status"]["resources"]}
+    for name, (usage, requested, efficiency) in expected.items():
+        assert resources[name]["usageHours"] == usage
+        assert resources[name]["requestedHours"] == requested
+        assert resources[name]["efficiency"] == efficiency
+    assert payload["status"]["conditions"][0]["reason"] == "Available"
+    if route == routes["community"]:
+        assert all(value not in response.text for value in ("alice", "carol", "pod_uid"))
+
+
+@accounting
+def test_accounting_restart_recovers_and_provider_outage_returns_partial_current_data() -> None:
+    redis_url = os.environ["METRICS_TEST_REDIS_URL"]
+    redis = Redis.from_url(redis_url, decode_responses=True)
+    try:
+        for deployment in ("metrics-accounting-producer", "metrics-accounting-prometheus"):
+            subprocess.run(
+                [
+                    "kubectl",
+                    "--context",
+                    "kind-metrics",
+                    "-n",
+                    "metrics",
+                    "rollout",
+                    "restart",
+                    f"deployment/{deployment}",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "kubectl",
+                    "--context",
+                    "kind-metrics",
+                    "-n",
+                    "metrics",
+                    "rollout",
+                    "status",
+                    f"deployment/{deployment}",
+                    "--timeout=120s",
+                ],
+                check=True,
+            )
+        _wait_for_accounting_series()
+        redis.flushdb()
+        recovered = httpx.get(f"{base_url}{routes['user']}", timeout=30)
+        assert recovered.status_code == 200
+        assert recovered.json()["status"]["accountingPeriod"] == "ActiveWorkloadLifetime"
+
+        subprocess.run(
+            [
+                "kubectl",
+                "--context",
+                "kind-metrics",
+                "-n",
+                "metrics",
+                "scale",
+                "deployment/metrics-accounting-prometheus",
+                "--replicas=0",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "kubectl",
+                "--context",
+                "kind-metrics",
+                "-n",
+                "metrics",
+                "rollout",
+                "status",
+                "deployment/metrics-accounting-prometheus",
+                "--timeout=60s",
+            ],
+            check=True,
+        )
+        redis.flushdb()
+        partial = httpx.get(
+            f"{base_url}/apis/canfar.net/v1alpha1/metrics/user/carol",
+            timeout=30,
+        )
+        assert partial.status_code == 200
+        assert partial.json()["status"]["conditions"][0]["reason"] == "PartialData"
+        assert partial.json()["status"]["runningPods"] == 1
+        assert "usageHours" not in partial.text
+    finally:
+        subprocess.run(
+            [
+                "kubectl",
+                "--context",
+                "kind-metrics",
+                "-n",
+                "metrics",
+                "scale",
+                "deployment/metrics-accounting-prometheus",
+                "--replicas=1",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "kubectl",
+                "--context",
+                "kind-metrics",
+                "-n",
+                "metrics",
+                "rollout",
+                "status",
+                "deployment/metrics-accounting-prometheus",
+                "--timeout=120s",
+            ],
+            check=True,
+        )
+        redis.close()
 
 
 def test_built_image_serves_stale_then_fails_closed_without_a_snapshot() -> None:
