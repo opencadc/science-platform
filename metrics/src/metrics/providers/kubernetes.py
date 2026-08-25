@@ -18,10 +18,11 @@ from metrics.providers.kueue import (
     merge_resource_totals,
     parse_resource_amount,
 )
-from metrics.services.models import UserObservation
+from metrics.services.models import CommunityObservation, UserObservation
 
 _MANAGED_BY = "app.kubernetes.io/managed-by=skaha"
 _PART_OF = "app.kubernetes.io/part-of=canfar"
+_COMMUNITY_LABEL = "canfar.net/community"
 _USERNAME_LABEL = "canfar.net/username"
 _REQUEST_ERRORS = (
     kr8s.APITimeoutError,
@@ -38,7 +39,7 @@ async def create_kube_api(config: KubernetesProviderConfig) -> Any:
 
 
 def _requests(container: dict[str, Any]) -> dict[str, float]:
-    values = ((container.get("resources") or {}).get("requests") or {})
+    values = (container.get("resources") or {}).get("requests") or {}
     if not isinstance(values, dict):
         raise ProviderExecutionError("Kubernetes Pod data contained invalid resource requests")
     return {name: parse_resource_amount(name, value) for name, value in values.items()}
@@ -92,10 +93,11 @@ def scheduler_requests(pod: dict[str, Any]) -> dict[str, float]:
 async def fetch_running_pods(
     api: Any,
     namespaces: list[str],
-    username: str,
+    label: str,
+    value: str,
 ) -> list[dict[str, Any]]:
     """List exact-subject Running Pods from every configured namespace."""
-    selector = ",".join((_MANAGED_BY, _PART_OF, f"{_USERNAME_LABEL}={username}"))
+    selector = ",".join((_MANAGED_BY, _PART_OF, f"{label}={value}"))
 
     async def fetch(namespace: str) -> list[dict[str, Any]]:
         async with api.call_api(
@@ -116,7 +118,7 @@ async def fetch_running_pods(
 
 
 class KubernetesProvider:
-    """Namespaced Kubernetes source for user workload requests."""
+    """Namespaced Kubernetes source for subject workload requests."""
 
     def __init__(self, settings: Settings, api: Any | None = None) -> None:
         """Attach settings and an optional pre-built Kubernetes API handle."""
@@ -141,9 +143,32 @@ class KubernetesProvider:
 
     async def read_user(self, username: str) -> UserObservation:
         """Aggregate scheduler-effective requests for one exact username."""
+        pods, requests = await self._read_subject(_USERNAME_LABEL, username)
+        return UserObservation(user=username, running_pods=len(pods), requests=requests)
+
+    async def read_community(self, community: str) -> CommunityObservation:
+        """Aggregate scheduler-effective requests for one exact community."""
+        pods, requests = await self._read_subject(_COMMUNITY_LABEL, community)
+        return CommunityObservation(
+            community=community,
+            running_pods=len(pods),
+            requests=requests,
+        )
+
+    async def _read_subject(
+        self,
+        label: str,
+        value: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        """Read and aggregate one exact canonical subject label."""
         api = await self._ensure_api()
         try:
-            pods = await fetch_running_pods(api, self._config.workload_namespaces, username)
+            pods = await fetch_running_pods(
+                api,
+                self._config.workload_namespaces,
+                label,
+                value,
+            )
             totals: dict[str, float] = {}
             for pod in pods:
                 _add(totals, scheduler_requests(pod))
@@ -155,12 +180,9 @@ class KubernetesProvider:
             ) from exc
         except _REQUEST_ERRORS as exc:
             raise ProviderExecutionError("Failed querying Running Pods") from exc
-        return UserObservation(
-            user=username,
-            running_pods=len(pods),
-            requests={
-                name: format_resource_amount(name, value) for name, value in sorted(totals.items())
-            },
+        return (
+            pods,
+            {name: format_resource_amount(name, value) for name, value in sorted(totals.items())},
         )
 
     def cache_fingerprint(self) -> str:
@@ -180,8 +202,18 @@ class KubernetesProvider:
             )
         try:
             api = await self._ensure_api()
-            await fetch_running_pods(api, self._config.workload_namespaces, "metrics-startup-check")
-        except (ProviderUnavailableError, ProviderExecutionError, kr8s.ServerError, *_REQUEST_ERRORS) as exc:
+            await fetch_running_pods(
+                api,
+                self._config.workload_namespaces,
+                _USERNAME_LABEL,
+                "metrics-startup-check",
+            )
+        except (
+            ProviderUnavailableError,
+            ProviderExecutionError,
+            kr8s.ServerError,
+            *_REQUEST_ERRORS,
+        ) as exc:
             raise RuntimeStartupError(
                 "Cannot list Running Pods in every configured workload namespace"
             ) from exc

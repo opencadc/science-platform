@@ -62,7 +62,7 @@ def build_cache(
     settings: Settings,
     recorder: MetricsRecorder | None = None,
     *,
-    surface: Literal["platform", "user"] = "platform",
+    surface: Literal["platform", "user", "community"] = "platform",
     redis: Redis | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
     """Construct the configured cache coordinator and owned Redis client."""
@@ -125,6 +125,7 @@ class MetricsRuntime:
         cache: CacheCoordinator[CachedSnapshot],
         user_provider: KubernetesProvider | None = None,
         user_cache: CacheCoordinator[CachedSnapshot] | None = None,
+        community_cache: CacheCoordinator[CachedSnapshot] | None = None,
         redis: Redis | None = None,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
@@ -139,6 +140,7 @@ class MetricsRuntime:
             cache: Cache coordinator and readiness dependency.
             user_provider: Optional Kubernetes workload provider.
             user_cache: Cache coordinator using User freshness boundaries.
+            community_cache: Cache coordinator using Community freshness boundaries.
             redis: Redis client when configured; closed on shutdown.
             telemetry: Bounded lifecycle and readiness recorder.
         """
@@ -148,6 +150,7 @@ class MetricsRuntime:
         self._provider_started = False
         self._cache = cache
         self._user_cache = user_cache
+        self._community_cache = community_cache
         self._redis: Redis | None = redis
         self._metrics: MetricsService | None = metrics_service
         self._telemetry = telemetry or NoopMetricsRecorder()
@@ -173,6 +176,12 @@ class MetricsRuntime:
             surface="user",
             redis=redis_client,
         )
+        community_cache, _ = build_cache(
+            settings,
+            recorder,
+            surface="community",
+            redis=redis_client,
+        )
         provider = KueueProvider(settings)
         user_provider = KubernetesProvider(settings)
         fingerprint = provider.cache_fingerprint()
@@ -194,6 +203,15 @@ class MetricsRuntime:
                 source=user_provider.name,
                 fingerprint=user_fingerprint,
             ),
+            community=user_provider.read_community,
+            community_cache=community_cache,
+            community_identity=lambda community: CacheIdentity(
+                subject_kind="community",
+                subject_value=community,
+                cluster=settings.cluster_name,
+                source=user_provider.name,
+                fingerprint=user_fingerprint,
+            ),
             telemetry=recorder,
             provider=provider.name,
             user_provider=user_provider.name,
@@ -205,6 +223,7 @@ class MetricsRuntime:
             metrics_service=metrics_service,
             cache=cache,
             user_cache=user_cache,
+            community_cache=community_cache,
             redis=redis_client,
             telemetry=recorder,
         )
@@ -225,8 +244,10 @@ class MetricsRuntime:
     @property
     def ready(self) -> bool:
         """Whether Redis is reachable and the provider completed startup."""
-        caches_available = self._cache.available and (
-            self._user_cache is None or self._user_cache.available
+        caches_available = (
+            self._cache.available
+            and (self._user_cache is None or self._user_cache.available)
+            and (self._community_cache is None or self._community_cache.available)
         )
         return caches_available and self._provider_started
 
@@ -242,6 +263,8 @@ class MetricsRuntime:
                     await self._cache.ping()
                 if isinstance(self._user_cache, RedisCoordinator):
                     await self._user_cache.ping()
+                if isinstance(self._community_cache, RedisCoordinator):
+                    await self._community_cache.ping()
                 await self._provider.startup()
                 if self._user_provider is not None:
                     await self._user_provider.startup()

@@ -29,6 +29,7 @@ LABELS = {
     "app.kubernetes.io/managed-by": "skaha",
     "app.kubernetes.io/part-of": "canfar",
     "canfar.net/username": "alice",
+    "canfar.net/community": "astronomy",
 }
 
 
@@ -36,14 +37,22 @@ def _pod(
     name: str,
     *,
     username: str = "alice",
+    community: str = "astronomy",
     phase: str = "Running",
     labels: dict[str, str] | None = None,
     spec: dict | None = None,
 ) -> dict:
     return {
-        "metadata": {"name": name, "uid": f"uid-{name}", "labels": labels or LABELS | {
-            "canfar.net/username": username
-        }},
+        "metadata": {
+            "name": name,
+            "uid": f"uid-{name}",
+            "labels": labels
+            or LABELS
+            | {
+                "canfar.net/username": username,
+                "canfar.net/community": community,
+            },
+        },
         "status": {"phase": phase},
         "spec": spec
         or {
@@ -90,7 +99,9 @@ class FakePodApi:
             pod
             for pod in value
             if pod["status"]["phase"] == phase
-            and all(pod["metadata"]["labels"].get(key) == expected for key, expected in labels.items())
+            and all(
+                pod["metadata"]["labels"].get(key) == expected for key, expected in labels.items()
+            )
         ]
         yield httpx.Response(200, json={"items": selected})
 
@@ -115,11 +126,7 @@ def _runtime(api: FakePodApi) -> MetricsRuntime:
                 "cq": {
                     "spec": {
                         "resourceGroups": [
-                            {
-                                "flavors": [
-                                    {"resources": [{"name": "cpu", "nominalQuota": "1"}]}
-                                ]
-                            }
+                            {"flavors": [{"resources": [{"name": "cpu", "nominalQuota": "1"}]}]}
                         ]
                     }
                 }
@@ -133,6 +140,9 @@ def _runtime(api: FakePodApi) -> MetricsRuntime:
     user_cache = InMemoryCoordinator[CachedSnapshot](
         policy=FRESHNESS_POLICIES["user"], created=lambda value: value.created
     )
+    community_cache = InMemoryCoordinator[CachedSnapshot](
+        policy=FRESHNESS_POLICIES["community"], created=lambda value: value.created
+    )
     service = MetricsService(
         platform=platform.read_platform,
         cache=platform_cache,
@@ -142,6 +152,11 @@ def _runtime(api: FakePodApi) -> MetricsRuntime:
         user_identity=lambda username: CacheIdentity(
             "user", username, "kind-metrics", "kubernetes", "work-a-work-b"
         ),
+        community=users.read_community,
+        community_cache=community_cache,
+        community_identity=lambda community: CacheIdentity(
+            "community", community, "kind-metrics", "kubernetes", "work-a-work-b"
+        ),
     )
     return MetricsRuntime(
         settings,
@@ -150,6 +165,7 @@ def _runtime(api: FakePodApi) -> MetricsRuntime:
         metrics_service=service,
         cache=platform_cache,
         user_cache=user_cache,
+        community_cache=community_cache,
     )
 
 
@@ -224,12 +240,67 @@ def test_user_route_selects_exact_running_skaha_pods_and_returns_no_inventory() 
     )
 
 
+def test_community_route_aggregates_mixed_users_in_one_direct_scan() -> None:
+    api = FakePodApi(
+        {
+            "work-a": [
+                _pod("alice-astronomy", username="alice"),
+                _pod("carol-astronomy", username="carol"),
+                _pod("bob-physics", username="bob", community="physics"),
+                _pod("pending", username="dana", phase="Pending"),
+                _pod(
+                    "unlabelled",
+                    labels={
+                        "app.kubernetes.io/managed-by": "skaha",
+                        "app.kubernetes.io/part-of": "canfar",
+                        "canfar.net/username": "erin",
+                    },
+                ),
+            ],
+            "work-b": [],
+        }
+    )
+    with TestClient(create_app(settings=_settings(), runtime=_runtime(api))) as client:
+        api.requests.clear()
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/community/astronomy")
+        cached = client.get("/apis/canfar.net/v1alpha1/metrics/community/astronomy")
+        isolated = client.get("/apis/canfar.net/v1alpha1/metrics/community/physics")
+        empty = client.get("/apis/canfar.net/v1alpha1/metrics/community/nobody")
+
+    assert response.status_code == 200
+    assert response.json()["metadata"] == {"name": "community-astronomy"}
+    assert response.json()["spec"] == {"community": "astronomy"}
+    assert response.json()["status"]["runningPods"] == 2
+    assert response.json()["status"]["resources"] == [
+        {"name": "cpu", "requests": "0.4"},
+        {"name": "example.com/fpga", "requests": "2"},
+        {"name": "memory", "requests": "0.390625Gi"},
+    ]
+    assert all(name not in response.text for name in ("alice", "carol", "uid-"))
+    assert cached.json()["status"]["conditions"][1]["reason"] == "FreshHit"
+    assert isolated.json()["status"]["runningPods"] == 1
+    assert empty.json()["status"]["runningPods"] == 0
+    assert len(api.requests) == 6
+    assert all("canfar.net/username" not in params["labelSelector"] for _, params in api.requests)
+    assert all(params["fieldSelector"] == "status.phase=Running" for _, params in api.requests)
+
+
 @pytest.mark.parametrize("value", ["%252F", "%2F", "%252E%252E", "bad%252Cselector"])
 def test_user_route_rejects_encoded_or_selector_like_values(value: str) -> None:
     api = FakePodApi({"work-a": [], "work-b": []})
     with TestClient(create_app(settings=_settings(), runtime=_runtime(api))) as client:
         api.requests.clear()
         response = client.get(f"/apis/canfar.net/v1alpha1/metrics/user/{value}")
+    assert response.status_code == 400
+    assert not api.requests
+
+
+@pytest.mark.parametrize("value", ["%252F", "%2F", "%252E%252E", "bad%252Cselector"])
+def test_community_route_rejects_encoded_or_selector_like_values(value: str) -> None:
+    api = FakePodApi({"work-a": [], "work-b": []})
+    with TestClient(create_app(settings=_settings(), runtime=_runtime(api))) as client:
+        api.requests.clear()
+        response = client.get(f"/apis/canfar.net/v1alpha1/metrics/community/{value}")
     assert response.status_code == 400
     assert not api.requests
 
