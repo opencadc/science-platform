@@ -40,7 +40,10 @@ present) Kubernetes secret file sources; environment values override defaults
   plain string
 - `METRICS_SOURCES__PLATFORM` → `sources.platform` (which provider key backs
   platform metrics; M4 uses `kueue`)
-- `METRICS_CACHE__BACKEND` / `METRICS_CACHE__TTL_SECONDS` → `cache` fields
+- `METRICS_CACHE__KEY_SECRET` → required for Redis and at least 32 UTF-8 bytes
+- `METRICS_CACHE__REDIS_COMMAND_TIMEOUT_SECONDS` /
+  `METRICS_CACHE__FILL_TIMEOUT_SECONDS` /
+  `METRICS_CACHE__COLD_GET_TIMEOUT_SECONDS` → finite cache deadlines
 
 `METRICS_REDIS_URL` and other top-level `Settings` fields use the `METRICS_`
 prefix without extra nesting. Legacy flat aliases such as `METRICS_KUEUE_*` and
@@ -53,6 +56,11 @@ endpoint, credentials, and CA are discovered by kr8s from the service account
 or kubeconfig (ADR-0001) and are not settings. The reference chart
 `values-dev.yaml` and `scripts/kind-values.yaml` use this same closed Settings
 surface and are validated by the unit suite.
+
+Redis is the deployed and local-development load boundary. The memory backend
+is available only for injected tests. Platform snapshots are fresh for 5
+minutes, serviceable through 30 minutes, and retained through 60 minutes; User
+and Community use 2/10/15-minute boundaries.
 
 Borrowed/lending response expansion is out of scope for this delivery; platform
 responses remain the existing `capacity` and `allocated` maps.

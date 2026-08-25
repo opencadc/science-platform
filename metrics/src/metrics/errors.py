@@ -12,6 +12,7 @@ class AppError(Exception):
     code: str
     message: str
     status_code: int
+    retry_after: int | None = None
 
 
 class ProviderUnavailableError(Exception):

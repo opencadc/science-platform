@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,7 +23,7 @@ class KueueProviderConfig(BaseModel):
         description="ClusterQueue names included in platform aggregation.",
     )
     kueue_api_version: str = "kueue.x-k8s.io/v1beta2"
-    kube_request_timeout_seconds: float = Field(default=10.0, gt=0)
+    kube_request_timeout_seconds: float = Field(default=5.0, gt=0)
 
     @field_validator("cluster_queues")
     @classmethod
@@ -58,12 +58,25 @@ class SourceConfig(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    """TTL cache backend selection."""
+    """Required cache dependency, deadlines, and bounded local fallback."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     backend: Literal["memory", "redis"] = "redis"
-    ttl_seconds: int = Field(default=300, ge=0)
+    key_secret: SecretStr | None = None
+    redis_command_timeout_seconds: float = Field(default=0.5, gt=0)
+    fill_timeout_seconds: float = Field(default=10.0, gt=0)
+    cold_get_timeout_seconds: float = Field(default=12.0, gt=0)
+    l1_max_entries: int = Field(default=128, gt=0)
+    max_fills: int = Field(default=8, gt=0)
+
+    @model_validator(mode="after")
+    def _require_redis_secret(self) -> CacheConfig:
+        if self.backend == "redis":
+            secret = self.key_secret.get_secret_value() if self.key_secret else ""
+            if len(secret.encode("utf-8")) < 32:
+                raise ValueError("key_secret must contain at least 32 UTF-8 bytes")
+        return self
 
 
 class Settings(BaseSettings):

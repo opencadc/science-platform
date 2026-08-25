@@ -7,7 +7,7 @@ import httpx
 import kr8s
 import pytest
 
-from metrics.core.settings import KueueProviderConfig, ProviderConfigs, Settings
+from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
 from metrics.errors import ProviderExecutionError, RuntimeStartupError
 from metrics.providers.kueue import (
     KueueProvider,
@@ -24,6 +24,7 @@ pytestmark = pytest.mark.anyio
 def _settings(queues: list[str]) -> Settings:
     return Settings(
         cluster_name="c",
+        cache=CacheConfig(backend="memory"),
         providers=ProviderConfigs(kueue=KueueProviderConfig(cluster_queues=queues)),
     )
 
@@ -215,13 +216,14 @@ def test_fingerprint_covers_identity_and_excludes_transport() -> None:
         *, api_version: str = "kueue.x-k8s.io/v1beta2", queues=("cq-a", "cq-b"), timeout=10.0
     ):
         settings = Settings(
+            cache=CacheConfig(backend="memory"),
             providers=ProviderConfigs(
                 kueue=KueueProviderConfig(
                     cluster_queues=list(queues),
                     kueue_api_version=api_version,
                     kube_request_timeout_seconds=timeout,
                 )
-            )
+            ),
         )
         return KueueProvider(settings, api=FakeKueueApi()).cache_fingerprint()
 

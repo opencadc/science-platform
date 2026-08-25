@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from time import perf_counter
 
-from metrics.cache import TTLCacheBackend
+from metrics.cache import CacheCoordinator, CacheIdentity, CacheUnavailable
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
 from metrics.services.models import (
     PLATFORM_SUBJECT,
@@ -32,34 +31,30 @@ class MetricsService:
         self,
         *,
         platform: Callable[[], Awaitable[PlatformObservation]],
-        cache: TTLCacheBackend[CachedSnapshot],
-        key: Callable[[], str],
+        cache: CacheCoordinator[CachedSnapshot],
+        identity: Callable[[], CacheIdentity],
         telemetry: MetricsRecorder | None = None,
-        ttl: int | None = None,
         provider: str = "unknown",
     ) -> None:
         """Wire cache, platform loader, and optional telemetry.
 
         Args:
             platform: Async callable that fetches a fresh platform observation.
-            cache: Async TTL backend storing :class:`CachedSnapshot`.
-            key: Sync callable returning the platform cache key.
+            cache: Required cache coordinator storing :class:`CachedSnapshot`.
+            identity: Sync callable returning the platform cache identity.
             telemetry: Optional cache/provider timing recorder.
-            ttl: Override cache TTL; defaults to the backend's TTL.
             provider: Adapter name for provider duration telemetry.
         """
         self._platform = platform
         self._cache = cache
-        self._key = key
+        self._identity = identity
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
-        self._platform_ttl_seconds = ttl if ttl is not None else self._cache.ttl_seconds
         self._provider = provider
-        self._inflight: dict[str, asyncio.Task[MetricsResult]] = {}
 
     @property
     def cache_ttl_seconds(self) -> int:
-        """Effective TTL in seconds for ``Cache-Control`` and cache writes."""
-        return self._platform_ttl_seconds
+        """Freshness window retained by the legacy Platform HTTP adapter."""
+        return self._cache.policy.fresh_seconds
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
         """Return Metrics for ``subject``, using cache on hit and the source on miss.
@@ -86,52 +81,36 @@ class MetricsService:
         return await self._get_platform()
 
     async def _get_platform(self) -> MetricsResult:
-        cache_key = self._key()
-        cached = await self._cache.get(cache_key)
-        if cached is not None:
-            self._metrics_recorder.record_cache_lookup(
-                backend=self._cache.backend_name,
-                hit=True,
-                scope="platform",
-            )
-            return MetricsResult(
-                observation=cached.observation,
-                created=cached.created,
-                cached=True,
-            )
+        try:
+            result = await self._cache.get_or_fill(self._identity(), self._load_snapshot)
+        except CacheUnavailable as exc:
+            raise AppError(
+                code="metrics_cache_unavailable",
+                message="Platform metrics are temporarily unavailable",
+                status_code=503,
+                retry_after=1,
+            ) from exc
+        snapshot = result.value
         self._metrics_recorder.record_cache_lookup(
             backend=self._cache.backend_name,
-            hit=False,
+            hit=result.cached,
             scope="platform",
         )
-        task = self._inflight.get(cache_key)
-        if task is None or task.done():
-            task = asyncio.create_task(self._load_and_cache(cache_key))
-            self._inflight[cache_key] = task
-            task.add_done_callback(self._make_inflight_reaper(cache_key))
-        return await asyncio.shield(task)
+        return MetricsResult(
+            observation=snapshot.observation,
+            created=snapshot.created,
+            cached=result.cached,
+            stale=result.stale,
+        )
 
-    def _make_inflight_reaper(self, cache_key: str) -> Callable[[asyncio.Task], None]:
-        def reap(done: asyncio.Task) -> None:
-            if self._inflight.get(cache_key) is done:
-                del self._inflight[cache_key]
-            if not done.cancelled():
-                done.exception()
-
-        return reap
-
-    async def _load_and_cache(self, cache_key: str) -> MetricsResult:
+    async def _load_snapshot(self) -> CachedSnapshot:
         scope = "platform"
         started = perf_counter()
         status = "ok"
         try:
             observation = await self._timed_platform_load()
             created = datetime.now(UTC)
-            await self._cache.set(
-                cache_key,
-                CachedSnapshot(observation=observation, created=created),
-            )
-            return MetricsResult(observation=observation, created=created, cached=False)
+            return CachedSnapshot(observation=observation, created=created)
         except AppError as exc:
             status = exc.code
             raise
