@@ -61,11 +61,8 @@ Multi-context monorepo: start at `CONTEXT-MAP.md` at the science-platform repo r
 - The Metrics API Helm chart lives under `metrics/helm/metrics-api`.
 - Local Kubernetes integration and CI smoke: `metrics/scripts/kind-smoke.sh`
   (Kueue, `scripts/test-setup.yaml`, Docker build/load, integration tests) and
-  `metrics/scripts/kind-values.yaml`. Shared bash helpers:
-  `metrics/scripts/lib-kind-smoke.sh` (port-forward state parsing). A local
-  success may leave a background port-forward; stop with
-  `metrics/scripts/kind-smoke-teardown.sh` (optional `--all` for Kubernetes
-  teardown).
+  `metrics/scripts/kind-values.yaml`. Use `metrics-dev down`, `reset`, or
+  `destroy` for cleanup.
   With `pullPolicy: Never`, use unique image tags to avoid stale layers. Short
   `METRICS_CACHE_TTL_SECONDS` in `kind-values.yaml` keeps integration snapshots
   fresh. If port-forward fails, change `PORT_FORWARD_PORT`. If Kueue

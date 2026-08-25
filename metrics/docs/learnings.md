@@ -99,8 +99,8 @@ decisions are also recorded under `docs/adr/`.
   provides a smaller and easier smoke path than the previous Minikube plus
   Skaffold flow, while keeping the Kueue fixture and chart deployment contracts
   unchanged.
-- Evidence: `scripts/kind-smoke.sh`, `scripts/kind-smoke-teardown.sh`,
-  `scripts/kind-values.yaml`, `docs/dev-setup.md`, and
+- Evidence: `scripts/kind-smoke.sh`, `scripts/kind-values.yaml`,
+  `src/metrics/dev/cli.py`, `docs/dev-setup.md`, and
   `.github/workflows/ci.metrics.yml`.
 - Action taken: Switched the active local/CI smoke workflow to kind and removed
   Minikube/Skaffold smoke-path artifacts.

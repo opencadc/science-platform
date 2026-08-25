@@ -102,18 +102,44 @@ metadata:
 data:
   producer.py: |
     import json
-    import os
     import ssl
+    from datetime import UTC, datetime
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from urllib.request import Request, urlopen
 
     token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     api = "https://kubernetes.default.svc/api/v1/namespaces/canfar-workloads/pods"
-    values = {
-        "cpu": ("core-hours", "0.1", "0.2"),
-        "memory": ("GiB-hours", "0.05", "0.1"),
-    }
+    units = {"cpu": "core-hours", "memory": "GiB-hours"}
+
+    def quantity(resource, value):
+        value = str(value)
+        if resource == "cpu":
+            return float(value[:-1]) / 1000 if value.endswith("m") else float(value)
+        suffixes = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30}
+        for suffix, factor in suffixes.items():
+            if value.endswith(suffix):
+                return float(value[:-2]) * factor / 2**30
+        return float(value) / 2**30
+
+    def request_rates(pod):
+        totals = {"cpu": 0.0, "memory": 0.0}
+        for container in pod["spec"].get("containers", []):
+            requests = container.get("resources", {}).get("requests", {})
+            for resource in totals:
+                if resource in requests:
+                    totals[resource] += quantity(resource, requests[resource])
+        return totals
+
+    def running_since(pod):
+        # Kubernetes status is the durable checkpoint: after producer restarts,
+        # recompute from Pod/container Running timestamps instead of local state.
+        starts = [pod["status"]["startTime"]]
+        for status in pod["status"].get("containerStatuses", []):
+            started = status.get("state", {}).get("running", {}).get("startedAt")
+            if started:
+                starts.append(started)
+        return max(datetime.fromisoformat(value.replace("Z", "+00:00")) for value in starts)
 
     def active_pods():
         token = open(token_path, encoding="utf-8").read()
@@ -129,16 +155,23 @@ data:
                 and labels.get("canfar.net/username")
                 and labels.get("canfar.net/community")
             ):
-                yield pod["metadata"]["uid"], labels
+                yield pod, labels
 
     def fixture_payload():
         lines = []
-        for uid, pod_labels in active_pods():
-            for resource, (unit, usage, requested) in values.items():
+        observed_at = datetime.now(UTC)
+        for pod, pod_labels in active_pods():
+            elapsed_hours = max(0.0, (observed_at - running_since(pod)).total_seconds()) / 3600
+            for resource, rate in request_rates(pod).items():
+                if rate == 0:
+                    continue
+                # This smoke producer has no usage sampler, so request rate is
+                # the deterministic usage proxy for both integrated counters.
+                hours = rate * elapsed_hours
                 labels = {
                     "cluster": "kind-metrics",
                     "namespace": "canfar-workloads",
-                    "pod_uid": uid,
+                    "pod_uid": pod["metadata"]["uid"],
                     "resource": resource,
                     "canfar_username": pod_labels["canfar.net/username"],
                     "canfar_community": pod_labels["canfar.net/community"],
@@ -147,8 +180,8 @@ data:
                 encoded = ",".join(f"{key}={json.dumps(value)}" for key, value in labels.items())
                 lines.extend(
                     (
-                        f'metrics_fixture_active_workload_usage_hours{{{encoded},unit="{unit}"}} {usage}',
-                        f'metrics_fixture_active_workload_requested_hours{{{encoded},unit="{unit}"}} {requested}',
+                        f'metrics_fixture_active_workload_usage_hours{{{encoded},unit="{units[resource]}"}} {hours}',
+                        f'metrics_fixture_active_workload_requested_hours{{{encoded},unit="{units[resource]}"}} {hours}',
                         f'metrics_fixture_active_workload_accounting_complete'
                         f'{{{encoded},unit="boolean",reason="complete"}} 1',
                     )

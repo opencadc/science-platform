@@ -4,6 +4,9 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+networkPolicy:
+  enabled: false
+
 env:
   METRICS_CLUSTER_NAME: "dev-cluster"
   METRICS_SOURCES__PLATFORM: "kueue"

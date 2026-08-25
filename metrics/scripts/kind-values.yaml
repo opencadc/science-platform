@@ -7,6 +7,9 @@ image:
 
 replicaCount: 2
 
+networkPolicy:
+  enabled: false
+
 serviceAccount:
   create: true
 
