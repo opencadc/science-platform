@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
+from enum import StrEnum
 from typing import Literal
 
 
@@ -28,6 +30,62 @@ class PlatformObservation:
     cluster: str
     capacity: dict[str, str]
     allocated: dict[str, str]
+
+
+class LifetimeIssue(StrEnum):
+    """Machine-readable reasons that lifetime accounting is incomplete."""
+
+    CORRUPT_STATE = "corrupt-state"
+    COUNTER_RESET = "counter-reset"
+    MISSING_SERIES = "missing-series"
+    POD_DISAPPEARED = "pod-disappeared"
+    PROCESS_RESTART = "process-restart"
+    SAMPLING_GAP = "sampling-gap"
+    SCRAPE_GAP = "scrape-gap"
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceInterval:
+    """Constant resource rates over one covered Running interval."""
+
+    started_at: datetime
+    ended_at: datetime
+    usage_rate: Decimal
+    requested_rate: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PodResourceLifetime:
+    """Internal lifetime series for one currently Running Pod UID and resource."""
+
+    pod_uid: str
+    resource: str
+    running_since: datetime
+    observed_at: datetime
+    intervals: tuple[ResourceInterval, ...] = ()
+    issues: frozenset[LifetimeIssue] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceHours:
+    """Additive observed and requested resource-time in the named unit."""
+
+    unit: Literal["core-hours", "GiB-hours", "GPU-hours"]
+    usage: Decimal
+    requested: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveWorkloadLifetime:
+    """Complete totals and per-resource incompleteness for active Pods."""
+
+    resources: dict[str, ResourceHours]
+    incomplete: dict[str, frozenset[LifetimeIssue]]
+
+    @property
+    def ready(self) -> bool:
+        """Whether every resource has complete lifetime coverage."""
+        return not self.incomplete
 
 
 @dataclass(slots=True)
