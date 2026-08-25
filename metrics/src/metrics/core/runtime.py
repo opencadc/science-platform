@@ -308,6 +308,9 @@ class MetricsRuntime:
                 source=user_provider.name,
                 fingerprint=user_fingerprint,
             ),
+            community_accounting=(
+                accounting_service.get_community if accounting_service is not None else None
+            ),
             telemetry=recorder,
             provider=provider.name,
             user_provider=user_provider.name,

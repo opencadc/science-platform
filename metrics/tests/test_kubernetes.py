@@ -130,6 +130,7 @@ def _runtime(
     api: FakePodApi,
     *,
     user_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
+    community_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
 ) -> MetricsRuntime:
     settings = _settings()
     platform = KueueProvider(
@@ -171,6 +172,7 @@ def _runtime(
         community_identity=lambda community: CacheIdentity(
             "community", community, "kind-metrics", "kubernetes", "work-a-work-b"
         ),
+        community_accounting=community_accounting,
     )
     return MetricsRuntime(
         settings,
@@ -474,6 +476,100 @@ def test_community_route_aggregates_mixed_users_in_one_direct_scan() -> None:
     assert len(api.requests) == 6
     assert all("canfar.net/username" not in params["labelSelector"] for _, params in api.requests)
     assert all(params["fieldSelector"] == "status.phase=Running" for _, params in api.requests)
+
+
+def test_community_lifetime_sums_direct_inputs_before_efficiency_without_members() -> None:
+    calls: list[str] = []
+
+    async def accounting(community: str) -> CacheResult:
+        calls.append(community)
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={
+                        # Controlled inputs: (1 + 9) / (2 + 10), not mean(0.5, 0.9).
+                        "cpu": ResourceHours("core-hours", Decimal("10"), Decimal("12")),
+                        "memory": ResourceHours("GiB-hours", Decimal("30"), Decimal("60")),
+                    },
+                    incomplete={},
+                    pod_uids=frozenset({"uid-alice", "uid-carol"}),
+                    coverage={
+                        "cpu": frozenset({"uid-alice", "uid-carol"}),
+                        "memory": frozenset({"uid-alice", "uid-carol"}),
+                    },
+                ),
+                created=datetime.now(UTC),
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi(
+        {
+            "work-a": [
+                _pod("alice", username="alice"),
+                _pod("carol", username="carol"),
+                _pod("other", username="bob", community="physics"),
+            ],
+            "work-b": [],
+        }
+    )
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, community_accounting=accounting),
+        )
+    ) as client:
+        api.requests.clear()
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/community/astronomy")
+
+    assert response.status_code == 200
+    assert calls == ["astronomy"]
+    assert len(api.requests) == 2
+    status = response.json()["status"]
+    assert status["accountingPeriod"] == "ActiveWorkloadLifetime"
+    resources = {item["name"]: item for item in status["resources"]}
+    assert resources["cpu"] == {
+        "name": "cpu",
+        "requests": "0.4",
+        "usageHours": "10",
+        "requestedHours": "12",
+        "efficiency": "0.833333",
+    }
+    assert resources["memory"]["efficiency"] == "0.5"
+    assert all(value not in response.text for value in ("alice", "carol", "uid-"))
+
+
+def test_incomplete_community_accounting_preserves_requests_and_readiness() -> None:
+    async def accounting(_community: str) -> CacheResult:
+        return CacheResult(
+            AccountingSnapshot(
+                lifetime=ActiveWorkloadLifetime(
+                    resources={"cpu": ResourceHours("core-hours", Decimal("2"), Decimal("4"))},
+                    incomplete={"memory": frozenset({LifetimeIssue.SAMPLING_GAP})},
+                    pod_uids=frozenset({"uid-selected"}),
+                    coverage={"cpu": frozenset({"uid-selected"})},
+                ),
+                created=datetime.now(UTC),
+            ),
+            cached=False,
+            stale=False,
+        )
+
+    api = FakePodApi({"work-a": [_pod("selected")], "work-b": []})
+    with TestClient(
+        create_app(
+            settings=_settings(),
+            runtime=_runtime(api, community_accounting=accounting),
+        )
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/community/astronomy")
+
+    status = response.json()["status"]
+    resources = {item["name"]: item for item in status["resources"]}
+    assert resources["cpu"]["efficiency"] == "0.5"
+    assert resources["memory"] == {"name": "memory", "requests": "0.195312Gi"}
+    assert status["conditions"][0]["reason"] == "AccountingIncomplete"
 
 
 @pytest.mark.parametrize("value", ["%252F", "%2F", "%252E%252E", "bad%252Cselector"])

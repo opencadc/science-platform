@@ -46,6 +46,7 @@ class MetricsService:
         community: Callable[[str], Awaitable[CommunityObservation]] | None = None,
         community_cache: CacheCoordinator[CachedSnapshot] | None = None,
         community_identity: Callable[[str], CacheIdentity] | None = None,
+        community_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
         telemetry: MetricsRecorder | None = None,
         provider: str = "unknown",
         user_provider: str = "kubernetes",
@@ -63,6 +64,7 @@ class MetricsService:
             community: Optional callable that fetches one community observation.
             community_cache: Coordinator using the Community freshness policy.
             community_identity: Callable returning an opaque community cache identity.
+            community_accounting: Optional cache-coordinated lifetime accounting read.
             telemetry: Optional cache/provider timing recorder.
             provider: Adapter name for provider duration telemetry.
             user_provider: User adapter name for provider duration telemetry.
@@ -77,6 +79,7 @@ class MetricsService:
         self._community = community
         self._community_cache = community_cache
         self._community_identity = community_identity
+        self._community_accounting = community_accounting
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
         self._user_provider = user_provider
@@ -230,11 +233,15 @@ class MetricsService:
             ) from exc
         snapshot = result.value
         self._record_cache_result("community", snapshot, result.cached, result.stale)
+        observation = snapshot.observation
+        accounting_stale = (
+            isinstance(observation, CommunityObservation) and observation.accounting_stale
+        )
         return MetricsResult(
-            observation=snapshot.observation,
+            observation=observation,
             created=snapshot.created,
             cached=result.cached,
-            stale=result.stale,
+            stale=result.stale or accounting_stale,
             cache_available=self._community_cache.available,
         )
 
@@ -337,7 +344,61 @@ class MetricsService:
         status = "ok"
         try:
             observation = await self._timed_community_load(community)
-            return CachedSnapshot(observation=observation, created=datetime.now(UTC))
+            created = datetime.now(UTC)
+            if self._community_accounting is not None:
+                try:
+                    result = await self._community_accounting(community)
+                    accounting = result.value
+                    if not isinstance(accounting, AccountingSnapshot):
+                        raise TypeError("Accounting source returned an invalid snapshot")
+                    if accounting.lifetime.pod_uids != observation.pod_uids:
+                        observation = replace(
+                            observation,
+                            accounting_state=AccountingState.INCOMPLETE,
+                            accounting_stale=result.stale,
+                        )
+                    else:
+                        uncovered = {
+                            resource
+                            for resource in accounting.lifetime.resources
+                            if accounting.lifetime.coverage.get(resource, frozenset())
+                            != observation.pod_uids
+                        }
+                        lifetime = replace(
+                            accounting.lifetime,
+                            resources={
+                                resource: hours
+                                for resource, hours in accounting.lifetime.resources.items()
+                                if resource not in uncovered
+                            },
+                            incomplete=accounting.lifetime.incomplete
+                            | {
+                                resource: frozenset({LifetimeIssue.MISSING_SERIES})
+                                for resource in uncovered
+                            },
+                        )
+                        observation = replace(
+                            observation,
+                            accounting=lifetime,
+                            accounting_state=(
+                                AccountingState.COMPLETE
+                                if lifetime.ready
+                                else AccountingState.INCOMPLETE
+                            ),
+                            accounting_stale=result.stale,
+                        )
+                    created = min(created, accounting.created)
+                except (
+                    CacheUnavailable,
+                    ProviderExecutionError,
+                    ProviderUnavailableError,
+                ):
+                    logger.warning("Community lifetime accounting unavailable")
+                    observation = replace(
+                        observation,
+                        accounting_state=AccountingState.UNAVAILABLE,
+                    )
+            return CachedSnapshot(observation=observation, created=created)
         except AppError as exc:
             status = exc.code
             raise
