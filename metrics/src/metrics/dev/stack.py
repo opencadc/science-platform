@@ -29,6 +29,7 @@ WORKLOAD_NAMESPACE = "canfar-workloads"
 METRICS_ROOT = Path(__file__).parents[3]
 FIXTURES = METRICS_ROOT / "scripts" / "test-setup.yaml"
 WORKLOAD_FIXTURES = METRICS_ROOT / "scripts" / "workload-fixtures.yaml"
+ACCOUNTING_PROFILE = METRICS_ROOT / "scripts" / "accounting-profile.yaml"
 KUEUE_CONFIG = METRICS_ROOT / "scripts" / "kueue-config.yaml"
 KIND_VALUES = METRICS_ROOT / "scripts" / "kind-values.yaml"
 CHART = METRICS_ROOT / "helm" / "metrics-api"
@@ -243,15 +244,42 @@ def image() -> None:
     print(f"deployed {repository}:{tag}")
 
 
-def up() -> None:
-    """Create or converge the approved core profile and Helm deployment."""
+def up(profile: str = "core") -> None:
+    """Create or converge the approved core or accounting profile."""
     _ensure_cluster()
     _install_kueue()
     fixtures()
+    if profile == "accounting":
+        _kubectl(
+            "apply", "--server-side", "--field-manager=metrics-dev", "-f", str(ACCOUNTING_PROFILE)
+        )
+        deployments = (
+            "metrics-kube-state-metrics",
+            "metrics-accounting-producer",
+            "metrics-accounting-prometheus",
+        )
+        _kubectl(
+            "rollout",
+            "restart",
+            *(f"deployment/{deployment}" for deployment in deployments),
+            "--namespace",
+            METRICS_NAMESPACE,
+        )
+        for deployment in deployments:
+            _kubectl(
+                "rollout",
+                "status",
+                f"deployment/{deployment}",
+                "--namespace",
+                METRICS_NAMESPACE,
+                "--timeout=5m",
+            )
+    elif profile != "core":
+        raise DevStackError(f"unknown profile: {profile}")
     repository, tag = _build_and_load_image()
     _deploy(repository, tag)
     print(
-        f"core ready: kind={KIND_VERSION} kubernetes={KUBERNETES_VERSION} "
+        f"{profile} ready: kind={KIND_VERSION} kubernetes={KUBERNETES_VERSION} "
         f"kueue={KUEUE_VERSION} context={KUBE_CONTEXT}"
     )
 

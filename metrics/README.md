@@ -87,6 +87,9 @@ uv run metrics-dev run
 ```
 
 This starts the host process against the local Redis and Kueue dependencies.
+Use `uv run metrics-dev up --profile accounting` to add pinned
+kube-state-metrics, Prometheus, recording rules, and producer fixtures; the
+default core profile remains unchanged.
 For the full Kubernetes-first workflow, follow `docs/dev-setup.md`.
 
 For roadmap-level environment naming across `dev`, integration, staging, and

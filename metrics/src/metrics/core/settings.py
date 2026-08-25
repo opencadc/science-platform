@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -63,6 +71,31 @@ class KubernetesProviderConfig(BaseModel):
         return names
 
 
+class PromQLProviderConfig(BaseModel):
+    """Controlled Prometheus-compatible instant-query settings."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    enabled: bool = False
+    base_url: AnyHttpUrl = AnyHttpUrl("http://prometheus.metrics.svc:9090")
+    request_timeout_seconds: float = Field(default=5.0, gt=0)
+    max_sample_age_seconds: int = Field(default=300, gt=0)
+    future_sample_tolerance_seconds: int = Field(default=30, ge=0)
+    max_series: int = Field(default=3_000, gt=0)
+    mimir_tenant_id: str | None = Field(default=None, min_length=1, max_length=150)
+
+    @field_validator("mimir_tenant_id")
+    @classmethod
+    def _validate_tenant_id(cls, value: str | None) -> str | None:
+        """Accept one bounded tenant ID, never an arbitrary header value."""
+        if value is None:
+            return None
+        tenant = value.strip()
+        if not tenant or any(character.isspace() or ord(character) < 33 for character in tenant):
+            raise ValueError("mimir_tenant_id must be a non-whitespace header value")
+        return tenant
+
+
 class ProviderConfigs(BaseModel):
     """Container for active upstream provider configuration blocks."""
 
@@ -70,6 +103,7 @@ class ProviderConfigs(BaseModel):
 
     kueue: KueueProviderConfig = Field(default_factory=KueueProviderConfig)
     kubernetes: KubernetesProviderConfig = Field(default_factory=KubernetesProviderConfig)
+    promql: PromQLProviderConfig = Field(default_factory=PromQLProviderConfig)
 
 
 class SourceConfig(BaseModel):

@@ -7,6 +7,7 @@ import subprocess
 import pytest
 
 from metrics.dev import stack
+from metrics.dev.cli import build_parser
 
 
 def _safe_output(command: list[str]) -> str:
@@ -79,3 +80,10 @@ def test_local_stack_versions_are_pinned() -> None:
         "sha256:3f5c8443c620245e4d355cfe09e96a91ead32ceaa569d3f1ca9edf0cb2fe2ff4"
     )
     assert stack.KUEUE_VERSION == "0.19.2"
+
+
+def test_accounting_profile_is_explicit_and_core_remains_default() -> None:
+    parser = build_parser()
+    assert parser.parse_args(["up"]).profile == "core"
+    assert parser.parse_args(["up", "--profile", "accounting"]).profile == "accounting"
+    assert stack.ACCOUNTING_PROFILE.name == "accounting-profile.yaml"

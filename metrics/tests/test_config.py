@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_settings.exceptions import SettingsError
 
-from metrics.core.settings import CacheConfig, KueueProviderConfig, Settings
+from metrics.core.settings import CacheConfig, KueueProviderConfig, PromQLProviderConfig, Settings
 
 
 @pytest.mark.parametrize(
@@ -96,3 +96,15 @@ def test_cache_secret_and_deadline_contract(monkeypatch: pytest.MonkeyPatch) -> 
     assert settings.cache.redis_command_timeout_seconds == 0.5
     assert settings.cache.fill_timeout_seconds == 10
     assert settings.cache.cold_get_timeout_seconds == 12
+
+
+def test_promql_configuration_exposes_no_caller_transport_escape_hatches() -> None:
+    config = PromQLProviderConfig(mimir_tenant_id="tenant-a")
+    assert str(config.base_url) == "http://prometheus.metrics.svc:9090/"
+    assert config.request_timeout_seconds == 5
+
+    for field in ("query", "headers", "endpoint", "range", "credentials"):
+        with pytest.raises(ValidationError, match=field):
+            PromQLProviderConfig.model_validate({field: "unsafe"})
+    with pytest.raises(ValidationError, match="mimir_tenant_id"):
+        PromQLProviderConfig(mimir_tenant_id="tenant\r\nX-Unsafe: value")

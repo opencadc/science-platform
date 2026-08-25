@@ -12,6 +12,7 @@ from metrics.core.settings import CacheConfig, Settings
 from metrics.errors import RuntimeStartupError
 from metrics.services.metrics import MetricsService
 from metrics.services.models import PLATFORM_SUBJECT, CachedSnapshot, PlatformObservation
+from metrics.telemetry import NoopMetricsRecorder
 from tests.fakes import LifecycleProvider
 
 pytestmark = pytest.mark.anyio
@@ -31,6 +32,26 @@ def test_platform_cache_identity_preserves_source_dimensions() -> None:
         fingerprint="abc123",
     )
     assert identity == CacheIdentity("platform", "canfar", "kind-metrics", "kueue", "abc123")
+
+
+def test_runtime_wires_accounting_only_when_promql_is_enabled() -> None:
+    recorder = NoopMetricsRecorder()
+    core = MetricsRuntime.from_settings(
+        Settings(cache=CacheConfig(backend="memory")),
+        recorder=recorder,
+    )
+    assert core.accounting_service is None
+
+    accounting = MetricsRuntime.from_settings(
+        Settings.model_validate(
+            {
+                "cache": {"backend": "memory"},
+                "providers": {"promql": {"enabled": True}},
+            }
+        ),
+        recorder=recorder,
+    )
+    assert accounting.accounting_service is not None
 
 
 class _RecordingRedis:
