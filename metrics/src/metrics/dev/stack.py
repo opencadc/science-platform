@@ -216,9 +216,9 @@ def _build_and_load_image() -> tuple[str, str]:
     return repository, tag
 
 
-def _deploy(repository: str, tag: str) -> None:
+def _deploy(repository: str, tag: str, profile: str = "core") -> None:
     """Deploy Redis, Collector, RBAC, and Metrics through its chart."""
-    _helm(
+    command = [
         "upgrade",
         "--install",
         "metrics-api",
@@ -234,7 +234,19 @@ def _deploy(repository: str, tag: str) -> None:
         f"image.tag={tag}",
         "--wait",
         "--timeout=5m",
-    )
+    ]
+    if profile == "accounting":
+        command.extend(
+            [
+                "--set",
+                "env.METRICS_PROVIDERS__PROMQL__ENABLED=true",
+                "--set",
+                "env.METRICS_PROVIDERS__PROMQL__BASE_URL=http://metrics-accounting-prometheus.metrics.svc:9090",
+            ]
+        )
+    else:
+        command.extend(["--set", "env.METRICS_PROVIDERS__PROMQL__ENABLED=false"])
+    _helm(*command)
 
 
 def image() -> None:
@@ -242,6 +254,37 @@ def image() -> None:
     repository, tag = _build_and_load_image()
     _deploy(repository, tag)
     print(f"deployed {repository}:{tag}")
+
+
+def _remove_accounting_profile() -> None:
+    """Remove optional accounting workloads while preserving the core stack."""
+    assert_safe_context()
+    _kubectl(
+        "--namespace",
+        METRICS_NAMESPACE,
+        "delete",
+        "deployment,service,configmap,serviceaccount",
+        "-l",
+        "metrics.canfar.net/profile=accounting",
+        "--ignore-not-found",
+        "--wait",
+    )
+    _kubectl(
+        "delete",
+        "clusterrole,clusterrolebinding",
+        "-l",
+        "metrics.canfar.net/profile=accounting",
+        "--ignore-not-found",
+    )
+    _kubectl(
+        "--namespace",
+        WORKLOAD_NAMESPACE,
+        "delete",
+        "role,rolebinding",
+        "-l",
+        "metrics.canfar.net/profile=accounting",
+        "--ignore-not-found",
+    )
 
 
 def up(profile: str = "core") -> None:
@@ -274,10 +317,12 @@ def up(profile: str = "core") -> None:
                 METRICS_NAMESPACE,
                 "--timeout=5m",
             )
-    elif profile != "core":
+    elif profile == "core":
+        _remove_accounting_profile()
+    else:
         raise DevStackError(f"unknown profile: {profile}")
     repository, tag = _build_and_load_image()
-    _deploy(repository, tag)
+    _deploy(repository, tag, profile)
     print(
         f"{profile} ready: kind={KIND_VERSION} kubernetes={KUBERNETES_VERSION} "
         f"kueue={KUEUE_VERSION} context={KUBE_CONTEXT}"
@@ -347,8 +392,10 @@ def run_host() -> None:
             forward.kill()
 
 
-def smoke() -> None:
+def smoke(profile: str = "core") -> None:
     """Exercise the Helm-deployed service through a real HTTP socket."""
+    if profile not in {"core", "accounting"}:
+        raise DevStackError(f"unknown profile: {profile}")
     assert_safe_context()
     started = time.monotonic()
     port = "18080"
@@ -431,6 +478,7 @@ def smoke() -> None:
         env = os.environ | {
             "METRICS_BASE_URL": f"http://127.0.0.1:{port}",
             "METRICS_TEST_REDIS_URL": f"redis://127.0.0.1:{redis_port}/0",
+            "METRICS_TEST_PROFILE": profile,
         }
         _run(["uv", "run", "pytest", "tests/integration", "-m", "integration", "-q"], env=env)
         pod = _output(
@@ -521,9 +569,10 @@ def smoke() -> None:
         except subprocess.TimeoutExpired:
             redis_forward.kill()
     elapsed = time.monotonic() - started
-    print(f"warm smoke completed in {elapsed:.1f}s (budget: 120s)")
-    if elapsed > 120:
-        raise DevStackError("warm smoke exceeded the nominal two-minute budget")
+    budget = 300 if profile == "accounting" else 120
+    print(f"warm {profile} smoke completed in {elapsed:.1f}s (budget: {budget}s)")
+    if elapsed > budget:
+        raise DevStackError(f"warm {profile} smoke exceeded its {budget}-second budget")
 
 
 def down() -> None:

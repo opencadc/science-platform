@@ -6,7 +6,7 @@ import asyncio
 import os
 import subprocess
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from redis.asyncio import Redis
@@ -127,7 +127,7 @@ async def test_lease_release_cannot_delete_a_new_owner(redis_clients) -> None:
 
 async def test_stale_requests_have_one_refresh_winner(redis_clients) -> None:
     first_redis, second_redis = redis_clients
-    policy = FreshnessPolicy(0.05, 1, 2)
+    policy = FreshnessPolicy(1, 5, 10)
     first = _coordinator(first_redis, policy=policy)
     second = _coordinator(second_redis, policy=policy)
     fills = 0
@@ -136,10 +136,12 @@ async def test_stale_requests_have_one_refresh_winner(redis_clients) -> None:
         nonlocal fills
         fills += 1
         await asyncio.sleep(0.05)
-        return Snapshot(fills, datetime.now(UTC))
+        created = datetime.now(UTC)
+        if fills == 1:
+            created -= timedelta(seconds=2)
+        return Snapshot(fills, created)
 
     await first.get_or_fill(IDENTITY, fill)
-    await asyncio.sleep(0.06)
     results = await asyncio.gather(
         *(coordinator.get_or_fill(IDENTITY, fill) for coordinator in [first, second] * 10)
     )

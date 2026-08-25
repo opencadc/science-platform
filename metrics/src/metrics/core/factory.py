@@ -36,6 +36,8 @@ def _sanitize_http_span(span, scope: dict, _message: dict | None = None) -> None
     route = scope.get("route")
     template = getattr(route, "path", None) or "unmatched"
     span.set_attribute("http.route", template)
+    span.set_attribute("http.url", template)
+    span.set_attribute("url.full", template)
     span.set_attribute("url.path", template)
     span.set_attribute("http.target", template)
     span.set_attribute("url.query", "")

@@ -39,26 +39,36 @@ forward_pid="$!"
 
 UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/canfar-uv-cache}" uv run python - "$trace_id" <<'PY'
 import sys
+import os
 import time
 import urllib.error
 import urllib.request
 
 trace_id = sys.argv[1]
-request = urllib.request.Request(
-    "http://127.0.0.1:18086/apis/canfar.net/v1alpha1/metrics/platform/canfar",
-    headers={"traceparent": f"00-{trace_id}-0123456789abcdef-01"},
-)
+routes = ["/apis/canfar.net/v1alpha1/metrics/platform/canfar"]
+if os.getenv("METRICS_OTEL_SMOKE_ACCOUNTING"):
+    routes.extend(
+        (
+            "/apis/canfar.net/v1alpha1/metrics/user/bob",
+            "/apis/canfar.net/v1alpha1/metrics/community/astronomy",
+        )
+    )
 deadline = time.monotonic() + 30
-while True:
-    try:
-        with urllib.request.urlopen(request, timeout=5) as response:
-            if response.status != 200:
-                raise SystemExit(f"platform request returned HTTP {response.status}")
-            break
-    except (OSError, urllib.error.URLError):
-        if time.monotonic() >= deadline:
-            raise SystemExit("metrics API port-forward did not become ready")
-        time.sleep(0.25)
+for route in routes:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:18086{route}",
+        headers={"traceparent": f"00-{trace_id}-0123456789abcdef-01"},
+    )
+    while True:
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                if response.status != 200:
+                    raise SystemExit(f"metrics request returned HTTP {response.status}")
+                break
+        except (OSError, urllib.error.URLError):
+            if time.monotonic() >= deadline:
+                raise SystemExit("metrics API port-forward did not become ready")
+            time.sleep(0.25)
 time.sleep(4)
 PY
 
@@ -74,6 +84,7 @@ kubectl --context "$context" --namespace "$namespace" \
 UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/canfar-uv-cache}" \
   uv run python - "$tmp/evidence.json" scripts/workload-fixtures.yaml "$trace_id" <<'PY'
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -110,11 +121,9 @@ for forbidden in (
     "fieldSelector",
     "canfar.net/username=",
     "canfar.net/community=",
-    "/metrics/user/",
-    "/metrics/community/",
     "metrics-cache-v1",
     "metrics:",
-    "PromQL",
+    "canfar_active_workload_",
 ):
     if forbidden.lower() in raw.lower():
         raise SystemExit(f"forbidden telemetry content found: {forbidden!r}")
@@ -135,6 +144,8 @@ required = (
     "Platform metrics request completed",
 )
 missing = [item for item in required if item not in raw]
+if os.getenv("METRICS_OTEL_SMOKE_ACCOUNTING") and '"promql"' not in raw:
+    missing.append("PromQL provider telemetry")
 if missing:
     raise SystemExit(f"missing Collector evidence: {', '.join(missing)}")
 if trace_id not in raw:
