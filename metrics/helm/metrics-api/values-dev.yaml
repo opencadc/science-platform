@@ -10,7 +10,9 @@ env:
   METRICS_CACHE__BACKEND: "redis"
   # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
   METRICS_CACHE__KEY_SECRET: "local-development-cache-key-32bytes"
-  METRICS_OTEL_METRICS_ENABLED: "false"
+  METRICS_OTEL__METRICS_ENABLED: "false"
+  METRICS_OTEL__TRACES_ENABLED: "false"
+  METRICS_OTEL__LOGS_ENABLED: "false"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
   # service account (ADR-0001); no transport settings are configured here.
   METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-example"]'

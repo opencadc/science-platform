@@ -72,13 +72,17 @@ class MetricsService:
             AppError: Unsupported subject, provider unavailability (503), or
                 execution failure (502). Details stay in server logs.
         """
-        if subject.kind != PLATFORM_SUBJECT.kind:
-            raise AppError(
-                code="subject_unsupported",
-                message="Requested metrics subject is not supported",
-                status_code=404,
-            )
-        return await self._get_platform()
+        with self._metrics_recorder.span(
+            "metrics.get",
+            {"metrics.operation": "get", "metrics.subject.type": subject.kind},
+        ):
+            if subject.kind != PLATFORM_SUBJECT.kind:
+                raise AppError(
+                    code="subject_unsupported",
+                    message="Requested metrics subject is not supported",
+                    status_code=404,
+                )
+            return await self._get_platform()
 
     async def _get_platform(self) -> MetricsResult:
         try:
@@ -91,11 +95,14 @@ class MetricsService:
                 retry_after=1,
             ) from exc
         snapshot = result.value
+        cache_result = "stale" if result.stale else ("hit" if result.cached else "miss")
         self._metrics_recorder.record_cache_lookup(
             backend=self._cache.backend_name,
-            hit=result.cached,
+            result=cache_result,
             scope="platform",
+            age_seconds=(datetime.now(UTC) - snapshot.created).total_seconds(),
         )
+        logger.info("Platform metrics request completed")
         return MetricsResult(
             observation=snapshot.observation,
             created=snapshot.created,
@@ -128,26 +135,26 @@ class MetricsService:
         started = perf_counter()
         pstatus = "ok"
         try:
-            return await self._platform()
+            with self._metrics_recorder.span(
+                "source.read",
+                {
+                    "metrics.scope": "platform",
+                    "provider.name": self._provider,
+                    "source.operation": "read",
+                },
+            ):
+                return await self._platform()
         except Exception as exc:
-            pstatus = exc.__class__.__name__
+            pstatus = "error"
             if isinstance(exc, ProviderUnavailableError):
-                logger.warning(
-                    "Platform metrics unavailable: %s",
-                    exc,
-                    exc_info=exc,
-                )
+                logger.warning("Platform metrics unavailable")
                 raise AppError(
                     code="platform_metrics_unavailable",
                     message="Could not load platform metrics from Kubernetes",
                     status_code=503,
                 ) from exc
             if isinstance(exc, ProviderExecutionError):
-                logger.error(
-                    "Platform metrics collection failed: %s",
-                    exc,
-                    exc_info=exc,
-                )
+                logger.error("Platform metrics collection failed")
                 raise AppError(
                     code="platform_metrics_error",
                     message="Platform metrics collection failed",

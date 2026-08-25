@@ -21,14 +21,41 @@ from metrics.telemetry import setup_telemetry
 _logger = logging.getLogger(__name__)
 
 
+def _sanitize_http_span(span, scope: dict, _message: dict | None = None) -> None:
+    """Replace concrete request targets with a bounded route template."""
+    if span is None or not span.is_recording():
+        return
+    route = scope.get("route")
+    template = getattr(route, "path", None) or "unmatched"
+    span.set_attribute("http.route", template)
+    span.set_attribute("url.path", template)
+    span.set_attribute("http.target", template)
+    span.set_attribute("url.query", "")
+
+
+def _sanitize_client_span(span, *_details: object) -> None:
+    """Remove downstream URLs while retaining the bounded HTTP operation."""
+    if span is None or not span.is_recording():
+        return
+    span.set_attribute("url.full", "redacted")
+    span.set_attribute("http.url", "redacted")
+    span.set_attribute("url.path", "redacted")
+    span.set_attribute("url.query", "")
+
+
+async def _sanitize_async_client_span(span, *_details: object) -> None:
+    """Sanitize an asynchronous downstream HTTP span."""
+    _sanitize_client_span(span)
+
+
 def create_app(
     *,
     settings: Settings,
     runtime: MetricsRuntime | None = None,
 ) -> FastAPI:
     """Create and configure the metrics API application."""
-    recorder, meter_provider = setup_telemetry(settings)
-    runtime = runtime or MetricsRuntime.from_settings(settings, recorder=recorder)
+    telemetry = setup_telemetry(settings)
+    runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
     httpx_instrumentor = HTTPXClientInstrumentor()
 
     @asynccontextmanager
@@ -39,20 +66,20 @@ def create_app(
         app.state.cache_control_public = settings.cache_control_public
         try:
             try:
-                await runtime.start()
+                with telemetry.recorder.span("application.lifespan"):
+                    await runtime.start()
                 started = True
             except RuntimeStartupError:
-                _logger.exception("Application startup validation failed; see configuration docs")
+                _logger.error("Application startup validation failed; see configuration docs")
                 raise
             yield
         finally:
-            if settings.otel_metrics_enabled:
+            if telemetry.enabled:
                 FastAPIInstrumentor.uninstrument_app(app)
                 httpx_instrumentor.uninstrument()
             if started:
                 await runtime.shutdown()
-            if meter_provider is not None:
-                meter_provider.shutdown()
+            telemetry.shutdown()
 
     app = FastAPI(
         title=settings.app_name,
@@ -62,12 +89,23 @@ def create_app(
         lifespan=lifespan,
     )
 
-    if settings.otel_metrics_enabled:
+    if telemetry.enabled:
         FastAPIInstrumentor.instrument_app(
             app,
-            meter_provider=meter_provider,
+            meter_provider=telemetry.meter_provider,
+            tracer_provider=telemetry.tracer_provider,
+            server_request_hook=_sanitize_http_span,
+            client_request_hook=_sanitize_http_span,
+            client_response_hook=_sanitize_http_span,
         )
-        httpx_instrumentor.instrument()
+        httpx_instrumentor.instrument(
+            meter_provider=telemetry.meter_provider,
+            tracer_provider=telemetry.tracer_provider,
+            request_hook=_sanitize_client_span,
+            response_hook=_sanitize_client_span,
+            async_request_hook=_sanitize_async_client_span,
+            async_response_hook=_sanitize_async_client_span,
+        )
 
     app.include_router(router)
 
@@ -79,6 +117,7 @@ def create_app(
     @app.get("/readyz", include_in_schema=False)
     async def readiness() -> JSONResponse:
         status = 200 if runtime.ready else 503
+        telemetry.recorder.record_readiness(runtime.ready)
         return JSONResponse(
             status_code=status, content={"status": "ready" if status == 200 else "not ready"}
         )
@@ -101,7 +140,8 @@ def create_app(
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
-        _logger.error("Unhandled request failure", exc_info=exc)
+        del exc
+        _logger.error("Unhandled request failure")
         body = ErrorResponse(
             version=app.state.api_version,
             metadata=ResponseMetadata(),

@@ -17,13 +17,19 @@ import metrics.core.factory as factory_module
 import metrics.main as main_module
 from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, InMemoryCoordinator
 from metrics.core.runtime import MetricsRuntime
-from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
+from metrics.core.settings import (
+    CacheConfig,
+    KueueProviderConfig,
+    OTelConfig,
+    ProviderConfigs,
+    Settings,
+)
 from metrics.errors import RuntimeStartupError
 from metrics.http_cache import metrics_success_cache_headers, remaining_freshness_seconds
 from metrics.providers.kueue import KueueProvider
 from metrics.services.metrics import MetricsService
 from metrics.services.models import CachedSnapshot
-from metrics.telemetry import NoopMetricsRecorder
+from metrics.telemetry import NoopMetricsRecorder, Telemetry
 from tests.fakes import FakeKueueApi, LifecycleProvider, cache_control_max_age
 
 CQ_A = {
@@ -275,12 +281,18 @@ def test_otel_wiring_instruments_and_uninstruments(monkeypatch) -> None:
     monkeypatch.setattr(
         factory_module,
         "setup_telemetry",
-        lambda settings: (NoopMetricsRecorder(), meter_provider),
+        lambda settings: Telemetry(NoopMetricsRecorder(), meter_provider=meter_provider),
     )
     monkeypatch.setattr(factory_module, "FastAPIInstrumentor", fastapi_instrumentor)
     monkeypatch.setattr(factory_module, "HTTPXClientInstrumentor", httpx_instrumentor)
 
-    settings = Settings(otel_metrics_enabled=True, cache=CacheConfig(backend="memory"))
+    settings = Settings(
+        otel=OTelConfig(
+            metrics_enabled=True,
+            exporter_otlp_endpoint="http://collector:4318",
+        ),
+        cache=CacheConfig(backend="memory"),
+    )
     with TestClient(factory_module.create_app(settings=settings, runtime=_runtime())) as client:
         assert client.get("/healthz").status_code == 200
 

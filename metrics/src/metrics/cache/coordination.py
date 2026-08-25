@@ -21,6 +21,7 @@ from metrics.cache.models import (
     cache_keys,
 )
 from metrics.cache.redis import RedisSnapshots, RedisUnavailable, StoredSnapshot
+from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 Value = TypeVar("Value")
 
@@ -51,6 +52,7 @@ class RedisCoordinator(Generic[Value]):
         poll_max: float = 0.15,
         max_l1_entries: int = 128,
         max_fills: int = 8,
+        telemetry: MetricsRecorder | None = None,
     ) -> None:
         """Configure freshness, finite deadlines, polling, and local bounds."""
         self.policy = policy
@@ -67,6 +69,7 @@ class RedisCoordinator(Generic[Value]):
         self._lock = asyncio.Lock()
         self._capacity = asyncio.Semaphore(max(1, max_fills))
         self._available = True
+        self._telemetry = telemetry or NoopMetricsRecorder()
 
     @property
     def available(self) -> bool:
@@ -121,6 +124,20 @@ class RedisCoordinator(Generic[Value]):
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult:
         """Read a snapshot or coordinate exactly one bounded downstream fill."""
+        with self._telemetry.span(
+            "cache.get_or_fill",
+            {
+                "cache.backend": self.backend_name,
+                "metrics.scope": identity.subject_kind,
+            },
+        ):
+            return await self._get_or_fill(identity, fill)
+
+    async def _get_or_fill(
+        self,
+        identity: CacheIdentity,
+        fill: Callable[[], Awaitable[Value]],
+    ) -> CacheResult:
         keys = self._keys(identity)
         try:
             snapshot = await self._read(keys)
@@ -160,7 +177,11 @@ class RedisCoordinator(Generic[Value]):
             self._available = False
             return CacheResult(stale.value, cached=True, stale=True)
         if not won or self._capacity.locked():
+            self._telemetry.record_lease(outcome="contended", scope="platform")
             return CacheResult(stale.value, cached=True, stale=True)
+        self._telemetry.record_lease(outcome="acquired", scope="platform")
+        started = time.perf_counter()
+        outcome = "ok"
         try:
             async with self._capacity, asyncio.timeout(self._fill_timeout):
                 value = await fill()
@@ -176,11 +197,18 @@ class RedisCoordinator(Generic[Value]):
             self._remember(keys.base, StoredSnapshot(snapshot_id, value, created))
             return CacheResult(value, cached=False, stale=False)
         except RedisUnavailable:
+            outcome = "error"
             self._available = False
             return CacheResult(stale.value, cached=True, stale=True)
         except Exception:
+            outcome = "error"
             return CacheResult(stale.value, cached=True, stale=True)
         finally:
+            self._telemetry.record_fill_duration(
+                seconds=time.perf_counter() - started,
+                outcome=outcome,
+                scope="platform",
+            )
             try:
                 await self._store.release_lease(keys=keys, bucket=bucket, token=token)
             except RedisUnavailable:
@@ -249,7 +277,11 @@ class RedisCoordinator(Generic[Value]):
             raise CacheUnavailable("Redis unavailable during cold fill") from exc
 
         if not won:
+            self._telemetry.record_lease(outcome="contended", scope="platform")
             return await self._poll(keys, baseline)
+        self._telemetry.record_lease(outcome="acquired", scope="platform")
+        started = time.perf_counter()
+        outcome = "ok"
         try:
             async with self._capacity, asyncio.timeout(self._fill_timeout):
                 value = await fill()
@@ -265,12 +297,21 @@ class RedisCoordinator(Generic[Value]):
             self._remember(keys.base, StoredSnapshot(snapshot_id, value, created))
             return CacheResult(value, cached=False, stale=False)
         except RedisUnavailable as exc:
+            outcome = "error"
             self._available = False
             fallback = self._fallback(keys.base)
             if fallback is not None:
                 return fallback
             raise CacheUnavailable("Redis unavailable while publishing snapshot") from exc
+        except Exception:
+            outcome = "error"
+            raise
         finally:
+            self._telemetry.record_fill_duration(
+                seconds=time.perf_counter() - started,
+                outcome=outcome,
+                scope="platform",
+            )
             try:
                 await self._store.release_lease(keys=keys, bucket=bucket, token=token)
             except RedisUnavailable:

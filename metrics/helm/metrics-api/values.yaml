@@ -45,5 +45,9 @@ redis:
     key: redis-url
 
 collector:
+  # Local development only. Production points OTLP at an external Collector/Alloy.
   enabled: false
-  image: otel/opentelemetry-collector:0.123.0
+  image: otel/opentelemetry-collector-contrib:0.123.0
+  file:
+    # Smoke-only machine evidence; never enable in production values.
+    enabled: false

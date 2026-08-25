@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from time import perf_counter
 
 from redis.asyncio import Redis
 
@@ -21,7 +22,7 @@ from metrics.errors import RuntimeStartupError
 from metrics.providers.kueue import KueueProvider
 from metrics.services.metrics import MetricsService
 from metrics.services.models import CachedSnapshot
-from metrics.telemetry import MetricsRecorder
+from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 _logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ def platform_cache_identity(
 
 def build_cache(
     settings: Settings,
+    recorder: MetricsRecorder | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
     """Construct the configured cache coordinator and owned Redis client."""
     policy = FRESHNESS_POLICIES["platform"]
@@ -87,6 +89,7 @@ def build_cache(
         schema_revision=_SCHEMA_REVISION,
         source_revision=_SOURCE_REVISION,
         query_revision=_QUERY_REVISION,
+        telemetry=recorder,
     )
     return (
         RedisCoordinator[CachedSnapshot](
@@ -99,6 +102,7 @@ def build_cache(
             cold_timeout=settings.cache.cold_get_timeout_seconds,
             max_l1_entries=settings.cache.l1_max_entries,
             max_fills=settings.cache.max_fills,
+            telemetry=recorder,
         ),
         redis_client,
     )
@@ -115,6 +119,7 @@ class MetricsRuntime:
         metrics_service: MetricsService,
         cache: CacheCoordinator[CachedSnapshot],
         redis: Redis | None = None,
+        telemetry: MetricsRecorder | None = None,
     ) -> None:
         """Attach the provider, Metrics service, and optional Redis client.
 
@@ -126,6 +131,7 @@ class MetricsRuntime:
             metrics_service: Shared Metrics service exposed to HTTP adapters.
             cache: Cache coordinator and readiness dependency.
             redis: Redis client when configured; closed on shutdown.
+            telemetry: Bounded lifecycle and readiness recorder.
         """
         self._settings = settings
         self._provider: KueueProvider | None = provider
@@ -133,6 +139,7 @@ class MetricsRuntime:
         self._cache = cache
         self._redis: Redis | None = redis
         self._metrics: MetricsService | None = metrics_service
+        self._telemetry = telemetry or NoopMetricsRecorder()
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
@@ -148,7 +155,7 @@ class MetricsRuntime:
         Returns:
             A fully wired runtime ready for :meth:`start`.
         """
-        cache, redis_client = build_cache(settings)
+        cache, redis_client = build_cache(settings, recorder)
         provider = KueueProvider(settings)
         fingerprint = provider.cache_fingerprint()
         metrics_service = MetricsService(
@@ -168,6 +175,7 @@ class MetricsRuntime:
             metrics_service=metrics_service,
             cache=cache,
             redis=redis_client,
+            telemetry=recorder,
         )
 
     @property
@@ -192,28 +200,43 @@ class MetricsRuntime:
         """Start the active provider once, cleaning up all resources on failure."""
         if self._provider is None or self._provider_started:
             return
+        started = perf_counter()
+        outcome = "ok"
         try:
-            if isinstance(self._cache, RedisCoordinator):
-                await self._cache.ping()
-            await self._provider.startup()
-            self._provider_started = True
+            with self._telemetry.span("application.startup"):
+                if isinstance(self._cache, RedisCoordinator):
+                    await self._cache.ping()
+                await self._provider.startup()
+                self._provider_started = True
+                self._telemetry.record_readiness(True)
+                _logger.info("Runtime startup completed")
         except asyncio.CancelledError:
+            outcome = "cancelled"
             try:
                 await self.shutdown()
             finally:
                 raise
         except RedisUnavailable:
-            _logger.exception("Runtime startup validation failed")
+            outcome = "error"
+            _logger.error("Runtime startup validation failed")
             await self.shutdown()
             raise RuntimeStartupError("Required metrics dependency is unavailable") from None
         except RuntimeStartupError:
-            _logger.exception("Provider startup validation failed")
+            outcome = "error"
+            _logger.error("Provider startup validation failed")
             await self.shutdown()
             raise
         except Exception as exc:
-            _logger.exception("Unexpected provider startup failure")
+            outcome = "error"
+            _logger.error("Unexpected provider startup failure")
             await self.shutdown()
             raise RuntimeStartupError("Unexpected error during metrics runtime startup") from exc
+        finally:
+            self._telemetry.record_lifecycle(
+                operation="startup",
+                outcome=outcome,
+                seconds=perf_counter() - started,
+            )
 
     async def shutdown(self) -> None:
         """Close each owned resource once without allowing one failure to skip another.
@@ -221,24 +244,41 @@ class MetricsRuntime:
         After this returns, :attr:`_metrics` is ``None`` so :attr:`metrics_service`
         surfaces an invalid state instead of reusing closed resources.
         """
+        with self._telemetry.span("application.shutdown"):
+            await self._shutdown()
+
+    async def _shutdown(self) -> None:
+        started = perf_counter()
+        outcome = "ok"
         cancellation: asyncio.CancelledError | None = None
+        self._telemetry.record_readiness(False)
         provider, self._provider = self._provider, None
         self._provider_started = False
         if provider is not None:
             try:
                 await provider.shutdown()
             except asyncio.CancelledError as exc:
+                outcome = "cancelled"
                 cancellation = exc
             except Exception:
-                _logger.exception("Platform provider shutdown failed; closing remaining resources")
+                outcome = "error"
+                _logger.error("Platform provider shutdown failed; closing remaining resources")
         redis, self._redis = self._redis, None
         if redis is not None:
             try:
                 await redis.aclose()
             except asyncio.CancelledError as exc:
+                outcome = "cancelled"
                 cancellation = cancellation or exc
             except Exception:
-                _logger.exception("Redis shutdown failed")
+                outcome = "error"
+                _logger.error("Redis shutdown failed")
         self._metrics = None
+        self._telemetry.record_lifecycle(
+            operation="shutdown",
+            outcome=outcome,
+            seconds=perf_counter() - started,
+        )
+        _logger.info("Runtime shutdown completed")
         if cancellation is not None:
             raise cancellation
