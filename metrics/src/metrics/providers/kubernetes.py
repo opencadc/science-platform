@@ -171,6 +171,7 @@ class KubernetesProvider:
             community=community,
             running_pods=len(pods),
             requests=requests,
+            pod_uids=_pod_uids(pods),
         )
 
     async def _read_subject(

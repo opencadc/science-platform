@@ -61,6 +61,10 @@ class CommunityObservation:
     community: str
     running_pods: int
     requests: dict[str, str]
+    pod_uids: frozenset[str] = frozenset()
+    accounting: ActiveWorkloadLifetime | None = None
+    accounting_state: AccountingState = AccountingState.DISABLED
+    accounting_stale: bool = False
 
 
 class LifetimeIssue(StrEnum):
@@ -157,7 +161,7 @@ class MetricsResult:
         """Return the public Ready status and reason."""
         if self.stale:
             return "False", "StaleData"
-        if isinstance(self.observation, UserObservation):
+        if isinstance(self.observation, (UserObservation, CommunityObservation)):
             if self.observation.accounting_state is AccountingState.UNAVAILABLE:
                 return "False", "PartialData"
             if self.observation.accounting_state is AccountingState.INCOMPLETE:

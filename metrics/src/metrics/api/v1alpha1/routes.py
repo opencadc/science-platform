@@ -170,7 +170,9 @@ def _decimal_string(value: Decimal) -> str:
     return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
 
 
-def _user_resources(observation: UserObservation) -> list[ResourceMetrics]:
+def _subject_resources(
+    observation: UserObservation | CommunityObservation,
+) -> list[ResourceMetrics]:
     """Combine current requests with complete additive lifetime accounting."""
     accounting = observation.accounting
     names = set(observation.requests)
@@ -245,7 +247,7 @@ async def get_user_metrics(
                 else None
             ),
             running_pods=observation.running_pods,
-            resources=_user_resources(observation),
+            resources=_subject_resources(observation),
             conditions=[
                 Condition(
                     type="Ready",
@@ -272,7 +274,7 @@ async def get_user_metrics(
         400: {"model": Status, "description": "Malformed community value."},
         503: {"model": Status, "description": "No serviceable report is available."},
     },
-    summary="Get current community requests",
+    summary="Get community requests and lifetime accounting",
 )
 async def get_community_metrics(
     community: str,
@@ -280,7 +282,7 @@ async def get_community_metrics(
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
 ) -> Metrics | Response:
-    """Return requests held by one community's Running Pods."""
+    """Return requests and lifetime accounting for one community's Running Pods."""
     community = _subject_value(community, "community")
     result = await runtime.metrics_service.get(MetricsSubject(kind="community", value=community))
     observation = result.observation
@@ -304,11 +306,13 @@ async def get_community_metrics(
         spec=MetricsSpec(community=community),
         status=MetricsStatus(
             observed_at=result.created,
+            accounting_period=(
+                "ActiveWorkloadLifetime"
+                if observation.accounting_state is not AccountingState.DISABLED
+                else None
+            ),
             running_pods=observation.running_pods,
-            resources=[
-                ResourceMetrics(name=name, requests=observation.requests[name])
-                for name in sorted(observation.requests)
-            ],
+            resources=_subject_resources(observation),
             conditions=[
                 Condition(
                     type="Ready",
