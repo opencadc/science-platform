@@ -2,7 +2,7 @@
 
 The Metrics service exposes cluster-wide **platform capacity** and **platform
 allocation** derived from Kueue. Skaha and other in-cluster consumers call it
-via `GET /api/v1/metrics/platform`.
+via `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`.
 
 Shared cross-context vocabulary: [`../CONTEXT-MAP.md`](../CONTEXT-MAP.md).
 
@@ -11,11 +11,11 @@ Distilled decisions: [`docs/adr/README.md`](docs/adr/README.md).
 ## Language
 
 **Platform capacity**: Total CPU and memory available across the cluster for
-scheduling (Kueue-backed). Exposed as `data.capacity`. Open resource-name keys
+scheduling (Kueue-backed). Exposed as `status.resources[].capacity`. Open resource-name keys
 (for example `cpu`, `memory`, `nvidia.com/gpu`). _Avoid_: "available" alone.
 
 **Platform allocation**: CPU and memory already allocated on the cluster
-(Kueue-backed). Exposed as `data.allocated`. Sourced from
+(Kueue-backed). Exposed as `status.resources[].allocated`. Sourced from
 `flavorsUsage.resources[].total`. _Avoid_: "requested" alone when meaning
 cluster totals.
 
@@ -40,17 +40,15 @@ does not compose fragments across providers.
 **Provider fingerprint**: Stable segment in cache keys when queue lists or
 provider config change.
 
-**Versioned API envelope**: Responses use `version` (for example
-`metrics.canfar.net/v1`), `kind`, `metadata.created`, `status`, and `data`.
-
-**PlatformMetrics**: Cluster-wide Kueue-backed contract (`kind: PlatformMetrics`);
-route `GET /api/v1/metrics/platform`. Shipped in M4.
+**Metrics**: Kubernetes-style `canfar.net/v1alpha1` response kind for one
+bounded report. Platform uses `spec.platform: canfar`, `status.observedAt`,
+named resources, and exactly `Ready` and `Cached` conditions.
 
 ## Relationships
 
 - Metrics owns caching and snapshot freshness for platform reads; Skaha does
   not cache Metrics responses.
-- Each key in `data.capacity` must also appear in `data.allocated` using the
+- Each named Platform resource contains both `capacity` and `allocated` using the
   **same unit** for that resource name
   ([ADR-0002](docs/adr/0002-platform-api-contract.md)).
 - Platform `allocated` sums `status.flavorsUsage.resources[].total` only;
@@ -61,13 +59,12 @@ route `GET /api/v1/metrics/platform`. Shipped in M4.
 > **Domain expert:** "Summed nominal quota from the configured ClusterQueues in
 > the Kueue provider — not node listing or pod aggregation."
 
-## Proposed vocabulary
+## Shared vocabulary
 
-The terms below describe the accepted design for the unreleased `v1alpha1`
-contract. They do not exist in runtime configuration or the active API yet.
-ADRs 0004–0009 own these decisions.
+ADRs 0004–0009 own these terms. Platform is implemented; User, Community, and
+accounting terms describe later packages.
 
-**Metrics**: Proposed Kubernetes API kind for one bounded metrics report about
+**Metrics**: Kubernetes API kind for one bounded metrics report about
 a `Platform`, `User`, or `Community` subject. The API group `canfar.net`
 carries the product identity, so the Kind is the unprefixed CamelCase domain
 type. `Metrics` is the accepted mass noun. _Avoid_: `CanfarMetrics`, `CANFARMetrics`,

@@ -7,7 +7,7 @@ This file captures repository-specific design decisions and tradeoffs.
 Operational environment contracts and roadmap-to-runtime mappings for Metrics
 live in `environment-contracts.md` in this directory.
 
-## Current design (post M4)
+## Current design
 
 See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
 
@@ -16,8 +16,9 @@ See [`docs/adr/README.md`](adr/README.md) for distilled decisions. Summary:
   part of the supported service contract (see `environment-contracts.md`).
 - **Single service process, platform-only HTTP:** `MetricsRuntime` constructs
   the Kueue provider, owns provider lifecycle and cache resources, and exposes
-  platform reads to versioned routes. Kueue reads Kubernetes through kr8s (ADR-0001). M4 serves only
-  `GET /api/v1/metrics/platform` and `GET /healthz`.
+  platform reads to the versioned route. Kueue reads Kubernetes through kr8s
+  (ADR-0001). The metrics API serves only
+  `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`.
 - **Truthful provider configuration:** Kueue is the only configured provider
   and the only accepted `sources.platform` value.
 - **Kueue allocated semantics:** Platform `allocated` values come from

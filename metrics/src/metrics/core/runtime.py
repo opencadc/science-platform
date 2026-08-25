@@ -26,7 +26,7 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 _logger = logging.getLogger(__name__)
 
-_SCHEMA_REVISION = "4"
+_SCHEMA_REVISION = "5"
 _SOURCE_REVISION = "1"
 _QUERY_REVISION = "0"
 
@@ -49,7 +49,7 @@ def platform_cache_identity(
     """
     return CacheIdentity(
         subject_kind="platform",
-        subject_value="",
+        subject_value="canfar",
         cluster=cluster_name,
         source=source,
         fingerprint=fingerprint.strip(),

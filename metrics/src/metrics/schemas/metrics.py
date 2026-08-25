@@ -1,78 +1,72 @@
-"""Pydantic API and service models."""
+"""Public ``canfar.net/v1alpha1`` Metrics wire models."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class ResponseMetadata(BaseModel):
-    """Common metadata for all API responses.
+class WireModel(BaseModel):
+    """Strict public wire model."""
 
-    Freshness and cache visibility are expressed via HTTP headers
-    (``Cache-Control``, ``Date``, ``Expires``, ``Last-Modified``), not JSON fields.
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    created: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        description="Timestamp when this metric snapshot was produced (also ``Last-Modified``).",
+
+class ObjectMetadata(WireModel):
+    """Truthful metadata for the standalone response."""
+
+    name: str
+
+
+class MetricsSpec(WireModel):
+    """One compact Metrics subject selector."""
+
+    platform: str
+
+
+class ResourceMetrics(WireModel):
+    """Named Kubernetes resource observation."""
+
+    name: str
+    capacity: str
+    allocated: str
+
+
+class Condition(WireModel):
+    """Kubernetes-style report condition."""
+
+    type: Literal["Ready", "Cached"]
+    status: Literal["True", "False", "Unknown"]
+    reason: Literal[
+        "Available",
+        "PartialData",
+        "AccountingIncomplete",
+        "StaleData",
+        "FreshHit",
+        "StaleHit",
+        "Refreshed",
+        "RedisUnavailable",
+    ]
+    last_transition_time: datetime = Field(serialization_alias="lastTransitionTime")
+
+
+class MetricsStatus(WireModel):
+    """Observed resources and exactly Ready/Cached conditions."""
+
+    observed_at: datetime = Field(serialization_alias="observedAt")
+    resources: list[ResourceMetrics]
+    conditions: list[Condition]
+
+
+class Metrics(WireModel):
+    """One Kubernetes-style metrics report."""
+
+    api_version: Literal["canfar.net/v1alpha1"] = Field(
+        default="canfar.net/v1alpha1", serialization_alias="apiVersion"
     )
-
-
-class ErrorDetail(BaseModel):
-    """Structured error payload."""
-
-    code: str = Field(description="Stable machine-readable error code.")
-    message: str = Field(description="Human-readable error summary.")
-
-
-class PlatformMetricsData(BaseModel):
-    """Platform metrics payload."""
-
-    scope: Literal["platform"] = "platform"
-    cluster: str = Field(description="Cluster identifier for this metric scope.")
-    capacity: dict[str, str] = Field(
-        default_factory=dict,
-        description=(
-            "Aggregated nominal quota keyed by Kubernetes resource name "
-            "(for example cpu, memory, nvidia.com/gpu). Per-resource units match "
-            "`allocated` (CPU in cores, memory in Gi, etc.)."
-        ),
-    )
-    allocated: dict[str, str] = Field(
-        default_factory=dict,
-        description=(
-            "Aggregated admitted usage from Kueue ClusterQueue status.flavorsUsage "
-            "total per resource, keyed by resource name. Kueue total already "
-            "includes borrowed quota. Per-resource units match `capacity` "
-            "(CPU in cores, memory in Gi, etc.)."
-        ),
-    )
-
-
-class PlatformMetricsResponse(BaseModel):
-    """Success envelope for platform metrics."""
-
-    version: str = Field(
-        description="Versioned API group identifier.",
-        examples=["metrics.canfar.net/v1"],
-    )
-    kind: Literal["PlatformMetrics"] = "PlatformMetrics"
-    metadata: ResponseMetadata
-    status: Literal["Success"] = "Success"
-    data: PlatformMetricsData
-
-
-class ErrorResponse(BaseModel):
-    """Error envelope for all API routes."""
-
-    version: str = Field(
-        description="Versioned API group identifier.",
-        examples=["metrics.canfar.net/v1"],
-    )
-    kind: Literal["Status"] = "Status"
-    metadata: ResponseMetadata
-    status: Literal["Error"] = "Error"
-    error: ErrorDetail
+    kind: Literal["Metrics"] = "Metrics"
+    metadata: ObjectMetadata
+    spec: MetricsSpec
+    status: MetricsStatus

@@ -17,23 +17,34 @@ public class PlatformMetricsDAOTest {
     private static final String FIXTURE_JSON =
             """
             {
-              "version": "metrics.canfar.net/v1",
-              "kind": "PlatformMetrics",
+              "apiVersion": "canfar.net/v1alpha1",
+              "kind": "Metrics",
               "metadata": {
-                "created": "2026-03-15T12:30:00Z"
+                "name": "platform-canfar"
               },
-              "status": "Success",
-              "data": {
-                "scope": "platform",
-                "cluster": "test-cluster",
-                "capacity": {
-                  "cpu": "100",
-                  "memory": "200Gi"
-                },
-                "allocated": {
-                  "cpu": "25",
-                  "memory": "50Gi"
-                }
+              "spec": {
+                "platform": "canfar"
+              },
+              "status": {
+                "observedAt": "2026-03-15T12:30:00Z",
+                "resources": [
+                  {"name": "cpu", "capacity": "100", "allocated": "25"},
+                  {"name": "memory", "capacity": "200Gi", "allocated": "50Gi"}
+                ],
+                "conditions": [
+                  {
+                    "type": "Ready",
+                    "status": "True",
+                    "reason": "Available",
+                    "lastTransitionTime": "2026-03-15T12:30:00Z"
+                  },
+                  {
+                    "type": "Cached",
+                    "status": "True",
+                    "reason": "FreshHit",
+                    "lastTransitionTime": "2026-03-15T12:30:00Z"
+                  }
+                ]
               }
             }
             """;
@@ -45,7 +56,7 @@ public class PlatformMetricsDAOTest {
     public void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         port = server.getAddress().getPort();
-        server.createContext("/api/v1/metrics/platform", exchange -> {
+        server.createContext("/apis/canfar.net/v1alpha1/metrics/platform/canfar", exchange -> {
             final byte[] body = FIXTURE_JSON.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, body.length);

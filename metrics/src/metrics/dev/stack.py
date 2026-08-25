@@ -352,7 +352,8 @@ def smoke() -> None:
                     raise DevStackError("metrics API did not become healthy within 60s")
                 time.sleep(1)
         with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/api/v1/metrics/platform", timeout=15
+            f"http://127.0.0.1:{port}/apis/canfar.net/v1alpha1/metrics/platform/canfar",
+            timeout=15,
         ) as response:
             if response.status != 200:
                 raise DevStackError(f"platform API returned HTTP {response.status}")

@@ -4,13 +4,14 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Platform metrics envelope returned by the Metrics backend {@code GET /api/v1/metrics/platform}.
+ * Platform metrics adapted from the Metrics backend
+ * {@code GET /apis/canfar.net/v1alpha1/metrics/platform/canfar}.
  *
  * <p>Combines snapshot metadata with {@linkplain Data platform capacity} and {@linkplain Data platform allocation}
  * resource maps.
  *
- * @param metadata snapshot metadata including {@link Metadata#created()}
- * @param data platform capacity and allocation keyed by Kueue resource names
+ * @param metadata snapshot metadata adapted from {@code status.observedAt}
+ * @param data platform capacity and allocation adapted from {@code status.resources}
  */
 public record PlatformMetrics(Metadata metadata, Data data) {
 
@@ -20,15 +21,15 @@ public record PlatformMetrics(Metadata metadata, Data data) {
     /**
      * Metrics response metadata for a platform metrics snapshot.
      *
-     * @param created snapshot time ({@code metadata.created} from the Metrics API)
+     * @param created snapshot time ({@code status.observedAt} from the Metrics API)
      */
     public record Metadata(Instant created) {}
 
     /**
-     * Platform metrics payload from the Metrics API {@code data} object.
+     * Platform metrics payload adapted from the Metrics API resource list.
      *
-     * @param capacity platform capacity from Metrics {@code data.capacity}
-     * @param allocated platform allocation from Metrics {@code data.allocated}
+     * @param capacity platform capacity keyed from Metrics {@code status.resources}
+     * @param allocated platform allocation keyed from Metrics {@code status.resources}
      */
     public record Data(Map<String, String> capacity, Map<String, String> allocated) {
 

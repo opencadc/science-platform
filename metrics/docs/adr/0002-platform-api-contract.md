@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (last amended 2026-07-31). Consolidates former ADRs 0002 (itself
+Partially superseded by ADR-0004 and ADR-0005. Its Kueue aggregation semantics
+remain active; its route, wire envelope, error shape, and downstream-cache
+policy do not. Originally accepted 2026-07-31 and consolidated former ADRs 0002 (itself
 0002/0003/0006/0007/0008), 0004 (itself 0004/0017), 0013 (itself 0013/0014),
 and 0019; originals in git history.
 

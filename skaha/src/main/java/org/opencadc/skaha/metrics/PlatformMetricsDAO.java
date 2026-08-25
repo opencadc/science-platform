@@ -2,16 +2,14 @@ package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.util.StringUtil;
-import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -26,10 +24,8 @@ class PlatformMetricsDAO {
     /** Environment variable holding the Metrics backend base URL (scheme, host, optional port). */
     public static final String SKAHA_METRICS_BACKEND_URL = "SKAHA_METRICS_BACKEND_URL";
 
-    private static final String PLATFORM_METRICS_PATH = "/api/v1/metrics/platform";
-    private static final Type STRING_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
+    private static final String PLATFORM_METRICS_PATH = "/apis/canfar.net/v1alpha1/metrics/platform/canfar";
 
-    private final Gson gson = new Gson();
     private final String platformMetricsUrl;
 
     /**
@@ -80,23 +76,38 @@ class PlatformMetricsDAO {
 
     private PlatformMetrics parseEnvelope(final String json) {
         final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        final JsonObject metadata = root.getAsJsonObject("metadata");
-        final JsonObject data = root.getAsJsonObject("data");
-        if (metadata == null || data == null) {
-            throw new IllegalArgumentException("invalid PlatformMetrics envelope");
+        final JsonObject spec = root.getAsJsonObject("spec");
+        final JsonObject status = root.getAsJsonObject("status");
+        if (!"canfar.net/v1alpha1".equals(text(root, "apiVersion"))
+                || !"Metrics".equals(text(root, "kind"))
+                || spec == null
+                || !"canfar".equals(text(spec, "platform"))
+                || status == null) {
+            throw new IllegalArgumentException("invalid Metrics envelope");
         }
-        final Instant created = Instant.parse(metadata.get("created").getAsString());
-        final Map<String, String> capacity = parseResourceMap(data, "capacity");
-        final Map<String, String> allocated = parseResourceMap(data, "allocated");
+        final Instant created = Instant.parse(text(status, "observedAt"));
+        final Map<String, String> capacity = new HashMap<>();
+        final Map<String, String> allocated = new HashMap<>();
+        final JsonArray resources = status.getAsJsonArray("resources");
+        if (resources == null) {
+            throw new IllegalArgumentException("invalid Metrics resources");
+        }
+        resources.forEach(element -> {
+            final JsonObject resource = element.getAsJsonObject();
+            final String name = text(resource, "name");
+            if (capacity.put(name, text(resource, "capacity")) != null
+                    || allocated.put(name, text(resource, "allocated")) != null) {
+                throw new IllegalArgumentException("duplicate Metrics resource");
+            }
+        });
         return new PlatformMetrics(
                 new PlatformMetrics.Metadata(created), new PlatformMetrics.Data(capacity, allocated));
     }
 
-    private Map<String, String> parseResourceMap(final JsonObject data, final String field) {
-        if (!data.has(field) || data.get(field).isJsonNull()) {
-            return Collections.emptyMap();
+    private static String text(final JsonObject object, final String field) {
+        if (!object.has(field) || object.get(field).isJsonNull()) {
+            throw new IllegalArgumentException("invalid Metrics envelope");
         }
-        final Map<String, String> values = gson.fromJson(data.get(field), STRING_MAP_TYPE);
-        return values == null ? Collections.emptyMap() : values;
+        return object.get(field).getAsString();
     }
 }

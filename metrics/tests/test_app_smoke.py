@@ -28,9 +28,9 @@ from metrics.errors import RuntimeStartupError
 from metrics.http_cache import metrics_success_cache_headers, remaining_freshness_seconds
 from metrics.providers.kueue import KueueProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import CachedSnapshot
+from metrics.services.models import CachedSnapshot, PlatformObservation
 from metrics.telemetry import NoopMetricsRecorder, Telemetry
-from tests.fakes import FakeKueueApi, LifecycleProvider, cache_control_max_age
+from tests.fakes import FakeKueueApi, LifecycleProvider
 
 CQ_A = {
     "spec": {
@@ -105,83 +105,139 @@ def _runtime(
     service = MetricsService(
         platform=active.read_platform,
         cache=cache,
-        identity=lambda: CacheIdentity("platform", "", "prod", "kueue", "test"),
+        identity=lambda: CacheIdentity("platform", "canfar", "prod", "kueue", "test"),
     )
     return MetricsRuntime(settings, provider=active, metrics_service=service, cache=cache)
 
 
 def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> None:
     with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
-        response = client.get("/api/v1/metrics/platform")
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
         assert response.status_code == 200
 
-        # HTTP caching is header-based (ADR-0002): shared, bounded by TTL.
-        cache_control = response.headers["cache-control"]
-        assert "public" in cache_control
-        assert 295 <= cache_control_max_age(cache_control) <= 300
-        assert response.headers.get("date")
-        assert response.headers.get("expires")
-        created = datetime.fromisoformat(response.json()["metadata"]["created"])
-        assert created.tzinfo is not None
-
-        # Versioned envelope with no cache metadata in the body.
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["age"] == "0"
+        assert response.headers["cache-status"].startswith("metrics; fwd=uri-miss; ttl=")
+        assert response.headers["last-modified"]
         payload = response.json()
-        assert set(payload) == {"version", "kind", "metadata", "status", "data"}
-        assert payload["version"] == "metrics.canfar.net/v1"
-        assert payload["kind"] == "PlatformMetrics"
-        assert payload["status"] == "Success"
-        assert "ttl" not in payload["metadata"] and "cached" not in payload["metadata"]
-
-        # Aggregation contract (ADR-0002): summed quotas, usage totals only,
-        # unit parity, zero-alignment, sorted open-ended maps.
-        data = payload["data"]
-        assert set(data) == {"scope", "cluster", "capacity", "allocated"}
-        assert data["cluster"] == "prod"
-        assert data["capacity"]["cpu"] == "15.3"
-        assert data["capacity"]["memory"] == "20Gi"
-        assert data["capacity"]["ephemeral-storage"] == "2Gi"
-        assert data["capacity"]["nvidia.com/gpu"] == "0.3"
-        assert data["allocated"]["cpu"] == "0.1"
-        assert data["allocated"]["memory"] == "2Gi"
-        assert data["allocated"]["ephemeral-storage"] == "0Gi"
-        assert data["allocated"]["nvidia.com/gpu"] == "0.3"
-        assert list(data["capacity"]) == sorted(data["capacity"])
-        assert set(data["allocated"]) == set(data["capacity"])
+        observed_at = payload["status"]["observedAt"]
+        assert payload == {
+            "apiVersion": "canfar.net/v1alpha1",
+            "kind": "Metrics",
+            "metadata": {"name": "platform-canfar"},
+            "spec": {"platform": "canfar"},
+            "status": {
+                "observedAt": observed_at,
+                "resources": [
+                    {"name": "cpu", "capacity": "15.3", "allocated": "0.1"},
+                    {"name": "ephemeral-storage", "capacity": "2Gi", "allocated": "0Gi"},
+                    {"name": "memory", "capacity": "20Gi", "allocated": "2Gi"},
+                    {"name": "nvidia.com/gpu", "capacity": "0.3", "allocated": "0.3"},
+                ],
+                "conditions": [
+                    {
+                        "type": "Ready",
+                        "status": "True",
+                        "reason": "Available",
+                        "lastTransitionTime": observed_at,
+                    },
+                    {
+                        "type": "Cached",
+                        "status": "False",
+                        "reason": "Refreshed",
+                        "lastTransitionTime": observed_at,
+                    },
+                ],
+            },
+        }
+        assert datetime.fromisoformat(observed_at).tzinfo is not None
 
         # Second read is served from the same snapshot.
-        second = client.get("/api/v1/metrics/platform")
+        second = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
         assert second.headers["last-modified"] == response.headers["last-modified"]
+        assert second.json()["status"]["conditions"][1]["reason"] == "FreshHit"
+        assert second.headers["cache-status"].startswith("metrics; hit; ttl=")
 
-        # Removed route surface stays removed (ADR-0002).
-        assert client.get("/api/v1/metrics/users/u1").status_code == 404
-        assert client.get("/api/v1/metrics/users/u1/sessions/s1").status_code == 404
-        assert client.get("/metrics").status_code == 404
+        legacy = client.get("/api/v1/metrics/platform")
+        assert legacy.status_code == 404
+        assert legacy.json()["kind"] == "Status"
+
+
+def test_stale_platform_report_has_exact_conditions_and_headers() -> None:
+    settings = _settings()
+    provider = KueueProvider(settings, api=FakeKueueApi({"cq-a": CQ_A, "cq-b": CQ_B}))
+    identity = CacheIdentity("platform", "canfar", "prod", "kueue", "test")
+    cache = InMemoryCoordinator[CachedSnapshot](
+        policy=FRESHNESS_POLICIES["platform"],
+        created=lambda snapshot: snapshot.created,
+    )
+    created = datetime.now(UTC) - timedelta(minutes=10)
+    cache._values.put(  # noqa: SLF001 - deterministic stale cache fixture
+        identity.canonical().decode(),
+        CachedSnapshot(
+            observation=PlatformObservation(
+                cluster="prod",
+                capacity={"cpu": "1"},
+                allocated={"cpu": "0"},
+            ),
+            created=created,
+        ),
+    )
+    service = MetricsService(
+        platform=provider.read_platform,
+        cache=cache,
+        identity=lambda: identity,
+    )
+    runtime = MetricsRuntime(
+        settings,
+        provider=provider,
+        metrics_service=service,
+        cache=cache,
+    )
+
+    with TestClient(factory_module.create_app(settings=settings, runtime=runtime)) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert int(response.headers["age"]) >= 600
+    assert "ttl=-" in response.headers["cache-status"]
+    assert response.json()["status"]["conditions"] == [
+        {
+            "type": "Ready",
+            "status": "False",
+            "reason": "StaleData",
+            "lastTransitionTime": created.isoformat().replace("+00:00", "Z"),
+        },
+        {
+            "type": "Cached",
+            "status": "True",
+            "reason": "StaleHit",
+            "lastTransitionTime": created.isoformat().replace("+00:00", "Z"),
+        },
+    ]
+
+
+def test_openapi_contains_only_v1alpha1_metrics_contract() -> None:
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
+        schema = client.get("/openapi.json").json()
+
+    assert "/apis/canfar.net/v1alpha1/metrics/platform/canfar" in schema["paths"]
+    assert "/api/v1/metrics/platform" not in schema["paths"]
+    assert "Metrics" in schema["components"]["schemas"]
+    assert "Status" in schema["components"]["schemas"]
+    assert not any("PlatformMetrics" in name for name in schema["components"]["schemas"])
 
 
 @pytest.mark.parametrize(
-    ("broken_doc", "status_code", "code", "message"),
+    "broken_doc",
     [
-        # Upstream failure -> 502; unavailable data -> 503. Raw upstream text
-        # and URLs must never reach the response body (ADR-0002).
-        (
-            httpx.ConnectError("secret at https://kubernetes.default.svc"),
-            502,
-            "platform_metrics_error",
-            "Platform metrics collection failed",
-        ),
-        (
-            {"spec": {}},
-            503,
-            "platform_metrics_unavailable",
-            "Could not load platform metrics from Kubernetes",
-        ),
+        httpx.ConnectError("secret at https://kubernetes.default.svc"),
+        {"spec": {}},
     ],
 )
 def test_provider_errors_map_to_sanitized_error_envelopes(
     broken_doc: object,
-    status_code: int,
-    code: str,
-    message: str,
 ) -> None:
     # Healthy at startup; the upstream breaks afterwards, on the request path.
     api = FakeKueueApi({"cq-a": CQ_A, "cq-b": CQ_B})
@@ -190,15 +246,18 @@ def test_provider_errors_map_to_sanitized_error_envelopes(
         factory_module.create_app(settings=_settings(), runtime=_runtime(provider=provider))
     ) as client:
         api.docs = {"cq-a": broken_doc, "cq-b": broken_doc}
-        response = client.get("/api/v1/metrics/platform")
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
 
-    assert response.status_code == status_code
+    assert response.status_code == 503
     assert response.headers["cache-control"] == "no-store"
-    payload = response.json()
-    assert set(payload) == {"version", "kind", "metadata", "status", "error"}
-    assert payload["kind"] == "Status"
-    assert payload["status"] == "Error"
-    assert payload["error"] == {"code": code, "message": message}
+    assert response.json() == {
+        "apiVersion": "v1",
+        "kind": "Status",
+        "status": "Failure",
+        "reason": "ServiceUnavailable",
+        "message": "The requested metrics report could not be produced.",
+        "code": 503,
+    }
     assert "secret" not in response.text
     assert "kubernetes.default.svc" not in response.text
 
@@ -214,7 +273,7 @@ def test_generic_500_response_exposes_no_exception_details() -> None:
         response = client.get("/boom")
 
     assert response.status_code == 500
-    assert response.json()["error"]["code"] == "internal_error"
+    assert response.json()["reason"] == "InternalError"
     assert "secret-token" not in response.text
     assert "ValueError" not in response.text
 
@@ -222,24 +281,29 @@ def test_generic_500_response_exposes_no_exception_details() -> None:
 def test_http_cache_header_edge_cases() -> None:
     created = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
     assert remaining_freshness_seconds(created, 60, now=created + timedelta(seconds=10)) == 50
-    assert remaining_freshness_seconds(created, 5, now=created + timedelta(seconds=10)) == 0
+    assert remaining_freshness_seconds(created, 5, now=created + timedelta(seconds=10)) == -5
 
-    private = metrics_success_cache_headers(
+    stale = metrics_success_cache_headers(
         snapshot_created=created,
         configured_ttl=30,
-        shared_cache_public=False,
-        now=created,
+        cached=True,
+        stale=True,
+        cache_available=True,
+        now=created + timedelta(seconds=40),
     )
-    assert "private" in private["Cache-Control"]
+    assert stale["Cache-Control"] == "no-store"
+    assert stale["Age"] == "40"
+    assert stale["Cache-Status"] == "metrics; hit; ttl=-10"
 
-    no_store = metrics_success_cache_headers(
+    redis_down = metrics_success_cache_headers(
         snapshot_created=created,
-        configured_ttl=0,
-        shared_cache_public=True,
+        configured_ttl=30,
+        cached=True,
+        stale=False,
+        cache_available=False,
         now=created,
     )
-    assert no_store["Cache-Control"] == "no-store"
-    assert "Expires" not in no_store
+    assert 'detail="redis-unavailable"' in redis_down["Cache-Status"]
 
 
 def test_constructed_and_injected_runtimes_share_lifecycle_and_cleanup(monkeypatch) -> None:
@@ -329,7 +393,7 @@ def test_main_run_wires_settings_logging_app_and_server(monkeypatch) -> None:
         "metrics.core.settings",
         "metrics.core.factory",
         "metrics.providers.kueue",
-        "metrics.api.v1.routes",
+        "metrics.api.v1alpha1.routes",
         "metrics.main",
     ],
 )
