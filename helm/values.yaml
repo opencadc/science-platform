@@ -595,6 +595,8 @@ telemetry:
 metricsBackend:
   # -- When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).
   enabled: false
+  # -- Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps.
+  platformName: canfar
   rbac:
     # -- When true, create metricsBackend Kueue-read ClusterRole/ClusterRoleBinding. Set false to disable cluster-scoped RBAC while keeping the metrics workload enabled.
     enabled: true

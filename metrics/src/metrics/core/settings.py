@@ -1,7 +1,13 @@
-"""Runtime settings from the environment (``METRICS_*``, nested ``__``)."""
+"""Parse and validate runtime configuration from ``METRICS_*`` variables.
+
+Nested provider, cache, and telemetry blocks use ``__`` delimiters. Validation
+fails early so the runtime never starts with ambiguous queue populations,
+unsafe cache integrity settings, or incomplete telemetry configuration.
+"""
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import (
@@ -50,7 +56,7 @@ class KueueProviderConfig(BaseModel):
 
 
 class KubernetesProviderConfig(BaseModel):
-    """Kubernetes settings for namespaced Running workload observations."""
+    """Configure namespaces and deadlines for Running workload observations."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -63,7 +69,14 @@ class KubernetesProviderConfig(BaseModel):
     @field_validator("workload_namespaces")
     @classmethod
     def _strip_and_reject_duplicates(cls, value: list[str]) -> list[str]:
-        """Normalize namespaces and reject duplicates."""
+        """Normalize namespace names and reject duplicate populations.
+
+        Args:
+            value: Namespace values decoded by pydantic-settings.
+
+        Returns:
+            Non-empty stripped namespace names in configured order.
+        """
         names = [str(item).strip() for item in value if str(item).strip()]
         duplicates = sorted({name for name in names if names.count(name) > 1})
         if duplicates:
@@ -72,7 +85,7 @@ class KubernetesProviderConfig(BaseModel):
 
 
 class PromQLProviderConfig(BaseModel):
-    """Controlled Prometheus-compatible instant-query settings."""
+    """Bound Prometheus-compatible accounting queries and response sizes."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -87,7 +100,14 @@ class PromQLProviderConfig(BaseModel):
     @field_validator("mimir_tenant_id")
     @classmethod
     def _validate_tenant_id(cls, value: str | None) -> str | None:
-        """Accept one bounded tenant ID, never an arbitrary header value."""
+        """Accept one bounded tenant ID, never an arbitrary header value.
+
+        Args:
+            value: Optional configured Mimir tenant ID.
+
+        Returns:
+            Stripped tenant ID, or ``None`` when multitenancy is unused.
+        """
         if value is None:
             return None
         tenant = value.strip()
@@ -97,7 +117,7 @@ class PromQLProviderConfig(BaseModel):
 
 
 class ProviderConfigs(BaseModel):
-    """Container for active upstream provider configuration blocks."""
+    """Group independently validated upstream provider configuration blocks."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -107,7 +127,7 @@ class ProviderConfigs(BaseModel):
 
 
 class SourceConfig(BaseModel):
-    """Which provider powers each metric source."""
+    """Restrict each metric source to its supported provider implementation."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -116,7 +136,7 @@ class SourceConfig(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    """Required cache dependency, deadlines, and bounded local fallback."""
+    """Configure cache integrity, finite deadlines, and bounded local fallback."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -130,6 +150,7 @@ class CacheConfig(BaseModel):
 
     @model_validator(mode="after")
     def _require_redis_secret(self) -> CacheConfig:
+        """Require a sufficiently long HMAC key when Redis is selected."""
         if self.backend == "redis":
             secret = self.key_secret.get_secret_value() if self.key_secret else ""
             if len(secret.encode("utf-8")) < 32:
@@ -138,7 +159,7 @@ class CacheConfig(BaseModel):
 
 
 class OTelConfig(BaseModel):
-    """OpenTelemetry signal controls and bounded resource identity."""
+    """Control OpenTelemetry signals and bounded exported resource identity."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -154,6 +175,7 @@ class OTelConfig(BaseModel):
 
     @model_validator(mode="after")
     def _require_endpoint_when_enabled(self) -> OTelConfig:
+        """Require an OTLP endpoint whenever any signal is enabled."""
         if (
             self.metrics_enabled or self.traces_enabled or self.logs_enabled
         ) and not self.exporter_otlp_endpoint:
@@ -162,7 +184,7 @@ class OTelConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    """Process configuration: defaults overridden by ``METRICS_*`` environment."""
+    """Collect validated process configuration from ``METRICS_*`` variables."""
 
     model_config = SettingsConfigDict(
         env_prefix="METRICS_",
@@ -180,6 +202,16 @@ class Settings(BaseSettings):
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
 
     cluster_name: str = "unknown"
+    platform_name: str = Field(
+        default="canfar",
+        min_length=1,
+        max_length=63,
+        description=(
+            "Public platform subject served at "
+            "/apis/canfar.net/v1alpha1/metrics/platform/{platform_name}. "
+            "Must match the name operators publish for this ClusterQueue cohort."
+        ),
+    )
     providers: ProviderConfigs = Field(default_factory=ProviderConfigs)
     sources: SourceConfig = Field(default_factory=SourceConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
@@ -187,3 +219,15 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
     redis_key_prefix: str = "metrics:"
+
+    @field_validator("platform_name")
+    @classmethod
+    def _validate_platform_name(cls, value: str) -> str:
+        """Require a DNS-label-safe platform subject for URL and cache identity."""
+        name = value.strip()
+        if not re.fullmatch(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$", name):
+            raise ValueError(
+                "platform_name must be a Kubernetes label value "
+                "(alphanumeric start/end, up to 63 chars)"
+            )
+        return name

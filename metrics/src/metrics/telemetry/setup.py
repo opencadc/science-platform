@@ -1,4 +1,8 @@
-"""Application-owned OpenTelemetry providers and exporters."""
+"""Create application-owned OpenTelemetry providers and OTLP exporters.
+
+Providers remain local to the application instead of replacing global SDK
+providers, which keeps lifecycle, tests, and shutdown behavior explicit.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +33,18 @@ _METER_NAME = "metrics.service"
 
 
 def _signal_endpoint(base: str, signal: str) -> str:
-    """Build an OTLP/HTTP signal URL from one configured base endpoint."""
+    """Build an OTLP/HTTP signal URL from one configured base endpoint.
+
+    Existing standard signal suffixes are replaced so operators may configure
+    either the common OTLP base or one signal-specific URL.
+
+    Args:
+        base: Configured OTLP HTTP endpoint.
+        signal: Signal path component such as ``metrics`` or ``traces``.
+
+    Returns:
+        Endpoint ending in ``/v1/{signal}`` with query and fragment removed.
+    """
     parsed = urlsplit(base.rstrip("/"))
     path = parsed.path
     for suffix in ("/v1/metrics", "/v1/traces", "/v1/logs"):
@@ -41,7 +56,7 @@ def _signal_endpoint(base: str, signal: str) -> str:
 
 @dataclass(slots=True)
 class Telemetry:
-    """Owned telemetry resources and application recorder."""
+    """Own optional signal providers, handlers, and the application recorder."""
 
     recorder: MetricsRecorder
     meter_provider: MeterProvider | None = None
@@ -55,7 +70,7 @@ class Telemetry:
         return any((self.meter_provider, self.tracer_provider, self.logger_provider))
 
     def shutdown(self) -> None:
-        """Flush and close all signal providers."""
+        """Detach log export and flush each configured signal provider."""
         logger = logging.getLogger("metrics")
         if self.log_handler is not None:
             logger.removeHandler(self.log_handler)
@@ -68,7 +83,15 @@ class Telemetry:
 
 
 def setup_telemetry(settings: Settings) -> Telemetry:
-    """Configure JSON logging and optional OTLP signals without global providers."""
+    """Configure JSON logging and optional OTLP signals.
+
+    Args:
+        settings: Validated process and OpenTelemetry settings.
+
+    Returns:
+        Owned telemetry resources; when all signals are disabled, only a no-op
+        recorder is returned.
+    """
     configure_logging(settings.log_level)
     config = settings.otel
     if not (config.metrics_enabled or config.traces_enabled or config.logs_enabled):

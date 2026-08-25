@@ -1,4 +1,4 @@
-"""Kubernetes ``Status`` error wire model."""
+"""Define the sanitized Kubernetes ``Status`` failure response contract."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ StatusReason = Literal[
 
 
 class Status(BaseModel):
-    """Stable, sanitized API failure."""
+    """Present a stable failure without leaking provider or framework details."""
 
     api_version: Literal["v1"] = Field(default="v1", serialization_alias="apiVersion")
     kind: Literal["Status"] = "Status"

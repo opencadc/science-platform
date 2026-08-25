@@ -122,3 +122,14 @@ def test_chart_renders_default_network_policy() -> None:
     ).stdout
     assert "kind: NetworkPolicy" in rendered
     assert "kubernetes.io/metadata.name: kube-system" in rendered
+    assert "name: METRICS_PLATFORM_NAME" in rendered
+    assert 'value: "canfar"' in rendered
+
+
+def test_precommit_enforces_google_docstrings_via_ruff() -> None:
+    text = (METRICS_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"D"' in text or '"D",' in text
+    assert 'convention = "google"' in text
+    hooks = (METRICS_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    assert "metrics-ruff-check" in hooks
+    assert "ruff check" in hooks

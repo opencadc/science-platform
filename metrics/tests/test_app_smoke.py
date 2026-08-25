@@ -106,6 +106,7 @@ def _runtime(
         platform=active.read_platform,
         cache=cache,
         identity=lambda: CacheIdentity("platform", "canfar", "prod", "kueue", "test"),
+        platform_name=settings.platform_name,
     )
     return MetricsRuntime(settings, provider=active, metrics_service=service, cache=cache)
 
@@ -196,6 +197,7 @@ def test_stale_platform_report_has_exact_conditions_and_headers() -> None:
         platform=provider.read_platform,
         cache=cache,
         identity=lambda: identity,
+        platform_name=settings.platform_name,
     )
     runtime = MetricsRuntime(
         settings,
@@ -231,13 +233,49 @@ def test_openapi_contains_only_v1alpha1_metrics_contract() -> None:
     with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
         schema = client.get("/openapi.json").json()
 
-    assert "/apis/canfar.net/v1alpha1/metrics/platform/canfar" in schema["paths"]
+    assert "/apis/canfar.net/v1alpha1/metrics/platform/{platform}" in schema["paths"]
     assert "/apis/canfar.net/v1alpha1/metrics/user/{user}" in schema["paths"]
     assert "/apis/canfar.net/v1alpha1/metrics/community/{community}" in schema["paths"]
+    assert "/apis/canfar.net/v1alpha1/metrics/platform/canfar" not in schema["paths"]
     assert "/api/v1/metrics/platform" not in schema["paths"]
     assert "Metrics" in schema["components"]["schemas"]
     assert "Status" in schema["components"]["schemas"]
     assert not any("PlatformMetrics" in name for name in schema["components"]["schemas"])
+
+
+def test_platform_endpoint_rejects_unconfigured_platform_name() -> None:
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/other-cohort")
+
+    assert response.status_code == 404
+    assert response.json()["kind"] == "Status"
+    assert response.json()["reason"] == "NotFound"
+
+
+def test_platform_endpoint_serves_configured_non_default_name() -> None:
+    settings = _settings()
+    settings.platform_name = "cohort-west"
+    provider = KueueProvider(settings, api=FakeKueueApi({"cq-a": CQ_A, "cq-b": CQ_B}))
+    cache = InMemoryCoordinator[CachedSnapshot](
+        policy=FRESHNESS_POLICIES["platform"],
+        created=lambda snapshot: snapshot.created,
+    )
+    service = MetricsService(
+        platform=provider.read_platform,
+        cache=cache,
+        identity=lambda: CacheIdentity("platform", "cohort-west", "prod", "kueue", "test"),
+        platform_name="cohort-west",
+    )
+    runtime = MetricsRuntime(settings, provider=provider, metrics_service=service, cache=cache)
+
+    with TestClient(factory_module.create_app(settings=settings, runtime=runtime)) as client:
+        missing = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+        ok = client.get("/apis/canfar.net/v1alpha1/metrics/platform/cohort-west")
+
+    assert missing.status_code == 404
+    assert ok.status_code == 200
+    assert ok.json()["metadata"]["name"] == "platform-cohort-west"
+    assert ok.json()["spec"]["platform"] == "cohort-west"
 
 
 @pytest.mark.parametrize(

@@ -19,10 +19,15 @@ permissions are not bound to the namespace `default` ServiceAccount. See
 
 The API exposes:
 
-- `GET /apis/canfar.net/v1alpha1/metrics/platform/canfar`
+- `GET /apis/canfar.net/v1alpha1/metrics/platform/{platform}`
 - `GET /apis/canfar.net/v1alpha1/metrics/user/{user}`
 - `GET /apis/canfar.net/v1alpha1/metrics/community/{community}`
 - `GET /healthz`
+
+The platform path segment must match `METRICS_PLATFORM_NAME` (Helm
+`platformName` / Skaha `metricsBackend.platformName`, default `canfar`). That
+name identifies the ClusterQueue cohort this deployment serves; unconfigured
+names return `404`.
 
 ## `v1alpha1` contract
 

@@ -29,10 +29,16 @@ resources:
     cpu: 500m
     memory: 512Mi
 
+# -- Public platform path segment for GET .../metrics/platform/{name}.
+# Operators set this to the name they publish for the ClusterQueue cohort this
+# deployment serves. Injected as METRICS_PLATFORM_NAME (default canfar).
+platformName: canfar
+
 # -- Flat fail-closed Settings map. Supported provider/source keys are
 # METRICS_PROVIDERS__KUEUE__*, METRICS_PROVIDERS__KUBERNETES__*,
 # METRICS_SOURCES__PLATFORM=kueue, and METRICS_SOURCES__USER=kubernetes;
 # unknown provider, source, or cache fields fail application startup.
+# Prefer platformName for METRICS_PLATFORM_NAME; env may override it.
 env: {}
 
 # Existing Secret containing the required cache HMAC/integrity key.

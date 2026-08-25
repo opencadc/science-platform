@@ -23,7 +23,6 @@ from metrics.schemas.metrics import (
 )
 from metrics.schemas.status import Status
 from metrics.services.models import (
-    PLATFORM_SUBJECT,
     AccountingState,
     CommunityObservation,
     MetricsResult,
@@ -48,7 +47,20 @@ def _cache_response(
     stale: bool,
     available: bool,
 ) -> Response | None:
-    """Set snapshot headers and return an empty conditional response on a hit."""
+    """Attach snapshot headers and evaluate ``If-Modified-Since``.
+
+    Args:
+        request: Incoming request containing an optional validator.
+        response: Mutable success response receiving cache headers.
+        created: Collection time of the returned snapshot.
+        ttl: Configured fresh period in seconds.
+        cached: Whether the internal coordinator returned a cache hit.
+        stale: Whether the snapshot is beyond its fresh period.
+        available: Whether the shared cache is currently reachable.
+
+    Returns:
+        An empty ``304`` response when the validator matches, otherwise ``None``.
+    """
     headers = metrics_success_cache_headers(
         snapshot_created=created,
         configured_ttl=ttl,
@@ -71,24 +83,61 @@ def _cache_response(
 
 
 def get_runtime(request: Request) -> MetricsRuntime:
-    """Return the runtime owned by the application lifespan."""
+    """Resolve the lifespan-owned runtime for FastAPI dependency injection.
+
+    Args:
+        request: Current FastAPI request.
+
+    Returns:
+        The process runtime stored during application startup.
+    """
     return request.app.state.runtime
 
 
 @router.get(
-    "/apis/canfar.net/v1alpha1/metrics/platform/canfar",
+    "/apis/canfar.net/v1alpha1/metrics/platform/{platform}",
     response_model=Metrics,
     response_model_exclude_none=True,
-    responses={503: {"model": Status, "description": "No serviceable report is available."}},
-    summary="Get CANFAR platform metrics",
+    responses={
+        400: {"model": Status, "description": "Malformed platform value."},
+        404: {"model": Status, "description": "Platform is not configured on this deployment."},
+        503: {"model": Status, "description": "No serviceable report is available."},
+    },
+    summary="Get platform metrics",
 )
 async def get_platform_metrics(
+    platform: str,
     request: Request,
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
 ) -> Metrics | Response:
-    """Return Kueue-backed platform capacity and admitted allocation."""
-    result = await runtime.metrics_service.get(PLATFORM_SUBJECT)
+    """Return Kueue-backed platform capacity and admitted allocation.
+
+    The path segment must equal the deployment's configured
+    ``METRICS_PLATFORM_NAME`` (Helm ``platformName``, default ``canfar``). That
+    name identifies the ClusterQueue cohort this Metrics API serves.
+
+    Args:
+        platform: Public platform subject from the request path.
+        request: Incoming HTTP request (conditional validators).
+        response: Mutable response used for cache headers.
+        runtime: Process runtime owned by the FastAPI lifespan.
+
+    Returns:
+        A Metrics envelope, or an empty ``304`` when validators match.
+
+    Raises:
+        AppError: ``400`` for malformed names, ``404`` when the platform is not
+            configured, or ``503`` when no serviceable report exists.
+    """
+    platform = _subject_value(platform, "platform")
+    if platform != runtime.settings.platform_name:
+        raise AppError(
+            code="platform_not_found",
+            message="Requested platform metrics subject is not configured",
+            status_code=404,
+        )
+    result = await runtime.metrics_service.get(MetricsSubject(kind="platform", value=platform))
     conditional = _cache_response(
         request=request,
         response=response,
@@ -107,8 +156,8 @@ async def get_platform_metrics(
     if not isinstance(observation, PlatformObservation):
         raise RuntimeError("Platform route received a non-platform observation")
     return Metrics(
-        metadata=ObjectMetadata(name="platform-canfar"),
-        spec=MetricsSpec(platform="canfar"),
+        metadata=ObjectMetadata(name=_subject_name("platform", platform)),
+        spec=MetricsSpec(platform=platform),
         status=MetricsStatus(
             observed_at=result.created,
             resources=[
@@ -138,7 +187,18 @@ async def get_platform_metrics(
 
 
 def _subject_value(value: str, kind: str) -> str:
-    """Validate one decoded canonical Kubernetes label value."""
+    """Validate an exact decoded subject as a Kubernetes label value.
+
+    Args:
+        value: Decoded path value supplied by the client.
+        kind: Subject kind used to produce a bounded error code.
+
+    Returns:
+        The unchanged validated subject.
+
+    Raises:
+        AppError: If the value is empty, non-canonical, or label-unsafe.
+    """
     if (
         not value
         or value in {".", ".."}
@@ -156,7 +216,15 @@ def _subject_value(value: str, kind: str) -> str:
 
 
 def _subject_name(kind: str, value: str) -> str:
-    """Build a deterministic DNS-safe presentation name."""
+    """Build a deterministic DNS-safe metadata name for a subject.
+
+    Args:
+        kind: Subject kind used as the name prefix.
+        value: Validated subject value.
+
+    Returns:
+        A readable name when possible, otherwise a slug with a stable digest.
+    """
     candidate = f"{kind}-{value.lower()}"
     if re.fullmatch(r"[a-z0-9](?:[-a-z0-9.]{0,61}[a-z0-9])?", candidate):
         return candidate
@@ -166,7 +234,14 @@ def _subject_name(kind: str, value: str) -> str:
 
 
 def _decimal_string(value: Decimal) -> str:
-    """Serialize a finite decimal without exponent notation or trailing zeros."""
+    """Serialize a decimal without exponent notation or redundant zeros.
+
+    Args:
+        value: Validated finite decimal.
+
+    Returns:
+        Plain decimal notation suitable for the wire schema.
+    """
     rendered = format(value, "f")
     return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
 
@@ -174,7 +249,15 @@ def _decimal_string(value: Decimal) -> str:
 def _subject_resources(
     observation: UserObservation | CommunityObservation,
 ) -> list[ResourceMetrics]:
-    """Combine current requests with complete additive lifetime accounting."""
+    """Combine current requests with complete additive lifetime accounting.
+
+    Args:
+        observation: User or community observation to present.
+
+    Returns:
+        Resource entries sorted by name, with efficiency only when requested
+        hours are nonzero and complete.
+    """
     accounting = observation.accounting
     names = set(observation.requests)
     if accounting is not None:
@@ -208,7 +291,17 @@ def _subject_response(
     observation: UserObservation | CommunityObservation,
     result: MetricsResult,
 ) -> Metrics:
-    """Assemble the shared user/community response contract."""
+    """Assemble the shared user or community response envelope.
+
+    Args:
+        kind: Either ``user`` or ``community``.
+        value: Validated subject value.
+        observation: Workload observation returned by the service.
+        result: Service result carrying timestamps and cache provenance.
+
+    Returns:
+        A public Metrics wire model with Ready and Cached conditions.
+    """
     ready_status, ready_reason = result.ready_condition
     cached_status, cached_reason = result.cached_condition
     return Metrics(
@@ -257,7 +350,20 @@ async def get_user_metrics(
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
 ) -> Metrics | Response:
-    """Return scheduler-effective requests held by one user's Running Pods."""
+    """Return requests and optional lifetime accounting for a user's Running Pods.
+
+    Args:
+        user: Exact username from the request path.
+        request: Incoming request containing conditional validators.
+        response: Mutable response receiving cache headers.
+        runtime: Lifespan-owned process runtime.
+
+    Returns:
+        A Metrics envelope, or an empty ``304`` when validators match.
+
+    Raises:
+        AppError: If the username is invalid or no serviceable report exists.
+    """
     user = _subject_value(user, "user")
     result = await runtime.metrics_service.get(MetricsSubject(kind="user", value=user))
     observation = result.observation
@@ -293,7 +399,20 @@ async def get_community_metrics(
     response: Response,
     runtime: MetricsRuntime = Depends(get_runtime),
 ) -> Metrics | Response:
-    """Return requests and lifetime accounting for one community's Running Pods."""
+    """Return requests and optional accounting for a community's Running Pods.
+
+    Args:
+        community: Exact community name from the request path.
+        request: Incoming request containing conditional validators.
+        response: Mutable response receiving cache headers.
+        runtime: Lifespan-owned process runtime.
+
+    Returns:
+        A Metrics envelope, or an empty ``304`` when validators match.
+
+    Raises:
+        AppError: If the community is invalid or no serviceable report exists.
+    """
     community = _subject_value(community, "community")
     result = await runtime.metrics_service.get(MetricsSubject(kind="community", value=community))
     observation = result.observation

@@ -5,10 +5,11 @@ import java.util.Map;
 
 /**
  * Platform metrics adapted from the Metrics backend
- * {@code GET /apis/canfar.net/v1alpha1/metrics/platform/canfar}.
+ * {@code GET /apis/canfar.net/v1alpha1/metrics/platform/{platform}}.
  *
  * <p>Combines snapshot metadata with {@linkplain Data platform capacity} and {@linkplain Data platform allocation}
- * resource maps.
+ * resource maps. The platform path segment is configured with {@link PlatformMetricsDAO#SKAHA_METRICS_PLATFORM_NAME}
+ * (default {@code canfar}).
  *
  * @param metadata snapshot metadata adapted from {@code status.observedAt}
  * @param data platform capacity and allocation adapted from {@code status.resources}

@@ -16,17 +16,24 @@ import java.util.Map;
  * Fetches platform metrics from the co-deployed Metrics HTTP API.
  *
  * <p>Configured via the {@value #SKAHA_METRICS_BACKEND_URL} environment variable (in-cluster base URL, without a
- * trailing slash). When that variable is unset, use {@link #fromEnvironmentOrNull()} and treat a {@code null} result as
- * Metrics not deployed.
+ * trailing slash) and optional {@value #SKAHA_METRICS_PLATFORM_NAME} (default {@code canfar}). When the backend URL is
+ * unset, use {@link #fromEnvironmentOrNull()} and treat a {@code null} result as Metrics not deployed.
  */
 class PlatformMetricsDAO {
 
     /** Environment variable holding the Metrics backend base URL (scheme, host, optional port). */
     public static final String SKAHA_METRICS_BACKEND_URL = "SKAHA_METRICS_BACKEND_URL";
 
-    private static final String PLATFORM_METRICS_PATH = "/apis/canfar.net/v1alpha1/metrics/platform/canfar";
+    /**
+     * Environment variable holding the Metrics platform path segment ({@code .../platform/{name}}). Defaults to {@code
+     * canfar} when unset so GitOps can rename the ClusterQueue cohort without rebuilding Skaha.
+     */
+    public static final String SKAHA_METRICS_PLATFORM_NAME = "SKAHA_METRICS_PLATFORM_NAME";
+
+    private static final String DEFAULT_PLATFORM_NAME = "canfar";
 
     private final String platformMetricsUrl;
+    private final String platformName;
 
     /**
      * Returns a platform Metrics client when {@link #SKAHA_METRICS_BACKEND_URL} is set; otherwise {@code null} so
@@ -37,12 +44,29 @@ class PlatformMetricsDAO {
         if (!StringUtil.hasText(metricsBackendBaseUrl)) {
             return null;
         }
-        return new PlatformMetricsDAO(metricsBackendBaseUrl);
+        return new PlatformMetricsDAO(metricsBackendBaseUrl, platformNameFromEnvironment());
     }
 
     /** @param metricsBackendBaseUrl Metrics backend base URL (for example {@code http://skaha-metrics:8000}) */
     PlatformMetricsDAO(final String metricsBackendBaseUrl) {
-        this.platformMetricsUrl = platformMetricsUrl(requireBaseUrl(metricsBackendBaseUrl));
+        this(metricsBackendBaseUrl, DEFAULT_PLATFORM_NAME);
+    }
+
+    /**
+     * @param metricsBackendBaseUrl Metrics backend base URL (for example {@code http://skaha-metrics:8000})
+     * @param platformName Public platform subject matching Metrics {@code METRICS_PLATFORM_NAME}
+     */
+    PlatformMetricsDAO(final String metricsBackendBaseUrl, final String platformName) {
+        this.platformName = requirePlatformName(platformName);
+        this.platformMetricsUrl = platformMetricsUrl(requireBaseUrl(metricsBackendBaseUrl), this.platformName);
+    }
+
+    static String platformNameFromEnvironment() {
+        final String configured = System.getenv(SKAHA_METRICS_PLATFORM_NAME);
+        if (!StringUtil.hasText(configured)) {
+            return DEFAULT_PLATFORM_NAME;
+        }
+        return requirePlatformName(configured);
     }
 
     static String requireBaseUrl(final String metricsBackendBaseUrl) {
@@ -50,6 +74,17 @@ class PlatformMetricsDAO {
             throw new IllegalStateException("missing configuration: " + SKAHA_METRICS_BACKEND_URL);
         }
         return metricsBackendBaseUrl.trim();
+    }
+
+    static String requirePlatformName(final String platformName) {
+        if (!StringUtil.hasText(platformName)) {
+            throw new IllegalStateException("missing configuration: " + SKAHA_METRICS_PLATFORM_NAME);
+        }
+        final String trimmed = platformName.trim();
+        if (!trimmed.matches("^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")) {
+            throw new IllegalStateException("invalid configuration: " + SKAHA_METRICS_PLATFORM_NAME);
+        }
+        return trimmed;
     }
 
     static String normalizeBaseUrl(final String metricsBackendBaseUrl) {
@@ -60,8 +95,12 @@ class PlatformMetricsDAO {
         return trimmed;
     }
 
-    static String platformMetricsUrl(final String normalizedBaseUrl) {
-        return normalizeBaseUrl(normalizedBaseUrl) + PLATFORM_METRICS_PATH;
+    static String platformMetricsPath(final String platformName) {
+        return "/apis/canfar.net/v1alpha1/metrics/platform/" + requirePlatformName(platformName);
+    }
+
+    static String platformMetricsUrl(final String normalizedBaseUrl, final String platformName) {
+        return normalizeBaseUrl(normalizedBaseUrl) + platformMetricsPath(platformName);
     }
 
     public PlatformMetrics getPlatformMetrics() throws Exception {
@@ -81,7 +120,7 @@ class PlatformMetricsDAO {
         if (!"canfar.net/v1alpha1".equals(text(root, "apiVersion"))
                 || !"Metrics".equals(text(root, "kind"))
                 || spec == null
-                || !"canfar".equals(text(spec, "platform"))
+                || !platformName.equals(text(spec, "platform"))
                 || status == null) {
             throw new IllegalArgumentException("invalid Metrics envelope");
         }

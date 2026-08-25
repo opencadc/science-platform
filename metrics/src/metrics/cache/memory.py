@@ -1,4 +1,8 @@
-"""Bounded process-local snapshot storage and test coordinator."""
+"""Provide bounded process-local snapshots and a deterministic coordinator.
+
+The coordinator mirrors serviceable freshness behavior without Redis, making it
+appropriate for explicitly configured local runs and focused tests.
+"""
 
 from __future__ import annotations
 
@@ -13,22 +17,38 @@ Value = TypeVar("Value")
 
 
 class MemorySnapshots(Generic[Value]):
-    """Small LRU of last-known snapshots, bounded by count and collection age."""
+    """Keep a count-bounded least-recently-used set of arbitrary snapshots."""
 
     def __init__(self, max_entries: int = 128) -> None:
-        """Create a cache that retains at most ``max_entries`` snapshots."""
+        """Create a cache with a positive effective entry limit.
+
+        Args:
+            max_entries: Maximum retained keys; values below one become one.
+        """
         self._max_entries = max(1, max_entries)
         self._entries: OrderedDict[str, Value] = OrderedDict()
 
     def put(self, key: str, value: Value) -> None:
-        """Store and mark a snapshot as most recently used."""
+        """Store a value, mark it recently used, and evict the oldest key.
+
+        Args:
+            key: Stable cache key.
+            value: Snapshot value to retain.
+        """
         self._entries[key] = value
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_entries:
             self._entries.popitem(last=False)
 
     def get(self, key: str) -> Value | None:
-        """Return a snapshot and mark it as most recently used."""
+        """Read a value and move a hit to the most-recently-used position.
+
+        Args:
+            key: Stable cache key.
+
+        Returns:
+            Stored value, or ``None`` on a miss.
+        """
         value = self._entries.get(key)
         if value is not None:
             self._entries.move_to_end(key)
@@ -36,7 +56,11 @@ class MemorySnapshots(Generic[Value]):
 
 
 class InMemoryCoordinator(Generic[Value]):
-    """Test-only get-or-fill implementation with freshness semantics."""
+    """Coordinate local get-or-fill calls using production freshness semantics.
+
+    Unlike the Redis coordinator, this implementation has no distributed lease
+    or outage mode and fills synchronously after a miss or unusable snapshot.
+    """
 
     backend_name = "memory"
 
@@ -47,7 +71,13 @@ class InMemoryCoordinator(Generic[Value]):
         created: Callable[[Value], datetime],
         max_entries: int = 128,
     ) -> None:
-        """Configure freshness and snapshot timestamp extraction."""
+        """Configure freshness and snapshot timestamp extraction.
+
+        Args:
+            policy: Age boundaries used to classify cached values.
+            created: Callable extracting source collection time from a value.
+            max_entries: Maximum process-local identities to retain.
+        """
         self.policy = policy
         self._created = created
         self._values = MemorySnapshots[Value](max_entries)
@@ -62,7 +92,15 @@ class InMemoryCoordinator(Generic[Value]):
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult[Value]:
-        """Return a serviceable value or fill synchronously."""
+        """Return a fresh or stale local value, otherwise fill synchronously.
+
+        Args:
+            identity: Complete source stream identity.
+            fill: Async callable producing a replacement value.
+
+        Returns:
+            Value and cache provenance.
+        """
         key = identity.canonical().decode()
         cached = self._values.get(key)
         if cached is not None:

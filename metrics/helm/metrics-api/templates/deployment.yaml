@@ -40,6 +40,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
+            - name: METRICS_PLATFORM_NAME
+              value: {{ .Values.platformName | default "canfar" | quote }}
             - name: METRICS_OTEL__POD_UID
               valueFrom:
                 fieldRef:

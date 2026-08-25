@@ -1,4 +1,8 @@
-"""Structured stdout logging with OpenTelemetry correlation."""
+"""Emit bounded structured logs with optional OpenTelemetry correlation.
+
+Exception payloads and arbitrary record attributes are intentionally excluded
+to keep logs predictable and avoid leaking upstream request details.
+"""
 
 from __future__ import annotations
 
@@ -10,10 +14,17 @@ from opentelemetry import trace
 
 
 class JsonFormatter(logging.Formatter):
-    """Serialize a bounded log envelope without exception payloads."""
+    """Serialize the approved log fields without exception payloads."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """Return one compact JSON object."""
+        """Serialize one standard log record with active trace identifiers.
+
+        Args:
+            record: Standard-library log record.
+
+        Returns:
+            One compact JSON object.
+        """
         context = trace.get_current_span().get_span_context()
         return json.dumps(
             {
@@ -29,7 +40,14 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str) -> logging.Handler:
-    """Install one JSON stdout handler on the application logger."""
+    """Replace application handlers with one JSON stdout handler.
+
+    Args:
+        level: Configured standard or Uvicorn ``trace`` log level.
+
+    Returns:
+        The installed handler, allowing telemetry setup to retain ownership.
+    """
     logger = logging.getLogger("metrics")
     logger.setLevel({"trace": "debug"}.get(level, level).upper())
     handler = logging.StreamHandler()

@@ -46,8 +46,10 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
 ## Request flow
 
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
-2. **HTTP GET** `/apis/canfar.net/v1alpha1/metrics/platform/canfar`: route depends on `MetricsRuntime`;
-   `runtime.metrics_service.get(PLATFORM_SUBJECT)` serves the read.
+2. **HTTP GET** `/apis/canfar.net/v1alpha1/metrics/platform/{platform}`: the path
+   segment must equal configured `METRICS_PLATFORM_NAME` (Helm `platformName`,
+   default `canfar`). The route calls
+   `runtime.metrics_service.get(MetricsSubject(kind="platform", value=platform))`.
 3. **Miss:** Concurrent misses coalesce onto one in-flight load
    (single-flight); the loader → `KueueProvider.read_platform()` fetches configured
    queues via kr8s with bounded concurrency, sums nominal quota and usage

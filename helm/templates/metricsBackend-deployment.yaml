@@ -47,6 +47,10 @@ spec:
             - name: METRICS_REDIS_URL
               value: {{ include "skaha.metricsBackend.chartRedisURL" . | quote }}
             {{- end }}
+            {{- if not (hasKey $customEnv "METRICS_PLATFORM_NAME") }}
+            - name: METRICS_PLATFORM_NAME
+              value: {{ $mb.platformName | default "canfar" | quote }}
+            {{- end }}
             {{- range $k, $v := $customEnv }}
             - name: {{ $k }}
               value: {{ $v | quote }}

@@ -1,4 +1,9 @@
-"""Bounded application telemetry instruments."""
+"""Expose bounded application metrics and spans behind a no-op-safe recorder.
+
+Callers use one interface regardless of whether OpenTelemetry is enabled.
+Attribute values are deliberately chosen by the application to avoid
+high-cardinality subjects or upstream details.
+"""
 
 from __future__ import annotations
 
@@ -29,11 +34,19 @@ _SECONDS_BUCKETS = (
 
 
 class MetricsRecorder:
-    """No-op recorder used when telemetry is disabled."""
+    """Provide the recorder contract and no-op behavior for disabled telemetry."""
 
     @contextmanager
     def span(self, name: str, attributes: Mapping[str, str] | None = None) -> Iterator[Any]:
-        """Enter a no-op operation span."""
+        """Enter a no-op operation span.
+
+        Args:
+            name: Bounded operation name.
+            attributes: Optional bounded application-owned attributes.
+
+        Yields:
+            The OpenTelemetry invalid span.
+        """
         del name, attributes
         yield trace.INVALID_SPAN
 
@@ -46,16 +59,41 @@ class MetricsRecorder:
         age_seconds: float | None = None,
         hit: bool | None = None,
     ) -> None:
-        """Record one bounded cache outcome."""
+        """Record one bounded cache outcome.
+
+        Args:
+            backend: Cache implementation name.
+            result: Bounded hit, miss, or stale result.
+            scope: Metrics subject kind.
+            age_seconds: Optional non-negative snapshot age.
+            hit: Legacy boolean override for the result.
+        """
 
     def record_lease(self, *, outcome: str, scope: str) -> None:
-        """Record a distributed lease outcome."""
+        """Record a distributed lease outcome for one subject scope.
+
+        Args:
+            outcome: Bounded acquisition result.
+            scope: Metrics subject kind.
+        """
 
     def record_fill_duration(self, *, seconds: float, outcome: str, scope: str) -> None:
-        """Record one cache fill."""
+        """Record cache fill duration and bounded outcome.
+
+        Args:
+            seconds: Elapsed fill time.
+            outcome: Bounded fill result.
+            scope: Metrics subject kind.
+        """
 
     def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
-        """Record end-to-end source and fill time."""
+        """Record end-to-end source and fill duration.
+
+        Args:
+            seconds: Elapsed computation time.
+            status: Bounded completion status.
+            scope: Metrics subject kind.
+        """
 
     def record_provider_duration(
         self,
@@ -65,7 +103,14 @@ class MetricsRecorder:
         status: str,
         seconds: float,
     ) -> None:
-        """Record one source operation."""
+        """Record one provider operation's duration and result.
+
+        Args:
+            provider: Stable provider name.
+            scope: Metrics subject kind or controlled query scope.
+            status: Bounded completion status.
+            seconds: Elapsed provider time.
+        """
 
     def record_redis(
         self,
@@ -74,20 +119,36 @@ class MetricsRecorder:
         outcome: str,
         seconds: float,
     ) -> None:
-        """Record one Redis operation."""
+        """Record one bounded Redis operation and its duration.
+
+        Args:
+            operation: Stable Redis operation name.
+            outcome: Bounded operation result.
+            seconds: Elapsed command time.
+        """
 
     def record_lifecycle(self, *, operation: str, outcome: str, seconds: float) -> None:
-        """Record startup or shutdown."""
+        """Record startup or shutdown duration and outcome.
+
+        Args:
+            operation: Stable lifecycle operation name.
+            outcome: Bounded completion result.
+            seconds: Elapsed lifecycle time.
+        """
 
     def record_readiness(self, ready: bool) -> None:
-        """Record the latest readiness observation."""
+        """Record the latest boolean readiness observation.
+
+        Args:
+            ready: Whether the runtime can currently serve requests.
+        """
 
 
 NoopMetricsRecorder = MetricsRecorder
 
 
 class OpenTelemetryMetricsRecorder(MetricsRecorder):
-    """OTel recorder exposing only bounded operational attributes."""
+    """Implement application telemetry with bounded OpenTelemetry instruments."""
 
     def __init__(
         self,
@@ -97,7 +158,14 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
         meter: Meter | None = None,
         tracer: Tracer | None = None,
     ) -> None:
-        """Create application instruments from owned providers."""
+        """Create application instruments from owned or global providers.
+
+        Args:
+            meter_name: Stable instrumentation scope name.
+            meter_version: Application version for the scope.
+            meter: Optional meter from an application-owned provider.
+            tracer: Optional tracer from an application-owned provider.
+        """
         if meter is None:
             from opentelemetry import metrics
 
@@ -169,7 +237,15 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
 
     @contextmanager
     def span(self, name: str, attributes: Mapping[str, str] | None = None) -> Iterator[Any]:
-        """Create one internal span with bounded caller-owned attributes."""
+        """Create one internal span with bounded caller-owned attributes.
+
+        Args:
+            name: Bounded operation name.
+            attributes: Optional bounded application-owned attributes.
+
+        Yields:
+            The active internal span.
+        """
         with self._tracer.start_as_current_span(name, attributes=dict(attributes or {})) as span:
             yield span
 
@@ -182,7 +258,15 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
         age_seconds: float | None = None,
         hit: bool | None = None,
     ) -> None:
-        """Record a cache result and optional snapshot age."""
+        """Record a cache result and optional snapshot age.
+
+        Args:
+            backend: Cache implementation name.
+            result: Bounded hit, miss, or stale result.
+            scope: Metrics subject kind.
+            age_seconds: Optional snapshot age.
+            hit: Legacy boolean override for the result.
+        """
         if hit is not None:
             result = "hit" if hit else "miss"
         attributes = {
@@ -195,18 +279,18 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             self._cache_age.record(max(age_seconds, 0.0), attributes=attributes)
 
     def record_lease(self, *, outcome: str, scope: str) -> None:
-        """Record lease acquisition or contention."""
+        """Count lease acquisition or contention for a subject scope."""
         self._leases.add(1, attributes={"lease.outcome": outcome, "metrics.scope": scope})
 
     def record_fill_duration(self, *, seconds: float, outcome: str, scope: str) -> None:
-        """Record cache fill duration."""
+        """Observe non-negative cache fill duration by outcome and scope."""
         self._fill_duration.record(
             max(seconds, 0.0),
             attributes={"result.status": outcome, "metrics.scope": scope},
         )
 
     def record_compute_duration(self, *, seconds: float, status: str, scope: str) -> None:
-        """Record end-to-end compute duration."""
+        """Observe non-negative end-to-end compute duration."""
         self._compute_duration.record(
             max(seconds, 0.0),
             attributes={"result.status": status, "metrics.scope": scope},
@@ -220,7 +304,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
         status: str,
         seconds: float,
     ) -> None:
-        """Record source duration and count failures."""
+        """Observe source duration and count non-successful operations."""
         attributes = {
             "provider.name": provider,
             "metrics.scope": scope,
@@ -231,7 +315,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             self._provider_errors.add(1, attributes=attributes)
 
     def record_redis(self, *, operation: str, outcome: str, seconds: float) -> None:
-        """Record Redis operation latency and health."""
+        """Observe Redis latency and update health after ping operations."""
         attributes = {"db.operation.name": operation, "result.status": outcome}
         self._redis_duration.record(max(seconds, 0.0), attributes=attributes)
         if operation == "ping":
@@ -240,14 +324,14 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             self._last_redis_health = value
 
     def record_lifecycle(self, *, operation: str, outcome: str, seconds: float) -> None:
-        """Record startup or shutdown duration."""
+        """Observe non-negative startup or shutdown duration."""
         self._lifecycle_duration.record(
             max(seconds, 0.0),
             attributes={"lifecycle.operation": operation, "result.status": outcome},
         )
 
     def record_readiness(self, ready: bool) -> None:
-        """Record a readiness state transition."""
+        """Update the readiness gauge to the supplied boolean state."""
         value = int(ready)
         self._readiness.add(value - self._last_readiness)
         self._last_readiness = value

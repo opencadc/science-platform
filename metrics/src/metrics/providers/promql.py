@@ -1,4 +1,9 @@
-"""Controlled PromQL source for active-workload lifetime accounting."""
+"""Read active-workload lifetime accounting through controlled PromQL.
+
+Only fixed query templates are permitted. Returned vectors are fully validated
+for labels, identity, freshness, units, and completeness before becoming
+transport-neutral accounting snapshots.
+"""
 
 from __future__ import annotations
 
@@ -46,11 +51,27 @@ class QueryTemplate(StrEnum):
 
 
 def _escape_label(value: str) -> str:
-    """Escape one exact PromQL string literal."""
+    """Escape an exact subject for a PromQL string literal.
+
+    Args:
+        value: Unescaped label value.
+
+    Returns:
+        Value escaped for backslash, newline, and quote characters.
+    """
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
 def _query(template: QueryTemplate, subject: str) -> str:
+    """Render one allowlisted instant query for an exact subject.
+
+    Args:
+        template: Fixed query shape to render.
+        subject: Exact user or community label value.
+
+    Returns:
+        PromQL selecting accounting series for currently Running Pods.
+    """
     label = (
         "canfar_username" if template is QueryTemplate.USER_ACTIVE_LIFETIME else "canfar_community"
     )
@@ -66,6 +87,17 @@ def _query(template: QueryTemplate, subject: str) -> str:
 
 
 def _decimal(value: Any) -> Decimal:
+    """Parse a non-negative finite PromQL sample value.
+
+    Args:
+        value: Sample value returned by the backend.
+
+    Returns:
+        Exact decimal representation.
+
+    Raises:
+        ProviderExecutionError: If the sample is not usable.
+    """
     try:
         result = Decimal(str(value))
     except (InvalidOperation, ValueError) as exc:
@@ -76,6 +108,17 @@ def _decimal(value: Any) -> Decimal:
 
 
 def _sample_time(value: Any) -> datetime:
+    """Parse a PromQL sample timestamp as UTC.
+
+    Args:
+        value: Unix timestamp returned by the backend.
+
+    Returns:
+        Timezone-aware UTC datetime.
+
+    Raises:
+        ProviderExecutionError: If the timestamp is invalid or out of range.
+    """
     try:
         return datetime.fromtimestamp(float(value), tz=UTC)
     except (OSError, OverflowError, TypeError, ValueError) as exc:
@@ -83,7 +126,7 @@ def _sample_time(value: Any) -> datetime:
 
 
 class PromQLProvider:
-    """Async form-POST adapter over a fixed, Metrics-owned query catalog."""
+    """Read validated accounting through a fixed Metrics-owned query catalog."""
 
     name = "promql"
 
@@ -94,7 +137,13 @@ class PromQLProvider:
         client: httpx.AsyncClient | None = None,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Attach strict settings and an optional test-owned HTTP client."""
+        """Attach strict settings and an optional caller-owned HTTP client.
+
+        Args:
+            settings: Validated process and PromQL settings.
+            client: Optional async client; when omitted, the provider owns one.
+            telemetry: Optional bounded provider telemetry recorder.
+        """
         self._cluster = settings.cluster_name
         self._config = settings.providers.promql
         self._endpoint = f"{str(self._config.base_url).rstrip('/')}/api/v1/query"
@@ -108,7 +157,7 @@ class PromQLProvider:
         self._telemetry = telemetry or NoopMetricsRecorder()
 
     def cache_fingerprint(self) -> str:
-        """Hash backend and tenant ownership for cache segregation."""
+        """Hash backend and tenant identity to segregate cached query results."""
         identity = json.dumps(
             {
                 "base_url": str(self._config.base_url),
@@ -120,7 +169,7 @@ class PromQLProvider:
         return hashlib.sha256(identity.encode()).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """Create the single lifespan-scoped HTTP client."""
+        """Create the single lifespan-scoped HTTP client when not injected."""
         if self._client is not None:
             return
         self._client = httpx.AsyncClient(
@@ -129,7 +178,7 @@ class PromQLProvider:
         )
 
     async def shutdown(self) -> None:
-        """Close the owned HTTP client."""
+        """Close only the HTTP client created by this provider."""
         client, self._client = self._client, None
         if client is not None and self._owns_client:
             await client.aclose()
@@ -137,7 +186,15 @@ class PromQLProvider:
     async def read_user(
         self, username: str, observed_at: datetime | None = None
     ) -> AccountingSnapshot:
-        """Read one exact user's validated accounting snapshot."""
+        """Read one exact user's validated accounting snapshot.
+
+        Args:
+            username: Exact canonical username.
+            observed_at: Optional query cutoff shared with workload collection.
+
+        Returns:
+            Validated active-workload accounting.
+        """
         return await self._read(
             QueryTemplate.USER_ACTIVE_LIFETIME,
             username,
@@ -147,7 +204,15 @@ class PromQLProvider:
     async def read_community(
         self, community: str, observed_at: datetime | None = None
     ) -> AccountingSnapshot:
-        """Read one exact community's validated accounting snapshot."""
+        """Read one exact community's validated accounting snapshot.
+
+        Args:
+            community: Exact canonical community name.
+            observed_at: Optional query cutoff shared with workload collection.
+
+        Returns:
+            Validated active-workload accounting.
+        """
         return await self._read(
             QueryTemplate.COMMUNITY_ACTIVE_LIFETIME,
             community,
@@ -160,6 +225,20 @@ class PromQLProvider:
         subject: str,
         observed_at: datetime,
     ) -> AccountingSnapshot:
+        """Execute one controlled query and validate its complete response.
+
+        Args:
+            template: Allowlisted query template.
+            subject: Exact subject label value.
+            observed_at: Evaluation cutoff passed to Prometheus.
+
+        Returns:
+            Validated accounting snapshot.
+
+        Raises:
+            ProviderUnavailableError: If the client or backend is unavailable.
+            ProviderExecutionError: If the request or response is unusable.
+        """
         if not subject:
             raise ProviderExecutionError("Accounting subject must not be empty")
         if self._client is None:
@@ -215,7 +294,21 @@ class PromQLProvider:
         subject: str,
         cutoff: datetime,
     ) -> AccountingSnapshot:
-        """Validate one vector completely before returning a normalized value."""
+        """Validate one vector completely before returning a normalized value.
+
+        Args:
+            payload: Decoded Prometheus API response.
+            template: Query template that defined the expected subject label.
+            subject: Exact subject expected on every series.
+            cutoff: Fallback creation time for an empty valid vector.
+
+        Returns:
+            Normalized accounting snapshot.
+
+        Raises:
+            ProviderExecutionError: If any response field or series violates
+                the controlled query contract.
+        """
         if not isinstance(payload, dict) or payload.get("status") != "success":
             raise ProviderExecutionError("PromQL query did not succeed")
         data = payload.get("data")

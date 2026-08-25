@@ -108,3 +108,15 @@ def test_promql_configuration_exposes_no_caller_transport_escape_hatches() -> No
             PromQLProviderConfig.model_validate({field: "unsafe"})
     with pytest.raises(ValidationError, match="mimir_tenant_id"):
         PromQLProviderConfig(mimir_tenant_id="tenant\r\nX-Unsafe: value")
+
+
+def test_platform_name_defaults_and_rejects_invalid_labels() -> None:
+    assert Settings(cache=CacheConfig(backend="memory")).platform_name == "canfar"
+    assert (
+        Settings(cache=CacheConfig(backend="memory"), platform_name="cohort-west").platform_name
+        == "cohort-west"
+    )
+    with pytest.raises(ValidationError, match="platform_name"):
+        Settings(cache=CacheConfig(backend="memory"), platform_name="../escape")
+    with pytest.raises(ValidationError, match="platform_name"):
+        Settings(cache=CacheConfig(backend="memory"), platform_name="")

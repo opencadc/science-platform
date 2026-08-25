@@ -11,7 +11,7 @@ from time import perf_counter
 from metrics.cache import CacheCoordinator, CacheIdentity, CacheResult, CacheUnavailable
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
 from metrics.services.models import (
-    PLATFORM_SUBJECT,
+    DEFAULT_PLATFORM_NAME,
     AccountingSnapshot,
     AccountingState,
     CachedSnapshot,
@@ -32,6 +32,8 @@ WorkloadObservation = UserObservation | CommunityObservation
 
 @dataclass(frozen=True, slots=True)
 class _WorkloadBinding:
+    """Bundle one subject loader with its observation and accounting caches."""
+
     loader: Callable[[str], Awaitable[WorkloadObservation]]
     cache: CacheCoordinator[CachedSnapshot]
     identity: Callable[[str], CacheIdentity]
@@ -50,6 +52,7 @@ class MetricsService:
         platform: Callable[[], Awaitable[PlatformObservation]],
         cache: CacheCoordinator[CachedSnapshot],
         identity: Callable[[], CacheIdentity],
+        platform_name: str = DEFAULT_PLATFORM_NAME,
         user: Callable[[str], Awaitable[UserObservation]] | None = None,
         user_cache: CacheCoordinator[CachedSnapshot] | None = None,
         user_identity: Callable[[str], CacheIdentity] | None = None,
@@ -72,6 +75,8 @@ class MetricsService:
             platform: Async callable that fetches a fresh platform observation.
             cache: Required cache coordinator storing :class:`CachedSnapshot`.
             identity: Sync callable returning the platform cache identity.
+            platform_name: Configured public platform path segment (default
+                ``canfar``). Requests for other platform names return 404.
             user: Optional callable that fetches one user observation.
             user_cache: Coordinator using the User freshness policy.
             user_identity: Callable returning an opaque user cache identity.
@@ -87,6 +92,7 @@ class MetricsService:
         self._platform = platform
         self._cache = cache
         self._identity = identity
+        self._platform_name = platform_name
         self._workloads: dict[str, _WorkloadBinding] = {}
         if user is not None and user_cache is not None and user_identity is not None:
             self._workloads["user"] = _WorkloadBinding(
@@ -124,20 +130,27 @@ class MetricsService:
         (single-flight). Cancelling one waiter does not cancel the shared load.
 
         Args:
-            subject: Subject selector. Only ``platform`` is supported initially.
+            subject: Subject selector (``platform``, ``user``, or ``community``).
 
         Returns:
             Observation, snapshot creation time, and whether it came from cache.
 
         Raises:
-            AppError: Unsupported subject, provider unavailability (503), or
-                execution failure (502). Details stay in server logs.
+            AppError: Unsupported subject, unknown platform name, provider
+                unavailability (503), or execution failure. Details stay in
+                server logs.
         """
         with self._metrics_recorder.span(
             "metrics.get",
             {"metrics.operation": "get", "metrics.subject.type": subject.kind},
         ):
-            if subject == PLATFORM_SUBJECT:
+            if subject.kind == "platform":
+                if subject.value != self._platform_name:
+                    raise AppError(
+                        code="platform_not_found",
+                        message="Requested platform metrics subject is not configured",
+                        status_code=404,
+                    )
                 return await self._get_platform()
             if subject.kind in self._workloads:
                 return await self._get_workload(subject.kind, subject.value)
@@ -148,6 +161,7 @@ class MetricsService:
             )
 
     async def _get_platform(self) -> MetricsResult:
+        """Resolve a platform snapshot and map cache failure to API semantics."""
         try:
             result = await self._cache.get_or_fill(self._identity(), self._load_snapshot)
         except CacheUnavailable as exc:
@@ -175,6 +189,7 @@ class MetricsService:
         )
 
     async def _load_snapshot(self) -> CachedSnapshot:
+        """Load and timestamp a fresh platform observation for the cache."""
         scope = "platform"
         started = perf_counter()
         status = "ok"
@@ -196,6 +211,15 @@ class MetricsService:
             )
 
     async def _get_workload(self, kind: str, subject: str) -> MetricsResult:
+        """Resolve one cached user or community workload report.
+
+        Args:
+            kind: Supported workload subject kind.
+            subject: Exact canonical subject value.
+
+        Returns:
+            Workload observation with cache provenance.
+        """
         binding = self._workloads[kind]
         try:
             result = await binding.cache.get_or_fill(
@@ -230,6 +254,15 @@ class MetricsService:
         cached: bool,
         stale: bool,
     ) -> None:
+        """Record bounded lookup provenance for a returned snapshot.
+
+        Args:
+            scope: Metrics subject kind.
+            cache: Coordinator that served the request.
+            snapshot: Returned observation snapshot.
+            cached: Whether the coordinator reported a hit.
+            stale: Whether the snapshot is stale-serviceable.
+        """
         cache_result = "stale" if stale else ("hit" if cached else "miss")
         self._metrics_recorder.record_cache_lookup(
             backend=cache.backend_name,
@@ -244,6 +277,16 @@ class MetricsService:
         subject: str,
         binding: _WorkloadBinding,
     ) -> CachedSnapshot:
+        """Load workload requests and merge matching optional accounting.
+
+        Args:
+            kind: User or community subject kind.
+            subject: Exact canonical subject value.
+            binding: Provider and cache functions for the subject kind.
+
+        Returns:
+            Observation snapshot suitable for the workload cache.
+        """
         started = perf_counter()
         status = "ok"
         try:
@@ -281,6 +324,15 @@ class MetricsService:
         observation: WorkloadObservation,
         result: CacheResult[AccountingSnapshot],
     ) -> WorkloadObservation:
+        """Merge accounting only when time, Pods, and resource coverage match.
+
+        Args:
+            observation: Current Kubernetes workload population.
+            result: Cache-coordinated accounting for that population.
+
+        Returns:
+            Observation with complete, incomplete, or stale accounting state.
+        """
         accounting = result.value
         if (
             accounting.lifetime.pod_uids != observation.pod_uids
@@ -321,6 +373,16 @@ class MetricsService:
         subject: str,
         loader: Callable[[str], Awaitable[WorkloadObservation]],
     ) -> WorkloadObservation:
+        """Time one workload provider call and map expected failures.
+
+        Args:
+            kind: User or community subject kind.
+            subject: Exact canonical subject value.
+            loader: Provider callable for the subject kind.
+
+        Returns:
+            Fresh workload observation.
+        """
         started = perf_counter()
         status = "ok"
         try:
@@ -350,6 +412,7 @@ class MetricsService:
             )
 
     async def _timed_platform_load(self) -> PlatformObservation:
+        """Time a platform provider call and map expected failures."""
         started = perf_counter()
         status = "ok"
         try:

@@ -1,4 +1,9 @@
-"""Kueue-backed platform metrics: kr8s reads, quantity handling, startup checks."""
+"""Collect platform capacity and admitted allocation from Kueue ClusterQueues.
+
+The provider performs named GETs to preserve get-only RBAC, validates
+Kubernetes quantities, and emits comparable public units for capacity and
+allocation.
+"""
 
 from __future__ import annotations
 
@@ -45,6 +50,13 @@ def parse_resource_amount(resource_name: str, raw: object) -> float:
     floats, so totals are accurate to well past the 6 decimal places the API
     formats, not bit-exact.
 
+    Args:
+        resource_name: Kubernetes resource name that determines public units.
+        raw: Kubernetes quantity text.
+
+    Returns:
+        Cores for CPU, GiB for storage resources, or base units otherwise.
+
     Raises:
         ProviderExecutionError: For non-strings, malformed syntax, surrounding
             whitespace, negatives, non-finite values, or values at or beyond
@@ -64,13 +76,28 @@ def parse_resource_amount(resource_name: str, raw: object) -> float:
 
 
 def _validate_resource_amount(resource_name: str, value: float) -> None:
+    """Require a finite non-negative total within the supported quantity range.
+
+    Args:
+        resource_name: Kubernetes resource name that determines base units.
+        value: Numeric amount in public response units.
+    """
     base_value = value * _GIB if resource_name.lower() in _STORAGE_RESOURCES else value
     if not isfinite(base_value) or base_value < 0 or base_value >= _MAX_QUANTITY:
         raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
 
 
 def format_resource_amount(resource_name: str, value: float) -> str:
-    """Format a resource total for API payloads: ≤6 decimals, no scientific notation."""
+    """Format a validated resource total for API payloads.
+
+    Args:
+        resource_name: Kubernetes resource name that determines unit suffix.
+        value: Numeric amount in public response units.
+
+    Returns:
+        At most six decimals without scientific notation, with ``Gi`` for
+        storage resources.
+    """
     _validate_resource_amount(resource_name, value)
     text = f"{value:.6f}".rstrip("0").rstrip(".")
     if resource_name.lower() in _STORAGE_RESOURCES:
@@ -79,7 +106,13 @@ def format_resource_amount(resource_name: str, value: float) -> str:
 
 
 def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> None:
-    """Accumulate a resource total while retaining valid zero values."""
+    """Accumulate and validate a resource total while retaining zero values.
+
+    Args:
+        target: Totals mutated in place.
+        name: Kubernetes resource name.
+        delta: Amount in the resource's public response unit.
+    """
     total = target.get(name, 0.0) + delta
     _validate_resource_amount(name, total)
     target[name] = total
@@ -89,7 +122,14 @@ def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> 
 
 
 async def create_kube_api(kueue_config: KueueProviderConfig) -> Any:
-    """Build a kr8s API handle using its own discovery (in-cluster SA or kubeconfig)."""
+    """Build a kr8s handle through in-cluster or kubeconfig discovery.
+
+    Args:
+        kueue_config: Provider settings supplying the request timeout.
+
+    Returns:
+        Configured asynchronous kr8s API handle.
+    """
     api = await kr8s.asyncio.api()
     api.timeout = kueue_config.kube_request_timeout_seconds
     return api
@@ -108,6 +148,14 @@ async def fetch_cluster_queue_docs(
 
     Platform loads are already serialized by the single-flight service, and the
     configured queue list is small, so there is no parallel fan-out here.
+
+    Args:
+        api: kr8s-compatible API handle.
+        api_version: Configured Kueue API group and version.
+        names: Exact ClusterQueue names in desired response order.
+
+    Returns:
+        Decoded ClusterQueue documents in request order.
 
     Raises:
         kr8s.ServerError: For API server errors, including HTTP 404 when a
@@ -137,6 +185,11 @@ def _merge_resource_entries(
     Resource **names** are taken verbatim from the API (for example ``cpu``,
     ``memory``, ``nvidia.com/gpu``) so the platform contract can surface future
     resource types without schema changes; values use public response units.
+
+    Args:
+        totals: Resource totals mutated in place.
+        resources: Kueue resource entry sequence.
+        value_key: Quantity field to read from each entry.
     """
     for resource in resources or []:
         name = str(resource.get("name", "")).strip()
@@ -150,11 +203,14 @@ def _merge_resource_entries(
 
 
 def _resource_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
+    """Format a numeric resource map in deterministic name order."""
     return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
 
 
 @dataclass(slots=True)
 class _PlatformResourceMaps:
+    """Pair comparable formatted capacity and allocation maps."""
+
     capacity: dict[str, str]
     allocated: dict[str, str]
 
@@ -180,6 +236,7 @@ class KueueProvider:
         return "kueue"
 
     async def _ensure_api(self) -> Any:
+        """Create and retain the Kubernetes API handle on first use."""
         if self._api is None:
             try:
                 self._api = await create_kube_api(self._kueue_config)
@@ -200,6 +257,7 @@ class KueueProvider:
         )
 
     async def _collect_resource_maps(self) -> _PlatformResourceMaps:
+        """Fetch configured queues and aggregate comparable resource maps."""
         kueue_config = self._kueue_config
         if not kueue_config.cluster_queues:
             raise ProviderUnavailableError(

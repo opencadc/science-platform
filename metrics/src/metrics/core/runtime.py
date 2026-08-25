@@ -37,6 +37,7 @@ _ACCOUNTING_QUERY_REVISION = "1"
 
 def platform_cache_identity(
     *,
+    platform_name: str,
     cluster_name: str,
     source: str,
     fingerprint: str = "",
@@ -44,6 +45,7 @@ def platform_cache_identity(
     """Build the cache identity for Platform observations.
 
     Args:
+        platform_name: Configured public platform subject (``METRICS_PLATFORM_NAME``).
         cluster_name: Cluster identifier from settings.
         source: Active source adapter name.
         fingerprint: Optional provider configuration fingerprint.
@@ -53,7 +55,7 @@ def platform_cache_identity(
     """
     return CacheIdentity(
         subject_kind="platform",
-        subject_value="canfar",
+        subject_value=platform_name,
         cluster=cluster_name,
         source=source,
         fingerprint=fingerprint.strip(),
@@ -67,7 +69,17 @@ def build_cache(
     surface: Literal["platform", "user", "community"] = "platform",
     redis: Redis | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
-    """Construct the configured cache coordinator and owned Redis client."""
+    """Construct a subject cache and, when needed, an owned Redis client.
+
+    Args:
+        settings: Validated cache and Redis settings.
+        recorder: Optional bounded cache telemetry recorder.
+        surface: Subject scope selecting freshness policy.
+        redis: Optional shared Redis client.
+
+    Returns:
+        The configured coordinator and a newly owned Redis client, if created.
+    """
     policy = FRESHNESS_POLICIES[surface]
     if settings.cache.backend == "memory":
         return (
@@ -122,7 +134,21 @@ def build_accounting_cache(
     redis: Redis | None,
     recorder: MetricsRecorder,
 ) -> CacheCoordinator[AccountingSnapshot]:
-    """Build an accounting cache over the shared Redis connection."""
+    """Build a subject accounting cache over the shared Redis connection.
+
+    Args:
+        settings: Validated cache and Redis settings.
+        surface: User or community freshness policy selector.
+        redis: Shared Redis client created for observation caches.
+        recorder: Bounded cache telemetry recorder.
+
+    Returns:
+        A coordinator for validated accounting snapshots.
+
+    Raises:
+        RuntimeStartupError: If accounting is enabled without Redis integrity
+            configuration.
+    """
     policy = FRESHNESS_POLICIES[surface]
     if settings.cache.backend == "memory":
         return InMemoryCoordinator[AccountingSnapshot](
@@ -267,6 +293,12 @@ class MetricsRuntime:
             accounting_fingerprint = accounting_provider.cache_fingerprint()
 
             async def user_accounting(username, observed_at):
+                """Read cache-coordinated accounting for one user population.
+
+                Args:
+                    username: Exact canonical username.
+                    observed_at: Workload population observation time.
+                """
                 return await accounting_caches[0].get_or_fill(
                     CacheIdentity(
                         subject_kind="user",
@@ -279,6 +311,12 @@ class MetricsRuntime:
                 )
 
             async def community_accounting(community, observed_at):
+                """Read cache-coordinated accounting for one community population.
+
+                Args:
+                    community: Exact canonical community name.
+                    observed_at: Workload population observation time.
+                """
                 return await accounting_caches[1].get_or_fill(
                     CacheIdentity(
                         subject_kind="community",
@@ -296,10 +334,12 @@ class MetricsRuntime:
             platform=provider.read_platform,
             cache=cache,
             identity=lambda: platform_cache_identity(
+                platform_name=settings.platform_name,
                 cluster_name=settings.cluster_name,
                 source=provider.name,
                 fingerprint=fingerprint,
             ),
+            platform_name=settings.platform_name,
             user=user_provider.read_user,
             user_cache=user_cache,
             user_identity=lambda username: CacheIdentity(
@@ -357,7 +397,11 @@ class MetricsRuntime:
         return self._started and all(cache.available for cache in self._caches)
 
     async def start(self) -> None:
-        """Start the active provider once, cleaning up all resources on failure."""
+        """Validate dependencies and start each provider exactly once.
+
+        Any startup failure triggers complete resource cleanup before a
+        sanitized :class:`RuntimeStartupError` reaches the application.
+        """
         if not self._providers or self._started:
             return
         started = perf_counter()
@@ -409,6 +453,7 @@ class MetricsRuntime:
             await self._shutdown()
 
     async def _shutdown(self) -> None:
+        """Close providers, coordinators, and Redis despite individual failures."""
         started = perf_counter()
         outcome = "ok"
         cancellation: asyncio.CancelledError | None = None

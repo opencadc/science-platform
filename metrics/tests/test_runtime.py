@@ -27,11 +27,21 @@ def _memory_cache() -> InMemoryCoordinator[CachedSnapshot]:
 
 def test_platform_cache_identity_preserves_source_dimensions() -> None:
     identity = platform_cache_identity(
+        platform_name="canfar",
         cluster_name="kind-metrics",
         source="kueue",
         fingerprint="abc123",
     )
     assert identity == CacheIdentity("platform", "canfar", "kind-metrics", "kueue", "abc123")
+
+
+def test_platform_cache_identity_uses_configured_platform_name() -> None:
+    identity = platform_cache_identity(
+        platform_name="cohort-west",
+        cluster_name="kind-metrics",
+        source="kueue",
+    )
+    assert identity.subject_value == "cohort-west"
 
 
 def test_runtime_wires_promql_provider_only_when_enabled() -> None:

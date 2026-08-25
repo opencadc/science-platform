@@ -1,4 +1,9 @@
-"""Pure active-workload lifetime resource-time accounting."""
+"""Validate and integrate active-workload resource rates into resource-hours.
+
+The functions are deliberately pure: producers supply timestamped intervals or
+already integrated samples, and incomplete resources are omitted rather than
+presented as misleading partial totals.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,14 @@ RESOURCE_UNITS: dict[str, Literal["core-hours", "GiB-hours", "GPU-hours"]] = {
 
 
 def _hours(duration: timedelta) -> Decimal:
+    """Convert a duration to decimal hours without float rounding.
+
+    Args:
+        duration: Exact interval duration.
+
+    Returns:
+        Duration expressed as decimal hours.
+    """
     seconds = Decimal(duration.days * 86_400 + duration.seconds) + Decimal(
         duration.microseconds
     ) / Decimal(1_000_000)
@@ -31,11 +44,27 @@ def _hours(duration: timedelta) -> Decimal:
 
 
 def _validate_timestamp(value: datetime) -> None:
+    """Require a timezone-aware lifetime timestamp.
+
+    Args:
+        value: Timestamp supplied by an accounting producer.
+
+    Raises:
+        ValueError: If the timestamp has no usable timezone.
+    """
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("lifetime timestamps must include a timezone")
 
 
 def _validate_interval(interval: ResourceInterval) -> None:
+    """Validate interval ordering and non-negative finite rates.
+
+    Args:
+        interval: Constant-rate interval to validate.
+
+    Raises:
+        ValueError: If timestamps, duration, or rates are invalid.
+    """
     _validate_timestamp(interval.started_at)
     _validate_timestamp(interval.ended_at)
     if interval.ended_at <= interval.started_at:
@@ -50,6 +79,17 @@ def _validate_interval(interval: ResourceInterval) -> None:
 def _integrate_series(
     series: PodResourceLifetime,
 ) -> tuple[Decimal, Decimal, frozenset[LifetimeIssue]]:
+    """Integrate one Pod-resource series and identify coverage gaps.
+
+    Args:
+        series: Intervals for one Pod UID and resource.
+
+    Returns:
+        Usage hours, requested hours, and all detected completeness issues.
+
+    Raises:
+        ValueError: If identities, timestamps, intervals, or rates are invalid.
+    """
     _validate_timestamp(series.running_since)
     _validate_timestamp(series.observed_at)
     if not series.pod_uid or not series.resource:
@@ -85,7 +125,22 @@ def _integrate_series(
 def integrate_active_workload(
     lifetimes: Iterable[PodResourceLifetime],
 ) -> ActiveWorkloadLifetime:
-    """Sum complete per-Pod Running lifetimes without deriving efficiency."""
+    """Integrate and sum complete per-Pod Running lifetimes.
+
+    A resource is excluded from totals when any Pod series for that resource is
+    incomplete. Efficiency is intentionally left to the presentation layer.
+
+    Args:
+        lifetimes: Series for unique Pod UID and resource pairs, all observed at
+            the same time.
+
+    Returns:
+        Complete resource-hour totals, issues, Pod identities, and coverage.
+
+    Raises:
+        ValueError: If a series is invalid, duplicated, unsupported, or observed
+            at a different time.
+    """
     totals: dict[str, tuple[Decimal, Decimal]] = {}
     incomplete: dict[str, set[LifetimeIssue]] = {}
     identities: set[tuple[str, str]] = set()
@@ -133,7 +188,18 @@ def integrate_active_workload(
 def aggregate_active_workload_hours(
     samples: Iterable[tuple[str, str, Decimal, Decimal, frozenset[LifetimeIssue]]],
 ) -> ActiveWorkloadLifetime:
-    """Aggregate validated producer totals, omitting any incomplete resource."""
+    """Aggregate producer-integrated totals without publishing partial values.
+
+    Args:
+        samples: Pod UID, resource, usage hours, requested hours, and issues for
+            each producer sample.
+
+    Returns:
+        Complete totals plus per-resource issues and Pod coverage.
+
+    Raises:
+        ValueError: If a Pod UID, resource, or resource-hour value is invalid.
+    """
     totals: dict[str, tuple[Decimal, Decimal]] = {}
     incomplete: dict[str, set[LifetimeIssue]] = {}
     pod_uids: set[str] = set()

@@ -1,4 +1,9 @@
-"""Kubernetes source for scheduler-effective Running workload requests."""
+"""Collect scheduler-effective requests from namespaced Running Pods.
+
+The provider selects only Skaha-managed Pods for an exact user or community,
+then reproduces Kubernetes whole-Pod request accounting across regular,
+restartable init, ordinary init, and overhead resources.
+"""
 
 from __future__ import annotations
 
@@ -46,6 +51,17 @@ async def create_kube_api(config: KubernetesProviderConfig) -> Any:
 
 
 def _requests(container: dict[str, Any]) -> dict[str, float]:
+    """Parse one container's resource requests into public numeric units.
+
+    Args:
+        container: Kubernetes container document.
+
+    Returns:
+        Parsed requests keyed by resource name.
+
+    Raises:
+        ProviderExecutionError: If the requests object is malformed.
+    """
     values = (container.get("resources") or {}).get("requests") or {}
     if not isinstance(values, dict):
         raise ProviderExecutionError("Kubernetes Pod data contained invalid resource requests")
@@ -53,12 +69,32 @@ def _requests(container: dict[str, Any]) -> dict[str, float]:
 
 
 def _add(target: dict[str, float], values: dict[str, float]) -> None:
+    """Add resource values into validated running totals.
+
+    Args:
+        target: Totals mutated in place.
+        values: Resource amounts to add.
+    """
     for name, value in values.items():
         merge_resource_totals(target, name, value)
 
 
 def scheduler_requests(pod: dict[str, Any]) -> dict[str, float]:
-    """Calculate scheduler-effective whole-Pod requests for every resource."""
+    """Calculate scheduler-effective whole-Pod requests for every resource.
+
+    The calculation follows Kubernetes scheduling semantics: regular and
+    restartable-init requests form the steady sum, ordinary init containers
+    contribute a peak, and Pod overhead is added afterward.
+
+    Args:
+        pod: Kubernetes Pod document.
+
+    Returns:
+        Effective requests in public numeric units.
+
+    Raises:
+        ProviderExecutionError: If the Pod shape or a quantity is invalid.
+    """
     try:
         spec = pod["spec"]
         steady: dict[str, float] = {}
@@ -98,7 +134,17 @@ def scheduler_requests(pod: dict[str, Any]) -> dict[str, float]:
 
 
 def _pod_uids(pods: list[dict[str, Any]]) -> frozenset[str]:
-    """Return the selected immutable Pod identities."""
+    """Extract unique immutable Pod identities from a selected population.
+
+    Args:
+        pods: Kubernetes Pod documents.
+
+    Returns:
+        Unique non-empty Pod UIDs.
+
+    Raises:
+        ProviderExecutionError: If a UID is missing, invalid, or duplicated.
+    """
     try:
         values = [pod["metadata"]["uid"] for pod in pods]
     except (KeyError, TypeError) as exc:
@@ -116,10 +162,24 @@ async def fetch_running_pods(
     label: str,
     value: str,
 ) -> list[dict[str, Any]]:
-    """List exact-subject Running Pods from every configured namespace."""
+    """List exact-subject Running Pods from every configured namespace.
+
+    Args:
+        api: kr8s-compatible API handle.
+        namespaces: Namespaces queried concurrently.
+        label: Canonical subject label key.
+        value: Exact canonical subject value.
+
+    Returns:
+        Flattened Pod documents from all namespaces.
+
+    Raises:
+        ProviderExecutionError: If a Pod list response has an invalid shape.
+    """
     selector = ",".join((_MANAGED_BY, _PART_OF, f"{label}={value}"))
 
     async def fetch(namespace: str) -> list[dict[str, Any]]:
+        """Fetch and validate one namespace's Running Pod list."""
         async with api.call_api(
             method="GET",
             version="v1",
@@ -138,10 +198,15 @@ async def fetch_running_pods(
 
 
 class KubernetesProvider:
-    """Namespaced Kubernetes source for subject workload requests."""
+    """Aggregate workload requests from configured Kubernetes namespaces."""
 
     def __init__(self, settings: Settings, api: Any | None = None) -> None:
-        """Attach settings and an optional pre-built Kubernetes API handle."""
+        """Attach settings and an optional pre-built Kubernetes API handle.
+
+        Args:
+            settings: Validated process and Kubernetes provider settings.
+            api: Optional kr8s-compatible handle, usually injected by tests.
+        """
         self._settings = settings
         self._config = settings.providers.kubernetes
         self._api = api
@@ -152,6 +217,7 @@ class KubernetesProvider:
         return "kubernetes"
 
     async def _ensure_api(self) -> Any:
+        """Create and retain the Kubernetes API handle on first use."""
         if self._api is None:
             try:
                 self._api = await create_kube_api(self._config)
@@ -190,7 +256,18 @@ class KubernetesProvider:
         label: str,
         value: str,
     ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-        """Read and aggregate one exact canonical subject label."""
+        """Read and aggregate one exact canonical subject label.
+
+        Args:
+            label: Canonical user or community label key.
+            value: Exact canonical label value.
+
+        Returns:
+            Selected Pods and formatted aggregate requests.
+
+        Raises:
+            ProviderExecutionError: If Kubernetes access or Pod data fails.
+        """
         api = await self._ensure_api()
         try:
             pods = await fetch_running_pods(
@@ -216,7 +293,7 @@ class KubernetesProvider:
         )
 
     def cache_fingerprint(self) -> str:
-        """Hash the configured namespace set for cache segregation."""
+        """Hash the provider and namespace set to segregate cached populations."""
         raw = json.dumps(
             {"name": self.name, "namespaces": sorted(self._config.workload_namespaces)},
             separators=(",", ":"),

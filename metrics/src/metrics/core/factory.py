@@ -30,7 +30,13 @@ _STATUS_REASONS: dict[int, tuple[StatusReason, str]] = {
 
 
 def _sanitize_http_span(span, scope: dict, _message: dict | None = None) -> None:
-    """Replace concrete request targets with a bounded route template."""
+    """Replace concrete request targets with a bounded route template.
+
+    Args:
+        span: OpenTelemetry server span, when recording is active.
+        scope: ASGI scope containing the matched FastAPI route.
+        _message: Optional ASGI message accepted by response hooks.
+    """
     if span is None or not span.is_recording():
         return
     route = scope.get("route")
@@ -44,7 +50,12 @@ def _sanitize_http_span(span, scope: dict, _message: dict | None = None) -> None
 
 
 def _sanitize_client_span(span, *_details: object) -> None:
-    """Remove downstream URLs while retaining the bounded HTTP operation."""
+    """Remove downstream URLs while retaining the bounded HTTP operation.
+
+    Args:
+        span: OpenTelemetry client span, when recording is active.
+        *_details: Instrumentor-specific request or response details.
+    """
     if span is None or not span.is_recording():
         return
     span.set_attribute("url.full", "redacted")
@@ -54,7 +65,12 @@ def _sanitize_client_span(span, *_details: object) -> None:
 
 
 async def _sanitize_async_client_span(span, *_details: object) -> None:
-    """Sanitize an asynchronous downstream HTTP span."""
+    """Apply client URL redaction through the async instrumentor hook.
+
+    Args:
+        span: OpenTelemetry client span, when recording is active.
+        *_details: Instrumentor-specific request or response details.
+    """
     _sanitize_client_span(span)
 
 
@@ -63,13 +79,25 @@ def create_app(
     settings: Settings,
     runtime: MetricsRuntime | None = None,
 ) -> FastAPI:
-    """Create and configure the metrics API application."""
+    """Create the API and bind its runtime, telemetry, routes, and handlers.
+
+    The returned application owns startup and shutdown of all injected
+    resources through its lifespan.
+
+    Args:
+        settings: Validated process configuration.
+        runtime: Optional pre-wired runtime, primarily for controlled callers.
+
+    Returns:
+        A configured FastAPI application.
+    """
     telemetry = setup_telemetry(settings)
     runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
     httpx_instrumentor = HTTPXClientInstrumentor()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Start and reliably stop runtime and telemetry resources."""
         started = False
         app.state.runtime = runtime
         try:
@@ -120,10 +148,12 @@ def create_app(
     @app.get("/livez", include_in_schema=False)
     @app.get("/healthz", include_in_schema=False)
     async def healthcheck() -> dict[str, str]:
+        """Report process liveness independently of upstream dependencies."""
         return {"status": "ok"}
 
     @app.get("/readyz", include_in_schema=False)
     async def readiness() -> JSONResponse:
+        """Report whether startup completed and required caches remain available."""
         status = 200 if runtime.ready else 503
         telemetry.recorder.record_readiness(runtime.ready)
         return JSONResponse(
@@ -132,6 +162,7 @@ def create_app(
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+        """Map an expected application failure to a sanitized Status response."""
         reason, message = _STATUS_REASONS.get(
             exc.status_code, ("InternalError", "The request could not be completed.")
         )
@@ -147,6 +178,7 @@ def create_app(
 
     @app.exception_handler(HTTPException)
     async def http_error_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+        """Map framework HTTP failures to the stable Status response contract."""
         reason, message = _STATUS_REASONS.get(
             exc.status_code, ("InternalError", "The request could not be completed.")
         )
@@ -161,6 +193,7 @@ def create_app(
     async def validation_error_handler(
         _request: Request, _exc: RequestValidationError
     ) -> JSONResponse:
+        """Hide request-validation internals behind a stable bad-request response."""
         reason, message = _STATUS_REASONS[400]
         body = Status(reason=reason, message=message, code=400)
         return JSONResponse(
@@ -171,6 +204,7 @@ def create_app(
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+        """Fail closed with a sanitized response for unexpected exceptions."""
         del exc
         _logger.error("Unhandled request failure")
         body = Status(

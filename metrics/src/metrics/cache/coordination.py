@@ -1,4 +1,8 @@
-"""Redis-backed cache-aside coordination and bounded outage behavior."""
+"""Coordinate Redis cache-aside reads, distributed fills, and safe fallbacks.
+
+The coordinator uses Redis leases to avoid replica stampedes, local single
+flight to coalesce same-process misses, and a bounded L1 only during outages.
+"""
 
 from __future__ import annotations
 
@@ -28,13 +32,20 @@ Value = TypeVar("Value")
 
 @dataclass(slots=True)
 class _LocalFill(Generic[Value]):
+    """Share one cold-fill result or failure among process-local waiters."""
+
     event: asyncio.Event
     result: CacheResult[Value] | None = None
     error: BaseException | None = None
 
 
 class RedisCoordinator(Generic[Value]):
-    """Distributed single-flight boundary with bounded process-local fallback."""
+    """Provide distributed single flight with bounded process-local fallback.
+
+    Fresh hits return immediately, stale hits attempt one leased refresh, and
+    cold misses wait for a lease owner to publish. Redis outages use L1 only
+    while its snapshot remains serviceable.
+    """
 
     backend_name = "redis"
 
@@ -54,7 +65,22 @@ class RedisCoordinator(Generic[Value]):
         max_fills: int = 8,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Configure freshness, finite deadlines, polling, and local bounds."""
+        """Configure freshness, finite deadlines, polling, and local bounds.
+
+        Args:
+            store: Redis snapshot repository.
+            key_prefix: Namespace prepended to opaque Redis keys.
+            key_secret: HMAC key used to obscure cache identities.
+            policy: Freshness and retention boundaries.
+            created: Callable extracting source collection time from a value.
+            fill_timeout: Maximum time allowed for one provider fill.
+            cold_timeout: Maximum total wait for a cold result.
+            poll_min: Minimum delay between durable pointer checks.
+            poll_max: Maximum delay between durable pointer checks.
+            max_l1_entries: Maximum last-known snapshots retained locally.
+            max_fills: Maximum concurrent provider fills in this process.
+            telemetry: Optional bounded cache telemetry recorder.
+        """
         self.policy = policy
         self._store = store
         self._key_prefix = key_prefix
@@ -78,6 +104,7 @@ class RedisCoordinator(Generic[Value]):
         return self._available
 
     def _keys(self, identity: CacheIdentity):
+        """Derive revisioned Redis keys for one source identity."""
         return cache_keys(
             prefix=self._key_prefix,
             identity=identity,
@@ -88,7 +115,11 @@ class RedisCoordinator(Generic[Value]):
         )
 
     async def ping(self) -> None:
-        """Verify Redis before the runtime begins serving."""
+        """Verify Redis before the runtime begins serving.
+
+        Raises:
+            RedisUnavailable: If the bounded health check fails.
+        """
         try:
             await self._store.ping()
             self._available = True
@@ -97,11 +128,13 @@ class RedisCoordinator(Generic[Value]):
             raise
 
     def _remember(self, base: str, snapshot: StoredSnapshot[Value]) -> None:
+        """Retain a serviceable durable snapshot as an outage fallback."""
         state = self.policy.classify(snapshot.created)
         if state in {Freshness.FRESH, Freshness.STALE}:
             self._l1.put(base, snapshot)
 
     def _fallback(self, base: str) -> CacheResult[Value] | None:
+        """Return a serviceable L1 snapshot when one exists."""
         snapshot = self._l1.get(base)
         if snapshot is None:
             return None
@@ -111,6 +144,7 @@ class RedisCoordinator(Generic[Value]):
         return CacheResult(snapshot.value, cached=True, stale=state is Freshness.STALE)
 
     async def _read(self, keys) -> StoredSnapshot[Value] | None:
+        """Read Redis while updating the coordinator availability flag."""
         try:
             snapshot = await self._store.read(keys)
             self._available = True
@@ -124,7 +158,18 @@ class RedisCoordinator(Generic[Value]):
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult[Value]:
-        """Read a snapshot or coordinate exactly one bounded downstream fill."""
+        """Read a snapshot or coordinate exactly one bounded downstream fill.
+
+        Args:
+            identity: Complete source stream identity.
+            fill: Async callable producing a fresh value.
+
+        Returns:
+            A serviceable value with cache provenance.
+
+        Raises:
+            CacheUnavailable: If no durable or local result can be served.
+        """
         with self._telemetry.span(
             "cache.get_or_fill",
             {
@@ -139,6 +184,12 @@ class RedisCoordinator(Generic[Value]):
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult[Value]:
+        """Apply fresh, stale-refresh, cold-fill, and outage fallback policy.
+
+        Args:
+            identity: Complete source stream identity.
+            fill: Async callable producing a fresh value.
+        """
         keys = self._keys(identity)
         scope = identity.subject_kind
         try:
@@ -166,6 +217,14 @@ class RedisCoordinator(Generic[Value]):
         fill: Callable[[], Awaitable[Value]],
         scope: str,
     ) -> CacheResult[Value]:
+        """Refresh under a lease or immediately serve the stale snapshot.
+
+        Args:
+            keys: Derived keys for the source identity.
+            stale: Serviceable stale snapshot.
+            fill: Async callable producing a fresh value.
+            scope: Bounded subject scope used for telemetry.
+        """
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
         try:
@@ -197,6 +256,13 @@ class RedisCoordinator(Generic[Value]):
         fill: Callable[[], Awaitable[Value]],
         scope: str,
     ) -> CacheResult[Value]:
+        """Join or launch the process-local task serving a cold identity.
+
+        Args:
+            keys: Derived keys for the source identity.
+            fill: Async callable producing a fresh value.
+            scope: Bounded subject scope used for telemetry.
+        """
         async with self._lock:
             local = self._fills.get(keys.base)
             if local is None:
@@ -223,6 +289,14 @@ class RedisCoordinator(Generic[Value]):
         local: _LocalFill[Value],
         scope: str,
     ) -> None:
+        """Run one cold fill and publish its result to local waiters.
+
+        Args:
+            keys: Derived keys for the source identity.
+            fill: Async callable producing a fresh value.
+            local: Process-local result shared by waiters.
+            scope: Bounded subject scope used for telemetry.
+        """
         try:
             async with asyncio.timeout(self._cold_timeout):
                 local.result = await self._fill_or_poll(keys, fill, scope)
@@ -240,6 +314,13 @@ class RedisCoordinator(Generic[Value]):
         fill: Callable[[], Awaitable[Value]],
         scope: str,
     ) -> CacheResult[Value]:
+        """Acquire the distributed lease or poll for its owner's publication.
+
+        Args:
+            keys: Derived keys for the source identity.
+            fill: Async callable producing a fresh value.
+            scope: Bounded subject scope used for telemetry.
+        """
         bucket = int(time.time() // self.policy.fresh_seconds)
         token = uuid.uuid4().hex
         try:
@@ -279,7 +360,18 @@ class RedisCoordinator(Generic[Value]):
         bucket: int,
         token: str,
     ) -> CacheResult[Value]:
-        """Publish one bounded fill while holding a distributed lease."""
+        """Publish one bounded fill while holding a distributed lease.
+
+        Args:
+            keys: Derived keys for the source identity.
+            fill: Async callable producing a fresh value.
+            scope: Bounded subject scope used for telemetry.
+            bucket: Freshness bucket whose lease is held.
+            token: Unique lease-owner token.
+
+        Returns:
+            Newly published value marked as a cache miss.
+        """
         started = time.perf_counter()
         outcome = "ok"
         try:
@@ -311,7 +403,15 @@ class RedisCoordinator(Generic[Value]):
                 self._available = False
 
     async def _poll(self, keys, baseline: str | None) -> CacheResult[Value]:
-        """Poll the durable pointer until another replica publishes."""
+        """Poll until another replica publishes a serviceable snapshot.
+
+        Args:
+            keys: Derived keys for the source identity.
+            baseline: Snapshot ID present before lease contention.
+
+        Returns:
+            The newly published serviceable snapshot.
+        """
         while True:
             await asyncio.sleep(random.uniform(self._poll_min, self._poll_max))
             try:
@@ -329,7 +429,7 @@ class RedisCoordinator(Generic[Value]):
                 return CacheResult(snapshot.value, cached=True, stale=state is Freshness.STALE)
 
     async def shutdown(self) -> None:
-        """Cancel and await process-local cache fills."""
+        """Cancel and await process-local fills so none outlive the runtime."""
         tasks = tuple(self._fill_tasks)
         for task in tasks:
             task.cancel()

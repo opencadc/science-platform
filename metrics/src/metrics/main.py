@@ -1,4 +1,4 @@
-"""Application entrypoint."""
+"""Provide the process entrypoint for the CANFAR Metrics API server."""
 
 from __future__ import annotations
 
@@ -11,7 +11,11 @@ from metrics.core.settings import Settings
 
 
 def run() -> None:
-    """Run the API server with environment configuration."""
+    """Load environment settings and run one Uvicorn worker.
+
+    The application owns cache single-flight state and lifecycle resources, so
+    horizontal scaling is handled by separate pods rather than Uvicorn workers.
+    """
     settings = Settings()
     # "trace" is a uvicorn level; the stdlib logger tree maps it to DEBUG.
     stdlib_level = {"trace": "debug"}.get(settings.log_level, settings.log_level)

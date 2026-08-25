@@ -1,4 +1,8 @@
-"""Transport-neutral Metrics subjects and observations (no FastAPI types)."""
+"""Define transport-neutral subjects, observations, and cache payloads.
+
+Providers and services exchange these types without depending on FastAPI or
+public wire schemas, keeping collection and cache logic reusable and testable.
+"""
 
 from __future__ import annotations
 
@@ -11,21 +15,43 @@ from typing import Literal
 
 @dataclass(frozen=True, slots=True)
 class MetricsSubject:
-    """Subject selector for :meth:`metrics.services.metrics.MetricsService.get`.
+    """Select the report requested from :class:`MetricsService`.
 
-    Platform, user, and community are served.
+    Attributes:
+        kind: Supported report scope.
+        value: Exact platform, username, or community identifier.
     """
 
     kind: Literal["platform", "user", "community"]
     value: str = ""
 
 
-PLATFORM_SUBJECT = MetricsSubject(kind="platform", value="canfar")
+DEFAULT_PLATFORM_NAME = "canfar"
+
+
+def platform_subject(name: str = DEFAULT_PLATFORM_NAME) -> MetricsSubject:
+    """Build the platform subject for the configured public platform name.
+
+    Args:
+        name: Platform path segment and ``spec.platform`` value. Defaults to
+            :data:`DEFAULT_PLATFORM_NAME` (``canfar``).
+
+    Returns:
+        A platform :class:`MetricsSubject` for :meth:`MetricsService.get`.
+    """
+    return MetricsSubject(kind="platform", value=name)
+
+
+PLATFORM_SUBJECT = platform_subject()
 
 
 @dataclass(frozen=True, slots=True)
 class PlatformObservation:
-    """Scheduler-facing platform capacity and admitted allocation."""
+    """Represent Kueue capacity and admitted allocation for one cluster.
+
+    Resource values use the public quantity format so the service does not need
+    to reinterpret provider-specific units.
+    """
 
     cluster: str
     capacity: dict[str, str]
@@ -33,7 +59,7 @@ class PlatformObservation:
 
 
 class AccountingState(StrEnum):
-    """Availability of requested lifetime accounting."""
+    """Describe whether lifetime accounting accompanies a workload report."""
 
     DISABLED = "disabled"
     COMPLETE = "complete"
@@ -43,7 +69,11 @@ class AccountingState(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class UserObservation:
-    """Scheduler-effective requests held by one user's Running Pods."""
+    """Capture scheduler-effective requests for one user's Running Pods.
+
+    Immutable Pod UIDs tie optional lifetime accounting to the same observed
+    workload population and prevent mismatched data from appearing complete.
+    """
 
     user: str
     running_pods: int
@@ -57,7 +87,11 @@ class UserObservation:
 
 @dataclass(frozen=True, slots=True)
 class CommunityObservation:
-    """Scheduler-effective requests held by one community's Running Pods."""
+    """Capture requests and optional accounting for a community's Running Pods.
+
+    Immutable Pod UIDs identify the population observed at ``observed_at`` so
+    separately collected accounting can be checked before it is merged.
+    """
 
     community: str
     running_pods: int
@@ -70,7 +104,7 @@ class CommunityObservation:
 
 
 class LifetimeIssue(StrEnum):
-    """Machine-readable reasons that lifetime accounting is incomplete."""
+    """Enumerate bounded reasons a resource lifetime cannot be reported."""
 
     CORRUPT_STATE = "corrupt-state"
     COUNTER_RESET = "counter-reset"
@@ -83,7 +117,10 @@ class LifetimeIssue(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ResourceInterval:
-    """Constant resource rates over one covered Running interval."""
+    """Represent constant usage and request rates over a covered interval.
+
+    Integrating these rates over the interval yields additive resource-hours.
+    """
 
     started_at: datetime
     ended_at: datetime
@@ -93,7 +130,11 @@ class ResourceInterval:
 
 @dataclass(frozen=True, slots=True)
 class PodResourceLifetime:
-    """Internal lifetime series for one currently Running Pod UID and resource."""
+    """Collect covered intervals for one Running Pod and resource.
+
+    ``issues`` carries producer-known gaps; integration may add further issues
+    when the intervals do not cover the complete Running lifetime.
+    """
 
     pod_uid: str
     resource: str
@@ -105,7 +146,7 @@ class PodResourceLifetime:
 
 @dataclass(frozen=True, slots=True)
 class ResourceHours:
-    """Additive observed and requested resource-time in the named unit."""
+    """Hold additive usage and requested time in a resource-specific unit."""
 
     unit: Literal["core-hours", "GiB-hours", "GPU-hours"]
     usage: Decimal
@@ -114,7 +155,12 @@ class ResourceHours:
 
 @dataclass(frozen=True, slots=True)
 class ActiveWorkloadLifetime:
-    """Complete totals and per-resource incompleteness for active Pods."""
+    """Aggregate complete resource-hours for the currently active workload.
+
+    A resource with incomplete coverage is listed in ``incomplete`` and omitted
+    from ``resources`` so callers cannot mistake a partial total for a complete
+    lifetime.
+    """
 
     resources: dict[str, ResourceHours]
     incomplete: dict[str, frozenset[LifetimeIssue]]
@@ -123,13 +169,13 @@ class ActiveWorkloadLifetime:
 
     @property
     def ready(self) -> bool:
-        """Whether every resource has complete lifetime coverage."""
+        """Return whether every represented resource has complete coverage."""
         return not self.incomplete
 
 
 @dataclass(slots=True)
 class AccountingSnapshot:
-    """Validated active-workload accounting payload stored as one cache unit."""
+    """Store validated accounting and its source observation time atomically."""
 
     lifetime: ActiveWorkloadLifetime
     created: datetime
@@ -137,7 +183,7 @@ class AccountingSnapshot:
 
 @dataclass(slots=True)
 class CachedSnapshot:
-    """Versioned cache payload for a supported observation."""
+    """Store one provider observation with the time used for freshness."""
 
     observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
@@ -145,7 +191,7 @@ class CachedSnapshot:
 
 @dataclass(slots=True)
 class MetricsResult:
-    """Outcome of a Metrics get, including cache provenance for HTTP headers."""
+    """Return an observation with cache provenance needed by HTTP adapters."""
 
     observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
@@ -160,7 +206,11 @@ class MetricsResult:
         Literal["True", "False"],
         Literal["Available", "PartialData", "AccountingIncomplete", "StaleData"],
     ]:
-        """Return the public Ready status and reason."""
+        """Derive the public Ready condition from freshness and accounting.
+
+        Returns:
+            Kubernetes-style condition status and a bounded reason.
+        """
         if self.stale:
             return "False", "StaleData"
         if isinstance(self.observation, (UserObservation, CommunityObservation)):
@@ -177,7 +227,11 @@ class MetricsResult:
         Literal["True", "False", "Unknown"],
         Literal["FreshHit", "StaleHit", "Refreshed", "RedisUnavailable"],
     ]:
-        """Return the public Cached status and reason."""
+        """Derive the public Cached condition from coordinator provenance.
+
+        Returns:
+            Kubernetes-style condition status and a bounded cache reason.
+        """
         if not self.cache_available:
             return "Unknown", "RedisUnavailable"
         if self.stale:

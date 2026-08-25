@@ -2,6 +2,7 @@
 
 from metrics.services.metrics import MetricsService
 from metrics.services.models import (
+    DEFAULT_PLATFORM_NAME,
     PLATFORM_SUBJECT,
     CachedSnapshot,
     CommunityObservation,
@@ -9,9 +10,11 @@ from metrics.services.models import (
     MetricsSubject,
     PlatformObservation,
     UserObservation,
+    platform_subject,
 )
 
 __all__ = [
+    "DEFAULT_PLATFORM_NAME",
     "PLATFORM_SUBJECT",
     "CachedSnapshot",
     "CommunityObservation",
@@ -20,4 +23,5 @@ __all__ = [
     "MetricsSubject",
     "PlatformObservation",
     "UserObservation",
+    "platform_subject",
 ]

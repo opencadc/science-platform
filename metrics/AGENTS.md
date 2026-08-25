@@ -19,6 +19,11 @@ From `metrics/`:
 After substantive CI or script changes, run `pre-commit run --all-files` at the
 science-platform repository root.
 
+## Python
+
+The pre-commit `metrics-ruff-check` hook enforces Google-style pydocstyle
+rules (Ruff `D`) on `src`.
+
 ## Agent skills
 
 ### Issue tracker

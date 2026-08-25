@@ -31,10 +31,14 @@ Runtime behavior is driven by `METRICS_*` environment variables and (when
 present) Kubernetes secret file sources; environment values override defaults
 (ADR-0001). Configuration is environment-only — no file-based config source.
 
-**Settings model:** The root model exposes `providers`, `sources`, and `cache`
+**Settings model:** The root model exposes `providers`, `sources`, `cache`, and
+top-level identity fields such as `cluster_name` and `platform_name`
 (not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with
 `METRICS_` + the nested name using `__` as the delimiter, for example:
 
+- `METRICS_PLATFORM_NAME` → public platform path segment for
+  `GET /apis/canfar.net/v1alpha1/metrics/platform/{name}` (default `canfar`).
+  Helm charts set this from `platformName` / `metricsBackend.platformName`.
 - `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` → must be a **JSON array of
   strings** (for example `'["cq-proton","cq-neutron"]'`), not a comma-separated
   plain string

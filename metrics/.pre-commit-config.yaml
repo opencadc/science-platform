@@ -2,6 +2,9 @@
 # metrics/ changes. Manual stages are invoked by CI / metrics-dev, not on every
 # commit.
 #
+# Google-style docstrings on metrics/src are enforced by metrics-ruff-check
+# (Ruff pydocstyle rule set "D", convention = "google" in pyproject.toml).
+#
 #   pre-commit run --config metrics/.pre-commit-config.yaml --all-files
 #   pre-commit run --config metrics/.pre-commit-config.yaml --hook-stage manual --all-files
 ---

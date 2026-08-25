@@ -1,4 +1,8 @@
-"""Cache identities, freshness policies, and strict snapshot envelopes."""
+"""Define cache identity, freshness, integrity, and result contracts.
+
+Shared models keep Redis keys opaque, snapshots versioned and signed, and
+freshness decisions consistent across in-memory and distributed coordinators.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ Value = TypeVar("Value")
 
 
 class Freshness(StrEnum):
-    """Serviceability state derived from the snapshot collection time."""
+    """Classify whether a snapshot may be returned or should be discarded."""
 
     FRESH = "fresh"
     STALE = "stale"
@@ -26,14 +30,22 @@ class Freshness(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class FreshnessPolicy:
-    """Fresh, stale-serviceable, and retention boundaries in seconds."""
+    """Set ordered fresh, stale-serviceable, and retention age boundaries."""
 
     fresh_seconds: int
     stale_seconds: int
     retention_seconds: int
 
     def classify(self, created: datetime, *, now: datetime | None = None) -> Freshness:
-        """Classify a snapshot from its collection time."""
+        """Classify a snapshot by elapsed time since source collection.
+
+        Args:
+            created: Snapshot collection time; naive values are interpreted as UTC.
+            now: Optional clock override.
+
+        Returns:
+            The serviceability state for the snapshot's age.
+        """
         clock = now or datetime.now(UTC)
         observed = (
             created.replace(tzinfo=UTC) if created.tzinfo is None else created.astimezone(UTC)
@@ -57,7 +69,7 @@ FRESHNESS_POLICIES = {
 
 @dataclass(frozen=True, slots=True)
 class CacheIdentity:
-    """Stable dimensions for one source snapshot stream."""
+    """Identify one source snapshot stream without exposing it in Redis keys."""
 
     subject_kind: Literal["platform", "user", "community"]
     subject_value: str
@@ -66,7 +78,7 @@ class CacheIdentity:
     fingerprint: str = ""
 
     def canonical(self) -> bytes:
-        """Return an unambiguous canonical representation for keyed hashing."""
+        """Serialize all identity dimensions deterministically for keyed hashing."""
         return json.dumps(
             {
                 "cluster": self.cluster,
@@ -83,21 +95,35 @@ class CacheIdentity:
 
 @dataclass(frozen=True, slots=True)
 class CacheKeys:
-    """Redis keys for one opaque cache identity."""
+    """Derive pointer, immutable snapshot, and lease keys from one opaque base."""
 
     base: str
 
     @property
     def latest(self) -> str:
-        """Latest immutable snapshot pointer."""
+        """Return the key holding the latest immutable snapshot ID."""
         return f"{self.base}:latest"
 
     def snapshot(self, snapshot_id: str) -> str:
-        """Key for an immutable snapshot."""
+        """Build the key for an immutable snapshot value.
+
+        Args:
+            snapshot_id: Unique ID assigned when the snapshot is published.
+
+        Returns:
+            Redis snapshot key.
+        """
         return f"{self.base}:snapshot:{snapshot_id}"
 
     def lease(self, bucket: int) -> str:
-        """Key for a refresh-bucket lease."""
+        """Build the key coordinating one refresh time bucket.
+
+        Args:
+            bucket: Integer freshness bucket shared by replicas.
+
+        Returns:
+            Redis lease key.
+        """
         return f"{self.base}:lease:{bucket}"
 
 
@@ -110,14 +136,26 @@ def cache_keys(
     source_revision: str,
     query_revision: str,
 ) -> CacheKeys:
-    """Build an opaque key path; raw subject values never enter Redis keys."""
+    """Build revisioned opaque keys without exposing raw subject values.
+
+    Args:
+        prefix: Operator-configured Redis key namespace.
+        identity: Complete source stream identity.
+        secret: HMAC key used to obscure identity dimensions.
+        schema_revision: Cached value schema revision.
+        source_revision: Provider data contract revision.
+        query_revision: Source query revision.
+
+    Returns:
+        Key derivation object rooted at the revisioned identity digest.
+    """
     digest = hmac.new(secret, identity.canonical(), hashlib.sha256).hexdigest()
     revisions = f"{schema_revision}:{source_revision}:{query_revision}"
     return CacheKeys(f"{prefix}{revisions}:{identity.subject_kind}:{digest}")
 
 
 class SnapshotEnvelope(BaseModel):
-    """Strict, signed JSON envelope stored as an immutable Redis value."""
+    """Store a strict versioned payload with HMAC integrity protection."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -131,7 +169,7 @@ class SnapshotEnvelope(BaseModel):
     integrity: str
 
     def signed_bytes(self) -> bytes:
-        """Return canonical bytes covered by the integrity HMAC."""
+        """Serialize the envelope fields covered by the integrity HMAC."""
         body = self.model_dump(mode="json", exclude={"integrity"})
         return json.dumps(
             body,
@@ -141,14 +179,21 @@ class SnapshotEnvelope(BaseModel):
         ).encode()
 
     def verify(self, secret: bytes) -> bool:
-        """Verify envelope integrity without timing-dependent comparison."""
+        """Verify envelope integrity with a constant-time digest comparison.
+
+        Args:
+            secret: HMAC key used when the envelope was published.
+
+        Returns:
+            Whether the stored digest matches the canonical envelope.
+        """
         expected = hmac.new(secret, self.signed_bytes(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.integrity, expected)
 
 
 @dataclass(frozen=True, slots=True)
 class CacheResult(Generic[Value]):
-    """One cache-coordinated result returned to the service."""
+    """Return a value plus the cache provenance needed by the service."""
 
     value: Value
     cached: bool
@@ -156,4 +201,4 @@ class CacheResult(Generic[Value]):
 
 
 class CacheUnavailable(RuntimeError):
-    """Raised when no serviceable snapshot can be returned safely."""
+    """Indicate that neither the shared cache nor a safe fallback can serve."""

@@ -1,4 +1,8 @@
-"""Public ``canfar.net/v1alpha1`` Metrics wire models."""
+"""Define the strict public ``canfar.net/v1alpha1`` Metrics wire contract.
+
+These models isolate serialized field names and response invariants from the
+transport-neutral service observations used internally.
+"""
 
 from __future__ import annotations
 
@@ -9,19 +13,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class WireModel(BaseModel):
-    """Strict public wire model."""
+    """Reject undeclared fields in every public Metrics response model."""
 
     model_config = ConfigDict(extra="forbid")
 
 
 class ObjectMetadata(WireModel):
-    """Truthful metadata for the standalone response."""
+    """Identify a standalone report with a deterministic presentation name."""
 
     name: str
 
 
 class MetricsSpec(WireModel):
-    """One compact Metrics subject selector."""
+    """Select exactly one platform, user, or community report subject."""
 
     platform: str | None = None
     user: str | None = None
@@ -29,13 +33,18 @@ class MetricsSpec(WireModel):
 
     @model_validator(mode="after")
     def _exactly_one_subject(self) -> MetricsSpec:
+        """Reject ambiguous or empty subject selectors."""
         if sum(value is not None for value in (self.platform, self.user, self.community)) != 1:
             raise ValueError("spec must contain exactly one subject")
         return self
 
 
 class ResourceMetrics(WireModel):
-    """Named Kubernetes resource observation."""
+    """Present current and optional lifetime values for one resource.
+
+    Platform reports populate capacity and allocation. User and community
+    reports populate requests and, when complete, additive lifetime fields.
+    """
 
     name: str
     capacity: str | None = None
@@ -47,7 +56,7 @@ class ResourceMetrics(WireModel):
 
 
 class Condition(WireModel):
-    """Kubernetes-style report condition."""
+    """Describe report readiness or cache provenance in Kubernetes style."""
 
     type: Literal["Ready", "Cached"]
     status: Literal["True", "False", "Unknown"]
@@ -65,7 +74,7 @@ class Condition(WireModel):
 
 
 class MetricsStatus(WireModel):
-    """Observed resources and exactly Ready/Cached conditions."""
+    """Report observation time, resources, and Ready/Cached conditions."""
 
     observed_at: datetime = Field(serialization_alias="observedAt")
     accounting_period: Literal["ActiveWorkloadLifetime"] | None = Field(
@@ -78,7 +87,7 @@ class MetricsStatus(WireModel):
 
 
 class Metrics(WireModel):
-    """One Kubernetes-style metrics report."""
+    """Wrap one subject report in the versioned Kubernetes-style envelope."""
 
     api_version: Literal["canfar.net/v1alpha1"] = Field(
         default="canfar.net/v1alpha1", serialization_alias="apiVersion"

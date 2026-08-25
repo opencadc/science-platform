@@ -1,4 +1,8 @@
-"""Redis snapshot storage, pointer publication, and token-owned leases."""
+"""Persist signed immutable snapshots and token-owned leases in Redis.
+
+All commands have finite deadlines. Invalid, incompatible, or tampered payloads
+are treated as misses so they never cross the cache trust boundary.
+"""
 
 from __future__ import annotations
 
@@ -36,12 +40,12 @@ return 0
 
 
 class RedisUnavailable(RuntimeError):
-    """Raised when a bounded Redis command cannot complete."""
+    """Indicate that a bounded Redis command failed or timed out."""
 
 
 @dataclass(frozen=True, slots=True)
 class StoredSnapshot(Generic[Value]):
-    """Decoded immutable snapshot and its pointer ID."""
+    """Hold a verified decoded snapshot, its pointer ID, and collection time."""
 
     snapshot_id: str
     value: Value
@@ -49,7 +53,7 @@ class StoredSnapshot(Generic[Value]):
 
 
 class RedisSnapshots(Generic[Value]):
-    """Strict JSON snapshot repository over one Redis client."""
+    """Store typed, signed snapshots behind an atomically advanced pointer."""
 
     def __init__(
         self,
@@ -64,7 +68,19 @@ class RedisSnapshots(Generic[Value]):
         query_revision: str,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Configure revisions, integrity key, deadlines, and retention."""
+        """Configure revisions, integrity key, deadlines, and retention.
+
+        Args:
+            redis: Async Redis-compatible client.
+            value_type: Runtime type used to validate decoded snapshot values.
+            secret: HMAC key protecting envelope integrity.
+            command_timeout: Maximum duration of each Redis command.
+            retention_seconds: Expiry applied to snapshots and pointers.
+            schema_revision: Cached value schema revision.
+            source_revision: Provider data contract revision.
+            query_revision: Source query revision.
+            telemetry: Optional bounded Redis telemetry recorder.
+        """
         self._redis = redis
         self._adapter = TypeAdapter(value_type)
         self._secret = secret
@@ -76,6 +92,18 @@ class RedisSnapshots(Generic[Value]):
         self._telemetry = telemetry or NoopMetricsRecorder()
 
     async def _command(self, operation: str, awaitable: Any) -> Any:
+        """Run one Redis awaitable with a deadline and bounded telemetry.
+
+        Args:
+            operation: Bounded operation label for telemetry.
+            awaitable: Redis operation to await.
+
+        Returns:
+            Result returned by the Redis client.
+
+        Raises:
+            RedisUnavailable: If Redis fails or the command times out.
+        """
         started = perf_counter()
         outcome = "ok"
         try:
@@ -93,6 +121,18 @@ class RedisSnapshots(Generic[Value]):
 
     @staticmethod
     def _text(raw: Any) -> str:
+        """Decode a Redis response as strict UTF-8 text.
+
+        Args:
+            raw: Bytes or string returned by Redis.
+
+        Returns:
+            Decoded text.
+
+        Raises:
+            ValueError: If the response is not text-like.
+            UnicodeDecodeError: If bytes are not valid UTF-8.
+        """
         if isinstance(raw, bytes):
             return raw.decode("utf-8", errors="strict")
         if isinstance(raw, str):
@@ -105,7 +145,7 @@ class RedisSnapshots(Generic[Value]):
             raise RedisUnavailable("Redis ping failed")
 
     async def pointer(self, keys: CacheKeys) -> str | None:
-        """Read the latest immutable snapshot ID."""
+        """Read the latest immutable snapshot ID, treating invalid text as a miss."""
         raw = await self._command("get", self._redis.get(keys.latest))
         if raw is None:
             return None
@@ -115,7 +155,14 @@ class RedisSnapshots(Generic[Value]):
             return None
 
     async def read(self, keys: CacheKeys) -> StoredSnapshot[Value] | None:
-        """Read and verify the snapshot named by the latest pointer."""
+        """Read, authenticate, revision-check, and decode the latest snapshot.
+
+        Args:
+            keys: Derived Redis keys for one cache identity.
+
+        Returns:
+            A verified typed snapshot, or ``None`` for any unusable payload.
+        """
         snapshot_id = await self.pointer(keys)
         if snapshot_id is None:
             return None
@@ -145,7 +192,14 @@ class RedisSnapshots(Generic[Value]):
         created: datetime,
         value: Value,
     ) -> None:
-        """Atomically persist an immutable snapshot and advance its pointer."""
+        """Persist a signed immutable snapshot and atomically advance its pointer.
+
+        Args:
+            keys: Derived Redis keys for one cache identity.
+            snapshot_id: Unique immutable snapshot ID.
+            created: Source collection time.
+            value: Typed value to encode inside the envelope.
+        """
         envelope = SnapshotEnvelope(
             format="metrics-cache-v1",
             schema_revision=self.schema_revision,
@@ -183,7 +237,17 @@ class RedisSnapshots(Generic[Value]):
         token: str,
         lease_seconds: float,
     ) -> bool:
-        """Acquire one refresh-bucket lease with a unique owner token."""
+        """Acquire one refresh-bucket lease with a unique owner token.
+
+        Args:
+            keys: Derived Redis keys for one cache identity.
+            bucket: Shared freshness time bucket.
+            token: Unique owner token.
+            lease_seconds: Positive lease lifetime.
+
+        Returns:
+            Whether this caller acquired the lease.
+        """
         result = await self._command(
             "lease_acquire",
             self._redis.set(
@@ -196,7 +260,13 @@ class RedisSnapshots(Generic[Value]):
         return bool(result)
 
     async def release_lease(self, *, keys: CacheKeys, bucket: int, token: str) -> None:
-        """Delete a lease only when ``token`` still owns it."""
+        """Delete a lease only when the caller's token still owns it.
+
+        Args:
+            keys: Derived Redis keys for one cache identity.
+            bucket: Shared freshness time bucket.
+            token: Unique owner token used during acquisition.
+        """
         await self._command(
             "lease_release",
             self._redis.eval(_RELEASE, 1, keys.lease(bucket), token),
