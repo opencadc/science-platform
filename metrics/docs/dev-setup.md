@@ -55,6 +55,18 @@ over a local HTTP socket. It checks cold fill, fresh hit, `If-Modified-Since`
 stable fail-closed `Status` response with no snapshot, legacy-route absence,
 and a graceful SIGTERM restart with shutdown-log evidence.
 
+Use the optional accounting profile when changing the lifetime source:
+
+```bash
+UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev up --profile accounting
+```
+
+It adds pinned kube-state-metrics and Prometheus workloads plus the
+Metrics-owned recording rules and deterministic producer fixture in
+`scripts/accounting-profile.yaml`. The default `core` profile remains
+unchanged. Mimir is not part of this local gate; the same provider contract can
+target Mimir by setting its server-owned base URL and optional tenant ID.
+
 The compatibility script delegates to the installed command:
 
 ```bash

@@ -107,6 +107,14 @@ class ActiveWorkloadLifetime:
 
 
 @dataclass(slots=True)
+class AccountingSnapshot:
+    """Validated active-workload accounting payload stored as one cache unit."""
+
+    lifetime: ActiveWorkloadLifetime
+    created: datetime
+
+
+@dataclass(slots=True)
 class CachedSnapshot:
     """Versioned cache payload for a supported observation."""
 

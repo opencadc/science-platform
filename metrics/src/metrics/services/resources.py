@@ -123,3 +123,34 @@ def integrate_active_workload(
         resources=resources,
         incomplete={resource: frozenset(issues) for resource, issues in sorted(incomplete.items())},
     )
+
+
+def aggregate_active_workload_hours(
+    samples: Iterable[tuple[str, Decimal, Decimal, frozenset[LifetimeIssue]]],
+) -> ActiveWorkloadLifetime:
+    """Aggregate validated producer totals, omitting any incomplete resource."""
+    totals: dict[str, tuple[Decimal, Decimal]] = {}
+    incomplete: dict[str, set[LifetimeIssue]] = {}
+    for resource, usage, requested, issues in samples:
+        if resource not in _RESOURCE_UNITS:
+            raise ValueError(f"unsupported resource unit: {resource}")
+        if any(not value.is_finite() or value < 0 for value in (usage, requested)):
+            raise ValueError("resource hours must be finite and non-negative")
+        if issues:
+            incomplete.setdefault(resource, set()).update(issues)
+            continue
+        old_usage, old_requested = totals.get(resource, (Decimal(0), Decimal(0)))
+        totals[resource] = (old_usage + usage, old_requested + requested)
+
+    return ActiveWorkloadLifetime(
+        resources={
+            resource: ResourceHours(
+                unit=_RESOURCE_UNITS[resource],
+                usage=usage,
+                requested=requested,
+            )
+            for resource, (usage, requested) in sorted(totals.items())
+            if resource not in incomplete
+        },
+        incomplete={resource: frozenset(issues) for resource, issues in sorted(incomplete.items())},
+    )

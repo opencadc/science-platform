@@ -1,0 +1,270 @@
+# Optional local accounting dependencies and deterministic producer fixture.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metrics
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-kube-state-metrics
+  namespace: metrics
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-kube-state-metrics
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: metrics-kube-state-metrics
+    namespace: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-kube-state-metrics
+  namespace: metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-kube-state-metrics
+  template:
+    metadata:
+      labels:
+        app: metrics-kube-state-metrics
+    spec:
+      serviceAccountName: metrics-kube-state-metrics
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kube-state-metrics
+          image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.16.0
+          args:
+            - --resources=pods
+            - --metric-labels-allowlist=pods=[canfar.net/username,canfar.net/community]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-kube-state-metrics
+  namespace: metrics
+spec:
+  selector:
+    app: metrics-kube-state-metrics
+  ports:
+    - name: http
+      port: 8080
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metrics-accounting-producer
+  namespace: metrics
+data:
+  producer.py: |
+    import os
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    labels = (
+        f'cluster="kind-metrics",namespace="metrics",pod_uid="{os.environ["POD_UID"]}",'
+        'resource="cpu",canfar_username="ada",canfar_community="science",'
+        'source_revision="1"'
+    )
+    payload = (
+        f'metrics_fixture_active_workload_usage_hours{{{labels},unit="core-hours"}} 1.5\n'
+        f'metrics_fixture_active_workload_requested_hours{{{labels},unit="core-hours"}} 4\n'
+        f'metrics_fixture_active_workload_accounting_complete'
+        f'{{{labels},unit="boolean",reason="complete"}} 1\n'
+    ).encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *_):
+            pass
+
+    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-accounting-producer
+  namespace: metrics
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: metrics-accounting-producer
+  template:
+    metadata:
+      labels:
+        app: metrics-accounting-producer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: producer
+          image: python:3.13.5-alpine3.22
+          command:
+            - python
+            - /fixture/producer.py
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: fixture
+              mountPath: /fixture
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: fixture
+          configMap:
+            name: metrics-accounting-producer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-accounting-producer
+  namespace: metrics
+spec:
+  selector:
+    app: metrics-accounting-producer
+  ports:
+    - name: http
+      port: 8080
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metrics-accounting-prometheus
+  namespace: metrics
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+    rule_files:
+      - /etc/prometheus/rules.yml
+    scrape_configs:
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: [metrics-kube-state-metrics.metrics.svc:8080]
+      - job_name: accounting-producer
+        static_configs:
+          - targets: [metrics-accounting-producer.metrics.svc:8080]
+  rules.yml: |
+    groups:
+      - name: canfar-accounting
+        interval: 5s
+        rules:
+          - record: canfar_active_workload_usage_hours_total
+            expr: max without (instance, job) (metrics_fixture_active_workload_usage_hours)
+          - record: canfar_active_workload_requested_hours_total
+            expr: max without (instance, job) (metrics_fixture_active_workload_requested_hours)
+          - record: canfar_active_workload_accounting_complete
+            expr: max without (instance, job) (metrics_fixture_active_workload_accounting_complete)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-accounting-prometheus
+  namespace: metrics
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: metrics-accounting-prometheus
+  template:
+    metadata:
+      labels:
+        app: metrics-accounting-prometheus
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: quay.io/prometheus/prometheus:v3.5.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: config
+          configMap:
+            name: metrics-accounting-prometheus
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-accounting-prometheus
+  namespace: metrics
+spec:
+  selector:
+    app: metrics-accounting-prometheus
+  ports:
+    - name: http
+      port: 9090
