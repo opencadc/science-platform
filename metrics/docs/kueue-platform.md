@@ -27,8 +27,8 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
   against the Kubernetes API and performs platform capacity/allocated
   aggregation. It owns a lazily built kr8s API handle (ADR-0001); endpoint,
   credentials, and CA trust are discovered by kr8s, not configured.
-- **`MetricsRuntime`** owns the active provider lifecycle, cache backend, and
-  platform service for `sources.platform`.
+- **`MetricsRuntime`** owns provider lifecycle, cache backends, and the shared
+  `MetricsService`.
 - **Startup vs request:** validation for required upstreams runs during
   `startup()` in lifespan; the `MetricsService` path serves cached
   results and maps request-time failures to HTTP/telemetry (without exposing raw
@@ -41,15 +41,15 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
 | `metrics.core.runtime` | `MetricsRuntime`: provider construction and lifecycle, cache backend, platform cache keys. |
 | `metrics.providers.kueue` | kr8s ClusterQueue reads, startup checks, quantity parsing/formatting (quantiphy, ADR-0001), platform aggregation, and fingerprinting. |
 | `metrics.core.factory` | FastAPI `create_app`, lifespan, telemetry hooks. |
-| `metrics.services.platform` | TTL cache, telemetry, and error mapping for `/platform`. |
+| `metrics.services.metrics` | Cache orchestration, telemetry, subject dispatch, and error mapping. |
 
 ## Request flow
 
 1. **Startup:** Lifespan builds `MetricsRuntime.from_settings`, then `await runtime.start()`.
 2. **HTTP GET** `/apis/canfar.net/v1alpha1/metrics/platform/canfar`: route depends on `MetricsRuntime`;
-   `runtime.platform_service.get_platform_metrics()` serves the read.
+   `runtime.metrics_service.get(PLATFORM_SUBJECT)` serves the read.
 3. **Miss:** Concurrent misses coalesce onto one in-flight load
-   (single-flight); the loader → `KueueProvider.platform()` fetches configured
+   (single-flight); the loader → `KueueProvider.read_platform()` fetches configured
    queues via kr8s with bounded concurrency, sums nominal quota and usage
    `total` fields, and formats strings.
 4. **Response:** `Metrics.status.resources` carries named `capacity` / `allocated` quantities;
@@ -63,4 +63,4 @@ and the client standard in [`adr/0001-runtime-architecture.md`](adr/0001-runtime
 
 Use `scripts/kind-smoke.sh` and `docs/dev-setup.md` for cluster-backed runs;
 unit tests inject `FakeKueueApi` (see `tests/fakes.py`) as in
-`tests/test_kueue_platform.py`.
+`tests/test_kueue.py`.

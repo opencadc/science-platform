@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from time import perf_counter
 
@@ -27,6 +27,17 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 logger = logging.getLogger(__name__)
 
 
+WorkloadObservation = UserObservation | CommunityObservation
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkloadBinding:
+    loader: Callable[[str], Awaitable[WorkloadObservation]]
+    cache: CacheCoordinator[CachedSnapshot]
+    identity: Callable[[str], CacheIdentity]
+    accounting: Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None = None
+
+
 class MetricsService:
     """Cache-first Metrics reads with subject dispatch and provider error mapping.
 
@@ -42,11 +53,15 @@ class MetricsService:
         user: Callable[[str], Awaitable[UserObservation]] | None = None,
         user_cache: CacheCoordinator[CachedSnapshot] | None = None,
         user_identity: Callable[[str], CacheIdentity] | None = None,
-        user_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
+        user_accounting: (
+            Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None
+        ) = None,
         community: Callable[[str], Awaitable[CommunityObservation]] | None = None,
         community_cache: CacheCoordinator[CachedSnapshot] | None = None,
         community_identity: Callable[[str], CacheIdentity] | None = None,
-        community_accounting: Callable[[str], Awaitable[CacheResult]] | None = None,
+        community_accounting: (
+            Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None
+        ) = None,
         telemetry: MetricsRecorder | None = None,
         provider: str = "unknown",
         user_provider: str = "kubernetes",
@@ -72,14 +87,15 @@ class MetricsService:
         self._platform = platform
         self._cache = cache
         self._identity = identity
-        self._user = user
-        self._user_cache = user_cache
-        self._user_identity = user_identity
-        self._user_accounting = user_accounting
-        self._community = community
-        self._community_cache = community_cache
-        self._community_identity = community_identity
-        self._community_accounting = community_accounting
+        self._workloads: dict[str, _WorkloadBinding] = {}
+        if user is not None and user_cache is not None and user_identity is not None:
+            self._workloads["user"] = _WorkloadBinding(
+                user, user_cache, user_identity, user_accounting
+            )
+        if community is not None and community_cache is not None and community_identity is not None:
+            self._workloads["community"] = _WorkloadBinding(
+                community, community_cache, community_identity, community_accounting
+            )
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
         self._user_provider = user_provider
@@ -92,12 +108,14 @@ class MetricsService:
     @property
     def user_cache_ttl_seconds(self) -> int:
         """Return the User report freshness window."""
-        return self._user_cache.policy.fresh_seconds if self._user_cache else 0
+        binding = self._workloads.get("user")
+        return binding.cache.policy.fresh_seconds if binding else 0
 
     @property
     def community_cache_ttl_seconds(self) -> int:
         """Return the Community report freshness window."""
-        return self._community_cache.policy.fresh_seconds if self._community_cache else 0
+        binding = self._workloads.get("community")
+        return binding.cache.policy.fresh_seconds if binding else 0
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
         """Return Metrics for ``subject``, using cache on hit and the source on miss.
@@ -121,20 +139,8 @@ class MetricsService:
         ):
             if subject == PLATFORM_SUBJECT:
                 return await self._get_platform()
-            if (
-                subject.kind == "user"
-                and self._user is not None
-                and self._user_cache is not None
-                and self._user_identity is not None
-            ):
-                return await self._get_user(subject.value)
-            if (
-                subject.kind == "community"
-                and self._community is not None
-                and self._community_cache is not None
-                and self._community_identity is not None
-            ):
-                return await self._get_community(subject.value)
+            if subject.kind in self._workloads:
+                return await self._get_workload(subject.kind, subject.value)
             raise AppError(
                 code="subject_unsupported",
                 message="Requested metrics subject is not supported",
@@ -189,75 +195,41 @@ class MetricsService:
                 scope=scope,
             )
 
-    async def _get_user(self, username: str) -> MetricsResult:
-        assert self._user_cache is not None
-        assert self._user_identity is not None
+    async def _get_workload(self, kind: str, subject: str) -> MetricsResult:
+        binding = self._workloads[kind]
         try:
-            result = await self._user_cache.get_or_fill(
-                self._user_identity(username),
-                lambda: self._load_user_snapshot(username),
+            result = await binding.cache.get_or_fill(
+                binding.identity(subject),
+                lambda: self._load_workload_snapshot(kind, subject, binding),
             )
         except CacheUnavailable as exc:
             raise AppError(
                 code="metrics_cache_unavailable",
-                message="User metrics are temporarily unavailable",
+                message=f"{kind.title()} metrics are temporarily unavailable",
                 status_code=503,
                 retry_after=1,
             ) from exc
         snapshot = result.value
-        self._record_cache_result("user", snapshot, result.cached, result.stale)
+        self._record_cache_result(kind, binding.cache, snapshot, result.cached, result.stale)
         observation = snapshot.observation
-        accounting_stale = isinstance(observation, UserObservation) and observation.accounting_stale
+        if not isinstance(observation, (UserObservation, CommunityObservation)):
+            raise TypeError("Workload cache returned a platform observation")
         return MetricsResult(
             observation=observation,
             created=snapshot.created,
             cached=result.cached,
-            stale=result.stale or accounting_stale,
-            cache_available=self._user_cache.available,
-        )
-
-    async def _get_community(self, community: str) -> MetricsResult:
-        assert self._community_cache is not None
-        assert self._community_identity is not None
-        try:
-            result = await self._community_cache.get_or_fill(
-                self._community_identity(community),
-                lambda: self._load_community_snapshot(community),
-            )
-        except CacheUnavailable as exc:
-            raise AppError(
-                code="metrics_cache_unavailable",
-                message="Community metrics are temporarily unavailable",
-                status_code=503,
-                retry_after=1,
-            ) from exc
-        snapshot = result.value
-        self._record_cache_result("community", snapshot, result.cached, result.stale)
-        observation = snapshot.observation
-        accounting_stale = (
-            isinstance(observation, CommunityObservation) and observation.accounting_stale
-        )
-        return MetricsResult(
-            observation=observation,
-            created=snapshot.created,
-            cached=result.cached,
-            stale=result.stale or accounting_stale,
-            cache_available=self._community_cache.available,
+            stale=result.stale or observation.accounting_stale,
+            cache_available=binding.cache.available,
         )
 
     def _record_cache_result(
         self,
         scope: str,
+        cache: CacheCoordinator[CachedSnapshot],
         snapshot: CachedSnapshot,
         cached: bool,
         stale: bool,
     ) -> None:
-        cache = {
-            "platform": self._cache,
-            "user": self._user_cache,
-            "community": self._community_cache,
-        }[scope]
-        assert cache is not None
         cache_result = "stale" if stale else ("hit" if cached else "miss")
         self._metrics_recorder.record_cache_lookup(
             backend=cache.backend_name,
@@ -266,66 +238,31 @@ class MetricsService:
             age_seconds=(datetime.now(UTC) - snapshot.created).total_seconds(),
         )
 
-    async def _load_user_snapshot(self, username: str) -> CachedSnapshot:
+    async def _load_workload_snapshot(
+        self,
+        kind: str,
+        subject: str,
+        binding: _WorkloadBinding,
+    ) -> CachedSnapshot:
         started = perf_counter()
         status = "ok"
         try:
-            observation = await self._timed_user_load(username)
-            created = datetime.now(UTC)
-            if self._user_accounting is not None:
+            observation = await self._timed_workload_load(kind, subject, binding.loader)
+            if binding.accounting is not None:
                 try:
-                    result = await self._user_accounting(username)
-                    accounting = result.value
-                    if not isinstance(accounting, AccountingSnapshot):
-                        raise TypeError("Accounting source returned an invalid snapshot")
-                    if accounting.lifetime.pod_uids != observation.pod_uids:
-                        observation = replace(
-                            observation,
-                            accounting_state=AccountingState.INCOMPLETE,
-                            accounting_stale=result.stale,
-                        )
-                    else:
-                        uncovered = {
-                            resource
-                            for resource in accounting.lifetime.resources
-                            if accounting.lifetime.coverage.get(resource, frozenset())
-                            != observation.pod_uids
-                        }
-                        lifetime = replace(
-                            accounting.lifetime,
-                            resources={
-                                resource: hours
-                                for resource, hours in accounting.lifetime.resources.items()
-                                if resource not in uncovered
-                            },
-                            incomplete=accounting.lifetime.incomplete
-                            | {
-                                resource: frozenset({LifetimeIssue.MISSING_SERIES})
-                                for resource in uncovered
-                            },
-                        )
-                        observation = replace(
-                            observation,
-                            accounting=lifetime,
-                            accounting_state=(
-                                AccountingState.COMPLETE
-                                if lifetime.ready
-                                else AccountingState.INCOMPLETE
-                            ),
-                            accounting_stale=result.stale,
-                        )
-                    created = min(created, accounting.created)
+                    result = await binding.accounting(subject, observation.observed_at)
+                    observation = self._merge_accounting(observation, result)
                 except (
                     CacheUnavailable,
                     ProviderExecutionError,
                     ProviderUnavailableError,
                 ):
-                    logger.warning("User lifetime accounting unavailable")
+                    logger.warning("%s lifetime accounting unavailable", kind.title())
                     observation = replace(
                         observation,
                         accounting_state=AccountingState.UNAVAILABLE,
                     )
-            return CachedSnapshot(observation=observation, created=created)
+            return CachedSnapshot(observation=observation, created=observation.observed_at)
         except AppError as exc:
             status = exc.code
             raise
@@ -336,138 +273,78 @@ class MetricsService:
             self._metrics_recorder.record_compute_duration(
                 seconds=perf_counter() - started,
                 status=status,
-                scope="user",
+                scope=kind,
             )
 
-    async def _load_community_snapshot(self, community: str) -> CachedSnapshot:
-        started = perf_counter()
-        status = "ok"
-        try:
-            observation = await self._timed_community_load(community)
-            created = datetime.now(UTC)
-            if self._community_accounting is not None:
-                try:
-                    result = await self._community_accounting(community)
-                    accounting = result.value
-                    if not isinstance(accounting, AccountingSnapshot):
-                        raise TypeError("Accounting source returned an invalid snapshot")
-                    if accounting.lifetime.pod_uids != observation.pod_uids:
-                        observation = replace(
-                            observation,
-                            accounting_state=AccountingState.INCOMPLETE,
-                            accounting_stale=result.stale,
-                        )
-                    else:
-                        uncovered = {
-                            resource
-                            for resource in accounting.lifetime.resources
-                            if accounting.lifetime.coverage.get(resource, frozenset())
-                            != observation.pod_uids
-                        }
-                        lifetime = replace(
-                            accounting.lifetime,
-                            resources={
-                                resource: hours
-                                for resource, hours in accounting.lifetime.resources.items()
-                                if resource not in uncovered
-                            },
-                            incomplete=accounting.lifetime.incomplete
-                            | {
-                                resource: frozenset({LifetimeIssue.MISSING_SERIES})
-                                for resource in uncovered
-                            },
-                        )
-                        observation = replace(
-                            observation,
-                            accounting=lifetime,
-                            accounting_state=(
-                                AccountingState.COMPLETE
-                                if lifetime.ready
-                                else AccountingState.INCOMPLETE
-                            ),
-                            accounting_stale=result.stale,
-                        )
-                    created = min(created, accounting.created)
-                except (
-                    CacheUnavailable,
-                    ProviderExecutionError,
-                    ProviderUnavailableError,
-                ):
-                    logger.warning("Community lifetime accounting unavailable")
-                    observation = replace(
-                        observation,
-                        accounting_state=AccountingState.UNAVAILABLE,
-                    )
-            return CachedSnapshot(observation=observation, created=created)
-        except AppError as exc:
-            status = exc.code
-            raise
-        except Exception:
-            status = "unexpected_error"
-            raise
-        finally:
-            self._metrics_recorder.record_compute_duration(
-                seconds=perf_counter() - started,
-                status=status,
-                scope="community",
+    @staticmethod
+    def _merge_accounting(
+        observation: WorkloadObservation,
+        result: CacheResult[AccountingSnapshot],
+    ) -> WorkloadObservation:
+        accounting = result.value
+        if (
+            accounting.lifetime.pod_uids != observation.pod_uids
+            or accounting.created != observation.observed_at
+        ):
+            return replace(
+                observation,
+                accounting_state=AccountingState.INCOMPLETE,
+                accounting_stale=result.stale,
             )
+        uncovered = {
+            resource
+            for resource in accounting.lifetime.resources
+            if accounting.lifetime.coverage.get(resource, frozenset()) != observation.pod_uids
+        }
+        lifetime = replace(
+            accounting.lifetime,
+            resources={
+                resource: hours
+                for resource, hours in accounting.lifetime.resources.items()
+                if resource not in uncovered
+            },
+            incomplete=accounting.lifetime.incomplete
+            | {resource: frozenset({LifetimeIssue.MISSING_SERIES}) for resource in uncovered},
+        )
+        return replace(
+            observation,
+            accounting=lifetime,
+            accounting_state=(
+                AccountingState.COMPLETE if lifetime.ready else AccountingState.INCOMPLETE
+            ),
+            accounting_stale=result.stale,
+        )
 
-    async def _timed_user_load(self, username: str) -> UserObservation:
-        assert self._user is not None
+    async def _timed_workload_load(
+        self,
+        kind: str,
+        subject: str,
+        loader: Callable[[str], Awaitable[WorkloadObservation]],
+    ) -> WorkloadObservation:
         started = perf_counter()
         status = "ok"
         try:
             with self._metrics_recorder.span(
                 "source.read",
                 {
-                    "metrics.scope": "user",
+                    "metrics.scope": kind,
                     "provider.name": self._user_provider,
                     "source.operation": "read",
                 },
             ):
-                return await self._user(username)
+                return await loader(subject)
         except (ProviderUnavailableError, ProviderExecutionError) as exc:
             status = "error"
-            logger.warning("User metrics collection failed")
+            logger.warning("%s metrics collection failed", kind.title())
             raise AppError(
-                code="user_metrics_unavailable",
-                message="Could not load user metrics from Kubernetes",
+                code=f"{kind}_metrics_unavailable",
+                message=f"Could not load {kind} metrics from Kubernetes",
                 status_code=503,
             ) from exc
         finally:
             self._metrics_recorder.record_provider_duration(
                 provider=self._user_provider,
-                scope="user",
-                status=status,
-                seconds=perf_counter() - started,
-            )
-
-    async def _timed_community_load(self, community: str) -> CommunityObservation:
-        assert self._community is not None
-        started = perf_counter()
-        status = "ok"
-        try:
-            with self._metrics_recorder.span(
-                "source.read",
-                {
-                    "metrics.scope": "community",
-                    "provider.name": self._user_provider,
-                    "source.operation": "read",
-                },
-            ):
-                return await self._community(community)
-        except (ProviderUnavailableError, ProviderExecutionError) as exc:
-            status = "error"
-            logger.warning("Community metrics collection failed")
-            raise AppError(
-                code="community_metrics_unavailable",
-                message="Could not load community metrics from Kubernetes",
-                status_code=503,
-            ) from exc
-        finally:
-            self._metrics_recorder.record_provider_duration(
-                provider=self._user_provider,
-                scope="community",
+                scope=kind,
                 status=status,
                 seconds=perf_counter() - started,
             )

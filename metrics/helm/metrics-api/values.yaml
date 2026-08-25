@@ -53,6 +53,34 @@ rbac:
 # serviceAccount.name) so the ClusterRoleBinding does not attach read access to
 # the namespace default ServiceAccount by accident.
 
+# Isolate the API Pod by default. Each egress group accepts complete Kubernetes
+# NetworkPolicy egress rules so deployed environments can use CIDRs, namespace
+# selectors, and Pod selectors appropriate to their CNI and service topology.
+networkPolicy:
+  enabled: true
+  ingress:
+    - ports:
+        - port: 8000
+          protocol: TCP
+  egress:
+    dns:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - port: 53
+            protocol: UDP
+          - port: 53
+            protocol: TCP
+    # Required in deployed environments: allow the Kubernetes service CIDR on 443.
+    kubeApiServer: []
+    # The embedded Redis selector is added automatically when redis.enabled.
+    redis: []
+    # Configure deployed OTLP and PromQL destinations explicitly.
+    otlp: []
+    promql: []
+
 redis:
   # Embedded Redis is local-only. Production supplies urlSecret.
   enabled: false

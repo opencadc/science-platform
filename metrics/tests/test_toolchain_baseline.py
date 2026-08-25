@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -106,3 +107,18 @@ def test_metrics_dev_console_script_resolves() -> None:
     assert result.returncode == 0
     for name in _COMMANDS:
         assert name in result.stdout
+
+
+def test_chart_renders_default_network_policy() -> None:
+    helm = shutil.which("helm")
+    if helm is None:
+        pytest.skip("helm is not installed")
+    rendered = subprocess.run(
+        [helm, "template", "test", "helm/metrics-api"],
+        cwd=METRICS_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert "kind: NetworkPolicy" in rendered
+    assert "kubernetes.io/metadata.name: kube-system" in rendered

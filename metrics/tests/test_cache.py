@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
-from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, Freshness, cache_keys
+import pytest
+
+from metrics.cache import (
+    FRESHNESS_POLICIES,
+    CacheIdentity,
+    Freshness,
+    FreshnessPolicy,
+    RedisCoordinator,
+    cache_keys,
+)
 
 
 def test_subject_keys_redact_values_and_rotate_with_secret() -> None:
@@ -82,3 +92,43 @@ def test_all_subject_freshness_windows_match_policy() -> None:
             policy.classify(now - timedelta(seconds=policy.retention_seconds + 1), now=now)
             is Freshness.PURGED
         )
+
+
+@pytest.mark.anyio
+async def test_redis_coordinator_shutdown_cancels_cold_fill() -> None:
+    class Store:
+        schema_revision = source_revision = query_revision = "1"
+
+        async def read(self, _keys):
+            return None
+
+        async def pointer(self, _keys):
+            return None
+
+        async def acquire_lease(self, **_kwargs):
+            return True
+
+        async def release_lease(self, **_kwargs):
+            return None
+
+    started = asyncio.Event()
+
+    async def fill():
+        started.set()
+        await asyncio.Future()
+
+    coordinator = RedisCoordinator(
+        store=Store(),
+        key_prefix="test:",
+        key_secret=b"x" * 32,
+        policy=FreshnessPolicy(60, 120, 180),
+        created=lambda value: value.created,
+    )
+    request = asyncio.create_task(
+        coordinator.get_or_fill(CacheIdentity("platform", "canfar", "c", "test"), fill)
+    )
+    await started.wait()
+    await coordinator.shutdown()
+
+    with pytest.raises(asyncio.CancelledError):
+        await request

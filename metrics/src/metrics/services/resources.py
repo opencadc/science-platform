@@ -16,7 +16,7 @@ from metrics.services.models import (
 )
 
 _HOUR_SECONDS = Decimal(3600)
-_RESOURCE_UNITS: dict[str, Literal["core-hours", "GiB-hours", "GPU-hours"]] = {
+RESOURCE_UNITS: dict[str, Literal["core-hours", "GiB-hours", "GPU-hours"]] = {
     "cpu": "core-hours",
     "memory": "GiB-hours",
     "nvidia.com/gpu": "GPU-hours",
@@ -92,7 +92,7 @@ def integrate_active_workload(
     observed_at: datetime | None = None
 
     for series in lifetimes:
-        if series.resource not in _RESOURCE_UNITS:
+        if series.resource not in RESOURCE_UNITS:
             raise ValueError(f"unsupported resource unit: {series.resource}")
         identity = (series.pod_uid, series.resource)
         if identity in identities:
@@ -112,7 +112,7 @@ def integrate_active_workload(
 
     resources = {
         resource: ResourceHours(
-            unit=_RESOURCE_UNITS[resource],
+            unit=RESOURCE_UNITS[resource],
             usage=usage,
             requested=requested,
         )
@@ -143,7 +143,7 @@ def aggregate_active_workload_hours(
             raise ValueError("Pod UID is required")
         pod_uids.add(pod_uid)
         coverage.setdefault(resource, set()).add(pod_uid)
-        if resource not in _RESOURCE_UNITS:
+        if resource not in RESOURCE_UNITS:
             raise ValueError(f"unsupported resource unit: {resource}")
         if any(not value.is_finite() or value < 0 for value in (usage, requested)):
             raise ValueError("resource hours must be finite and non-negative")
@@ -156,7 +156,7 @@ def aggregate_active_workload_hours(
     return ActiveWorkloadLifetime(
         resources={
             resource: ResourceHours(
-                unit=_RESOURCE_UNITS[resource],
+                unit=RESOURCE_UNITS[resource],
                 usage=usage,
                 requested=requested,
             )

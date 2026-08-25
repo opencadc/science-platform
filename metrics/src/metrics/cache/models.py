@@ -8,9 +8,11 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+Value = TypeVar("Value")
 
 
 class Freshness(StrEnum):
@@ -145,10 +147,10 @@ class SnapshotEnvelope(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
-class CacheResult:
+class CacheResult(Generic[Value]):
     """One cache-coordinated result returned to the service."""
 
-    value: Any
+    value: Value
     cached: bool
     stale: bool
 

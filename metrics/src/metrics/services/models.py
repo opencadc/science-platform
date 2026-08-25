@@ -48,6 +48,7 @@ class UserObservation:
     user: str
     running_pods: int
     requests: dict[str, str]
+    observed_at: datetime
     pod_uids: frozenset[str] = frozenset()
     accounting: ActiveWorkloadLifetime | None = None
     accounting_state: AccountingState = AccountingState.DISABLED
@@ -61,6 +62,7 @@ class CommunityObservation:
     community: str
     running_pods: int
     requests: dict[str, str]
+    observed_at: datetime
     pod_uids: frozenset[str] = frozenset()
     accounting: ActiveWorkloadLifetime | None = None
     accounting_state: AccountingState = AccountingState.DISABLED

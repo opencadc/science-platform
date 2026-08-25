@@ -81,4 +81,3 @@ This file stores repository-specific behavioral specifications.
 ## Decision linkage
 
 Canonical decisions: [`docs/adr/README.md`](adr/README.md).
-
