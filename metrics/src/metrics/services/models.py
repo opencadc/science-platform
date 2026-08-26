@@ -1,224 +1,300 @@
-"""Define transport-neutral subjects, observations, and cache payloads.
-
-Providers and services exchange these types without depending on FastAPI or
-public wire schemas, keeping collection and cache logic reusable and testable.
-"""
+"""Define transport-neutral Metrics observations and cache payloads."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from decimal import Decimal
-from enum import StrEnum
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
+import re
 from typing import Literal
+
+
+MetricsSurface = Literal["platform", "user", "community"]
+
+DEFAULT_PLATFORM_NAME = "canfar"
+MAX_DECIMAL_INPUT_LENGTH = 4_096
+MAX_DECIMAL_DIGITS = 2_048
+MAX_DECIMAL_EXPONENT = 4_096
+MAX_DECIMAL_ADJUSTED = 1_000
+MAX_DECIMAL_PLAIN_LENGTH = 4_096
+_DECIMAL_TEXT = re.compile(r"^[+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
+_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
+
+
+def _normalise_observed_at(value: datetime) -> datetime:
+    """Require an aware timestamp and normalize it to UTC."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("observation timestamps must be timezone-aware")
+    return value.astimezone(UTC)
+
+
+def bounded_decimal(value: object) -> Decimal:
+    """Parse one finite, non-negative decimal within the wire-size policy.
+
+    Args:
+        value: Decimal-like value from a provider or efficiency adapter.
+
+    Returns:
+        A validated Decimal with zero normalized to ``Decimal(0)``.
+
+    Raises:
+        ValueError: If the value is not finite, non-negative, or bounded.
+    """
+    result = _coerce_decimal(value)
+    if not result.is_finite() or result < 0:
+        raise ValueError("decimal values must be finite and non-negative")
+    digits = result.as_tuple().digits
+    exponent = result.as_tuple().exponent
+    if not isinstance(exponent, int):
+        raise ValueError("decimal value exceeds the bounded metric policy")
+    if (
+        len(digits) > MAX_DECIMAL_DIGITS
+        or abs(exponent) > MAX_DECIMAL_EXPONENT
+        or not -MAX_DECIMAL_ADJUSTED <= result.adjusted() <= MAX_DECIMAL_ADJUSTED
+        or _decimal_plain_length(result, digits, exponent) > MAX_DECIMAL_PLAIN_LENGTH
+    ):
+        raise ValueError("decimal value exceeds the bounded metric policy")
+    return Decimal(0) if result.is_zero() else result
+
+
+def _coerce_decimal(value: object) -> Decimal:
+    """Convert supported internal numeric values without binary expansion."""
+    if isinstance(value, bool):
+        raise ValueError("decimal values must be finite and non-negative")
+    if isinstance(value, Decimal):
+        result = value
+    elif isinstance(value, str):
+        if len(value) > MAX_DECIMAL_INPUT_LENGTH or _DECIMAL_TEXT.fullmatch(value) is None:
+            raise ValueError("decimal value is invalid")
+        try:
+            result = Decimal(value)
+        except (InvalidOperation, ValueError) as exc:
+            raise ValueError("decimal value is invalid") from exc
+    elif isinstance(value, (int, float)):
+        try:
+            result = Decimal(str(value))
+        except (InvalidOperation, ValueError, OverflowError) as exc:
+            raise ValueError("decimal value is invalid") from exc
+    else:
+        raise ValueError("decimal value is invalid")
+    return result
+
+
+def _decimal_plain_length(result: Decimal, digits: tuple[int, ...], exponent: int) -> int:
+    """Calculate the bounded fixed-point output length for one Decimal."""
+    decimal_position = len(digits) + exponent
+    if exponent >= 0:
+        plain_length = len(digits) + exponent
+    elif decimal_position > 0:
+        plain_length = len(digits) + 1
+    else:
+        plain_length = 2 - decimal_position + len(digits)
+    return plain_length + int(bool(result.as_tuple().sign))
 
 
 @dataclass(frozen=True, slots=True)
 class MetricsSubject:
-    """Select the report requested from :class:`MetricsService`.
+    """Select one platform, user, or community report."""
 
-    Attributes:
-        kind: Supported report scope.
-        value: Exact platform, username, or community identifier.
-    """
-
-    kind: Literal["platform", "user", "community"]
+    kind: MetricsSurface
     value: str = ""
 
 
-DEFAULT_PLATFORM_NAME = "canfar"
+@dataclass(frozen=True, slots=True)
+class EfficiencyObservation:
+    """Represent an optional current efficiency result.
 
-
-def platform_subject(name: str = DEFAULT_PLATFORM_NAME) -> MetricsSubject:
-    """Build the platform subject for the configured public platform name.
-
-    Args:
-        name: Platform path segment and ``spec.platform`` value. Defaults to
-            :data:`DEFAULT_PLATFORM_NAME` (``canfar``).
-
-    Returns:
-        A platform :class:`MetricsSubject` for :meth:`MetricsService.get`.
+    The adapter seam intentionally supports only CPU and memory. It contains
+    no query language or provider details, so any efficiency adapter can feed
+    it without changing Metrics service or response assembly.
     """
-    return MetricsSubject(kind="platform", value=name)
 
+    observed_at: datetime
+    efficiencies: dict[str, Decimal]
 
-PLATFORM_SUBJECT = platform_subject()
+    def __post_init__(self) -> None:
+        """Validate timestamps, resource names, and bounded ratios."""
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        normalized: dict[str, Decimal] = {}
+        for resource, value in self.efficiencies.items():
+            if resource not in _EFFICIENCY_RESOURCES:
+                raise ValueError("efficiency observations support only cpu and memory")
+            normalized[resource] = bounded_decimal(value)
+        if set(normalized) != _EFFICIENCY_RESOURCES:
+            raise ValueError("efficiency observations must contain cpu and memory together")
+        object.__setattr__(self, "efficiencies", normalized)
 
 
 @dataclass(frozen=True, slots=True)
 class PlatformObservation:
-    """Represent Kueue capacity and admitted allocation for one cluster.
-
-    Resource values use the public quantity format so the service does not need
-    to reinterpret provider-specific units.
-    """
+    """Represent aggregate ClusterQueue capacity and allocation."""
 
     cluster: str
     capacity: dict[str, str]
     allocated: dict[str, str]
+    reserving_workloads: int
+    observed_at: datetime
 
-
-class AccountingState(StrEnum):
-    """Describe whether lifetime accounting accompanies a workload report."""
-
-    DISABLED = "disabled"
-    COMPLETE = "complete"
-    INCOMPLETE = "incomplete"
-    UNAVAILABLE = "unavailable"
+    def __post_init__(self) -> None:
+        """Validate the queue count and observation timestamp."""
+        if self.reserving_workloads < 0:
+            raise ValueError("reserving_workloads must be non-negative")
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
 class UserObservation:
-    """Capture scheduler-effective requests for one user's Running Pods.
-
-    Immutable Pod UIDs tie optional lifetime accounting to the same observed
-    workload population and prevent mismatched data from appearing complete.
-    """
+    """Represent one user's LocalQueue reservations and active queue count."""
 
     user: str
-    running_pods: int
     requests: dict[str, str]
+    reserving_workloads: int
     observed_at: datetime
-    pod_uids: frozenset[str] = frozenset()
-    accounting: ActiveWorkloadLifetime | None = None
-    accounting_state: AccountingState = AccountingState.DISABLED
-    accounting_stale: bool = False
+
+    def __post_init__(self) -> None:
+        """Validate the queue count and observation timestamp."""
+        if self.reserving_workloads < 0:
+            raise ValueError("reserving_workloads must be non-negative")
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
 class CommunityObservation:
-    """Capture requests and optional accounting for a community's Running Pods.
-
-    Immutable Pod UIDs identify the population observed at ``observed_at`` so
-    separately collected accounting can be checked before it is merged.
-    """
+    """Represent one community's configured ClusterQueue reservations."""
 
     community: str
-    running_pods: int
     requests: dict[str, str]
+    reserving_workloads: int
     observed_at: datetime
-    pod_uids: frozenset[str] = frozenset()
-    accounting: ActiveWorkloadLifetime | None = None
-    accounting_state: AccountingState = AccountingState.DISABLED
-    accounting_stale: bool = False
 
-
-class LifetimeIssue(StrEnum):
-    """Enumerate bounded reasons a resource lifetime cannot be reported."""
-
-    CORRUPT_STATE = "corrupt-state"
-    COUNTER_RESET = "counter-reset"
-    MISSING_SERIES = "missing-series"
-    POD_DISAPPEARED = "pod-disappeared"
-    PROCESS_RESTART = "process-restart"
-    SAMPLING_GAP = "sampling-gap"
-    SCRAPE_GAP = "scrape-gap"
+    def __post_init__(self) -> None:
+        """Validate the queue count and observation timestamp."""
+        if self.reserving_workloads < 0:
+            raise ValueError("reserving_workloads must be non-negative")
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
-class ResourceInterval:
-    """Represent constant usage and request rates over a covered interval.
-
-    Integrating these rates over the interval yields additive resource-hours.
-    """
-
-    started_at: datetime
-    ended_at: datetime
-    usage_rate: Decimal
-    requested_rate: Decimal
-
-
-@dataclass(frozen=True, slots=True)
-class PodResourceLifetime:
-    """Collect covered intervals for one Running Pod and resource.
-
-    ``issues`` carries producer-known gaps; integration may add further issues
-    when the intervals do not cover the complete Running lifetime.
-    """
-
-    pod_uid: str
-    resource: str
-    running_since: datetime
-    observed_at: datetime
-    intervals: tuple[ResourceInterval, ...] = ()
-    issues: frozenset[LifetimeIssue] = frozenset()
-
-
-@dataclass(frozen=True, slots=True)
-class ResourceHours:
-    """Hold additive usage and requested time in a resource-specific unit."""
-
-    unit: Literal["core-hours", "GiB-hours", "GPU-hours"]
-    usage: Decimal
-    requested: Decimal
-
-
-@dataclass(frozen=True, slots=True)
-class ActiveWorkloadLifetime:
-    """Aggregate complete resource-hours for the currently active workload.
-
-    A resource with incomplete coverage is listed in ``incomplete`` and omitted
-    from ``resources`` so callers cannot mistake a partial total for a complete
-    lifetime.
-    """
-
-    resources: dict[str, ResourceHours]
-    incomplete: dict[str, frozenset[LifetimeIssue]]
-    pod_uids: frozenset[str] = frozenset()
-    coverage: dict[str, frozenset[str]] = field(default_factory=dict)
-
-    @property
-    def ready(self) -> bool:
-        """Return whether every represented resource has complete coverage."""
-        return not self.incomplete
-
-
-@dataclass(slots=True)
-class AccountingSnapshot:
-    """Store validated accounting and its source observation time atomically."""
-
-    lifetime: ActiveWorkloadLifetime
-    created: datetime
-
-
-@dataclass(slots=True)
 class CachedSnapshot:
-    """Store one provider observation with the time used for freshness."""
+    """Store one queue observation and optional efficiency in one cache fill."""
 
     observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
+    efficiency: EfficiencyObservation | None = None
+    ready: bool = True
+    ready_reason: Literal["Available", "PartialData"] = "Available"
+
+    def __post_init__(self) -> None:
+        """Validate cache timestamp and optional readiness state."""
+        object.__setattr__(self, "created", _normalise_observed_at(self.created))
+        if not self.ready and self.ready_reason != "PartialData":
+            raise ValueError("unready cache snapshots must use PartialData")
+        if self.ready and self.ready_reason != "Available":
+            raise ValueError("ready cache snapshots must use Available")
+
+
+@dataclass(slots=True)
+class SurfaceReadiness:
+    """Track source, snapshot, and cache availability for one surface."""
+
+    source_reachable: bool = False
+    snapshot_complete: bool = False
+    snapshot_serviceable: bool = False
+    cache_available: bool = True
+
+    @property
+    def ready(self) -> bool:
+        """Return whether this surface has a safe serving path."""
+        return self.cache_available and (
+            self.source_reachable or (self.snapshot_complete and self.snapshot_serviceable)
+        )
+
+
+@dataclass(slots=True)
+class ReadinessState:
+    """Coordinate process readiness without probing dependencies on demand."""
+
+    _surfaces: dict[MetricsSurface, SurfaceReadiness]
+    _started: bool = False
+
+    def __init__(self, surfaces: Iterable[MetricsSurface] = ("platform",)) -> None:
+        """Create readiness state for the configured report surfaces."""
+        self._surfaces = {surface: SurfaceReadiness() for surface in surfaces}
+
+    @property
+    def surfaces(self) -> tuple[MetricsSurface, ...]:
+        """Return the tracked report surfaces."""
+        return tuple(self._surfaces)
+
+    @property
+    def ready(self) -> bool:
+        """Return Platform serviceability with every shared cache available."""
+        platform = self._surfaces.get("platform")
+        return self._started and platform is not None and platform.ready and self.cache_available
+
+    @property
+    def cache_available(self) -> bool:
+        """Return whether every tracked shared cache is available."""
+        return bool(self._surfaces) and all(
+            surface.cache_available for surface in self._surfaces.values()
+        )
+
+    def start(self) -> None:
+        """Mark the runtime as serving."""
+        self._started = True
+
+    def stop(self) -> None:
+        """Mark the runtime stopped and clear dependency observations."""
+        self._started = False
+        for surface in self._surfaces.values():
+            surface.source_reachable = False
+            surface.snapshot_complete = False
+            surface.snapshot_serviceable = False
+            surface.cache_available = False
+
+    def mark_source(self, surface: MetricsSurface, *, reachable: bool) -> None:
+        """Record source reachability for one report surface."""
+        self._surfaces[surface].source_reachable = reachable
+
+    def mark_snapshot(
+        self,
+        surface: MetricsSurface,
+        *,
+        complete: bool,
+        serviceable: bool,
+    ) -> None:
+        """Record whether a complete serviceable snapshot is available."""
+        state = self._surfaces[surface]
+        state.snapshot_complete = complete
+        state.snapshot_serviceable = serviceable
+
+    def mark_cache(self, surface: MetricsSurface, *, available: bool) -> None:
+        """Record cache availability for one report surface."""
+        self._surfaces[surface].cache_available = available
 
 
 @dataclass(slots=True)
 class MetricsResult:
-    """Return an observation with cache provenance needed by HTTP adapters."""
+    """Return an observation with cache and readiness provenance."""
 
     observation: PlatformObservation | UserObservation | CommunityObservation
     created: datetime
     cached: bool
     stale: bool = False
     cache_available: bool = True
+    efficiency: EfficiencyObservation | None = None
+    ready: bool = True
+    ready_reason: Literal["Available", "PartialData"] = "Available"
 
     @property
     def ready_condition(
         self,
-    ) -> tuple[
-        Literal["True", "False"],
-        Literal["Available", "PartialData", "AccountingIncomplete", "StaleData"],
-    ]:
-        """Derive the public Ready condition from freshness and accounting.
-
-        Returns:
-            Kubernetes-style condition status and a bounded reason.
-        """
+    ) -> tuple[Literal["True", "False"], Literal["Available", "PartialData", "StaleData"]]:
+        """Return the public Ready condition for this result."""
         if self.stale:
             return "False", "StaleData"
-        if isinstance(self.observation, (UserObservation, CommunityObservation)):
-            if self.observation.accounting_state is AccountingState.UNAVAILABLE:
-                return "False", "PartialData"
-            if self.observation.accounting_state is AccountingState.INCOMPLETE:
-                return "False", "AccountingIncomplete"
-        return "True", "Available"
+        return ("True", "Available") if self.ready else ("False", self.ready_reason)
 
     @property
     def cached_condition(
@@ -227,11 +303,7 @@ class MetricsResult:
         Literal["True", "False", "Unknown"],
         Literal["FreshHit", "StaleHit", "Refreshed", "RedisUnavailable"],
     ]:
-        """Derive the public Cached condition from coordinator provenance.
-
-        Returns:
-            Kubernetes-style condition status and a bounded cache reason.
-        """
+        """Return the public Cached condition for this result."""
         if not self.cache_available:
             return "Unknown", "RedisUnavailable"
         if self.stale:

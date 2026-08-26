@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import socket
 import subprocess
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 
 from metrics.dev.fixtures import apply_fixtures
+from metrics.errors import ProviderExecutionError
+from metrics.providers.promql import (
+    _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS,
+    _DEFAULT_MAX_SAMPLE_AGE_SECONDS,
+    _DEFAULT_MAX_SERIES,
+    _query,
+    _validate_response,
+)
 
 KIND_VERSION = "0.32.0"
 KIND_CLUSTER = "metrics"
@@ -25,14 +35,28 @@ KUBERNETES_VERSION = "v1.33.12"
 KUEUE_VERSION = "0.19.2"
 METRICS_NAMESPACE = "metrics"
 WORKLOAD_NAMESPACE = "canfar-workloads"
+WORKLOAD_NAMESPACES = ("canfar-workloads", "canfar-workloads-secondary")
+CLUSTER_QUEUES = ("cq-proton", "cq-electron", "cq-fair")
 
 METRICS_ROOT = Path(__file__).parents[3]
 FIXTURES = METRICS_ROOT / "scripts" / "test-setup.yaml"
 WORKLOAD_FIXTURES = METRICS_ROOT / "scripts" / "workload-fixtures.yaml"
-ACCOUNTING_PROFILE = METRICS_ROOT / "scripts" / "accounting-profile.yaml"
+TEST_DEPENDENCIES = METRICS_ROOT / "scripts" / "test-dependencies.yaml"
 KUEUE_CONFIG = METRICS_ROOT / "scripts" / "kueue-config.yaml"
 KIND_VALUES = METRICS_ROOT / "scripts" / "kind-values.yaml"
 CHART = METRICS_ROOT / "helm" / "metrics-api"
+_IMAGE_NAME_COMPONENT = r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*"
+_IMAGE_REPOSITORY = re.compile(
+    rf"{_IMAGE_NAME_COMPONENT}(?::[0-9]{{1,5}})?(?:/{_IMAGE_NAME_COMPONENT})*"
+)
+_IMAGE_TAG = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")
+_ACCOUNTING_PROFILE_SELECTOR = "metrics.canfar.net/profile=accounting"
+_ACCOUNTING_PROFILE_NAMESPACED_KINDS = "deployment,service,configmap,serviceaccount"
+_ACCOUNTING_PROFILE_WORKLOAD_KINDS = "role,rolebinding"
+_ACCOUNTING_PROFILE_CLUSTER_KINDS = "clusterrole,clusterrolebinding"
+_PROMETHEUS_READY_DEADLINE_SECONDS = 60.0
+_PROMETHEUS_READY_POLL_INTERVAL_SECONDS = 1.0
+_PROMETHEUS_REQUEST_TIMEOUT_SECONDS = 5.0
 
 
 class DevStackError(RuntimeError):
@@ -205,19 +229,64 @@ def fixtures() -> None:
     apply_fixtures(FIXTURES, WORKLOAD_FIXTURES)
 
 
-def _build_and_load_image() -> tuple[str, str]:
-    """Build a uniquely tagged production image and load it into kind."""
+def test_dependencies() -> None:
+    """Converge disposable Redis, Prometheus, KSM, and OTLP test fixtures."""
     assert_safe_context()
+    _kubectl(
+        "apply",
+        "--server-side",
+        "--field-manager=metrics-dev-test",
+        "-f",
+        str(TEST_DEPENDENCIES),
+    )
+    for deployment in (
+        "metrics-test-redis",
+        "metrics-test-kube-state-metrics",
+        "metrics-test-prometheus",
+        "metrics-test-otel-collector",
+    ):
+        _kubectl(
+            "rollout",
+            "status",
+            f"deployment/{deployment}",
+            "--namespace",
+            METRICS_NAMESPACE,
+            "--timeout=5m",
+        )
+
+
+def _validate_image_reference(repository: str, tag: str) -> tuple[str, str]:
+    """Validate image parts before shell, YAML, or Helm interpolation."""
+    if not repository or len(repository) > 255 or _IMAGE_REPOSITORY.fullmatch(repository) is None:
+        raise DevStackError("METRICS_IMAGE_REPOSITORY must be a Docker repository name[:port]/path")
+    first_component = repository.split("/", 1)[0]
+    if ":" in first_component and not 1 <= int(first_component.rsplit(":", 1)[1]) <= 65_535:
+        raise DevStackError("METRICS_IMAGE_REPOSITORY port is outside the TCP range")
+    if not tag or len(tag) > 128 or tag.lower() == "latest" or _IMAGE_TAG.fullmatch(tag) is None:
+        raise DevStackError(
+            "METRICS_IMAGE_TAG must be a non-latest Docker tag of at most 128 characters"
+        )
+    return repository, tag
+
+
+def _build_and_load_image() -> tuple[str, str]:
+    """Build or verify a tagged production image, then load it into kind."""
     tag = os.environ.get("METRICS_IMAGE_TAG", f"dev-{int(time.time())}")
-    repository = "canfar-metrics-local"
+    repository = os.environ.get("METRICS_IMAGE_REPOSITORY", "canfar-metrics-local")
+    _validate_image_reference(repository, tag)
+    assert_safe_context()
     image_ref = f"{repository}:{tag}"
-    _run(["docker", "build", "--tag", image_ref, "."])
+    if os.environ.get("KIND_SMOKE_SKIP_BUILD") == "1":
+        _run(["docker", "image", "inspect", image_ref], capture=True)
+    else:
+        _run(["docker", "build", "--tag", image_ref, "."])
     _run(["kind", "load", "docker-image", image_ref, "--name", KIND_CLUSTER])
     return repository, tag
 
 
-def _deploy(repository: str, tag: str, profile: str = "core") -> None:
-    """Deploy Redis, Collector, RBAC, and Metrics through its chart."""
+def _deploy(repository: str, tag: str) -> None:
+    """Deploy only the Metrics API through its production Helm chart."""
+    _validate_image_reference(repository, tag)
     command = [
         "upgrade",
         "--install",
@@ -235,102 +304,66 @@ def _deploy(repository: str, tag: str, profile: str = "core") -> None:
         "--wait",
         "--timeout=5m",
     ]
-    if profile == "accounting":
-        command.extend(
-            [
-                "--set",
-                "env.METRICS_PROVIDERS__PROMQL__ENABLED=true",
-                "--set",
-                "env.METRICS_PROVIDERS__PROMQL__BASE_URL=http://metrics-accounting-prometheus.metrics.svc:9090",
-            ]
-        )
-    else:
-        command.extend(["--set", "env.METRICS_PROVIDERS__PROMQL__ENABLED=false"])
     _helm(*command)
 
 
 def image() -> None:
     """Build, load, and Helm-deploy the production image."""
     repository, tag = _build_and_load_image()
+    _cleanup_retired_accounting_profile()
     _deploy(repository, tag)
     print(f"deployed {repository}:{tag}")
 
 
-def _remove_accounting_profile() -> None:
-    """Remove optional accounting workloads while preserving the core stack."""
+def _cleanup_retired_accounting_profile() -> None:
+    """Remove only the retired, label-owned accounting profile resources."""
     assert_safe_context()
     _kubectl(
         "--namespace",
         METRICS_NAMESPACE,
         "delete",
-        "deployment,service,configmap,serviceaccount",
+        _ACCOUNTING_PROFILE_NAMESPACED_KINDS,
         "-l",
-        "metrics.canfar.net/profile=accounting",
+        _ACCOUNTING_PROFILE_SELECTOR,
         "--ignore-not-found",
         "--wait",
     )
-    _kubectl(
-        "delete",
-        "clusterrole,clusterrolebinding",
-        "-l",
-        "metrics.canfar.net/profile=accounting",
-        "--ignore-not-found",
-    )
-    _kubectl(
-        "--namespace",
-        WORKLOAD_NAMESPACE,
-        "delete",
-        "role,rolebinding",
-        "-l",
-        "metrics.canfar.net/profile=accounting",
-        "--ignore-not-found",
-    )
-
-
-def up(profile: str = "core") -> None:
-    """Create or converge the approved core or accounting profile."""
-    _ensure_cluster()
-    _install_kueue()
-    fixtures()
-    if profile == "accounting":
+    for namespace in WORKLOAD_NAMESPACES:
         _kubectl(
-            "apply", "--server-side", "--field-manager=metrics-dev", "-f", str(ACCOUNTING_PROFILE)
-        )
-        deployments = (
-            "metrics-kube-state-metrics",
-            "metrics-accounting-producer",
-            "metrics-accounting-prometheus",
-        )
-        _kubectl(
-            "rollout",
-            "restart",
-            *(f"deployment/{deployment}" for deployment in deployments),
             "--namespace",
-            METRICS_NAMESPACE,
+            namespace,
+            "delete",
+            _ACCOUNTING_PROFILE_WORKLOAD_KINDS,
+            "-l",
+            _ACCOUNTING_PROFILE_SELECTOR,
+            "--ignore-not-found",
         )
-        for deployment in deployments:
-            _kubectl(
-                "rollout",
-                "status",
-                f"deployment/{deployment}",
-                "--namespace",
-                METRICS_NAMESPACE,
-                "--timeout=5m",
-            )
-    elif profile == "core":
-        _remove_accounting_profile()
-    else:
-        raise DevStackError(f"unknown profile: {profile}")
+    _kubectl(
+        "delete",
+        _ACCOUNTING_PROFILE_CLUSTER_KINDS,
+        "-l",
+        _ACCOUNTING_PROFILE_SELECTOR,
+        "--ignore-not-found",
+    )
+
+
+def up() -> None:
+    """Create or converge the single supported disposable development stack."""
+    _ensure_cluster()
+    _cleanup_retired_accounting_profile()
+    _install_kueue()
+    test_dependencies()
+    fixtures()
     repository, tag = _build_and_load_image()
-    _deploy(repository, tag, profile)
+    _deploy(repository, tag)
     print(
-        f"{profile} ready: kind={KIND_VERSION} kubernetes={KUBERNETES_VERSION} "
+        f"dev ready: kind={KIND_VERSION} kubernetes={KUBERNETES_VERSION} "
         f"kueue={KUEUE_VERSION} context={KUBE_CONTEXT}"
     )
 
 
 def run_host() -> None:
-    """Run the host API with narrowed kubeconfig against the kind Redis Service."""
+    """Run the host API with narrowed kubeconfig against disposable test Redis."""
     assert_safe_context()
     forward = subprocess.Popen(
         [
@@ -340,7 +373,7 @@ def run_host() -> None:
             "--namespace",
             METRICS_NAMESPACE,
             "port-forward",
-            "service/metrics-api-redis",
+            "service/metrics-test-redis",
             "16379:6379",
         ],
         cwd=METRICS_ROOT,
@@ -366,22 +399,19 @@ def run_host() -> None:
                 encoding="utf-8",
             )
             kubeconfig.chmod(0o600)
-            deadline = time.monotonic() + 15
-            while forward.poll() is None and time.monotonic() < deadline:
-                try:
-                    with urllib.request.urlopen("http://127.0.0.1:16379", timeout=1):
-                        break
-                except OSError:
-                    time.sleep(0.25)
-            if forward.poll() is not None:
-                raise DevStackError("Redis port-forward failed")
+            _wait_for_tcp_port(
+                forward,
+                16379,
+                timeout_seconds=15,
+                description="Redis port-forward",
+            )
             env = os.environ | {
                 "KUBECONFIG": str(kubeconfig),
                 "METRICS_CLUSTER_NAME": KUBE_CONTEXT,
-                "METRICS_CACHE__BACKEND": "redis",
                 "METRICS_CACHE__KEY_SECRET": "metrics-dev-ephemeral-cache-key!!",
                 "METRICS_REDIS_URL": "redis://127.0.0.1:16379/0",
-                "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES": '["cq-proton","cq-electron"]',
+                "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES": '["cq-proton","cq-electron","cq-fair"]',
+                "METRICS_PROVIDERS__KUEUE__NAMESPACES": '["canfar-workloads","canfar-workloads-secondary"]',
             }
             _run(["uv", "run", "python", "-m", "metrics.main"], env=env)
     finally:
@@ -392,19 +422,34 @@ def run_host() -> None:
             forward.kill()
 
 
-def smoke(profile: str = "core") -> None:
-    """Exercise the Helm-deployed service through a real HTTP socket."""
-    if profile not in {"core", "accounting"}:
-        raise DevStackError(f"unknown profile: {profile}")
-    assert_safe_context()
-    started = time.monotonic()
-    port = "18080"
-    redis_port = "16380"
+def _wait_for_tcp_port(
+    process: subprocess.Popen[str] | subprocess.Popen[bytes],
+    port: int,
+    *,
+    timeout_seconds: float,
+    description: str,
+) -> None:
+    """Wait for a local TCP listener or fail when the finite budget expires."""
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise DevStackError(f"{description} did not become ready within {timeout_seconds:g}s")
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=min(1, remaining)):
+                return
+        except OSError:
+            time.sleep(min(0.25, remaining))
+    raise DevStackError(f"{description} failed")
+
+
+def _restart_metrics_deployment() -> None:
+    """Flush the local Redis database and restart the API deployment."""
     _kubectl(
         "--namespace",
         METRICS_NAMESPACE,
         "exec",
-        "deployment/metrics-api-redis",
+        "deployment/metrics-test-redis",
         "--",
         "redis-cli",
         "FLUSHDB",
@@ -424,64 +469,118 @@ def smoke(profile: str = "core") -> None:
         "deployment/metrics-api-metrics-api",
         "--timeout=120s",
     )
-    forward = subprocess.Popen(
+
+
+def _start_smoke_forwards(
+    started: list[subprocess.Popen], specifications: Sequence[tuple[str, str]]
+) -> None:
+    """Start and record the requested local port-forwards for smoke."""
+    for service, mapping in specifications:
+        started.append(
+            subprocess.Popen(
+                [
+                    "kubectl",
+                    "--context",
+                    KUBE_CONTEXT,
+                    "--namespace",
+                    METRICS_NAMESPACE,
+                    "port-forward",
+                    service,
+                    mapping,
+                ],
+                cwd=METRICS_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        )
+
+
+def _wait_for_prometheus_readiness(process: subprocess.Popen, port: str) -> None:
+    """Wait for the disposable Prometheus to expose both platform resources."""
+    query = _query(
+        scope="platform",
+        subject=None,
+        cluster=KUBE_CONTEXT,
+        namespaces=list(WORKLOAD_NAMESPACES),
+    )
+    deadline = time.monotonic() + _PROMETHEUS_READY_DEADLINE_SECONDS
+    last_error: Exception | None = None
+    while (remaining := deadline - time.monotonic()) > 0:
+        if process.poll() is not None:
+            raise DevStackError("Prometheus port-forward failed")
+        try:
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/v1/query",
+                data=urllib.parse.urlencode({"query": query}).encode(),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            with urllib.request.urlopen(
+                request,
+                timeout=min(_PROMETHEUS_REQUEST_TIMEOUT_SECONDS, remaining),
+            ) as response:
+                if response.status != 200:
+                    raise OSError(f"Prometheus returned HTTP {response.status}")
+                payload = json.loads(response.read())
+            _validate_response(
+                payload,
+                max_series=_DEFAULT_MAX_SERIES,
+                max_sample_age_seconds=_DEFAULT_MAX_SAMPLE_AGE_SECONDS,
+                future_sample_tolerance_seconds=_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS,
+                cutoff=None,
+            )
+            return
+        except (OSError, ProviderExecutionError, ValueError) as error:
+            last_error = error
+        if process.poll() is not None:
+            raise DevStackError("Prometheus port-forward failed")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(_PROMETHEUS_READY_POLL_INTERVAL_SECONDS, remaining))
+    raise DevStackError(
+        "Prometheus did not return a valid CPU and memory platform vector "
+        f"within {_PROMETHEUS_READY_DEADLINE_SECONDS:g}s; last error={last_error!r}"
+    )
+
+
+def _wait_for_http_health(process: subprocess.Popen, port: str) -> None:
+    """Wait for the API health endpoint while checking the forward process."""
+    deadline = time.monotonic() + 60
+    while True:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as response:
+                if response.status == 200:
+                    return
+        except OSError:
+            if process.poll() is not None or time.monotonic() >= deadline:
+                raise DevStackError("metrics API did not become healthy within 60s")
+            time.sleep(1)
+
+
+def _run_smoke_integration(port: str, redis_port: str) -> None:
+    """Run integration checks and verify graceful API process restart."""
+    env = os.environ | {
+        "METRICS_BASE_URL": f"http://127.0.0.1:{port}",
+        "METRICS_TEST_REDIS_URL": f"redis://127.0.0.1:{redis_port}/0",
+    }
+    _run(["uv", "run", "pytest", "tests/integration", "-m", "integration", "-q"], env=env)
+    pod = _output(
         [
             "kubectl",
             "--context",
             KUBE_CONTEXT,
             "--namespace",
             METRICS_NAMESPACE,
-            "port-forward",
-            "service/metrics-api-metrics-api",
-            f"{port}:8000",
-        ],
-        cwd=METRICS_ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+            "get",
+            "pod",
+            "-l",
+            "app.kubernetes.io/component=api",
+            "-o",
+            "jsonpath={.items[0].metadata.name}",
+        ]
     )
-    redis_forward = subprocess.Popen(
-        [
-            "kubectl",
-            "--context",
-            KUBE_CONTEXT,
-            "--namespace",
-            METRICS_NAMESPACE,
-            "port-forward",
-            "service/metrics-api-redis",
-            f"{redis_port}:6379",
-        ],
-        cwd=METRICS_ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        deadline = time.monotonic() + 60
-        while True:
-            try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/healthz", timeout=2
-                ) as response:
-                    if response.status == 200:
-                        break
-            except OSError:
-                if forward.poll() is not None or time.monotonic() >= deadline:
-                    raise DevStackError("metrics API did not become healthy within 60s")
-                time.sleep(1)
-        while True:
-            try:
-                with socket.create_connection(("127.0.0.1", int(redis_port)), timeout=1):
-                    break
-            except OSError:
-                if redis_forward.poll() is not None or time.monotonic() >= deadline:
-                    raise DevStackError("Redis port-forward did not become ready")
-                time.sleep(0.25)
-        env = os.environ | {
-            "METRICS_BASE_URL": f"http://127.0.0.1:{port}",
-            "METRICS_TEST_REDIS_URL": f"redis://127.0.0.1:{redis_port}/0",
-            "METRICS_TEST_PROFILE": profile,
-        }
-        _run(["uv", "run", "pytest", "tests/integration", "-m", "integration", "-q"], env=env)
-        pod = _output(
+    before = int(
+        _output(
             [
                 "kubectl",
                 "--context",
@@ -489,14 +588,25 @@ def smoke(profile: str = "core") -> None:
                 "--namespace",
                 METRICS_NAMESPACE,
                 "get",
-                "pod",
-                "-l",
-                "app.kubernetes.io/component=api",
+                f"pod/{pod}",
                 "-o",
-                "jsonpath={.items[0].metadata.name}",
+                "jsonpath={.status.containerStatuses[0].restartCount}",
             ]
         )
-        before = int(
+    )
+    _kubectl(
+        "--namespace",
+        METRICS_NAMESPACE,
+        "exec",
+        f"pod/{pod}",
+        "--",
+        "/bin/sh",
+        "-c",
+        "kill -TERM 1",
+    )
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        restarts = int(
             _output(
                 [
                     "kubectl",
@@ -511,72 +621,88 @@ def smoke(profile: str = "core") -> None:
                 ]
             )
         )
-        _kubectl(
+        if restarts > before:
+            break
+        time.sleep(0.5)
+    else:
+        raise DevStackError("API container did not restart after SIGTERM")
+    previous_logs = _output(
+        [
+            "kubectl",
+            "--context",
+            KUBE_CONTEXT,
             "--namespace",
             METRICS_NAMESPACE,
-            "exec",
+            "logs",
             f"pod/{pod}",
-            "--",
-            "/bin/sh",
-            "-c",
-            "kill -TERM 1",
+            "--previous",
+        ]
+    )
+    if "Runtime shutdown completed" not in previous_logs:
+        raise DevStackError("graceful shutdown log was not emitted")
+
+
+def _stop_smoke_forwards(*forwards: subprocess.Popen) -> None:
+    """Stop local forwards, escalating to SIGKILL when a process ignores SIGTERM."""
+    for process in forwards:
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+    for process in forwards:
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+
+
+def smoke() -> None:
+    """Exercise the Helm-deployed service through a real HTTP socket."""
+    assert_safe_context()
+    started_at = time.monotonic()
+    port = "18080"
+    redis_port = "16380"
+    prometheus_port = "19090"
+    fixtures()
+    forwards: list[subprocess.Popen] = []
+    try:
+        _start_smoke_forwards(
+            forwards,
+            [("service/metrics-test-prometheus", f"{prometheus_port}:9090")],
         )
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            restarts = int(
-                _output(
-                    [
-                        "kubectl",
-                        "--context",
-                        KUBE_CONTEXT,
-                        "--namespace",
-                        METRICS_NAMESPACE,
-                        "get",
-                        f"pod/{pod}",
-                        "-o",
-                        "jsonpath={.status.containerStatuses[0].restartCount}",
-                    ]
-                )
-            )
-            if restarts > before:
-                break
-            time.sleep(0.5)
-        else:
-            raise DevStackError("API container did not restart after SIGTERM")
-        previous_logs = _output(
+        prometheus_forward = forwards[-1]
+        _wait_for_prometheus_readiness(prometheus_forward, prometheus_port)
+        _stop_smoke_forwards(prometheus_forward)
+        forwards.remove(prometheus_forward)
+        _restart_metrics_deployment()
+        _start_smoke_forwards(
+            forwards,
             [
-                "kubectl",
-                "--context",
-                KUBE_CONTEXT,
-                "--namespace",
-                METRICS_NAMESPACE,
-                "logs",
-                f"pod/{pod}",
-                "--previous",
-            ]
+                ("service/metrics-api-metrics-api", f"{port}:8000"),
+                ("service/metrics-test-redis", f"{redis_port}:6379"),
+            ],
         )
-        if "Runtime shutdown completed" not in previous_logs:
-            raise DevStackError("graceful shutdown log was not emitted")
+        forward, redis_forward = forwards
+        _wait_for_http_health(forward, port)
+        _wait_for_tcp_port(
+            redis_forward,
+            int(redis_port),
+            timeout_seconds=60,
+            description="Redis port-forward",
+        )
+        _run_smoke_integration(port, redis_port)
     finally:
-        forward.terminate()
-        redis_forward.terminate()
-        try:
-            forward.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            forward.kill()
-        try:
-            redis_forward.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            redis_forward.kill()
-    elapsed = time.monotonic() - started
-    budget = 300 if profile == "accounting" else 120
-    print(f"warm {profile} smoke completed in {elapsed:.1f}s (budget: {budget}s)")
+        _stop_smoke_forwards(*forwards)
+    elapsed = time.monotonic() - started_at
+    budget = 120
+    print(f"warm dev smoke completed in {elapsed:.1f}s (budget: {budget}s)")
     if elapsed > budget:
-        raise DevStackError(f"warm {profile} smoke exceeded its {budget}-second budget")
+        raise DevStackError(f"warm dev smoke exceeded its {budget}-second budget")
 
 
 def down() -> None:
-    """Remove the Helm workload while retaining the cluster and image cache."""
+    """Remove the API and disposable test dependencies while retaining the cluster."""
     assert_safe_context()
     _run(
         [
@@ -590,19 +716,13 @@ def down() -> None:
             "--ignore-not-found",
         ]
     )
+    _cleanup_retired_accounting_profile()
+    _kubectl("delete", "-f", str(TEST_DEPENDENCIES), "--ignore-not-found")
 
 
 def reset() -> None:
     """Recreate workload fixtures while retaining cluster image caches."""
     assert_safe_context()
-    _kubectl(
-        "delete",
-        "namespace",
-        WORKLOAD_NAMESPACE,
-        "--ignore-not-found",
-        "--wait",
-        "--timeout=120s",
-    )
     fixtures()
 
 

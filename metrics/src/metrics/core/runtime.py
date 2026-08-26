@@ -1,11 +1,13 @@
-"""App-level :class:`MetricsRuntime`: provider lifecycle, cache, and Metrics service."""
+"""Own Kueue, cache, and Metrics service lifecycle resources."""
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 from time import perf_counter
-from typing import Literal
+from typing import Any, Literal, Protocol, cast
 
 from redis.asyncio import Redis
 
@@ -13,26 +15,91 @@ from metrics.cache import (
     FRESHNESS_POLICIES,
     CacheCoordinator,
     CacheIdentity,
-    InMemoryCoordinator,
     RedisCoordinator,
     RedisSnapshots,
     RedisUnavailable,
 )
 from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
-from metrics.providers.kubernetes import KubernetesProvider
 from metrics.providers.kueue import KueueProvider
-from metrics.providers.promql import SOURCE_REVISION, PromQLProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import AccountingSnapshot, CachedSnapshot
+from metrics.services.models import CachedSnapshot, EfficiencyObservation
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
-_logger = logging.getLogger(__name__)
 
-_SCHEMA_REVISION = "5"
-_SOURCE_REVISION = "1"
+_logger = logging.getLogger(__name__)
+_SCHEMA_REVISION = "7"
+_SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
-_ACCOUNTING_QUERY_REVISION = "1"
+
+
+class _ReadinessCoordinator(Protocol):
+    """Define the cache health seam used by runtime readiness recovery."""
+
+    backend_name: str
+    available: bool
+
+    async def ping(self) -> None:
+        """Run one bounded cache health check."""
+
+
+class _EfficiencyProvider(Protocol):
+    """Define the optional PromQL efficiency provider lifecycle and loaders."""
+
+    async def startup(self) -> None:
+        """Start the optional efficiency provider client."""
+
+    async def shutdown(self) -> None:
+        """Close the optional efficiency provider client."""
+
+    async def read_platform(self) -> EfficiencyObservation:
+        """Read attributed platform efficiency."""
+
+    async def read_user(self, username: str) -> EfficiencyObservation:
+        """Read attributed user efficiency."""
+
+    async def read_community(self, community: str) -> EfficiencyObservation:
+        """Read attributed community efficiency."""
+
+
+async def _close_resources(
+    resources: tuple[Any, ...],
+    failure_message: str,
+) -> tuple[str, asyncio.CancelledError | None]:
+    """Close resources independently so one failure cannot skip another."""
+    outcome = "ok"
+    cancellation: asyncio.CancelledError | None = None
+    for resource in resources:
+        try:
+            await resource.shutdown()
+        except asyncio.CancelledError as exc:
+            outcome = "cancelled"
+            cancellation = cancellation or exc
+        except Exception:
+            outcome = "error"
+            _logger.error(failure_message)
+    return outcome, cancellation
+
+
+async def _close_redis(redis: Redis) -> tuple[str, asyncio.CancelledError | None]:
+    """Close the shared Redis client while preserving cancellation."""
+    try:
+        await redis.aclose()
+    except asyncio.CancelledError as exc:
+        return "cancelled", exc
+    except Exception:
+        _logger.error("Redis shutdown failed")
+        return "error", None
+    return "ok", None
+
+
+def _combine_shutdown_outcomes(*outcomes: str) -> str:
+    """Prefer errors, then cancellation, over clean shutdown."""
+    if "error" in outcomes:
+        return "error"
+    if "cancelled" in outcomes:
+        return "cancelled"
+    return "ok"
 
 
 def platform_cache_identity(
@@ -42,23 +109,31 @@ def platform_cache_identity(
     source: str,
     fingerprint: str = "",
 ) -> CacheIdentity:
-    """Build the cache identity for Platform observations.
-
-    Args:
-        platform_name: Configured public platform subject (``METRICS_PLATFORM_NAME``).
-        cluster_name: Cluster identifier from settings.
-        source: Active source adapter name.
-        fingerprint: Optional provider configuration fingerprint.
-
-    Returns:
-        Stable dimensions passed to the opaque key builder.
-    """
+    """Build the opaque Platform cache identity."""
     return CacheIdentity(
         subject_kind="platform",
         subject_value=platform_name,
         cluster=cluster_name,
         source=source,
         fingerprint=fingerprint.strip(),
+    )
+
+
+def _subject_cache_identity(
+    *,
+    kind: Literal["user", "community"],
+    subject: str,
+    cluster: str,
+    source: str,
+    fingerprint: str,
+) -> CacheIdentity:
+    """Build one opaque User or Community cache identity."""
+    return CacheIdentity(
+        subject_kind=kind,
+        subject_value=subject,
+        cluster=cluster,
+        source=source,
+        fingerprint=fingerprint,
     )
 
 
@@ -69,31 +144,9 @@ def build_cache(
     surface: Literal["platform", "user", "community"] = "platform",
     redis: Redis | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
-    """Construct a subject cache and, when needed, an owned Redis client.
-
-    Args:
-        settings: Validated cache and Redis settings.
-        recorder: Optional bounded cache telemetry recorder.
-        surface: Subject scope selecting freshness policy.
-        redis: Optional shared Redis client.
-
-    Returns:
-        The configured coordinator and a newly owned Redis client, if created.
-    """
+    """Construct one surface cache, reusing the supplied Redis client."""
     policy = FRESHNESS_POLICIES[surface]
-    if settings.cache.backend == "memory":
-        return (
-            InMemoryCoordinator[CachedSnapshot](
-                policy=policy,
-                created=lambda snapshot: snapshot.created,
-            ),
-            None,
-        )
-
-    secret = settings.cache.key_secret
-    if secret is None:  # Settings validation owns the user-facing error.
-        raise RuntimeStartupError("Redis cache key secret is not configured")
-    secret_bytes = secret.get_secret_value().encode()
+    secret_bytes = settings.cache.key_secret.get_secret_value().encode()
     redis_client = redis or Redis.from_url(
         settings.redis_url,
         socket_connect_timeout=settings.cache.redis_command_timeout_seconds,
@@ -104,7 +157,6 @@ def build_cache(
         value_type=CachedSnapshot,
         secret=secret_bytes,
         command_timeout=settings.cache.redis_command_timeout_seconds,
-        retention_seconds=policy.retention_seconds,
         schema_revision=_SCHEMA_REVISION,
         source_revision=_SOURCE_REVISION,
         query_revision=_QUERY_REVISION,
@@ -116,75 +168,43 @@ def build_cache(
             key_prefix=settings.redis_key_prefix,
             key_secret=secret_bytes,
             policy=policy,
-            created=lambda snapshot: snapshot.created,
+            created=lambda snapshot: snapshot.observation.observed_at,
             fill_timeout=settings.cache.fill_timeout_seconds,
             cold_timeout=settings.cache.cold_get_timeout_seconds,
             max_l1_entries=settings.cache.l1_max_entries,
-            max_fills=settings.cache.max_fills,
             telemetry=recorder,
         ),
         None if redis is not None else redis_client,
     )
 
 
-def build_accounting_cache(
+def _build_efficiency_provider(
     settings: Settings,
-    *,
-    surface: Literal["user", "community"],
-    redis: Redis | None,
     recorder: MetricsRecorder,
-) -> CacheCoordinator[AccountingSnapshot]:
-    """Build a subject accounting cache over the shared Redis connection.
+) -> _EfficiencyProvider | None:
+    """Create the optional PromQL adapter only when an endpoint is supplied."""
+    if settings.providers.promql.base_url is None:
+        return None
+    from metrics.providers.promql import PromQLProvider
 
-    Args:
-        settings: Validated cache and Redis settings.
-        surface: User or community freshness policy selector.
-        redis: Shared Redis client created for observation caches.
-        recorder: Bounded cache telemetry recorder.
+    return PromQLProvider(settings, telemetry=recorder)
 
-    Returns:
-        A coordinator for validated accounting snapshots.
 
-    Raises:
-        RuntimeStartupError: If accounting is enabled without Redis integrity
-            configuration.
-    """
-    policy = FRESHNESS_POLICIES[surface]
-    if settings.cache.backend == "memory":
-        return InMemoryCoordinator[AccountingSnapshot](
-            policy=policy,
-            created=lambda snapshot: snapshot.created,
-        )
-    if redis is None or settings.cache.key_secret is None:
-        raise RuntimeStartupError("Accounting requires the configured Redis cache")
-    secret = settings.cache.key_secret.get_secret_value().encode()
-    store = RedisSnapshots[AccountingSnapshot](
-        redis=redis,
-        value_type=AccountingSnapshot,
-        secret=secret,
-        command_timeout=settings.cache.redis_command_timeout_seconds,
-        retention_seconds=policy.retention_seconds,
-        schema_revision=_SCHEMA_REVISION,
-        source_revision=SOURCE_REVISION,
-        query_revision=_ACCOUNTING_QUERY_REVISION,
-        telemetry=recorder,
+def _efficiency_cache_fingerprint(settings: Settings) -> str:
+    """Hash the enabled PromQL configuration into the queue cache identity."""
+    config = settings.providers.promql
+    if config.base_url is None:
+        return "disabled"
+    raw = json.dumps(
+        config.model_dump(mode="json", exclude_none=True),
+        separators=(",", ":"),
+        sort_keys=True,
     )
-    return RedisCoordinator[AccountingSnapshot](
-        store=store,
-        key_prefix=settings.redis_key_prefix,
-        key_secret=secret,
-        policy=policy,
-        created=lambda snapshot: snapshot.created,
-        fill_timeout=settings.cache.fill_timeout_seconds,
-        cold_timeout=settings.cache.cold_get_timeout_seconds,
-        max_l1_entries=settings.cache.l1_max_entries,
-        max_fills=settings.cache.max_fills,
-        telemetry=recorder,
-    )
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
 class MetricsRuntime:
-    """Own the active provider, cache resources, and Metrics service."""
+    """Own Kueue, optional efficiency, three surface caches, and Metrics."""
 
     def __init__(
         self,
@@ -193,74 +213,34 @@ class MetricsRuntime:
         provider: KueueProvider,
         metrics_service: MetricsService,
         cache: CacheCoordinator[CachedSnapshot],
-        user_provider: KubernetesProvider | None = None,
-        user_cache: CacheCoordinator[CachedSnapshot] | None = None,
-        community_cache: CacheCoordinator[CachedSnapshot] | None = None,
-        accounting_provider: PromQLProvider | None = None,
-        accounting_caches: tuple[
-            CacheCoordinator[AccountingSnapshot],
-            CacheCoordinator[AccountingSnapshot],
-        ]
-        | None = None,
+        user_cache: CacheCoordinator[CachedSnapshot],
+        community_cache: CacheCoordinator[CachedSnapshot],
         redis: Redis | None = None,
         telemetry: MetricsRecorder | None = None,
+        efficiency_provider: _EfficiencyProvider | None = None,
     ) -> None:
-        """Attach the provider, Metrics service, and optional Redis client.
-
-        Production callers use :meth:`from_settings`; tests may inject doubles.
-
-        Args:
-            settings: Validated :class:`Settings` for the process.
-            provider: Active provider; it owns its Kubernetes access handle.
-            metrics_service: Shared Metrics service exposed to HTTP adapters.
-            cache: Cache coordinator and readiness dependency.
-            user_provider: Optional Kubernetes workload provider.
-            user_cache: Cache coordinator using User freshness boundaries.
-            community_cache: Cache coordinator using Community freshness boundaries.
-            accounting_provider: Optional controlled PromQL source.
-            accounting_caches: User and Community accounting coordinators.
-            redis: Redis client when configured; closed on shutdown.
-            telemetry: Bounded lifecycle and readiness recorder.
-        """
+        """Attach injected resources for production or focused tests."""
         self._settings = settings
-        self._providers = [
-            current
-            for current in (provider, user_provider, accounting_provider)
-            if current is not None
-        ]
-        self._started = False
-        self._cache = cache
-        self._caches = tuple(
-            current
-            for current in (
-                cache,
-                user_cache,
-                community_cache,
-                *(accounting_caches or ()),
-            )
-            if current is not None
-        )
-        self._redis_coordinators = tuple(
-            current for current in self._caches if isinstance(current, RedisCoordinator)
-        )
-        self._redis: Redis | None = redis
+        self._provider = provider
         self._metrics: MetricsService | None = metrics_service
+        self._readiness = metrics_service.readiness
         self._telemetry = telemetry or NoopMetricsRecorder()
+        self._efficiency_provider = efficiency_provider
+        self._started = False
+        self._redis = redis
+        self._caches = (cache, user_cache, community_cache)
+        self._redis_coordinators: tuple[_ReadinessCoordinator, ...] = tuple(
+            cast(_ReadinessCoordinator, current)
+            for current in self._caches
+            if callable(getattr(current, "ping", None))
+        )
+        self._readiness_recovery: asyncio.Task[bool] | None = None
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
-        """Wire the Kueue provider, cache, and :class:`MetricsService`.
-
-        This method does not run provider startup; call :meth:`start` during the
-        application lifespan.
-
-        Args:
-            settings: Validated application settings.
-            recorder: Telemetry recorder for cache and provider timings.
-
-        Returns:
-            A fully wired runtime ready for :meth:`start`.
-        """
+        """Wire Kueue, optional PromQL efficiency, shared Redis, and service."""
+        provider = KueueProvider(settings)
+        efficiency_provider = _build_efficiency_provider(settings, recorder)
         cache, redis_client = build_cache(settings, recorder)
         user_cache, _ = build_cache(
             settings,
@@ -274,62 +254,8 @@ class MetricsRuntime:
             surface="community",
             redis=redis_client,
         )
-        provider = KueueProvider(settings)
-        user_provider = KubernetesProvider(settings)
         fingerprint = provider.cache_fingerprint()
-        user_fingerprint = user_provider.cache_fingerprint()
-        accounting_provider = None
-        accounting_caches = None
-        if settings.providers.promql.enabled:
-            accounting_provider = PromQLProvider(settings, telemetry=recorder)
-            accounting_caches = (
-                build_accounting_cache(
-                    settings, surface="user", redis=redis_client, recorder=recorder
-                ),
-                build_accounting_cache(
-                    settings, surface="community", redis=redis_client, recorder=recorder
-                ),
-            )
-            accounting_fingerprint = accounting_provider.cache_fingerprint()
-
-            async def user_accounting(username, observed_at):
-                """Read cache-coordinated accounting for one user population.
-
-                Args:
-                    username: Exact canonical username.
-                    observed_at: Workload population observation time.
-                """
-                return await accounting_caches[0].get_or_fill(
-                    CacheIdentity(
-                        subject_kind="user",
-                        subject_value=username,
-                        cluster=settings.cluster_name,
-                        source=accounting_provider.name,
-                        fingerprint=f"{accounting_fingerprint}:{observed_at.isoformat()}",
-                    ),
-                    lambda: accounting_provider.read_user(username, observed_at),
-                )
-
-            async def community_accounting(community, observed_at):
-                """Read cache-coordinated accounting for one community population.
-
-                Args:
-                    community: Exact canonical community name.
-                    observed_at: Workload population observation time.
-                """
-                return await accounting_caches[1].get_or_fill(
-                    CacheIdentity(
-                        subject_kind="community",
-                        subject_value=community,
-                        cluster=settings.cluster_name,
-                        source=accounting_provider.name,
-                        fingerprint=f"{accounting_fingerprint}:{observed_at.isoformat()}",
-                    ),
-                    lambda: accounting_provider.read_community(community, observed_at),
-                )
-        else:
-            user_accounting = None
-            community_accounting = None
+        fingerprint = f"{fingerprint}:promql-{_efficiency_cache_fingerprint(settings)}"
         metrics_service = MetricsService(
             platform=provider.read_platform,
             cache=cache,
@@ -340,100 +266,178 @@ class MetricsRuntime:
                 fingerprint=fingerprint,
             ),
             platform_name=settings.platform_name,
-            user=user_provider.read_user,
+            user=provider.read_user,
             user_cache=user_cache,
-            user_identity=lambda username: CacheIdentity(
-                subject_kind="user",
-                subject_value=username,
+            user_identity=lambda username: _subject_cache_identity(
+                kind="user",
+                subject=username,
                 cluster=settings.cluster_name,
-                source=user_provider.name,
-                fingerprint=user_fingerprint,
+                source=provider.name,
+                fingerprint=fingerprint,
             ),
-            user_accounting=user_accounting,
-            community=user_provider.read_community,
+            community=provider.read_community,
             community_cache=community_cache,
-            community_identity=lambda community: CacheIdentity(
-                subject_kind="community",
-                subject_value=community,
+            community_identity=lambda community: _subject_cache_identity(
+                kind="community",
+                subject=community,
                 cluster=settings.cluster_name,
-                source=user_provider.name,
-                fingerprint=user_fingerprint,
+                source=provider.name,
+                fingerprint=fingerprint,
             ),
-            community_accounting=community_accounting,
             telemetry=recorder,
             provider=provider.name,
-            user_provider=user_provider.name,
+            platform_efficiency=efficiency_provider.read_platform
+            if efficiency_provider is not None
+            else None,
+            user_efficiency=efficiency_provider.read_user
+            if efficiency_provider is not None
+            else None,
+            community_efficiency=efficiency_provider.read_community
+            if efficiency_provider is not None
+            else None,
+            efficiency_timeout_seconds=min(
+                settings.providers.promql.request_timeout_seconds,
+                settings.cache.fill_timeout_seconds * 0.5,
+            ),
         )
         return cls(
             settings,
             provider=provider,
-            user_provider=user_provider,
             metrics_service=metrics_service,
             cache=cache,
             user_cache=user_cache,
             community_cache=community_cache,
-            accounting_provider=accounting_provider,
-            accounting_caches=accounting_caches,
             redis=redis_client,
             telemetry=recorder,
+            efficiency_provider=efficiency_provider,
         )
 
     @property
     def metrics_service(self) -> MetricsService:
-        """Return the shared Metrics service, once wired and available."""
+        """Return the active Metrics service."""
         if self._metrics is None:
-            msg = "Metrics service is not initialised for this runtime"
-            raise RuntimeError(msg)
+            raise RuntimeError("Metrics service is not initialised for this runtime")
         return self._metrics
 
     @property
     def settings(self) -> Settings:
-        """Process settings associated with this runtime."""
+        """Return the settings associated with this runtime."""
         return self._settings
 
     @property
     def ready(self) -> bool:
-        """Whether Redis is reachable and the provider completed startup."""
-        return self._started and all(cache.available for cache in self._caches)
+        """Return readiness without probing dependencies."""
+        if self._started and self._metrics is not None:
+            self._metrics.sync_cache_readiness()
+        return self._started and self._readiness.ready
+
+    async def check_readiness(self) -> bool:
+        """Recover failed cache or Kueue dependencies through one task."""
+        if self.ready:
+            return True
+        if not self._started:
+            return False
+        recovery = self._readiness_recovery
+        if recovery is None or recovery.done():
+            recovery = asyncio.create_task(self._recover_readiness())
+            self._readiness_recovery = recovery
+        return await asyncio.shield(recovery)
+
+    async def _recover_readiness(self) -> bool:
+        """Ping caches and rerun the provider startup validation."""
+        if not self._started:
+            return False
+        provider = self._provider
+        if provider is None:
+            return False
+        if not await self._recover_cache_readiness():
+            return False
+        try:
+            async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
+                await provider.startup()
+            await self._start_efficiency_provider()
+        except Exception:
+            self._readiness.mark_source("platform", reachable=False)
+            return False
+        self._readiness.mark_source("platform", reachable=True)
+        self.metrics_service.sync_cache_readiness()
+        return self.ready
+
+    async def _recover_cache_readiness(self) -> bool:
+        """Ping every Redis coordinator once and update cache state."""
+        if not self._redis_coordinators:
+            self.metrics_service.sync_cache_readiness()
+            return self._readiness.cache_available
+        try:
+            async with asyncio.timeout(self._settings.cache.redis_command_timeout_seconds):
+                results = await asyncio.gather(
+                    *(coordinator.ping() for coordinator in self._redis_coordinators),
+                    return_exceptions=True,
+                )
+        except TimeoutError:
+            return False
+        if any(isinstance(result, BaseException) for result in results):
+            return False
+        self.metrics_service.sync_cache_readiness()
+        return self._readiness.cache_available
+
+    async def _start_efficiency_provider(self) -> None:
+        """Start PromQL best-effort so failures become partial reports."""
+        if self._efficiency_provider is None:
+            return
+        try:
+            async with asyncio.timeout(self._settings.providers.promql.request_timeout_seconds):
+                await self._efficiency_provider.startup()
+        except Exception as exc:
+            _logger.warning("Optional PromQL efficiency provider unavailable: %s", exc)
 
     async def start(self) -> None:
-        """Validate dependencies and start each provider exactly once.
-
-        Any startup failure triggers complete resource cleanup before a
-        sanitized :class:`RuntimeStartupError` reaches the application.
-        """
-        if not self._providers or self._started:
+        """Validate dependencies and start the runtime exactly once."""
+        if self._started:
             return
         started = perf_counter()
         outcome = "ok"
         try:
-            with self._telemetry.span("application.startup"):
+            provider = self._provider
+            if provider is None:
+                raise RuntimeStartupError("Metrics runtime has already been shut down")
+            async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                 for coordinator in self._redis_coordinators:
                     await coordinator.ping()
-                for provider in self._providers:
+            self._started = True
+            self._readiness.start()
+            for surface in self._readiness.surfaces:
+                self._readiness.mark_source(surface, reachable=False)
+                self._readiness.mark_cache(surface, available=True)
+            try:
+                async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                     await provider.startup()
-                self._started = True
-                self._telemetry.record_readiness(True)
-                _logger.info("Runtime startup completed")
+            except Exception as exc:
+                outcome = "degraded"
+                _logger.warning("Kueue provider unavailable during startup: %s", exc)
+            else:
+                for surface in self._readiness.surfaces:
+                    self._readiness.mark_source(surface, reachable=True)
+            await self._start_efficiency_provider()
+            self._telemetry.record_readiness(self.ready)
         except asyncio.CancelledError:
             outcome = "cancelled"
-            try:
-                await self.shutdown()
-            finally:
-                raise
-        except RedisUnavailable:
-            outcome = "error"
-            _logger.error("Runtime startup validation failed")
             await self.shutdown()
-            raise RuntimeStartupError("Required metrics dependency is unavailable") from None
+            raise
+        except RedisUnavailable as exc:
+            outcome = "error"
+            await self.shutdown()
+            raise RuntimeStartupError("Required metrics dependency is unavailable") from exc
+        except TimeoutError as exc:
+            outcome = "error"
+            await self.shutdown()
+            raise RuntimeStartupError("Metrics dependency startup validation timed out") from exc
         except RuntimeStartupError:
             outcome = "error"
-            _logger.error("Provider startup validation failed")
             await self.shutdown()
             raise
         except Exception as exc:
             outcome = "error"
-            _logger.error("Unexpected provider startup failure")
             await self.shutdown()
             raise RuntimeStartupError("Unexpected error during metrics runtime startup") from exc
         finally:
@@ -444,57 +448,53 @@ class MetricsRuntime:
             )
 
     async def shutdown(self) -> None:
-        """Close each owned resource once without allowing one failure to skip another.
-
-        After this returns, :attr:`_metrics` is ``None`` so :attr:`metrics_service`
-        surfaces an invalid state instead of reusing closed resources.
-        """
-        with self._telemetry.span("application.shutdown"):
-            await self._shutdown()
-
-    async def _shutdown(self) -> None:
-        """Close providers, coordinators, and Redis despite individual failures."""
+        """Close provider, caches, and shared Redis resources."""
         started = perf_counter()
-        outcome = "ok"
-        cancellation: asyncio.CancelledError | None = None
+        recovery, self._readiness_recovery = self._readiness_recovery, None
+        if recovery is not None:
+            recovery.cancel()
+            await asyncio.gather(recovery, return_exceptions=True)
         self._telemetry.record_readiness(False)
-        providers, self._providers = self._providers, []
-        coordinators, self._redis_coordinators = self._redis_coordinators, ()
+        self._readiness.stop()
         self._started = False
-        for provider in providers:
-            try:
-                await provider.shutdown()
-            except asyncio.CancelledError as exc:
-                outcome = "cancelled"
-                cancellation = cancellation or exc
-            except Exception:
-                outcome = "error"
-                _logger.error("Provider shutdown failed; closing remaining resources")
-        for coordinator in coordinators:
-            try:
-                await coordinator.shutdown()
-            except asyncio.CancelledError as exc:
-                outcome = "cancelled"
-                cancellation = cancellation or exc
-            except Exception:
-                outcome = "error"
-                _logger.error("Cache coordinator shutdown failed; closing Redis")
+        provider, self._provider = self._provider, None  # type: ignore[assignment]
+        efficiency_provider, self._efficiency_provider = self._efficiency_provider, None
+        caches, self._caches = self._caches, ()  # type: ignore[assignment]
         redis, self._redis = self._redis, None
+        provider_outcome = "ok"
+        provider_cancel: asyncio.CancelledError | None = None
+        cache_outcome, cache_cancel = await _close_resources(
+            caches, "Metrics cache shutdown failed"
+        )
+        if provider is not None:
+            provider_outcome, provider_cancel = await _close_resources(
+                (provider,), "Kueue provider shutdown failed"
+            )
+        efficiency_outcome = "ok"
+        efficiency_cancel: asyncio.CancelledError | None = None
+        if efficiency_provider is not None:
+            efficiency_outcome, efficiency_cancel = await _close_resources(
+                (efficiency_provider,),
+                "PromQL efficiency provider shutdown failed",
+            )
+        redis_outcome = "ok"
+        redis_cancel: asyncio.CancelledError | None = None
         if redis is not None:
-            try:
-                await redis.aclose()
-            except asyncio.CancelledError as exc:
-                outcome = "cancelled"
-                cancellation = cancellation or exc
-            except Exception:
-                outcome = "error"
-                _logger.error("Redis shutdown failed")
+            redis_outcome, redis_cancel = await _close_redis(redis)
         self._metrics = None
+        cancellation = provider_cancel or efficiency_cancel or cache_cancel or redis_cancel
+        shutdown_outcome = _combine_shutdown_outcomes(
+            provider_outcome,
+            efficiency_outcome,
+            cache_outcome,
+            redis_outcome,
+        )
         self._telemetry.record_lifecycle(
             operation="shutdown",
-            outcome=outcome,
+            outcome=shutdown_outcome,
             seconds=perf_counter() - started,
         )
-        _logger.info("Runtime shutdown completed")
+        if shutdown_outcome == "ok" and cancellation is None:
+            _logger.info("Runtime shutdown completed")
         if cancellation is not None:
             raise cancellation

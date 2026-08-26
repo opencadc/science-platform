@@ -12,12 +12,9 @@ dependencies = [
     "httpx>=0.28.1",
     "kr8s>=0.20.15",
     "opentelemetry-exporter-otlp-proto-http>=1.41.0",
-    "opentelemetry-instrumentation-fastapi>=0.62b0",
-    "opentelemetry-instrumentation-httpx>=0.62b0",
     "opentelemetry-sdk>=1.41.0",
     "pydantic>=2.13.1",
     "pydantic-settings>=2.13.1",
-    "quantiphy>=2.22.1",
     "redis>=7.4.0",
     "uvicorn>=0.44.0",
 ]

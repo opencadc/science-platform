@@ -1,134 +1,147 @@
-"""Pure cache security and freshness invariants."""
+"""Public cache identity, freshness, envelope, and memory contracts."""
 
-from __future__ import annotations
-
-import asyncio
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
+from metrics.cache import CacheFailureCategory
 from metrics.cache import (
-    FRESHNESS_POLICIES,
+    CacheEnvelope,
     CacheIdentity,
     Freshness,
     FreshnessPolicy,
-    RedisCoordinator,
+    MemorySnapshots,
     cache_keys,
 )
 
+SECRET = b"cache-test-secret"
+NOW = datetime(2025, 1, 1, tzinfo=UTC)
+IDENTITY = CacheIdentity("user", "bob", "cluster-a", "kueue", "v1")
 
-def test_subject_keys_redact_values_and_rotate_with_secret() -> None:
-    identity = CacheIdentity(
-        subject_kind="user",
-        subject_value="Alice.Example@CANFAR.NET",
-        cluster="prod",
-        source="kubernetes",
-        fingerprint="namespaces-v1",
+
+def test_cache_keys_have_exactly_two_stable_opaque_keys() -> None:
+    keys = cache_keys(
+        prefix="metrics:",
+        identity=IDENTITY,
+        secret=SECRET,
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
     )
+
+    assert keys.value == f"{keys.base}:value"
+    assert keys.lease == f"{keys.base}:lease"
+    assert keys.value != keys.lease
+    assert "bob" not in keys.base
+    assert keys.identity_digest
+
+
+def test_cache_key_digest_changes_when_subject_identity_changes() -> None:
     first = cache_keys(
         prefix="metrics:",
-        identity=identity,
-        secret=b"a" * 32,
-        schema_revision="1",
-        source_revision="2",
-        query_revision="3",
+        identity=IDENTITY,
+        secret=SECRET,
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
     )
-    rotated = cache_keys(
+    second = cache_keys(
         prefix="metrics:",
-        identity=identity,
-        secret=b"b" * 32,
-        schema_revision="1",
-        source_revision="2",
-        query_revision="3",
+        identity=CacheIdentity("user", "alice", "cluster-a", "kueue", "v1"),
+        secret=SECRET,
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
     )
 
-    assert "alice" not in first.base.lower()
-    assert "canfar" not in first.base.lower()
-    assert first.base != rotated.base
+    assert first.base != second.base
+    assert first.identity_digest != second.identity_digest
 
 
-def test_community_keys_are_hmac_redacted_and_isolated() -> None:
-    astronomy = CacheIdentity("community", "astronomy", "prod", "kubernetes")
-    physics = CacheIdentity("community", "physics", "prod", "kubernetes")
-    keys = [
-        cache_keys(
-            prefix="metrics:",
-            identity=identity,
-            secret=b"a" * 32,
-            schema_revision="1",
-            source_revision="1",
-            query_revision="0",
-        ).base
-        for identity in (astronomy, physics)
-    ]
+def test_freshness_policy_has_four_positive_states_and_remaining_ttl() -> None:
+    policy = FreshnessPolicy(2, 10, 15)
 
-    assert keys[0] != keys[1]
-    assert all(subject not in key for key in keys for subject in ("astronomy", "physics"))
+    assert policy.classify(NOW, now=NOW) is Freshness.FRESH
+    assert policy.classify(NOW - timedelta(seconds=3), now=NOW) is Freshness.STALE
+    assert policy.classify(NOW - timedelta(seconds=11), now=NOW) is Freshness.RETAINED
+    assert policy.classify(NOW - timedelta(seconds=16), now=NOW) is Freshness.PURGED
+    assert policy.remaining_seconds(NOW - timedelta(seconds=5), now=NOW) == 10
+    assert policy.terminal_is_fresh(NOW + timedelta(seconds=1), now=NOW) is False
+    assert policy.terminal_is_fresh(NOW + timedelta(seconds=1), now=NOW + timedelta(seconds=1))
 
 
-def test_all_subject_freshness_windows_match_policy() -> None:
-    now = datetime.now(UTC)
-    expected = {
-        "platform": (5 * 60, 30 * 60, 60 * 60),
-        "user": (2 * 60, 10 * 60, 15 * 60),
-        "community": (2 * 60, 10 * 60, 15 * 60),
-    }
-    for subject, boundaries in expected.items():
-        policy = FRESHNESS_POLICIES[subject]
-        assert (policy.fresh_seconds, policy.stale_seconds, policy.retention_seconds) == boundaries
-        assert (
-            policy.classify(now - timedelta(seconds=policy.fresh_seconds - 1), now=now)
-            is Freshness.FRESH
-        )
-        assert (
-            policy.classify(now - timedelta(seconds=policy.fresh_seconds + 1), now=now)
-            is Freshness.STALE
-        )
-        assert (
-            policy.classify(now - timedelta(seconds=policy.stale_seconds + 1), now=now)
-            is Freshness.RETAINED
-        )
-        assert (
-            policy.classify(now - timedelta(seconds=policy.retention_seconds + 1), now=now)
-            is Freshness.PURGED
-        )
-
-
-@pytest.mark.anyio
-async def test_redis_coordinator_shutdown_cancels_cold_fill() -> None:
-    class Store:
-        schema_revision = source_revision = query_revision = "1"
-
-        async def read(self, _keys):
-            return None
-
-        async def pointer(self, _keys):
-            return None
-
-        async def acquire_lease(self, **_kwargs):
-            return True
-
-        async def release_lease(self, **_kwargs):
-            return None
-
-    started = asyncio.Event()
-
-    async def fill():
-        started.set()
-        await asyncio.Future()
-
-    coordinator = RedisCoordinator(
-        store=Store(),
-        key_prefix="test:",
-        key_secret=b"x" * 32,
-        policy=FreshnessPolicy(60, 120, 180),
-        created=lambda value: value.created,
+def test_envelope_signs_created_identity_revisions_kind_and_value() -> None:
+    keys = cache_keys(
+        prefix="metrics:",
+        identity=IDENTITY,
+        secret=SECRET,
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
     )
-    request = asyncio.create_task(
-        coordinator.get_or_fill(CacheIdentity("platform", "canfar", "c", "test"), fill)
-    )
-    await started.wait()
-    await coordinator.shutdown()
+    envelope = CacheEnvelope(
+        format="metrics-cache-v2",
+        identity_digest=keys.identity_digest,
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
+        kind="value",
+        created=NOW,
+        value={"count": 1},
+        integrity="",
+    ).sign(SECRET)
 
-    with pytest.raises(asyncio.CancelledError):
-        await request
+    restored = CacheEnvelope.model_validate_json(envelope.model_dump_json())
+    assert restored.verify(SECRET)
+    assert restored.created == NOW
+    assert restored.value == {"count": 1}
+    assert restored.kind == "value"
+
+
+def test_negative_envelope_is_the_same_signed_format_with_no_value() -> None:
+    envelope = CacheEnvelope(
+        format="metrics-cache-v2",
+        identity_digest="digest",
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
+        kind="not_found",
+        created=NOW,
+        value=None,
+        integrity="",
+    ).sign(SECRET)
+
+    assert envelope.kind == "not_found"
+    assert envelope.value is None
+    assert envelope.verify(SECRET)
+
+
+def test_failure_envelope_signs_only_a_bounded_category() -> None:
+    envelope = CacheEnvelope(
+        format="metrics-cache-v2",
+        identity_digest="digest",
+        schema_revision="2",
+        source_revision="kueue",
+        query_revision="1",
+        kind="failure",
+        created=NOW,
+        value=None,
+        failure_category=CacheFailureCategory.INTERNAL,
+        integrity="",
+    ).sign(SECRET)
+
+    encoded = envelope.model_dump_json()
+    restored = CacheEnvelope.model_validate_json(encoded)
+
+    assert restored.failure_category is CacheFailureCategory.INTERNAL
+    assert "source failure details" not in encoded
+    assert restored.verify(SECRET)
+
+
+def test_memory_is_bounded_and_supports_terminal_eviction() -> None:
+    memory = MemorySnapshots[int](max_entries=1)
+    memory.put("one", 1)
+    memory.put("two", 2)
+
+    assert memory.get("one") is None
+    assert memory.get("two") == 2
+    memory.evict("two")
+    assert memory.get("two") is None

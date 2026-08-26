@@ -5,19 +5,20 @@ kind: Job
 metadata:
   name: integration-idle
   namespace: canfar-workloads
-  labels: &borrowing-labels
-    metrics.canfar.net/fixture-phase: borrowing
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: borrowing-alice
-    canfar.net/username: alice
-    canfar.net/name: borrowing-alice
-    canfar.net/kind: headless
-    canfar.net/job: integration-idle
-    canfar.net/flavor: flexible
-    canfar.net/accelerator: none
-    canfar.net/community: astronomy
-    canfar.net/project: usage-fixtures
+  labels: &borrowing-job-labels
+    <<: &borrowing-pod-labels
+      metrics.canfar.net/fixture-phase: borrowing
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: borrowing-bob
+      canfar.net/username: bob
+      canfar.net/name: borrowing-bob
+      canfar.net/kind: headless
+      canfar.net/job: integration-idle
+      canfar.net/flavor: flexible
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-smoke
 spec:
   suspend: true
@@ -25,7 +26,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *borrowing-labels
+      labels: *borrowing-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -60,19 +61,20 @@ kind: Job
 metadata:
   name: resource-shapes
   namespace: canfar-workloads
-  labels: &shape-labels
-    metrics.canfar.net/fixture-phase: controls
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: shapes-bob
-    canfar.net/username: bob
-    canfar.net/name: resource-shapes
-    canfar.net/kind: notebook
-    canfar.net/job: resource-shapes
-    canfar.net/flavor: flexible
-    canfar.net/accelerator: none
-    canfar.net/community: physics
-    canfar.net/project: usage-fixtures
+  labels: &shape-job-labels
+    <<: &shape-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: shapes-bob
+      canfar.net/username: bob
+      canfar.net/name: resource-shapes
+      canfar.net/kind: notebook
+      canfar.net/job: resource-shapes
+      canfar.net/flavor: flexible
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-smoke
 spec:
   suspend: true
@@ -80,7 +82,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *shape-labels
+      labels: *shape-pod-labels
     spec:
       runtimeClassName: metrics-overhead
       restartPolicy: Never
@@ -138,19 +140,20 @@ kind: Job
 metadata:
   name: pending-demand
   namespace: canfar-workloads
-  labels: &pending-labels
-    metrics.canfar.net/fixture-phase: controls
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: pending-bob
-    canfar.net/username: bob
-    canfar.net/name: pending-demand
-    canfar.net/kind: notebook
-    canfar.net/job: pending-demand
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: physics
-    canfar.net/project: usage-fixtures
+  labels: &pending-job-labels
+    <<: &pending-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: pending-bob
+      canfar.net/username: bob
+      canfar.net/name: pending-demand
+      canfar.net/kind: notebook
+      canfar.net/job: pending-demand
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-smoke
 spec:
   suspend: true
@@ -158,7 +161,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *pending-labels
+      labels: *pending-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -190,116 +193,27 @@ kind: Job
 metadata:
   name: terminal-control
   namespace: canfar-workloads
-  labels: &terminal-labels
-    metrics.canfar.net/fixture-phase: controls
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: terminal-alice
-    canfar.net/username: alice
-    canfar.net/name: terminal-control
-    canfar.net/kind: headless
-    canfar.net/job: terminal-control
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: astronomy
-    canfar.net/project: usage-fixtures
+  labels: &terminal-job-labels
+    <<: &terminal-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: terminal-bob
+      canfar.net/username: bob
+      canfar.net/name: terminal-control
+      canfar.net/kind: headless
+      canfar.net/job: terminal-control
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-smoke
 spec:
   suspend: true
   backoffLimit: 0
   template:
     metadata:
-      labels: *terminal-labels
-    spec:
-      restartPolicy: Never
-      automountServiceAccountToken: false
-      securityContext: &pod-security
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-        - name: terminal
-          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
-          imagePullPolicy: IfNotPresent
-          command: [sh, -c, "dd if=/dev/zero of=/tmp/activity bs=1M count=2"]
-          securityContext: &container-security
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 20m
-              memory: 24Mi
----
-# Intentional exclusion: no Skaha provenance or subject labels.
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: unlabelled-control
-  namespace: canfar-workloads
-  labels:
-    metrics.canfar.net/fixture-phase: controls
-spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        metrics.canfar.net/fixture-phase: controls
-    spec:
-      restartPolicy: Never
-      automountServiceAccountToken: false
-      securityContext: &pod-security
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-        - name: terminal
-          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
-          imagePullPolicy: IfNotPresent
-          command: [sh, -c, "dd if=/dev/zero of=/tmp/activity bs=1M count=2"]
-          securityContext: &container-security
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 20m
-              memory: 24Mi
----
-# Intentional exclusion: Kubernetes permits empty label values.
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: empty-subject-control
-  namespace: canfar-workloads
-  labels: &empty-labels
-    metrics.canfar.net/fixture-phase: controls
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: empty-subject
-    canfar.net/username: ""
-    canfar.net/name: empty-subject-control
-    canfar.net/kind: headless
-    canfar.net/job: empty-subject-control
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: ""
-    canfar.net/project: usage-fixtures
-spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels: *empty-labels
+      labels: *terminal-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -331,19 +245,20 @@ kind: Job
 metadata:
   name: fair-warm-high
   namespace: canfar-workloads
-  labels: &warm-labels
-    metrics.canfar.net/fixture-phase: fair-warm
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: fair-warm-alice
-    canfar.net/username: alice
-    canfar.net/name: fair-warm-high
-    canfar.net/kind: headless
-    canfar.net/job: fair-warm-high
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: astronomy
-    canfar.net/project: usage-fixtures
+  labels: &warm-job-labels
+    <<: &warm-pod-labels
+      metrics.canfar.net/fixture-phase: fair-warm
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-warm-alice
+      canfar.net/username: alice
+      canfar.net/name: fair-warm-high
+      canfar.net/kind: headless
+      canfar.net/job: fair-warm-high
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-high
 spec:
   suspend: true
@@ -351,7 +266,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *warm-labels
+      labels: *warm-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -383,19 +298,20 @@ kind: Job
 metadata:
   name: fair-next-high
   namespace: canfar-workloads
-  labels: &fair-high-labels
-    metrics.canfar.net/fixture-phase: fair-contenders
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: fair-next-high-bob
-    canfar.net/username: bob
-    canfar.net/name: fair-next-high
-    canfar.net/kind: headless
-    canfar.net/job: fair-next-high
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: physics
-    canfar.net/project: usage-fixtures
+  labels: &fair-high-job-labels
+    <<: &fair-high-pod-labels
+      metrics.canfar.net/fixture-phase: fair-contenders
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-next-high-alice
+      canfar.net/username: alice
+      canfar.net/name: fair-next-high
+      canfar.net/kind: headless
+      canfar.net/job: fair-next-high
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-high
 spec:
   suspend: true
@@ -403,7 +319,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *fair-high-labels
+      labels: *fair-high-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -435,19 +351,20 @@ kind: Job
 metadata:
   name: fair-next-low
   namespace: canfar-workloads
-  labels: &fair-low-labels
-    metrics.canfar.net/fixture-phase: fair-contenders
-    app.kubernetes.io/managed-by: skaha
-    app.kubernetes.io/part-of: canfar
-    canfar.net/id: fair-next-low-carol
-    canfar.net/username: carol
-    canfar.net/name: fair-next-low
-    canfar.net/kind: headless
-    canfar.net/job: fair-next-low
-    canfar.net/flavor: fixed
-    canfar.net/accelerator: none
-    canfar.net/community: astronomy
-    canfar.net/project: usage-fixtures
+  labels: &fair-low-job-labels
+    <<: &fair-low-pod-labels
+      metrics.canfar.net/fixture-phase: fair-contenders
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-next-low-carol
+      canfar.net/username: carol
+      canfar.net/name: fair-next-low
+      canfar.net/kind: headless
+      canfar.net/job: fair-next-low
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-low
 spec:
   suspend: true
@@ -455,7 +372,7 @@ spec:
   activeDeadlineSeconds: 300
   template:
     metadata:
-      labels: *fair-low-labels
+      labels: *fair-low-pod-labels
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false

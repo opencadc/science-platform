@@ -2,224 +2,211 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
+from typing import Any, NoReturn
 
-from metrics.cache import CacheCoordinator, CacheIdentity, CacheResult, CacheUnavailable
-from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
+from metrics.cache import (
+    CacheCoordinator,
+    CacheIdentity,
+    CacheNotFound,
+    CacheResult,
+    CacheUnavailable,
+)
+from metrics.errors import (
+    AppError,
+    ProviderExecutionError,
+    ProviderUnavailableError,
+    SubjectNotFoundError,
+)
 from metrics.services.models import (
     DEFAULT_PLATFORM_NAME,
-    AccountingSnapshot,
-    AccountingState,
     CachedSnapshot,
     CommunityObservation,
-    LifetimeIssue,
+    EfficiencyObservation,
     MetricsResult,
     MetricsSubject,
+    MetricsSurface,
     PlatformObservation,
+    ReadinessState,
     UserObservation,
 )
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
+
 logger = logging.getLogger(__name__)
 
-
 WorkloadObservation = UserObservation | CommunityObservation
+AnyObservation = PlatformObservation | WorkloadObservation
+PlatformLoader = Callable[[], Awaitable[PlatformObservation]]
+WorkloadLoader = Callable[[str], Awaitable[WorkloadObservation]]
+PlatformEfficiencyLoader = Callable[[], Awaitable[EfficiencyObservation]]
+WorkloadEfficiencyLoader = Callable[[str], Awaitable[EfficiencyObservation]]
 
 
 @dataclass(frozen=True, slots=True)
 class _WorkloadBinding:
-    """Bundle one subject loader with its observation and accounting caches."""
+    """Bundle one workload loader with its cache and optional efficiency loader."""
 
-    loader: Callable[[str], Awaitable[WorkloadObservation]]
+    loader: WorkloadLoader
     cache: CacheCoordinator[CachedSnapshot]
     identity: Callable[[str], CacheIdentity]
-    accounting: Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None = None
+    efficiency_loader: WorkloadEfficiencyLoader | None
 
 
 class MetricsService:
-    """Cache-first Metrics reads with subject dispatch and provider error mapping.
-
-    Routes call :meth:`get` only. Cache orchestration and source selection stay here.
-    """
+    """Cache-first Metrics reads with per-subject source fills."""
 
     def __init__(
         self,
         *,
-        platform: Callable[[], Awaitable[PlatformObservation]],
+        platform: PlatformLoader,
         cache: CacheCoordinator[CachedSnapshot],
         identity: Callable[[], CacheIdentity],
         platform_name: str = DEFAULT_PLATFORM_NAME,
-        user: Callable[[str], Awaitable[UserObservation]] | None = None,
-        user_cache: CacheCoordinator[CachedSnapshot] | None = None,
-        user_identity: Callable[[str], CacheIdentity] | None = None,
-        user_accounting: (
-            Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None
-        ) = None,
-        community: Callable[[str], Awaitable[CommunityObservation]] | None = None,
-        community_cache: CacheCoordinator[CachedSnapshot] | None = None,
-        community_identity: Callable[[str], CacheIdentity] | None = None,
-        community_accounting: (
-            Callable[[str, datetime], Awaitable[CacheResult[AccountingSnapshot]]] | None
-        ) = None,
+        platform_efficiency: PlatformEfficiencyLoader | None = None,
+        user: WorkloadLoader,
+        user_cache: CacheCoordinator[CachedSnapshot],
+        user_identity: Callable[[str], CacheIdentity],
+        user_efficiency: WorkloadEfficiencyLoader | None = None,
+        community: WorkloadLoader,
+        community_cache: CacheCoordinator[CachedSnapshot],
+        community_identity: Callable[[str], CacheIdentity],
+        community_efficiency: WorkloadEfficiencyLoader | None = None,
         telemetry: MetricsRecorder | None = None,
-        provider: str = "unknown",
-        user_provider: str = "kubernetes",
+        provider: str = "kueue",
+        readiness: ReadinessState | None = None,
+        efficiency_timeout_seconds: float = 5.0,
     ) -> None:
-        """Wire cache, platform loader, and optional telemetry.
+        """Wire all three Kueue surfaces and optional efficiency adapters.
 
-        Args:
-            platform: Async callable that fetches a fresh platform observation.
-            cache: Required cache coordinator storing :class:`CachedSnapshot`.
-            identity: Sync callable returning the platform cache identity.
-            platform_name: Configured public platform path segment (default
-                ``canfar``). Requests for other platform names return 404.
-            user: Optional callable that fetches one user observation.
-            user_cache: Coordinator using the User freshness policy.
-            user_identity: Callable returning an opaque user cache identity.
-            user_accounting: Optional cache-coordinated lifetime accounting read.
-            community: Optional callable that fetches one community observation.
-            community_cache: Coordinator using the Community freshness policy.
-            community_identity: Callable returning an opaque community cache identity.
-            community_accounting: Optional cache-coordinated lifetime accounting read.
-            telemetry: Optional cache/provider timing recorder.
-            provider: Adapter name for provider duration telemetry.
-            user_provider: User adapter name for provider duration telemetry.
+        Efficiency is bounded independently from the Kueue observation and
+        runs concurrently with it. A failed efficiency read leaves the queue
+        observation serviceable, but marks that cached report ``Ready=False``
+        with ``PartialData``.
         """
+        if efficiency_timeout_seconds <= 0:
+            raise ValueError("efficiency_timeout_seconds must be positive")
+
         self._platform = platform
         self._cache = cache
         self._identity = identity
         self._platform_name = platform_name
-        self._workloads: dict[str, _WorkloadBinding] = {}
-        if user is not None and user_cache is not None and user_identity is not None:
-            self._workloads["user"] = _WorkloadBinding(
-                user, user_cache, user_identity, user_accounting
-            )
-        if community is not None and community_cache is not None and community_identity is not None:
-            self._workloads["community"] = _WorkloadBinding(
-                community, community_cache, community_identity, community_accounting
-            )
+        self._platform_efficiency = platform_efficiency
+        self._efficiency_timeout_seconds = efficiency_timeout_seconds
+        self._workloads: dict[MetricsSurface, _WorkloadBinding] = {
+            "user": _WorkloadBinding(user, user_cache, user_identity, user_efficiency),
+            "community": _WorkloadBinding(
+                community,
+                community_cache,
+                community_identity,
+                community_efficiency,
+            ),
+        }
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
-        self._user_provider = user_provider
+        self._readiness = readiness or ReadinessState(("platform", "user", "community"))
+        self._serviceable_until: dict[MetricsSurface, datetime | None] = {
+            surface: None for surface in self._readiness.surfaces
+        }
+
+    @property
+    def readiness(self) -> ReadinessState:
+        """Return the service's process readiness state."""
+        return self._readiness
+
+    def sync_cache_readiness(self) -> None:
+        """Copy each cache coordinator's availability into readiness state."""
+        caches: dict[MetricsSurface, CacheCoordinator[CachedSnapshot]] = {
+            "platform": self._cache,
+            **{surface: binding.cache for surface, binding in self._workloads.items()},
+        }
+        now = datetime.now(UTC)
+        for surface in self._readiness.surfaces:
+            self._readiness.mark_cache(surface, available=caches[surface].available)
+            serviceable_until = self._global_serviceable_until(surface)
+            self._readiness.mark_snapshot(
+                surface,
+                complete=serviceable_until is not None,
+                serviceable=serviceable_until is not None and now <= serviceable_until,
+            )
+
+    def _global_serviceable_until(self, surface: MetricsSurface) -> datetime | None:
+        """Return readiness evidence only for the global Platform snapshot."""
+        if surface != "platform":
+            return None
+        return self._serviceable_until.get(surface)
 
     @property
     def cache_ttl_seconds(self) -> int:
-        """Return the Platform report freshness window."""
+        """Return the Platform fresh-cache window."""
         return self._cache.policy.fresh_seconds
 
     @property
     def user_cache_ttl_seconds(self) -> int:
-        """Return the User report freshness window."""
-        binding = self._workloads.get("user")
-        return binding.cache.policy.fresh_seconds if binding else 0
+        """Return the User fresh-cache window."""
+        return self._workloads["user"].cache.policy.fresh_seconds
 
     @property
     def community_cache_ttl_seconds(self) -> int:
-        """Return the Community report freshness window."""
-        binding = self._workloads.get("community")
-        return binding.cache.policy.fresh_seconds if binding else 0
+        """Return the Community fresh-cache window."""
+        return self._workloads["community"].cache.policy.fresh_seconds
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
-        """Return Metrics for ``subject``, using cache on hit and the source on miss.
-
-        Concurrent cache misses coalesce onto one in-flight backend load per key
-        (single-flight). Cancelling one waiter does not cancel the shared load.
-
-        Args:
-            subject: Subject selector (``platform``, ``user``, or ``community``).
-
-        Returns:
-            Observation, snapshot creation time, and whether it came from cache.
-
-        Raises:
-            AppError: Unsupported subject, unknown platform name, provider
-                unavailability (503), or execution failure. Details stay in
-                server logs.
-        """
-        with self._metrics_recorder.span(
-            "metrics.get",
-            {"metrics.operation": "get", "metrics.subject.type": subject.kind},
-        ):
-            if subject.kind == "platform":
-                if subject.value != self._platform_name:
-                    raise AppError(
-                        code="platform_not_found",
-                        message="Requested platform metrics subject is not configured",
-                        status_code=404,
-                    )
-                return await self._get_platform()
-            if subject.kind in self._workloads:
-                return await self._get_workload(subject.kind, subject.value)
-            raise AppError(
-                code="subject_unsupported",
-                message="Requested metrics subject is not supported",
-                status_code=404,
-            )
-
-    async def _get_platform(self) -> MetricsResult:
-        """Resolve a platform snapshot and map cache failure to API semantics."""
-        try:
-            result = await self._cache.get_or_fill(self._identity(), self._load_snapshot)
-        except CacheUnavailable as exc:
-            raise AppError(
-                code="metrics_cache_unavailable",
-                message="Platform metrics are temporarily unavailable",
-                status_code=503,
-                retry_after=1,
-            ) from exc
-        snapshot = result.value
-        cache_result = "stale" if result.stale else ("hit" if result.cached else "miss")
-        self._metrics_recorder.record_cache_lookup(
-            backend=self._cache.backend_name,
-            result=cache_result,
-            scope="platform",
-            age_seconds=(datetime.now(UTC) - snapshot.created).total_seconds(),
-        )
-        logger.info("Platform metrics request completed")
-        return MetricsResult(
-            observation=snapshot.observation,
-            created=snapshot.created,
-            cached=result.cached,
-            stale=result.stale,
-            cache_available=self._cache.available,
-        )
-
-    async def _load_snapshot(self) -> CachedSnapshot:
-        """Load and timestamp a fresh platform observation for the cache."""
-        scope = "platform"
+        """Return one cached or freshly filled report for ``subject``."""
         started = perf_counter()
         status = "ok"
         try:
-            observation = await self._timed_platform_load()
-            created = datetime.now(UTC)
-            return CachedSnapshot(observation=observation, created=created)
+            if subject.kind == "platform":
+                if subject.value != self._platform_name:
+                    raise AppError(code="platform_not_found", status_code=404)
+                return await self._get_platform()
+            if subject.kind == "user":
+                return await self._get_workload("user", subject.value)
+            return await self._get_workload("community", subject.value)
+        except asyncio.CancelledError:
+            status = "cancelled"
+            raise
         except AppError as exc:
-            status = exc.code
+            status = "not_found" if exc.status_code == 404 else "error"
             raise
         except Exception:
-            status = "unexpected_error"
+            status = "error"
             raise
         finally:
             self._metrics_recorder.record_compute_duration(
                 seconds=perf_counter() - started,
                 status=status,
-                scope=scope,
+                scope=subject.kind,
             )
 
-    async def _get_workload(self, kind: str, subject: str) -> MetricsResult:
-        """Resolve one cached user or community workload report.
+    def _raise_unavailable(self, kind: MetricsSurface, exc: CacheUnavailable) -> NoReturn:
+        """Map a cache miss or source outage onto the HTTP error contract."""
+        if exc.cache_available and exc.source_reachable is False:
+            self._mark_surface_failure(kind)
+            raise AppError(code=f"{kind}_metrics_unavailable", status_code=503) from exc
+        self._mark_cache_failure(kind)
+        raise AppError(code="metrics_cache_unavailable", status_code=503, retry_after=1) from exc
 
-        Args:
-            kind: Supported workload subject kind.
-            subject: Exact canonical subject value.
+    async def _get_platform(self) -> MetricsResult:
+        """Resolve one Platform cache identity and map failures to HTTP semantics."""
+        try:
+            result = await self._cache.get_or_fill(self._identity(), self._load_platform_snapshot)
+        except CacheUnavailable as exc:
+            self._raise_unavailable("platform", exc)
+        except Exception:
+            self._mark_surface_failure("platform")
+            raise
+        snapshot = self._require_snapshot(result.value, PlatformObservation)
+        self._mark_surface_result("platform", result)
+        return self._result(snapshot, result)
 
-        Returns:
-            Workload observation with cache provenance.
-        """
+    async def _get_workload(self, kind: MetricsSurface, subject: str) -> MetricsResult:
+        """Resolve one User or Community cache identity."""
         binding = self._workloads[kind]
         try:
             result = await binding.cache.get_or_fill(
@@ -227,223 +214,146 @@ class MetricsService:
                 lambda: self._load_workload_snapshot(kind, subject, binding),
             )
         except CacheUnavailable as exc:
-            raise AppError(
-                code="metrics_cache_unavailable",
-                message=f"{kind.title()} metrics are temporarily unavailable",
-                status_code=503,
-                retry_after=1,
-            ) from exc
-        snapshot = result.value
-        self._record_cache_result(kind, binding.cache, snapshot, result.cached, result.stale)
-        observation = snapshot.observation
-        if not isinstance(observation, (UserObservation, CommunityObservation)):
-            raise TypeError("Workload cache returned a platform observation")
-        return MetricsResult(
-            observation=observation,
-            created=snapshot.created,
-            cached=result.cached,
-            stale=result.stale or observation.accounting_stale,
-            cache_available=binding.cache.available,
-        )
+            self._raise_unavailable(kind, exc)
+        except CacheNotFound as exc:
+            self._mark_subject_not_found(
+                kind,
+                cache_available=exc.cache_available,
+                source_reachable=exc.source_reachable,
+            )
+            raise AppError(code=f"{kind}_not_found", status_code=404) from exc
+        except Exception:
+            self._mark_surface_failure(kind)
+            raise
+        expected_type = UserObservation if kind == "user" else CommunityObservation
+        snapshot = self._require_snapshot(result.value, expected_type)
+        self._mark_surface_result(kind, result)
+        return self._result(snapshot, result)
 
-    def _record_cache_result(
-        self,
-        scope: str,
-        cache: CacheCoordinator[CachedSnapshot],
-        snapshot: CachedSnapshot,
-        cached: bool,
-        stale: bool,
-    ) -> None:
-        """Record bounded lookup provenance for a returned snapshot.
-
-        Args:
-            scope: Metrics subject kind.
-            cache: Coordinator that served the request.
-            snapshot: Returned observation snapshot.
-            cached: Whether the coordinator reported a hit.
-            stale: Whether the snapshot is stale-serviceable.
-        """
-        cache_result = "stale" if stale else ("hit" if cached else "miss")
-        self._metrics_recorder.record_cache_lookup(
-            backend=cache.backend_name,
-            result=cache_result,
-            scope=scope,
-            age_seconds=(datetime.now(UTC) - snapshot.created).total_seconds(),
+    async def _load_platform_snapshot(self) -> CachedSnapshot:
+        """Fill Platform Kueue data and optional attributed efficiency."""
+        return await self._snapshot_with_efficiency(
+            "platform",
+            self._timed_platform_load,
+            self._platform_efficiency,
         )
 
     async def _load_workload_snapshot(
         self,
-        kind: str,
+        kind: MetricsSurface,
         subject: str,
         binding: _WorkloadBinding,
     ) -> CachedSnapshot:
-        """Load workload requests and merge matching optional accounting.
-
-        Args:
-            kind: User or community subject kind.
-            subject: Exact canonical subject value.
-            binding: Provider and cache functions for the subject kind.
-
-        Returns:
-            Observation snapshot suitable for the workload cache.
-        """
-        started = perf_counter()
-        status = "ok"
-        try:
-            observation = await self._timed_workload_load(kind, subject, binding.loader)
-            if binding.accounting is not None:
-                try:
-                    result = await binding.accounting(subject, observation.observed_at)
-                    observation = self._merge_accounting(observation, result)
-                except (
-                    CacheUnavailable,
-                    ProviderExecutionError,
-                    ProviderUnavailableError,
-                ):
-                    logger.warning("%s lifetime accounting unavailable", kind.title())
-                    observation = replace(
-                        observation,
-                        accounting_state=AccountingState.UNAVAILABLE,
-                    )
-            return CachedSnapshot(observation=observation, created=observation.observed_at)
-        except AppError as exc:
-            status = exc.code
-            raise
-        except Exception:
-            status = "unexpected_error"
-            raise
-        finally:
-            self._metrics_recorder.record_compute_duration(
-                seconds=perf_counter() - started,
-                status=status,
-                scope=kind,
-            )
-
-    @staticmethod
-    def _merge_accounting(
-        observation: WorkloadObservation,
-        result: CacheResult[AccountingSnapshot],
-    ) -> WorkloadObservation:
-        """Merge accounting only when time, Pods, and resource coverage match.
-
-        Args:
-            observation: Current Kubernetes workload population.
-            result: Cache-coordinated accounting for that population.
-
-        Returns:
-            Observation with complete, incomplete, or stale accounting state.
-        """
-        accounting = result.value
-        if (
-            accounting.lifetime.pod_uids != observation.pod_uids
-            or accounting.created != observation.observed_at
-        ):
-            return replace(
-                observation,
-                accounting_state=AccountingState.INCOMPLETE,
-                accounting_stale=result.stale,
-            )
-        uncovered = {
-            resource
-            for resource in accounting.lifetime.resources
-            if accounting.lifetime.coverage.get(resource, frozenset()) != observation.pod_uids
-        }
-        lifetime = replace(
-            accounting.lifetime,
-            resources={
-                resource: hours
-                for resource, hours in accounting.lifetime.resources.items()
-                if resource not in uncovered
-            },
-            incomplete=accounting.lifetime.incomplete
-            | {resource: frozenset({LifetimeIssue.MISSING_SERIES}) for resource in uncovered},
-        )
-        return replace(
-            observation,
-            accounting=lifetime,
-            accounting_state=(
-                AccountingState.COMPLETE if lifetime.ready else AccountingState.INCOMPLETE
-            ),
-            accounting_stale=result.stale,
+        """Fill one workload observation and its optional efficiency."""
+        efficiency_loader = binding.efficiency_loader
+        loader = None if efficiency_loader is None else lambda: efficiency_loader(subject)
+        return await self._snapshot_with_efficiency(
+            kind,
+            lambda: self._timed_workload_load(kind, subject, binding.loader),
+            loader,
         )
 
-    async def _timed_workload_load(
+    async def _snapshot_with_efficiency(
         self,
-        kind: str,
-        subject: str,
-        loader: Callable[[str], Awaitable[WorkloadObservation]],
-    ) -> WorkloadObservation:
-        """Time one workload provider call and map expected failures.
-
-        Args:
-            kind: User or community subject kind.
-            subject: Exact canonical subject value.
-            loader: Provider callable for the subject kind.
-
-        Returns:
-            Fresh workload observation.
-        """
-        started = perf_counter()
-        status = "ok"
+        kind: MetricsSurface,
+        observation_loader: Callable[[], Awaitable[AnyObservation]],
+        efficiency_loader: Callable[[], Awaitable[EfficiencyObservation]] | None,
+    ) -> CachedSnapshot:
+        """Collect Kueue and bounded optional efficiency in one fill."""
+        observation_task = asyncio.ensure_future(observation_loader())
+        tasks: list[asyncio.Future[Any]] = [observation_task]
+        efficiency_task: asyncio.Task[EfficiencyObservation | None] | None = None
+        if efficiency_loader is not None:
+            efficiency_task = asyncio.create_task(self._bounded_efficiency_load(efficiency_loader))
+            tasks.append(efficiency_task)
+        observation: AnyObservation | None = None
+        efficiency_result: EfficiencyObservation | None = None
+        efficiency_failed = False
+        pending: set[asyncio.Future[Any]] = set(tasks)
         try:
-            with self._metrics_recorder.span(
-                "source.read",
-                {
-                    "metrics.scope": kind,
-                    "provider.name": self._user_provider,
-                    "source.operation": "read",
-                },
-            ):
-                return await loader(subject)
-        except (ProviderUnavailableError, ProviderExecutionError) as exc:
-            status = "error"
-            logger.warning("%s metrics collection failed", kind.title())
-            raise AppError(
-                code=f"{kind}_metrics_unavailable",
-                message=f"Could not load {kind} metrics from Kubernetes",
-                status_code=503,
-            ) from exc
-        finally:
-            self._metrics_recorder.record_provider_duration(
-                provider=self._user_provider,
-                scope=kind,
-                status=status,
-                seconds=perf_counter() - started,
-            )
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if observation_task in done:
+                    if observation_task.cancelled():
+                        raise asyncio.CancelledError
+                    observation_error = observation_task.exception()
+                    if observation_error is not None:
+                        raise observation_error
+                    observation = observation_task.result()
+                if efficiency_task is not None and efficiency_task in done:
+                    if efficiency_task.cancelled():
+                        raise asyncio.CancelledError
+                    efficiency_error = efficiency_task.exception()
+                    if efficiency_error is not None:
+                        if isinstance(efficiency_error, Exception):
+                            efficiency_failed = True
+                        else:
+                            raise efficiency_error
+                    else:
+                        efficiency_result = efficiency_task.result()
+                        efficiency_failed = efficiency_result is None
+        except BaseException:
+            for task in pending:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+
+        if observation is None:
+            raise RuntimeError("Kueue observation task completed without a result")
+
+        efficiency: EfficiencyObservation | None = efficiency_result
+        ready = True
+        ready_reason = "Available"
+        if efficiency_task is not None and efficiency_failed:
+            logger.warning("%s efficiency data unavailable", kind)
+            ready = False
+            ready_reason = "PartialData"
+        created = observation.observed_at
+        if efficiency is not None:
+            created = min(created, efficiency.observed_at)
+        return CachedSnapshot(
+            observation=observation,
+            created=created,
+            efficiency=efficiency,
+            ready=ready,
+            ready_reason=ready_reason,
+        )
+
+    async def _bounded_efficiency_load(
+        self,
+        loader: Callable[[], Awaitable[EfficiencyObservation]],
+    ) -> EfficiencyObservation | None:
+        """Bound optional efficiency without changing Kueue cancellation."""
+        try:
+            async with asyncio.timeout(self._efficiency_timeout_seconds):
+                return await loader()
+        except TimeoutError:
+            return None
 
     async def _timed_platform_load(self) -> PlatformObservation:
-        """Time a platform provider call and map expected failures."""
+        """Load Platform data and map expected provider failures."""
         started = perf_counter()
         status = "ok"
         try:
-            with self._metrics_recorder.span(
-                "source.read",
-                {
-                    "metrics.scope": "platform",
-                    "provider.name": self._provider,
-                    "source.operation": "read",
-                },
-            ):
-                return await self._platform()
+            return await self._platform()
         except ProviderUnavailableError as exc:
             status = "error"
-            logger.warning("Platform metrics unavailable")
-            raise AppError(
-                code="platform_metrics_unavailable",
-                message="Could not load platform metrics from Kubernetes",
-                status_code=503,
+            raise CacheUnavailable(
+                "Platform source is unavailable",
+                cache_available=True,
+                source_reachable=False,
             ) from exc
         except ProviderExecutionError as exc:
             status = "error"
-            logger.error("Platform metrics collection failed")
-            raise AppError(
-                code="platform_metrics_error",
-                message="Platform metrics collection failed",
-                status_code=503,
+            raise CacheUnavailable(
+                "Platform source response is unusable",
+                cache_available=True,
+                source_reachable=False,
             ) from exc
-        except Exception:
-            status = "error"
-            raise
         finally:
             self._metrics_recorder.record_provider_duration(
                 provider=self._provider,
@@ -451,3 +361,121 @@ class MetricsService:
                 status=status,
                 seconds=perf_counter() - started,
             )
+
+    async def _timed_workload_load(
+        self,
+        kind: MetricsSurface,
+        subject: str,
+        loader: WorkloadLoader,
+    ) -> WorkloadObservation:
+        """Load one workload surface and map expected provider failures."""
+        started = perf_counter()
+        status = "ok"
+        try:
+            return await loader(subject)
+        except SubjectNotFoundError as exc:
+            status = "not_found"
+            raise CacheNotFound(source_reachable=True) from exc
+        except ProviderUnavailableError as exc:
+            status = "error"
+            raise CacheUnavailable(
+                f"{kind.capitalize()} source is unavailable",
+                cache_available=True,
+                source_reachable=False,
+            ) from exc
+        except ProviderExecutionError as exc:
+            status = "error"
+            raise CacheUnavailable(
+                f"{kind.capitalize()} source response is unusable",
+                cache_available=True,
+                source_reachable=False,
+            ) from exc
+        finally:
+            self._metrics_recorder.record_provider_duration(
+                provider=self._provider,
+                scope=kind,
+                status=status,
+                seconds=perf_counter() - started,
+            )
+
+    @staticmethod
+    def _require_snapshot(
+        snapshot: CachedSnapshot,
+        expected_type: type[PlatformObservation]
+        | type[UserObservation]
+        | type[CommunityObservation],
+    ) -> CachedSnapshot:
+        """Reject a cache payload for the wrong Metrics surface."""
+        if not isinstance(snapshot.observation, expected_type):
+            raise TypeError("Metrics cache returned an observation for the wrong surface")
+        return snapshot
+
+    @staticmethod
+    def _result(
+        snapshot: CachedSnapshot,
+        result: CacheResult[CachedSnapshot],
+    ) -> MetricsResult:
+        """Convert a generic cache result into the transport-neutral result."""
+        return MetricsResult(
+            observation=snapshot.observation,
+            created=snapshot.created,
+            cached=result.cached,
+            stale=result.stale,
+            cache_available=result.cache_available,
+            efficiency=snapshot.efficiency,
+            ready=snapshot.ready,
+            ready_reason=snapshot.ready_reason,
+        )
+
+    def _mark_surface_result(
+        self,
+        surface: MetricsSurface,
+        result: CacheResult[CachedSnapshot],
+    ) -> None:
+        """Record a serviceable queue snapshot in readiness state."""
+        self._readiness.mark_cache(
+            surface,
+            available=result.cache_available,
+        )
+        self._readiness.mark_snapshot(
+            surface,
+            complete=surface == "platform",
+            serviceable=(
+                surface == "platform"
+                and result.serviceable_until is not None
+                and datetime.now(UTC) <= result.serviceable_until
+            ),
+        )
+        self._serviceable_until[surface] = (
+            result.serviceable_until if surface == "platform" else None
+        )
+        if result.source_reachable is not None:
+            self._readiness.mark_source(surface, reachable=result.source_reachable)
+
+    def _mark_subject_not_found(
+        self,
+        surface: MetricsSurface,
+        *,
+        cache_available: bool,
+        source_reachable: bool | None,
+    ) -> None:
+        """Record an authoritative subject miss without failing the source surface."""
+        self._serviceable_until[surface] = None
+        self._readiness.mark_cache(surface, available=cache_available)
+        self._readiness.mark_snapshot(surface, complete=False, serviceable=False)
+        if source_reachable is not None:
+            self._readiness.mark_source(surface, reachable=source_reachable)
+
+    def _mark_surface_failure(
+        self,
+        surface: MetricsSurface,
+    ) -> None:
+        """Record a failed read when no report can satisfy the request."""
+        self._serviceable_until[surface] = None
+        if surface == "platform":
+            self._readiness.mark_source(surface, reachable=False)
+        self._readiness.mark_snapshot(surface, complete=False, serviceable=False)
+
+    def _mark_cache_failure(self, surface: MetricsSurface) -> None:
+        """Record cache unavailability without discarding source state."""
+        self._readiness.mark_cache(surface, available=False)

@@ -1,154 +1,203 @@
-# Kind: Metrics API development and testing
+# Metrics development and testing
 
-Use the installed `metrics-dev` command for the reusable core profile. It owns
-the one supported kind cluster (`metrics`) and context (`kind-metrics`), pinned
-Kueue, Redis, OpenTelemetry Collector, fixtures, image, and Helm release.
+Metrics is developed as one asynchronous FastAPI service. Kubernetes-first
+tests use kind, Helm, Kueue, and the configured external-service interfaces.
+The production chart does not install Redis, KSM, Prometheus/Mimir, or an OTLP
+metrics receiver; a disposable test profile may install them for integration
+checks.
 
 ## Prerequisites
 
-Install these tools before running the smoke flow.
-
 - Docker
-- kind 0.32.0
+- kind
 - kubectl
 - Helm
 - Python 3.13 and `uv`
 
-Run from the `metrics/` directory.
+Run commands from `metrics/`. Use the repository's pinned kind/Kubernetes and
+Kueue versions for CI-equivalent checks.
 
-The cluster is created from
-`kindest/node:v1.33.12@sha256:3f5c8443c620245e4d355cfe09e96a91ead32ceaa569d3f1ca9edf0cb2fe2ff4`;
-Kueue is pinned to 0.19.2 and fixtures use its v1beta2 APIs.
-
-## Reusable development loop
-
-Create or converge the core stack, then run the deployed HTTP smoke:
+## Fast local loop
 
 ```bash
-UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev up
-UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev smoke
+uv sync --group dev
+uv run ruff check src tests
+uv run pytest -m "not integration"
 ```
 
-Time `up` separately when it must pull the pinned kind, Kueue, Redis,
-Collector, fixture, or Python images. `smoke` is the warm gate and fails if it
-exceeds 120 seconds; its final line reports the measured warm duration.
+The application test suite should inject Kueue, Redis, and optional PromQL
+fakes. It must exercise the same service interfaces as the deployed process:
+fresh hits, stale refresh, cold single-flight, subject isolation, source
+errors, 404 subjects, and optional `PartialData` responses.
 
-Other finite lifecycle commands are:
+## Kubernetes smoke loop
+
+Use the installed project lifecycle for the reusable `kind-metrics` cluster:
 
 ```bash
-uv run metrics-dev run
-uv run metrics-dev image
-uv run metrics-dev fixtures
-uv run metrics-dev down
-uv run metrics-dev reset
+uv run metrics-dev up
+uv run metrics-dev smoke
 ```
 
-`run` writes a temporary, minified kubeconfig containing only `kind-metrics`;
-the Helm workload uses only its Kubernetes ServiceAccount. `reset` preserves
-the cluster and image cache while recreating fixtures and flushing local Redis.
-The core profile does not install Prometheus or Mimir.
+The deployed smoke must configure:
 
-The Helm release uses two API replicas for this gate. The warm smoke flushes
-Redis and restarts those replicas, then exercises Platform, User, and Community
-over a local HTTP socket. It checks cold fill, fresh hit, `If-Modified-Since`
-`304`, empty subjects, stale serve during a Kueue permission failure, the
-stable fail-closed `Status` response with no snapshot, legacy-route absence,
-and a graceful SIGTERM restart with shutdown-log evidence.
+```text
+METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
+METRICS_PROVIDERS__KUEUE__NAMESPACES='["canfar-workloads"]'
+```
 
-Use the optional accounting profile when changing the lifetime source:
+Fixtures should create LocalQueues with exact User and Community labels,
+ClusterQueues with exact Community labels, and workloads that exercise pending
+and reserving states. Each LocalQueue's Community label must equal its
+referenced ClusterQueue's label. Fixture names are not identity sources.
+
+These fixtures represent the output of a trusted platform provisioning or
+admission path. The Metrics and Skaha charts do not deploy that path. Before
+production use, an independently approved component must create the
+per-user LocalQueue, hand its exact name to the submitter, validate
+`LocalQueue -> configured ClusterQueue -> Community`, reserve the attribution
+labels from user override, and stamp only configured-ClusterQueue workloads.
+
+Each submitting Job or other supported workload object (not a
+generated/direct Kueue Workload CR) must identify its LocalQueue with the
+queue-name metadata label:
+
+```yaml
+metadata:
+  labels:
+    kueue.x-k8s.io/queue-name: lq-bob-astronomy
+    canfar.net/username: bob
+    canfar.net/community: astronomy
+spec:
+  template:
+    metadata:
+      labels:
+        canfar.net/username: bob
+        canfar.net/community: astronomy
+```
+
+Every submitted Job or supported workload object must carry the
+`kueue.x-k8s.io/queue-name` label for its User-specific LocalQueue. A
+generated/direct Kueue Workload CR is distinct: its authoritative queue
+selection is `.spec.queueName`, a field rather than a metadata label. Its
+top-level `canfar.net/username` and `canfar.net/community` labels are optional
+mirrors. When `METRICS_PROVIDERS__PROMQL__BASE_URL` is present, every
+`.spec.podSets[].template.metadata.labels` entry and the submitting metadata
+must carry the authoritative two `canfar.net` labels. An admitted Pod may additionally receive
+`kueue.x-k8s.io/local-queue-name` as corroborating metadata; PromQL attribution
+still uses the `canfar` labels.
+
+For the optional efficiency gate, add disposable KSM and Prometheus/Mimir
+fixtures, enable the KSM label allowlist, and add the stable `cluster` label to
+every ingested series used by the fixed query. `external_labels.cluster` is
+appropriate on the remote-write path to Mimir but is insufficient by itself
+for a local Prometheus query. The fixture must propagate authoritative labels
+to Jobs and Pod templates so recreated Running Pods retain attribution. See
+[`metadata-labels.md`](metadata-labels.md).
+
+## Read-only Kueue inspection
+
+Use these commands to inspect the exact source objects:
 
 ```bash
-UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev up --profile accounting
-UV_CACHE_DIR=/tmp/canfar-uv-cache uv run metrics-dev smoke --profile accounting
+kubectl --context kind-metrics get localqueues.kueue.x-k8s.io -A \
+  -l canfar.net/username=bob -o yaml
+kubectl --context kind-metrics get clusterqueues.kueue.x-k8s.io \
+  -l canfar.net/community=astronomy -o yaml
+kubectl --context kind-metrics get \
+  localqueues.kueue.x-k8s.io -n canfar-workloads \
+  -l canfar.net/username=bob \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}'
+kubectl --context kind-metrics get --raw \
+  '/apis/kueue.x-k8s.io/v1beta2/namespaces/canfar-workloads/localqueues?labelSelector=canfar.net%2Fusername%3Dbob'
+kubectl --context kind-metrics get --raw \
+  '/apis/kueue.x-k8s.io/v1beta2/clusterqueues?labelSelector=canfar.net%2Fcommunity%3Dastronomy'
 ```
 
-It adds pinned kube-state-metrics and Prometheus workloads plus the
-Metrics-owned recording rules and deterministic producer fixture in
-`scripts/accounting-profile.yaml`. The default `core` profile remains
-unchanged. The accounting smoke reconciles User and Community lifetime fields
-with the controlled per-Pod series, recreates the producer and Prometheus data,
-and proves a Prometheus outage returns current requests as partial data. Its
-separate warm budget is 300 seconds. Running `metrics-dev up` without the
-profile removes the optional accounting resources and reconverges core. Mimir
-is not part of this local gate; the same provider contract can target Mimir by
-setting its server-owned base URL and optional tenant ID.
+Inspect `status.flavorsReservation`, `status.reservingWorkloads`, and the
+referenced ClusterQueue. `pendingWorkloads` is waiting and is not the public
+Metrics count.
 
-The compatibility script delegates to the installed command:
+## Deployment boundary
+
+The Helm smoke may create disposable support resources inside the test
+namespace. Production deployment must provide external references for:
+
+- one shared Redis cache;
+- optional Prometheus/Mimir current-resource metrics; and
+- optional OTLP/HTTP application-state metrics.
+
+The Metrics chart owns only the API deployment, Service, RBAC, probes, and
+configuration references. It must not create a producer, accounting store,
+Cohort source, KSM, Prometheus, Mimir, or Collector.
+
+## Manual OTLP metrics smoke
+
+Run this from `metrics/` after the disposable stack is available:
 
 ```bash
-bash scripts/kind-smoke.sh
+UV_CACHE_DIR=/tmp/canfar-uv-cache bash scripts/precommit-otel-smoke.sh
 ```
 
-## Context and teardown safety
+The script first proves the current context is the exact `kind-metrics` target,
+then restarts the disposable Collector and API, flushes Redis, and makes real
+`/readyz`, Platform, User, and Community API requests. The Collector has one
+metrics pipeline and its file exporter is the evidence source. The smoke
+requires the application instruments emitted by that healthy startup and those
+Redis-backed cold reads:
 
-Every mutating command fails closed unless the exact context is
-`kind-metrics` and it resolves to the `metrics` kind cluster. An existing
-cluster on a Kubernetes version other than v1.33.12 is rejected; it is never
-silently reused or recreated.
+- `canfar.metrics.cache.lookups`, `canfar.metrics.cache.age`,
+  `canfar.metrics.cache.leases`, and `canfar.metrics.cache.fill.duration`;
+- `canfar.metrics.provider.duration`;
+- `canfar.metrics.redis.duration` and `canfar.metrics.redis.health`; and
+- `canfar.metrics.readiness` and `canfar.metrics.lifecycle.duration`.
 
-Stop the Helm workload while retaining the cluster with `down`. Cluster
-deletion requires the exact confirmation:
+The recorder also declares compute-duration and provider-error instruments, but
+the current production request path does not record them, so this healthy-path
+smoke does not require them. The privacy proof rejects fixture User/Community
+identities and selectors, opaque Redis key markers, response payload fields and
+values, and any missing application metric evidence. It does not require HTTP
+request auto-instrumentation. Port-forward processes and temporary evidence are
+cleaned up on exit; use the lifecycle commands above to manage the cluster.
+
+## Retired accounting profile migration
+
+The retired accounting profile was applied directly with `kubectl`, outside
+the Metrics Helm release. Helm cannot prune resources applied outside the
+release because they lack Helm ownership/release tracking. The lifecycle
+cleanup is bounded to the exact accounting label. Inspect first, then delete
+only these resources if a manual cleanup is required:
+
+The Role/RoleBinding inspect/delete pair must be repeated for every
+`METRICS_PROVIDERS__KUEUE__NAMESPACES` entry; `canfar-workloads` and
+`canfar-workloads-secondary` are only the disposable fixture's configured
+examples.
 
 ```bash
-uv run metrics-dev destroy --confirm kind-metrics
+kubectl --context kind-metrics --namespace metrics get deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting -o yaml
+kubectl --context kind-metrics --namespace metrics delete deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting --ignore-not-found --wait
+
+kubectl --context kind-metrics --namespace canfar-workloads get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml
+kubectl --context kind-metrics --namespace canfar-workloads delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found
+
+kubectl --context kind-metrics --namespace canfar-workloads-secondary get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml
+kubectl --context kind-metrics --namespace canfar-workloads-secondary delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found
+
+kubectl --context kind-metrics get clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting -o yaml
+kubectl --context kind-metrics delete clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found
 ```
 
-## Contract fixtures
+## Teardown
 
-The smoke contract names in `scripts/test-setup.yaml` and chart values remain:
+Use the lifecycle's non-destructive stop/reset commands for local iteration.
+Only the explicit cluster-destroy command may delete the disposable kind
+cluster. Never use local fixture cleanup commands as production rollback or
+Redis recovery instructions.
 
-- `default-flavor`
-- `cohort-atom`
-- `cq-proton`
-- `cq-electron`
-- `cq-fair`
-- `lq-smoke`
-- `lq-fair-high`
-- `lq-fair-low`
-- `integration-idle`
+## Related documentation
 
-`metrics-dev fixtures` applies `scripts/workload-fixtures.yaml` in condition-
-driven phases. `integration-idle` targets `cq-electron`, whose `100m` CPU and
-`100Mi` memory nominal quota is smaller than the Job's `200m`/`200Mi` request.
-The command requires an admitted Workload and ClusterQueue usage above nominal
-quota before continuing.
-
-The separate `cq-fair` scenario uses two equal LocalQueues. The command admits
-`fair-warm-high`, waits for non-zero LocalQueue consumed CPU, queues equivalent
-high- and low-use contenders, releases the warm Job, and requires
-`fair-next-low` to be admitted while `fair-next-high` remains without quota.
-The controller uses a one-minute usage half-life and a one-second test sampling
-interval from `scripts/kueue-config.yaml`; no fixture assertion depends on a
-fixed sleep.
-
-The remaining finite Jobs cover two or more users and communities, Pending and
-terminal states, missing and empty subject labels, multiple containers, init
-containers, and RuntimeClass Pod overhead. Every normal Job and Pod template
-uses the current Skaha labels from `skaha/docs/labels.md`; exclusion controls
-omit or empty labels intentionally. Borrowed, Pending, and fair-share state is
-fixture evidence and does not expand the Metrics API.
-
-## Troubleshooting
-
-- Image not found (`ErrImageNeverPull`): run `uv run metrics-dev up` again.
-- API startup failure: check logs with
-  `kubectl --context kind-metrics -n metrics logs deploy/metrics-api-metrics-api --tail=200`.
-- Workload not admitted: check Kueue status and fixture objects:
-  `kubectl --context kind-metrics get clusterqueue` and
-  `kubectl --context kind-metrics -n canfar-workloads get localqueue,workload`.
-- Redis cache data stale during iterative tests:
-  `kubectl --context kind-metrics exec -n metrics deploy/metrics-api-redis -- redis-cli FLUSHDB`.
-- Smoke fails after interrupting the stale/error scenario: rerun
-  `uv run metrics-dev image` to reconcile the chart-owned ClusterRoleBinding.
-- Warm smoke exceeds 120 seconds: inspect Pod restarts and local CPU pressure;
-  image and prerequisite pulls belong to the separately timed `metrics-dev up`.
-- Accounting smoke exceeds 300 seconds: inspect producer and Prometheus
-  rollouts separately from the core two-minute gate.
-
-## Related files
-
-- `scripts/kind-smoke.sh`
-- `src/metrics/dev/stack.py`
-- `scripts/kind-values.yaml`
-- `scripts/test-setup.yaml`
-- `../.github/workflows/ci.metrics.yml`
+- [`README.md`](../README.md)
+- [`architecture.md`](architecture.md)
+- [`specs.md`](specs.md)
+- [`metadata-labels.md`](metadata-labels.md)
+- [`environment-contracts.md`](environment-contracts.md)

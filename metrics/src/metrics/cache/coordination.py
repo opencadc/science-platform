@@ -1,58 +1,87 @@
-"""Coordinate Redis cache-aside reads, distributed fills, and safe fallbacks.
-
-The coordinator uses Redis leases to avoid replica stampedes, local single
-flight to coalesce same-process misses, and a bounded L1 only during outages.
-"""
+"""Coordinate two-key Redis reads, fills, leases, and outage fallback."""
 
 from __future__ import annotations
 
 import asyncio
-import random
-import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Generic, TypeVar
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from typing import Generic, Literal, Protocol, TypeVar
 
 from metrics.cache.memory import MemorySnapshots
 from metrics.cache.models import (
     CacheIdentity,
+    CacheKeys,
+    CacheFillTimeout,
+    CacheFailureCategory,
+    CacheInternalError,
+    CacheNotFound,
     CacheResult,
     CacheUnavailable,
     Freshness,
     FreshnessPolicy,
     cache_keys,
+    serviceable_until,
 )
-from metrics.cache.redis import RedisSnapshots, RedisUnavailable, StoredSnapshot
+from metrics.cache.redis import RedisUnavailable, StoredFailure, StoredNotFound, StoredSnapshot
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 Value = TypeVar("Value")
 
 
-@dataclass(slots=True)
-class _LocalFill(Generic[Value]):
-    """Share one cold-fill result or failure among process-local waiters."""
+class _CoordinatorStore(Protocol[Value]):
+    """Small durable-store seam used by the coordinator and test fakes."""
 
-    event: asyncio.Event
-    result: CacheResult[Value] | None = None
-    error: BaseException | None = None
+    schema_revision: str
+    source_revision: str
+    query_revision: str
+
+    async def ping(self) -> None:
+        """Check durable-store reachability."""
+
+    async def read(
+        self, keys: CacheKeys
+    ) -> StoredSnapshot[Value] | StoredNotFound | StoredFailure | None:
+        """Read one verified envelope."""
+
+    async def acquire_lease(self, *, keys: CacheKeys, token: str, lease_seconds: float) -> bool:
+        """Try to acquire the stable subject lease."""
+
+    async def commit(
+        self,
+        *,
+        keys: CacheKeys,
+        token: str,
+        created: datetime,
+        value: Value | None,
+        ttl_seconds: float,
+        not_found: bool = False,
+        failure_category: CacheFailureCategory | None = None,
+    ) -> bool:
+        """Commit one signed value only when the token still owns the lease."""
+
+    async def release_lease(self, *, keys: CacheKeys, token: str) -> None:
+        """Release the token-owned lease."""
+
+
+@dataclass(slots=True)
+class _LocalFlight(Generic[Value]):
+    """Track one local cold fill and its active request waiters."""
+
+    task: asyncio.Task[CacheResult[Value]]
+    waiters: int = 0
 
 
 class RedisCoordinator(Generic[Value]):
-    """Provide distributed single flight with bounded process-local fallback.
-
-    Fresh hits return immediately, stale hits attempt one leased refresh, and
-    cold misses wait for a lease owner to publish. Redis outages use L1 only
-    while its snapshot remains serviceable.
-    """
+    """Provide bounded cache-aside reads with distributed single flight."""
 
     backend_name = "redis"
 
     def __init__(
         self,
         *,
-        store: RedisSnapshots[Value],
+        store: _CoordinatorStore[Value],
         key_prefix: str,
         key_secret: bytes,
         policy: FreshnessPolicy,
@@ -60,51 +89,37 @@ class RedisCoordinator(Generic[Value]):
         fill_timeout: float = 10.0,
         cold_timeout: float = 12.0,
         poll_min: float = 0.05,
-        poll_max: float = 0.15,
         max_l1_entries: int = 128,
-        max_fills: int = 8,
+        clock: Callable[[], datetime] | None = None,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Configure freshness, finite deadlines, polling, and local bounds.
-
-        Args:
-            store: Redis snapshot repository.
-            key_prefix: Namespace prepended to opaque Redis keys.
-            key_secret: HMAC key used to obscure cache identities.
-            policy: Freshness and retention boundaries.
-            created: Callable extracting source collection time from a value.
-            fill_timeout: Maximum time allowed for one provider fill.
-            cold_timeout: Maximum total wait for a cold result.
-            poll_min: Minimum delay between durable pointer checks.
-            poll_max: Maximum delay between durable pointer checks.
-            max_l1_entries: Maximum last-known snapshots retained locally.
-            max_fills: Maximum concurrent provider fills in this process.
-            telemetry: Optional bounded cache telemetry recorder.
-        """
+        """Configure source deadlines, Redis identity, and local bounds."""
         self.policy = policy
         self._store = store
         self._key_prefix = key_prefix
         self._key_secret = key_secret
         self._created = created
-        self._fill_timeout = fill_timeout
-        self._cold_timeout = cold_timeout
-        self._poll_min = poll_min
-        self._poll_max = poll_max
+        self._fill_timeout = max(0.001, fill_timeout)
+        self._cold_timeout = max(0.001, cold_timeout)
+        self._lease_seconds = max(self._fill_timeout + 1.0, self._cold_timeout + 1.0)
+        self._poll_min = max(0.001, poll_min)
         self._l1 = MemorySnapshots[StoredSnapshot[Value]](max_l1_entries)
-        self._fills: dict[str, _LocalFill[Value]] = {}
-        self._fill_tasks: set[asyncio.Task[None]] = set()
-        self._lock = asyncio.Lock()
-        self._capacity = asyncio.Semaphore(max(1, max_fills))
-        self._available = True
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._telemetry = telemetry or NoopMetricsRecorder()
+        self._flights: dict[str, _LocalFlight[Value]] = {}
+        self._detached_flights: set[asyncio.Task[CacheResult[Value]]] = set()
+        self._refreshes: dict[str, asyncio.Task[None]] = {}
+        self._background_tasks: set[asyncio.Task[None]] = set()
+        self._closed = False
+        self._available = True
 
     @property
     def available(self) -> bool:
-        """Whether the most recent Redis operation succeeded."""
+        """Return the latest durable-store health bit for runtime recovery."""
         return self._available
 
-    def _keys(self, identity: CacheIdentity):
-        """Derive revisioned Redis keys for one source identity."""
+    def _keys(self, identity: CacheIdentity) -> CacheKeys:
+        """Derive the two opaque keys for one identity."""
         return cache_keys(
             prefix=self._key_prefix,
             identity=identity,
@@ -114,324 +129,666 @@ class RedisCoordinator(Generic[Value]):
             query_revision=self._store.query_revision,
         )
 
-    async def ping(self) -> None:
-        """Verify Redis before the runtime begins serving.
+    def _record_lookup(
+        self,
+        *,
+        result: Literal["hit", "miss", "stale"],
+        scope: str,
+        age: float | None = None,
+    ) -> None:
+        """Record bounded lookup telemetry without coupling cache behavior to it."""
+        try:
+            self._telemetry.record_cache_lookup(
+                backend=self.backend_name,
+                result=result,
+                scope=scope,
+                age_seconds=age,
+            )
+        except Exception:
+            pass
 
-        Raises:
-            RedisUnavailable: If the bounded health check fails.
-        """
+    def _record_lease(self, *, outcome: str, scope: str) -> None:
+        """Record one lease outcome defensively."""
+        try:
+            self._telemetry.record_lease(outcome=outcome, scope=scope)
+        except Exception:
+            pass
+
+    def _record_fill(self, *, seconds: float, outcome: str, scope: str) -> None:
+        """Record one source-fill outcome defensively."""
+        try:
+            self._telemetry.record_fill_duration(
+                seconds=seconds,
+                outcome=outcome,
+                scope=scope,
+            )
+        except Exception:
+            pass
+
+    async def ping(self) -> None:
+        """Verify the durable cache and update the compatibility health bit."""
         try:
             await self._store.ping()
-            self._available = True
         except RedisUnavailable:
             self._available = False
             raise
+        self._available = True
 
-    def _remember(self, base: str, snapshot: StoredSnapshot[Value]) -> None:
-        """Retain a serviceable durable snapshot as an outage fallback."""
-        state = self.policy.classify(snapshot.created)
+    async def _read(
+        self, keys: CacheKeys
+    ) -> StoredSnapshot[Value] | StoredNotFound | StoredFailure | None:
+        """Read one value while recording the latest durable-store health."""
+        try:
+            result = await self._store.read(keys)
+        except RedisUnavailable:
+            self._available = False
+            raise
+        self._available = True
+        return result
+
+    def _remember(
+        self,
+        keys: CacheKeys,
+        snapshot: StoredSnapshot[Value],
+        state: Freshness,
+    ) -> None:
+        """Keep only positive observations that are still serviceable."""
         if state in {Freshness.FRESH, Freshness.STALE}:
-            self._l1.put(base, snapshot)
+            self._l1.put(keys.base, snapshot)
+        else:
+            self._l1.evict(keys.base)
 
-    def _fallback(self, base: str) -> CacheResult[Value] | None:
-        """Return a serviceable L1 snapshot when one exists."""
-        snapshot = self._l1.get(base)
+    def _fallback(self, keys: CacheKeys, scope: str) -> CacheResult[Value] | None:
+        """Return a stale, not-ready positive L1 value during Redis outage."""
+        snapshot = self._l1.get(keys.base)
         if snapshot is None:
             return None
-        state = self.policy.classify(snapshot.created)
+        now = self._clock()
+        state = self.policy.classify(snapshot.created, now=now)
         if state not in {Freshness.FRESH, Freshness.STALE}:
+            self._l1.evict(keys.base)
             return None
-        return CacheResult(snapshot.value, cached=True, stale=state is Freshness.STALE)
+        self._record_lookup(result="stale", scope=scope)
+        return CacheResult(
+            snapshot.value,
+            cached=True,
+            stale=True,
+            cache_available=False,
+            source_reachable=None,
+            serviceable_until=serviceable_until(snapshot.created, self.policy),
+        )
 
-    async def _read(self, keys) -> StoredSnapshot[Value] | None:
-        """Read Redis while updating the coordinator availability flag."""
+    def _result(
+        self,
+        snapshot: StoredSnapshot[Value],
+        *,
+        state: Freshness,
+        cached: bool,
+        source_reachable: bool | None,
+    ) -> CacheResult[Value]:
+        """Build one result from the snapshot's observation age."""
+        return CacheResult(
+            snapshot.value,
+            cached=cached,
+            stale=state is Freshness.STALE,
+            cache_available=True,
+            source_reachable=source_reachable,
+            serviceable_until=serviceable_until(snapshot.created, self.policy),
+        )
+
+    def _failed_fill(self, category: CacheFailureCategory) -> CacheUnavailable | CacheInternalError:
+        """Rebuild the bounded failure outcome shared by cache replicas."""
+        if category is CacheFailureCategory.INTERNAL:
+            return CacheInternalError()
+        return CacheUnavailable(
+            "The source fill is temporarily unavailable",
+            cache_available=True,
+            source_reachable=False,
+        )
+
+    @staticmethod
+    def _failure_category(exc: Exception) -> CacheFailureCategory:
+        """Reduce a source exception to one bounded durable-cache category."""
+        if isinstance(exc, CacheUnavailable):
+            return CacheFailureCategory.SOURCE_UNAVAILABLE
+        return CacheFailureCategory.INTERNAL
+
+    @staticmethod
+    def _normalise_failure(exc: Exception) -> CacheUnavailable | CacheInternalError:
+        """Give owners the same sanitized semantic result as followers."""
+        if isinstance(exc, CacheUnavailable):
+            return CacheUnavailable(
+                "The source fill is temporarily unavailable",
+                cache_available=True,
+                source_reachable=False,
+            )
+        return CacheInternalError()
+
+    def _finish_flight(
+        self,
+        key: str,
+        flight: _LocalFlight[Value],
+        task: asyncio.Task[CacheResult[Value]],
+    ) -> None:
+        """Forget one completed flight and retrieve unobserved exceptions."""
+        self._detached_flights.discard(task)
+        if self._flights.get(key) is flight:
+            self._flights.pop(key, None)
+        if not task.cancelled():
+            task.exception()
+
+    async def _await_flight(
+        self,
+        keys: CacheKeys,
+        fill: Callable[[], Awaitable[Value]],
+        scope: str,
+        deadline: float,
+    ) -> CacheResult[Value]:
+        """Share one local cache decision while cancelling it after its last waiter."""
+        flight = self._flights.get(keys.base)
+        if flight is None:
+            task = asyncio.create_task(self._read_or_fill(keys, fill, scope, deadline))
+            flight = _LocalFlight(task)
+            self._flights[keys.base] = flight
+            task.add_done_callback(
+                lambda completed: self._finish_flight(keys.base, flight, completed)
+            )
+        leader = flight.waiters == 0
+        flight.waiters += 1
         try:
-            snapshot = await self._store.read(keys)
-            self._available = True
-            return snapshot
-        except RedisUnavailable:
-            self._available = False
+            result = await asyncio.shield(flight.task)
+            if not leader and not result.cached:
+                return replace(result, cached=True, source_reachable=None)
+            return result
+        except asyncio.CancelledError:
+            if flight.waiters == 1 and not flight.task.done():
+                if self._flights.get(keys.base) is flight:
+                    self._flights.pop(keys.base, None)
+                self._detached_flights.add(flight.task)
+                flight.task.cancel()
             raise
+        finally:
+            flight.waiters -= 1
+            if flight.task.done() and self._flights.get(keys.base) is flight:
+                self._flights.pop(keys.base, None)
+
+    async def _read_or_fill(
+        self,
+        keys: CacheKeys,
+        fill: Callable[[], Awaitable[Value]],
+        scope: str,
+        deadline: float,
+    ) -> CacheResult[Value]:
+        """Read, decide, and fill one identity inside its local flight."""
+        try:
+            async with asyncio.timeout_at(deadline):
+                current = await self._read(keys)
+        except TimeoutError as exc:
+            raise CacheUnavailable("Cold cache lookup timed out") from exc
+        except RedisUnavailable as exc:
+            fallback = self._fallback(keys, scope)
+            if fallback is not None:
+                return fallback
+            raise CacheUnavailable(
+                "Redis unavailable and no serviceable snapshot",
+                cache_available=False,
+            ) from exc
+
+        now = self._clock()
+        if isinstance(current, StoredNotFound):
+            self._l1.evict(keys.base)
+            if self.policy.terminal_is_fresh(current.created, now=now):
+                self._record_lookup(result="hit", scope=scope)
+                raise CacheNotFound(cache_available=True, source_reachable=None)
+            current = None
+        if isinstance(current, StoredFailure):
+            self._l1.evict(keys.base)
+            if self.policy.terminal_is_fresh(current.created, now=now):
+                self._record_lookup(result="hit", scope=scope)
+                raise self._failed_fill(current.category)
+            current = None
+        if isinstance(current, StoredSnapshot):
+            state = self.policy.classify(current.created, now=now)
+            if state in {Freshness.FRESH, Freshness.STALE}:
+                self._remember(keys, current, state)
+                self._record_lookup(
+                    result="stale" if state is Freshness.STALE else "hit",
+                    scope=scope,
+                    age=self.policy.age_seconds(current.created, now=now),
+                )
+                if state is Freshness.STALE:
+                    self._schedule_refresh(keys, fill, scope)
+                return self._result(
+                    current,
+                    state=state,
+                    cached=True,
+                    source_reachable=None,
+                )
+            self._l1.evict(keys.base)
+            self._record_lookup(result="miss", scope=scope)
+        else:
+            self._record_lookup(result="miss", scope=scope)
+
+        return await self._cold_fill(keys, fill, scope, deadline)
 
     async def get_or_fill(
         self,
         identity: CacheIdentity,
         fill: Callable[[], Awaitable[Value]],
     ) -> CacheResult[Value]:
-        """Read a snapshot or coordinate exactly one bounded downstream fill.
-
-        Args:
-            identity: Complete source stream identity.
-            fill: Async callable producing a fresh value.
-
-        Returns:
-            A serviceable value with cache provenance.
-
-        Raises:
-            CacheUnavailable: If no durable or local result can be served.
-        """
-        with self._telemetry.span(
-            "cache.get_or_fill",
-            {
-                "cache.backend": self.backend_name,
-                "metrics.scope": identity.subject_kind,
-            },
-        ):
-            return await self._get_or_fill(identity, fill)
-
-    async def _get_or_fill(
-        self,
-        identity: CacheIdentity,
-        fill: Callable[[], Awaitable[Value]],
-    ) -> CacheResult[Value]:
-        """Apply fresh, stale-refresh, cold-fill, and outage fallback policy.
-
-        Args:
-            identity: Complete source stream identity.
-            fill: Async callable producing a fresh value.
-        """
+        """Return a serviceable value or perform one bounded coordinated fill."""
+        if self._closed:
+            raise CacheUnavailable("Redis cache coordinator is shut down")
         keys = self._keys(identity)
         scope = identity.subject_kind
-        try:
-            snapshot = await self._read(keys)
-        except RedisUnavailable as exc:
-            fallback = self._fallback(keys.base)
-            if fallback is not None:
-                return fallback
-            raise CacheUnavailable("Redis unavailable and no serviceable snapshot") from exc
+        deadline = asyncio.get_running_loop().time() + self._cold_timeout
+        return await self._await_flight(keys, fill, scope, deadline)
 
-        if snapshot is not None:
-            self._remember(keys.base, snapshot)
-            state = self.policy.classify(snapshot.created)
-            if state is Freshness.FRESH:
-                return CacheResult(snapshot.value, cached=True, stale=False)
-            if state is Freshness.STALE:
-                return await self._refresh_stale(keys, snapshot, fill, scope)
-
-        return await self._join_cold(keys, fill, scope)
-
-    async def _refresh_stale(
+    def _schedule_refresh(
         self,
-        keys,
-        stale: StoredSnapshot[Value],
+        keys: CacheKeys,
         fill: Callable[[], Awaitable[Value]],
-        scope: str,
-    ) -> CacheResult[Value]:
-        """Refresh under a lease or immediately serve the stale snapshot.
-
-        Args:
-            keys: Derived keys for the source identity.
-            stale: Serviceable stale snapshot.
-            fill: Async callable producing a fresh value.
-            scope: Bounded subject scope used for telemetry.
-        """
-        bucket = int(time.time() // self.policy.fresh_seconds)
-        token = uuid.uuid4().hex
-        try:
-            won = await self._store.acquire_lease(
-                keys=keys,
-                bucket=bucket,
-                token=token,
-                lease_seconds=self._fill_timeout + 1,
-            )
-            self._available = True
-        except RedisUnavailable:
-            self._available = False
-            return CacheResult(stale.value, cached=True, stale=True)
-        if not won:
-            self._telemetry.record_lease(outcome="contended", scope=scope)
-            return CacheResult(stale.value, cached=True, stale=True)
-        self._telemetry.record_lease(outcome="acquired", scope=scope)
-        try:
-            return await self._fill_under_lease(keys, fill, scope, bucket, token)
-        except RedisUnavailable:
-            self._available = False
-            return CacheResult(stale.value, cached=True, stale=True)
-        except Exception:
-            return CacheResult(stale.value, cached=True, stale=True)
-
-    async def _join_cold(
-        self,
-        keys,
-        fill: Callable[[], Awaitable[Value]],
-        scope: str,
-    ) -> CacheResult[Value]:
-        """Join or launch the process-local task serving a cold identity.
-
-        Args:
-            keys: Derived keys for the source identity.
-            fill: Async callable producing a fresh value.
-            scope: Bounded subject scope used for telemetry.
-        """
-        async with self._lock:
-            local = self._fills.get(keys.base)
-            if local is None:
-                local = _LocalFill(event=asyncio.Event())
-                self._fills[keys.base] = local
-                task = asyncio.create_task(self._run_cold(keys, fill, local, scope))
-                self._fill_tasks.add(task)
-                task.add_done_callback(self._fill_tasks.discard)
-        try:
-            async with asyncio.timeout(self._cold_timeout):
-                await local.event.wait()
-        except TimeoutError as exc:
-            raise CacheUnavailable("Cold cache fill timed out") from exc
-        if local.error is not None:
-            raise local.error
-        if local.result is None:
-            raise CacheUnavailable("Cold cache fill produced no result")
-        return local.result
-
-    async def _run_cold(
-        self,
-        keys,
-        fill: Callable[[], Awaitable[Value]],
-        local: _LocalFill[Value],
         scope: str,
     ) -> None:
-        """Run one cold fill and publish its result to local waiters.
+        """Start one bounded best-effort stale refresh behind the request."""
+        if self._closed:
+            return
+        existing = self._refreshes.get(keys.base)
+        if existing is not None and not existing.done():
+            return
+        task = asyncio.create_task(self._refresh(keys, fill, scope))
+        self._refreshes[keys.base] = task
+        self._background_tasks.add(task)
 
-        Args:
-            keys: Derived keys for the source identity.
-            fill: Async callable producing a fresh value.
-            local: Process-local result shared by waiters.
-            scope: Bounded subject scope used for telemetry.
-        """
-        try:
-            async with asyncio.timeout(self._cold_timeout):
-                local.result = await self._fill_or_poll(keys, fill, scope)
-        except BaseException as exc:
-            local.error = exc
-        finally:
-            local.event.set()
-            async with self._lock:
-                if self._fills.get(keys.base) is local:
-                    del self._fills[keys.base]
+        def finish(completed: asyncio.Task[None]) -> None:
+            """Forget one refresh and retrieve unobserved exceptions."""
+            self._background_tasks.discard(completed)
+            if self._refreshes.get(keys.base) is completed:
+                self._refreshes.pop(keys.base, None)
+            if not completed.cancelled():
+                completed.exception()
 
-    async def _fill_or_poll(
+        task.add_done_callback(finish)
+
+    async def _refresh(
         self,
-        keys,
+        keys: CacheKeys,
         fill: Callable[[], Awaitable[Value]],
         scope: str,
-    ) -> CacheResult[Value]:
-        """Acquire the distributed lease or poll for its owner's publication.
-
-        Args:
-            keys: Derived keys for the source identity.
-            fill: Async callable producing a fresh value.
-            scope: Bounded subject scope used for telemetry.
-        """
-        bucket = int(time.time() // self.policy.fresh_seconds)
+    ) -> None:
+        """Refresh a stale value only after winning the stable lease."""
         token = uuid.uuid4().hex
         try:
-            baseline = await self._store.pointer(keys)
+            won = await self._acquire(keys, token, scope)
+            if not won:
+                return
+            try:
+                await self._run_owner(
+                    keys,
+                    fill,
+                    scope,
+                    token,
+                    asyncio.get_running_loop().time() + self._cold_timeout,
+                    force_refresh=True,
+                )
+            except asyncio.CancelledError:
+                raise
+            except (CacheNotFound, CacheUnavailable, RedisUnavailable):
+                return
+            except Exception:
+                return
+        except asyncio.CancelledError:
+            raise
+        except RedisUnavailable:
+            self._available = False
+
+    async def _acquire(self, keys: CacheKeys, token: str, scope: str) -> bool:
+        """Acquire a lease and keep the compatibility health bit current."""
+        try:
             won = await self._store.acquire_lease(
                 keys=keys,
-                bucket=bucket,
                 token=token,
-                lease_seconds=self._fill_timeout + 1,
+                lease_seconds=self._lease_seconds,
             )
-            self._available = True
-        except RedisUnavailable as exc:
+        except RedisUnavailable:
             self._available = False
-            fallback = self._fallback(keys.base)
-            if fallback is not None:
-                return fallback
-            raise CacheUnavailable("Redis unavailable during cold fill") from exc
+            self._record_lease(outcome="error", scope=scope)
+            raise
+        self._available = True
+        self._record_lease(outcome="acquired" if won else "contended", scope=scope)
+        return won
 
-        if not won:
-            self._telemetry.record_lease(outcome="contended", scope=scope)
-            return await self._poll(keys, baseline)
-        self._telemetry.record_lease(outcome="acquired", scope=scope)
+    async def _release(self, keys: CacheKeys, token: str) -> None:
+        """Attempt owner-checked release without masking source outcomes."""
         try:
-            return await self._fill_under_lease(keys, fill, scope, bucket, token)
-        except RedisUnavailable as exc:
+            await self._store.release_lease(keys=keys, token=token)
+        except RedisUnavailable:
             self._available = False
-            fallback = self._fallback(keys.base)
-            if fallback is not None:
-                return fallback
-            raise CacheUnavailable("Redis unavailable while publishing snapshot") from exc
 
-    async def _fill_under_lease(
+    async def _cold_fill(
         self,
-        keys,
+        keys: CacheKeys,
         fill: Callable[[], Awaitable[Value]],
         scope: str,
-        bucket: int,
-        token: str,
+        deadline: float,
     ) -> CacheResult[Value]:
-        """Publish one bounded fill while holding a distributed lease.
+        """Poll cold followers until a winner publishes or the deadline expires."""
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise CacheUnavailable("Cold cache fill timed out")
+            token = uuid.uuid4().hex
+            try:
+                won = await self._acquire(keys, token, scope)
+            except RedisUnavailable as exc:
+                fallback = self._fallback(keys, scope)
+                if fallback is not None:
+                    return fallback
+                raise CacheUnavailable(
+                    "Redis unavailable and no serviceable snapshot",
+                    cache_available=False,
+                ) from exc
+            if won:
+                try:
+                    return await self._run_owner(
+                        keys,
+                        fill,
+                        scope,
+                        token,
+                        deadline,
+                        force_refresh=False,
+                    )
+                except RedisUnavailable as exc:
+                    self._available = False
+                    raise CacheUnavailable(
+                        "Redis unavailable during cache fill",
+                        cache_available=False,
+                    ) from exc
 
-        Args:
-            keys: Derived keys for the source identity.
-            fill: Async callable producing a fresh value.
-            scope: Bounded subject scope used for telemetry.
-            bucket: Freshness bucket whose lease is held.
-            token: Unique lease-owner token.
+            try:
+                current = await self._read(keys)
+            except RedisUnavailable as exc:
+                fallback = self._fallback(keys, scope)
+                if fallback is not None:
+                    return fallback
+                raise CacheUnavailable(
+                    "Redis unavailable and no serviceable snapshot",
+                    cache_available=False,
+                ) from exc
+            now = self._clock()
+            if isinstance(current, StoredNotFound):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise CacheNotFound(cache_available=True, source_reachable=None)
+            elif isinstance(current, StoredFailure):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise self._failed_fill(current.category)
+            elif isinstance(current, StoredSnapshot):
+                state = self.policy.classify(current.created, now=now)
+                if state in {Freshness.FRESH, Freshness.STALE}:
+                    self._remember(keys, current, state)
+                    return self._result(
+                        current,
+                        state=state,
+                        cached=True,
+                        source_reachable=None,
+                    )
+                self._l1.evict(keys.base)
+            await asyncio.sleep(min(self._poll_min, remaining))
 
-        Returns:
-            Newly published value marked as a cache miss.
-        """
-        started = time.perf_counter()
-        outcome = "ok"
+    async def _run_owner(
+        self,
+        keys: CacheKeys,
+        fill: Callable[[], Awaitable[Value]],
+        scope: str,
+        token: str,
+        deadline: float,
+        *,
+        force_refresh: bool,
+    ) -> CacheResult[Value]:
+        """Re-read after lease acquisition, then perform and publish one fill."""
         try:
-            async with self._capacity, asyncio.timeout(self._fill_timeout):
-                value = await fill()
+            current = await self._read(keys)
+            now = self._clock()
+            if isinstance(current, StoredNotFound):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise CacheNotFound(cache_available=True, source_reachable=None)
+            elif isinstance(current, StoredFailure):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise self._failed_fill(current.category)
+            elif isinstance(current, StoredSnapshot):
+                state = self.policy.classify(current.created, now=now)
+                if state is Freshness.FRESH or (state is Freshness.STALE and not force_refresh):
+                    self._remember(keys, current, state)
+                    return self._result(
+                        current,
+                        state=state,
+                        cached=True,
+                        source_reachable=None,
+                    )
+
+            try:
+                value = await self._fill_source(fill, scope, deadline)
+            except CacheNotFound:
+                terminal_created = self._clock()
+                committed = await self._commit(
+                    keys,
+                    token,
+                    created=terminal_created,
+                    value=None,
+                    ttl_seconds=self.policy.fresh_seconds,
+                    not_found=True,
+                )
+                if committed:
+                    self._l1.evict(keys.base)
+                    raise CacheNotFound(
+                        cache_available=True,
+                        source_reachable=True,
+                    )
+                return await self._await_authoritative(keys, scope, deadline)
+            except asyncio.CancelledError:
+                raise
+            except RedisUnavailable:
+                raise
+            except Exception as exc:
+                category = self._failure_category(exc)
+                if not force_refresh:
+                    await self._publish_failure(
+                        keys,
+                        token,
+                        deadline,
+                        failure_category=category,
+                    )
+                raise self._normalise_failure(exc) from exc
+
             created = self._created(value)
-            snapshot_id = uuid.uuid4().hex
-            await self._store.publish(
-                keys=keys,
-                snapshot_id=snapshot_id,
+            now = self._clock()
+            ttl_seconds = self.policy.remaining_seconds(created, now=now)
+            state = self.policy.classify(created, now=now)
+            if ttl_seconds <= 0 or state not in {Freshness.FRESH, Freshness.STALE}:
+                error = CacheUnavailable(
+                    "Source returned an unserviceable observation",
+                    cache_available=True,
+                    source_reachable=False,
+                )
+                if not force_refresh:
+                    await self._publish_failure(
+                        keys,
+                        token,
+                        deadline,
+                        failure_category=CacheFailureCategory.SOURCE_UNAVAILABLE,
+                    )
+                raise error
+            committed = await self._commit(
+                keys,
+                token,
                 created=created,
                 value=value,
+                ttl_seconds=ttl_seconds,
             )
-            self._available = True
-            self._remember(keys.base, StoredSnapshot(snapshot_id, value, created))
-            return CacheResult(value, cached=False, stale=False)
-        except BaseException:
+            if committed:
+                stored = StoredSnapshot(value, created)
+                self._remember(keys, stored, state)
+                return self._result(
+                    stored,
+                    state=state,
+                    cached=False,
+                    source_reachable=True,
+                )
+            return await self._await_authoritative(keys, scope, deadline)
+        finally:
+            await self._release(keys, token)
+
+    async def _commit(
+        self,
+        keys: CacheKeys,
+        token: str,
+        *,
+        created: datetime,
+        value: Value | None,
+        ttl_seconds: float,
+        not_found: bool = False,
+        failure_category: CacheFailureCategory | None = None,
+    ) -> bool:
+        """Commit only through the fenced durable-store seam."""
+        try:
+            committed = await self._store.commit(
+                keys=keys,
+                token=token,
+                created=created,
+                value=value,
+                ttl_seconds=ttl_seconds,
+                not_found=not_found,
+                failure_category=failure_category,
+            )
+        except RedisUnavailable:
+            self._available = False
+            raise
+        self._available = True
+        return committed
+
+    async def _publish_failure(
+        self,
+        keys: CacheKeys,
+        token: str,
+        deadline: float,
+        *,
+        failure_category: CacheFailureCategory,
+    ) -> None:
+        """Publish a short-lived failed-fill outcome without masking its cause."""
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            return
+        try:
+            await self._commit(
+                keys,
+                token,
+                created=self._clock(),
+                value=None,
+                ttl_seconds=min(float(self.policy.fresh_seconds), remaining),
+                failure_category=failure_category,
+            )
+        except RedisUnavailable:
+            return
+
+    async def _fill_source(
+        self,
+        fill: Callable[[], Awaitable[Value]],
+        scope: str,
+        deadline: float,
+    ) -> Value:
+        """Run one source query under independent source and cold-fill deadlines."""
+        started = asyncio.get_running_loop().time()
+        outcome = "ok"
+        try:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise CacheFillTimeout()
+            async with asyncio.timeout(min(self._fill_timeout, remaining)):
+                return await fill()
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            raise
+        except CacheNotFound:
+            outcome = "not_found"
+            raise
+        except CacheFillTimeout:
+            outcome = "timeout"
+            raise
+        except TimeoutError as exc:
+            outcome = "timeout"
+            raise CacheFillTimeout() from exc
+        except Exception:
             outcome = "error"
             raise
         finally:
-            self._telemetry.record_fill_duration(
-                seconds=time.perf_counter() - started,
+            self._record_fill(
+                seconds=asyncio.get_running_loop().time() - started,
                 outcome=outcome,
                 scope=scope,
             )
-            try:
-                await self._store.release_lease(keys=keys, bucket=bucket, token=token)
-            except RedisUnavailable:
-                self._available = False
 
-    async def _poll(self, keys, baseline: str | None) -> CacheResult[Value]:
-        """Poll until another replica publishes a serviceable snapshot.
-
-        Args:
-            keys: Derived keys for the source identity.
-            baseline: Snapshot ID present before lease contention.
-
-        Returns:
-            The newly published serviceable snapshot.
-        """
+    async def _await_authoritative(
+        self,
+        keys: CacheKeys,
+        scope: str,
+        deadline: float,
+    ) -> CacheResult[Value]:
+        """Await a winner after fencing without exposing a private result."""
         while True:
-            await asyncio.sleep(random.uniform(self._poll_min, self._poll_max))
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise CacheUnavailable("Authoritative cache publication timed out")
             try:
-                snapshot = await self._read(keys)
+                current = await self._read(keys)
             except RedisUnavailable as exc:
-                fallback = self._fallback(keys.base)
-                if fallback is not None:
-                    return fallback
-                raise CacheUnavailable("Redis unavailable while awaiting fill") from exc
-            if snapshot is None or snapshot.snapshot_id == baseline:
-                continue
-            state = self.policy.classify(snapshot.created)
-            if state in {Freshness.FRESH, Freshness.STALE}:
-                self._remember(keys.base, snapshot)
-                return CacheResult(snapshot.value, cached=True, stale=state is Freshness.STALE)
+                raise CacheUnavailable(
+                    "Redis unavailable while awaiting publication",
+                    cache_available=False,
+                ) from exc
+            now = self._clock()
+            if isinstance(current, StoredNotFound):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise CacheNotFound(cache_available=True, source_reachable=True)
+            elif isinstance(current, StoredSnapshot):
+                state = self.policy.classify(current.created, now=now)
+                if state in {Freshness.FRESH, Freshness.STALE}:
+                    self._remember(keys, current, state)
+                    self._record_lookup(
+                        result="stale" if state is Freshness.STALE else "hit", scope=scope
+                    )
+                    return self._result(
+                        current,
+                        state=state,
+                        cached=True,
+                        source_reachable=True,
+                    )
+            elif isinstance(current, StoredFailure):
+                self._l1.evict(keys.base)
+                if self.policy.terminal_is_fresh(current.created, now=now):
+                    raise self._failed_fill(current.category)
+            self._l1.evict(keys.base)
+            await asyncio.sleep(min(self._poll_min, remaining))
 
     async def shutdown(self) -> None:
-        """Cancel and await process-local fills so none outlive the runtime."""
-        tasks = tuple(self._fill_tasks)
+        """Stop refresh work and await its lease-cleanup paths."""
+        self._closed = True
+        tasks = tuple(
+            {
+                *self._background_tasks,
+                *(flight.task for flight in self._flights.values()),
+                *self._detached_flights,
+            }
+        )
         for task in tasks:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        self._flights.clear()
+        self._detached_flights.clear()
+        self._refreshes.clear()
+        self._background_tasks.clear()

@@ -1,33 +1,65 @@
-"""Persist signed immutable snapshots and token-owned leases in Redis.
-
-All commands have finite deadlines. Invalid, incompatible, or tampered payloads
-are treated as misses so they never cross the cache trust boundary.
-"""
+"""Redis adapter for the two-key signed Metrics cache."""
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 import json
+import re
+from collections.abc import Awaitable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from time import perf_counter
-from typing import Any, Generic, TypeVar
+from typing import Generic, Literal, Protocol, TypeAlias, TypeVar, cast
 
 from pydantic import TypeAdapter, ValidationError
+from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from metrics.cache.models import CacheKeys, SnapshotEnvelope
+from metrics.cache.models import CacheEnvelope, CacheFailureCategory, CacheKeys
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 Value = TypeVar("Value")
+CommandResult = TypeVar("CommandResult")
+_RedisArgument: TypeAlias = bytes | bytearray | memoryview | str | int | float
+_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
-_PUBLISH = """
-if redis.call('EXISTS', KEYS[1]) == 0 then
-  redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[3])
+
+class _AsyncRedis(Protocol):
+    """Minimal async Redis seam used by the adapter."""
+
+    def ping(self) -> Awaitable[object]:
+        """Check server reachability."""
+
+    def get(self, name: str, /) -> Awaitable[object]:
+        """Read one value."""
+
+    def set(
+        self,
+        name: str,
+        value: _RedisArgument,
+        /,
+        *,
+        nx: bool = False,
+        px: int | None = None,
+    ) -> Awaitable[object]:
+        """Set one value, optionally only when absent."""
+
+    def eval(
+        self,
+        script: str,
+        numkeys: int,
+        /,
+        *keys_and_args: _RedisArgument,
+    ) -> Awaitable[object]:
+        """Execute one atomic Lua operation."""
+
+
+_COMMIT = """
+if redis.call('GET', KEYS[2]) ~= ARGV[2] then
+  return 0
 end
-redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[3])
+redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3])
+redis.call('DEL', KEYS[2])
 return 1
 """
 
@@ -40,234 +72,252 @@ return 0
 
 
 class RedisUnavailable(RuntimeError):
-    """Indicate that a bounded Redis command failed or timed out."""
+    """Indicate a bounded Redis command failure."""
 
 
 @dataclass(frozen=True, slots=True)
 class StoredSnapshot(Generic[Value]):
-    """Hold a verified decoded snapshot, its pointer ID, and collection time."""
+    """Hold one verified positive envelope."""
 
-    snapshot_id: str
     value: Value
     created: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class StoredNotFound:
+    """Hold one verified negative envelope and its creation time."""
+
+    created: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class StoredFailure:
+    """Hold one verified failed-fill outcome and its cooldown start time."""
+
+    created: datetime
+    category: CacheFailureCategory
+
+
 class RedisSnapshots(Generic[Value]):
-    """Store typed, signed snapshots behind an atomically advanced pointer."""
+    """Read and fenced-write typed signed envelopes in Redis."""
 
     def __init__(
         self,
         *,
-        redis: Any,
+        redis: Redis | _AsyncRedis,
         value_type: type[Value],
         secret: bytes,
         command_timeout: float,
-        retention_seconds: int,
         schema_revision: str,
         source_revision: str,
         query_revision: str,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Configure revisions, integrity key, deadlines, and retention.
-
-        Args:
-            redis: Async Redis-compatible client.
-            value_type: Runtime type used to validate decoded snapshot values.
-            secret: HMAC key protecting envelope integrity.
-            command_timeout: Maximum duration of each Redis command.
-            retention_seconds: Expiry applied to snapshots and pointers.
-            schema_revision: Cached value schema revision.
-            source_revision: Provider data contract revision.
-            query_revision: Source query revision.
-            telemetry: Optional bounded Redis telemetry recorder.
-        """
-        self._redis = redis
+        """Configure validation, signing, bounded commands, and revisions."""
+        self._redis = cast(_AsyncRedis, redis)
         self._adapter = TypeAdapter(value_type)
         self._secret = secret
         self._command_timeout = command_timeout
-        self._retention_seconds = retention_seconds
         self.schema_revision = schema_revision
         self.source_revision = source_revision
         self.query_revision = query_revision
         self._telemetry = telemetry or NoopMetricsRecorder()
 
-    async def _command(self, operation: str, awaitable: Any) -> Any:
-        """Run one Redis awaitable with a deadline and bounded telemetry.
-
-        Args:
-            operation: Bounded operation label for telemetry.
-            awaitable: Redis operation to await.
-
-        Returns:
-            Result returned by the Redis client.
-
-        Raises:
-            RedisUnavailable: If Redis fails or the command times out.
-        """
+    async def _command(
+        self,
+        operation: str,
+        awaitable: Awaitable[CommandResult],
+    ) -> CommandResult:
+        """Run a Redis command with a deadline and non-fatal telemetry."""
         started = perf_counter()
         outcome = "ok"
         try:
             async with asyncio.timeout(self._command_timeout):
                 return await awaitable
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            raise
         except (RedisError, TimeoutError) as exc:
             outcome = "error"
             raise RedisUnavailable("Redis command failed") from exc
         finally:
-            self._telemetry.record_redis(
-                operation=operation,
-                outcome=outcome,
-                seconds=perf_counter() - started,
-            )
+            try:
+                self._telemetry.record_redis(
+                    operation=operation,
+                    outcome=outcome,
+                    seconds=perf_counter() - started,
+                )
+            except Exception:
+                pass
 
     @staticmethod
-    def _text(raw: Any) -> str:
-        """Decode a Redis response as strict UTF-8 text.
-
-        Args:
-            raw: Bytes or string returned by Redis.
-
-        Returns:
-            Decoded text.
-
-        Raises:
-            ValueError: If the response is not text-like.
-            UnicodeDecodeError: If bytes are not valid UTF-8.
-        """
+    def _text(raw: object) -> str:
+        """Decode one strict Redis text response."""
         if isinstance(raw, bytes):
             return raw.decode("utf-8", errors="strict")
         if isinstance(raw, str):
             return raw
         raise ValueError("Redis value was not UTF-8 text")
 
-    async def ping(self) -> None:
-        """Require a successful bounded Redis health check."""
-        if not await self._command("ping", self._redis.ping()):
-            raise RedisUnavailable("Redis ping failed")
+    @staticmethod
+    def _valid_token(token: str) -> bool:
+        """Bound lease tokens before passing them to Redis."""
+        return bool(_TOKEN_PATTERN.fullmatch(token))
 
-    async def pointer(self, keys: CacheKeys) -> str | None:
-        """Read the latest immutable snapshot ID, treating invalid text as a miss."""
-        raw = await self._command("get", self._redis.get(keys.latest))
-        if raw is None:
-            return None
-        try:
-            return self._text(raw)
-        except (UnicodeDecodeError, ValueError):
-            return None
+    @staticmethod
+    def _normalise_created(created: datetime) -> datetime:
+        """Normalise source timestamps for signed payloads."""
+        if created.tzinfo is None:
+            return created.replace(tzinfo=UTC)
+        return created.astimezone(UTC)
 
-    async def read(self, keys: CacheKeys) -> StoredSnapshot[Value] | None:
-        """Read, authenticate, revision-check, and decode the latest snapshot.
-
-        Args:
-            keys: Derived Redis keys for one cache identity.
-
-        Returns:
-            A verified typed snapshot, or ``None`` for any unusable payload.
-        """
-        snapshot_id = await self.pointer(keys)
-        if snapshot_id is None:
-            return None
-        raw = await self._command("get", self._redis.get(keys.snapshot(snapshot_id)))
-        if raw is None:
-            return None
-        try:
-            envelope = SnapshotEnvelope.model_validate_json(self._text(raw))
-            if (
-                envelope.schema_revision != self.schema_revision
-                or envelope.source_revision != self.source_revision
-                or envelope.query_revision != self.query_revision
-                or envelope.snapshot_id != snapshot_id
-                or not envelope.verify(self._secret)
-            ):
-                return None
-            value = self._adapter.validate_python(envelope.value)
-        except (UnicodeDecodeError, ValueError, ValidationError, json.JSONDecodeError):
-            return None
-        return StoredSnapshot(snapshot_id, value, envelope.created)
-
-    async def publish(
+    def _sign(
         self,
         *,
         keys: CacheKeys,
-        snapshot_id: str,
+        kind: Literal["value", "not_found", "failure"],
         created: datetime,
-        value: Value,
-    ) -> None:
-        """Persist a signed immutable snapshot and atomically advance its pointer.
-
-        Args:
-            keys: Derived Redis keys for one cache identity.
-            snapshot_id: Unique immutable snapshot ID.
-            created: Source collection time.
-            value: Typed value to encode inside the envelope.
-        """
-        envelope = SnapshotEnvelope(
-            format="metrics-cache-v1",
+        value: Value | None,
+        failure_category: CacheFailureCategory | None = None,
+    ) -> str:
+        """Build and sign one positive or negative envelope."""
+        encoded = None if value is None else self._adapter.dump_python(value, mode="json")
+        envelope = CacheEnvelope(
+            format="metrics-cache-v2",
+            identity_digest=keys.identity_digest,
             schema_revision=self.schema_revision,
             source_revision=self.source_revision,
             query_revision=self.query_revision,
-            snapshot_id=snapshot_id,
-            created=created,
-            value=self._adapter.dump_python(value, mode="json"),
+            kind=kind,
+            created=self._normalise_created(created),
+            value=encoded,
+            failure_category=failure_category,
             integrity="",
+        ).sign(self._secret)
+        return envelope.model_dump_json()
+
+    async def ping(self) -> None:
+        """Require a successful bounded Redis health check."""
+        result = await self._command("ping", self._redis.ping())
+        if result not in (True, b"PONG", "PONG"):
+            raise RedisUnavailable("Redis ping returned an invalid result")
+
+    async def read(
+        self, keys: CacheKeys
+    ) -> StoredSnapshot[Value] | StoredNotFound | StoredFailure | None:
+        """Read and verify one envelope; malformed state is a cache miss."""
+        raw = await self._command("get", self._redis.get(keys.value))
+        if raw is None:
+            return None
+        try:
+            envelope = CacheEnvelope.model_validate_json(self._text(raw))
+            if (
+                envelope.identity_digest != keys.identity_digest
+                or envelope.schema_revision != self.schema_revision
+                or envelope.source_revision != self.source_revision
+                or envelope.query_revision != self.query_revision
+                or not envelope.verify(self._secret)
+            ):
+                return None
+            if envelope.kind == "not_found":
+                if envelope.value is not None:
+                    return None
+                return StoredNotFound(envelope.created)
+            if envelope.kind == "failure":
+                if envelope.value is not None or envelope.failure_category is None:
+                    return None
+                return StoredFailure(envelope.created, envelope.failure_category)
+            if envelope.failure_category is not None:
+                return None
+            if envelope.value is None:
+                return None
+            return StoredSnapshot(
+                self._adapter.validate_python(envelope.value),
+                envelope.created,
+            )
+        except (UnicodeDecodeError, ValueError, ValidationError, json.JSONDecodeError):
+            return None
+
+    async def commit(
+        self,
+        *,
+        keys: CacheKeys,
+        token: str,
+        created: datetime,
+        value: Value | None,
+        ttl_seconds: float,
+        not_found: bool = False,
+        failure_category: CacheFailureCategory | None = None,
+    ) -> bool:
+        """Atomically write a signed envelope only for the exact lease owner."""
+        if not self._valid_token(token):
+            raise ValueError("token must be a bounded ASCII value")
+        if ttl_seconds <= 0:
+            return False
+        if not_found and failure_category is not None:
+            raise ValueError("a cache commit cannot be both not-found and failure")
+        kind: Literal["value", "not_found", "failure"] = (
+            "not_found" if not_found else "failure" if failure_category is not None else "value"
         )
-        envelope.integrity = hmac.new(
-            self._secret,
-            envelope.signed_bytes(),
-            hashlib.sha256,
-        ).hexdigest()
-        payload = envelope.model_dump_json()
-        await self._command(
-            "publish",
+        if (not_found or failure_category is not None) and value is not None:
+            raise ValueError("negative cache commits cannot carry a value")
+        if not not_found and failure_category is None and value is None:
+            raise ValueError("positive commits require a value")
+        payload = self._sign(
+            keys=keys,
+            kind=kind,
+            created=created,
+            value=value,
+            failure_category=failure_category,
+        )
+        result = await self._command(
+            "commit",
             self._redis.eval(
-                _PUBLISH,
+                _COMMIT,
                 2,
-                keys.snapshot(snapshot_id),
-                keys.latest,
+                keys.value,
+                keys.lease,
                 payload,
-                snapshot_id,
-                self._retention_seconds,
+                token,
+                max(1, int(ttl_seconds * 1000)),
             ),
         )
+        if type(result) is not int or result not in {0, 1}:
+            raise RedisUnavailable("Redis commit returned an invalid result")
+        return bool(result)
 
     async def acquire_lease(
         self,
         *,
         keys: CacheKeys,
-        bucket: int,
         token: str,
         lease_seconds: float,
     ) -> bool:
-        """Acquire one refresh-bucket lease with a unique owner token.
-
-        Args:
-            keys: Derived Redis keys for one cache identity.
-            bucket: Shared freshness time bucket.
-            token: Unique owner token.
-            lease_seconds: Positive lease lifetime.
-
-        Returns:
-            Whether this caller acquired the lease.
-        """
+        """Acquire the stable lease with Redis SET NX PX."""
+        if not self._valid_token(token):
+            raise ValueError("token must be a bounded ASCII value")
         result = await self._command(
             "lease_acquire",
             self._redis.set(
-                keys.lease(bucket),
+                keys.lease,
                 token,
                 nx=True,
                 px=max(1, int(lease_seconds * 1000)),
             ),
         )
-        return bool(result)
+        if result in (True, b"OK", "OK"):
+            return True
+        if result is None or result is False:
+            return False
+        raise RedisUnavailable("Redis lease acquire returned an invalid result")
 
-    async def release_lease(self, *, keys: CacheKeys, bucket: int, token: str) -> None:
-        """Delete a lease only when the caller's token still owns it.
-
-        Args:
-            keys: Derived Redis keys for one cache identity.
-            bucket: Shared freshness time bucket.
-            token: Unique owner token used during acquisition.
-        """
-        await self._command(
+    async def release_lease(self, *, keys: CacheKeys, token: str) -> None:
+        """Release only the lease still owned by this token."""
+        if not self._valid_token(token):
+            raise ValueError("token must be a bounded ASCII value")
+        result = await self._command(
             "lease_release",
-            self._redis.eval(_RELEASE, 1, keys.lease(bucket), token),
+            self._redis.eval(_RELEASE, 1, keys.lease, token),
         )
+        if type(result) is not int or result not in {0, 1}:
+            raise RedisUnavailable("Redis lease release returned an invalid result")

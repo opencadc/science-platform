@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "metrics-api.fullname" . }}-metrics-api
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "metrics-api") }}
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 spec:
@@ -16,19 +16,14 @@ spec:
   ingress:
     {{- toYaml .Values.networkPolicy.ingress | nindent 4 }}
   egress:
+    {{- $renderedEgress := false }}
     {{- range $rules := .Values.networkPolicy.egress }}
     {{- if $rules }}
+    {{- $renderedEgress = true }}
     {{- toYaml $rules | nindent 4 }}
     {{- end }}
     {{- end }}
-    {{- if .Values.redis.enabled }}
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "metrics-api.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: redis
-      ports:
-        - port: 6379
-          protocol: TCP
+    {{- if not $renderedEgress }}
+    []
     {{- end }}
 {{- end }}

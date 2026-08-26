@@ -15,13 +15,11 @@ class AppError(Exception):
 
     Attributes:
         code: Internal stable identifier used for telemetry and logs.
-        message: Sanitized description safe to retain inside the application.
         status_code: HTTP status returned by the API adapter.
         retry_after: Optional delay advertised through ``Retry-After``.
     """
 
     code: str
-    message: str
     status_code: int
     retry_after: int | None = None
 
@@ -36,6 +34,10 @@ class ProviderUnavailableError(Exception):
 
 class ProviderExecutionError(Exception):
     """Indicate that a provider call or returned payload could not be used."""
+
+
+class SubjectNotFoundError(Exception):
+    """Indicate that a valid provider has no data for one requested subject."""
 
 
 class RuntimeStartupError(RuntimeError):

@@ -1,24 +1,43 @@
-# Development values (kept in-repo per M1; int/staging/prod live elsewhere)
+# Development values. Redis, Prometheus/Mimir, and OTLP are disposable
+# external test fixtures; this values file never enables chart-owned services.
 image:
   repository: images.opencadc.org/platform/metrics
-  tag: latest
+  tag: v0.1.5
   pullPolicy: IfNotPresent
+
+clusterName: dev-cluster
 
 networkPolicy:
   enabled: false
 
-env:
-  METRICS_CLUSTER_NAME: "dev-cluster"
-  METRICS_SOURCES__PLATFORM: "kueue"
-  METRICS_CACHE__BACKEND: "redis"
-  # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
-  METRICS_CACHE__KEY_SECRET: "local-development-cache-key-32bytes"
-  METRICS_OTEL__METRICS_ENABLED: "false"
-  METRICS_OTEL__TRACES_ENABLED: "false"
-  METRICS_OTEL__LOGS_ENABLED: "false"
-  # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
-  # service account (ADR-0001); no transport settings are configured here.
-  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-example"]'
+serviceAccount:
+  create: true
+
+rbac:
+  create: true
+
+kueue:
+  clusterQueues:
+    - cq-proton
+    - cq-electron
+  namespaces:
+    - canfar-workloads
 
 redis:
-  enabled: true
+  urlSecret:
+    name: metrics-dev-redis
+    key: redis-url
+
+cacheKeySecret:
+  name: metrics-dev-cache
+  key: key-secret
+
+promql:
+  baseUrl: ""
+  mimirTenantId: ""
+
+otel:
+  endpoint: ""
+
+env:
+  METRICS_OTEL__DEPLOYMENT_ENVIRONMENT: "development"

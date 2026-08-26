@@ -1,173 +1,131 @@
 # Metrics
 
-The Metrics service exposes Kueue-backed **platform capacity/allocation** and
-Kubernetes-backed **current requested resources** for one User's Running Pods.
+Metrics is the read-only service that reports current Kueue queue state for
+CANFAR Users, Communities, and the Platform. It may add current CPU and memory
+efficiency from an external Prometheus-compatible system; it does not create a
+history or own a monitoring backend.
 
-Shared cross-context vocabulary: [`../CONTEXT-MAP.md`](../CONTEXT-MAP.md).
+## Subjects and queues
 
-Distilled decisions: [`docs/adr/README.md`](docs/adr/README.md).
+**Metrics subject**:
+The User, Community, or Platform named by one Metrics route. A subject selects
+an aggregate; it is not an authorization claim.
+_Avoid_: raw label selectors, caller-supplied PromQL, report inventory
 
-## Language
+**User**:
+A canonical `canfar.net/username` label value. A User report aggregates the
+matching LocalQueues in the configured namespaces.
+_Avoid_: Pod owner, account, billing identity
 
-**Platform capacity**: Total CPU and memory available across the cluster for
-scheduling (Kueue-backed). Exposed as `status.resources[].capacity`. Open resource-name keys
-(for example `cpu`, `memory`, `nvidia.com/gpu`). _Avoid_: "available" alone.
+**Community**:
+A canonical `canfar.net/community` label value. A Community report aggregates
+configured ClusterQueues carrying that label.
+_Avoid_: Cohort, namespace, user list
 
-**Platform allocation**: CPU and memory already allocated on the cluster
-(Kueue-backed). Exposed as `status.resources[].allocated`. Sourced from
-`flavorsUsage.resources[].total`. _Avoid_: "requested" alone when meaning
-cluster totals.
+**Platform**:
+The configured Metrics deployment subject. A Platform report aggregates every
+ClusterQueue named by `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES`.
+_Avoid_: every ClusterQueue visible to the Kubernetes identity
 
-**Metrics backend**: This service when co-deployed with Skaha. Skaha reaches it
-at `SKAHA_METRICS_BACKEND_URL` (in-cluster Service, not the edge hostname).
-_Avoid_: "metrics pod" in specs.
+**LocalQueue**:
+A namespaced Kueue queue that assigns a User's work to one configured
+ClusterQueue. The queue carries the canonical username and community labels.
+_Avoid_: workload inventory, Pod queue, user account
 
-**ClusterQueue-backed metrics**: Platform metrics aggregate configured Kueue
-`ClusterQueue` objects only; cohort is not part of provider configuration or
-capacity aggregation.
+**ClusterQueue**:
+A cluster-scoped Kueue queue that supplies the community and platform
+aggregation boundary. Each configured ClusterQueue maps to one Community.
+_Avoid_: Cohort, node pool, Prometheus series
 
-**Metric scope**: Named read surface mapped via `sources.*` to exactly one
-provider. The shipped scopes are `platform` and `user`. A scope ships with its route,
-cache TTL, provider method, schema, telemetry, and tests together.
+**Configured namespace**:
+A namespace in `METRICS_PROVIDERS__KUEUE__NAMESPACES` that Metrics searches for
+User LocalQueues. The set is deployment configuration, not a request filter.
+_Avoid_: all namespaces, workload namespace inferred from a Pod
 
-**Source configuration**: Typed `sources` tree selecting which provider key backs
-each scope. Distinct from `providers.*` connection settings.
+## Report values
 
-**Complete provider metric**: Provider returns a full scope model; the runtime
-does not compose fragments across providers.
+**Resource request**:
+The Kueue-reserved quantity represented by `flavorsReservation` for a queue
+or ClusterQueue, aggregated by Kubernetes resource name. It is a scheduler
+quantity, not measured consumption.
+_Avoid_: usage, capacity, usage-hours
 
-**Provider fingerprint**: Stable segment in cache keys when queue lists or
-provider config change.
+**Pending workload**:
+A Kueue workload counted by `pendingWorkloads`: it is waiting for admission.
+It is not the public Metrics workload count.
+_Avoid_: reserving workload, admitted workload
 
-**Metrics**: Kubernetes-style `canfar.net/v1alpha1` response kind for one
-bounded report. Platform uses `spec.platform: canfar`, `status.observedAt`,
-named resources, and exactly `Ready` and `Cached` conditions.
+**Reserving workload**:
+A Kueue workload counted by `reservingWorkloads`: it is admitted at the
+cluster level and is holding or progressing through a quota reservation. It is
+not a Kubernetes Pod-phase count.
+_Avoid_: waiting workload, pending workload, running Pod, active Pod
 
-## Relationships
+**Platform capacity**:
+The sum of nominal quota across the configured ClusterQueues, grouped by
+resource name.
+_Avoid_: node capacity, available capacity without a source
 
-- Metrics owns caching and snapshot freshness for platform reads; Skaha does
-  not cache Metrics responses.
-- Each named Platform resource contains both `capacity` and `allocated` using the
-  **same unit** for that resource name
-  ([ADR-0002](docs/adr/0002-platform-api-contract.md)).
-- Platform `allocated` sums `status.flavorsUsage.resources[].total` only;
-  do not add `borrowed` separately (total already includes borrowed quota).
-## Example dialogue
+**Platform allocation**:
+The sum of `flavorsUsage.resources[].total` across the configured ClusterQueues.
+Borrowed quota is already included in `total`.
+_Avoid_: requested resources, usage, reservation
 
-> **Dev:** "Where does platform capacity come from?"
-> **Domain expert:** "Summed nominal quota from the configured ClusterQueues in
-> the Kueue provider — not node listing or pod aggregation."
+**Efficiency**:
+Current Running-Pod CPU or memory usage divided by the corresponding Running-
+Pod resource request for one subject. It is optional, instantaneous, and
+Prometheus/Mimir-backed; it is not lifetime utilization.
+_Avoid_: accounting, usage-hours, overall efficiency
 
-## Shared vocabulary
+## Runtime boundaries
 
-ADRs 0004–0009 own these terms. Platform and User phase 1 are implemented;
-Community and accounting terms describe later packages.
+**Fresh report**:
+A Redis snapshot inside its surface-specific fresh window: User and Community
+2 minutes; Platform 5 minutes.
+_Avoid_: live response, uncached response
 
-**Metrics**: Kubernetes API kind for one bounded metrics report about
-a `Platform`, `User`, or `Community` subject. The API group `canfar.net`
-carries the product identity, so the Kind is the unprefixed CamelCase domain
-type. `Metrics` is the accepted mass noun. _Avoid_: `CanfarMetrics`, `CANFARMetrics`,
-`MetricsReport`, and separate `PlatformMetrics`, `UserMetrics`, or
-`CommunityMetrics` kinds.
+**Serviceable stale report**:
+A complete snapshot outside its fresh window but inside its serviceable window:
+10 minutes for User and Community; 30 minutes for Platform. It may be served
+while a single request refreshes it.
+_Avoid_: expired report, current data
 
-**CANFAR API family**: Kubernetes-shaped resources sharing API group
-`canfar.net`; the initial Kind is the mass noun `Metrics`, while a future
-object resource would use a singular noun such as `Session`. A future
-aggregated API server owns the group/version as one
-serving boundary. _Avoid_: product-prefixed kinds such as `CanfarMetrics` or
-implementation-role kinds such as `Controller` and `Accounting`.
+**Retained snapshot**:
+A Redis snapshot kept for recovery after serviceability ends: 15 minutes for
+User and Community; 60 minutes for Platform. It is not returned by the API.
+_Avoid_: stale response, valid cache
 
-**Metrics subject**: Aggregation selector chosen by the GET route and echoed as
-exactly one of `spec.user`, `spec.community`, or `spec.platform`. In the
-unauthenticated `v1alpha1` service this is not an authorization boundary:
-`spec.user` is the exact `canfar.net/username` label value and
-`spec.community` is the exact `canfar.net/community` label value. The
-cluster-internal deployment boundary controls access until a separate
-authorization design exists.
-_Avoid_: raw Kubernetes label selectors or PromQL supplied as subject identity.
+**Server-owned PromQL**:
+A fixed query selected by Metrics for a known surface and resource. Supplying
+the Prometheus/Mimir base endpoint enables the provider; absence disables it.
+A caller cannot submit query text, labels, URLs, or headers.
+_Avoid_: PromQL proxy, accounting query, user query
 
-**Metrics report**: Bounded observations represented by one `Metrics`
-object. Initial reports contain current requested resources and, in phase 2,
-active-workload lifetime usage and efficiency; fixed-window history is
-deferred. This remains the domain concept represented by the serialized
-`Metrics` Kind.
-_Avoid_: raw time series, unbounded query results, or a per-Pod inventory.
+**External dependency**:
+Redis, Prometheus/Mimir, or an OTLP metrics receiver supplied by the deployment. The
+Metrics production chart references these services but does not install or
+operate them.
+_Avoid_: embedded production service, Metrics-owned database
 
-**Current requested resources**: Scheduler-effective whole-Pod resource
-requests held by the subject's `Running` Pods at the report's observation
-time. For each Pod, sum regular containers and restartable sidecars, compare
-that sum with the largest effective init-container request, then add Pod
-overhead. Preserve open Kubernetes resource names and treat an absent request
-as unknown, not zero. This is reserved capacity, not measured consumption.
-_Avoid_: total usage, current usage, or first-container-only requests.
+**Application-state telemetry**:
+Optional OTLP metrics describing request, cache, source, and readiness behavior.
+The endpoint is external to the Metrics process and chart.
+_Avoid_: business metric history, accounting series
 
-**Active-workload lifetime accounting**: Serialized as
-`accountingPeriod: ActiveWorkloadLifetime`. For the Pods `Running` at
-observation time, report per-resource total usage hours, requested hours, and
-their ratio, with each Pod integrated only over its own Running duration. CPU
-uses core-hours, memory uses GiB-hours, and GPU uses GPU-hours. _Avoid_:
-Running-Pod lifetime, live efficiency, overall efficiency, average Pod
-efficiency.
+## API terms
 
-**Running workload set**: Pods in phase `Running` at observation time that
-are in a configured CANFAR workload namespace and carry
-`app.kubernetes.io/managed-by=skaha`, `app.kubernetes.io/part-of=canfar`, and
-the exact canonical User or Community subject label. Pending demand, completed
-Pods, other namespaces, and non-Skaha Pods are outside this set. _Avoid_:
-active workloads when the Pod phase boundary matters.
+**Metrics report**:
+One bounded `canfar.net/v1alpha1` `Metrics` response with one subject, one
+observation time, resource values, and exactly one `Ready` and one `Cached`
+condition.
+_Avoid_: per-Pod inventory, time-series database, collection endpoint
 
-**Stale metrics report**: A previously collected report served after its fresh
-period but before its stale-serviceable deadline, retaining the original
-observation time and an explicit stale condition. After that deadline the
-snapshot may remain in Redis briefly for recovery and diagnostics but the API
-returns 503. _Avoid_: cached report when freshness matters.
+**PartialData**:
+The `Ready=False` reason used when optional efficiency collection fails but the
+primary Kueue report is successfully served. The HTTP response remains 200.
+_Avoid_: zero efficiency, accounting incomplete
 
-**Resource-time accounting series**: Metrics-owned, versioned internal series
-that expose additive requested and observed resource-time for each Pod UID and
-resource, plus continuity/coverage needed to detect resets. Reports sum the
-numerators and denominators before deriving efficiency. _Avoid_: a final
-per-Pod ratio, an average of ratios, or a public raw PromQL contract.
-
-**Source snapshot**: Normalized, schema-versioned observation for one source,
-cluster, configured namespace set, and subject digest, stored in Redis. A
-request may trigger a bounded fill when no serviceable snapshot exists, but
-Redis leases ensure concurrent traffic shares that fill. _Avoid_: cached raw
-upstream envelopes, an unscoped cluster-wide Pod inventory, or a downstream
-query for every concurrent API request.
-
-**Kueue source**: Internal `kueue` provider for Platform capacity and admitted
-allocation. _Avoid_: treating Kueue quota as observed resource consumption.
-
-**Kubernetes workload source**: Internal `kubernetes` provider for Running Pod
-lifecycle, canonical labels, and declared requests. It reads Pod
-specifications, not the Kubernetes Resource Metrics API. _Avoid_:
-`kube_metrics` for this source.
-
-**PromQL accounting source**: Internal `promql` provider for controlled
-Prometheus- or Mimir-compatible queries that return active-workload lifetime
-usage and efficiency inputs. _Avoid_: provider names tied to one compatible
-backend product or caller-authored PromQL.
-
-**Complete namespace observation**: A User or Community total assembled only
-after every configured workload namespace has been observed successfully. A
-subset is not a valid total; Metrics serves a prior complete snapshot or marks
-the section unavailable. _Avoid_: partial namespace totals presented as
-complete.
-
-**Public source provenance**: Internal source adapters, snapshots, and their
-individual timestamps are operational details and are not serialized in the
-`Metrics` response. The public report exposes one conservative
-`observedAt`, readiness, and cache status. Source-level detail remains in OTel
-telemetry. _Avoid_: `status.sources`.
-
-**Metrics query catalog**: Versioned allowlist of server-owned time-series
-query templates addressed by stable query IDs. _Avoid_: raw PromQL proxy,
-caller-authored query endpoint, upstream query URL.
-
-**Metrics module architecture**: Incremental evolution of the existing
-`api`, `core`, `providers`, `schemas`, and `services` packages. The runtime is
-the explicit composition root, the shared Metrics service hides orchestration,
-and source adapters normalize into service-owned models. `cache.py` and
-`telemetry.py` become deeper packages only when their concrete behavior lands.
-_Avoid_: a parallel `domain/application/ports/adapters` tree, generic provider
-registry, service locator, or empty operator package.
+**Service-unavailable report**:
+An HTTP 503 response when the primary Kueue source fails and no serviceable
+snapshot exists.
+_Avoid_: empty zero report, partial success

@@ -1,13 +1,14 @@
-"""Contracts for deterministic Kueue development fixtures."""
+"""Contracts for the labelled, deterministic Kueue development fixtures."""
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
+import pytest
 import yaml
 
-from metrics.dev import stack
-from metrics.dev.fixtures import _millicpu
+from metrics.dev import fixtures, stack
 
 METRICS_ROOT = Path(__file__).parents[1]
 TOPOLOGY = METRICS_ROOT / "scripts" / "test-setup.yaml"
@@ -15,61 +16,108 @@ WORKLOADS = METRICS_ROOT / "scripts" / "workload-fixtures.yaml"
 KUEUE_CONFIG = METRICS_ROOT / "scripts" / "kueue-config.yaml"
 
 
-def _documents(path: Path) -> list[dict]:
+def _documents(path: Path) -> list[dict[str, object]]:
+    """Load non-empty YAML documents from one fixture manifest."""
     return [document for document in yaml.safe_load_all(path.read_text()) if document]
 
 
-def test_topology_uses_v1beta2_borrowing_and_equal_fair_queues() -> None:
+def _write_documents(path: Path, documents: list[dict[str, object]]) -> None:
+    """Write temporary fixture documents for negative validation tests."""
+    path.write_text(
+        "---\n".join(yaml.safe_dump(document, sort_keys=False) for document in documents),
+        encoding="utf-8",
+    )
+
+
+def test_topology_uses_v1beta2_clusterqueues_and_labelled_localqueues() -> None:
     documents = _documents(TOPOLOGY)
-    kueue = [item for item in documents if item["apiVersion"].startswith("kueue.")]
+    kueue = [item for item in documents if str(item["apiVersion"]).startswith("kueue.")]
     assert all(item["apiVersion"] == "kueue.x-k8s.io/v1beta2" for item in kueue)
+    assert not any(item["kind"] == "Cohort" for item in documents)
 
-    by_name = {item["metadata"]["name"]: item for item in documents}
-    assert by_name["cq-proton"]["spec"]["cohortName"] == "cohort-atom"
-    electron = by_name["cq-electron"]["spec"]
-    assert electron["cohortName"] == "cohort-atom"
-    cpu = electron["resourceGroups"][0]["flavors"][0]["resources"][0]
-    assert cpu == {"name": "cpu", "nominalQuota": "100m", "borrowingLimit": "1"}
-    assert by_name["cq-fair"]["spec"]["admissionScope"] == {
-        "admissionMode": "UsageBasedAdmissionFairSharing"
+    cluster_queues = {
+        item["metadata"]["name"]: item for item in documents if item["kind"] == "ClusterQueue"
     }
-    for name in ("lq-fair-high", "lq-fair-low"):
-        assert by_name[name]["spec"] == {
-            "clusterQueue": "cq-fair",
-            "fairSharing": {"weight": "1"},
-        }
+    assert set(cluster_queues) == set(stack.CLUSTER_QUEUES)
+    communities = {
+        name: queue["metadata"]["labels"]["canfar.net/community"]
+        for name, queue in cluster_queues.items()
+    }
+    assert all(communities.values())
+    assert all("cohortName" not in queue["spec"] for queue in cluster_queues.values())
+
+    local_queues = [item for item in documents if item["kind"] == "LocalQueue"]
+    identities: set[tuple[str, str, str, str]] = set()
+    for queue in local_queues:
+        metadata = queue["metadata"]
+        namespace = metadata["namespace"]
+        name = metadata["name"]
+        labels = metadata["labels"]
+        username = labels["canfar.net/username"]
+        community = labels["canfar.net/community"]
+        cluster_queue = queue["spec"]["clusterQueue"]
+        assert username and community
+        assert cluster_queue in communities
+        assert communities[cluster_queue] == community
+        identities.add((namespace, name, username, community))
+    assert len(identities) == len(local_queues)
+    assert {namespace for namespace, _, _, _ in identities} == set(stack.WORKLOAD_NAMESPACES)
+    assert {"bob", "alice", "carol"} <= {username for _, _, username, _ in identities}
 
 
-def test_fair_sharing_controller_history_is_nonzero_and_fast() -> None:
+def test_topology_marks_only_reset_owned_objects() -> None:
+    documents = _documents(TOPOLOGY)
+    owned_kinds = {"ResourceFlavor", "RuntimeClass", "ClusterQueue", "LocalQueue"}
+    for document in documents:
+        labels = document["metadata"].get("labels", {})
+        if document["kind"] in owned_kinds:
+            assert labels[fixtures.FIXTURE_OWNER_LABEL] == "metrics-dev"
+        else:
+            assert fixtures.FIXTURE_OWNER_LABEL not in labels
+
+
+def test_kueue_config_does_not_enable_cohort_fixture_behaviour() -> None:
     config = yaml.safe_load(KUEUE_CONFIG.read_text())
     assert config["apiVersion"] == "config.kueue.x-k8s.io/v1beta2"
     assert "metadata" not in config
-    assert config["admissionFairSharing"] == {
-        "usageHalfLifeTime": "1m",
-        "usageSamplingInterval": "1s",
-        "resourceWeights": {"cpu": 1, "memory": 1},
-    }
+    assert "Cohort.kueue.x-k8s.io" not in config["controller"]["groupKindConcurrency"]
 
 
-def test_jobs_are_finite_pinned_and_cover_required_controls() -> None:
+def test_jobs_are_finite_pinned_and_carry_matching_queue_identity() -> None:
     jobs = _documents(WORKLOADS)
-    by_name = {job["metadata"]["name"]: job for job in jobs}
-    assert {
-        "integration-idle",
-        "resource-shapes",
-        "pending-demand",
-        "terminal-control",
-        "unlabelled-control",
-        "empty-subject-control",
-        "fair-warm-high",
-        "fair-next-high",
-        "fair-next-low",
-    } == set(by_name)
+    assert jobs
+    topology = _documents(TOPOLOGY)
+    local_queues = {
+        (item["metadata"]["namespace"], item["metadata"]["name"]): item["metadata"]["labels"]
+        for item in topology
+        if item["kind"] == "LocalQueue"
+    }
 
     images: set[str] = set()
     for job in jobs:
         assert job["kind"] == "Job"
         assert job["spec"]["backoffLimit"] == 0
+        metadata = job["metadata"]
+        labels = metadata["labels"]
+        assert labels["kueue.x-k8s.io/queue-name"]
+        identity = (
+            metadata["namespace"],
+            labels["kueue.x-k8s.io/queue-name"],
+        )
+        assert identity in local_queues
+        assert labels["canfar.net/username"]
+        assert labels["canfar.net/community"]
+        queue_labels = local_queues[identity]
+        assert (labels["canfar.net/username"], labels["canfar.net/community"]) == (
+            queue_labels["canfar.net/username"],
+            queue_labels["canfar.net/community"],
+        )
+
+        pod_metadata = job["spec"]["template"]["metadata"]
+        pod_labels = pod_metadata["labels"]
+        assert "kueue.x-k8s.io/queue-name" not in pod_labels
+        assert pod_labels["canfar.net/username"] == labels["canfar.net/username"]
+        assert pod_labels["canfar.net/community"] == labels["canfar.net/community"]
         pod_spec = job["spec"]["template"]["spec"]
         for container in pod_spec.get("initContainers", []) + pod_spec["containers"]:
             images.add(container["image"])
@@ -80,56 +128,154 @@ def test_jobs_are_finite_pinned_and_cover_required_controls() -> None:
     assert len(images) == 1
     assert "@sha256:" in images.pop()
 
-    shape = by_name["resource-shapes"]["spec"]["template"]["spec"]
-    assert len(shape["containers"]) == 2
-    assert shape["initContainers"]
-    assert shape["runtimeClassName"] == "metrics-overhead"
-    assert by_name["pending-demand"]["spec"]["suspend"] is True
-    assert "app.kubernetes.io/managed-by" not in by_name["unlabelled-control"]["metadata"]["labels"]
-    empty = by_name["empty-subject-control"]["metadata"]["labels"]
-    assert empty["canfar.net/username"] == ""
-    assert empty["canfar.net/community"] == ""
 
+def test_prepare_prunes_only_owned_fixture_objects_before_reapply(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple[str, ...]] = []
 
-def test_skaha_jobs_carry_the_canonical_session_labels() -> None:
-    jobs = _documents(WORKLOADS)
-    canonical = {
-        "app.kubernetes.io/managed-by",
-        "app.kubernetes.io/part-of",
-        "canfar.net/id",
-        "canfar.net/username",
-        "canfar.net/name",
-        "canfar.net/kind",
-        "canfar.net/job",
-        "canfar.net/flavor",
-        "canfar.net/accelerator",
-        "canfar.net/community",
-        "canfar.net/project",
-    }
-    included = [
-        job
-        for job in jobs
-        if job["metadata"]["name"] not in {"unlabelled-control", "empty-subject-control"}
+    class FakeStack:
+        WORKLOAD_NAMESPACES = ("canfar-workloads", "canfar-workloads-secondary")
+        WORKLOAD_NAMESPACE = "canfar-workloads"
+        CLUSTER_QUEUES = ("cq-proton", "cq-electron", "cq-fair")
+
+        @staticmethod
+        def _kubectl(*args: str) -> None:
+            calls.append(args)
+
+    monkeypatch.setattr(fixtures, "_stack", lambda: FakeStack)
+    topology = tmp_path / "topology.yaml"
+    topology.write_text("{}\n", encoding="utf-8")
+
+    fixtures._prepare(topology)
+
+    selector = "metrics.canfar.net/fixture-owner=metrics-dev"
+    expected_deletes = [
+        *(
+            delete
+            for namespace in FakeStack.WORKLOAD_NAMESPACES
+            for delete in (
+                (
+                    "--namespace",
+                    namespace,
+                    "delete",
+                    "job",
+                    "-l",
+                    "metrics.canfar.net/fixture-phase",
+                    "--ignore-not-found",
+                    "--wait",
+                    f"--timeout={fixtures.TIMEOUT}",
+                ),
+                (
+                    "--namespace",
+                    namespace,
+                    "delete",
+                    "localqueue",
+                    "-l",
+                    selector,
+                    "--ignore-not-found",
+                    "--wait",
+                    f"--timeout={fixtures.TIMEOUT}",
+                ),
+            )
+        ),
+        (
+            "delete",
+            "resourceflavor,runtimeclass,clusterqueue",
+            "-l",
+            selector,
+            "--ignore-not-found",
+            "--wait",
+            f"--timeout={fixtures.TIMEOUT}",
+        ),
     ]
-    for job in included:
-        labels = job["metadata"]["labels"]
-        assert canonical <= labels.keys()
-        assert labels["app.kubernetes.io/managed-by"] == "skaha"
-        assert labels["app.kubernetes.io/part-of"] == "canfar"
-        assert labels["kueue.x-k8s.io/queue-name"]
-        assert job["spec"]["template"]["metadata"]["labels"] == labels
-    assert len({job["metadata"]["labels"]["canfar.net/username"] for job in included}) >= 2
-    assert len({job["metadata"]["labels"]["canfar.net/community"] for job in included}) >= 2
-    astronomy_users = {
-        job["metadata"]["labels"]["canfar.net/username"]
-        for job in included
-        if job["metadata"]["labels"]["canfar.net/community"] == "astronomy"
-    }
-    assert {"alice", "carol"} <= astronomy_users
+    actual_deletes = [call for call in calls if "delete" in call]
+    assert actual_deletes == expected_deletes
+    apply_index = calls.index(("apply", "-f", str(topology)))
+    assert all("delete" not in call for call in calls[apply_index:])
 
 
-def test_fixture_cpu_quantity_comparison() -> None:
-    assert _millicpu("100m") == 100
-    assert _millicpu("2") == 2000
-    assert _millicpu("955132n") > 0
-    assert stack.KUEUE_VERSION == "0.19.2"
+def test_fixture_validator_allows_distinct_local_queues_with_same_labels(tmp_path: Path) -> None:
+    topology = _documents(TOPOLOGY)
+    duplicate = next(
+        copy.deepcopy(item)
+        for item in topology
+        if item["kind"] == "LocalQueue" and item["metadata"]["name"] == "lq-bob-physics"
+    )
+    duplicate["metadata"]["name"] = "lq-bob-physics-duplicate"
+    topology.append(duplicate)
+    topology_path = tmp_path / "topology.yaml"
+    _write_documents(topology_path, topology)
+
+    fixtures.validate_fixture_metadata(topology_path, WORKLOADS)
+
+
+def test_fixture_validator_rejects_duplicate_local_queue_name(tmp_path: Path) -> None:
+    topology = _documents(TOPOLOGY)
+    duplicate = next(
+        copy.deepcopy(item)
+        for item in topology
+        if item["kind"] == "LocalQueue" and item["metadata"]["name"] == "lq-bob-physics"
+    )
+    topology.append(duplicate)
+    topology_path = tmp_path / "topology.yaml"
+    _write_documents(topology_path, topology)
+
+    with pytest.raises(stack.DevStackError, match="duplicate LocalQueue Kubernetes identity"):
+        fixtures.validate_fixture_metadata(topology_path, WORKLOADS)
+
+
+def test_fixture_validator_rejects_duplicate_local_queue_uid(tmp_path: Path) -> None:
+    topology = _documents(TOPOLOGY)
+    duplicate = next(
+        copy.deepcopy(item)
+        for item in topology
+        if item["kind"] == "LocalQueue" and item["metadata"]["name"] == "lq-bob-physics"
+    )
+    uid = "550e8400-e29b-41d4-a716-446655440000"
+    topology[-1]["metadata"]["uid"] = uid
+    duplicate["metadata"]["name"] = "lq-bob-physics-duplicate"
+    duplicate["metadata"]["uid"] = uid
+    topology.append(duplicate)
+    topology_path = tmp_path / "topology.yaml"
+    _write_documents(topology_path, topology)
+
+    with pytest.raises(stack.DevStackError, match="duplicate LocalQueue .* metadata.uid"):
+        fixtures.validate_fixture_metadata(topology_path, WORKLOADS)
+
+
+def test_fixture_validator_rejects_malformed_local_queue_uid(tmp_path: Path) -> None:
+    topology = _documents(TOPOLOGY)
+    queue = next(item for item in topology if item["kind"] == "LocalQueue")
+    queue["metadata"]["uid"] = "not a Kubernetes UID"
+    topology_path = tmp_path / "topology.yaml"
+    _write_documents(topology_path, topology)
+
+    with pytest.raises(stack.DevStackError, match="malformed LocalQueue .* metadata.uid"):
+        fixtures.validate_fixture_metadata(topology_path, WORKLOADS)
+
+
+def test_fixture_validator_rejects_job_queue_mismatch(tmp_path: Path) -> None:
+    workloads = _documents(WORKLOADS)
+    job = workloads[0]
+    job["metadata"]["labels"] = copy.deepcopy(job["metadata"]["labels"])
+    job["metadata"]["labels"]["kueue.x-k8s.io/queue-name"] = "lq-fair-high"
+    workloads_path = tmp_path / "workloads.yaml"
+    _write_documents(workloads_path, workloads)
+
+    with pytest.raises(stack.DevStackError, match="labels do not match LocalQueue"):
+        fixtures.validate_fixture_metadata(TOPOLOGY, workloads_path)
+
+
+def test_fixture_validator_rejects_pod_label_mismatch(tmp_path: Path) -> None:
+    workloads = _documents(WORKLOADS)
+    job = workloads[0]
+    job["spec"]["template"]["metadata"]["labels"] = copy.deepcopy(
+        job["spec"]["template"]["metadata"]["labels"]
+    )
+    job["spec"]["template"]["metadata"]["labels"]["canfar.net/community"] = "physics"
+    workloads_path = tmp_path / "workloads.yaml"
+    _write_documents(workloads_path, workloads)
+
+    with pytest.raises(stack.DevStackError, match="Pod template .* community"):
+        fixtures.validate_fixture_metadata(TOPOLOGY, workloads_path)

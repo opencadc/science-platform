@@ -1,132 +1,342 @@
-"""Read active-workload lifetime accounting through controlled PromQL.
-
-Only fixed query templates are permitted. Returned vectors are fully validated
-for labels, identity, freshness, units, and completeness before becoming
-transport-neutral accounting snapshots.
-"""
+"""Collect current CPU and memory efficiency from Prometheus-compatible APIs."""
 
 from __future__ import annotations
 
-import hashlib
+import asyncio
 import json
-from collections import defaultdict
+import re
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
-from enum import StrEnum
+from decimal import Decimal
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
-from metrics.services.models import AccountingSnapshot, LifetimeIssue
-from metrics.services.resources import RESOURCE_UNITS, aggregate_active_workload_hours
+from metrics.services.models import EfficiencyObservation, bounded_decimal
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
-SOURCE_REVISION = "1"
-USAGE_METRIC = "canfar_active_workload_usage_hours_total"
-REQUESTED_METRIC = "canfar_active_workload_requested_hours_total"
-COMPLETE_METRIC = "canfar_active_workload_accounting_complete"
 
-_BASE_LABELS = {
-    "__name__",
-    "cluster",
-    "namespace",
-    "pod_uid",
-    "resource",
-    "canfar_username",
-    "canfar_community",
-    "source_revision",
-    "unit",
-}
-_ISSUES = {issue.value: issue for issue in LifetimeIssue}
-
-
-class QueryTemplate(StrEnum):
-    """Names of the only instant queries this provider can execute."""
-
-    USER_ACTIVE_LIFETIME = "user-active-lifetime"
-    COMMUNITY_ACTIVE_LIFETIME = "community-active-lifetime"
+_CPU_USAGE_METRIC = "container_cpu_usage_seconds_total"
+_MEMORY_USAGE_METRIC = "container_memory_working_set_bytes"
+_POD_REQUEST_METRIC = "kube_pod_container_resource_requests"
+_POD_LABELS_METRIC = "kube_pod_labels"
+_POD_PHASE_METRIC = "kube_pod_status_phase"
+_JOIN_LABELS = "cluster,namespace,pod"
+_USER_LABEL = "label_canfar_net_username"
+_COMMUNITY_LABEL = "label_canfar_net_community"
+_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
+_NAMESPACE_LABEL = "namespace"
+_PROMQL_SCOPE = Literal["user", "community", "platform"]
+_DEFAULT_REQUEST_TIMEOUT_SECONDS = 5.0
+_DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
+_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
+_DEFAULT_MAX_SERIES = 3_000
+_DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
-def _escape_label(value: str) -> str:
-    """Escape an exact subject for a PromQL string literal.
-
-    Args:
-        value: Unescaped label value.
-
-    Returns:
-        Value escaped for backslash, newline, and quote characters.
-    """
-    return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+def _validation_now() -> datetime:
+    """Return the wall-clock value used to validate one response."""
+    return datetime.now(UTC)
 
 
-def _query(template: QueryTemplate, subject: str) -> str:
-    """Render one allowlisted instant query for an exact subject.
+def _promql_string(value: str) -> str:
+    """Encode one value as a PromQL double-quoted string literal."""
+    return json.dumps(value, ensure_ascii=True)
 
-    Args:
-        template: Fixed query shape to render.
-        subject: Exact user or community label value.
 
-    Returns:
-        PromQL selecting accounting series for currently Running Pods.
-    """
-    label = (
-        "canfar_username" if template is QueryTemplate.USER_ACTIVE_LIFETIME else "canfar_community"
+def _namespace_regex(namespaces: list[str]) -> str:
+    """Build an anchored regex from configured namespace names."""
+    if not namespaces:
+        raise ProviderExecutionError("PromQL namespaces are not configured")
+    return "^(?:" + "|".join(re.escape(namespace) for namespace in namespaces) + ")$"
+
+
+def _matcher(name: str, operator: str, value: str) -> str:
+    """Render one fixed PromQL label matcher."""
+    return f"{name}{operator}{_promql_string(value)}"
+
+
+def _selector(
+    metric: str,
+    *,
+    cluster: str,
+    namespaces: str,
+    matchers: tuple[str, ...] = (),
+) -> str:
+    """Render one fully scoped metric selector."""
+    labels = (
+        _matcher("cluster", "=", cluster),
+        _matcher(_NAMESPACE_LABEL, "=~", namespaces),
+        *matchers,
     )
-    selector = (
-        '{__name__=~"canfar_active_workload_(usage|requested)_hours_total|'
-        'canfar_active_workload_accounting_complete",'
-        f'source_revision="{SOURCE_REVISION}",{label}="{_escape_label(subject)}"' + "}"
+    return f"{metric}{{{','.join(labels)}}}"
+
+
+def _selected_pods(
+    *,
+    scope: _PROMQL_SCOPE,
+    subject: str | None,
+    cluster: str,
+    namespaces: str,
+) -> str:
+    """Select labelled Running Pods for one efficiency scope."""
+    if scope == "user":
+        if subject is None:
+            raise ProviderExecutionError("PromQL user subject is missing")
+        matchers = (
+            _matcher(_USER_LABEL, "=", subject),
+            _matcher(_COMMUNITY_LABEL, "!=", ""),
+        )
+    elif scope == "community":
+        if subject is None:
+            raise ProviderExecutionError("PromQL community subject is missing")
+        matchers = (
+            _matcher(_COMMUNITY_LABEL, "=", subject),
+            _matcher(_USER_LABEL, "!=", ""),
+        )
+    else:
+        if subject is not None:
+            raise ProviderExecutionError("PromQL platform scope does not accept a subject")
+        matchers = (
+            _matcher(_USER_LABEL, "!=", ""),
+            _matcher(_COMMUNITY_LABEL, "!=", ""),
+        )
+
+    labels = _selector(
+        _POD_LABELS_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=matchers,
     )
-    running = (
-        'label_replace(kube_pod_status_phase{phase="Running"} == 1,"pod_uid","$1","uid","(.*)")'
+    running = _selector(
+        _POD_PHASE_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(_matcher("phase", "=", "Running"),),
     )
-    return f"({selector}) and on (namespace,pod_uid) ({running})"
+    return f"({labels} and on ({_JOIN_LABELS}) ({running} == 1))"
 
 
-def _decimal(value: Any) -> Decimal:
-    """Parse a non-negative finite PromQL sample value.
+def _selected_metric(metric: str, selected_pods: str) -> str:
+    """Join a source metric to the selected Running Pod population."""
+    return f"({metric} and on ({_JOIN_LABELS}) {selected_pods})"
 
-    Args:
-        value: Sample value returned by the backend.
 
-    Returns:
-        Exact decimal representation.
+def _cpu_usage(selected_pods: str, *, cluster: str, namespaces: str) -> str:
+    """Return CPU usage summed after a five-minute counter rate."""
+    source = _selector(
+        _CPU_USAGE_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+            _matcher("image", "!=", ""),
+        ),
+    )
+    return f"sum({_selected_metric(f'rate({source}[5m])', selected_pods)})"
 
-    Raises:
-        ProviderExecutionError: If the sample is not usable.
-    """
-    try:
-        result = Decimal(str(value))
-    except (InvalidOperation, ValueError) as exc:
-        raise ProviderExecutionError("PromQL returned a non-decimal sample") from exc
-    if not result.is_finite() or result < 0:
-        raise ProviderExecutionError("PromQL returned a negative or non-finite sample")
+
+def _memory_usage(selected_pods: str, *, cluster: str, namespaces: str) -> str:
+    """Return working-set bytes summed for selected Running Pods."""
+    source = _selector(
+        _MEMORY_USAGE_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+        ),
+    )
+    return f"sum({_selected_metric(source, selected_pods)})"
+
+
+def _resource_requests(
+    resource: str,
+    unit: str,
+    selected_pods: str,
+    *,
+    cluster: str,
+    namespaces: str,
+) -> str:
+    """Return resource requests summed for selected Running Pods."""
+    source = _selector(
+        _POD_REQUEST_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("resource", "=", resource),
+            _matcher("unit", "=", unit),
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+        ),
+    )
+    return f"sum({_selected_metric(source, selected_pods)})"
+
+
+def _label_resource(expression: str, resource: str) -> str:
+    """Attach the controlled resource label to one ratio vector."""
+    return f'label_replace(({expression}), "resource", "{resource}", "__name__", ".*")'
+
+
+def _query(
+    *,
+    scope: _PROMQL_SCOPE,
+    subject: str | None,
+    cluster: str,
+    namespaces: list[str],
+) -> str:
+    """Render the sole server-owned CPU/memory efficiency query."""
+    namespace_pattern = _namespace_regex(namespaces)
+    selected = _selected_pods(
+        scope=scope,
+        subject=subject,
+        cluster=cluster,
+        namespaces=namespace_pattern,
+    )
+    cpu_ratio = (
+        f"{_cpu_usage(selected, cluster=cluster, namespaces=namespace_pattern)}"
+        " / "
+        f"{_resource_requests('cpu', 'core', selected, cluster=cluster, namespaces=namespace_pattern)}"
+    )
+    memory_ratio = (
+        f"{_memory_usage(selected, cluster=cluster, namespaces=namespace_pattern)}"
+        " / "
+        f"{_resource_requests('memory', 'byte', selected, cluster=cluster, namespaces=namespace_pattern)}"
+    )
+    return f"{_label_resource(cpu_ratio, 'cpu')} or {_label_resource(memory_ratio, 'memory')}"
+
+
+def _normalise_cutoff(value: datetime | None) -> datetime | None:
+    """Normalize an optional caller observation time to UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ProviderExecutionError("PromQL observation time must be timezone-aware")
+    return value.astimezone(UTC)
+
+
+def _result_vector(payload: Any, max_series: int) -> list[Any]:
+    """Validate the Prometheus success envelope and return its vector."""
+    if not isinstance(payload, dict) or payload.get("status") != "success":
+        raise ProviderExecutionError("PromQL API did not return success")
+    data = payload.get("data")
+    if not isinstance(data, dict) or data.get("resultType") != "vector":
+        raise ProviderExecutionError("PromQL API did not return an instant vector")
+    result = data.get("result")
+    if not isinstance(result, list) or len(result) > max_series:
+        raise ProviderExecutionError("PromQL vector cardinality exceeded the configured limit")
+    if len(result) != 2:
+        raise ProviderExecutionError("PromQL efficiency vector must contain cpu and memory")
     return result
 
 
-def _sample_time(value: Any) -> datetime:
-    """Parse a PromQL sample timestamp as UTC.
-
-    Args:
-        value: Unix timestamp returned by the backend.
-
-    Returns:
-        Timezone-aware UTC datetime.
-
-    Raises:
-        ProviderExecutionError: If the timestamp is invalid or out of range.
-    """
+def _sample_timestamp(value: Any) -> tuple[Decimal, datetime]:
+    """Parse one Prometheus sample timestamp into bounded UTC values."""
     try:
-        return datetime.fromtimestamp(float(value), tz=UTC)
-    except (OSError, OverflowError, TypeError, ValueError) as exc:
+        timestamp = bounded_decimal(value)
+    except ValueError as exc:
         raise ProviderExecutionError("PromQL returned an invalid sample timestamp") from exc
+    if timestamp < 0:
+        raise ProviderExecutionError("PromQL returned a negative sample timestamp")
+    try:
+        result = datetime.fromtimestamp(float(timestamp), tz=UTC)
+    except (OverflowError, OSError, ValueError) as exc:
+        raise ProviderExecutionError("PromQL returned an unusable sample timestamp") from exc
+    return timestamp, result
+
+
+def _sample_value(value: Any) -> Decimal:
+    """Parse one finite, non-negative efficiency ratio."""
+    try:
+        return bounded_decimal(value)
+    except ValueError as exc:
+        raise ProviderExecutionError("PromQL returned an invalid efficiency ratio") from exc
+
+
+def _validate_response(
+    payload: Any,
+    *,
+    max_series: int,
+    max_sample_age_seconds: int,
+    future_sample_tolerance_seconds: int,
+    cutoff: datetime | None,
+) -> EfficiencyObservation:
+    """Validate and normalize the two controlled efficiency samples."""
+    result = _result_vector(payload, max_series)
+    validation_now = _validation_now()
+    now_seconds = Decimal(str(validation_now.timestamp()))
+    cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
+    observed_timestamp: Decimal | None = None
+    observed_at: datetime | None = None
+    efficiencies: dict[str, Decimal] = {}
+
+    for series in result:
+        if not isinstance(series, dict):
+            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
+        labels = series.get("metric")
+        sample = series.get("value")
+        if (
+            not isinstance(labels, dict)
+            or set(labels) != {"resource"}
+            or not isinstance(labels.get("resource"), str)
+            or not isinstance(sample, list)
+            or len(sample) != 2
+        ):
+            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
+        resource = labels["resource"]
+        if resource not in _EFFICIENCY_RESOURCES:
+            raise ProviderExecutionError("PromQL returned an unknown efficiency resource")
+        if resource in efficiencies:
+            raise ProviderExecutionError("PromQL returned duplicate efficiency resources")
+
+        sample_timestamp, sample_at = _sample_timestamp(sample[0])
+        if observed_timestamp is None:
+            observed_timestamp = sample_timestamp
+            observed_at = sample_at
+        elif sample_timestamp != observed_timestamp:
+            raise ProviderExecutionError("PromQL efficiency samples have different timestamps")
+
+        age = now_seconds - sample_timestamp
+        if age > Decimal(max_sample_age_seconds) or age < -Decimal(future_sample_tolerance_seconds):
+            raise ProviderExecutionError("PromQL returned a stale or future sample")
+        if cutoff_seconds is not None and sample_timestamp > cutoff_seconds + Decimal(
+            future_sample_tolerance_seconds
+        ):
+            raise ProviderExecutionError("PromQL returned a sample after the requested cutoff")
+        efficiencies[resource] = _sample_value(sample[1])
+
+    if set(efficiencies) != _EFFICIENCY_RESOURCES or observed_at is None:
+        raise ProviderExecutionError("PromQL efficiency vector is incomplete")
+    return EfficiencyObservation(observed_at=observed_at, efficiencies=efficiencies)
+
+
+async def _bounded_response_body(response: httpx.Response, max_bytes: int) -> bytes:
+    """Read a response body without exceeding the configured byte bound."""
+    declared_length = response.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            declared = int(declared_length)
+        except ValueError as exc:
+            raise ProviderExecutionError("PromQL response Content-Length is invalid") from exc
+        if declared < 0 or declared > max_bytes:
+            raise ProviderExecutionError("PromQL response exceeded the byte limit")
+
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        if len(body) + len(chunk) > max_bytes:
+            raise ProviderExecutionError("PromQL response exceeded the byte limit")
+        body.extend(chunk)
+    return bytes(body)
 
 
 class PromQLProvider:
-    """Read validated accounting through a fixed Metrics-owned query catalog."""
+    """Read current efficiency through one fixed Prometheus-compatible query."""
 
     name = "promql"
 
@@ -137,284 +347,140 @@ class PromQLProvider:
         client: httpx.AsyncClient | None = None,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
-        """Attach strict settings and an optional caller-owned HTTP client.
-
-        Args:
-            settings: Validated process and PromQL settings.
-            client: Optional async client; when omitted, the provider owns one.
-            telemetry: Optional bounded provider telemetry recorder.
-        """
+        """Attach validated settings and an optional injected HTTP client."""
         self._cluster = settings.cluster_name
+        self._namespaces = list(settings.providers.kueue.namespaces)
         self._config = settings.providers.promql
-        self._endpoint = f"{str(self._config.base_url).rstrip('/')}/api/v1/query"
-        self._headers = (
-            {"X-Scope-OrgID": self._config.mimir_tenant_id}
-            if self._config.mimir_tenant_id
-            else None
-        )
+        base_url = self._config.base_url
+        self._endpoint = None
+        if base_url is not None:
+            parsed = urlsplit(str(base_url))
+            base_path = parsed.path.rstrip("/")
+            self._endpoint = urlunsplit(
+                (parsed.scheme, parsed.netloc, f"{base_path}/api/v1/query", "", "")
+            )
+        self._tenant = self._config.mimir_tenant_id
+        self._request_timeout_seconds = self._config.request_timeout_seconds
+        self._max_sample_age_seconds = self._config.max_sample_age_seconds
+        self._future_sample_tolerance_seconds = self._config.future_sample_tolerance_seconds
+        self._max_series = self._config.max_series
+        self._max_response_bytes = self._config.max_response_bytes
+        self._headers = {"X-Scope-OrgID": self._tenant} if self._tenant else None
         self._client = client
         self._owns_client = client is None
         self._telemetry = telemetry or NoopMetricsRecorder()
 
     def cache_fingerprint(self) -> str:
-        """Hash backend and tenant identity to segregate cached query results."""
-        identity = json.dumps(
+        """Return a stable identity for this fixed query configuration."""
+        return json.dumps(
             {
-                "base_url": str(self._config.base_url),
-                "tenant": self._config.mimir_tenant_id,
+                "base_url": self._config.base_url,
+                "tenant": self._tenant,
+                "cluster": self._cluster,
+                "namespaces": self._namespaces,
             },
+            default=str,
             separators=(",", ":"),
             sort_keys=True,
         )
-        return hashlib.sha256(identity.encode()).hexdigest()[:24]
 
     async def startup(self) -> None:
-        """Create the single lifespan-scoped HTTP client when not injected."""
-        if self._client is not None:
-            return
-        self._client = httpx.AsyncClient(
-            headers=self._headers,
-            timeout=self._config.request_timeout_seconds,
-        )
+        """Create the provider-owned HTTP client when an endpoint is configured."""
+        if self._endpoint is not None and self._client is None:
+            self._client = httpx.AsyncClient(
+                headers=self._headers,
+                timeout=self._request_timeout_seconds,
+            )
 
     async def shutdown(self) -> None:
-        """Close only the HTTP client created by this provider."""
+        """Close only an HTTP client owned by this provider."""
         client, self._client = self._client, None
         if client is not None and self._owns_client:
             await client.aclose()
 
     async def read_user(
         self, username: str, observed_at: datetime | None = None
-    ) -> AccountingSnapshot:
-        """Read one exact user's validated accounting snapshot.
-
-        Args:
-            username: Exact canonical username.
-            observed_at: Optional query cutoff shared with workload collection.
-
-        Returns:
-            Validated active-workload accounting.
-        """
-        return await self._read(
-            QueryTemplate.USER_ACTIVE_LIFETIME,
-            username,
-            observed_at or datetime.now(UTC),
-        )
+    ) -> EfficiencyObservation:
+        """Read current efficiency for one exact user label value."""
+        return await self._read("user", username, observed_at)
 
     async def read_community(
         self, community: str, observed_at: datetime | None = None
-    ) -> AccountingSnapshot:
-        """Read one exact community's validated accounting snapshot.
+    ) -> EfficiencyObservation:
+        """Read current efficiency for one exact community label value."""
+        return await self._read("community", community, observed_at)
 
-        Args:
-            community: Exact canonical community name.
-            observed_at: Optional query cutoff shared with workload collection.
-
-        Returns:
-            Validated active-workload accounting.
-        """
-        return await self._read(
-            QueryTemplate.COMMUNITY_ACTIVE_LIFETIME,
-            community,
-            observed_at or datetime.now(UTC),
-        )
+    async def read_platform(self, observed_at: datetime | None = None) -> EfficiencyObservation:
+        """Read current efficiency for all labelled workload Pods in scope."""
+        return await self._read("platform", None, observed_at)
 
     async def _read(
         self,
-        template: QueryTemplate,
-        subject: str,
-        observed_at: datetime,
-    ) -> AccountingSnapshot:
-        """Execute one controlled query and validate its complete response.
-
-        Args:
-            template: Allowlisted query template.
-            subject: Exact subject label value.
-            observed_at: Evaluation cutoff passed to Prometheus.
-
-        Returns:
-            Validated accounting snapshot.
-
-        Raises:
-            ProviderUnavailableError: If the client or backend is unavailable.
-            ProviderExecutionError: If the request or response is unusable.
-        """
-        if not subject:
-            raise ProviderExecutionError("Accounting subject must not be empty")
-        if self._client is None:
-            raise ProviderUnavailableError("PromQL provider has not started")
+        scope: _PROMQL_SCOPE,
+        subject: str | None,
+        observed_at: datetime | None,
+    ) -> EfficiencyObservation:
+        """Execute and validate one fixed instant query."""
+        if self._endpoint is None:
+            raise ProviderUnavailableError("PromQL endpoint is not configured")
+        if scope != "platform" and (not isinstance(subject, str) or not subject):
+            raise ProviderExecutionError("PromQL subject must be a non-empty string")
+        cutoff = _normalise_cutoff(observed_at)
+        query = _query(
+            scope=scope,
+            subject=subject,
+            cluster=self._cluster,
+            namespaces=self._namespaces,
+        )
         started = perf_counter()
         status = "ok"
         try:
-            with self._telemetry.span(
-                "source.read",
-                {
-                    "metrics.scope": template.value.split("-", 1)[0],
-                    "provider.name": self.name,
-                    "promql.template": template.value,
-                    "source.operation": "instant-query",
-                },
-            ):
-                response = await self._client.post(
-                    self._endpoint,
-                    data={"query": _query(template, subject), "time": observed_at.timestamp()},
-                    headers=self._headers,
-                )
-                response.raise_for_status()
-            return self._validate(response.json(), template, subject, observed_at)
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            status = "error"
-            raise ProviderUnavailableError("PromQL backend unavailable") from exc
-        except httpx.HTTPStatusError as exc:
-            status = "error"
-            error = (
-                ProviderUnavailableError("PromQL backend unavailable")
-                if exc.response.status_code >= 500
-                else ProviderExecutionError("PromQL backend rejected a controlled query")
+            payload = await self._request(query)
+            return _validate_response(
+                payload,
+                max_series=self._max_series,
+                max_sample_age_seconds=self._max_sample_age_seconds,
+                future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
+                cutoff=cutoff,
             )
-            raise error from exc
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            status = "error"
-            raise ProviderExecutionError("PromQL backend returned invalid JSON") from exc
+        except asyncio.CancelledError:
+            status = "cancelled"
+            raise
         except Exception:
             status = "error"
             raise
         finally:
             self._telemetry.record_provider_duration(
                 provider=self.name,
-                scope=template.value,
+                scope=scope,
                 status=status,
                 seconds=perf_counter() - started,
             )
 
-    def _validate(
-        self,
-        payload: Any,
-        template: QueryTemplate,
-        subject: str,
-        cutoff: datetime,
-    ) -> AccountingSnapshot:
-        """Validate one vector completely before returning a normalized value.
-
-        Args:
-            payload: Decoded Prometheus API response.
-            template: Query template that defined the expected subject label.
-            subject: Exact subject expected on every series.
-            cutoff: Fallback creation time for an empty valid vector.
-
-        Returns:
-            Normalized accounting snapshot.
-
-        Raises:
-            ProviderExecutionError: If any response field or series violates
-                the controlled query contract.
-        """
-        if not isinstance(payload, dict) or payload.get("status") != "success":
-            raise ProviderExecutionError("PromQL query did not succeed")
-        data = payload.get("data")
-        if not isinstance(data, dict) or data.get("resultType") != "vector":
-            raise ProviderExecutionError("PromQL query did not return an instant vector")
-        result = data.get("result")
-        if not isinstance(result, list) or len(result) > self._config.max_series:
-            raise ProviderExecutionError("PromQL vector cardinality is invalid")
-
-        expected_label = (
-            "canfar_username"
-            if template is QueryTemplate.USER_ACTIVE_LIFETIME
-            else "canfar_community"
-        )
-        groups: dict[tuple[str, ...], dict[str, tuple[dict[str, str], Decimal]]] = defaultdict(dict)
-        observed_at: datetime | None = None
-        for series in result:
-            if not isinstance(series, dict):
-                raise ProviderExecutionError("PromQL returned an invalid series")
-            labels = series.get("metric")
-            sample = series.get("value")
-            if (
-                not isinstance(labels, dict)
-                or not all(
-                    isinstance(key, str) and isinstance(value, str) for key, value in labels.items()
-                )
-                or not isinstance(sample, list)
-                or len(sample) != 2
-            ):
-                raise ProviderExecutionError("PromQL returned an invalid series")
-            metric = labels.get("__name__")
-            allowed = _BASE_LABELS | ({"reason"} if metric == COMPLETE_METRIC else set())
-            if set(labels) != allowed:
-                raise ProviderExecutionError("PromQL returned unexpected series labels")
-            if (
-                labels["cluster"] != self._cluster
-                or labels["source_revision"] != SOURCE_REVISION
-                or labels[expected_label] != subject
-                or not labels["namespace"]
-                or not labels["pod_uid"]
-            ):
-                raise ProviderExecutionError(
-                    "PromQL returned a series outside the selected population"
-                )
-
-            resource = labels["resource"]
-            unit = "boolean" if metric == COMPLETE_METRIC else RESOURCE_UNITS.get(resource)
-            if unit is None or labels["unit"] != unit:
-                raise ProviderExecutionError("PromQL returned an invalid resource unit")
-            timestamp = _sample_time(sample[0])
-            now = datetime.now(UTC)
-            age = (now - timestamp).total_seconds()
-            if (
-                age > self._config.max_sample_age_seconds
-                or age < -self._config.future_sample_tolerance_seconds
-            ):
-                raise ProviderExecutionError("PromQL returned a stale or future sample")
-            if observed_at is None:
-                observed_at = timestamp
-            elif timestamp != observed_at:
-                raise ProviderExecutionError("PromQL series do not share one observation time")
-
-            identity = (
-                labels["namespace"],
-                labels["pod_uid"],
-                resource,
-                labels["canfar_username"],
-                labels["canfar_community"],
-            )
-            if metric not in {USAGE_METRIC, REQUESTED_METRIC, COMPLETE_METRIC}:
-                raise ProviderExecutionError("PromQL returned an unexpected metric")
-            if metric in groups[identity]:
-                raise ProviderExecutionError("PromQL returned duplicate accounting series")
-            groups[identity][metric] = (labels, _decimal(sample[1]))
-
-        normalized: list[tuple[str, str, Decimal, Decimal, frozenset[LifetimeIssue]]] = []
-        for identity, metrics in groups.items():
-            resource = identity[2]
-            if set(metrics) != {USAGE_METRIC, REQUESTED_METRIC, COMPLETE_METRIC}:
-                raise ProviderExecutionError("PromQL accounting series are incomplete")
-            complete_labels, complete_value = metrics[COMPLETE_METRIC]
-            reason = complete_labels["reason"]
-            if complete_value == 1 and reason == "complete":
-                normalized.append(
-                    (
-                        identity[1],
-                        resource,
-                        metrics[USAGE_METRIC][1],
-                        metrics[REQUESTED_METRIC][1],
-                        frozenset(),
-                    )
-                )
-            elif complete_value == 0 and reason in _ISSUES:
-                normalized.append(
-                    (
-                        identity[1],
-                        resource,
-                        metrics[USAGE_METRIC][1],
-                        metrics[REQUESTED_METRIC][1],
-                        frozenset({_ISSUES[reason]}),
-                    )
-                )
-            else:
-                raise ProviderExecutionError("PromQL returned invalid completeness state")
-        created = observed_at or cutoff
-        return AccountingSnapshot(
-            lifetime=aggregate_active_workload_hours(normalized),
-            created=created,
-        )
+    async def _request(self, query: str) -> Any:
+        """POST the fixed query and decode one bounded Prometheus response."""
+        client = self._client
+        endpoint = self._endpoint
+        if client is None or endpoint is None:
+            raise ProviderUnavailableError("PromQL provider has not started")
+        try:
+            async with client.stream(
+                "POST",
+                endpoint,
+                data={"query": query},
+                headers=self._headers,
+            ) as response:
+                response.raise_for_status()
+                body = await _bounded_response_body(response, self._max_response_bytes)
+            try:
+                return json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise ProviderExecutionError("PromQL response was not valid JSON") from exc
+        except ProviderExecutionError:
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code >= 500:
+                raise ProviderUnavailableError("PromQL backend is unavailable") from exc
+            raise ProviderExecutionError("PromQL backend rejected the fixed query") from exc
+        except httpx.RequestError as exc:
+            raise ProviderUnavailableError("PromQL backend is unavailable") from exc

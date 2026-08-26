@@ -1,268 +1,470 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+import json
 from urllib.parse import parse_qs
 
 import httpx
 import pytest
 
+import metrics.providers.promql as promql_module
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
-from metrics.providers.promql import (
-    COMPLETE_METRIC,
-    REQUESTED_METRIC,
-    SOURCE_REVISION,
-    USAGE_METRIC,
-    PromQLProvider,
-)
-from metrics.telemetry import NoopMetricsRecorder
+from metrics.providers.promql import PromQLProvider
+from metrics.services.models import EfficiencyObservation
+from metrics.telemetry import MetricsRecorder
+
 
 pytestmark = pytest.mark.anyio
 
 
+class RecordingTelemetry(MetricsRecorder):
+    """Capture provider status labels at the public provider seam."""
+
+    def __init__(self) -> None:
+        self.statuses: list[str] = []
+
+    def record_provider_duration(
+        self,
+        *,
+        provider: str,
+        scope: str,
+        status: str,
+        seconds: float,
+    ) -> None:
+        del provider, scope, seconds
+        self.statuses.append(status)
+
+
 def _settings(**promql: object) -> Settings:
+    """Build mandatory-Redis settings with two namespaces and one cluster."""
     return Settings.model_validate(
         {
-            "cluster_name": "fixture",
-            "cache": {"backend": "memory"},
+            "cluster_name": "cluster-a",
+            "redis_url": "redis://redis.test:6379/0",
+            "cache": {"key_secret": "x" * 32},
             "providers": {
+                "kueue": {
+                    "cluster_queues": ["cq-science", "cq-physics"],
+                    "namespaces": ["workloads", "batch"],
+                },
                 "promql": {
-                    "enabled": True,
-                    "base_url": "http://prometheus.test:9090",
+                    "base_url": "http://prometheus.test:9090/prometheus",
                     **promql,
-                }
+                },
             },
         }
     )
 
 
-def _series(
-    name: str,
-    value: str,
+def _timestamp() -> datetime:
+    """Return a current UTC timestamp with stable JSON precision."""
+    current = datetime.now(UTC)
+    return current.replace(microsecond=current.microsecond // 1_000 * 1_000)
+
+
+def _sample(
+    resource: str,
+    value: object,
+    timestamp: datetime,
     *,
-    timestamp: datetime | None = None,
-    reason: str | None = None,
-    username: str = "ada",
-    community: str = "science",
-    pod_uid: str = "pod-1",
+    labels: dict[str, str] | None = None,
 ) -> dict[str, object]:
-    labels = {
-        "__name__": name,
-        "cluster": "fixture",
-        "namespace": "workloads",
-        "pod_uid": pod_uid,
-        "resource": "cpu",
-        "canfar_username": username,
-        "canfar_community": community,
-        "source_revision": SOURCE_REVISION,
-        "unit": "boolean" if name == COMPLETE_METRIC else "core-hours",
-    }
-    if reason is not None:
-        labels["reason"] = reason
-    return {
-        "metric": labels,
-        "value": [(timestamp or datetime.now(UTC)).timestamp(), value],
-    }
+    """Build one Prometheus vector sample."""
+    metric = {"resource": resource, **(labels or {})}
+    return {"metric": metric, "value": [timestamp.timestamp(), value]}
 
 
-def _payload(*series: dict[str, object]) -> dict[str, object]:
-    return {"status": "success", "data": {"resultType": "vector", "result": list(series)}}
+def _payload(*samples: dict[str, object]) -> dict[str, object]:
+    """Build a Prometheus success response."""
+    return {"status": "success", "data": {"resultType": "vector", "result": list(samples)}}
 
 
-def _complete_payload(*, timestamp: datetime | None = None) -> dict[str, object]:
-    observed = timestamp or datetime.now(UTC)
-    return _payload(
-        _series(USAGE_METRIC, "1.5", timestamp=observed),
-        _series(REQUESTED_METRIC, "4", timestamp=observed),
-        _series(COMPLETE_METRIC, "1", timestamp=observed, reason="complete"),
-    )
+def _successful_payload(
+    timestamp: datetime,
+    *,
+    cpu: object = "0.25",
+    memory: object = "0.5",
+) -> dict[str, object]:
+    """Build the exact two-resource response expected from the fixed query."""
+    return _payload(_sample("cpu", cpu, timestamp), _sample("memory", memory, timestamp))
 
 
-async def test_named_template_uses_only_form_post_and_optional_mimir_tenant() -> None:
-    request: httpx.Request | None = None
-    observed = datetime.now(UTC).replace(microsecond=123000)
+def _client(
+    response: httpx.Response | dict[str, object],
+    calls: list[httpx.Request],
+) -> httpx.AsyncClient:
+    """Build an injected client that records every request."""
 
-    async def respond(current: httpx.Request) -> httpx.Response:
-        nonlocal request
-        request = current
-        return httpx.Response(200, json=_complete_payload(timestamp=observed))
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if isinstance(response, httpx.Response):
+            return response
+        return httpx.Response(200, json=response)
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
-    provider = PromQLProvider(
-        _settings(mimir_tenant_id="tenant-a"),
-        client=client,
-    )
-    assert (
-        provider.cache_fingerprint()
-        != PromQLProvider(
-            _settings(mimir_tenant_id="tenant-b"),
-            client=client,
-        ).cache_fingerprint()
-    )
-    assert "tenant-a" not in provider.cache_fingerprint()
-    result = await provider.read_user("ada", observed)
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
-    assert result.created == observed
-    assert result.lifetime.ready
-    assert result.lifetime.resources["cpu"].usage == Decimal("1.5")
-    assert result.lifetime.pod_uids == frozenset({"pod-1"})
-    assert result.lifetime.coverage["cpu"] == frozenset({"pod-1"})
-    assert request is not None
+
+async def test_successful_cpu_and_memory_parsing_uses_one_form_post() -> None:
+    observed = _timestamp()
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(observed), calls)
+    try:
+        result = await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
+        await client.aclose()
+
+    assert isinstance(result, EfficiencyObservation)
+    assert result.efficiencies == {"cpu": Decimal("0.25"), "memory": Decimal("0.5")}
+    assert abs((result.observed_at - observed).total_seconds()) < 0.01
+    assert len(calls) == 1
+    request = calls[0]
     assert request.method == "POST"
-    assert request.url.path == "/api/v1/query"
-    assert request.url.query == b""
-    assert request.headers["X-Scope-OrgID"] == "tenant-a"
-    form = parse_qs(request.content.decode())
-    assert set(form) == {"query", "time"}
-    assert float(form["time"][0]) == observed.timestamp()
-    assert 'canfar_username="ada"' in form["query"][0]
-    assert 'kube_pod_status_phase{phase="Running"}' in form["query"][0]
-    assert "and on (namespace,pod_uid)" in form["query"][0]
-    assert "query_range" not in form["query"][0]
-    await client.aclose()
+    assert request.url.path == "/prometheus/api/v1/query"
+    assert set(parse_qs(request.content.decode())) == {"query"}
+    assert request.headers["content-type"].startswith("application/x-www-form-urlencoded")
 
 
-async def test_community_template_aggregates_direct_series_and_rejects_cross_community() -> None:
-    observed = datetime.now(UTC)
-    payload = _payload(
-        *(
-            _series(
-                metric, value, timestamp=observed, reason=reason, username=username, pod_uid=pod
-            )
-            for username, pod, values in (
-                ("ada", "pod-1", ("1", "2")),
-                ("grace", "pod-2", ("9", "10")),
-            )
-            for metric, value, reason in (
-                (USAGE_METRIC, values[0], None),
-                (REQUESTED_METRIC, values[1], None),
-                (COMPLETE_METRIC, "1", "complete"),
-            )
-        )
-    )
-    request: httpx.Request | None = None
+async def test_promql_telemetry_records_ok_after_response_validation() -> None:
+    telemetry = RecordingTelemetry()
+    client = _client(_successful_payload(_timestamp()), [])
+    try:
+        await PromQLProvider(_settings(), client=client, telemetry=telemetry).read_user("ada")
+    finally:
+        await client.aclose()
 
-    def respond(current: httpx.Request) -> httpx.Response:
-        nonlocal request
-        request = current
-        return httpx.Response(200, json=payload)
-
-    client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
-    provider = PromQLProvider(_settings(), client=client)
-    result = await provider.read_community("science")
-
-    assert result.lifetime.resources["cpu"].usage == Decimal("10")
-    assert result.lifetime.resources["cpu"].requested == Decimal("12")
-    assert request is not None
-    query = parse_qs(request.content.decode())["query"][0]
-    assert 'canfar_community="science"' in query
-    assert "canfar_username=" not in query
-
-    wrong = _payload(
-        _series(USAGE_METRIC, "1", community="physics"),
-        _series(REQUESTED_METRIC, "2", community="physics"),
-        _series(COMPLETE_METRIC, "1", community="physics", reason="complete"),
-    )
-    wrong_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=wrong))
-    )
-    with pytest.raises(ProviderExecutionError, match="selected population"):
-        await PromQLProvider(_settings(), client=wrong_client).read_community("science")
-    await client.aclose()
-    await wrong_client.aclose()
+    assert telemetry.statuses == ["ok"]
 
 
-async def test_telemetry_names_template_but_never_query_or_subject() -> None:
-    class Recorder(NoopMetricsRecorder):
-        def __init__(self) -> None:
-            self.attributes: list[dict[str, str]] = []
-
-        @contextmanager
-        def span(self, _name: str, attributes=None):
-            self.attributes.append(dict(attributes or {}))
-            yield None
-
-    recorder = Recorder()
-    client = httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda _request: httpx.Response(200, json=_complete_payload())
-        )
-    )
-    provider = PromQLProvider(_settings(), client=client, telemetry=recorder)
-    await provider.read_user("ada")
-
-    encoded = repr(recorder.attributes)
-    assert recorder.attributes[0]["promql.template"] == "user-active-lifetime"
-    assert "ada" not in encoded
-    assert "canfar_active_workload" not in encoded
-    await client.aclose()
-
-
-async def test_timeout_and_upstream_errors_are_bounded() -> None:
-    async def timeout(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("late", request=request)
-
-    timeout_client = httpx.AsyncClient(transport=httpx.MockTransport(timeout))
-    timeout_provider = PromQLProvider(_settings(), client=timeout_client)
-    with pytest.raises(ProviderUnavailableError, match="unavailable"):
-        await timeout_provider.read_user("ada")
-    await timeout_client.aclose()
-
-    error_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _request: httpx.Response(500))
-    )
-    error_provider = PromQLProvider(_settings(), client=error_client)
-    with pytest.raises(ProviderUnavailableError, match="unavailable"):
-        await error_provider.read_user("ada")
-    await error_client.aclose()
-
-
-async def test_stale_and_invalid_series_fail_before_publication() -> None:
-    stale = datetime.now(UTC) - timedelta(minutes=10)
-    payloads = [
-        _complete_payload(timestamp=stale),
-        {"status": "success", "data": {"resultType": "matrix", "result": []}},
-        _payload(_series(USAGE_METRIC, "1")),
-        _payload(
-            _series(USAGE_METRIC, "1"),
-            _series(REQUESTED_METRIC, "2"),
-            _series(COMPLETE_METRIC, "2", reason="complete"),
+@pytest.mark.parametrize(
+    ("method", "subject", "expected_matcher"),
+    [
+        (
+            "read_user",
+            "ada",
+            'label_canfar_net_username="ada"',
         ),
-    ]
-    for payload in payloads:
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(
-                lambda _request, current=payload: httpx.Response(200, json=current)
-            )
-        )
-        provider = PromQLProvider(_settings(), client=client)
+        (
+            "read_community",
+            "astronomy",
+            'label_canfar_net_community="astronomy"',
+        ),
+    ],
+)
+async def test_user_and_community_use_exact_attribution_matchers(
+    method: str,
+    subject: str,
+    expected_matcher: str,
+) -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        await getattr(PromQLProvider(_settings(), client=client), method)(subject)
+    finally:
+        await client.aclose()
+
+    query = parse_qs(calls[0].content.decode())["query"][0]
+    assert expected_matcher in query
+    assert 'cluster="cluster-a"' in query
+    assert 'namespace=~"^(?:workloads|batch)$"' in query
+
+
+async def test_platform_uses_labelled_workloads_without_platform_or_cohort_labels() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        await PromQLProvider(_settings(), client=client).read_platform()
+    finally:
+        await client.aclose()
+
+    query = parse_qs(calls[0].content.decode())["query"][0]
+    assert 'label_canfar_net_username!=""' in query
+    assert 'label_canfar_net_community!=""' in query
+    assert "canfar.net/platform" not in query
+    assert "cohort" not in query.lower()
+
+
+def test_namespace_regex_escapes_regex_metacharacters() -> None:
+    assert promql_module._namespace_regex(["tenant.+", "literal"]) == ("^(?:tenant\\.\\+|literal)$")
+
+
+async def test_subject_string_is_escaped_and_never_inserted_raw() -> None:
+    subject = 'ada"\\line\n'
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        await PromQLProvider(_settings(), client=client).read_user(subject)
+    finally:
+        await client.aclose()
+
+    query = parse_qs(calls[0].content.decode())["query"][0]
+    assert f"label_canfar_net_username={json.dumps(subject, ensure_ascii=True)}" in query
+    assert subject not in query
+
+
+async def test_query_joins_running_pods_and_scopes_every_metric() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
+        await client.aclose()
+
+    query = parse_qs(calls[0].content.decode())["query"][0]
+    assert "container_cpu_usage_seconds_total" in query
+    assert "container_memory_working_set_bytes" in query
+    assert "kube_pod_container_resource_requests" in query
+    assert "kube_pod_labels" in query
+    assert "kube_pod_status_phase{" in query
+    assert 'phase="Running"' in query
+    assert "rate(" in query and "[5m]" in query
+    assert "and on (cluster,namespace,pod)" in query
+    assert 'resource="cpu"' in query and 'unit="core"' in query
+    assert 'resource="memory"' in query and 'unit="byte"' in query
+    assert query.count('cluster="cluster-a"') >= 8
+    assert 'cluster="other-cluster"' not in query
+
+
+async def test_mimir_tenant_and_base_path_are_preserved() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        await PromQLProvider(
+            _settings(
+                base_url="https://mimir.test:9009/prom/api",
+                mimir_tenant_id="canfar",
+            ),
+            client=client,
+        ).read_community("astronomy")
+    finally:
+        await client.aclose()
+
+    assert calls[0].url == "https://mimir.test:9009/prom/api/api/v1/query"
+    assert calls[0].headers["x-scope-orgid"] == "canfar"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "error", "errorType": "bad_data"},
+        {"status": "success", "data": {"resultType": "matrix", "result": []}},
+        {"status": "success", "data": {"resultType": "vector", "result": []}},
+        {"status": "success", "data": {"resultType": "vector", "result": [{"metric": {}}]}},
+        _payload(
+            _sample("cpu", "0.1", _timestamp()),
+            _sample("memory", "0.2", _timestamp(), labels={"extra": "x"}),
+        ),
+    ],
+)
+async def test_malformed_success_vector_is_execution_error(payload: dict[str, object]) -> None:
+    calls: list[httpx.Request] = []
+    client = _client(payload, calls)
+    try:
         with pytest.raises(ProviderExecutionError):
-            await provider.read_user("ada")
+            await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
         await client.aclose()
 
 
-async def test_incomplete_population_omits_resource_with_reason() -> None:
-    observed = datetime.now(UTC)
-    client = httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda _request: httpx.Response(
-                200,
-                json=_payload(
-                    _series(USAGE_METRIC, "1", timestamp=observed),
-                    _series(REQUESTED_METRIC, "2", timestamp=observed),
-                    _series(
-                        COMPLETE_METRIC,
-                        "0",
-                        timestamp=observed,
-                        reason="sampling-gap",
-                    ),
-                ),
-            )
-        )
+async def test_promql_telemetry_records_vector_validation_as_error() -> None:
+    telemetry = RecordingTelemetry()
+    client = _client(
+        {"status": "success", "data": {"resultType": "matrix", "result": []}},
+        [],
     )
-    result = await PromQLProvider(_settings(), client=client).read_user("ada")
-    assert result.lifetime.resources == {}
-    assert {issue.value for issue in result.lifetime.incomplete["cpu"]} == {"sampling-gap"}
-    await client.aclose()
+    try:
+        with pytest.raises(ProviderExecutionError):
+            await PromQLProvider(_settings(), client=client, telemetry=telemetry).read_user("ada")
+    finally:
+        await client.aclose()
+
+    assert telemetry.statuses == ["error"]
+
+
+async def test_promql_telemetry_records_cancellation_and_reraises() -> None:
+    telemetry = RecordingTelemetry()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        raise asyncio.CancelledError()
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            await PromQLProvider(_settings(), client=client, telemetry=telemetry).read_user("ada")
+    finally:
+        await client.aclose()
+
+    assert telemetry.statuses == ["cancelled"]
+
+
+@pytest.mark.parametrize(
+    "samples",
+    [
+        lambda now: (_sample("cpu", "0.1", now), _sample("cpu", "0.2", now)),
+        lambda now: (_sample("gpu", "0.1", now), _sample("memory", "0.2", now)),
+    ],
+)
+async def test_duplicate_or_unknown_resources_fail_closed(samples) -> None:
+    now = _timestamp()
+    calls: list[httpx.Request] = []
+    client = _client(_payload(*samples(now)), calls)
+    try:
+        with pytest.raises(ProviderExecutionError):
+            await PromQLProvider(_settings(), client=client).read_platform()
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.parametrize("value", ["NaN", "+Inf", "-Inf", "-0.1", True])
+async def test_nonfinite_or_negative_efficiency_fails_closed(value: object) -> None:
+    now = _timestamp()
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(now, cpu=value), calls)
+    try:
+        with pytest.raises(ProviderExecutionError):
+            await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
+        await client.aclose()
+
+
+async def test_zero_denominator_infinite_result_and_empty_vector_fail() -> None:
+    now = _timestamp()
+    for payload in (
+        _payload(_sample("cpu", "+Inf", now), _sample("memory", "0.2", now)),
+        _payload(),
+    ):
+        calls: list[httpx.Request] = []
+        client = _client(payload, calls)
+        try:
+            with pytest.raises(ProviderExecutionError):
+                await PromQLProvider(_settings(), client=client).read_user("ada")
+        finally:
+            await client.aclose()
+
+
+@pytest.mark.parametrize("offset", [timedelta(minutes=-11), timedelta(seconds=6)])
+async def test_stale_and_future_timestamps_follow_configured_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+    offset: timedelta,
+) -> None:
+    validation_now = datetime(2025, 1, 1, tzinfo=UTC)
+    monkeypatch.setattr(promql_module, "_validation_now", lambda: validation_now)
+    timestamp = validation_now + offset
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(timestamp), calls)
+    try:
+        with pytest.raises(ProviderExecutionError, match="stale or future"):
+            await PromQLProvider(
+                _settings(max_sample_age_seconds=600, future_sample_tolerance_seconds=5),
+                client=client,
+            ).read_user("ada")
+    finally:
+        await client.aclose()
+
+
+async def test_efficiency_samples_must_share_one_timestamp() -> None:
+    now = _timestamp()
+    calls: list[httpx.Request] = []
+    client = _client(
+        _payload(
+            _sample("cpu", "0.1", now),
+            _sample("memory", "0.2", now + timedelta(seconds=1)),
+        ),
+        calls,
+    )
+    try:
+        with pytest.raises(ProviderExecutionError, match="different timestamps"):
+            await PromQLProvider(_settings(), client=client).read_platform()
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        httpx.ReadTimeout("timeout"),
+        httpx.ConnectError("connection failed"),
+    ],
+)
+async def test_endpoint_transport_failures_are_unavailable(failure: Exception) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        raise failure
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(ProviderUnavailableError):
+            await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "error_type"),
+    [(500, ProviderUnavailableError), (400, ProviderExecutionError)],
+)
+async def test_http_status_failures_are_classified(
+    status_code: int,
+    error_type: type[Exception],
+) -> None:
+    calls: list[httpx.Request] = []
+    client = _client(httpx.Response(status_code), calls)
+    try:
+        with pytest.raises(error_type):
+            await PromQLProvider(_settings(), client=client).read_community("astronomy")
+    finally:
+        await client.aclose()
+
+
+async def test_invalid_json_and_response_size_fail_as_execution_errors() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(httpx.Response(200, content=b"not-json"), calls)
+    try:
+        with pytest.raises(ProviderExecutionError, match="valid JSON"):
+            await PromQLProvider(_settings(), client=client).read_user("ada")
+    finally:
+        await client.aclose()
+
+    body = json.dumps(_successful_payload(_timestamp())).encode()
+    calls = []
+    oversized = httpx.Response(
+        200,
+        content=body,
+        headers={"Content-Length": str(len(body))},
+    )
+    client = _client(oversized, calls)
+    try:
+        with pytest.raises(ProviderExecutionError, match="byte limit"):
+            await PromQLProvider(
+                _settings(max_response_bytes=len(body) - 1),
+                client=client,
+            ).read_user("ada")
+    finally:
+        await client.aclose()
+
+
+async def test_naive_cutoff_is_rejected_before_http_request() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    try:
+        with pytest.raises(ProviderExecutionError, match="timezone-aware"):
+            await PromQLProvider(_settings(), client=client).read_user("ada", datetime(2025, 1, 1))
+    finally:
+        await client.aclose()
+    assert calls == []
+
+
+async def test_missing_endpoint_is_not_an_active_provider() -> None:
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(_timestamp()), calls)
+    provider = PromQLProvider(_settings(), client=client)
+    provider._endpoint = None
+    try:
+        with pytest.raises(ProviderUnavailableError, match="endpoint"):
+            await provider.read_platform()
+    finally:
+        await client.aclose()

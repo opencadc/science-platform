@@ -1,138 +1,129 @@
-"""Collect platform capacity and admitted allocation from Kueue ClusterQueues.
-
-The provider performs named GETs to preserve get-only RBAC, validates
-Kubernetes quantities, and emits comparable public units for capacity and
-allocation.
-"""
+"""Collect Metrics observations from Kueue v1beta2 queue objects."""
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from math import isfinite
-from typing import Any
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any, Literal, TypeVar
 
 import httpx
 import kr8s
 import kr8s.asyncio
-from quantiphy import QuantiPhyError, Quantity
 
 from metrics.core.settings import KueueProviderConfig, Settings
 from metrics.errors import (
     ProviderExecutionError,
     ProviderUnavailableError,
     RuntimeStartupError,
+    SubjectNotFoundError,
 )
-from metrics.services.models import PlatformObservation
+from metrics.services.models import CommunityObservation, PlatformObservation, UserObservation
+from metrics.services.resources import (
+    format_resource_amount,
+    merge_resource_totals,
+    parse_resource_amount,
+)
 
-_MAX_QUANTITY = float(2**63)
-_GIB = float(2**30)
-_STORAGE_RESOURCES = frozenset({"memory", "ephemeral-storage"})
-_INVALID_QUANTITY_MESSAGE = "Kueue platform data contained an invalid resource quantity"
 
-_KUBE_REQUEST_ERRORS = (
+_KUEUE_API_VERSION = "kueue.x-k8s.io/v1beta2"
+_COMMUNITY_LABEL = "canfar.net/community"
+_USERNAME_LABEL = "canfar.net/username"
+_LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
+_MAX_LIST_PAGES = 1_000
+_MAX_CONTINUE_TOKEN_LENGTH = 4_096
+_MAX_RESULT_OBJECTS = 3_000
+_LIST_PAGE_LIMIT = 100
+_READ_CONCURRENCY = 4
+_REQUEST_ERRORS = (
     kr8s.APITimeoutError,
     kr8s.ConnectionClosedError,
     httpx.HTTPError,
 )
 
+_Input = TypeVar("_Input")
+_Output = TypeVar("_Output")
 
-# --- Resource quantities (quantiphy-backed, public response units) ---
+
+def _observation_time() -> datetime:
+    """Return a UTC timestamp with millisecond precision."""
+    now = datetime.now(UTC)
+    return now.replace(microsecond=now.microsecond // 1_000 * 1_000)
 
 
-def parse_resource_amount(resource_name: str, raw: object) -> float:
-    """Parse a Kubernetes quantity string into its public response unit.
-
-    Units follow the platform contract: cores for CPU, gibibytes for storage
-    resources, and base units for extended resources. Parsing is delegated to
-    ``quantiphy`` (SI and binary suffixes, scientific notation); values are
-    floats, so totals are accurate to well past the 6 decimal places the API
-    formats, not bit-exact.
-
-    Args:
-        resource_name: Kubernetes resource name that determines public units.
-        raw: Kubernetes quantity text.
-
-    Returns:
-        Cores for CPU, GiB for storage resources, or base units otherwise.
-
-    Raises:
-        ProviderExecutionError: For non-strings, malformed syntax, surrounding
-            whitespace, negatives, non-finite values, or values at or beyond
-            2**63 in base units.
-    """
-    if not isinstance(raw, str) or not raw or raw != raw.strip() or len(raw) > 100:
-        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
-    try:
-        value = float(Quantity(raw, binary=True))
-    except (QuantiPhyError, ValueError) as exc:
-        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE) from exc
-    if not isfinite(value) or value < 0 or value >= _MAX_QUANTITY:
-        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
-    if resource_name.lower() in _STORAGE_RESOURCES:
-        return value / _GIB
+def _validate_subject(value: str) -> str:
+    """Validate a subject before interpolating it into a label selector."""
+    if not isinstance(value, str) or _LABEL_VALUE.fullmatch(value) is None:
+        raise ProviderExecutionError("Kueue subject value is not a valid label value")
     return value
 
 
-def _validate_resource_amount(resource_name: str, value: float) -> None:
-    """Require a finite non-negative total within the supported quantity range.
-
-    Args:
-        resource_name: Kubernetes resource name that determines base units.
-        value: Numeric amount in public response units.
-    """
-    base_value = value * _GIB if resource_name.lower() in _STORAGE_RESOURCES else value
-    if not isfinite(base_value) or base_value < 0 or base_value >= _MAX_QUANTITY:
-        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
-
-
-def format_resource_amount(resource_name: str, value: float) -> str:
-    """Format a validated resource total for API payloads.
-
-    Args:
-        resource_name: Kubernetes resource name that determines unit suffix.
-        value: Numeric amount in public response units.
-
-    Returns:
-        At most six decimals without scientific notation, with ``Gi`` for
-        storage resources.
-    """
-    _validate_resource_amount(resource_name, value)
-    text = f"{value:.6f}".rstrip("0").rstrip(".")
-    if resource_name.lower() in _STORAGE_RESOURCES:
-        return f"{text}Gi"
-    return text
-
-
-def merge_resource_totals(target: dict[str, float], name: str, delta: float) -> None:
-    """Accumulate and validate a resource total while retaining zero values.
-
-    Args:
-        target: Totals mutated in place.
-        name: Kubernetes resource name.
-        delta: Amount in the resource's public response unit.
-    """
-    total = target.get(name, 0.0) + delta
-    _validate_resource_amount(name, total)
-    target[name] = total
-
-
-# --- Kubernetes access via kr8s ---
-
-
-async def create_kube_api(kueue_config: KueueProviderConfig) -> Any:
-    """Build a kr8s handle through in-cluster or kubeconfig discovery.
-
-    Args:
-        kueue_config: Provider settings supplying the request timeout.
-
-    Returns:
-        Configured asynchronous kr8s API handle.
-    """
+async def create_kube_api(config: KueueProviderConfig) -> Any:
+    """Build a kr8s API handle from in-cluster credentials or kubeconfig."""
     api = await kr8s.asyncio.api()
-    api.timeout = kueue_config.kube_request_timeout_seconds
+    api.timeout = config.kube_request_timeout_seconds
     return api
+
+
+def _json_response(response: Any, kind: str) -> dict[str, Any]:
+    """Decode one Kubernetes JSON object without exposing upstream details."""
+    try:
+        payload = response.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
+        raise ProviderExecutionError(f"Kueue {kind} payload was not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ProviderExecutionError(f"Kueue {kind} payload was not an object")
+    return payload
+
+
+async def _bounded_map(
+    items: list[_Input],
+    operation: Callable[[_Input], Awaitable[_Output]],
+) -> list[_Output]:
+    """Run independent operations with bounded workers and ordered results."""
+    next_index = 0
+    results: dict[int, _Output] = {}
+
+    async def worker() -> None:
+        nonlocal next_index
+        while next_index < len(items):
+            index = next_index
+            next_index += 1
+            results[index] = await operation(items[index])
+
+    tasks = [asyncio.create_task(worker()) for _ in range(min(_READ_CONCURRENCY, len(items)))]
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+    return [results[index] for index in range(len(items))]
+
+
+async def _fetch_cluster_queue_doc(
+    api: Any,
+    api_version: str,
+    name: str,
+) -> dict[str, Any]:
+    """Fetch and identity-check one configured ClusterQueue."""
+    async with api.call_api(
+        method="GET",
+        version=api_version,
+        url=f"clusterqueues/{name}",
+    ) as response:
+        doc = _json_response(response, "ClusterQueue")
+    metadata = doc.get("metadata")
+    if metadata is not None:
+        if not isinstance(metadata, dict) or metadata.get("name") != name:
+            raise ProviderExecutionError("Kueue ClusterQueue identity did not match its request")
+    return doc
 
 
 async def fetch_cluster_queue_docs(
@@ -140,226 +131,482 @@ async def fetch_cluster_queue_docs(
     api_version: str,
     names: list[str],
 ) -> list[dict[str, Any]]:
-    """Fetch ClusterQueue objects by name sequentially, in request order.
+    """Fetch configured ClusterQueues with named GET requests."""
+    if len(names) > _MAX_RESULT_OBJECTS:
+        raise ProviderExecutionError("Kueue ClusterQueue result exceeded the result limit")
 
-    Uses named GETs (``.../clusterqueues/{name}``) via ``call_api`` so the
-    get-only RBAC contract holds: kr8s's object helpers resolve names with a
-    LIST plus field selector, which would demand the ``list`` verb.
+    async def fetch(name: str) -> dict[str, Any]:
+        return await _fetch_cluster_queue_doc(api, api_version, name)
 
-    Platform loads are already serialized by the single-flight service, and the
-    configured queue list is small, so there is no parallel fan-out here.
+    return await _bounded_map(names, fetch)
 
-    Args:
-        api: kr8s-compatible API handle.
-        api_version: Configured Kueue API group and version.
-        names: Exact ClusterQueue names in desired response order.
 
-    Returns:
-        Decoded ClusterQueue documents in request order.
-
-    Raises:
-        kr8s.ServerError: For API server errors, including HTTP 404 when a
-            named ClusterQueue does not exist.
-    """
-    docs: list[dict[str, Any]] = []
-    for name in names:
+async def fetch_local_queue_docs(
+    api: Any,
+    api_version: str,
+    namespace: str,
+    *,
+    label_selector: str | None = None,
+) -> list[dict[str, Any]]:
+    """List all LocalQueues in one configured namespace."""
+    items: list[dict[str, Any]] = []
+    continue_token: str | None = None
+    seen_tokens: set[str] = set()
+    for _page in range(_MAX_LIST_PAGES):
+        params = {"limit": str(_LIST_PAGE_LIMIT)}
+        if label_selector:
+            params["labelSelector"] = label_selector
+        if continue_token is not None:
+            params["continue"] = continue_token
         async with api.call_api(
             method="GET",
             version=api_version,
-            url=f"clusterqueues/{name}",
+            namespace=namespace,
+            url="localqueues",
+            params=params,
         ) as response:
-            docs.append(response.json())
-    return docs
+            payload = _json_response(response, "LocalQueue list")
+        page_items = payload.get("items")
+        if not isinstance(page_items, list) or not all(
+            isinstance(item, dict) for item in page_items
+        ):
+            raise ProviderExecutionError("Kueue LocalQueue list contained an invalid object shape")
+        if len(items) + len(page_items) > _MAX_RESULT_OBJECTS:
+            raise ProviderExecutionError("Kueue LocalQueue result exceeded the result limit")
+        items.extend(page_items)
+
+        metadata = payload.get("metadata")
+        if metadata is None:
+            return items
+        if not isinstance(metadata, dict):
+            raise ProviderExecutionError("Kueue LocalQueue list metadata was invalid")
+        next_token = metadata.get("continue")
+        if next_token in (None, ""):
+            return items
+        if (
+            not isinstance(next_token, str)
+            or len(next_token) > _MAX_CONTINUE_TOKEN_LENGTH
+            or next_token in seen_tokens
+        ):
+            raise ProviderExecutionError("Kueue LocalQueue pagination token was invalid")
+        seen_tokens.add(next_token)
+        continue_token = next_token
+    raise ProviderExecutionError("Kueue LocalQueue list exceeded the pagination limit")
 
 
-# --- ClusterQueue document aggregation ---
+async def probe_local_queue_access(api: Any, api_version: str, namespace: str) -> None:
+    """Probe namespaced LocalQueue list access without following pagination."""
+    async with api.call_api(
+        method="GET",
+        version=api_version,
+        namespace=namespace,
+        url="localqueues",
+        params={"limit": "1"},
+    ) as response:
+        payload = _json_response(response, "LocalQueue access probe")
+    items = payload.get("items")
+    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+        raise ProviderExecutionError("Kueue LocalQueue access probe returned an invalid list")
+    metadata = payload.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        raise ProviderExecutionError("Kueue LocalQueue access probe metadata was invalid")
 
 
-def _merge_resource_entries(
-    totals: dict[str, float],
-    resources: Any,
-    value_key: str,
-) -> None:
-    """Accumulate ``resources[].{value_key}`` quantities into ``totals`` by name.
+def _mapping(value: object, message: str) -> dict[str, Any]:
+    """Require one decoded Kubernetes object member to be a mapping."""
+    if not isinstance(value, dict):
+        raise ProviderExecutionError(message)
+    return value
 
-    Resource **names** are taken verbatim from the API (for example ``cpu``,
-    ``memory``, ``nvidia.com/gpu``) so the platform contract can surface future
-    resource types without schema changes; values use public response units.
 
-    Args:
-        totals: Resource totals mutated in place.
-        resources: Kueue resource entry sequence.
-        value_key: Quantity field to read from each entry.
-    """
-    for resource in resources or []:
-        name = str(resource.get("name", "")).strip()
-        if not name:
-            continue
-        merge_resource_totals(
-            totals,
-            name,
-            parse_resource_amount(name, resource.get(value_key)),
+def _list(value: object, message: str) -> list[Any]:
+    """Require one decoded Kubernetes object member to be a list."""
+    if not isinstance(value, list):
+        raise ProviderExecutionError(message)
+    return value
+
+
+def _labels(doc: dict[str, Any], kind: str) -> dict[str, str]:
+    """Return a validated Kubernetes label map."""
+    metadata = _mapping(doc.get("metadata"), f"Kueue {kind} metadata was invalid")
+    labels = _mapping(metadata.get("labels"), f"Kueue {kind} labels were missing or invalid")
+    if not all(isinstance(name, str) and isinstance(value, str) for name, value in labels.items()):
+        raise ProviderExecutionError(f"Kueue {kind} labels were invalid")
+    return labels
+
+
+def _required_label(labels: dict[str, str], name: str, kind: str) -> str:
+    """Require one nonempty exact label value."""
+    value = labels.get(name)
+    if not isinstance(value, str) or not value:
+        raise ProviderExecutionError(f"Kueue {kind} was missing a nonempty {name} label")
+    return value
+
+
+def _cluster_queue_community(doc: dict[str, Any]) -> str:
+    """Validate and return a configured ClusterQueue's community label."""
+    return _required_label(_labels(doc, "ClusterQueue"), _COMMUNITY_LABEL, "ClusterQueue")
+
+
+def _metadata_namespace(doc: dict[str, Any], namespace: str) -> None:
+    """Require a LocalQueue list item to belong to the namespace queried."""
+    metadata = _mapping(doc.get("metadata"), "Kueue LocalQueue metadata was invalid")
+    if metadata.get("namespace") != namespace:
+        raise ProviderExecutionError("Kueue LocalQueue was returned from the wrong namespace")
+
+
+def _local_queue_identities(doc: dict[str, Any], namespace: str) -> tuple[tuple[str, str], ...]:
+    """Return Kubernetes object identities for one LocalQueue list item."""
+    metadata = _mapping(doc.get("metadata"), "Kueue LocalQueue metadata was invalid")
+    name = metadata.get("name")
+    if not isinstance(name, str) or not name:
+        raise ProviderExecutionError("Kueue LocalQueue metadata name was missing or invalid")
+    identities = [("name", f"{namespace}/{name}")]
+    uid = metadata.get("uid")
+    if uid is not None:
+        if not isinstance(uid, str) or not uid:
+            raise ProviderExecutionError("Kueue LocalQueue metadata uid was invalid")
+        identities.append(("uid", uid))
+    return tuple(identities)
+
+
+def _status(doc: dict[str, Any], kind: str) -> dict[str, Any]:
+    """Validate the common Kueue queue status shape."""
+    status = _mapping(doc.get("status"), f"Kueue {kind} status was missing or invalid")
+    reserving = status.get("reservingWorkloads")
+    if reserving is None:
+        reserving = 0
+    elif isinstance(reserving, bool) or not isinstance(reserving, int) or reserving < 0:
+        raise ProviderExecutionError(f"Kueue {kind} reservingWorkloads was invalid")
+    normalized = dict(status)
+    normalized["reservingWorkloads"] = reserving
+    for field_name in ("flavorsReservation", "flavorsUsage"):
+        raw_flavors = status.get(field_name)
+        flavors = (
+            []
+            if raw_flavors is None
+            else _list(raw_flavors, f"Kueue {kind} {field_name} was invalid")
         )
+        for flavor in flavors:
+            flavor_map = _mapping(flavor, f"Kueue {kind} {field_name} entry was invalid")
+            resources = _list(
+                flavor_map.get("resources"),
+                f"Kueue {kind} {field_name} resources were missing or invalid",
+            )
+            if not resources:
+                raise ProviderExecutionError(f"Kueue {kind} {field_name} resources were empty")
+        normalized[field_name] = flavors
+    return normalized
 
 
-def _resource_maps_to_strings(values: dict[str, float]) -> dict[str, str]:
-    """Format a numeric resource map in deterministic name order."""
-    return {name: format_resource_amount(name, val) for name, val in sorted(values.items())}
+def _merge_resources(
+    totals: dict[str, Decimal],
+    resources: object,
+    value_key: Literal["nominalQuota", "total"],
+) -> None:
+    """Add one Kueue resource list to a public-unit aggregate."""
+    entries = _list(resources, "Kueue resource list was missing or invalid")
+    names: set[str] = set()
+    for entry in entries:
+        resource = _mapping(entry, "Kueue resource entry was invalid")
+        name = resource.get("name")
+        if not isinstance(name, str) or not name or name != name.strip() or name in names:
+            raise ProviderExecutionError("Kueue resource entry had a duplicate or invalid name")
+        names.add(name)
+        merge_resource_totals(totals, name, parse_resource_amount(name, resource.get(value_key)))
 
 
-@dataclass(slots=True)
-class _PlatformResourceMaps:
-    """Pair comparable formatted capacity and allocation maps."""
+def _nominal_resources(doc: dict[str, Any]) -> dict[str, Decimal]:
+    """Aggregate one ClusterQueue's complete nominal quota."""
+    spec = _mapping(doc.get("spec"), "Kueue ClusterQueue spec was invalid")
+    groups = _list(spec.get("resourceGroups"), "Kueue ClusterQueue resourceGroups was invalid")
+    if not groups:
+        raise ProviderExecutionError("Kueue ClusterQueue resourceGroups was empty")
+    totals: dict[str, Decimal] = {}
+    for group_value in groups:
+        group = _mapping(group_value, "Kueue ClusterQueue resource group was invalid")
+        flavors = _list(group.get("flavors"), "Kueue ClusterQueue flavors were invalid")
+        if not flavors:
+            raise ProviderExecutionError("Kueue ClusterQueue flavors were empty")
+        for flavor_value in flavors:
+            flavor = _mapping(flavor_value, "Kueue ClusterQueue flavor was invalid")
+            resources = _list(flavor.get("resources"), "Kueue ClusterQueue resources were invalid")
+            if not resources:
+                raise ProviderExecutionError("Kueue ClusterQueue resources were empty")
+            _merge_resources(totals, resources, "nominalQuota")
+    if not totals:
+        raise ProviderExecutionError("Kueue ClusterQueue had no nominal resources")
+    return totals
 
-    capacity: dict[str, str]
-    allocated: dict[str, str]
+
+@dataclass(frozen=True, slots=True)
+class _QueueValues:
+    """Hold reservation, usage, capacity, and queue-count values."""
+
+    capacity: dict[str, Decimal]
+    allocated: dict[str, Decimal]
+    requests: dict[str, Decimal]
+    reserving_workloads: int
+
+
+def _queue_values(doc: dict[str, Any], *, include_capacity: bool) -> _QueueValues:
+    """Validate and aggregate one ClusterQueue or LocalQueue."""
+    status = _status(doc, "queue")
+    capacity = _nominal_resources(doc) if include_capacity else {}
+    reservation: dict[str, Decimal] = {}
+    usage: dict[str, Decimal] = {}
+    for flavor in status["flavorsReservation"]:
+        _merge_resources(
+            reservation, _mapping(flavor, "Kueue reservation was invalid")["resources"], "total"
+        )
+    for flavor in status["flavorsUsage"]:
+        _merge_resources(usage, _mapping(flavor, "Kueue usage was invalid")["resources"], "total")
+    if set(reservation) - set(capacity) and include_capacity:
+        raise ProviderExecutionError("Kueue reservation contained a resource absent from capacity")
+    if set(usage) - set(capacity) and include_capacity:
+        raise ProviderExecutionError("Kueue usage contained a resource absent from capacity")
+    return _QueueValues(
+        capacity=capacity,
+        allocated=usage,
+        requests=reservation,
+        reserving_workloads=status["reservingWorkloads"],
+    )
+
+
+def _resource_maps(values: dict[str, Decimal]) -> dict[str, str]:
+    """Format an aggregate resource map deterministically."""
+    return {name: format_resource_amount(name, value) for name, value in sorted(values.items())}
+
+
+def _platform_values(docs: list[dict[str, Any]]) -> _QueueValues:
+    """Aggregate configured ClusterQueues into Platform values."""
+    capacity: dict[str, Decimal] = {}
+    allocated: dict[str, Decimal] = {}
+    requests: dict[str, Decimal] = {}
+    reserving = 0
+    for doc in docs:
+        values = _queue_values(doc, include_capacity=True)
+        for name, value in values.capacity.items():
+            merge_resource_totals(capacity, name, value)
+        for name, value in values.allocated.items():
+            merge_resource_totals(allocated, name, value)
+        for name, value in values.requests.items():
+            merge_resource_totals(requests, name, value)
+        reserving += values.reserving_workloads
+    if not capacity:
+        raise ProviderExecutionError("Kueue platform had no configured capacity")
+    allocated = {name: allocated.get(name, Decimal(0)) for name in capacity}
+    return _QueueValues(capacity, allocated, requests, reserving)
 
 
 class KueueProvider:
-    """Kueue source: startup validation and platform metrics."""
+    """Read User, Community, and Platform observations from Kueue."""
 
     def __init__(self, settings: Settings, api: Any | None = None) -> None:
-        """Attach settings and an optional pre-built Kubernetes API handle.
-
-        Args:
-            settings: Full app settings; Kueue fields live under ``providers.kueue``.
-            api: kr8s-compatible API object. Production leaves this ``None`` and the
-                provider builds one lazily on first use; tests inject fakes.
-        """
+        """Attach validated settings and an optional kr8s-compatible API fake."""
         self._settings = settings
-        self._kueue_config = settings.providers.kueue
+        self._config = settings.providers.kueue
         self._api = api
 
     @property
     def name(self) -> str:
-        """Stable provider key matching configuration."""
+        """Return the stable provider name used in telemetry."""
         return "kueue"
 
     async def _ensure_api(self) -> Any:
         """Create and retain the Kubernetes API handle on first use."""
         if self._api is None:
             try:
-                self._api = await create_kube_api(self._kueue_config)
+                self._api = await create_kube_api(self._config)
             except Exception as exc:
-                # Do not embed str(exc): discovery errors can include paths/URLs.
-                raise ProviderUnavailableError(
-                    "Could not configure a Kubernetes API client for Kueue calls"
-                ) from exc
+                raise ProviderUnavailableError("Could not configure Kubernetes API access") from exc
         return self._api
 
-    async def read_platform(self) -> PlatformObservation:
-        """Load capacity and allocated maps from Kueue ClusterQueue data."""
-        maps = await self._collect_resource_maps()
-        return PlatformObservation(
-            cluster=self._settings.cluster_name,
-            capacity=maps.capacity,
-            allocated=maps.allocated,
-        )
-
-    async def _collect_resource_maps(self) -> _PlatformResourceMaps:
-        """Fetch configured queues and aggregate comparable resource maps."""
-        kueue_config = self._kueue_config
-        if not kueue_config.cluster_queues:
-            raise ProviderUnavailableError(
-                "Kueue cluster_queues must be configured for platform metrics"
-            )
+    async def _configured_cluster_queues(self) -> list[dict[str, Any]]:
+        """Read and validate every configured ClusterQueue atomically."""
         api = await self._ensure_api()
-
         try:
             docs = await fetch_cluster_queue_docs(
                 api,
-                kueue_config.kueue_api_version,
-                kueue_config.cluster_queues,
+                self._config.kueue_api_version,
+                self._config.cluster_queues,
             )
         except kr8s.ServerError as exc:
-            status_code = getattr(exc.response, "status_code", None)
-            detail = f"HTTP {status_code}" if status_code else "a server error"
-            raise ProviderExecutionError(
-                f"Kubernetes returned {detail} querying Kueue objects"
-            ) from exc
-        except _KUBE_REQUEST_ERRORS as exc:
-            # Do not embed str(exc) here: transports may include the request URL,
-            # which must not propagate into API error payloads.
-            raise ProviderExecutionError(
-                "Failed querying Kueue objects (upstream request error)"
-            ) from exc
+            raise ProviderUnavailableError("Configured Kueue ClusterQueue access failed") from exc
+        except _REQUEST_ERRORS as exc:
+            raise ProviderUnavailableError("Kueue ClusterQueue access failed") from exc
+        for doc in docs:
+            _cluster_queue_community(doc)
+            _queue_values(doc, include_capacity=True)
+        return docs
 
-        queue_totals: dict[str, float] = {}
-        allocated_totals: dict[str, float] = {}
+    async def _local_queues(self, subject: str | None) -> list[tuple[str, dict[str, Any]]]:
+        """Read every configured namespace, preserving all-or-nothing semantics."""
+        api = await self._ensure_api()
+        selector = None if subject is None else f"{_USERNAME_LABEL}={_validate_subject(subject)}"
+
+        async def fetch(namespace: str) -> list[dict[str, Any]]:
+            return await fetch_local_queue_docs(
+                api,
+                self._config.kueue_api_version,
+                namespace,
+                label_selector=selector,
+            )
 
         try:
-            for doc in docs:
-                for group in (doc.get("spec") or {}).get("resourceGroups") or []:
-                    for flavor in group.get("flavors") or []:
-                        _merge_resource_entries(
-                            queue_totals, flavor.get("resources"), "nominalQuota"
-                        )
-                for flavor in (doc.get("status") or {}).get("flavorsUsage") or []:
-                    _merge_resource_entries(allocated_totals, flavor.get("resources"), "total")
-        except (AttributeError, TypeError) as exc:
-            raise ProviderExecutionError(
-                "Kueue platform data contained an invalid object shape"
-            ) from exc
-        if not queue_totals:
-            raise ProviderUnavailableError(
-                "Kueue ClusterQueue specs did not include nominal quota values"
+            docs_by_namespace = await _bounded_map(self._config.namespaces, fetch)
+        except kr8s.ServerError as exc:
+            raise ProviderUnavailableError("Configured Kueue namespace access failed") from exc
+        except _REQUEST_ERRORS as exc:
+            raise ProviderUnavailableError("Kueue namespace access failed") from exc
+        return [
+            (namespace, doc)
+            for namespace, docs in zip(
+                self._config.namespaces,
+                docs_by_namespace,
+                strict=True,
             )
-        capacity = _resource_maps_to_strings(queue_totals)
-        # Allocated keys align with capacity: absent usage renders as explicit zero.
-        zeros = {name: format_resource_amount(name, 0.0) for name in queue_totals}
-        allocated = dict(sorted((zeros | _resource_maps_to_strings(allocated_totals)).items()))
-        return _PlatformResourceMaps(capacity=capacity, allocated=allocated)
+            for doc in docs
+        ]
+
+    async def _probe_local_queue_access(self) -> None:
+        """Probe LocalQueue list access once per configured namespace."""
+        api = await self._ensure_api()
+
+        async def probe(namespace: str) -> None:
+            await probe_local_queue_access(
+                api,
+                self._config.kueue_api_version,
+                namespace,
+            )
+
+        try:
+            await _bounded_map(self._config.namespaces, probe)
+        except kr8s.ServerError as exc:
+            raise ProviderUnavailableError("Configured Kueue namespace access failed") from exc
+        except _REQUEST_ERRORS as exc:
+            raise ProviderUnavailableError("Kueue namespace access failed") from exc
+
+    def _cluster_queue_labels(self, docs: list[dict[str, Any]]) -> dict[str, str]:
+        """Return the configured ClusterQueue-to-community mapping."""
+        labels: dict[str, str] = {}
+        for configured_name, doc in zip(self._config.cluster_queues, docs, strict=True):
+            metadata = _mapping(doc.get("metadata"), "Kueue ClusterQueue metadata was invalid")
+            returned_name = metadata.get("name")
+            if returned_name is not None and returned_name != configured_name:
+                raise ProviderExecutionError(
+                    "Kueue ClusterQueue identity did not match configuration"
+                )
+            labels[configured_name] = _cluster_queue_community(doc)
+        return labels
 
     def cache_fingerprint(self) -> str:
-        """Hash non-secret provider identity for cache key segregation."""
-        kueue_config = self._kueue_config
+        """Return a stable cache revision for the configured Kueue population."""
         raw = json.dumps(
             {
-                "api_version": kueue_config.kueue_api_version,
-                "name": self.name,
-                "queues": sorted(kueue_config.cluster_queues),
+                "api_version": self._config.kueue_api_version,
+                "cluster_queues": self._config.cluster_queues,
+                "namespaces": self._config.namespaces,
             },
-            sort_keys=True,
             separators=(",", ":"),
+            sort_keys=True,
         )
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+        return hashlib.sha256(raw.encode()).hexdigest()[:24]
+
+    async def read_platform(self) -> PlatformObservation:
+        """Sum capacity, allocation, and reserving workloads across ClusterQueues."""
+        docs = await self._configured_cluster_queues()
+        values = _platform_values(docs)
+        return PlatformObservation(
+            cluster=self._settings.cluster_name,
+            capacity=_resource_maps(values.capacity),
+            allocated=_resource_maps(values.allocated),
+            reserving_workloads=values.reserving_workloads,
+            observed_at=_observation_time(),
+        )
+
+    async def read_community(self, community: str) -> CommunityObservation:
+        """Sum reservation and reserving counts for matching ClusterQueues."""
+        community = _validate_subject(community)
+        docs = await self._configured_cluster_queues()
+        matching = [doc for doc in docs if _cluster_queue_community(doc) == community]
+        if not matching:
+            raise SubjectNotFoundError("Community has no configured ClusterQueue")
+        requests: dict[str, Decimal] = {}
+        reserving = 0
+        for doc in matching:
+            queue = _queue_values(doc, include_capacity=True)
+            for name, value in queue.requests.items():
+                merge_resource_totals(requests, name, value)
+            reserving += queue.reserving_workloads
+        return CommunityObservation(
+            community=community,
+            requests=_resource_maps(requests),
+            reserving_workloads=reserving,
+            observed_at=_observation_time(),
+        )
+
+    async def read_user(self, username: str) -> UserObservation:
+        """Aggregate valid LocalQueues for one user across configured namespaces."""
+        username = _validate_subject(username)
+        cluster_docs = await self._configured_cluster_queues()
+        community_by_queue = self._cluster_queue_labels(cluster_docs)
+        local_queues = await self._local_queues(username)
+        if not local_queues:
+            raise SubjectNotFoundError("User has no matching LocalQueue")
+
+        requests: dict[str, Decimal] = {}
+        reserving = 0
+        seen_local_queues: set[tuple[str, str]] = set()
+        for namespace, doc in local_queues:
+            _metadata_namespace(doc, namespace)
+            labels = _labels(doc, "LocalQueue")
+            if _required_label(labels, _USERNAME_LABEL, "LocalQueue") != username:
+                raise ProviderExecutionError(
+                    "Kueue LocalQueue username label did not match selector"
+                )
+            local_community = _required_label(labels, _COMMUNITY_LABEL, "LocalQueue")
+            spec = _mapping(doc.get("spec"), "Kueue LocalQueue spec was invalid")
+            cluster_queue = spec.get("clusterQueue")
+            if not isinstance(cluster_queue, str) or not cluster_queue:
+                raise ProviderExecutionError("Kueue LocalQueue clusterQueue was missing")
+            expected_community = community_by_queue.get(cluster_queue)
+            if expected_community is None:
+                raise ProviderExecutionError(
+                    "Kueue LocalQueue referenced an out-of-scope ClusterQueue"
+                )
+            if local_community != expected_community:
+                raise ProviderExecutionError(
+                    "Kueue LocalQueue community did not match its ClusterQueue"
+                )
+            identities = _local_queue_identities(doc, namespace)
+            if any(identity in seen_local_queues for identity in identities):
+                raise ProviderExecutionError("Kueue LocalQueue identity was duplicated")
+            seen_local_queues.update(identities)
+            queue = _queue_values(doc, include_capacity=False)
+            for name, value in queue.requests.items():
+                merge_resource_totals(requests, name, value)
+            reserving += queue.reserving_workloads
+        return UserObservation(
+            user=username,
+            requests=_resource_maps(requests),
+            reserving_workloads=reserving,
+            observed_at=_observation_time(),
+        )
 
     async def startup(self) -> None:
-        """Fetch each configured ClusterQueue to validate access, failing fast."""
-        kueue_config = self._kueue_config
-        if not kueue_config.cluster_queues:
-            raise RuntimeStartupError(
-                "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES must list at least one ClusterQueue"
-            )
+        """Validate all configured ClusterQueues and namespace list access."""
         try:
-            api = await self._ensure_api()
-        except ProviderUnavailableError as exc:
-            raise RuntimeStartupError(
-                "Cannot configure Kubernetes API access for Kueue startup checks"
-            ) from exc
-
-        for qname in kueue_config.cluster_queues:
-            try:
-                await fetch_cluster_queue_docs(api, kueue_config.kueue_api_version, [qname])
-            except kr8s.ServerError as exc:
-                status_code = getattr(exc.response, "status_code", None)
-                if status_code == 404:
-                    raise RuntimeStartupError(
-                        f"Configured ClusterQueue {qname!r} was not found in the cluster"
-                    ) from exc
-                if status_code == 403:
-                    raise RuntimeStartupError(
-                        f"Configured ClusterQueue {qname!r} is forbidden (HTTP 403)"
-                    ) from exc
-                detail = f"HTTP {status_code}" if status_code else "a server error"
-                raise RuntimeStartupError(
-                    f"Failed loading ClusterQueue {qname!r} ({detail})"
-                ) from exc
-            except _KUBE_REQUEST_ERRORS as exc:
-                raise RuntimeStartupError(
-                    "Cannot reach Kubernetes API for Kueue startup checks"
-                ) from exc
+            await self._configured_cluster_queues()
+            await self._probe_local_queue_access()
+        except (
+            ProviderUnavailableError,
+            ProviderExecutionError,
+            kr8s.ServerError,
+            *_REQUEST_ERRORS,
+        ) as exc:
+            raise RuntimeStartupError("Kueue dependency validation failed") from exc
 
     async def shutdown(self) -> None:
-        """Release the API handle; the kr8s session is process-shared and stays open."""
+        """Release the provider's API handle reference."""
         self._api = None

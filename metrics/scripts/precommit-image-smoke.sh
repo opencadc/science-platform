@@ -14,6 +14,8 @@ IMAGE_TAG="${METRICS_IMAGE_SMOKE_TAG:-metrics:toolchain-smoke}"
 KIND_CLUSTER="${METRICS_KIND_CLUSTER:-metrics}"
 KIND_CONTEXT="${METRICS_KIND_CONTEXT:-kind-metrics}"
 HOST_PORT="${METRICS_IMAGE_SMOKE_PORT:-18000}"
+REDIS_IMAGE="${METRICS_IMAGE_SMOKE_REDIS_IMAGE:-redis:7-alpine}"
+REDIS_CONTAINER="metrics-image-smoke-redis-$$"
 
 echo "==> building ${IMAGE_TAG}"
 docker build -t "${IMAGE_TAG}" .
@@ -40,10 +42,24 @@ if ! kubectl --context "${KIND_CONTEXT}" cluster-info >/dev/null; then
 fi
 
 tmp_dir="$(mktemp -d)"
+container_id=""
 cleanup_files() {
   rm -rf "${tmp_dir}"
 }
-trap cleanup_files EXIT
+
+cleanup() {
+  status=$?
+  if [[ "${status}" -ne 0 && -n "${container_id}" ]]; then
+    docker logs "${container_id}" >&2 || true
+  fi
+  if [[ -n "${container_id}" ]]; then
+    docker rm -f "${container_id}" >/dev/null 2>&1 || true
+  fi
+  docker rm -f "${REDIS_CONTAINER}" >/dev/null 2>&1 || true
+  cleanup_files
+  exit "${status}"
+}
+trap cleanup EXIT
 
 kubeconfig_path="${tmp_dir}/kubeconfig"
 kind get kubeconfig --name "${KIND_CLUSTER}" >"${kubeconfig_path}"
@@ -77,30 +93,42 @@ if "insecure-skip-tls-verify:" not in text:
 path.write_text(text, encoding="utf-8")
 PY
 
+echo "==> starting disposable Redis"
+docker run -d \
+  --name "${REDIS_CONTAINER}" \
+  -p 0:6379 \
+  "${REDIS_IMAGE}" \
+  redis-server --save "" --appendonly no >/dev/null
+redis_port="$(docker port "${REDIS_CONTAINER}" 6379/tcp | head -n 1 | sed 's/.*://')"
+if [[ -z "${redis_port}" ]]; then
+  echo "could not determine disposable Redis host port" >&2
+  exit 1
+fi
+for _ in $(seq 1 30); do
+  if docker exec "${REDIS_CONTAINER}" redis-cli ping 2>/dev/null | grep -qx PONG; then
+    break
+  fi
+  sleep 1
+done
+if ! docker exec "${REDIS_CONTAINER}" redis-cli ping 2>/dev/null | grep -qx PONG; then
+  echo "timed out waiting for disposable Redis" >&2
+  exit 1
+fi
+
 echo "==> starting entrypoint smoke"
 container_id="$(
   docker run -d \
     --add-host=host.docker.internal:host-gateway \
     -e KUBECONFIG=/kubeconfig/config \
-    -e METRICS_CACHE__BACKEND=memory \
+    -e METRICS_REDIS_URL="redis://host.docker.internal:${redis_port}/0" \
+    -e METRICS_CACHE__KEY_SECRET=metrics-image-smoke-cache-key-secret-32-bytes \
     -e METRICS_CLUSTER_NAME=kind-metrics \
-    -e 'METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-proton","cq-electron"]' \
-    -e 'METRICS_PROVIDERS__KUBERNETES__WORKLOAD_NAMESPACES=["canfar-workloads"]' \
+    -e 'METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-proton","cq-electron","cq-fair"]' \
+    -e 'METRICS_PROVIDERS__KUEUE__NAMESPACES=["canfar-workloads","canfar-workloads-secondary"]' \
     -v "${kubeconfig_path}:/kubeconfig/config:ro" \
     -p "${HOST_PORT}:8000" \
     "${IMAGE_TAG}"
 )"
-
-cleanup() {
-  status=$?
-  if [[ "${status}" -ne 0 ]]; then
-    docker logs "${container_id}" >&2 || true
-  fi
-  docker rm -f "${container_id}" >/dev/null 2>&1 || true
-  cleanup_files
-  exit "${status}"
-}
-trap cleanup EXIT
 
 ready=0
 for _ in $(seq 1 45); do

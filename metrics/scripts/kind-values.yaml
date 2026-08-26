@@ -7,6 +7,8 @@ image:
 
 replicaCount: 2
 
+clusterName: kind-metrics
+
 networkPolicy:
   enabled: false
 
@@ -15,33 +17,33 @@ serviceAccount:
 
 rbac:
   create: true
-  workloadNamespaces:
+
+kueue:
+  clusterQueues:
+    - cq-proton
+    - cq-electron
+    - cq-fair
+  namespaces:
     - canfar-workloads
+    - canfar-workloads-secondary
+
+cacheKeySecret:
+  name: metrics-test-cache-key
+  key: key-secret
 
 env:
-  METRICS_CLUSTER_NAME: "kind-metrics"
-  METRICS_SOURCES__PLATFORM: "kueue"
-  METRICS_SOURCES__USER: "kubernetes"
-  METRICS_CACHE__BACKEND: "redis"
-  # Local-only ephemeral integrity/HMAC key; deployed environments use a Secret.
-  METRICS_CACHE__KEY_SECRET: "kind-metrics-cache-key-32-bytes!!"
-  METRICS_OTEL__METRICS_ENABLED: "true"
-  METRICS_OTEL__TRACES_ENABLED: "true"
-  METRICS_OTEL__LOGS_ENABLED: "true"
-  METRICS_OTEL__EXPORTER_OTLP_ENDPOINT: "http://metrics-api-collector:4318"
+  METRICS_PROVIDERS__PROMQL__BASE_URL: "http://metrics-test-prometheus.metrics.svc:9090"
+  METRICS_OTEL__EXPORTER_OTLP_ENDPOINT: "http://metrics-test-otel-collector.metrics.svc:4318"
   METRICS_OTEL__EXPORT_INTERVAL_MILLIS: "1000"
   METRICS_OTEL__DEPLOYMENT_ENVIRONMENT: "development"
   METRICS_OTEL__KUBERNETES_NAMESPACE: "metrics"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
   # service account; no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
-  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron"]'
-  METRICS_PROVIDERS__KUBERNETES__WORKLOAD_NAMESPACES: '["canfar-workloads"]'
+  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron","cq-fair"]'
+  METRICS_PROVIDERS__KUEUE__NAMESPACES: '["canfar-workloads","canfar-workloads-secondary"]'
 
 redis:
-  enabled: true
-
-collector:
-  enabled: true
-  file:
-    enabled: true
+  urlSecret:
+    name: metrics-test-redis
+    key: redis-url

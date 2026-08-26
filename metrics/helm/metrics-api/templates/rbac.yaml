@@ -1,54 +1,60 @@
 {{- if .Values.rbac.create }}
+{{- $queues := include "metrics-api.clusterQueues" . | trim | fromJsonArray }}
+{{- $namespaces := include "metrics-api.kueueNamespaces" . | trim | fromJsonArray }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "metrics-api.fullname" . }}-{{ .Release.Namespace }}-kueue-read
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "kueue-read") }}
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["clusterqueues"]
+    resourceNames:
+{{- range $queue := $queues }}
+      - {{ $queue | quote }}
+{{- end }}
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "metrics-api.fullname" . }}-{{ .Release.Namespace }}-kueue-read
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "kueue-read") }}
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "metrics-api.fullname" . }}-{{ .Release.Namespace }}-kueue-read
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "kueue-read") }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "metrics-api.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
-{{- range .Values.rbac.workloadNamespaces }}
+{{- range $namespace := $namespaces }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "metrics-api.fullname" $ }}-pod-read
-  namespace: {{ . }}
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" $ "suffix" "localqueue-read") }}
+  namespace: {{ $namespace }}
   labels:
     {{- include "metrics-api.labels" $ | nindent 4 }}
 rules:
-  - apiGroups: [""]
-    resources: ["pods"]
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["localqueues"]
     verbs: ["list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "metrics-api.fullname" $ }}-pod-read
-  namespace: {{ . }}
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" $ "suffix" "localqueue-read") }}
+  namespace: {{ $namespace }}
   labels:
     {{- include "metrics-api.labels" $ | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "metrics-api.fullname" $ }}-pod-read
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" $ "suffix" "localqueue-read") }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "metrics-api.serviceAccountName" $ }}

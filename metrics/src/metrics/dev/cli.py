@@ -27,13 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     for name in _COMMANDS:
         command = subparsers.add_parser(name, help=f"Run the {name} lifecycle step.")
-        if name in {"up", "smoke"}:
-            command.add_argument(
-                "--profile",
-                choices=("core", "accounting"),
-                default="core",
-                help="optional dependency profile (default: core)",
-            )
         if name == "destroy":
             command.add_argument(
                 "--confirm",
@@ -48,11 +41,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     actions = {
-        "up": lambda: stack.up(args.profile),
+        "up": stack.up,
         "run": stack.run_host,
         "image": stack.image,
         "fixtures": stack.fixtures,
-        "smoke": lambda: stack.smoke(args.profile),
+        "smoke": stack.smoke,
         "down": stack.down,
         "reset": stack.reset,
         "destroy": lambda: stack.destroy(args.confirm),

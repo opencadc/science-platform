@@ -7,12 +7,15 @@ metadata:
   name: default-flavor
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec: {}
 ---
 apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
   name: metrics-overhead
+  labels:
+    metrics.canfar.net/fixture-owner: metrics-dev
 handler: runc
 overhead:
   podFixed:
@@ -20,30 +23,14 @@ overhead:
     memory: 8Mi
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
-kind: Cohort
-metadata:
-  name: cohort-atom
-  labels:
-    app.kubernetes.io/part-of: metrics-kueue-smoke
-spec:
-  resourceGroups:
-    - coveredResources: [cpu, memory]
-      flavors:
-        - name: default-flavor
-          resources:
-            - name: cpu
-              nominalQuota: "1"
-            - name: memory
-              nominalQuota: "1Gi"
----
-apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: cq-proton
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/community: physics
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
-  cohortName: cohort-atom
   namespaceSelector: {}
   resourceGroups:
     - coveredResources: [cpu, memory]
@@ -61,8 +48,9 @@ metadata:
   name: cq-electron
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/community: astronomy
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
-  cohortName: cohort-atom
   namespaceSelector: {}
   resourceGroups:
     - coveredResources: [cpu, memory]
@@ -70,11 +58,9 @@ spec:
         - name: default-flavor
           resources:
             - name: cpu
-              nominalQuota: "100m"
-              borrowingLimit: "1"
+              nominalQuota: "1"
             - name: memory
-              nominalQuota: "100Mi"
-              borrowingLimit: "1Gi"
+              nominalQuota: "1Gi"
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
@@ -82,6 +68,8 @@ metadata:
   name: cq-fair
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/community: astronomy
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   admissionScope:
     admissionMode: UsageBasedAdmissionFairSharing
@@ -104,6 +92,14 @@ metadata:
     app.kubernetes.io/part-of: metrics-kueue-smoke
     pod-security.kubernetes.io/enforce: restricted
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: canfar-workloads-secondary
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+    pod-security.kubernetes.io/enforce: restricted
+---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
@@ -111,6 +107,9 @@ metadata:
   namespace: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/username: bob
+    canfar.net/community: astronomy
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   clusterQueue: cq-electron
 ---
@@ -121,6 +120,9 @@ metadata:
   namespace: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/username: alice
+    canfar.net/community: astronomy
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   clusterQueue: cq-fair
   fairSharing:
@@ -133,7 +135,23 @@ metadata:
   namespace: canfar-workloads
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/username: carol
+    canfar.net/community: astronomy
+    metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   clusterQueue: cq-fair
   fairSharing:
     weight: "1"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: lq-bob-physics
+  namespace: canfar-workloads-secondary
+  labels:
+    app.kubernetes.io/part-of: metrics-kueue-smoke
+    canfar.net/username: bob
+    canfar.net/community: physics
+    metrics.canfar.net/fixture-owner: metrics-dev
+spec:
+  clusterQueue: cq-proton

@@ -1,12 +1,10 @@
 # Production Metrics image: locked uv install into python:3.13-slim, one worker.
-# UV pin matches the supported local toolchain; bumping it is an explicit change.
+# Global UV pin selects the builder image; bumping it is an explicit change.
 ARG UV_VERSION=0.12.5
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM python:3.13-slim AS builder
-
-ARG UV_VERSION=0.12.5
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

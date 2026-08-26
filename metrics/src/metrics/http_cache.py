@@ -102,7 +102,6 @@ def metrics_success_cache_headers(
     return {
         "Date": http_date(now),
         "Cache-Control": "no-store",
-        "Last-Modified": http_date(created),
         "Age": str(age),
         "Cache-Status": cache_status,
     }

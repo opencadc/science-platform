@@ -5,10 +5,10 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import UTC, datetime
-from decimal import Decimal, ROUND_HALF_UP
-from email.utils import parsedate_to_datetime
+from decimal import Decimal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 
 from metrics.core.runtime import MetricsRuntime
 from metrics.errors import AppError
@@ -23,44 +23,45 @@ from metrics.schemas.metrics import (
 )
 from metrics.schemas.status import Status
 from metrics.services.models import (
-    AccountingState,
     CommunityObservation,
+    EfficiencyObservation,
     MetricsResult,
     MetricsSubject,
     PlatformObservation,
     UserObservation,
+    bounded_decimal,
 )
 
-_LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
+
+_LABEL_VALUE_PATTERN = r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$"
+_LABEL_VALUE = re.compile(_LABEL_VALUE_PATTERN)
+_DNS_LABEL = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+_METADATA_NAME_MAX_LENGTH = 63
+_SUBJECT_DIGEST_LENGTH = 12
+
+SubjectPath = Annotated[
+    str,
+    Path(
+        min_length=1,
+        max_length=63,
+        pattern=_LABEL_VALUE_PATTERN,
+        description="A Kubernetes label value identifying the requested subject.",
+    ),
+]
 
 router = APIRouter(tags=["metrics"])
-_EFFICIENCY_QUANTUM = Decimal("0.000001")
 
 
-def _cache_response(
+def _set_cache_headers(
     *,
-    request: Request,
     response: Response,
     created: datetime,
     ttl: int,
     cached: bool,
     stale: bool,
     available: bool,
-) -> Response | None:
-    """Attach snapshot headers and evaluate ``If-Modified-Since``.
-
-    Args:
-        request: Incoming request containing an optional validator.
-        response: Mutable success response receiving cache headers.
-        created: Collection time of the returned snapshot.
-        ttl: Configured fresh period in seconds.
-        cached: Whether the internal coordinator returned a cache hit.
-        stale: Whether the snapshot is beyond its fresh period.
-        available: Whether the shared cache is currently reachable.
-
-    Returns:
-        An empty ``304`` response when the validator matches, otherwise ``None``.
-    """
+) -> None:
+    """Attach internal snapshot metadata to a successful response."""
     headers = metrics_success_cache_headers(
         snapshot_created=created,
         configured_ttl=ttl,
@@ -70,219 +71,111 @@ def _cache_response(
         now=datetime.now(UTC),
     )
     response.headers.update(headers)
-    validator = request.headers.get("if-modified-since")
-    if validator:
-        try:
-            modified_since = parsedate_to_datetime(validator)
-        except (TypeError, ValueError):
-            return None
-        snapshot_second = created.astimezone(UTC).replace(microsecond=0)
-        if modified_since.astimezone(UTC) >= snapshot_second:
-            return Response(status_code=304, headers=headers)
-    return None
 
 
 def get_runtime(request: Request) -> MetricsRuntime:
-    """Resolve the lifespan-owned runtime for FastAPI dependency injection.
-
-    Args:
-        request: Current FastAPI request.
-
-    Returns:
-        The process runtime stored during application startup.
-    """
+    """Resolve the lifespan-owned runtime for dependency injection."""
     return request.app.state.runtime
 
 
-@router.get(
-    "/apis/canfar.net/v1alpha1/metrics/platform/{platform}",
-    response_model=Metrics,
-    response_model_exclude_none=True,
-    responses={
-        400: {"model": Status, "description": "Malformed platform value."},
-        404: {"model": Status, "description": "Platform is not configured on this deployment."},
-        503: {"model": Status, "description": "No serviceable report is available."},
-    },
-    summary="Get platform metrics",
-)
-async def get_platform_metrics(
-    platform: str,
-    request: Request,
-    response: Response,
-    runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics | Response:
-    """Return Kueue-backed platform capacity and admitted allocation.
-
-    The path segment must equal the deployment's configured
-    ``METRICS_PLATFORM_NAME`` (Helm ``platformName``, default ``canfar``). That
-    name identifies the ClusterQueue cohort this Metrics API serves.
-
-    Args:
-        platform: Public platform subject from the request path.
-        request: Incoming HTTP request (conditional validators).
-        response: Mutable response used for cache headers.
-        runtime: Process runtime owned by the FastAPI lifespan.
-
-    Returns:
-        A Metrics envelope, or an empty ``304`` when validators match.
-
-    Raises:
-        AppError: ``400`` for malformed names, ``404`` when the platform is not
-            configured, or ``503`` when no serviceable report exists.
-    """
-    platform = _subject_value(platform, "platform")
-    if platform != runtime.settings.platform_name:
-        raise AppError(
-            code="platform_not_found",
-            message="Requested platform metrics subject is not configured",
-            status_code=404,
-        )
-    result = await runtime.metrics_service.get(MetricsSubject(kind="platform", value=platform))
-    conditional = _cache_response(
-        request=request,
-        response=response,
-        created=result.created,
-        ttl=runtime.metrics_service.cache_ttl_seconds,
-        cached=result.cached,
-        stale=result.stale,
-        available=result.cache_available,
-    )
-    if conditional is not None:
-        return conditional
-
-    ready_status, ready_reason = result.ready_condition
-    cached_status, cached_reason = result.cached_condition
-    observation = result.observation
-    if not isinstance(observation, PlatformObservation):
-        raise RuntimeError("Platform route received a non-platform observation")
-    return Metrics(
-        metadata=ObjectMetadata(name=_subject_name("platform", platform)),
-        spec=MetricsSpec(platform=platform),
-        status=MetricsStatus(
-            observed_at=result.created,
-            resources=[
-                ResourceMetrics(
-                    name=name,
-                    capacity=observation.capacity[name],
-                    allocated=observation.allocated[name],
-                )
-                for name in sorted(observation.capacity)
-            ],
-            conditions=[
-                Condition(
-                    type="Ready",
-                    status=ready_status,
-                    reason=ready_reason,
-                    last_transition_time=result.created,
-                ),
-                Condition(
-                    type="Cached",
-                    status=cached_status,
-                    reason=cached_reason,
-                    last_transition_time=result.created,
-                ),
-            ],
-        ),
-    )
+RuntimeDependency = Annotated[MetricsRuntime, Depends(get_runtime)]
 
 
 def _subject_value(value: str, kind: str) -> str:
-    """Validate an exact decoded subject as a Kubernetes label value.
-
-    Args:
-        value: Decoded path value supplied by the client.
-        kind: Subject kind used to produce a bounded error code.
-
-    Returns:
-        The unchanged validated subject.
-
-    Raises:
-        AppError: If the value is empty, non-canonical, or label-unsafe.
-    """
+    """Validate one exact decoded path value as a Kubernetes label value."""
     if (
         not value
         or value in {".", ".."}
         or "/" in value
         or "\\" in value
         or "%" in value
-        or not _LABEL_VALUE.fullmatch(value)
+        or _LABEL_VALUE.fullmatch(value) is None
     ):
-        raise AppError(
-            code=f"invalid_{kind}",
-            message=f"The requested {kind} is invalid",
-            status_code=400,
-        )
+        raise AppError(code=f"invalid_{kind}", status_code=400)
     return value
 
 
 def _subject_name(kind: str, value: str) -> str:
-    """Build a deterministic DNS-safe metadata name for a subject.
-
-    Args:
-        kind: Subject kind used as the name prefix.
-        value: Validated subject value.
-
-    Returns:
-        A readable name when possible, otherwise a slug with a stable digest.
-    """
-    candidate = f"{kind}-{value.lower()}"
-    if re.fullmatch(r"[a-z0-9](?:[-a-z0-9.]{0,61}[a-z0-9])?", candidate):
+    """Build a deterministic DNS-safe report metadata name."""
+    normalized = value.lower()
+    candidate = f"{kind}-{normalized}"
+    if (
+        value == normalized
+        and len(candidate) <= _METADATA_NAME_MAX_LENGTH
+        and _DNS_LABEL.fullmatch(candidate)
+    ):
         return candidate
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "subject"
-    digest = hashlib.sha256(value.encode()).hexdigest()[:8]
-    return f"{kind}-{slug[:48].rstrip('-')}-{digest}"
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-") or "subject"
+    digest = hashlib.sha256(value.encode()).hexdigest()[:_SUBJECT_DIGEST_LENGTH]
+    available = _METADATA_NAME_MAX_LENGTH - len(kind) - 2 - len(digest)
+    return f"{kind}-{slug[:available].rstrip('-') or 'subject'}-{digest}"
 
 
 def _decimal_string(value: Decimal) -> str:
-    """Serialize a decimal without exponent notation or redundant zeros.
-
-    Args:
-        value: Validated finite decimal.
-
-    Returns:
-        Plain decimal notation suitable for the wire schema.
-    """
-    rendered = format(value, "f")
+    """Serialize a bounded Decimal without exponent notation."""
+    rendered = format(bounded_decimal(value), "f")
     return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
 
 
-def _subject_resources(
+def _efficiency_value(efficiency: EfficiencyObservation | None, name: str) -> str | None:
+    """Return one optional attributed efficiency value."""
+    if efficiency is None or name not in efficiency.efficiencies:
+        return None
+    try:
+        return _decimal_string(efficiency.efficiencies[name])
+    except ValueError as exc:
+        raise AppError(code="invalid_efficiency_data", status_code=503) from exc
+
+
+def _workload_resources(
     observation: UserObservation | CommunityObservation,
+    efficiency: EfficiencyObservation | None,
 ) -> list[ResourceMetrics]:
-    """Combine current requests with complete additive lifetime accounting.
-
-    Args:
-        observation: User or community observation to present.
-
-    Returns:
-        Resource entries sorted by name, with efficiency only when requested
-        hours are nonzero and complete.
-    """
-    accounting = observation.accounting
-    names = set(observation.requests)
-    if accounting is not None:
-        names.update(accounting.resources)
-    resources = []
-    for name in sorted(names):
-        hours = accounting.resources.get(name) if accounting is not None else None
-        efficiency = None
-        if hours is not None and hours.requested != 0:
-            efficiency = _decimal_string(
-                (hours.usage / hours.requested).quantize(
-                    _EFFICIENCY_QUANTUM,
-                    rounding=ROUND_HALF_UP,
-                )
-            )
-        resources.append(
-            ResourceMetrics(
-                name=name,
-                requests=observation.requests.get(name),
-                usage_hours=_decimal_string(hours.usage) if hours is not None else None,
-                requested_hours=(_decimal_string(hours.requested) if hours is not None else None),
-                efficiency=efficiency,
-            )
+    """Build workload resource entries from queue reservations."""
+    return [
+        ResourceMetrics(
+            name=name,
+            requests=observation.requests[name],
+            efficiency=_efficiency_value(efficiency, name),
         )
-    return resources
+        for name in sorted(observation.requests)
+    ]
+
+
+def _platform_resources(
+    observation: PlatformObservation,
+    efficiency: EfficiencyObservation | None,
+) -> list[ResourceMetrics]:
+    """Build Platform resource entries from capacity and allocation."""
+    return [
+        ResourceMetrics(
+            name=name,
+            capacity=observation.capacity[name],
+            allocated=observation.allocated[name],
+            efficiency=_efficiency_value(efficiency, name),
+        )
+        for name in sorted(observation.capacity)
+    ]
+
+
+def _conditions(result: MetricsResult) -> list[Condition]:
+    """Build exactly the Ready and Cached conditions for one result."""
+    ready_status, ready_reason = result.ready_condition
+    cached_status, cached_reason = result.cached_condition
+    return [
+        Condition(
+            type="Ready",
+            status=ready_status,
+            reason=ready_reason,
+            last_transition_time=result.created,
+        ),
+        Condition(
+            type="Cached",
+            status=cached_status,
+            reason=cached_reason,
+            last_transition_time=result.created,
+        ),
+    ]
 
 
 def _subject_response(
@@ -291,47 +184,88 @@ def _subject_response(
     observation: UserObservation | CommunityObservation,
     result: MetricsResult,
 ) -> Metrics:
-    """Assemble the shared user or community response envelope.
-
-    Args:
-        kind: Either ``user`` or ``community``.
-        value: Validated subject value.
-        observation: Workload observation returned by the service.
-        result: Service result carrying timestamps and cache provenance.
-
-    Returns:
-        A public Metrics wire model with Ready and Cached conditions.
-    """
-    ready_status, ready_reason = result.ready_condition
-    cached_status, cached_reason = result.cached_condition
+    """Assemble one User or Community response envelope."""
     return Metrics(
         metadata=ObjectMetadata(name=_subject_name(kind, value)),
         spec=MetricsSpec(user=value) if kind == "user" else MetricsSpec(community=value),
         status=MetricsStatus(
             observed_at=result.created,
-            accounting_period=(
-                "ActiveWorkloadLifetime"
-                if observation.accounting_state is not AccountingState.DISABLED
-                else None
-            ),
-            running_pods=observation.running_pods,
-            resources=_subject_resources(observation),
-            conditions=[
-                Condition(
-                    type="Ready",
-                    status=ready_status,
-                    reason=ready_reason,
-                    last_transition_time=result.created,
-                ),
-                Condition(
-                    type="Cached",
-                    status=cached_status,
-                    reason=cached_reason,
-                    last_transition_time=result.created,
-                ),
-            ],
+            reserving_workloads=observation.reserving_workloads,
+            resources=_workload_resources(observation, result.efficiency),
+            conditions=_conditions(result),
         ),
     )
+
+
+def _ttl_seconds(runtime: MetricsRuntime, kind: str) -> int:
+    """Return the fresh-cache window for one report surface."""
+    if kind == "platform":
+        return runtime.metrics_service.cache_ttl_seconds
+    if kind == "user":
+        return runtime.metrics_service.user_cache_ttl_seconds
+    return runtime.metrics_service.community_cache_ttl_seconds
+
+
+async def _serve(
+    kind: Literal["platform", "user", "community"],
+    value: str,
+    response: Response,
+    runtime: MetricsRuntime,
+) -> Metrics:
+    """Load one subject report and attach cache metadata headers."""
+    value = _subject_value(value, kind)
+    result = await runtime.metrics_service.get(MetricsSubject(kind=kind, value=value))
+    _set_cache_headers(
+        response=response,
+        created=result.created,
+        ttl=_ttl_seconds(runtime, kind),
+        cached=result.cached,
+        stale=result.stale,
+        available=result.cache_available,
+    )
+    observation = result.observation
+    if kind == "platform":
+        if not isinstance(observation, PlatformObservation):
+            raise RuntimeError("Platform route received a non-platform observation")
+        return Metrics(
+            metadata=ObjectMetadata(name=_subject_name("platform", value)),
+            spec=MetricsSpec(platform=value),
+            status=MetricsStatus(
+                observed_at=result.created,
+                reserving_workloads=observation.reserving_workloads,
+                resources=_platform_resources(observation, result.efficiency),
+                conditions=_conditions(result),
+            ),
+        )
+    if kind == "user":
+        if not isinstance(observation, UserObservation):
+            raise RuntimeError("User route received a non-user observation")
+        return _subject_response("user", value, observation, result)
+    if not isinstance(observation, CommunityObservation):
+        raise RuntimeError("Community route received a non-community observation")
+    return _subject_response("community", value, observation, result)
+
+
+@router.get(
+    "/apis/canfar.net/v1alpha1/metrics/platform/{platform:path}",
+    response_model=Metrics,
+    response_model_exclude_none=True,
+    responses={
+        400: {"model": Status, "description": "Malformed platform value."},
+        404: {"model": Status, "description": "Platform is not configured."},
+        405: {"model": Status, "description": "The HTTP method is not allowed."},
+        500: {"model": Status, "description": "The metrics report could not be produced."},
+        503: {"model": Status, "description": "No serviceable report is available."},
+    },
+    summary="Get platform metrics",
+)
+async def get_platform_metrics(
+    platform: SubjectPath,
+    response: Response,
+    runtime: RuntimeDependency,
+) -> Metrics:
+    """Return configured ClusterQueue capacity, allocation, and queue state."""
+    return await _serve("platform", platform, response, runtime)
 
 
 @router.get(
@@ -340,47 +274,20 @@ def _subject_response(
     response_model_exclude_none=True,
     responses={
         400: {"model": Status, "description": "Malformed user value."},
+        404: {"model": Status, "description": "No matching LocalQueue exists."},
+        405: {"model": Status, "description": "The HTTP method is not allowed."},
+        500: {"model": Status, "description": "The metrics report could not be produced."},
         503: {"model": Status, "description": "No serviceable report is available."},
     },
-    summary="Get current user requests",
+    summary="Get current user queue metrics",
 )
 async def get_user_metrics(
-    user: str,
-    request: Request,
+    user: SubjectPath,
     response: Response,
-    runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics | Response:
-    """Return requests and optional lifetime accounting for a user's Running Pods.
-
-    Args:
-        user: Exact username from the request path.
-        request: Incoming request containing conditional validators.
-        response: Mutable response receiving cache headers.
-        runtime: Lifespan-owned process runtime.
-
-    Returns:
-        A Metrics envelope, or an empty ``304`` when validators match.
-
-    Raises:
-        AppError: If the username is invalid or no serviceable report exists.
-    """
-    user = _subject_value(user, "user")
-    result = await runtime.metrics_service.get(MetricsSubject(kind="user", value=user))
-    observation = result.observation
-    if not isinstance(observation, UserObservation):
-        raise RuntimeError("User route received a non-user observation")
-    conditional = _cache_response(
-        request=request,
-        response=response,
-        created=result.created,
-        ttl=runtime.metrics_service.user_cache_ttl_seconds,
-        cached=result.cached,
-        stale=result.stale,
-        available=result.cache_available,
-    )
-    if conditional is not None:
-        return conditional
-    return _subject_response("user", user, observation, result)
+    runtime: RuntimeDependency,
+) -> Metrics:
+    """Return LocalQueue reservations for one user."""
+    return await _serve("user", user, response, runtime)
 
 
 @router.get(
@@ -389,44 +296,17 @@ async def get_user_metrics(
     response_model_exclude_none=True,
     responses={
         400: {"model": Status, "description": "Malformed community value."},
+        404: {"model": Status, "description": "No matching ClusterQueue exists."},
+        405: {"model": Status, "description": "The HTTP method is not allowed."},
+        500: {"model": Status, "description": "The metrics report could not be produced."},
         503: {"model": Status, "description": "No serviceable report is available."},
     },
-    summary="Get community requests and lifetime accounting",
+    summary="Get current community queue metrics",
 )
 async def get_community_metrics(
-    community: str,
-    request: Request,
+    community: SubjectPath,
     response: Response,
-    runtime: MetricsRuntime = Depends(get_runtime),
-) -> Metrics | Response:
-    """Return requests and optional accounting for a community's Running Pods.
-
-    Args:
-        community: Exact community name from the request path.
-        request: Incoming request containing conditional validators.
-        response: Mutable response receiving cache headers.
-        runtime: Lifespan-owned process runtime.
-
-    Returns:
-        A Metrics envelope, or an empty ``304`` when validators match.
-
-    Raises:
-        AppError: If the community is invalid or no serviceable report exists.
-    """
-    community = _subject_value(community, "community")
-    result = await runtime.metrics_service.get(MetricsSubject(kind="community", value=community))
-    observation = result.observation
-    if not isinstance(observation, CommunityObservation):
-        raise RuntimeError("Community route received a non-community observation")
-    conditional = _cache_response(
-        request=request,
-        response=response,
-        created=result.created,
-        ttl=runtime.metrics_service.community_cache_ttl_seconds,
-        cached=result.cached,
-        stale=result.stale,
-        available=result.cache_available,
-    )
-    if conditional is not None:
-        return conditional
-    return _subject_response("community", community, observation, result)
+    runtime: RuntimeDependency,
+) -> Metrics:
+    """Return reservation and reserving counts for one community."""
+    return await _serve("community", community, response, runtime)
