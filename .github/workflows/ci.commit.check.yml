@@ -32,8 +32,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
           # Default subject max is 80; allow longer conventional-commit subjects in PR history.
           CCHK_SUBJECT_MAX_LENGTH: "120"
-          # Permit genuine two-parent merges; non-merge subjects remain checked.
+          # Permit genuine two-parent merges and merge: subjects used for branch integration.
           CCHK_ALLOW_MERGE_COMMITS: "true"
+          CCHK_ALLOW_COMMIT_TYPES: "feat,fix,docs,style,refactor,test,chore,ci,perf,build,revert,merge"
         with:
           # Conventional Commits Check
           message: true

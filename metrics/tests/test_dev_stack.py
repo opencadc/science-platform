@@ -139,6 +139,11 @@ def test_deploy_only_uses_the_metrics_chart_and_no_owned_dependencies(
 def test_up_converges_test_dependencies_before_api(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[str] = []
     monkeypatch.setattr(stack, "_ensure_cluster", lambda: events.append("cluster"))
+    monkeypatch.setattr(
+        stack,
+        "_cleanup_retired_accounting_profile",
+        lambda: events.append("cleanup"),
+    )
     monkeypatch.setattr(stack, "_install_kueue", lambda: events.append("kueue"))
     monkeypatch.setattr(stack, "test_dependencies", lambda: events.append("dependencies"))
     monkeypatch.setattr(stack, "fixtures", lambda: events.append("fixtures"))
@@ -157,6 +162,7 @@ def test_up_converges_test_dependencies_before_api(monkeypatch: pytest.MonkeyPat
 
     assert events == [
         "cluster",
+        "cleanup",
         "kueue",
         "dependencies",
         "fixtures",

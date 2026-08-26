@@ -113,6 +113,7 @@ def test_commit_check_scans_the_pr_delta_with_full_history() -> None:
         if step.get("name") == "Run Commit Check"
     )
     assert commit_check["env"]["CCHK_ALLOW_MERGE_COMMITS"] == "true"
+    assert "merge" in commit_check["env"]["CCHK_ALLOW_COMMIT_TYPES"].split(",")
     assert "commit-signoff" not in commit_check["with"]
     assert "merge-base" not in commit_check["with"]
 

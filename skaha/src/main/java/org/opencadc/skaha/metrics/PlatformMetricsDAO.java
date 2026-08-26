@@ -272,9 +272,7 @@ class PlatformMetricsDAO {
         return switch (type) {
             case "Ready" ->
                 ("True".equals(status) && "Available".equals(reason))
-                        || ("False".equals(status)
-                                && ("PartialData".equals(reason)
-                                        || "StaleData".equals(reason)));
+                        || ("False".equals(status) && ("PartialData".equals(reason) || "StaleData".equals(reason)));
             case "Cached" ->
                 ("True".equals(status) && ("FreshHit".equals(reason) || "StaleHit".equals(reason)))
                         || ("False".equals(status) && "Refreshed".equals(reason))
