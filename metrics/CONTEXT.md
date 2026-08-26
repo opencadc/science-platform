@@ -80,19 +80,20 @@ _Avoid_: accounting, usage-hours, overall efficiency
 ## Runtime boundaries
 
 **Fresh report**:
-A Redis snapshot inside its surface-specific fresh window: User and Community
-2 minutes; Platform 5 minutes.
+A Redis snapshot inside its surface-specific fresh window: User 2 minutes;
+Community 5 minutes; Platform 5 minutes.
 _Avoid_: live response, uncached response
 
 **Serviceable stale report**:
 A complete snapshot outside its fresh window but inside its serviceable window:
-10 minutes for User and Community; 30 minutes for Platform. It may be served
-while a single request refreshes it.
+3 minutes for User; 10 minutes for Community; 30 minutes for Platform. It may
+be served while a single request refreshes it.
 _Avoid_: expired report, current data
 
 **Retained snapshot**:
-A Redis snapshot kept for recovery after serviceability ends: 15 minutes for
-User and Community; 60 minutes for Platform. It is not returned by the API.
+A Redis snapshot kept for recovery after serviceability ends: 5 minutes for
+User; 15 minutes for Community; 60 minutes for Platform. It is not returned by
+the API.
 _Avoid_: stale response, valid cache
 
 **Server-owned PromQL**:

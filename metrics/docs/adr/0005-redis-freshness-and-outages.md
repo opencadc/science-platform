@@ -17,8 +17,8 @@ Fresh/serviceable/retained windows are fixed:
 
 | Surface | Fresh | Serviceable stale | Retained, not served |
 | --- | ---: | ---: | ---: |
-| User | 2m | 10m | 15m |
-| Community | 2m | 10m | 15m |
+| User | 2m | 3m | 5m |
+| Community | 5m | 10m | 15m |
 | Platform | 5m | 30m | 60m |
 
 Fresh snapshots return immediately. A stale-serviceable request may return

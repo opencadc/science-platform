@@ -89,8 +89,8 @@ The cache policy is fixed:
 
 | Surface | Fresh | Stale but serviceable | Retained, not served |
 | --- | ---: | ---: | ---: |
-| User | 2 minutes | through 10 minutes | through 15 minutes |
-| Community | 2 minutes | through 10 minutes | through 15 minutes |
+| User | 2 minutes | through 3 minutes | through 5 minutes |
+| Community | 5 minutes | through 10 minutes | through 15 minutes |
 | Platform | 5 minutes | through 30 minutes | through 60 minutes |
 
 Fresh data is returned immediately. For stale data, one lease holder performs

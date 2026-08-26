@@ -88,8 +88,8 @@ Freshness and serviceability are fixed by surface:
 
 | Surface | Fresh | Serviceable stale | Retained for recovery |
 | --- | ---: | ---: | ---: |
-| User | 2m | 10m | 15m |
-| Community | 2m | 10m | 15m |
+| User | 2m | 3m | 5m |
+| Community | 5m | 10m | 15m |
 | Platform | 5m | 30m | 60m |
 
 The service uses one stable Redis lease per surface and subject. Different

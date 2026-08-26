@@ -149,8 +149,8 @@ User and Community values do not appear in Redis key paths.
 
 | Surface | Fresh | Serviceable stale | Retained only |
 | --- | ---: | ---: | ---: |
-| User | 2 minutes | 10 minutes | 15 minutes |
-| Community | 2 minutes | 10 minutes | 15 minutes |
+| User | 2 minutes | 3 minutes | 5 minutes |
+| Community | 5 minutes | 10 minutes | 15 minutes |
 | Platform | 5 minutes | 30 minutes | 60 minutes |
 
 Fresh snapshots return immediately. One lease winner refreshes a stale

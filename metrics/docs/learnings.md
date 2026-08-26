@@ -6,6 +6,18 @@ attribution rules live in [`metadata-labels.md`](metadata-labels.md).
 
 ## Current lessons
 
+- Date: August 26, 2026
+  - Context: Cache window retune after User traffic vs Community/Platform
+    refresh cost.
+  - Lesson: Fresh/serviceable/retained windows are per-surface, not a shared
+    User+Community pair. User stays fresh for 2 minutes, is serviceable stale
+    through 3 minutes, and is retained (not served) through 5 minutes.
+    Community is 5/10/15 minutes. Platform stays 5/30/60 minutes.
+  - Evidence: `FRESHNESS_POLICIES` in `src/metrics/cache/models.py`, ADR-0005,
+    and `docs/runbooks/redis.md`.
+  - Action taken: Split User from Community in the fixed policy table and
+    updated the ADRs, runbook, and implementation-backed docs together.
+
 - Date: August 25, 2026
   - Context: Metrics redesign after review.
   - Lesson: A small queue read is the product boundary. User requests come

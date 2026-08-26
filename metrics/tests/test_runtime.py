@@ -54,7 +54,7 @@ def test_from_settings_builds_three_surface_caches_without_accounting() -> None:
     assert len(runtime._caches) == 3  # noqa: SLF001
     assert all(isinstance(cache, runtime_module.RedisCoordinator) for cache in runtime._caches)  # noqa: SLF001
     assert runtime.metrics_service.user_cache_ttl_seconds == 120
-    assert runtime.metrics_service.community_cache_ttl_seconds == 120
+    assert runtime.metrics_service.community_cache_ttl_seconds == 300
     assert runtime.metrics_service.cache_ttl_seconds == 300
     assert runtime._efficiency_provider is None  # noqa: SLF001
 

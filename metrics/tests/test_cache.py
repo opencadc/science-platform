@@ -6,6 +6,7 @@ from metrics.cache import CacheFailureCategory
 from metrics.cache import (
     CacheEnvelope,
     CacheIdentity,
+    FRESHNESS_POLICIES,
     Freshness,
     FreshnessPolicy,
     MemorySnapshots,
@@ -54,6 +55,12 @@ def test_cache_key_digest_changes_when_subject_identity_changes() -> None:
 
     assert first.base != second.base
     assert first.identity_digest != second.identity_digest
+
+
+def test_production_freshness_windows() -> None:
+    assert FRESHNESS_POLICIES["user"] == FreshnessPolicy(2 * 60, 3 * 60, 5 * 60)
+    assert FRESHNESS_POLICIES["community"] == FreshnessPolicy(5 * 60, 10 * 60, 15 * 60)
+    assert FRESHNESS_POLICIES["platform"] == FreshnessPolicy(5 * 60, 30 * 60, 60 * 60)
 
 
 def test_freshness_policy_has_four_positive_states_and_remaining_ttl() -> None:

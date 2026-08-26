@@ -15,7 +15,7 @@ configured ClusterQueues labelled exact `canfar.net/community`; no match is a
 quota is `capacity`, `flavorsUsage` is `allocated`, and Cohorts are excluded.
 
 Each surface uses distributed per-subject single-flight with fixed windows:
-User and Community 2/10/15 minutes, Platform 5/30/60 minutes. Prometheus or
+User 2/3/5 minutes, Community 5/10/15 minutes, Platform 5/30/60 minutes. Prometheus or
 Mimir is optional and may supply current CPU/memory efficiency through fixed
 server-owned PromQL over Running Pods. The presence of
 `METRICS_PROVIDERS__PROMQL__BASE_URL` enables that source and absence disables

@@ -29,8 +29,8 @@ quota is not added separately. User and Community source semantics are defined
 by ADR-0010. Resource names are open-ended and capacity/allocated units match
 for each resource name.
 
-Redis snapshots use the fixed User/Community 2/10/15-minute and Platform
-5/30/60-minute windows. `Cache-Control: no-store`, `Age`, `Last-Modified`, and
+Redis snapshots use the fixed User 2/3/5-minute, Community 5/10/15-minute,
+and Platform 5/30/60-minute windows. `Cache-Control: no-store`, `Age`, `Last-Modified`, and
 `Cache-Status` describe internal snapshot handling. Error responses use a
 sanitized Kubernetes `Status` envelope and never expose upstream exception
 text, credentials, URLs, or query strings.

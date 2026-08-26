@@ -89,8 +89,8 @@ class FreshnessPolicy:
 
 FRESHNESS_POLICIES = {
     "platform": FreshnessPolicy(5 * 60, 30 * 60, 60 * 60),
-    "user": FreshnessPolicy(2 * 60, 10 * 60, 15 * 60),
-    "community": FreshnessPolicy(2 * 60, 10 * 60, 15 * 60),
+    "user": FreshnessPolicy(2 * 60, 3 * 60, 5 * 60),
+    "community": FreshnessPolicy(5 * 60, 10 * 60, 15 * 60),
 }
 
 
