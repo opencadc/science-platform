@@ -57,7 +57,7 @@ public class MetricsDAO {
      */
     public PlatformMetrics getPlatformMetrics() throws Exception {
         if (platformMetricsDAO == null) {
-            PlatformMetricsDAO.requireBaseUrl(null);
+            throw new IllegalStateException("missing configuration: " + PlatformMetricsDAO.SKAHA_METRICS_BACKEND_URL);
         }
         return platformMetricsDAO.getPlatformMetrics();
     }

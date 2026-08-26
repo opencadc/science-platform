@@ -87,17 +87,8 @@ public class MetricsDAOTest {
     }
 
     @Test
-    public void fromEnvironmentSelectsBackendProviderWhenConfigured() {
-        final String previous = System.getenv(PodUsageProvider.SKAHA_POD_METRICS_SOURCE);
-        try {
-            // Cannot set env in Java easily; test the backend class directly
-            final PodUsageProvider provider = new MetricsBackendPodUsageProvider();
-            Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
-        } finally {
-            // env unchanged in test JVM
-            if (previous != null) {
-                // no-op: documented limitation
-            }
-        }
+    public void backendProviderIsNotImplemented() {
+        final PodUsageProvider provider = new MetricsBackendPodUsageProvider();
+        Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
     }
 }

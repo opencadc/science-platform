@@ -334,12 +334,14 @@ public class SessionJobBuilder {
                 if (podTemplateSpec != null) {
                     final V1Affinity affinity = podTemplateSpec.getAffinity();
 
-                    // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is
+                    // If we're this far, there is no need to check if gpuEnabled again, so only
+                    // check if gpuCount is
                     // greater than 0.
                     if (this.gpuCount > 0) {
                         // According to the Kubernetes Documentation:
                         // https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins
-                        // only the limits should be set.  However, to enable Fair Share in Kueue, the requests need
+                        // only the limits should be set.  However, to enable Fair Share in Kueue,
+                        // the requests need
                         // to be set as well.  As long as they are the same, this should be fine.
                         // jenkinsd 2026.05.14
                         //
@@ -395,7 +397,8 @@ public class SessionJobBuilder {
                                 final V1NodeSelector gpuRequiredNodeSelector =
                                         gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
 
-                                // No preset one from the configuration, so assume the GPU setting is the only one.
+                                // No preset one from the configuration, so assume the GPU setting
+                                // is the only one.
                                 if (requiredNodeSelector == null) {
                                     nodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(
                                             gpuRequiredNodeSelector);
