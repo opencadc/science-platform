@@ -1,6 +1,15 @@
 {{- $mb := .Values.metricsBackend | default dict }}
 {{- $mbRbac := default dict $mb.rbac }}
-{{- if and (eq $mb.enabled true) (eq $mbRbac.enabled true) }}
+{{- $rbacEnabled := true }}
+{{- if hasKey $mbRbac "enabled" }}
+{{- $rbacEnabled = $mbRbac.enabled }}
+{{- end }}
+{{- if and (default false $mb.enabled) $rbacEnabled }}
+{{- $_ := include "skaha.metricsBackend.platformName" . }}
+{{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
+{{- $queues := fromJsonArray $queueConfig }}
+{{- $kueueNamespaceConfig := include "skaha.metricsBackend.rbacKueueNamespaces" . | trim }}
+{{- $kueueNamespaces := fromJsonArray $kueueNamespaceConfig }}
 {{/*
   Kueue read ClusterRole / ClusterRoleBinding. With metricsBackend.enabled Helm renders these
   before the metrics Deployment and Service (Helm builtin kind install order applies RBAC before
@@ -16,6 +25,10 @@ metadata:
 rules:
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["clusterqueues"]
+    resourceNames:
+{{- range $queue := $queues }}
+      - {{ $queue | quote }}
+{{- end }}
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -30,6 +43,36 @@ roleRef:
   name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "skaha.serviceAccountName" . }}
+    name: {{ include "skaha.metricsBackend.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- range $kueueNamespace := $kueueNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  namespace: {{ $kueueNamespace }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["localqueues"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  namespace: {{ $kueueNamespace }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "skaha.metricsBackend.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
 {{- end }}

@@ -311,12 +311,13 @@ deployment:
       # -- Node label selector used when discovering schedulable worker nodes.
       nodeLabelSelector:
 
-      # Optionally configure the Kueue system to handle large workloads.  Configurable per session type (e.g. desktop, notebook, etc.).
+      # Optionally configure the Kueue system to handle large workloads. Configurable per session type (e.g. desktop, notebook, etc.).
       # Leaving this empty will default to submitting Jobs to the base Kubernetes system.
       # Provide a default configuration for all session types, or omit and only configure specific session types.
       # Provided PriorityClass names are "high", "medium", and "low".
       # Configure Kueue queues and priority classes for session scheduling.
-      # Leaving this empty uses the base Kubernetes scheduler.
+      # Queue provisioning and per-user LocalQueue selection are external to this chart.
+      # The Metrics/Skaha charts do not deploy an admission or provisioning component.
       # @see https://kueue.sigs.k8s.io/docs/
       # @see https://github.com/opencadc/deployments/tree/main/configs/kueue
       # Example 1:
@@ -333,7 +334,7 @@ deployment:
       #       priorityClass: "medium"
       #
       # Example 2:
-      #    # Configure contributed session types.  All else will use the bare Kubernetes system.
+      #    # Configure contributed session types. All else will use the bare Kubernetes system.
       #    kueue:
       #      contributed:
       #        queueName: "contributed-queue"
@@ -593,13 +594,17 @@ telemetry:
 
 # Optional science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:
-  # -- When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).
+  # -- When true, install the least-privilege Kueue-read RBAC first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).
   enabled: false
   # -- Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps.
   platformName: canfar
+  # -- Required stable lower-case DNS identity for this Metrics deployment. It scopes cache identities and must match the Prometheus/Mimir cluster label.
+  clusterName: ""
   rbac:
-    # -- When true, create metricsBackend Kueue-read ClusterRole/ClusterRoleBinding. Set false to disable cluster-scoped RBAC while keeping the metrics workload enabled.
+    # -- When true, create the least-privilege ClusterQueue and configured-namespace LocalQueue RBAC. Set false to provide those permissions out of band while keeping the Metrics workload enabled.
     enabled: true
+    # -- Namespaces in which Metrics lists LocalQueues for User metrics. Set this explicitly when Metrics is enabled; these must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied.
+    namespaces: []
   # -- Fixed replica count for the Metrics API (no HPA in this chart version).
   replicaCount: 1
   image:
@@ -617,24 +622,82 @@ metricsBackend:
     limits:
       cpu: "1"
       memory: 1Gi
-  # -- Map of METRICS_* environment variables for the Metrics container; configuration is environment-only. GitOps supplies per-environment values — at minimum METRICS_CLUSTER_NAME and METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES (JSON array string, for example '["cq-a"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings; images after v0.1.5 fail startup on the removed keys (METRICS_PROVIDERS__KUEUE__KUBE_API_URL / KUBE_API_TOKEN / TOKEN_FILE / CA_FILE / KUBE_VERIFY_TLS / KUBE_CLUSTERQUEUE_PATH / HTTP__*, METRICS_CACHE__SCOPE_TTL_SECONDS, METRICS_CONFIG_FILE). See metrics/docs/environment-contracts.md.
+  # -- Map of METRICS_* environment variables for the Metrics container. GitOps supplies per-environment values — at minimum METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES and METRICS_PROVIDERS__KUEUE__NAMESPACES (JSON array strings, for example '["cq-a"]' and '["canfar-workloads"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings. See metrics/docs/environment-contracts.md.
   env: {}
+  # -- Optional Prometheus/Mimir HTTP(S) endpoint for server-owned efficiency queries. When set, the chart enables the fixed PromQL provider.
+  prometheus:
+    url: ""
+  # -- Optional external OTLP/HTTP endpoint for Metrics application-state metrics. When set, the chart enables OTLP metrics export.
+  otlp:
+    endpoint: ""
+  # -- Required operator-provided Secret containing the Metrics cache HMAC/integrity key. The secret value is never rendered or accepted from the env map.
+  cacheKeySecret:
+    # -- Name of an operator-provided Secret containing the cache integrity key.
+    name: ""
+    # -- Key in the cache integrity Secret.
+    key: key-secret
   redis:
-    # -- When true, set METRICS_REDIS_URL to this release's Bitnami Redis master Service (<release>-redis-master), same instance Skaha uses. Set false and supply METRICS_REDIS_URL in env if Metrics should use another Redis.
+    # -- Existing Secret containing the single external Redis URL used by Metrics. Metrics never uses the chart's Skaha Redis dependency for this cache.
+    urlSecret:
+      name: ""
+      key: redis-url
+  # -- Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic.
+  networkPolicy:
+    # -- Create a default-deny Metrics NetworkPolicy when metricsBackend is enabled.
     enabled: true
+    # -- Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name.
+    ingress:
+      skaha:
+        # -- Port rules for the co-deployed Skaha caller. An explicitly empty list denies this caller.
+        ports:
+          - port: 8000
+            protocol: TCP
+      # -- Additional raw NetworkPolicy ingress rules. These are appended unchanged.
+      additional: []
+    egress:
+      # -- DNS egress to CoreDNS. Keep both protocols because resolver behavior is environment-dependent.
+      dns:
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: kube-system
+          ports:
+            - port: 53
+              protocol: UDP
+            - port: 53
+              protocol: TCP
+      # -- Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment.
+      kubeApiServer: []
+      # -- External Redis destinations. Set exact CIDR/selector and port rules for the Redis service.
+      redis: []
+      # -- Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled.
+      promql: []
+      # -- Optional metrics-only OTLP destinations. Leave empty when application-state telemetry is disabled.
+      otlp: []
+  serviceAccount:
+    # -- Create a dedicated Metrics ServiceAccount instead of inheriting Skaha's controller identity.
+    create: true
+    # -- Optional operator-provided Metrics ServiceAccount name. When create is false this must already exist and be bound to the configured least-privilege Kueue reads.
+    name: ""
+    # -- Annotations added to the dedicated Metrics ServiceAccount.
+    annotations: {}
+    # -- Automatically mount the Metrics ServiceAccount token.
+    automount: true
   # -- revisionHistoryLimit for the Metrics API Deployment.
   revisionHistoryLimit: 3
   ingress:
     # -- When true and top-level ingress.enabled is true, add a path on the same host routing to the Metrics Service.
     enabled: false
-    # -- Ingress path prefix for the Metrics API (Traefik).
-    path: /metrics
+    # -- Ingress path prefix for the Metrics API. It is forwarded unchanged, so
+    # it must match the FastAPI route prefix unless the ingress controller is
+    # configured with an external rewrite.
+    path: /apis/canfar.net/v1alpha1/metrics
   test:
-    # -- Run helm test hook that retries /healthz until success (requires metricsBackend.enabled).
+    # -- Run helm test hook that retries /readyz until success (requires metricsBackend.enabled).
     enabled: true
     # -- Image for the helm test hook Pod.
     image: busybox:1.37.0
-    # -- Maximum seconds to wait for Metrics /healthz (should exceed startupProbe worst case plus scheduling margin).
+    # -- Maximum seconds to wait for Metrics /readyz (should exceed startupProbe worst case plus scheduling margin).
     maxWaitSeconds: 180
 
 experimentalFeatures:
