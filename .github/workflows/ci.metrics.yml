@@ -43,10 +43,16 @@ jobs:
         with:
           enable-cache: true
           working-directory: metrics
+      - name: Validate lockfile
+        run: uv lock --check
       - name: Sync dependencies
-        run: uv sync --group dev
+        run: uv sync --locked --group dev
       - name: Lint
         run: uv run ruff check src tests
+      - name: Check formatting
+        run: uv run ruff format --check src tests
+      - name: Type check
+        run: uv run ty check
       - name: Unit tests
         run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80 -m "not integration"
 
@@ -55,7 +61,7 @@ jobs:
     needs: metrics-lint-test
     timeout-minutes: 60
     env:
-      KUEUE_CHART_VERSION: "0.17.0"
+      KUEUE_CHART_VERSION: "0.19.2"
       HELM_CACHE_HOME: ${{ github.workspace }}/.ci-helm-cache
       METRICS_IMAGE_REPOSITORY: canfar-metrics-local
       METRICS_IMAGE_TAG: ${{ github.sha }}
@@ -87,13 +93,13 @@ jobs:
           enable-cache: true
           working-directory: metrics
       - name: Sync dependencies
-        run: uv sync --group dev
+        run: uv sync --locked --group dev
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v4
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
         with:
-          version: v1.30.0
+          version: v1.33.12
       - name: Setup Helm
         uses: azure/setup-helm@v5
         with:
@@ -101,8 +107,9 @@ jobs:
       - name: Setup kind cluster
         uses: helm/kind-action@v1.14.0
         with:
-          version: v0.30.0
-          kubectl_version: v1.30.0
+          version: v0.32.0
+          node_image: kindest/node:v1.33.12@sha256:3f5c8443c620245e4d355cfe09e96a91ead32ceaa569d3f1ca9edf0cb2fe2ff4
+          kubectl_version: v1.33.12
           cluster_name: metrics
           wait: 120s
       - name: Build Metrics image (cache-enabled)
@@ -118,10 +125,7 @@ jobs:
         env:
           KIND_CLUSTER_NAME: metrics
           KUBE_CONTEXT: kind-metrics
-          KIND_SMOKE_CI: "1"
           KIND_SMOKE_SKIP_BUILD: "1"
-          KIND_IMAGE_LOAD_TIMEOUT_SECONDS: "900"
-          KIND_PRELOAD_IMAGES: "false"
           METRICS_IMAGE_REPOSITORY: ${{ env.METRICS_IMAGE_REPOSITORY }}
           METRICS_IMAGE_TAG: ${{ env.METRICS_IMAGE_TAG }}
         run: |
@@ -135,5 +139,5 @@ jobs:
           NAMESPACE: metrics
         run: |
           set +e
-          bash scripts/kind-smoke-teardown.sh --all --kind
+          uv run metrics-dev destroy --confirm kind-metrics
           exit 0
