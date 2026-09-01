@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 _MAX_WIRE_VALUE_LENGTH = 4_096
 _CANONICAL_DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$")
 _EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
+_USAGE_RESOURCES = frozenset({"cpu", "memory"})
 _STORAGE_RESOURCE_NAMES = frozenset({"memory", "ephemeral-storage"})
 
 
@@ -35,16 +36,23 @@ class ObjectMetadata(WireModel):
 
 
 class MetricsSpec(WireModel):
-    """Select exactly one platform, user, or community subject."""
+    """Select exactly one platform, user, community, or session subject."""
 
     platform: str | None = Field(default=None, min_length=1)
     user: str | None = Field(default=None, min_length=1)
     community: str | None = Field(default=None, min_length=1)
+    session: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _exactly_one_subject(self) -> MetricsSpec:
         """Reject ambiguous or empty subject selectors."""
-        if sum(value is not None for value in (self.platform, self.user, self.community)) != 1:
+        if (
+            sum(
+                value is not None
+                for value in (self.platform, self.user, self.community, self.session)
+            )
+            != 1
+        ):
             raise ValueError("spec must contain exactly one subject")
         return self
 
@@ -56,6 +64,7 @@ class ResourceMetrics(WireModel):
     capacity: str | None = None
     allocated: str | None = None
     requests: str | None = None
+    usage: str | None = None
     efficiency: str | None = None
 
     @model_validator(mode="before")
@@ -67,11 +76,13 @@ class ResourceMetrics(WireModel):
         name = values.get("name")
         if not isinstance(name, str):
             return values
-        for field_name in ("capacity", "allocated", "requests", "efficiency"):
+        for field_name in ("capacity", "allocated", "requests", "usage", "efficiency"):
             value = values.get(field_name)
             if value is not None:
                 if field_name == "efficiency" and name not in _EFFICIENCY_RESOURCES:
                     raise ValueError("efficiency is supported only for cpu and memory")
+                if field_name == "usage" and name not in _USAGE_RESOURCES:
+                    raise ValueError("usage is supported only for cpu and memory")
                 _validate_wire_value(name, field_name, value)
         return values
 
@@ -85,6 +96,8 @@ class ResourceMetrics(WireModel):
             raise ValueError("capacity and allocated must be provided together")
         if has_capacity and has_requests:
             raise ValueError("platform resources cannot contain requests")
+        if has_capacity and self.usage is not None:
+            raise ValueError("platform resources cannot contain usage")
         if not has_capacity and not has_requests:
             raise ValueError("workload resources must contain requests")
         return self
@@ -203,9 +216,12 @@ class Metrics(WireModel):
     def _validate_surface_invariants(self) -> Metrics:
         """Bind the subject selector to the resource shape."""
         is_platform = self.spec.platform is not None
+        is_session = self.spec.session is not None
         for resource in self.status.resources:
             if (resource.capacity is not None) != is_platform:
                 raise ValueError("spec subject does not match resource surface")
+            if resource.usage is not None and not is_session:
+                raise ValueError("usage is supported only for session reports")
         if is_platform and not self.status.resources:
             raise ValueError("platform status must contain resources")
         return self

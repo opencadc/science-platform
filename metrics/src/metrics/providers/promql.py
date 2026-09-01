@@ -27,14 +27,17 @@ _POD_PHASE_METRIC = "kube_pod_status_phase"
 _JOIN_LABELS = "cluster,namespace,pod"
 _USER_LABEL = "label_canfar_net_username"
 _COMMUNITY_LABEL = "label_canfar_net_community"
+_SESSION_ID_LABEL = "label_canfar_net_id"
 _EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
 _NAMESPACE_LABEL = "namespace"
-_PROMQL_SCOPE = Literal["user", "community", "platform"]
+_PROMQL_SCOPE = Literal["user", "community", "platform", "session"]
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 5.0
 _DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
 _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
 _DEFAULT_MAX_SERIES = 3_000
 _DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+_DEFAULT_SCRAPE_INTERVAL_SECONDS = 60
+_MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
 
 
 def _validation_now() -> datetime:
@@ -182,6 +185,205 @@ def _resource_requests(
 def _label_resource(expression: str, resource: str) -> str:
     """Attach the controlled resource label to one ratio vector."""
     return f'label_replace(({expression}), "resource", "{resource}", "__name__", ".*")'
+
+
+_WINDOW_PLACEHOLDER = "__WINDOW__"
+
+
+def _session_selected_pods(
+    *,
+    session_id: str,
+    cluster: str,
+    namespaces: str,
+) -> str:
+    """Select session Pods through a window-stable label join."""
+    labels = _selector(
+        _POD_LABELS_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(_matcher(_SESSION_ID_LABEL, "=", session_id),),
+    )
+    return f"max_over_time({labels}[{_WINDOW_PLACEHOLDER}])"
+
+
+def _render_window(duration_seconds: int) -> str:
+    """Render one bounded PromQL range selector."""
+    bounded = max(60, min(duration_seconds, _MAX_SESSION_WINDOW_SECONDS))
+    return f"{bounded}s"
+
+
+def _session_cpu_efficiency(
+    selected_pods: str,
+    *,
+    cluster: str,
+    namespaces: str,
+    window: str,
+) -> str:
+    """Return CPU duration efficiency for one session window."""
+    usage_source = _selector(
+        _CPU_USAGE_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+            _matcher("image", "!=", ""),
+        ),
+    )
+    request_source = _selector(
+        _POD_REQUEST_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("resource", "=", "cpu"),
+            _matcher("unit", "=", "core"),
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+        ),
+    )
+    usage = (
+        f"sum(increase({usage_source}[{window}]) "
+        f"and on (cluster,namespace,pod) {selected_pods})"
+    )
+    requested = (
+        f"sum(sum_over_time({request_source}[{window}]) "
+        f"and on (cluster,namespace,pod) {selected_pods})"
+    )
+    return f"({usage}) / ({requested} * {_DEFAULT_SCRAPE_INTERVAL_SECONDS})"
+
+
+def _session_memory_efficiency(
+    selected_pods: str,
+    *,
+    cluster: str,
+    namespaces: str,
+    window: str,
+) -> str:
+    """Return memory duration efficiency for one session window."""
+    usage_source = _selector(
+        _MEMORY_USAGE_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+        ),
+    )
+    request_source = _selector(
+        _POD_REQUEST_METRIC,
+        cluster=cluster,
+        namespaces=namespaces,
+        matchers=(
+            _matcher("resource", "=", "memory"),
+            _matcher("unit", "=", "byte"),
+            _matcher("pod", "!=", ""),
+            _matcher("container", "!=", ""),
+        ),
+    )
+    usage = (
+        f"sum(sum_over_time({usage_source}[{window}]) "
+        f"and on (cluster,namespace,pod) {selected_pods})"
+    )
+    requested = (
+        f"sum(sum_over_time({request_source}[{window}]) "
+        f"and on (cluster,namespace,pod) {selected_pods})"
+    )
+    return f"({usage}) / ({requested})"
+
+
+def _session_query(
+    *,
+    session_id: str,
+    cluster: str,
+    namespaces: list[str],
+    duration_seconds: int,
+) -> str:
+    """Render the server-owned session duration efficiency query."""
+    namespace_pattern = _namespace_regex(namespaces)
+    window = _render_window(duration_seconds)
+    selected = _session_selected_pods(
+        session_id=session_id,
+        cluster=cluster,
+        namespaces=namespace_pattern,
+    ).replace(_WINDOW_PLACEHOLDER, window)
+    cpu_ratio = _session_cpu_efficiency(
+        selected,
+        cluster=cluster,
+        namespaces=namespace_pattern,
+        window=window,
+    )
+    memory_ratio = _session_memory_efficiency(
+        selected,
+        cluster=cluster,
+        namespaces=namespace_pattern,
+        window=window,
+    )
+    return f"{_label_resource(cpu_ratio, 'cpu')} or {_label_resource(memory_ratio, 'memory')}"
+
+
+def _validate_session_response(
+    payload: Any,
+    *,
+    max_series: int,
+    max_sample_age_seconds: int,
+    future_sample_tolerance_seconds: int,
+    cutoff: datetime | None,
+) -> EfficiencyObservation:
+    """Validate and normalize one or two session efficiency samples."""
+    if not isinstance(payload, dict) or payload.get("status") != "success":
+        raise ProviderExecutionError("PromQL API did not return success")
+    data = payload.get("data")
+    if not isinstance(data, dict) or data.get("resultType") != "vector":
+        raise ProviderExecutionError("PromQL API did not return an instant vector")
+    result = data.get("result")
+    if not isinstance(result, list) or len(result) > max_series or not result:
+        raise ProviderExecutionError("PromQL session vector was empty or too large")
+
+    validation_now = _validation_now()
+    now_seconds = Decimal(str(validation_now.timestamp()))
+    cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
+    observed_timestamp: Decimal | None = None
+    observed_at: datetime | None = None
+    efficiencies: dict[str, Decimal] = {}
+
+    for series in result:
+        if not isinstance(series, dict):
+            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
+        labels = series.get("metric")
+        sample = series.get("value")
+        if (
+            not isinstance(labels, dict)
+            or set(labels) != {"resource"}
+            or not isinstance(labels.get("resource"), str)
+            or not isinstance(sample, list)
+            or len(sample) != 2
+        ):
+            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
+        resource = labels["resource"]
+        if resource not in _EFFICIENCY_RESOURCES or resource in efficiencies:
+            raise ProviderExecutionError("PromQL returned an unknown efficiency resource")
+
+        sample_timestamp, sample_at = _sample_timestamp(sample[0])
+        if observed_timestamp is None:
+            observed_timestamp = sample_timestamp
+            observed_at = sample_at
+        elif sample_timestamp != observed_timestamp:
+            raise ProviderExecutionError("PromQL efficiency samples have different timestamps")
+
+        age = now_seconds - sample_timestamp
+        if age > Decimal(max_sample_age_seconds) or age < -Decimal(future_sample_tolerance_seconds):
+            raise ProviderExecutionError("PromQL returned a stale or future sample")
+        if cutoff_seconds is not None and sample_timestamp > cutoff_seconds + Decimal(
+            future_sample_tolerance_seconds
+        ):
+            raise ProviderExecutionError("PromQL returned a sample after the requested cutoff")
+        efficiencies[resource] = _sample_value(sample[1])
+
+    if observed_at is None or not efficiencies:
+        raise ProviderExecutionError("PromQL session efficiency vector is incomplete")
+    return EfficiencyObservation(observed_at=observed_at, efficiencies=efficiencies)
 
 
 def _query(
@@ -413,6 +615,63 @@ class PromQLProvider:
     async def read_platform(self, observed_at: datetime | None = None) -> EfficiencyObservation:
         """Read current efficiency for all labelled workload Pods in scope."""
         return await self._read("platform", None, observed_at)
+
+    async def read_session(
+        self,
+        session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        observed_at: datetime | None = None,
+    ) -> EfficiencyObservation:
+        """Read duration efficiency for one session over its bounded window."""
+        if window_end < start_time:
+            raise ProviderExecutionError("Session efficiency window end precedes its start")
+        duration_seconds = int(min((window_end - start_time).total_seconds(), _MAX_SESSION_WINDOW_SECONDS))
+        return await self._read_session(session_id, duration_seconds, observed_at)
+
+    async def _read_session(
+        self,
+        session_id: str,
+        duration_seconds: int,
+        observed_at: datetime | None,
+    ) -> EfficiencyObservation:
+        """Execute and validate one fixed session duration query."""
+        if self._endpoint is None:
+            raise ProviderUnavailableError("PromQL endpoint is not configured")
+        if not isinstance(session_id, str) or not session_id:
+            raise ProviderExecutionError("PromQL session id must be a non-empty string")
+        cutoff = _normalise_cutoff(observed_at)
+        query = _session_query(
+            session_id=session_id,
+            cluster=self._cluster,
+            namespaces=self._namespaces,
+            duration_seconds=duration_seconds,
+        )
+        started = perf_counter()
+        status = "ok"
+        try:
+            payload = await self._request(query)
+            return _validate_session_response(
+                payload,
+                max_series=self._max_series,
+                max_sample_age_seconds=self._max_sample_age_seconds,
+                future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
+                cutoff=cutoff,
+            )
+        except asyncio.CancelledError:
+            status = "cancelled"
+            raise
+        except Exception:
+            status = "error"
+            raise
+        finally:
+            self._telemetry.record_provider_duration(
+                provider=self.name,
+                scope="session",
+                status=status,
+                seconds=perf_counter() - started,
+            )
 
     async def _read(
         self,

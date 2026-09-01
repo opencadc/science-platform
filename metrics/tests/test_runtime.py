@@ -29,6 +29,7 @@ from metrics.services.models import (
     CommunityObservation,
     EfficiencyObservation,
     PlatformObservation,
+    SessionObservation,
     UserObservation,
 )
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
@@ -51,10 +52,11 @@ def test_from_settings_builds_three_surface_caches_without_accounting() -> None:
     """Runtime wiring has one Kueue provider and one cache per surface."""
     runtime = MetricsRuntime.from_settings(_settings(), recorder=NoopMetricsRecorder())
 
-    assert len(runtime._caches) == 3  # noqa: SLF001
+    assert len(runtime._caches) == 4  # noqa: SLF001
     assert all(isinstance(cache, runtime_module.RedisCoordinator) for cache in runtime._caches)  # noqa: SLF001
     assert runtime.metrics_service.user_cache_ttl_seconds == 120
     assert runtime.metrics_service.community_cache_ttl_seconds == 300
+    assert runtime.metrics_service.session_cache_ttl_seconds == 30
     assert runtime.metrics_service.cache_ttl_seconds == 300
     assert runtime._efficiency_provider is None  # noqa: SLF001
 
@@ -78,6 +80,17 @@ class _FakeEfficiencyProvider:
 
     async def read_community(self, _community: str) -> Any:
         """Satisfy the community loader protocol."""
+
+    async def read_session(
+        self,
+        _session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        observed_at: datetime | None = None,
+    ) -> Any:
+        """Satisfy the session loader protocol."""
+        del start_time, window_end, observed_at
 
     def cache_fingerprint(self) -> str:
         """Return a stable fake backend identity."""
@@ -133,7 +146,7 @@ def test_cache_payload_type_has_no_lifetime_fields() -> None:
 
 def test_runtime_cache_schema_revision_separates_failure_envelopes() -> None:
     """New signed failure categories cannot be read as the old envelope shape."""
-    assert runtime_module._SCHEMA_REVISION == "7"  # noqa: SLF001
+    assert runtime_module._SCHEMA_REVISION == "8"  # noqa: SLF001
 
 
 def test_runtime_cache_freshness_uses_primary_observation_timestamp() -> None:
@@ -225,6 +238,60 @@ class _LifecycleProvider:
         return "lifecycle"
 
 
+class _LifecycleSessionProvider:
+    """Provide session observations while exposing controllable lifecycle hooks."""
+
+    name = "session"
+
+    def __init__(self, *, startup_error: BaseException | None = None) -> None:
+        self.startup_error = startup_error
+        self.startup_calls = 0
+        self.shutdown_calls = 0
+
+    async def startup(self) -> None:
+        """Record startup and optionally fail it."""
+        self.startup_calls += 1
+        if self.startup_error is not None:
+            raise self.startup_error
+
+    async def shutdown(self) -> None:
+        """Record shutdown."""
+        self.shutdown_calls += 1
+
+    async def read_session(self, session_id: str) -> SessionObservation:
+        """Return a minimal session observation."""
+        now = datetime.now(UTC)
+        return SessionObservation(
+            session=session_id,
+            requests={"cpu": "1"},
+            reserving_workloads=1,
+            observed_at=now,
+            start_time=now,
+            window_end=now,
+            has_running_pods=False,
+        )
+
+    def cache_fingerprint(self) -> str:
+        """Return a stable source fingerprint."""
+        return "lifecycle-session"
+
+
+class _LifecycleUsageProvider:
+    """Provide session usage without network access."""
+
+    name = "kubemetrics"
+
+    async def startup(self) -> None:
+        """Satisfy the provider lifecycle protocol."""
+
+    async def shutdown(self) -> None:
+        """Satisfy the provider lifecycle protocol."""
+
+    async def read_session_usage(self, _session_id: str) -> dict[str, str]:
+        """Return empty usage for lifecycle tests."""
+        return {}
+
+
 class _LifecycleEfficiency:
     """Provide optional efficiency lifecycle behavior without network access."""
 
@@ -291,6 +358,7 @@ def _runtime_with_provider(
     platform_cache = _test_cache("platform")
     user_cache = _test_cache("user")
     community_cache = _test_cache("community")
+    session_cache = _test_cache("session")
     service = MetricsService(
         platform=provider.read_platform,
         cache=platform_cache,
@@ -306,15 +374,24 @@ def _runtime_with_provider(
         community_identity=lambda community: CacheIdentity(
             "community", community, "cluster-a", "kueue", "test"
         ),
+        session=_LifecycleSessionProvider().read_session,
+        session_cache=session_cache,
+        session_identity=lambda session_id: CacheIdentity(
+            "session", session_id, "cluster-a", "session", "test"
+        ),
+        session_usage=_LifecycleUsageProvider().read_session_usage,
         telemetry=recorder,
     )
     return MetricsRuntime(
         _settings(),
         provider=provider,
+        session_provider=_LifecycleSessionProvider(),
+        usage_provider=_LifecycleUsageProvider(),
         metrics_service=service,
         cache=platform_cache,
         user_cache=user_cache,
         community_cache=community_cache,
+        session_cache=session_cache,
         telemetry=recorder,
         efficiency_provider=efficiency_provider,
     )

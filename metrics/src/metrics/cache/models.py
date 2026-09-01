@@ -91,6 +91,7 @@ FRESHNESS_POLICIES = {
     "platform": FreshnessPolicy(5 * 60, 30 * 60, 60 * 60),
     "user": FreshnessPolicy(2 * 60, 3 * 60, 5 * 60),
     "community": FreshnessPolicy(5 * 60, 10 * 60, 15 * 60),
+    "session": FreshnessPolicy(30, 60, 3 * 60),
 }
 
 
@@ -98,7 +99,7 @@ FRESHNESS_POLICIES = {
 class CacheIdentity:
     """Identify one opaque cache subject and its source contract."""
 
-    subject_kind: Literal["platform", "user", "community"]
+    subject_kind: Literal["platform", "user", "community", "session"]
     subject_value: str
     cluster: str
     source: str

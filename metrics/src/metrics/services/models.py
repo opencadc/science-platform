@@ -10,7 +10,7 @@ import re
 from typing import Literal
 
 
-MetricsSurface = Literal["platform", "user", "community"]
+MetricsSurface = Literal["platform", "user", "community", "session"]
 
 DEFAULT_PLATFORM_NAME = "canfar"
 MAX_DECIMAL_INPUT_LENGTH = 4_096
@@ -121,8 +121,8 @@ class EfficiencyObservation:
             if resource not in _EFFICIENCY_RESOURCES:
                 raise ValueError("efficiency observations support only cpu and memory")
             normalized[resource] = bounded_decimal(value)
-        if set(normalized) != _EFFICIENCY_RESOURCES:
-            raise ValueError("efficiency observations must contain cpu and memory together")
+        if not normalized:
+            raise ValueError("efficiency observations must contain at least one resource")
         object.__setattr__(self, "efficiencies", normalized)
 
 
@@ -160,6 +160,28 @@ class UserObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionObservation:
+    """Represent one session's Job reservations and timing inputs."""
+
+    session: str
+    requests: dict[str, str]
+    reserving_workloads: int
+    observed_at: datetime
+    start_time: datetime | None
+    window_end: datetime
+    has_running_pods: bool
+
+    def __post_init__(self) -> None:
+        """Validate the queue count, timestamps, and observation time."""
+        if self.reserving_workloads < 0:
+            raise ValueError("reserving_workloads must be non-negative")
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "window_end", _normalise_observed_at(self.window_end))
+        if self.start_time is not None:
+            object.__setattr__(self, "start_time", _normalise_observed_at(self.start_time))
+
+
+@dataclass(frozen=True, slots=True)
 class CommunityObservation:
     """Represent one community's configured ClusterQueue reservations."""
 
@@ -177,11 +199,12 @@ class CommunityObservation:
 
 @dataclass(frozen=True, slots=True)
 class CachedSnapshot:
-    """Store one queue observation and optional efficiency in one cache fill."""
+    """Store one observation and optional usage or efficiency in one cache fill."""
 
-    observation: PlatformObservation | UserObservation | CommunityObservation
+    observation: PlatformObservation | UserObservation | CommunityObservation | SessionObservation
     created: datetime
     efficiency: EfficiencyObservation | None = None
+    usage: dict[str, str] | None = None
     ready: bool = True
     ready_reason: Literal["Available", "PartialData"] = "Available"
 
@@ -278,12 +301,13 @@ class ReadinessState:
 class MetricsResult:
     """Return an observation with cache and readiness provenance."""
 
-    observation: PlatformObservation | UserObservation | CommunityObservation
+    observation: PlatformObservation | UserObservation | CommunityObservation | SessionObservation
     created: datetime
     cached: bool
     stale: bool = False
     cache_available: bool = True
     efficiency: EfficiencyObservation | None = None
+    usage: dict[str, str] | None = None
     ready: bool = True
     ready_reason: Literal["Available", "PartialData"] = "Available"
 

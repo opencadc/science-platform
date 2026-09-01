@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+from datetime import datetime
 from time import perf_counter
 from typing import Any, Literal, Protocol, cast
 
@@ -20,15 +21,17 @@ from metrics.cache import (
     RedisUnavailable,
 )
 from metrics.core.settings import Settings
-from metrics.errors import RuntimeStartupError
+from metrics.errors import ProviderUnavailableError, RuntimeStartupError
 from metrics.providers.kueue import KueueProvider
+from metrics.providers.kubemetrics import KubeMetricsProvider
+from metrics.providers.session import SessionProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import CachedSnapshot, EfficiencyObservation
+from metrics.services.models import CachedSnapshot, EfficiencyObservation, SessionObservation
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 
 _logger = logging.getLogger(__name__)
-_SCHEMA_REVISION = "7"
+_SCHEMA_REVISION = "8"
 _SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
 
@@ -60,6 +63,16 @@ class _EfficiencyProvider(Protocol):
 
     async def read_community(self, community: str) -> EfficiencyObservation:
         """Read attributed community efficiency."""
+
+    async def read_session(
+        self,
+        session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        observed_at: datetime | None = None,
+    ) -> EfficiencyObservation:
+        """Read attributed session duration efficiency."""
 
 
 async def _close_resources(
@@ -121,13 +134,13 @@ def platform_cache_identity(
 
 def _subject_cache_identity(
     *,
-    kind: Literal["user", "community"],
+    kind: Literal["user", "community", "session"],
     subject: str,
     cluster: str,
     source: str,
     fingerprint: str,
 ) -> CacheIdentity:
-    """Build one opaque User or Community cache identity."""
+    """Build one opaque User, Community, or Session cache identity."""
     return CacheIdentity(
         subject_kind=kind,
         subject_value=subject,
@@ -141,7 +154,7 @@ def build_cache(
     settings: Settings,
     recorder: MetricsRecorder | None = None,
     *,
-    surface: Literal["platform", "user", "community"] = "platform",
+    surface: Literal["platform", "user", "community", "session"] = "platform",
     redis: Redis | None = None,
 ) -> tuple[CacheCoordinator[CachedSnapshot], Redis | None]:
     """Construct one surface cache, reusing the supplied Redis client."""
@@ -204,17 +217,20 @@ def _efficiency_cache_fingerprint(settings: Settings) -> str:
 
 
 class MetricsRuntime:
-    """Own Kueue, optional efficiency, three surface caches, and Metrics."""
+    """Own Kueue, Session, optional efficiency, four surface caches, and Metrics."""
 
     def __init__(
         self,
         settings: Settings,
         *,
         provider: KueueProvider,
+        session_provider: SessionProvider,
+        usage_provider: KubeMetricsProvider,
         metrics_service: MetricsService,
         cache: CacheCoordinator[CachedSnapshot],
         user_cache: CacheCoordinator[CachedSnapshot],
         community_cache: CacheCoordinator[CachedSnapshot],
+        session_cache: CacheCoordinator[CachedSnapshot],
         redis: Redis | None = None,
         telemetry: MetricsRecorder | None = None,
         efficiency_provider: _EfficiencyProvider | None = None,
@@ -222,13 +238,15 @@ class MetricsRuntime:
         """Attach injected resources for production or focused tests."""
         self._settings = settings
         self._provider = provider
+        self._session_provider = session_provider
+        self._usage_provider = usage_provider
         self._metrics: MetricsService | None = metrics_service
         self._readiness = metrics_service.readiness
         self._telemetry = telemetry or NoopMetricsRecorder()
         self._efficiency_provider = efficiency_provider
         self._started = False
         self._redis = redis
-        self._caches = (cache, user_cache, community_cache)
+        self._caches = (cache, user_cache, community_cache, session_cache)
         self._redis_coordinators: tuple[_ReadinessCoordinator, ...] = tuple(
             cast(_ReadinessCoordinator, current)
             for current in self._caches
@@ -238,8 +256,10 @@ class MetricsRuntime:
 
     @classmethod
     def from_settings(cls, settings: Settings, *, recorder: MetricsRecorder) -> MetricsRuntime:
-        """Wire Kueue, optional PromQL efficiency, shared Redis, and service."""
+        """Wire Kueue, Session, optional PromQL efficiency, shared Redis, and service."""
         provider = KueueProvider(settings)
+        session_provider = SessionProvider(settings)
+        usage_provider = KubeMetricsProvider(settings)
         efficiency_provider = _build_efficiency_provider(settings, recorder)
         cache, redis_client = build_cache(settings, recorder)
         user_cache, _ = build_cache(
@@ -254,8 +274,28 @@ class MetricsRuntime:
             surface="community",
             redis=redis_client,
         )
+        session_cache, _ = build_cache(
+            settings,
+            recorder,
+            surface="session",
+            redis=redis_client,
+        )
         fingerprint = provider.cache_fingerprint()
-        fingerprint = f"{fingerprint}:promql-{_efficiency_cache_fingerprint(settings)}"
+        fingerprint = (
+            f"{fingerprint}:session-{session_provider.cache_fingerprint()}"
+            f":promql-{_efficiency_cache_fingerprint(settings)}"
+        )
+
+        async def session_efficiency(observation: SessionObservation) -> EfficiencyObservation:
+            if efficiency_provider is None or observation.start_time is None:
+                raise ProviderUnavailableError("Session efficiency is not configured")
+            return await efficiency_provider.read_session(
+                observation.session,
+                start_time=observation.start_time,
+                window_end=observation.window_end,
+                observed_at=observation.observed_at,
+            )
+
         metrics_service = MetricsService(
             platform=provider.read_platform,
             cache=cache,
@@ -284,6 +324,17 @@ class MetricsRuntime:
                 source=provider.name,
                 fingerprint=fingerprint,
             ),
+            session=session_provider.read_session,
+            session_cache=session_cache,
+            session_identity=lambda session_id: _subject_cache_identity(
+                kind="session",
+                subject=session_id,
+                cluster=settings.cluster_name,
+                source=session_provider.name,
+                fingerprint=fingerprint,
+            ),
+            session_usage=usage_provider.read_session_usage,
+            session_efficiency=session_efficiency if efficiency_provider is not None else None,
             telemetry=recorder,
             provider=provider.name,
             platform_efficiency=efficiency_provider.read_platform
@@ -303,10 +354,13 @@ class MetricsRuntime:
         return cls(
             settings,
             provider=provider,
+            session_provider=session_provider,
+            usage_provider=usage_provider,
             metrics_service=metrics_service,
             cache=cache,
             user_cache=user_cache,
             community_cache=community_cache,
+            session_cache=session_cache,
             redis=redis_client,
             telemetry=recorder,
             efficiency_provider=efficiency_provider,
@@ -348,13 +402,15 @@ class MetricsRuntime:
         if not self._started:
             return False
         provider = self._provider
-        if provider is None:
+        session_provider = self._session_provider
+        if provider is None or session_provider is None:
             return False
         if not await self._recover_cache_readiness():
             return False
         try:
             async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                 await provider.startup()
+                await session_provider.startup()
             await self._start_efficiency_provider()
         except Exception:
             self._readiness.mark_source("platform", reachable=False)
@@ -399,7 +455,8 @@ class MetricsRuntime:
         outcome = "ok"
         try:
             provider = self._provider
-            if provider is None:
+            session_provider = self._session_provider
+            if provider is None or session_provider is None:
                 raise RuntimeStartupError("Metrics runtime has already been shut down")
             async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                 for coordinator in self._redis_coordinators:
@@ -412,6 +469,7 @@ class MetricsRuntime:
             try:
                 async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                     await provider.startup()
+                    await session_provider.startup()
             except Exception as exc:
                 outcome = "degraded"
                 _logger.warning("Kueue provider unavailable during startup: %s", exc)
@@ -458,17 +516,18 @@ class MetricsRuntime:
         self._readiness.stop()
         self._started = False
         provider, self._provider = self._provider, None  # type: ignore[assignment]
+        session_provider, self._session_provider = self._session_provider, None
+        usage_provider, self._usage_provider = self._usage_provider, None
         efficiency_provider, self._efficiency_provider = self._efficiency_provider, None
         caches, self._caches = self._caches, ()  # type: ignore[assignment]
         redis, self._redis = self._redis, None
         provider_outcome = "ok"
         provider_cancel: asyncio.CancelledError | None = None
-        cache_outcome, cache_cancel = await _close_resources(
-            caches, "Metrics cache shutdown failed"
-        )
+        cache_outcome, cache_cancel = await _close_resources(caches, "Metrics cache shutdown failed")
         if provider is not None:
             provider_outcome, provider_cancel = await _close_resources(
-                (provider,), "Kueue provider shutdown failed"
+                (provider, session_provider, usage_provider),
+                "Metrics provider shutdown failed",
             )
         efficiency_outcome = "ok"
         efficiency_cancel: asyncio.CancelledError | None = None

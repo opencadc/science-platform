@@ -22,6 +22,12 @@ A canonical `canfar.net/community` label value. A Community report aggregates
 configured ClusterQueues carrying that label.
 _Avoid_: Cohort, namespace, user list
 
+**Session**:
+A canonical `canfar.net/id` label value. A Session report aggregates every
+matching Job in the configured namespaces, including desktop-app child Jobs
+that share the same id.
+_Avoid_: pod-name prefix, caller-supplied label selectors
+
 **Platform**:
 The configured Metrics deployment subject. A Platform report aggregates every
 ClusterQueue named by `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES`.
@@ -77,23 +83,37 @@ Pod resource request for one subject. It is optional, instantaneous, and
 Prometheus/Mimir-backed; it is not lifetime utilization.
 _Avoid_: accounting, usage-hours, overall efficiency
 
+**Usage**:
+Live CPU or memory consumption summed from `metrics.k8s.io` for matching
+Running session pods. Session is the only Metrics surface that exposes usage.
+_Avoid_: requests, lifetime totals, GPU utilization
+
+**Session efficiency**:
+Duration CPU or memory utilization for one session over its bounded window:
+core-seconds used divided by core-seconds requested for CPU, and mean working
+set divided by mean request for memory. The PromQL window starts at the
+earliest matching Job `startTime`, ends at now or the latest completion time,
+and is capped at six hours. This is not the five-minute instant ratio used by
+User, Community, or Platform efficiency.
+_Avoid_: instant efficiency, usage-hours, GPU efficiency
+
 ## Runtime boundaries
 
 **Fresh report**:
-A Redis snapshot inside its surface-specific fresh window: User 2 minutes;
-Community 5 minutes; Platform 5 minutes.
+A Redis snapshot inside its surface-specific fresh window: Session 30 seconds;
+User 2 minutes; Community 5 minutes; Platform 5 minutes.
 _Avoid_: live response, uncached response
 
 **Serviceable stale report**:
 A complete snapshot outside its fresh window but inside its serviceable window:
-3 minutes for User; 10 minutes for Community; 30 minutes for Platform. It may
-be served while a single request refreshes it.
+60 seconds for Session; 3 minutes for User; 10 minutes for Community; 30 minutes
+for Platform. It may be served while a single request refreshes it.
 _Avoid_: expired report, current data
 
 **Retained snapshot**:
-A Redis snapshot kept for recovery after serviceability ends: 5 minutes for
-User; 15 minutes for Community; 60 minutes for Platform. It is not returned by
-the API.
+A Redis snapshot kept for recovery after serviceability ends: 3 minutes for
+Session; 5 minutes for User; 15 minutes for Community; 60 minutes for Platform.
+It is not returned by the API.
 _Avoid_: stale response, valid cache
 
 **Server-owned PromQL**:

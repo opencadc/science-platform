@@ -28,6 +28,7 @@ from metrics.services.models import (
     MetricsResult,
     MetricsSubject,
     PlatformObservation,
+    SessionObservation,
     UserObservation,
     bounded_decimal,
 )
@@ -128,14 +129,17 @@ def _efficiency_value(efficiency: EfficiencyObservation | None, name: str) -> st
 
 
 def _workload_resources(
-    observation: UserObservation | CommunityObservation,
+    observation: UserObservation | CommunityObservation | SessionObservation,
     efficiency: EfficiencyObservation | None,
+    *,
+    usage: dict[str, str] | None = None,
 ) -> list[ResourceMetrics]:
-    """Build workload resource entries from queue reservations."""
+    """Build workload resource entries from queue or session reservations."""
     return [
         ResourceMetrics(
             name=name,
             requests=observation.requests[name],
+            usage=usage.get(name) if usage else None,
             efficiency=_efficiency_value(efficiency, name),
         )
         for name in sorted(observation.requests)
@@ -181,17 +185,24 @@ def _conditions(result: MetricsResult) -> list[Condition]:
 def _subject_response(
     kind: str,
     value: str,
-    observation: UserObservation | CommunityObservation,
+    observation: UserObservation | CommunityObservation | SessionObservation,
     result: MetricsResult,
 ) -> Metrics:
-    """Assemble one User or Community response envelope."""
+    """Assemble one User, Community, or Session response envelope."""
+    spec: MetricsSpec
+    if kind == "user":
+        spec = MetricsSpec(user=value)
+    elif kind == "community":
+        spec = MetricsSpec(community=value)
+    else:
+        spec = MetricsSpec(session=value)
     return Metrics(
         metadata=ObjectMetadata(name=_subject_name(kind, value)),
-        spec=MetricsSpec(user=value) if kind == "user" else MetricsSpec(community=value),
+        spec=spec,
         status=MetricsStatus(
             observed_at=result.created,
             reserving_workloads=observation.reserving_workloads,
-            resources=_workload_resources(observation, result.efficiency),
+            resources=_workload_resources(observation, result.efficiency, usage=result.usage),
             conditions=_conditions(result),
         ),
     )
@@ -203,11 +214,13 @@ def _ttl_seconds(runtime: MetricsRuntime, kind: str) -> int:
         return runtime.metrics_service.cache_ttl_seconds
     if kind == "user":
         return runtime.metrics_service.user_cache_ttl_seconds
-    return runtime.metrics_service.community_cache_ttl_seconds
+    if kind == "community":
+        return runtime.metrics_service.community_cache_ttl_seconds
+    return runtime.metrics_service.session_cache_ttl_seconds
 
 
 async def _serve(
-    kind: Literal["platform", "user", "community"],
+    kind: Literal["platform", "user", "community", "session"],
     value: str,
     response: Response,
     runtime: MetricsRuntime,
@@ -241,9 +254,35 @@ async def _serve(
         if not isinstance(observation, UserObservation):
             raise RuntimeError("User route received a non-user observation")
         return _subject_response("user", value, observation, result)
-    if not isinstance(observation, CommunityObservation):
-        raise RuntimeError("Community route received a non-community observation")
-    return _subject_response("community", value, observation, result)
+    if kind == "community":
+        if not isinstance(observation, CommunityObservation):
+            raise RuntimeError("Community route received a non-community observation")
+        return _subject_response("community", value, observation, result)
+    if not isinstance(observation, SessionObservation):
+        raise RuntimeError("Session route received a non-session observation")
+    return _subject_response("session", value, observation, result)
+
+
+@router.get(
+    "/apis/canfar.net/v1alpha1/metrics/session/{session_id:path}",
+    response_model=Metrics,
+    response_model_exclude_none=True,
+    responses={
+        400: {"model": Status, "description": "Malformed session id value."},
+        404: {"model": Status, "description": "No matching Job exists."},
+        405: {"model": Status, "description": "The HTTP method is not allowed."},
+        500: {"model": Status, "description": "The metrics report could not be produced."},
+        503: {"model": Status, "description": "No serviceable report is available."},
+    },
+    summary="Get session metrics",
+)
+async def get_session_metrics(
+    session_id: SubjectPath,
+    response: Response,
+    runtime: RuntimeDependency,
+) -> Metrics:
+    """Return Job reservations, optional usage, and optional duration efficiency."""
+    return await _serve("session", session_id, response, runtime)
 
 
 @router.get(

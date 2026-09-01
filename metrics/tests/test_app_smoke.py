@@ -30,6 +30,7 @@ from metrics.services.models import (
     CommunityObservation,
     EfficiencyObservation,
     PlatformObservation,
+    SessionObservation,
     UserObservation,
 )
 from tests.test_cache_helpers import FakeCacheCoordinator
@@ -120,6 +121,78 @@ class FakeProvider:
         return "fake"
 
 
+class FakeSessionProvider:
+    """Return deterministic session observations."""
+
+    name = "session"
+
+    def __init__(
+        self,
+        *,
+        session_error: BaseException | None = None,
+        startup_error: BaseException | None = None,
+        shutdown_error: BaseException | None = None,
+    ) -> None:
+        self.started = 0
+        self.stopped = 0
+        self.session_error = session_error
+        self.startup_error = startup_error
+        self.shutdown_error = shutdown_error
+
+    async def startup(self) -> None:
+        """Record the startup validation call."""
+        self.started += 1
+        if self.startup_error is not None:
+            raise self.startup_error
+
+    async def shutdown(self) -> None:
+        """Record the shutdown call."""
+        self.stopped += 1
+        if self.shutdown_error is not None:
+            raise self.shutdown_error
+
+    async def read_session(self, session_id: str) -> SessionObservation:
+        """Return one Session observation."""
+        if self.session_error is not None:
+            raise self.session_error
+        now = datetime.now(UTC)
+        return SessionObservation(
+            session=session_id,
+            requests={"cpu": "1", "memory": "1Gi"},
+            reserving_workloads=1,
+            observed_at=now,
+            start_time=now,
+            window_end=now,
+            has_running_pods=True,
+        )
+
+    def cache_fingerprint(self) -> str:
+        """Return a stable fake provider fingerprint."""
+        return "fake"
+
+
+class FakeUsageProvider:
+    """Return deterministic session usage."""
+
+    name = "kubemetrics"
+
+    def __init__(self, *, usage_error: BaseException | None = None) -> None:
+        self.usage_error = usage_error
+
+    async def startup(self) -> None:
+        """Satisfy the runtime lifecycle seam."""
+
+    async def shutdown(self) -> None:
+        """Satisfy the runtime lifecycle seam."""
+
+    async def read_session_usage(self, session_id: str) -> dict[str, str]:
+        """Return one usage map."""
+        del session_id
+        if self.usage_error is not None:
+            raise self.usage_error
+        return {"cpu": "0.5", "memory": "1Gi"}
+
+
 def _cache(surface: str) -> FakeCacheCoordinator[CachedSnapshot]:
     """Create one deterministic test cache seam."""
     return FakeCacheCoordinator(
@@ -132,16 +205,22 @@ def _runtime(
     *,
     user_efficiency=None,
     provider: FakeProvider | None = None,
+    session_provider: FakeSessionProvider | None = None,
+    usage_provider: FakeUsageProvider | None = None,
     platform_cache=None,
     user_cache=None,
     community_cache=None,
+    session_cache=None,
 ) -> tuple[MetricsRuntime, FakeProvider]:
     """Build a complete injected runtime for route tests."""
     settings = _settings()
     provider = provider or FakeProvider()
+    session_provider = session_provider or FakeSessionProvider()
+    usage_provider = usage_provider or FakeUsageProvider()
     platform_cache = platform_cache or _cache("platform")
     user_cache = user_cache or _cache("user")
     community_cache = community_cache or _cache("community")
+    session_cache = session_cache or _cache("session")
     service = MetricsService(
         platform=provider.read_platform,
         cache=platform_cache,
@@ -156,15 +235,24 @@ def _runtime(
         community_identity=lambda community: CacheIdentity(
             "community", community, "cluster-a", "kueue", "fake"
         ),
+        session=session_provider.read_session,
+        session_cache=session_cache,
+        session_identity=lambda session_id: CacheIdentity(
+            "session", session_id, "cluster-a", "session", "fake"
+        ),
+        session_usage=usage_provider.read_session_usage,
     )
     return (
         MetricsRuntime(
             settings,
             provider=provider,
+            session_provider=session_provider,
+            usage_provider=usage_provider,
             metrics_service=service,
             cache=platform_cache,
             user_cache=user_cache,
             community_cache=community_cache,
+            session_cache=session_cache,
         ),
         provider,
     )
@@ -250,10 +338,13 @@ def test_efficiency_observation_is_rendered_without_query_logic() -> None:
     runtime = MetricsRuntime(
         settings,
         provider=provider,
+        session_provider=FakeSessionProvider(),
+        usage_provider=FakeUsageProvider(),
         metrics_service=service,
         cache=platform_cache,
         user_cache=user_cache,
         community_cache=community_cache,
+        session_cache=_cache("session"),
     )
     with TestClient(factory_module.create_app(settings=settings, runtime=runtime)) as client:
         response = client.get("/apis/canfar.net/v1alpha1/metrics/user/bob")

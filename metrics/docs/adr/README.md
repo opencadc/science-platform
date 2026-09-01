@@ -16,6 +16,7 @@ the Git ADRs record the implementation boundary and its deliberate exclusions.
 | [0008](0008-api-only-async-core.md) | API-only asynchronous core | Accepted; Pod/accounting details superseded by 0010 |
 | [0009](0009-incremental-module-architecture.md) | Incremental Python package architecture | Accepted; obsolete provider details superseded by 0010 |
 | [0010](0010-simple-kueue-metrics-service.md) | Simple Kueue Metrics service | Accepted |
+| [0011](0011-session-metrics-surface.md) | Session Metrics surface | Accepted |
 
 ADR-0010 is the current source and scope boundary. Older conflicting text is
 retained only where it explains a historical choice; it must not be read as a

@@ -11,12 +11,13 @@ specified in [`metadata-labels.md`](metadata-labels.md).
 GET /apis/canfar.net/v1alpha1/metrics/user/{username}
 GET /apis/canfar.net/v1alpha1/metrics/community/{community}
 GET /apis/canfar.net/v1alpha1/metrics/platform/{platform}
+GET /apis/canfar.net/v1alpha1/metrics/session/{id}
 GET /healthz
 GET /livez
 GET /readyz
 ```
 
-The three report routes return a `canfar.net/v1alpha1` `Metrics` object. The
+The four report routes return a `canfar.net/v1alpha1` `Metrics` object. The
 path selects exactly one subject field:
 
 ```yaml
@@ -41,14 +42,16 @@ status:
 ```
 
 The example uses a User shape. Community uses the same `requests` and
-optional `efficiency` fields. Platform uses `capacity`, `allocated`, and
-optional `efficiency` instead of `requests`.
+optional `efficiency` fields. Session uses the same workload row shape and
+adds optional `usage` for CPU and memory. Platform uses `capacity`, `allocated`,
+and optional `efficiency` instead of `requests`.
 
 ## Report fields
 
 All surfaces expose:
 
-- one subject in `spec.user`, `spec.community`, or `spec.platform`;
+- one subject in `spec.user`, `spec.community`, `spec.platform`, or
+  `spec.session`;
 - `status.observedAt`, the conservative observation time for the report;
 - `status.reservingWorkloads`, the sum of Kueue reserving workloads; and
 - exactly one `Ready` and one `Cached` condition.
@@ -58,6 +61,13 @@ User and Community resources expose:
 - `name`, the Kubernetes resource name;
 - `requests`, the aggregate Kueue reservation; and
 - optional `efficiency` for current CPU or memory usage.
+
+Session resources expose:
+
+- `name`, the Kubernetes resource name;
+- `requests`, the aggregate Job template reservation;
+- optional `usage` for live CPU or memory consumption; and
+- optional `efficiency` for duration CPU or memory utilization.
 
 Platform resources expose:
 
@@ -112,6 +122,22 @@ Each configured ClusterQueue maps to one Community. A missing, inaccessible,
 or malformed configured ClusterQueue is a primary-source failure; Platform
 must not silently become a partial sum.
 
+### Session
+
+Metrics lists Jobs in every namespace from
+`METRICS_PROVIDERS__KUEUE__NAMESPACES`, selects exact
+`canfar.net/id=<id>` labels, and aggregates every matching Job including
+desktop-app children that share the id.
+
+For each matching Job, Metrics adds:
+
+- summed non-pause container template `requests` to `resources[].requests`; and
+- one Job to `status.reservingWorkloads`.
+
+Optional live `usage` sums `metrics.k8s.io` CPU and memory for matching
+Running pods. Optional Session `efficiency` uses fixed PromQL joined on
+`label_canfar_net_id` over the bounded session window. No match is a 404.
+
 ## Optional efficiency contract
 
 Efficiency activation is endpoint-only. If
@@ -137,9 +163,11 @@ Memory efficiency = Running-Pod memory working set / Running-Pod memory requests
 ```
 
 The ratio is omitted for a zero denominator, an invalid vector, or an
-unavailable optional backend. These are current ratios only. The API has no
-lifetime usage fields, accounting period, checkpoints, producer, or usage
-history.
+unavailable optional backend. User, Community, and Platform efficiency remain
+current five-minute instant ratios. Session efficiency is duration utilization
+over the bounded session window and is omitted when no Job has `startTime` yet.
+These are not lifetime usage fields, accounting period, checkpoints, producer,
+or usage history.
 
 ## Cache policy
 
@@ -149,6 +177,7 @@ User and Community values do not appear in Redis key paths.
 
 | Surface | Fresh | Serviceable stale | Retained only |
 | --- | ---: | ---: | ---: |
+| Session | 30 seconds | 60 seconds | 3 minutes |
 | User | 2 minutes | 3 minutes | 5 minutes |
 | Community | 5 minutes | 10 minutes | 15 minutes |
 | Platform | 5 minutes | 30 minutes | 60 minutes |
@@ -162,11 +191,16 @@ bounded and published once to Redis. There is no background refresh worker.
 
 - A User with no matching LocalQueue returns 404.
 - A Community with no matching configured ClusterQueue returns 404.
+- A Session with no matching Job returns 404.
 - A primary Kueue failure returns a serviceable cached report when one exists;
   otherwise it returns 503.
+- A primary Session Job failure returns a serviceable cached report when one
+  exists; otherwise it returns 503.
 - A Prometheus/Mimir failure while
   `METRICS_PROVIDERS__PROMQL__BASE_URL` is present returns 200 with queue
   values, efficiency omitted, and `Ready=False`/`PartialData`.
+- A kube-metrics failure while Running session pods exist returns 200 with Job
+  values, usage omitted, and `Ready=False`/`PartialData`.
 - `Ready=True`/`Available` means the required Kueue source was complete and
   optional efficiency, when requested, was usable.
 - `Cached` reports fresh, refreshed, stale, or unavailable cache provenance.

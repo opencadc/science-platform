@@ -107,6 +107,20 @@ def test_removed_lifetime_fields_are_forbidden(resource: dict[str, object]) -> N
         )
 
 
+def test_user_contract_omits_usage_field() -> None:
+    """User reports do not expose Session-only usage."""
+    with pytest.raises(ValidationError):
+        Metrics.model_validate(
+            _envelope(
+                {"user": "bob"},
+                {
+                    "resources": [{"name": "cpu", "requests": "1", "usage": "0.5"}],
+                    "conditions": _conditions(),
+                },
+            )
+        )
+
+
 def test_conditions_are_exactly_ready_and_cached() -> None:
     """No third condition or accounting-specific reason is allowed."""
     invalid = _conditions() + [
