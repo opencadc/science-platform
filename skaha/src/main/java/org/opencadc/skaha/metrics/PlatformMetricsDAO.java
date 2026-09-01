@@ -1,19 +1,11 @@
 package org.opencadc.skaha.metrics;
 
-import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,10 +31,6 @@ class PlatformMetricsDAO {
 
     private static final String DEFAULT_PLATFORM_NAME = "canfar";
     private static final Pattern PLATFORM_NAME = Pattern.compile("^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$");
-    private static final int CONNECTION_TIMEOUT_MILLIS = 1_000;
-    private static final int READ_TIMEOUT_MILLIS = 2_000;
-    private static final int MAX_RETRIES = 0;
-    private static final int MAX_RESPONSE_BYTES = 1_048_576;
 
     private final String platformMetricsUrl;
     private final String platformName;
@@ -133,77 +121,22 @@ class PlatformMetricsDAO {
     }
 
     public PlatformMetrics getPlatformMetrics() throws Exception {
-        final BoundedOutputStream responseBody = new BoundedOutputStream(MAX_RESPONSE_BYTES);
-        final HttpGet get = new HttpGet(URI.create(platformMetricsUrl).toURL(), responseBody);
-        configureHttpGet(get);
-        get.run();
-        if (get.getThrowable() != null) {
-            throw new IOException("failed to fetch platform metrics from " + platformMetricsUrl, get.getThrowable());
-        }
-        return parseEnvelope(responseBody.asUtf8());
-    }
-
-    /** Apply a bounded, single-attempt policy to this synchronous optional dashboard read. */
-    static void configureHttpGet(final HttpGet get) {
-        get.setConnectionTimeout(CONNECTION_TIMEOUT_MILLIS);
-        get.setReadTimeout(READ_TIMEOUT_MILLIS);
-        get.setMaxRetries(MAX_RETRIES);
-    }
-
-    /** Output stream that rejects a response before it can exceed the parser's memory budget. */
-    private static final class BoundedOutputStream extends OutputStream {
-
-        private final int maximumBytes;
-        private final ByteArrayOutputStream delegate;
-        private int size;
-
-        private BoundedOutputStream(final int maximumBytes) {
-            this.maximumBytes = maximumBytes;
-            this.delegate = new ByteArrayOutputStream(Math.min(maximumBytes, 8192));
-        }
-
-        @Override
-        public void write(final int value) throws IOException {
-            ensureCapacity(1);
-            delegate.write(value);
-        }
-
-        @Override
-        public void write(final byte[] bytes, final int offset, final int length) throws IOException {
-            if (bytes == null) {
-                throw new NullPointerException("bytes");
-            }
-            if (offset < 0 || length < 0 || offset > bytes.length - length) {
-                throw new IndexOutOfBoundsException();
-            }
-            ensureCapacity(length);
-            delegate.write(bytes, offset, length);
-        }
-
-        private void ensureCapacity(final int additionalBytes) throws IOException {
-            if (additionalBytes > maximumBytes - size) {
-                throw new IOException("Metrics response exceeded the maximum size");
-            }
-            size += additionalBytes;
-        }
-
-        private String asUtf8() {
-            return decodeUtf8(delegate.toByteArray());
-        }
+        return parseEnvelope(
+                MetricsBackendHttp.fetchUtf8(URI.create(platformMetricsUrl), "failed to fetch platform metrics from"));
     }
 
     private PlatformMetrics parseEnvelope(final String json) {
         final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         final JsonObject spec = root.getAsJsonObject("spec");
         final JsonObject status = root.getAsJsonObject("status");
-        if (!"canfar.net/v1alpha1".equals(text(root, "apiVersion"))
-                || !"Metrics".equals(text(root, "kind"))
+        if (!"canfar.net/v1alpha1".equals(MetricsBackendHttp.text(root, "apiVersion"))
+                || !"Metrics".equals(MetricsBackendHttp.text(root, "kind"))
                 || spec == null
-                || !platformName.equals(text(spec, "platform"))
+                || !platformName.equals(MetricsBackendHttp.text(spec, "platform"))
                 || status == null) {
             throw new IllegalArgumentException("invalid Metrics envelope");
         }
-        final Instant created = Instant.parse(text(status, "observedAt"));
+        final Instant created = Instant.parse(MetricsBackendHttp.text(status, "observedAt"));
         requireReadyConditions(status, created);
         final Map<String, String> capacity = new HashMap<>();
         final Map<String, String> allocated = new HashMap<>();
@@ -220,12 +153,12 @@ class PlatformMetricsDAO {
                 throw new IllegalArgumentException("invalid Metrics resource");
             }
             final JsonObject resource = element.getAsJsonObject();
-            final String name = text(resource, "name");
+            final String name = MetricsBackendHttp.text(resource, "name");
             if (capacity.containsKey(name)) {
                 throw new IllegalArgumentException("duplicate Metrics resource");
             }
-            capacity.put(name, text(resource, "capacity"));
-            allocated.put(name, text(resource, "allocated"));
+            capacity.put(name, MetricsBackendHttp.text(resource, "capacity"));
+            allocated.put(name, MetricsBackendHttp.text(resource, "allocated"));
         });
         return new PlatformMetrics(
                 new PlatformMetrics.Metadata(created), new PlatformMetrics.Data(capacity, allocated));
@@ -244,10 +177,10 @@ class PlatformMetricsDAO {
                 throw new IllegalArgumentException("invalid Metrics conditions");
             }
             final JsonObject condition = element.getAsJsonObject();
-            final String type = text(condition, "type");
-            final String statusValue = text(condition, "status");
-            final String reason = text(condition, "reason");
-            final Instant transition = Instant.parse(text(condition, "lastTransitionTime"));
+            final String type = MetricsBackendHttp.text(condition, "type");
+            final String statusValue = MetricsBackendHttp.text(condition, "status");
+            final String reason = MetricsBackendHttp.text(condition, "reason");
+            final Instant transition = Instant.parse(MetricsBackendHttp.text(condition, "lastTransitionTime"));
             if (transition.isAfter(observedAt) || !validConditionPair(type, statusValue, reason)) {
                 throw new IllegalArgumentException("invalid Metrics conditions");
             }
@@ -263,7 +196,8 @@ class PlatformMetricsDAO {
         if (readyCount != 1 || cachedCount != 1 || ready == null) {
             throw new IllegalArgumentException("invalid Metrics conditions");
         }
-        if (!"True".equals(text(ready, "status")) || !"Available".equals(text(ready, "reason"))) {
+        if (!"True".equals(MetricsBackendHttp.text(ready, "status"))
+                || !"Available".equals(MetricsBackendHttp.text(ready, "reason"))) {
             throw new IllegalArgumentException("platform Metrics are not ready");
         }
     }
@@ -279,33 +213,5 @@ class PlatformMetricsDAO {
                         || ("Unknown".equals(status) && "RedisUnavailable".equals(reason));
             default -> false;
         };
-    }
-
-    static String decodeUtf8(final byte[] bytes) {
-        try {
-            return StandardCharsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes))
-                    .toString();
-        } catch (CharacterCodingException ex) {
-            throw new IllegalArgumentException("Metrics response was not valid UTF-8", ex);
-        }
-    }
-
-    private static String text(final JsonObject object, final String field) {
-        if (!object.has(field) || object.get(field).isJsonNull()) {
-            throw new IllegalArgumentException("invalid Metrics envelope");
-        }
-        final JsonElement value = object.get(field);
-        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
-            throw new IllegalArgumentException("invalid Metrics envelope");
-        }
-        final String text = value.getAsString();
-        if (text.isBlank()) {
-            throw new IllegalArgumentException("invalid Metrics envelope");
-        }
-        return text;
     }
 }

@@ -6,7 +6,7 @@ import org.apache.log4j.Logger;
 
 /**
  * Central data access for all Skaha metrics: platform stats from the Metrics backend and session pod usage (Kubernetes
- * metrics API today; Metrics backend in future).
+ * metrics API or Metrics backend session API, selected via {@link PodUsageProvider#SKAHA_POD_METRICS_SOURCE}).
  *
  * <p>Platform Metrics is optional: when {@link PlatformMetricsDAO#SKAHA_METRICS_BACKEND_URL} is unset (Helm
  * {@code metricsBackend.enabled=false}), session listing and pod usage still work; {@link #getPlatformMetrics()} fails
@@ -68,7 +68,7 @@ public class MetricsDAO {
      * Fetch per-pod CPU and memory usage for session workloads, formatted for session listings.
      *
      * <p>Soft-fails: returns {@link PodResourceUsage#empty()} when pod metrics cannot be retrieved. Does not require
-     * the Metrics HTTP backend.
+     * the Metrics HTTP backend when the Kubernetes pod-usage source is selected.
      *
      * @param userID constrain by user ID when non-null/non-blank; otherwise all users
      * @param omitHeadless when true, exclude headless session pods
@@ -79,17 +79,14 @@ public class MetricsDAO {
     }
 
     /**
-     * Fetch session-list pod usage, using per-session Metrics backend calls when the backend provider is selected.
+     * Fetch session-list pod usage via the configured pod-usage provider.
      *
-     * @param userJobs listed session Jobs; required for backend pod-usage source
+     * @param userJobs listed session Jobs; required for the Metrics backend pod-usage source
      */
     public PodResourceUsage getPodResourceUsage(
             final String userID, final boolean omitHeadless, final List<V1Job> userJobs) {
         try {
-            if (podUsageProvider instanceof MetricsBackendPodUsageProvider backendProvider) {
-                return PodMetrics.toPodResourceUsage(backendProvider.getPodMetricsForJobs(userJobs));
-            }
-            return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless));
+            return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless, userJobs));
         } catch (Exception e) {
             log.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
             return PodResourceUsage.empty();

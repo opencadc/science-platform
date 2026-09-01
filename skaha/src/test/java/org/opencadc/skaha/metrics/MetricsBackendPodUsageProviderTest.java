@@ -11,7 +11,7 @@ import org.mockito.Mockito;
 public class MetricsBackendPodUsageProviderTest {
 
     @Test
-    public void getPodMetricsForJobsMapsUsageToJobNames() throws Exception {
+    public void getPodMetricsMapsUsageToJobNames() throws Exception {
         final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
         Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
                 .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
@@ -19,21 +19,27 @@ public class MetricsBackendPodUsageProviderTest {
                 .thenReturn(new SessionMetrics("session-b", Map.of("cpu", "250m", "memory", "256Mi")));
 
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(sessionMetricsDAO);
-        final PodMetrics podMetrics = provider.getPodMetricsForJobs(List.of(
-                job("job-a-main", "session-a"),
-                job("job-a-app", "session-a"),
-                job("job-b-main", "session-b")));
+        final List<V1Job> jobs =
+                List.of(job("job-a-main", "session-a"), job("job-a-app", "session-a"), job("job-b-main", "session-b"));
+        final PodMetrics podMetrics = provider.getPodMetrics("alice", false, jobs);
 
-        Assert.assertEquals("0.500", ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-a-main")));
-        Assert.assertEquals("0.500", ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-a-app")));
-        Assert.assertEquals("0.250", ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-b-main")));
+        Assert.assertEquals(
+                "0.500",
+                ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-a-main")));
+        Assert.assertEquals(
+                "0.500",
+                ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-a-app")));
+        Assert.assertEquals(
+                "0.250",
+                ResourceQuantityFormatter.toCoreUnit(podMetrics.cpuByPodName().get("job-b-main")));
         Assert.assertEquals(
                 "0.27",
-                ResourceQuantityFormatter.toSessionMemoryGb(podMetrics.memoryByPodName().get("job-b-main")));
+                ResourceQuantityFormatter.toSessionMemoryGb(
+                        podMetrics.memoryByPodName().get("job-b-main")));
     }
 
     @Test
-    public void getPodMetricsForJobsSoftFailsPerSession() throws Exception {
+    public void getPodMetricsSoftFailsPerSession() throws Exception {
         final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
         Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
                 .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m")));
@@ -41,18 +47,19 @@ public class MetricsBackendPodUsageProviderTest {
                 .thenThrow(new RuntimeException("backend unavailable"));
 
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(sessionMetricsDAO);
-        final PodMetrics podMetrics = provider.getPodMetricsForJobs(List.of(
-                job("job-a-main", "session-a"), job("job-b-main", "session-b")));
+        final PodMetrics podMetrics = provider.getPodMetrics(
+                "alice", false, List.of(job("job-a-main", "session-a"), job("job-b-main", "session-b")));
 
         Assert.assertEquals("500m", podMetrics.cpuByPodName().get("job-a-main"));
         Assert.assertFalse(podMetrics.cpuByPodName().containsKey("job-b-main"));
     }
 
     @Test
-    public void getPodMetricsForJobsReturnsEmptyWhenBackendUnset() {
+    public void getPodMetricsReturnsEmptyWhenBackendUnset() throws Exception {
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(null);
 
-        Assert.assertEquals(PodMetrics.empty(), provider.getPodMetricsForJobs(List.of(job("job-a-main", "session-a"))));
+        Assert.assertEquals(
+                PodMetrics.empty(), provider.getPodMetrics("alice", false, List.of(job("job-a-main", "session-a"))));
     }
 
     private static V1Job job(final String jobName, final String sessionId) {

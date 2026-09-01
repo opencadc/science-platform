@@ -81,8 +81,7 @@ public class SessionMetricsDAOTest {
         final SessionMetrics metrics = new SessionMetricsDAO("http://127.0.0.1:" + port).getSessionMetrics(SESSION_ID);
 
         Assert.assertEquals(SESSION_ID, metrics.sessionId());
-        Assert.assertEquals(
-                Map.of("cpu", "1367m", "memory", "1536Mi"), metrics.usageByResource());
+        Assert.assertEquals(Map.of("cpu", "1367m", "memory", "1536Mi"), metrics.usageByResource());
     }
 
     @Test

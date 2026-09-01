@@ -36,16 +36,12 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
     }
 
     @Override
-    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
-        return PodMetrics.empty();
-    }
-
-    PodMetrics getPodMetricsForJobs(final List<V1Job> jobs) {
-        if (sessionMetricsDAO == null || jobs == null || jobs.isEmpty()) {
+    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless, final List<V1Job> sessionJobs) {
+        if (sessionMetricsDAO == null || sessionJobs == null || sessionJobs.isEmpty()) {
             return PodMetrics.empty();
         }
 
-        final Map<String, List<String>> sessionIdToJobNames = sessionIdsByJobName(jobs);
+        final Map<String, List<String>> sessionIdToJobNames = sessionIdsByJobName(sessionJobs);
         if (sessionIdToJobNames.isEmpty()) {
             return PodMetrics.empty();
         }

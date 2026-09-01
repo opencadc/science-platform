@@ -178,7 +178,7 @@ public class PlatformMetricsDAOTest {
     public void rejectsMalformedUtf8ThroughDecoderSeam() {
         Assert.assertThrows(
                 IllegalArgumentException.class,
-                () -> PlatformMetricsDAO.decodeUtf8(new byte[] {(byte) 0xC3, (byte) 0x28}));
+                () -> MetricsBackendHttp.decodeUtf8(new byte[] {(byte) 0xC3, (byte) 0x28}));
     }
 
     @Test

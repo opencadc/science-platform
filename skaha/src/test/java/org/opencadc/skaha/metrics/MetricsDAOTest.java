@@ -50,13 +50,13 @@ public class MetricsDAOTest {
         final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
         final PodMetrics podMetrics = new PodMetrics(Map.of("pod-1", "250m"), Map.of("pod-1", "1Gi"));
 
-        Mockito.when(podProvider.getPodMetrics("alice", true)).thenReturn(podMetrics);
+        Mockito.when(podProvider.getPodMetrics("alice", true, List.of())).thenReturn(podMetrics);
 
         final MetricsDAO dao = new MetricsDAO(platformDao, podProvider);
         final PodResourceUsage usage = dao.getPodResourceUsage("alice", true);
 
         Assert.assertEquals("0.250", usage.cpu().get("pod-1"));
-        Mockito.verify(podProvider).getPodMetrics("alice", true);
+        Mockito.verify(podProvider).getPodMetrics("alice", true, List.of());
     }
 
     @Test
@@ -64,7 +64,7 @@ public class MetricsDAOTest {
         final PlatformMetricsDAO platformDao = Mockito.mock(PlatformMetricsDAO.class);
         final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
 
-        Mockito.when(podProvider.getPodMetrics("alice", false))
+        Mockito.when(podProvider.getPodMetrics("alice", false, List.of()))
                 .thenThrow(new RuntimeException("metrics API unavailable"));
 
         final MetricsDAO dao = new MetricsDAO(platformDao, podProvider);
@@ -97,9 +97,7 @@ public class MetricsDAOTest {
 
         final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(sessionMetricsDAO));
         final List<V1Job> jobs = List.of(new V1Job()
-                .metadata(new V1ObjectMeta()
-                        .name("job-a-main")
-                        .labels(Map.of("canfar.net/id", "session-a"))));
+                .metadata(new V1ObjectMeta().name("job-a-main").labels(Map.of("canfar.net/id", "session-a"))));
 
         final PodResourceUsage usage = dao.getPodResourceUsage("alice", false, jobs);
 
@@ -109,13 +107,14 @@ public class MetricsDAOTest {
 
     @Test
     public void backendProviderReturnsEmptyWithoutJobs() {
-        final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused")));
+        final MetricsDAO dao =
+                new MetricsDAO(null, new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused")));
         Assert.assertEquals(PodResourceUsage.empty(), dao.getPodResourceUsage("alice", false, List.of()));
     }
 
     @Test
-    public void backendProviderGetPodMetricsReturnsEmpty() throws Exception {
+    public void backendProviderGetPodMetricsReturnsEmptyWithoutJobs() throws Exception {
         final PodUsageProvider provider = new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused"));
-        Assert.assertEquals(PodMetrics.empty(), provider.getPodMetrics("alice", false));
+        Assert.assertEquals(PodMetrics.empty(), provider.getPodMetrics("alice", false, List.of()));
     }
 }
