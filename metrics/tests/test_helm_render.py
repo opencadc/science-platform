@@ -286,8 +286,8 @@ def test_env_json_lists_are_supported_when_structured_lists_are_empty(tmp_path: 
     assert environment["METRICS_OTEL__METRICS_ENABLED"]["value"] == "true"
 
 
-def test_rbac_is_limited_to_configured_clusterqueues_and_localqueues(tmp_path: Path) -> None:
-    """RBAC grants only Kueue reads and never Pod access."""
+def test_rbac_grants_kueue_and_session_workload_reads(tmp_path: Path) -> None:
+    """RBAC grants Kueue reads plus session Job, Pod, and PodMetrics access."""
     documents = _render("kueue-rbac", values_file=_write_complete_values(tmp_path))
     cluster_role = next(document for document in documents if document["kind"] == "ClusterRole")
     assert cluster_role["rules"] == [
@@ -299,23 +299,34 @@ def test_rbac_is_limited_to_configured_clusterqueues_and_localqueues(tmp_path: P
         }
     ]
 
+    expected_role_rules = [
+        {
+            "apiGroups": ["kueue.x-k8s.io"],
+            "resources": ["localqueues"],
+            "verbs": ["list"],
+        },
+        {
+            "apiGroups": ["batch"],
+            "resources": ["jobs"],
+            "verbs": ["get", "list"],
+        },
+        {
+            "apiGroups": [""],
+            "resources": ["pods"],
+            "verbs": ["get", "list"],
+        },
+        {
+            "apiGroups": ["metrics.k8s.io"],
+            "resources": ["pods"],
+            "verbs": ["get", "list"],
+        },
+    ]
     roles = [document for document in documents if document["kind"] == "Role"]
     assert {document["metadata"]["namespace"] for document in roles} == {
         "astro-workloads",
         "physics-workloads",
     }
-    assert all(
-        document["rules"]
-        == [
-            {
-                "apiGroups": ["kueue.x-k8s.io"],
-                "resources": ["localqueues"],
-                "verbs": ["list"],
-            }
-        ]
-        for document in roles
-    )
-    assert not any("pods" in str(document.get("rules", [])).lower() for document in documents)
+    assert all(document["rules"] == expected_role_rules for document in roles)
 
     deployment = _deployment(documents)
     service_account = next(

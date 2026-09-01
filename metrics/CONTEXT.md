@@ -142,11 +142,13 @@ condition.
 _Avoid_: per-Pod inventory, time-series database, collection endpoint
 
 **PartialData**:
-The `Ready=False` reason used when optional efficiency collection fails but the
-primary Kueue report is successfully served. The HTTP response remains 200.
+The `Ready=False` reason used when optional Session sources fail but the primary
+Job report is successfully served. This includes optional efficiency, live
+usage, or pod-state reads. The HTTP response remains 200.
 _Avoid_: zero efficiency, accounting incomplete
 
 **Service-unavailable report**:
-An HTTP 503 response when the primary Kueue source fails and no serviceable
-snapshot exists.
+An HTTP 503 response when the primary Kueue or Session Job source fails and no
+serviceable snapshot exists. Optional Session source failures alone do not
+produce 503 when Job data is complete.
 _Avoid_: empty zero report, partial success

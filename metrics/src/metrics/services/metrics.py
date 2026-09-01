@@ -34,6 +34,7 @@ from metrics.services.models import (
     PlatformObservation,
     ReadinessState,
     SessionObservation,
+    SessionUsageObservation,
     UserObservation,
 )
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
@@ -46,10 +47,21 @@ AnyObservation = PlatformObservation | WorkloadObservation | SessionObservation
 PlatformLoader = Callable[[], Awaitable[PlatformObservation]]
 WorkloadLoader = Callable[[str], Awaitable[WorkloadObservation]]
 SessionLoader = Callable[[str], Awaitable[SessionObservation]]
-SessionUsageLoader = Callable[[str], Awaitable[dict[str, str]]]
+SessionUsageLoader = Callable[[str], Awaitable[SessionUsageObservation]]
 PlatformEfficiencyLoader = Callable[[], Awaitable[EfficiencyObservation]]
 WorkloadEfficiencyLoader = Callable[[str], Awaitable[EfficiencyObservation]]
 SessionEfficiencyLoader = Callable[[SessionObservation], Awaitable[EfficiencyObservation]]
+
+
+@dataclass(frozen=True, slots=True)
+class _SessionBinding:
+    """Bundle one session loader with its cache and optional enrichments."""
+
+    loader: SessionLoader
+    cache: CacheCoordinator[CachedSnapshot]
+    identity: Callable[[str], CacheIdentity]
+    usage_loader: SessionUsageLoader | None
+    efficiency_loader: SessionEfficiencyLoader | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,17 +130,19 @@ class MetricsService:
         }
         if session is None or session_cache is None or session_identity is None:
             self._session = None
+            readiness_surfaces: tuple[MetricsSurface, ...] = ("platform", "user", "community")
         else:
-            self._session = (
+            self._session = _SessionBinding(
                 session,
                 session_cache,
                 session_identity,
                 session_usage,
                 session_efficiency,
             )
+            readiness_surfaces = ("platform", "user", "community", "session")
         self._metrics_recorder = telemetry or NoopMetricsRecorder()
         self._provider = provider
-        self._readiness = readiness or ReadinessState(("platform", "user", "community"))
+        self._readiness = readiness or ReadinessState(readiness_surfaces)
         self._serviceable_until: dict[MetricsSurface, datetime | None] = {
             surface: None for surface in self._readiness.surfaces
         }
@@ -144,6 +158,8 @@ class MetricsService:
             "platform": self._cache,
             **{surface: binding.cache for surface, binding in self._workloads.items()},
         }
+        if self._session is not None:
+            caches["session"] = self._session.cache
         now = datetime.now(UTC)
         for surface in self._readiness.surfaces:
             self._readiness.mark_cache(surface, available=caches[surface].available)
@@ -180,7 +196,7 @@ class MetricsService:
         """Return the Session fresh-cache window."""
         if self._session is None:
             raise RuntimeError("Session cache is not configured")
-        return self._session[1].policy.fresh_seconds
+        return self._session.cache.policy.fresh_seconds
 
     async def get(self, subject: MetricsSubject) -> MetricsResult:
         """Return one cached or freshly filled report for ``subject``."""
@@ -263,10 +279,9 @@ class MetricsService:
         binding = self._session
         if binding is None:
             raise RuntimeError("Session metrics are not configured")
-        loader, cache, identity, _usage, _efficiency = binding
         try:
-            result = await cache.get_or_fill(
-                identity(session_id),
+            result = await binding.cache.get_or_fill(
+                binding.identity(session_id),
                 lambda: self._load_session_snapshot(session_id, binding),
             )
         except CacheUnavailable as exc:
@@ -281,32 +296,28 @@ class MetricsService:
     async def _load_session_snapshot(
         self,
         session_id: str,
-        binding: tuple[
-            SessionLoader,
-            CacheCoordinator[CachedSnapshot],
-            Callable[[str], CacheIdentity],
-            SessionUsageLoader | None,
-            SessionEfficiencyLoader | None,
-        ],
+        binding: _SessionBinding,
     ) -> CachedSnapshot:
         """Fill one Session observation with optional usage and efficiency."""
-        loader, _cache, _identity, usage_loader, efficiency_loader = binding
-        observation = await self._timed_session_load(session_id, loader)
-        usage_task: asyncio.Task[dict[str, str] | None] | None = None
+        observation = await self._timed_session_load(session_id, binding.loader)
+        usage_task: asyncio.Task[SessionUsageObservation | None] | None = None
         efficiency_task: asyncio.Task[EfficiencyObservation | None] | None = None
         tasks: list[asyncio.Future[Any]] = []
-        if usage_loader is not None:
+        if binding.usage_loader is not None:
             usage_task = asyncio.create_task(
-                self._bounded_session_usage_load(session_id, usage_loader)
+                self._bounded_session_usage_load(session_id, binding.usage_loader)
             )
             tasks.append(usage_task)
-        if efficiency_loader is not None and observation.start_time is not None:
+        if binding.efficiency_loader is not None and observation.start_time is not None:
             efficiency_task = asyncio.create_task(
-                self._bounded_efficiency_load(lambda: efficiency_loader(observation))
+                self._bounded_efficiency_load(
+                    lambda: binding.efficiency_loader(observation)  # type: ignore[misc]
+                )
             )
             tasks.append(efficiency_task)
 
         usage: dict[str, str] | None = None
+        usage_observation: SessionUsageObservation | None = None
         efficiency: EfficiencyObservation | None = None
         usage_failed = False
         efficiency_failed = False
@@ -327,7 +338,9 @@ class MetricsService:
                         else:
                             raise usage_error
                     else:
-                        usage = usage_task.result()
+                        usage_observation = usage_task.result()
+                        if usage_observation is not None:
+                            usage = usage_observation.usage
                 if efficiency_task is not None and efficiency_task in done:
                     if efficiency_task.cancelled():
                         raise asyncio.CancelledError
@@ -350,6 +363,10 @@ class MetricsService:
 
         ready = True
         ready_reason = "Available"
+        if not observation.pods_reachable:
+            logger.warning("Session pod state unavailable for %s", session_id)
+            ready = False
+            ready_reason = "PartialData"
         if usage_failed and observation.has_running_pods:
             logger.warning("Session usage data unavailable for %s", session_id)
             ready = False
@@ -360,6 +377,8 @@ class MetricsService:
             ready_reason = "PartialData"
 
         created = observation.observed_at
+        if usage_observation is not None:
+            created = min(created, usage_observation.observed_at)
         if efficiency is not None:
             created = min(created, efficiency.observed_at)
         usage_payload = None if not usage else usage
@@ -376,13 +395,13 @@ class MetricsService:
         self,
         session_id: str,
         loader: SessionUsageLoader,
-    ) -> dict[str, str] | None:
+    ) -> SessionUsageObservation | None:
         """Bound optional session usage without failing the primary Job read."""
         try:
             async with asyncio.timeout(self._efficiency_timeout_seconds):
                 return await loader(session_id)
-        except TimeoutError:
-            return None
+        except TimeoutError as exc:
+            raise ProviderUnavailableError("Session usage load timed out") from exc
 
     async def _timed_session_load(
         self,

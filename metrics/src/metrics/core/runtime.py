@@ -26,11 +26,17 @@ from metrics.providers.kueue import KueueProvider
 from metrics.providers.kubemetrics import KubeMetricsProvider
 from metrics.providers.session import SessionProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import CachedSnapshot, EfficiencyObservation, SessionObservation
+from metrics.services.models import (
+    CachedSnapshot,
+    EfficiencyObservation,
+    MetricsSurface,
+    SessionObservation,
+)
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 
 _logger = logging.getLogger(__name__)
+_KUEUE_SURFACES: tuple[MetricsSurface, ...] = ("platform", "user", "community")
 _SCHEMA_REVISION = "8"
 _SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
@@ -410,12 +416,20 @@ class MetricsRuntime:
         try:
             async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                 await provider.startup()
-                await session_provider.startup()
-            await self._start_efficiency_provider()
         except Exception:
-            self._readiness.mark_source("platform", reachable=False)
-            return False
-        self._readiness.mark_source("platform", reachable=True)
+            for surface in _KUEUE_SURFACES:
+                self._readiness.mark_source(surface, reachable=False)
+        else:
+            for surface in _KUEUE_SURFACES:
+                self._readiness.mark_source(surface, reachable=True)
+        try:
+            async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
+                await session_provider.startup()
+        except Exception:
+            self._readiness.mark_source("session", reachable=False)
+        else:
+            self._readiness.mark_source("session", reachable=True)
+        await self._start_efficiency_provider()
         self.metrics_service.sync_cache_readiness()
         return self.ready
 
@@ -469,13 +483,24 @@ class MetricsRuntime:
             try:
                 async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                     await provider.startup()
-                    await session_provider.startup()
             except Exception as exc:
                 outcome = "degraded"
                 _logger.warning("Kueue provider unavailable during startup: %s", exc)
+                for surface in _KUEUE_SURFACES:
+                    self._readiness.mark_source(surface, reachable=False)
             else:
-                for surface in self._readiness.surfaces:
+                for surface in _KUEUE_SURFACES:
                     self._readiness.mark_source(surface, reachable=True)
+            try:
+                async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
+                    await session_provider.startup()
+            except Exception as exc:
+                outcome = "degraded"
+                _logger.warning("Session provider unavailable during startup: %s", exc)
+                self._readiness.mark_source("session", reachable=False)
+            else:
+                if "session" in self._readiness.surfaces:
+                    self._readiness.mark_source("session", reachable=True)
             await self._start_efficiency_provider()
             self._telemetry.record_readiness(self.ready)
         except asyncio.CancelledError:

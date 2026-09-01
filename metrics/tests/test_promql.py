@@ -468,3 +468,52 @@ async def test_missing_endpoint_is_not_an_active_provider() -> None:
             await provider.read_platform()
     finally:
         await client.aclose()
+
+
+async def test_read_session_posts_window_end_as_query_time() -> None:
+    """Session efficiency evaluates PromQL at the session window end."""
+    window_end = datetime(2026, 1, 1, 13, 0, tzinfo=UTC)
+    start_time = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+    calls: list[httpx.Request] = []
+    client = _client(_successful_payload(window_end), calls)
+    try:
+        await PromQLProvider(_settings(), client=client).read_session(
+            "sess-1",
+            start_time=start_time,
+            window_end=window_end,
+        )
+    finally:
+        await client.aclose()
+
+    body = parse_qs(calls[0].content.decode())
+    assert body["time"] == [str(window_end.timestamp())]
+
+
+def test_session_cpu_efficiency_uses_avg_over_time_and_duration_seconds() -> None:
+    """Session CPU efficiency scales requests by the bounded window duration."""
+    query = promql_module._session_query(
+        session_id="sess-1",
+        cluster="cluster-a",
+        namespaces=["workloads"],
+        duration_seconds=1800,
+    )
+    assert "avg_over_time(" in query
+    assert "sum_over_time(" not in query.split("or")[0]
+    assert "* 1800" in query
+    assert "* 60" not in query
+
+
+def test_session_sample_age_is_validated_against_evaluation_time() -> None:
+    """Session efficiency rejects samples stale relative to the query time."""
+    evaluation_time = datetime(2026, 1, 1, 13, 0, tzinfo=UTC)
+    stale_sample_time = evaluation_time - timedelta(minutes=11)
+    payload = _payload(_sample("cpu", "0.4", stale_sample_time))
+    with pytest.raises(ProviderExecutionError, match="stale or future"):
+        promql_module._validate_session_response(
+            payload,
+            max_series=10,
+            max_sample_age_seconds=600,
+            future_sample_tolerance_seconds=5,
+            evaluation_time=evaluation_time,
+            cutoff=None,
+        )

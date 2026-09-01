@@ -170,6 +170,7 @@ class SessionObservation:
     start_time: datetime | None
     window_end: datetime
     has_running_pods: bool
+    pods_reachable: bool = True
 
     def __post_init__(self) -> None:
         """Validate the queue count, timestamps, and observation time."""
@@ -179,6 +180,18 @@ class SessionObservation:
         object.__setattr__(self, "window_end", _normalise_observed_at(self.window_end))
         if self.start_time is not None:
             object.__setattr__(self, "start_time", _normalise_observed_at(self.start_time))
+
+
+@dataclass(frozen=True, slots=True)
+class SessionUsageObservation:
+    """Represent summed live pod usage and its metrics-server timestamp."""
+
+    usage: dict[str, str]
+    observed_at: datetime
+
+    def __post_init__(self) -> None:
+        """Validate the usage observation timestamp."""
+        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)

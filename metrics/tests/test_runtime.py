@@ -30,6 +30,7 @@ from metrics.services.models import (
     EfficiencyObservation,
     PlatformObservation,
     SessionObservation,
+    SessionUsageObservation,
     UserObservation,
 )
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
@@ -135,7 +136,12 @@ def test_runtime_lifecycle_uses_one_kueue_provider() -> None:
     # The real provider has no API fake here, so lifecycle ownership is tested
     # through a direct injected runtime in the application smoke tests.
     assert provider.name == "kueue"
-    assert runtime.metrics_service.readiness.surfaces == ("platform", "user", "community")
+    assert runtime.metrics_service.readiness.surfaces == (
+        "platform",
+        "user",
+        "community",
+        "session",
+    )
 
 
 def test_cache_payload_type_has_no_lifetime_fields() -> None:
@@ -287,9 +293,9 @@ class _LifecycleUsageProvider:
     async def shutdown(self) -> None:
         """Satisfy the provider lifecycle protocol."""
 
-    async def read_session_usage(self, _session_id: str) -> dict[str, str]:
+    async def read_session_usage(self, _session_id: str) -> SessionUsageObservation:
         """Return empty usage for lifecycle tests."""
-        return {}
+        return SessionUsageObservation(usage={}, observed_at=datetime.now(UTC))
 
 
 class _LifecycleEfficiency:
@@ -579,8 +585,8 @@ async def test_readiness_recovery_retries_failed_redis_health() -> None:
 
 
 @pytest.mark.anyio
-async def test_readiness_recovery_updates_only_shared_platform_source() -> None:
-    """Recovery does not claim arbitrary User or Community subjects were checked."""
+async def test_readiness_recovery_splits_kueue_and_session_sources() -> None:
+    """Recovery restores Kueue and Session reachability independently."""
     provider = _LifecycleProvider()
     runtime = _runtime_with_provider(provider)
 
@@ -588,11 +594,13 @@ async def test_readiness_recovery_updates_only_shared_platform_source() -> None:
     runtime._readiness.mark_source("platform", reachable=False)  # noqa: SLF001
     runtime._readiness.mark_source("user", reachable=False)  # noqa: SLF001
     runtime._readiness.mark_source("community", reachable=False)  # noqa: SLF001
+    runtime._readiness.mark_source("session", reachable=False)  # noqa: SLF001
 
     assert await runtime.check_readiness() is True
     assert runtime._readiness._surfaces["platform"].source_reachable  # noqa: SLF001
-    assert not runtime._readiness._surfaces["user"].source_reachable  # noqa: SLF001
-    assert not runtime._readiness._surfaces["community"].source_reachable  # noqa: SLF001
+    assert runtime._readiness._surfaces["user"].source_reachable  # noqa: SLF001
+    assert runtime._readiness._surfaces["community"].source_reachable  # noqa: SLF001
+    assert runtime._readiness._surfaces["session"].source_reachable  # noqa: SLF001
     await runtime.shutdown()
 
 

@@ -218,6 +218,7 @@ def _session_cpu_efficiency(
     cluster: str,
     namespaces: str,
     window: str,
+    duration_seconds: int,
 ) -> str:
     """Return CPU duration efficiency for one session window."""
     usage_source = _selector(
@@ -250,10 +251,10 @@ def _session_cpu_efficiency(
         f"and on (cluster,namespace,pod) {selected_pods})"
     )
     requested = (
-        f"sum(sum_over_time({request_source}[{window}]) "
+        f"sum(avg_over_time({request_source}[{window}]) "
         f"and on (cluster,namespace,pod) {selected_pods})"
     )
-    return f"({usage}) / ({requested} * {_DEFAULT_SCRAPE_INTERVAL_SECONDS})"
+    return f"({usage}) / ({requested} * {duration_seconds})"
 
 
 def _session_memory_efficiency(
@@ -319,6 +320,7 @@ def _session_query(
         cluster=cluster,
         namespaces=namespace_pattern,
         window=window,
+        duration_seconds=duration_seconds,
     )
     memory_ratio = _session_memory_efficiency(
         selected,
@@ -335,6 +337,7 @@ def _validate_session_response(
     max_series: int,
     max_sample_age_seconds: int,
     future_sample_tolerance_seconds: int,
+    evaluation_time: datetime | None,
     cutoff: datetime | None,
 ) -> EfficiencyObservation:
     """Validate and normalize one or two session efficiency samples."""
@@ -347,7 +350,7 @@ def _validate_session_response(
     if not isinstance(result, list) or len(result) > max_series or not result:
         raise ProviderExecutionError("PromQL session vector was empty or too large")
 
-    validation_now = _validation_now()
+    validation_now = evaluation_time or _validation_now()
     now_seconds = Decimal(str(validation_now.timestamp()))
     cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
     observed_timestamp: Decimal | None = None
@@ -633,13 +636,21 @@ class PromQLProvider:
         """Read duration efficiency for one session over its bounded window."""
         if window_end < start_time:
             raise ProviderExecutionError("Session efficiency window end precedes its start")
-        duration_seconds = int(min((window_end - start_time).total_seconds(), _MAX_SESSION_WINDOW_SECONDS))
-        return await self._read_session(session_id, duration_seconds, observed_at)
+        duration_seconds = int(
+            min((window_end - start_time).total_seconds(), _MAX_SESSION_WINDOW_SECONDS)
+        )
+        return await self._read_session(
+            session_id,
+            duration_seconds,
+            window_end,
+            observed_at,
+        )
 
     async def _read_session(
         self,
         session_id: str,
         duration_seconds: int,
+        evaluation_time: datetime,
         observed_at: datetime | None,
     ) -> EfficiencyObservation:
         """Execute and validate one fixed session duration query."""
@@ -657,12 +668,13 @@ class PromQLProvider:
         started = perf_counter()
         status = "ok"
         try:
-            payload = await self._request(query)
+            payload = await self._request(query, evaluation_time=evaluation_time)
             return _validate_session_response(
                 payload,
                 max_series=self._max_series,
                 max_sample_age_seconds=self._max_sample_age_seconds,
                 future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
+                evaluation_time=evaluation_time,
                 cutoff=cutoff,
             )
         except asyncio.CancelledError:
@@ -722,17 +734,25 @@ class PromQLProvider:
                 seconds=perf_counter() - started,
             )
 
-    async def _request(self, query: str) -> Any:
+    async def _request(
+        self,
+        query: str,
+        *,
+        evaluation_time: datetime | None = None,
+    ) -> Any:
         """POST the fixed query and decode one bounded Prometheus response."""
         client = self._client
         endpoint = self._endpoint
         if client is None or endpoint is None:
             raise ProviderUnavailableError("PromQL provider has not started")
+        data: dict[str, str] = {"query": query}
+        if evaluation_time is not None:
+            data["time"] = str(evaluation_time.timestamp())
         try:
             async with client.stream(
                 "POST",
                 endpoint,
-                data={"query": query},
+                data=data,
                 headers=self._headers,
             ) as response:
                 response.raise_for_status()

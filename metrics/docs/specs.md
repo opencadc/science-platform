@@ -131,8 +131,10 @@ desktop-app children that share the id.
 
 For each matching Job, Metrics adds:
 
-- summed non-pause container template `requests` to `resources[].requests`; and
-- one Job to `status.reservingWorkloads`.
+- summed non-pause container template `requests` to `resources[].requests`.
+
+`status.reservingWorkloads` is the count of matching Jobs, including
+desktop-app children that share the id.
 
 Optional live `usage` sums `metrics.k8s.io` CPU and memory for matching
 Running pods. Optional Session `efficiency` uses fixed PromQL joined on
@@ -201,6 +203,8 @@ bounded and published once to Redis. There is no background refresh worker.
   values, efficiency omitted, and `Ready=False`/`PartialData`.
 - A kube-metrics failure while Running session pods exist returns 200 with Job
   values, usage omitted, and `Ready=False`/`PartialData`.
+- A Pod list failure for an otherwise valid Session returns 200 with Job values,
+  `has_running_pods` unknown, and `Ready=False`/`PartialData`.
 - `Ready=True`/`Available` means the required Kueue source was complete and
   optional efficiency, when requested, was usable.
 - `Cached` reports fresh, refreshed, stale, or unavailable cache provenance.

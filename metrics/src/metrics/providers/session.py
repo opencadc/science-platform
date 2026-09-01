@@ -358,7 +358,12 @@ class SessionProvider:
         jobs = await self._jobs(session_id)
         if not jobs:
             raise SubjectNotFoundError("Session has no matching Job")
-        pods = await self._pods(session_id)
+        pods_reachable = True
+        try:
+            pods = await self._pods(session_id)
+        except (ProviderUnavailableError, ProviderExecutionError):
+            pods = []
+            pods_reachable = False
         requests: dict[str, Decimal] = {}
         seen_jobs: set[tuple[str, str]] = set()
         for namespace, doc in jobs:
@@ -384,6 +389,7 @@ class SessionProvider:
             start_time=window.start_time,
             window_end=window.window_end,
             has_running_pods=window.has_running_pods,
+            pods_reachable=pods_reachable,
         )
 
     async def startup(self) -> None:

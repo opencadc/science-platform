@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -16,10 +17,12 @@ from metrics.providers.kueue import (
     _json_response,
     _list,
     _mapping,
+    _observation_time,
     _validate_subject,
     create_kube_api,
 )
-from metrics.providers.session import fetch_pod_docs
+from metrics.providers.session import _parse_timestamp, fetch_pod_docs
+from metrics.services.models import SessionUsageObservation
 from metrics.services.resources import format_resource_amount, merge_resource_totals, parse_resource_amount
 
 
@@ -95,7 +98,7 @@ class KubeMetricsProvider:
                 raise ProviderUnavailableError("Could not configure Kubernetes API access") from exc
         return self._api
 
-    async def read_session_usage(self, session_id: str) -> dict[str, str]:
+    async def read_session_usage(self, session_id: str) -> SessionUsageObservation:
         """Return summed Running-pod usage for one session id."""
         session_id = _validate_subject(session_id)
         api = await self._ensure_api()
@@ -138,6 +141,7 @@ class KubeMetricsProvider:
             raise ProviderUnavailableError("PodMetrics access failed") from exc
 
         totals: dict[str, Decimal] = {}
+        observed_at: datetime | None = None
         for _namespace, docs, running_pods in zip(
             self._config.namespaces,
             metrics_by_namespace,
@@ -149,6 +153,10 @@ class KubeMetricsProvider:
                 pod_name = metadata.get("name")
                 if not isinstance(pod_name, str) or pod_name not in running_pods:
                     continue
+                raw_timestamp = doc.get("timestamp")
+                if raw_timestamp is not None:
+                    parsed = _parse_timestamp(raw_timestamp, "PodMetrics timestamp was invalid")
+                    observed_at = parsed if observed_at is None else max(observed_at, parsed)
                 containers = _list(
                     _mapping(doc, "PodMetrics object was invalid").get("containers"),
                     "PodMetrics containers were missing or invalid",
@@ -158,10 +166,15 @@ class KubeMetricsProvider:
                     for name, value in _container_usage(container).items():
                         merge_resource_totals(totals, name, value)
         if not totals:
-            return {}
-        return {
-            name: format_resource_amount(name, value) for name, value in sorted(totals.items())
-        }
+            return SessionUsageObservation(usage={}, observed_at=_observation_time())
+        if observed_at is None:
+            observed_at = _observation_time()
+        return SessionUsageObservation(
+            usage={
+                name: format_resource_amount(name, value) for name, value in sorted(totals.items())
+            },
+            observed_at=observed_at,
+        )
 
     async def shutdown(self) -> None:
         """Release the provider's API handle reference."""

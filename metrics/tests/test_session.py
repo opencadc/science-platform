@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -19,7 +20,7 @@ from metrics.errors import AppError, ProviderUnavailableError, SubjectNotFoundEr
 from metrics.providers.kubemetrics import KubeMetricsProvider
 from metrics.providers.session import SessionProvider
 from metrics.services.metrics import MetricsService
-from metrics.services.models import CachedSnapshot, EfficiencyObservation, MetricsSubject, SessionObservation
+from metrics.services.models import CachedSnapshot, EfficiencyObservation, MetricsSubject, SessionObservation, SessionUsageObservation
 from tests.test_app_smoke import FakeProvider, FakeSessionProvider, FakeUsageProvider, _cache, _runtime, _settings
 from tests.test_cache_helpers import FakeCacheCoordinator
 
@@ -93,10 +94,17 @@ def _pod(name: str, namespace: str, session_id: str, *, phase: str = "Running") 
     }
 
 
-def _pod_metrics(name: str, *, cpu: str = "250m", memory: str = "256Mi") -> dict[str, Any]:
+def _pod_metrics(
+    name: str,
+    *,
+    cpu: str = "250m",
+    memory: str = "256Mi",
+    timestamp: str = "2026-01-01T12:30:00Z",
+) -> dict[str, Any]:
     """Build one PodMetrics item."""
     return {
         "metadata": {"name": name},
+        "timestamp": timestamp,
         "containers": [
             {"name": "busy", "usage": {"cpu": cpu, "memory": memory}},
             {"name": "pause", "usage": {"cpu": "0", "memory": "0"}},
@@ -238,9 +246,10 @@ async def test_kubemetrics_sums_running_pod_usage() -> None:
         },
     )
     provider = KubeMetricsProvider(_settings(), api=api)
-    usage = await provider.read_session_usage("sess-1")
+    observation = await provider.read_session_usage("sess-1")
 
-    assert usage == {"cpu": "0.5", "memory": "1Gi"}
+    assert observation.usage == {"cpu": "0.5", "memory": "1Gi"}
+    assert observation.observed_at == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
 
 
 async def test_session_service_returns_usage_and_efficiency() -> None:
@@ -472,6 +481,90 @@ def test_session_schema_allows_usage_without_efficiency() -> None:
     )
     payload = report.model_dump(mode="json", by_alias=True, exclude_none=True)
     assert payload["status"]["resources"][2] == {"name": "nvidia.com/gpu", "requests": "1"}
+
+
+async def test_session_provider_soft_fails_when_pod_list_unavailable() -> None:
+    """Pod list failures keep Job data but mark pod state unreachable."""
+
+    class PodFailingApi(FakeKubernetesApi):
+        @contextlib.asynccontextmanager
+        async def call_api(
+            self,
+            *,
+            method: str,
+            version: str,
+            url: str,
+            namespace: str | None = None,
+            params: dict[str, str] | None = None,
+        ):
+            if version == "v1" and url == "pods":
+                raise kr8s.ServerError("pod list failed", response=httpx.Response(503))
+            async with super().call_api(
+                method=method,
+                version=version,
+                url=url,
+                namespace=namespace,
+                params=params,
+            ) as response:
+                yield response
+
+    api = PodFailingApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1")]},
+    )
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    assert observation.reserving_workloads == 1
+    assert observation.pods_reachable is False
+    assert observation.has_running_pods is False
+
+
+async def test_session_service_marks_partial_when_pods_unreachable() -> None:
+    """Unreachable pod state marks PartialData while Job data remains available."""
+    now = datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
+    observation = SessionObservation(
+        session="sess-1",
+        requests={"cpu": "1"},
+        reserving_workloads=1,
+        observed_at=now,
+        start_time=now,
+        window_end=now,
+        has_running_pods=False,
+        pods_reachable=False,
+    )
+
+    class StaticSessionProvider:
+        async def read_session(self, session_id: str) -> SessionObservation:
+            assert session_id == "sess-1"
+            return observation
+
+    result = await _session_service(
+        session_provider=StaticSessionProvider(),  # type: ignore[arg-type]
+        usage_loader=KubeMetricsProvider(_settings(), api=FakeKubernetesApi()).read_session_usage,
+    ).get(MetricsSubject("session", "sess-1"))
+
+    assert result.ready is False
+    assert result.ready_reason == "PartialData"
+
+
+async def test_session_service_marks_partial_when_usage_times_out() -> None:
+    """A bounded usage timeout counts as a usage failure for Running pods."""
+
+    async def slow_usage(_session_id: str) -> SessionUsageObservation:
+        await asyncio.sleep(1)
+        return SessionUsageObservation(usage={"cpu": "1"}, observed_at=datetime.now(UTC))
+
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1")]},
+        pods={"work-a": [_pod("desktop-pod", "work-a", "sess-1")]},
+    )
+    result = await _session_service(
+        session_provider=SessionProvider(_settings(), api=api),
+        usage_loader=slow_usage,
+    ).get(MetricsSubject("session", "sess-1"))
+
+    assert result.ready is False
+    assert result.ready_reason == "PartialData"
+    assert result.usage is None
 
 
 async def test_session_cache_terminal_miss_maps_to_not_found() -> None:

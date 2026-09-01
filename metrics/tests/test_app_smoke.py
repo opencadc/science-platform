@@ -31,6 +31,7 @@ from metrics.services.models import (
     EfficiencyObservation,
     PlatformObservation,
     SessionObservation,
+    SessionUsageObservation,
     UserObservation,
 )
 from tests.test_cache_helpers import FakeCacheCoordinator
@@ -185,12 +186,15 @@ class FakeUsageProvider:
     async def shutdown(self) -> None:
         """Satisfy the runtime lifecycle seam."""
 
-    async def read_session_usage(self, session_id: str) -> dict[str, str]:
-        """Return one usage map."""
+    async def read_session_usage(self, session_id: str) -> SessionUsageObservation:
+        """Return one usage observation."""
         del session_id
         if self.usage_error is not None:
             raise self.usage_error
-        return {"cpu": "0.5", "memory": "1Gi"}
+        return SessionUsageObservation(
+            usage={"cpu": "0.5", "memory": "1Gi"},
+            observed_at=datetime.now(UTC),
+        )
 
 
 def _cache(surface: str) -> FakeCacheCoordinator[CachedSnapshot]:
