@@ -208,7 +208,7 @@ def _session_selected_pods(
 
 def _render_window(duration_seconds: int) -> str:
     """Render one bounded PromQL range selector."""
-    bounded = max(60, min(duration_seconds, _MAX_SESSION_WINDOW_SECONDS))
+    bounded = min(max(duration_seconds, 1), _MAX_SESSION_WINDOW_SECONDS)
     return f"{bounded}s"
 
 
@@ -228,6 +228,7 @@ def _session_cpu_efficiency(
             _matcher("pod", "!=", ""),
             _matcher("container", "!=", ""),
             _matcher("container", "!=", "POD"),
+            _matcher("container", "!=", "pause"),
             _matcher("image", "!=", ""),
         ),
     )
@@ -240,6 +241,8 @@ def _session_cpu_efficiency(
             _matcher("unit", "=", "core"),
             _matcher("pod", "!=", ""),
             _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+            _matcher("container", "!=", "pause"),
         ),
     )
     usage = (
@@ -269,6 +272,7 @@ def _session_memory_efficiency(
             _matcher("pod", "!=", ""),
             _matcher("container", "!=", ""),
             _matcher("container", "!=", "POD"),
+            _matcher("container", "!=", "pause"),
         ),
     )
     request_source = _selector(
@@ -280,6 +284,8 @@ def _session_memory_efficiency(
             _matcher("unit", "=", "byte"),
             _matcher("pod", "!=", ""),
             _matcher("container", "!=", ""),
+            _matcher("container", "!=", "POD"),
+            _matcher("container", "!=", "pause"),
         ),
     )
     usage = (

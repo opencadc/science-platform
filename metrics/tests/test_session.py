@@ -222,19 +222,25 @@ async def test_session_provider_missing_job_is_not_found() -> None:
 
 
 async def test_kubemetrics_sums_running_pod_usage() -> None:
-    """Usage excludes pause containers and formats public units."""
+    """Usage excludes pause containers, non-Running pods, and formats public units."""
     api = FakeKubernetesApi(
+        pods={
+            "work-a": [
+                _pod("pod-a", "work-a", "sess-1", phase="Running"),
+                _pod("pod-b", "work-a", "sess-1", phase="Succeeded"),
+            ]
+        },
         pod_metrics={
             "work-a": [
                 _pod_metrics("pod-a", cpu="500m", memory="1Gi"),
                 _pod_metrics("pod-b", cpu="250m", memory="512Mi"),
             ]
-        }
+        },
     )
     provider = KubeMetricsProvider(_settings(), api=api)
     usage = await provider.read_session_usage("sess-1")
 
-    assert usage == {"cpu": "0.75", "memory": "1.5Gi"}
+    assert usage == {"cpu": "0.5", "memory": "1Gi"}
 
 
 async def test_session_service_returns_usage_and_efficiency() -> None:
@@ -347,6 +353,71 @@ def test_session_not_found_is_sanitized() -> None:
 
     assert response.status_code == 404
     assert response.json()["reason"] == "NotFound"
+
+
+def test_session_bad_id_returns_bad_request() -> None:
+    """Malformed session ids map to a stable 400 response."""
+    runtime, _provider = _runtime()
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/session/a%2Fb")
+
+    assert response.status_code == 400
+    assert response.json()["reason"] == "BadRequest"
+
+
+async def test_session_service_omits_efficiency_without_start_time() -> None:
+    """Pending sessions without Job startTime skip efficiency loading."""
+    api = FakeKubernetesApi(
+        jobs={
+            "work-a": [
+                _job(
+                    "desktop",
+                    "work-a",
+                    "sess-1",
+                    start_time=None,
+                    completion_time=None,
+                )
+            ]
+        },
+        pods={"work-a": [_pod("desktop-pod", "work-a", "sess-1", phase="Pending")]},
+    )
+    efficiency_called = False
+
+    async def efficiency(_observation: SessionObservation) -> EfficiencyObservation:
+        nonlocal efficiency_called
+        efficiency_called = True
+        return EfficiencyObservation(datetime.now(UTC), {"cpu": Decimal("0.5")})
+
+    result = await _session_service(
+        session_provider=SessionProvider(_settings(), api=api),
+        usage_loader=KubeMetricsProvider(_settings(), api=api).read_session_usage,
+        session_efficiency=efficiency,
+    ).get(MetricsSubject("session", "sess-1"))
+
+    assert result.ready
+    assert result.efficiency is None
+    assert efficiency_called is False
+
+
+async def test_session_service_marks_partial_when_efficiency_fails() -> None:
+    """A PromQL failure keeps Job data but marks PartialData."""
+
+    async def failing_efficiency(_observation: SessionObservation) -> EfficiencyObservation:
+        raise ProviderUnavailableError("PromQL unavailable")
+
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1", start_time="2026-01-01T12:00:00Z")]},
+        pods={"work-a": [_pod("desktop-pod", "work-a", "sess-1")]},
+    )
+    result = await _session_service(
+        session_provider=SessionProvider(_settings(), api=api),
+        usage_loader=KubeMetricsProvider(_settings(), api=api).read_session_usage,
+        session_efficiency=failing_efficiency,
+    ).get(MetricsSubject("session", "sess-1"))
+
+    assert result.ready is False
+    assert result.ready_reason == "PartialData"
+    assert result.efficiency is None
 
 
 def test_session_provider_failure_is_service_unavailable() -> None:

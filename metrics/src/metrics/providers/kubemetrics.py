@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from typing import Any
 
@@ -18,6 +19,7 @@ from metrics.providers.kueue import (
     _validate_subject,
     create_kube_api,
 )
+from metrics.providers.session import fetch_pod_docs
 from metrics.services.resources import format_resource_amount, merge_resource_totals, parse_resource_amount
 
 
@@ -26,6 +28,7 @@ _SESSION_LABEL = "canfar.net/id"
 _PAUSE_CONTAINERS = frozenset({"pause", "POD"})
 _USAGE_RESOURCES = frozenset({"cpu", "memory"})
 _MAX_RESULT_OBJECTS = 3_000
+_POD_API_VERSION = "v1"
 
 
 def _container_usage(container: dict[str, Any]) -> dict[str, Decimal]:
@@ -106,8 +109,27 @@ class KubeMetricsProvider:
                 label_selector=selector,
             )
 
+        async def fetch_running_pods(namespace: str) -> frozenset[str]:
+            docs = await fetch_pod_docs(
+                api,
+                _POD_API_VERSION,
+                namespace,
+                label_selector=selector,
+            )
+            running: set[str] = set()
+            for doc in docs:
+                metadata = _mapping(doc.get("metadata"), "Pod metadata was invalid")
+                name = metadata.get("name")
+                status = _mapping(doc.get("status"), "Pod status was invalid")
+                if isinstance(name, str) and status.get("phase") == "Running":
+                    running.add(name)
+            return frozenset(running)
+
         try:
-            docs_by_namespace = await _bounded_map(self._config.namespaces, fetch)
+            metrics_by_namespace, running_by_namespace = await asyncio.gather(
+                _bounded_map(self._config.namespaces, fetch),
+                _bounded_map(self._config.namespaces, fetch_running_pods),
+            )
         except kr8s.NotFoundError as exc:
             raise ProviderUnavailableError("metrics.k8s.io is unavailable") from exc
         except kr8s.ServerError as exc:
@@ -116,8 +138,17 @@ class KubeMetricsProvider:
             raise ProviderUnavailableError("PodMetrics access failed") from exc
 
         totals: dict[str, Decimal] = {}
-        for docs in docs_by_namespace:
+        for _namespace, docs, running_pods in zip(
+            self._config.namespaces,
+            metrics_by_namespace,
+            running_by_namespace,
+            strict=True,
+        ):
             for doc in docs:
+                metadata = _mapping(doc.get("metadata"), "PodMetrics metadata was invalid")
+                pod_name = metadata.get("name")
+                if not isinstance(pod_name, str) or pod_name not in running_pods:
+                    continue
                 containers = _list(
                     _mapping(doc, "PodMetrics object was invalid").get("containers"),
                     "PodMetrics containers were missing or invalid",
