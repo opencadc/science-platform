@@ -29,6 +29,8 @@ spec:
           value: "${skaha.userid}"
         - name: skaha_sessionid
           value: "${skaha.sessionid}"
+        - name: skaha_sessionname
+          value: "${skaha.sessionname}"
         - name: JUPYTER_TOKEN
           value: "${skaha.sessionid}"
         - name: JUPYTER_CONFIG_DIR
