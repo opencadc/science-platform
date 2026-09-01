@@ -19,7 +19,7 @@ interface PodUsageProvider {
     static PodUsageProvider fromEnvironment() {
         final String source = System.getenv(SKAHA_POD_METRICS_SOURCE);
         if (SOURCE_BACKEND.equalsIgnoreCase(source)) {
-            return new MetricsBackendPodUsageProvider();
+            return new MetricsBackendPodUsageProvider(SessionMetricsDAO.fromEnvironmentOrNull());
         }
         return new KubernetesPodUsageProvider(new PodMetricsDAO());
     }

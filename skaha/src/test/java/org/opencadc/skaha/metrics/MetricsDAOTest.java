@@ -1,6 +1,9 @@
 package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.util.StringUtil;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.util.List;
 import java.util.Map;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -87,8 +90,32 @@ public class MetricsDAOTest {
     }
 
     @Test
-    public void backendProviderIsNotImplemented() {
-        final PodUsageProvider provider = new MetricsBackendPodUsageProvider();
-        Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
+    public void getPodResourceUsageUsesBackendSessionApiForListedJobs() throws Exception {
+        final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
+        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
+                .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
+
+        final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(sessionMetricsDAO));
+        final List<V1Job> jobs = List.of(new V1Job()
+                .metadata(new V1ObjectMeta()
+                        .name("job-a-main")
+                        .labels(Map.of("canfar.net/id", "session-a"))));
+
+        final PodResourceUsage usage = dao.getPodResourceUsage("alice", false, jobs);
+
+        Assert.assertEquals("0.500", usage.cpu().get("job-a-main"));
+        Assert.assertEquals("0.54", usage.memory().get("job-a-main"));
+    }
+
+    @Test
+    public void backendProviderReturnsEmptyWithoutJobs() {
+        final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused")));
+        Assert.assertEquals(PodResourceUsage.empty(), dao.getPodResourceUsage("alice", false, List.of()));
+    }
+
+    @Test
+    public void backendProviderGetPodMetricsReturnsEmpty() throws Exception {
+        final PodUsageProvider provider = new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused"));
+        Assert.assertEquals(PodMetrics.empty(), provider.getPodMetrics("alice", false));
     }
 }

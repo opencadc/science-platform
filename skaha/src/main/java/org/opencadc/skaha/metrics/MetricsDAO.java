@@ -1,5 +1,7 @@
 package org.opencadc.skaha.metrics;
 
+import io.kubernetes.client.openapi.models.V1Job;
+import java.util.List;
 import org.apache.log4j.Logger;
 
 /**
@@ -73,7 +75,20 @@ public class MetricsDAO {
      * @return session-list pod usage DTO
      */
     public PodResourceUsage getPodResourceUsage(final String userID, final boolean omitHeadless) {
+        return getPodResourceUsage(userID, omitHeadless, List.of());
+    }
+
+    /**
+     * Fetch session-list pod usage, using per-session Metrics backend calls when the backend provider is selected.
+     *
+     * @param userJobs listed session Jobs; required for backend pod-usage source
+     */
+    public PodResourceUsage getPodResourceUsage(
+            final String userID, final boolean omitHeadless, final List<V1Job> userJobs) {
         try {
+            if (podUsageProvider instanceof MetricsBackendPodUsageProvider backendProvider) {
+                return PodMetrics.toPodResourceUsage(backendProvider.getPodMetricsForJobs(userJobs));
+            }
             return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless));
         } catch (Exception e) {
             log.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
