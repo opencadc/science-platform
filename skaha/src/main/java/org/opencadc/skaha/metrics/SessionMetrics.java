@@ -14,10 +14,6 @@ record SessionMetrics(String sessionId, Map<String, String> usageByResource) {
         usageByResource = Collections.unmodifiableMap(usageByResource);
     }
 
-    static SessionMetrics empty(final String sessionId) {
-        return new SessionMetrics(sessionId, Map.of());
-    }
-
     String cpuUsage() {
         return usageByResource.get("cpu");
     }

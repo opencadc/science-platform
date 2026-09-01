@@ -232,6 +232,7 @@ async def test_session_provider_missing_job_is_not_found() -> None:
 async def test_kubemetrics_sums_running_pod_usage() -> None:
     """Usage excludes pause containers, non-Running pods, and formats public units."""
     api = FakeKubernetesApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1")]},
         pods={
             "work-a": [
                 _pod("pod-a", "work-a", "sess-1", phase="Running"),
@@ -245,11 +246,38 @@ async def test_kubemetrics_sums_running_pod_usage() -> None:
             ]
         },
     )
-    provider = KubeMetricsProvider(_settings(), api=api)
-    observation = await provider.read_session_usage("sess-1")
+    session_observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+    usage_observation = await KubeMetricsProvider(_settings(), api=api).read_session_usage(
+        session_observation
+    )
 
-    assert observation.usage == {"cpu": "0.5", "memory": "1Gi"}
-    assert observation.observed_at == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
+    assert usage_observation.usage == {"cpu": "0.5", "memory": "1Gi"}
+    assert usage_observation.observed_at == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
+
+
+async def test_kubemetrics_observed_at_uses_oldest_podmetrics_timestamp() -> None:
+    """Conservative observedAt uses the oldest contributing PodMetrics timestamp."""
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1")]},
+        pods={
+            "work-a": [
+                _pod("pod-a", "work-a", "sess-1", phase="Running"),
+                _pod("pod-b", "work-a", "sess-1", phase="Running"),
+            ]
+        },
+        pod_metrics={
+            "work-a": [
+                _pod_metrics("pod-a", timestamp="2026-01-01T12:30:00Z"),
+                _pod_metrics("pod-b", timestamp="2026-01-01T12:20:00Z"),
+            ]
+        },
+    )
+    session_observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+    usage_observation = await KubeMetricsProvider(_settings(), api=api).read_session_usage(
+        session_observation
+    )
+
+    assert usage_observation.observed_at == datetime(2026, 1, 1, 12, 20, tzinfo=UTC)
 
 
 async def test_session_service_returns_usage_and_efficiency() -> None:
@@ -265,7 +293,7 @@ async def test_session_service_returns_usage_and_efficiency() -> None:
 
     async def efficiency(observation: SessionObservation) -> EfficiencyObservation:
         assert observation.session == "sess-1"
-        return EfficiencyObservation(now, {"cpu": Decimal("0.4")})
+        return EfficiencyObservation(now, {"cpu": Decimal("0.4"), "memory": Decimal("0.3")})
 
     result = await _session_service(
         session_provider=session_provider,
@@ -283,7 +311,7 @@ async def test_session_service_returns_usage_and_efficiency() -> None:
 async def test_session_service_marks_partial_when_running_usage_fails() -> None:
     """A kube-metrics failure with Running pods keeps Job data but marks PartialData."""
 
-    async def failing_usage(_session_id: str) -> dict[str, str]:
+    async def failing_usage(_observation: SessionObservation) -> SessionUsageObservation:
         raise ProviderUnavailableError("metrics.k8s.io unavailable")
 
     api = FakeKubernetesApi(
@@ -395,7 +423,9 @@ async def test_session_service_omits_efficiency_without_start_time() -> None:
     async def efficiency(_observation: SessionObservation) -> EfficiencyObservation:
         nonlocal efficiency_called
         efficiency_called = True
-        return EfficiencyObservation(datetime.now(UTC), {"cpu": Decimal("0.5")})
+        return EfficiencyObservation(
+            datetime.now(UTC), {"cpu": Decimal("0.5"), "memory": Decimal("0.4")}
+        )
 
     result = await _session_service(
         session_provider=SessionProvider(_settings(), api=api),
@@ -549,7 +579,7 @@ async def test_session_service_marks_partial_when_pods_unreachable() -> None:
 async def test_session_service_marks_partial_when_usage_times_out() -> None:
     """A bounded usage timeout counts as a usage failure for Running pods."""
 
-    async def slow_usage(_session_id: str) -> SessionUsageObservation:
+    async def slow_usage(_observation: SessionObservation) -> SessionUsageObservation:
         await asyncio.sleep(1)
         return SessionUsageObservation(usage={"cpu": "1"}, observed_at=datetime.now(UTC))
 

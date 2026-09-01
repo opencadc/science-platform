@@ -53,7 +53,9 @@ All surfaces expose:
 - one subject in `spec.user`, `spec.community`, `spec.platform`, or
   `spec.session`;
 - `status.observedAt`, the conservative observation time for the report;
-- `status.reservingWorkloads`, the sum of Kueue reserving workloads; and
+- `status.reservingWorkloads`, the count of reserving workloads for that
+  surface (Kueue queues for User, Community, and Platform; matching Jobs for
+  Session); and
 - exactly one `Ready` and one `Cached` condition.
 
 User and Community resources expose:

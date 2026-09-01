@@ -186,9 +186,9 @@ class FakeUsageProvider:
     async def shutdown(self) -> None:
         """Satisfy the runtime lifecycle seam."""
 
-    async def read_session_usage(self, session_id: str) -> SessionUsageObservation:
+    async def read_session_usage(self, observation: SessionObservation) -> SessionUsageObservation:
         """Return one usage observation."""
-        del session_id
+        del observation
         if self.usage_error is not None:
             raise self.usage_error
         return SessionUsageObservation(

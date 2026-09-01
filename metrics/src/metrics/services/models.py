@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 import re
@@ -123,6 +123,8 @@ class EfficiencyObservation:
             normalized[resource] = bounded_decimal(value)
         if not normalized:
             raise ValueError("efficiency observations must contain at least one resource")
+        if set(normalized) != _EFFICIENCY_RESOURCES:
+            raise ValueError("efficiency observations must contain cpu and memory together")
         object.__setattr__(self, "efficiencies", normalized)
 
 
@@ -171,6 +173,7 @@ class SessionObservation:
     window_end: datetime
     has_running_pods: bool
     pods_reachable: bool = True
+    running_pods_by_namespace: dict[str, frozenset[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate the queue count, timestamps, and observation time."""

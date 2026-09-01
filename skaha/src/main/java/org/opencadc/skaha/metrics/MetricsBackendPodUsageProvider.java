@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 /**
@@ -22,14 +23,11 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
 
     private static final Logger log = Logger.getLogger(MetricsBackendPodUsageProvider.class);
     private static final int MAX_CONCURRENT_REQUESTS = 8;
+    private static final int AGGREGATE_TIMEOUT_SECONDS = 30;
     private static final ExecutorService SESSION_METRICS_EXECUTOR =
             Executors.newFixedThreadPool(MAX_CONCURRENT_REQUESTS);
 
     private final SessionMetricsDAO sessionMetricsDAO;
-
-    MetricsBackendPodUsageProvider() {
-        this(SessionMetricsDAO.fromEnvironmentOrNull());
-    }
 
     MetricsBackendPodUsageProvider(final SessionMetricsDAO sessionMetricsDAO) {
         this.sessionMetricsDAO = sessionMetricsDAO;
@@ -51,7 +49,11 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
                 .map(sessionId -> CompletableFuture.runAsync(
                         () -> fetchSessionMetrics(sessionId, metricsBySessionId), SESSION_METRICS_EXECUTOR))
                 .toArray(CompletableFuture[]::new);
-        CompletableFuture.allOf(requests).join();
+        try {
+            CompletableFuture.allOf(requests).get(AGGREGATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception ex) {
+            log.warn("Session metrics fan-out timed out or failed: " + ex.getMessage(), ex);
+        }
 
         final Map<String, String> cpuByJobName = new HashMap<>();
         final Map<String, String> memoryByJobName = new HashMap<>();

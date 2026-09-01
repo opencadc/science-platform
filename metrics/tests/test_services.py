@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+from decimal import Decimal
+
 import pytest
 
 from metrics.cache import CacheFillTimeout, CacheIdentity, CacheUnavailable, FRESHNESS_POLICIES
@@ -460,3 +462,9 @@ async def test_coordinator_is_the_only_cache_lookup_telemetry_owner() -> None:
     await service.get(MetricsSubject("platform", "canfar"))
 
     assert recorder.lookups == 1
+
+
+def test_efficiency_observation_requires_cpu_and_memory_together() -> None:
+    """Partial efficiency vectors are rejected at the shared model boundary."""
+    with pytest.raises(ValueError, match="cpu and memory together"):
+        EfficiencyObservation(NOW, {"cpu": Decimal("0.5")})

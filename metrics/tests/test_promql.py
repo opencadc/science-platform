@@ -507,13 +507,16 @@ def test_session_sample_age_is_validated_against_evaluation_time() -> None:
     """Session efficiency rejects samples stale relative to the query time."""
     evaluation_time = datetime(2026, 1, 1, 13, 0, tzinfo=UTC)
     stale_sample_time = evaluation_time - timedelta(minutes=11)
-    payload = _payload(_sample("cpu", "0.4", stale_sample_time))
+    payload = _payload(
+        _sample("cpu", "0.4", stale_sample_time),
+        _sample("memory", "0.3", stale_sample_time),
+    )
     with pytest.raises(ProviderExecutionError, match="stale or future"):
-        promql_module._validate_session_response(
+        promql_module._validate_response(
             payload,
             max_series=10,
             max_sample_age_seconds=600,
             future_sample_tolerance_seconds=5,
-            evaluation_time=evaluation_time,
             cutoff=None,
+            evaluation_time=evaluation_time,
         )

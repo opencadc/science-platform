@@ -36,7 +36,6 @@ _DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
 _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
 _DEFAULT_MAX_SERIES = 3_000
 _DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
-_DEFAULT_SCRAPE_INTERVAL_SECONDS = 60
 _MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
 
 
@@ -331,70 +330,6 @@ def _session_query(
     return f"{_label_resource(cpu_ratio, 'cpu')} or {_label_resource(memory_ratio, 'memory')}"
 
 
-def _validate_session_response(
-    payload: Any,
-    *,
-    max_series: int,
-    max_sample_age_seconds: int,
-    future_sample_tolerance_seconds: int,
-    evaluation_time: datetime | None,
-    cutoff: datetime | None,
-) -> EfficiencyObservation:
-    """Validate and normalize one or two session efficiency samples."""
-    if not isinstance(payload, dict) or payload.get("status") != "success":
-        raise ProviderExecutionError("PromQL API did not return success")
-    data = payload.get("data")
-    if not isinstance(data, dict) or data.get("resultType") != "vector":
-        raise ProviderExecutionError("PromQL API did not return an instant vector")
-    result = data.get("result")
-    if not isinstance(result, list) or len(result) > max_series or not result:
-        raise ProviderExecutionError("PromQL session vector was empty or too large")
-
-    validation_now = evaluation_time or _validation_now()
-    now_seconds = Decimal(str(validation_now.timestamp()))
-    cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
-    observed_timestamp: Decimal | None = None
-    observed_at: datetime | None = None
-    efficiencies: dict[str, Decimal] = {}
-
-    for series in result:
-        if not isinstance(series, dict):
-            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
-        labels = series.get("metric")
-        sample = series.get("value")
-        if (
-            not isinstance(labels, dict)
-            or set(labels) != {"resource"}
-            or not isinstance(labels.get("resource"), str)
-            or not isinstance(sample, list)
-            or len(sample) != 2
-        ):
-            raise ProviderExecutionError("PromQL returned an invalid efficiency series")
-        resource = labels["resource"]
-        if resource not in _EFFICIENCY_RESOURCES or resource in efficiencies:
-            raise ProviderExecutionError("PromQL returned an unknown efficiency resource")
-
-        sample_timestamp, sample_at = _sample_timestamp(sample[0])
-        if observed_timestamp is None:
-            observed_timestamp = sample_timestamp
-            observed_at = sample_at
-        elif sample_timestamp != observed_timestamp:
-            raise ProviderExecutionError("PromQL efficiency samples have different timestamps")
-
-        age = now_seconds - sample_timestamp
-        if age > Decimal(max_sample_age_seconds) or age < -Decimal(future_sample_tolerance_seconds):
-            raise ProviderExecutionError("PromQL returned a stale or future sample")
-        if cutoff_seconds is not None and sample_timestamp > cutoff_seconds + Decimal(
-            future_sample_tolerance_seconds
-        ):
-            raise ProviderExecutionError("PromQL returned a sample after the requested cutoff")
-        efficiencies[resource] = _sample_value(sample[1])
-
-    if observed_at is None or not efficiencies:
-        raise ProviderExecutionError("PromQL session efficiency vector is incomplete")
-    return EfficiencyObservation(observed_at=observed_at, efficiencies=efficiencies)
-
-
 def _query(
     *,
     scope: _PROMQL_SCOPE,
@@ -440,10 +375,8 @@ def _result_vector(payload: Any, max_series: int) -> list[Any]:
     if not isinstance(data, dict) or data.get("resultType") != "vector":
         raise ProviderExecutionError("PromQL API did not return an instant vector")
     result = data.get("result")
-    if not isinstance(result, list) or len(result) > max_series:
+    if not isinstance(result, list) or len(result) > max_series or not result:
         raise ProviderExecutionError("PromQL vector cardinality exceeded the configured limit")
-    if len(result) != 2:
-        raise ProviderExecutionError("PromQL efficiency vector must contain cpu and memory")
     return result
 
 
@@ -477,10 +410,14 @@ def _validate_response(
     max_sample_age_seconds: int,
     future_sample_tolerance_seconds: int,
     cutoff: datetime | None,
+    evaluation_time: datetime | None = None,
 ) -> EfficiencyObservation:
-    """Validate and normalize the two controlled efficiency samples."""
+    """Validate and normalize controlled CPU and memory efficiency samples."""
     result = _result_vector(payload, max_series)
-    validation_now = _validation_now()
+    if len(result) != 2:
+        raise ProviderExecutionError("PromQL efficiency vector must contain cpu and memory")
+
+    validation_now = evaluation_time or _validation_now()
     now_seconds = Decimal(str(validation_now.timestamp()))
     cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
     observed_timestamp: Decimal | None = None
@@ -654,71 +591,44 @@ class PromQLProvider:
         observed_at: datetime | None,
     ) -> EfficiencyObservation:
         """Execute and validate one fixed session duration query."""
-        if self._endpoint is None:
-            raise ProviderUnavailableError("PromQL endpoint is not configured")
         if not isinstance(session_id, str) or not session_id:
             raise ProviderExecutionError("PromQL session id must be a non-empty string")
-        cutoff = _normalise_cutoff(observed_at)
         query = _session_query(
             session_id=session_id,
             cluster=self._cluster,
             namespaces=self._namespaces,
             duration_seconds=duration_seconds,
         )
+        return await self._execute_efficiency_read(
+            scope="session",
+            query=query,
+            evaluation_time=evaluation_time,
+            observed_at=observed_at,
+        )
+
+    async def _execute_efficiency_read(
+        self,
+        *,
+        scope: str,
+        query: str,
+        evaluation_time: datetime | None = None,
+        observed_at: datetime | None = None,
+    ) -> EfficiencyObservation:
+        """Execute one fixed query and validate its efficiency vector."""
+        if self._endpoint is None:
+            raise ProviderUnavailableError("PromQL endpoint is not configured")
+        cutoff = _normalise_cutoff(observed_at)
         started = perf_counter()
         status = "ok"
         try:
             payload = await self._request(query, evaluation_time=evaluation_time)
-            return _validate_session_response(
-                payload,
-                max_series=self._max_series,
-                max_sample_age_seconds=self._max_sample_age_seconds,
-                future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
-                evaluation_time=evaluation_time,
-                cutoff=cutoff,
-            )
-        except asyncio.CancelledError:
-            status = "cancelled"
-            raise
-        except Exception:
-            status = "error"
-            raise
-        finally:
-            self._telemetry.record_provider_duration(
-                provider=self.name,
-                scope="session",
-                status=status,
-                seconds=perf_counter() - started,
-            )
-
-    async def _read(
-        self,
-        scope: _PROMQL_SCOPE,
-        subject: str | None,
-        observed_at: datetime | None,
-    ) -> EfficiencyObservation:
-        """Execute and validate one fixed instant query."""
-        if self._endpoint is None:
-            raise ProviderUnavailableError("PromQL endpoint is not configured")
-        if scope != "platform" and (not isinstance(subject, str) or not subject):
-            raise ProviderExecutionError("PromQL subject must be a non-empty string")
-        cutoff = _normalise_cutoff(observed_at)
-        query = _query(
-            scope=scope,
-            subject=subject,
-            cluster=self._cluster,
-            namespaces=self._namespaces,
-        )
-        started = perf_counter()
-        status = "ok"
-        try:
-            payload = await self._request(query)
             return _validate_response(
                 payload,
                 max_series=self._max_series,
                 max_sample_age_seconds=self._max_sample_age_seconds,
                 future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
                 cutoff=cutoff,
+                evaluation_time=evaluation_time,
             )
         except asyncio.CancelledError:
             status = "cancelled"
@@ -733,6 +643,27 @@ class PromQLProvider:
                 status=status,
                 seconds=perf_counter() - started,
             )
+
+    async def _read(
+        self,
+        scope: _PROMQL_SCOPE,
+        subject: str | None,
+        observed_at: datetime | None,
+    ) -> EfficiencyObservation:
+        """Execute and validate one fixed instant query."""
+        if scope != "platform" and (not isinstance(subject, str) or not subject):
+            raise ProviderExecutionError("PromQL subject must be a non-empty string")
+        query = _query(
+            scope=scope,
+            subject=subject,
+            cluster=self._cluster,
+            namespaces=self._namespaces,
+        )
+        return await self._execute_efficiency_read(
+            scope=scope,
+            query=query,
+            observed_at=observed_at,
+        )
 
     async def _request(
         self,

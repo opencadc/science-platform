@@ -293,7 +293,7 @@ class _LifecycleUsageProvider:
     async def shutdown(self) -> None:
         """Satisfy the provider lifecycle protocol."""
 
-    async def read_session_usage(self, _session_id: str) -> SessionUsageObservation:
+    async def read_session_usage(self, _observation: SessionObservation) -> SessionUsageObservation:
         """Return empty usage for lifecycle tests."""
         return SessionUsageObservation(usage={}, observed_at=datetime.now(UTC))
 

@@ -215,6 +215,22 @@ def _pod_template_requests(doc: dict[str, Any]) -> dict[str, Decimal]:
     return totals
 
 
+def _running_pods_by_namespace(
+    pods: list[tuple[str, dict[str, Any]]],
+) -> dict[str, frozenset[str]]:
+    """Index Running pod names by namespace from one labelled Pod list."""
+    running: dict[str, set[str]] = {}
+    for namespace, doc in pods:
+        if _pod_phase(doc) != "Running":
+            continue
+        metadata = _mapping(doc.get("metadata"), "Pod metadata was invalid")
+        name = metadata.get("name")
+        if not isinstance(name, str):
+            raise ProviderExecutionError("Pod metadata name was missing or invalid")
+        running.setdefault(namespace, set()).add(name)
+    return {namespace: frozenset(names) for namespace, names in running.items()}
+
+
 def _pod_phase(doc: dict[str, Any]) -> str:
     """Return one Pod's phase."""
     status = _mapping(doc.get("status"), "Pod status was invalid")
@@ -238,7 +254,6 @@ class SessionProvider:
 
     def __init__(self, settings: Settings, api: Any | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
-        self._settings = settings
         self._config: KueueProviderConfig = settings.providers.kueue
         self._api = api
 
@@ -390,6 +405,7 @@ class SessionProvider:
             window_end=window.window_end,
             has_running_pods=window.has_running_pods,
             pods_reachable=pods_reachable,
+            running_pods_by_namespace=_running_pods_by_namespace(pods) if pods_reachable else {},
         )
 
     async def startup(self) -> None:

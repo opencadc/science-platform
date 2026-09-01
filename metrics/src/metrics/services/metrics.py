@@ -47,7 +47,7 @@ AnyObservation = PlatformObservation | WorkloadObservation | SessionObservation
 PlatformLoader = Callable[[], Awaitable[PlatformObservation]]
 WorkloadLoader = Callable[[str], Awaitable[WorkloadObservation]]
 SessionLoader = Callable[[str], Awaitable[SessionObservation]]
-SessionUsageLoader = Callable[[str], Awaitable[SessionUsageObservation]]
+SessionUsageLoader = Callable[[SessionObservation], Awaitable[SessionUsageObservation]]
 PlatformEfficiencyLoader = Callable[[], Awaitable[EfficiencyObservation]]
 WorkloadEfficiencyLoader = Callable[[str], Awaitable[EfficiencyObservation]]
 SessionEfficiencyLoader = Callable[[SessionObservation], Awaitable[EfficiencyObservation]]
@@ -305,7 +305,7 @@ class MetricsService:
         tasks: list[asyncio.Future[Any]] = []
         if binding.usage_loader is not None:
             usage_task = asyncio.create_task(
-                self._bounded_session_usage_load(session_id, binding.usage_loader)
+                self._bounded_session_usage_load(observation, binding.usage_loader)
             )
             tasks.append(usage_task)
         if binding.efficiency_loader is not None and observation.start_time is not None:
@@ -393,13 +393,13 @@ class MetricsService:
 
     async def _bounded_session_usage_load(
         self,
-        session_id: str,
+        observation: SessionObservation,
         loader: SessionUsageLoader,
     ) -> SessionUsageObservation | None:
         """Bound optional session usage without failing the primary Job read."""
         try:
             async with asyncio.timeout(self._efficiency_timeout_seconds):
-                return await loader(session_id)
+                return await loader(observation)
         except TimeoutError as exc:
             raise ProviderUnavailableError("Session usage load timed out") from exc
 

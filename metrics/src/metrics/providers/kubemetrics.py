@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -21,8 +20,8 @@ from metrics.providers.kueue import (
     _validate_subject,
     create_kube_api,
 )
-from metrics.providers.session import _parse_timestamp, fetch_pod_docs
-from metrics.services.models import SessionUsageObservation
+from metrics.providers.session import _parse_timestamp
+from metrics.services.models import SessionObservation, SessionUsageObservation
 from metrics.services.resources import format_resource_amount, merge_resource_totals, parse_resource_amount
 
 
@@ -31,7 +30,6 @@ _SESSION_LABEL = "canfar.net/id"
 _PAUSE_CONTAINERS = frozenset({"pause", "POD"})
 _USAGE_RESOURCES = frozenset({"cpu", "memory"})
 _MAX_RESULT_OBJECTS = 3_000
-_POD_API_VERSION = "v1"
 
 
 def _container_usage(container: dict[str, Any]) -> dict[str, Decimal]:
@@ -85,7 +83,6 @@ class KubeMetricsProvider:
 
     def __init__(self, settings: Settings, api: Any | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
-        self._settings = settings
         self._config: KueueProviderConfig = settings.providers.kueue
         self._api = api
 
@@ -98,9 +95,13 @@ class KubeMetricsProvider:
                 raise ProviderUnavailableError("Could not configure Kubernetes API access") from exc
         return self._api
 
-    async def read_session_usage(self, session_id: str) -> SessionUsageObservation:
-        """Return summed Running-pod usage for one session id."""
-        session_id = _validate_subject(session_id)
+    async def read_session_usage(self, observation: SessionObservation) -> SessionUsageObservation:
+        """Return summed Running-pod usage using the session's shared pod snapshot."""
+        session_id = _validate_subject(observation.session)
+        running_pods_by_namespace = observation.running_pods_by_namespace
+        if not observation.pods_reachable:
+            return SessionUsageObservation(usage={}, observed_at=observation.observed_at)
+
         api = await self._ensure_api()
         selector = f"{_SESSION_LABEL}={session_id}"
 
@@ -112,27 +113,8 @@ class KubeMetricsProvider:
                 label_selector=selector,
             )
 
-        async def fetch_running_pods(namespace: str) -> frozenset[str]:
-            docs = await fetch_pod_docs(
-                api,
-                _POD_API_VERSION,
-                namespace,
-                label_selector=selector,
-            )
-            running: set[str] = set()
-            for doc in docs:
-                metadata = _mapping(doc.get("metadata"), "Pod metadata was invalid")
-                name = metadata.get("name")
-                status = _mapping(doc.get("status"), "Pod status was invalid")
-                if isinstance(name, str) and status.get("phase") == "Running":
-                    running.add(name)
-            return frozenset(running)
-
         try:
-            metrics_by_namespace, running_by_namespace = await asyncio.gather(
-                _bounded_map(self._config.namespaces, fetch),
-                _bounded_map(self._config.namespaces, fetch_running_pods),
-            )
+            metrics_by_namespace = await _bounded_map(self._config.namespaces, fetch)
         except kr8s.NotFoundError as exc:
             raise ProviderUnavailableError("metrics.k8s.io is unavailable") from exc
         except kr8s.ServerError as exc:
@@ -142,12 +124,8 @@ class KubeMetricsProvider:
 
         totals: dict[str, Decimal] = {}
         observed_at: datetime | None = None
-        for _namespace, docs, running_pods in zip(
-            self._config.namespaces,
-            metrics_by_namespace,
-            running_by_namespace,
-            strict=True,
-        ):
+        for namespace, docs in zip(self._config.namespaces, metrics_by_namespace, strict=True):
+            running_pods = running_pods_by_namespace.get(namespace, frozenset())
             for doc in docs:
                 metadata = _mapping(doc.get("metadata"), "PodMetrics metadata was invalid")
                 pod_name = metadata.get("name")
@@ -156,7 +134,7 @@ class KubeMetricsProvider:
                 raw_timestamp = doc.get("timestamp")
                 if raw_timestamp is not None:
                     parsed = _parse_timestamp(raw_timestamp, "PodMetrics timestamp was invalid")
-                    observed_at = parsed if observed_at is None else max(observed_at, parsed)
+                    observed_at = parsed if observed_at is None else min(observed_at, parsed)
                 containers = _list(
                     _mapping(doc, "PodMetrics object was invalid").get("containers"),
                     "PodMetrics containers were missing or invalid",
@@ -166,7 +144,7 @@ class KubeMetricsProvider:
                     for name, value in _container_usage(container).items():
                         merge_resource_totals(totals, name, value)
         if not totals:
-            return SessionUsageObservation(usage={}, observed_at=_observation_time())
+            return SessionUsageObservation(usage={}, observed_at=observation.observed_at)
         if observed_at is None:
             observed_at = _observation_time()
         return SessionUsageObservation(
