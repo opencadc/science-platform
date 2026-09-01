@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.6](https://github.com/opencadc/science-platform/compare/metrics-v0.1.5...metrics-v0.1.6) (2026-09-01)
+
+
+### Features
+
+* CANFAR Science Platform Grafana dashboards ([#1147](https://github.com/opencadc/science-platform/issues/1147)) ([faca289](https://github.com/opencadc/science-platform/commit/faca289eb5ae3da86f0342fcaef5a282e5078c49))
+
+
+### Bug Fixes
+
+* **skaha:** adjust build configuration ([60b5ba8](https://github.com/opencadc/science-platform/commit/60b5ba865121d1db8a9d10cb404c1ba3bb0af4f9))
+* **skaha:** correct session name parameter ([6aa171d](https://github.com/opencadc/science-platform/commit/6aa171da30c4ea74a76dbc99c671f8c0adfc71b1))
+
+
+### Documentation
+
+* **metrics:** ignore AI adapter dirs and fix ADR/docs cleanup ([399416b](https://github.com/opencadc/science-platform/commit/399416b2b825ba3ea3190dd9d825f5843d1b6e59))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([9bc7d92](https://github.com/opencadc/science-platform/commit/9bc7d9296b9e598204d7b511517e642f84d7df04))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([0cf4955](https://github.com/opencadc/science-platform/commit/0cf49556c5364bc8f0cfd40c2859af4188120660))
+* **skaha:** document session labels and drop planning scratch ([dc95b0c](https://github.com/opencadc/science-platform/commit/dc95b0c1f74c190693bc97cf6914ebfd5b3e20d1))
+
 ## [0.1.5](https://github.com/opencadc/science-platform/compare/metrics-v0.1.4...metrics-v0.1.5) (2026-05-13)
 
 
