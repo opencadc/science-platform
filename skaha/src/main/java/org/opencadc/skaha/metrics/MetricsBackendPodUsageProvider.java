@@ -3,14 +3,16 @@ package org.opencadc.skaha.metrics;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
@@ -28,9 +30,23 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
             Executors.newFixedThreadPool(MAX_CONCURRENT_REQUESTS);
 
     private final SessionMetricsDAO sessionMetricsDAO;
+    private final int maxConcurrentRequests;
+    private final int aggregateTimeoutSeconds;
+    private final ExecutorService sessionMetricsExecutor;
 
     MetricsBackendPodUsageProvider(final SessionMetricsDAO sessionMetricsDAO) {
+        this(sessionMetricsDAO, MAX_CONCURRENT_REQUESTS, AGGREGATE_TIMEOUT_SECONDS, SESSION_METRICS_EXECUTOR);
+    }
+
+    MetricsBackendPodUsageProvider(
+            final SessionMetricsDAO sessionMetricsDAO,
+            final int maxConcurrentRequests,
+            final int aggregateTimeoutSeconds,
+            final ExecutorService sessionMetricsExecutor) {
         this.sessionMetricsDAO = sessionMetricsDAO;
+        this.maxConcurrentRequests = maxConcurrentRequests;
+        this.aggregateTimeoutSeconds = aggregateTimeoutSeconds;
+        this.sessionMetricsExecutor = sessionMetricsExecutor;
     }
 
     @Override
@@ -45,15 +61,7 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
         }
 
         final Map<String, SessionMetrics> metricsBySessionId = new ConcurrentHashMap<>();
-        final CompletableFuture<?>[] requests = sessionIdToJobNames.keySet().stream()
-                .map(sessionId -> CompletableFuture.runAsync(
-                        () -> fetchSessionMetrics(sessionId, metricsBySessionId), SESSION_METRICS_EXECUTOR))
-                .toArray(CompletableFuture[]::new);
-        try {
-            CompletableFuture.allOf(requests).get(AGGREGATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (Exception ex) {
-            log.warn("Session metrics fan-out timed out or failed: " + ex.getMessage(), ex);
-        }
+        fetchSessionMetricsBounded(sessionIdToJobNames.keySet(), metricsBySessionId);
 
         final Map<String, String> cpuByJobName = new HashMap<>();
         final Map<String, String> memoryByJobName = new HashMap<>();
@@ -77,6 +85,85 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
             }
         }
         return new PodMetrics(cpuByJobName, memoryByJobName);
+    }
+
+    private void fetchSessionMetricsBounded(
+            final Collection<String> sessionIds, final Map<String, SessionMetrics> metricsBySessionId) {
+        if (sessionIds.isEmpty()) {
+            return;
+        }
+
+        final List<String> pendingSessionIds = new ArrayList<>(sessionIds);
+        final int totalSessions = pendingSessionIds.size();
+        final ExecutorCompletionService<Void> completionService =
+                new ExecutorCompletionService<>(sessionMetricsExecutor);
+        final List<Future<?>> submittedFutures = new ArrayList<>();
+        final long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(aggregateTimeoutSeconds);
+        int nextSessionIndex = 0;
+        int completedSessions = 0;
+        int inFlightSessions = 0;
+
+        try {
+            while (completedSessions < totalSessions) {
+                while (inFlightSessions < maxConcurrentRequests && nextSessionIndex < totalSessions) {
+                    final String sessionId = pendingSessionIds.get(nextSessionIndex++);
+                    final Future<Void> future = completionService.submit(() -> {
+                        fetchSessionMetrics(sessionId, metricsBySessionId);
+                        return null;
+                    });
+                    submittedFutures.add(future);
+                    inFlightSessions++;
+                }
+
+                if (inFlightSessions == 0) {
+                    break;
+                }
+
+                final long remainingNanos = deadlineNanos - System.nanoTime();
+                if (remainingNanos <= 0L) {
+                    log.warn("Session metrics fan-out reached aggregate deadline after completing " + completedSessions
+                            + " of " + totalSessions + " sessions");
+                    break;
+                }
+
+                final Future<Void> completedFuture;
+                try {
+                    completedFuture = completionService.poll(remainingNanos, TimeUnit.NANOSECONDS);
+                } catch (final InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Session metrics fan-out interrupted after completing " + completedSessions + " of "
+                            + totalSessions + " sessions");
+                    break;
+                }
+
+                if (completedFuture == null) {
+                    log.warn("Session metrics fan-out timed out after completing " + completedSessions + " of "
+                            + totalSessions + " sessions");
+                    break;
+                }
+
+                inFlightSessions--;
+                completedSessions++;
+                try {
+                    completedFuture.get();
+                } catch (final Exception ex) {
+                    if (!(ex instanceof InterruptedException)) {
+                        log.debug("Session metrics task completed with failure: " + ex.getMessage());
+                    }
+                }
+            }
+        } finally {
+            int cancelledSessions = 0;
+            for (final Future<?> future : submittedFutures) {
+                if (!future.isDone() && future.cancel(true)) {
+                    cancelledSessions++;
+                }
+            }
+            if (cancelledSessions > 0) {
+                log.warn(
+                        "Cancelled " + cancelledSessions + " in-flight session metrics requests at aggregate deadline");
+            }
+        }
     }
 
     private void fetchSessionMetrics(final String sessionId, final Map<String, SessionMetrics> metricsBySessionId) {
