@@ -27,7 +27,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}  # checkout PR HEAD commit
           fetch-depth: 0  # required for merge-base check
       - name: Run Commit Check
-        uses: commit-check/commit-check-action@562a184b2b8e583e757b17eb385bc48370f44547 # v2.13.1
+        uses: commit-check/commit-check-action@f803083a5bf0867b60d77189bc3810fce2f0e314 # v2.15.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # use GITHUB_TOKEN because of use pr-comments
           # Default subject max is 80; allow longer conventional-commit subjects in PR history.
