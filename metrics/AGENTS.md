@@ -10,9 +10,9 @@
 - `docs/` — the Metrics glossary, ADRs, implementation contract, environment
   contract, and operator guidance.
 
-Confluence remains canonical for the approved product design. Git documents
-must describe the implementation of that design and must not resurrect the
-superseded accounting, Cohort, or Running-Pod source model.
+Confluence remains product-design authority. Git [`docs/specs.md`](docs/specs.md)
+is the implementation-of-record and may lead Confluence. Do not resurrect the
+superseded accounting, Cohort, or Running-Pod-as-primary source model.
 
 ## Validation
 
@@ -34,12 +34,15 @@ local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
   `canfar.net/community`.
 - Platform totals include every configured ClusterQueue. Cohorts are not a
   Metrics source.
-- `flavorsReservation` is the source for public request totals;
-  `reservingWorkloads` is the public workload count.
+- Session reports aggregate Jobs labelled `canfar.net/id` in the configured
+  namespaces, including desktop-app children that share the id.
+- `flavorsReservation` is the source for public User/Community request totals;
+  `reservingWorkloads` is the public workload count (Job count for Session).
 - Prometheus/Mimir is optional and receives fixed, server-owned PromQL for
-  current CPU and memory efficiency. The presence of
+  current (or Session duration) CPU and memory efficiency. The presence of
   `METRICS_PROVIDERS__PROMQL__BASE_URL` enables it; absence disables it.
   Callers never provide PromQL.
+- Platform-owned labels: [`../skaha/docs/labels.md`](../skaha/docs/labels.md).
 
 ## Configuration names
 
@@ -56,7 +59,7 @@ production-owned monitoring stack.
 
 ## Documentation changes
 
-When changing the domain model, update `CONTEXT.md`, the relevant ADR, and the
-implementation-backed documents together. Use Google-style docstrings for
+When changing the domain model, update `CONTEXT.md`, the relevant ADR, and
+[`docs/specs.md`](docs/specs.md) together. Use Google-style docstrings for
 Python source changes and Conventional Commits for commits; this worker does
 not create commits.

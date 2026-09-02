@@ -24,6 +24,7 @@ export METRICS_BASE_URL='<metrics-base-url>'
 export METRICS_NAMESPACE='<metrics-namespace>'
 export METRICS_USER='<canonical-username>'
 export METRICS_COMMUNITY='<canonical-community>'
+export METRICS_SESSION='<canonical-session-id>'
 
 kubectl -n "$METRICS_NAMESPACE" get pods \
   -l app.kubernetes.io/name=metrics-api -o wide
@@ -36,6 +37,8 @@ curl -sS -i \
   "$METRICS_BASE_URL/apis/canfar.net/v1alpha1/metrics/user/$METRICS_USER"
 curl -sS -i \
   "$METRICS_BASE_URL/apis/canfar.net/v1alpha1/metrics/community/$METRICS_COMMUNITY"
+curl -sS -i \
+  "$METRICS_BASE_URL/apis/canfar.net/v1alpha1/metrics/session/$METRICS_SESSION"
 ```
 
 Confirm:
@@ -47,16 +50,19 @@ Confirm:
 - User/Community values are `requests` and optional current `efficiency`;
 - Platform values are comparable `capacity` and `allocated` plus optional
   current `efficiency`;
-- `Cache-Control: no-store`, `Age`, `Last-Modified`, and `Cache-Status` remain
-  present and coherent; and
+- Session values are `requests` plus optional `usage` and duration
+  `efficiency`;
+- `Cache-Control: no-store`, `Age`, and `Cache-Status` remain present and
+  coherent; and
 - a PromQL failure while `METRICS_PROVIDERS__PROMQL__BASE_URL` is present is
-  HTTP 200 with `PartialData`, while a primary Kueue failure without a
-  serviceable snapshot is HTTP 503.
+  HTTP 200 with `PartialData`, while a primary Kueue or Session Job failure
+  without a serviceable snapshot is HTTP 503.
 
 If a subject unexpectedly returns 404 or a primary source returns 503, inspect
-the queue metadata and configured namespace/ClusterQueue lists using
-[`metadata-labels.md`](../metadata-labels.md). Do not treat an absent label or
-inaccessible queue as zero resources.
+the queue or Job metadata and configured namespace/ClusterQueue lists using
+[`../../../skaha/docs/labels.md`](../../../skaha/docs/labels.md) and
+[`../specs.md`](../specs.md). Do not treat an absent label or inaccessible
+queue as zero resources.
 
 ## Stop conditions
 

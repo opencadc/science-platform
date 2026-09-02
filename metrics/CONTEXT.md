@@ -142,13 +142,18 @@ condition.
 _Avoid_: per-Pod inventory, time-series database, collection endpoint
 
 **PartialData**:
-The `Ready=False` reason used when optional Session sources fail but the primary
-Job report is successfully served. This includes optional efficiency, live
-usage, or pod-state reads. The HTTP response remains 200.
+The `Ready=False` reason used when an optional source fails but the primary
+report is successfully served. This covers PromQL efficiency on any surface and
+Session live usage or pod-state reads. The HTTP response remains 200.
 _Avoid_: zero efficiency, accounting incomplete
+
+**StaleData**:
+The `Ready=False` reason used when a serviceable stale snapshot is served.
+When the result is stale, this reason wins over `PartialData`.
+_Avoid_: expired report, Redis unavailable
 
 **Service-unavailable report**:
 An HTTP 503 response when the primary Kueue or Session Job source fails and no
-serviceable snapshot exists. Optional Session source failures alone do not
-produce 503 when Job data is complete.
+serviceable snapshot exists. Optional source failures alone do not produce 503
+when primary data is complete.
 _Avoid_: empty zero report, partial success

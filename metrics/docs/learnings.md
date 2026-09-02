@@ -1,8 +1,9 @@
 # Metrics learnings
 
 This file records concise, implementation-backed lessons. Durable architecture
-decisions live in [`adr/README.md`](adr/README.md); queue identity and
-attribution rules live in [`metadata-labels.md`](metadata-labels.md).
+decisions live in [`adr/README.md`](adr/README.md); platform-owned labels live
+in [`../../skaha/docs/labels.md`](../../skaha/docs/labels.md); the wire
+contract lives in [`specs.md`](specs.md).
 
 ## Current lessons
 
@@ -25,7 +26,7 @@ attribution rules live in [`metadata-labels.md`](metadata-labels.md).
     ClusterQueues, and Platform totals come from the configured ClusterQueue
     list. Do not reintroduce Pod inventory, Cohorts, or a producer to fill a
     source gap.
-  - Evidence: ADR-0010, `docs/architecture.md`, and the Confluence Metrics
+  - Evidence: ADR-0010, `docs/specs.md`, and the Confluence Metrics
     Backend contract.
   - Action taken: Superseded the accounting and Pod-source ADR sections and
     removed the accounting runbook.
@@ -43,8 +44,8 @@ attribution rules live in [`metadata-labels.md`](metadata-labels.md).
   - Lesson: Core Kueue labels and conditional PromQL labels are different
     contracts. Platform-controlled admission stamping must preserve exact,
     case-sensitive values from LocalQueue through Jobs and Pod templates.
-  - Evidence: `docs/metadata-labels.md` and the fixed PromQL label contract.
-  - Action taken: Added a dedicated metadata-label requirements document and
+  - Evidence: `skaha/docs/labels.md` and the fixed PromQL label contract.
+  - Action taken: Documented attribution against the Skaha label catalog and
     linked it from the service entry points.
 
 - Date: August 25, 2026
@@ -52,7 +53,7 @@ attribution rules live in [`metadata-labels.md`](metadata-labels.md).
   - Lesson: One shared Redis lease per surface and subject prevents duplicate
     Kueue/PromQL reads across replicas while unrelated subjects remain
     parallel. An in-process lock alone is insufficient.
-  - Evidence: ADR-0005 and `docs/design.md`.
+  - Evidence: ADR-0005 and `docs/specs.md`.
   - Action taken: Kept the cache policy at User/Community 2/10/15 minutes and
     Platform 5/30/60 minutes.
 
@@ -61,7 +62,7 @@ attribution rules live in [`metadata-labels.md`](metadata-labels.md).
   - Lesson: Efficiency is a current Running-Pod ratio from Prometheus/Mimir,
     not a lifetime value. It must remain optional and server-owned; a backend
     failure returns Kueue data with `PartialData`.
-  - Evidence: `docs/specs.md`, `docs/metadata-labels.md`, and ADR-0010.
+  - Evidence: `docs/specs.md`, `skaha/docs/labels.md`, and ADR-0010.
   - Action taken: Removed usage-hours, checkpoints, and producer language from
     the current documentation.
 

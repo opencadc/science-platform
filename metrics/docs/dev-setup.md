@@ -93,7 +93,7 @@ every ingested series used by the fixed query. `external_labels.cluster` is
 appropriate on the remote-write path to Mimir but is insufficient by itself
 for a local Prometheus query. The fixture must propagate authoritative labels
 to Jobs and Pod templates so recreated Running Pods retain attribution. See
-[`metadata-labels.md`](metadata-labels.md).
+[`../../skaha/docs/labels.md`](../../skaha/docs/labels.md).
 
 ## Read-only Kueue inspection
 
@@ -197,7 +197,7 @@ Redis recovery instructions.
 ## Related documentation
 
 - [`README.md`](../README.md)
-- [`architecture.md`](architecture.md)
 - [`specs.md`](specs.md)
-- [`metadata-labels.md`](metadata-labels.md)
+- [`../../skaha/docs/labels.md`](../../skaha/docs/labels.md)
 - [`environment-contracts.md`](environment-contracts.md)
+- [`adr/README.md`](adr/README.md)

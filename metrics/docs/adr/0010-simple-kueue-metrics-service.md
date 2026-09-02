@@ -7,32 +7,23 @@ Accepted.
 ## Decision
 
 Metrics is one asynchronous FastAPI service with one shared external Redis
-cache. User reports list LocalQueues in configured namespaces by exact
-`canfar.net/username`, restrict them to the configured ClusterQueues, and sum
-`flavorsReservation` plus `reservingWorkloads`. Community reports aggregate
-configured ClusterQueues labelled exact `canfar.net/community`; no match is a
-404. Platform reports aggregate all configured ClusterQueues only: nominal
-quota is `capacity`, `flavorsUsage` is `allocated`, and Cohorts are excluded.
+cache and one public `canfar.net/v1alpha1` `Metrics` kind. Four subject routes
+select User, Community, Platform, or Session. User, Community, and Platform
+primary sources are Kueue only: LocalQueues by exact `canfar.net/username` in
+configured namespaces (restricted to configured ClusterQueues), ClusterQueues
+by exact `canfar.net/community`, and all configured ClusterQueues for
+Platform. Session primary source is `batch/v1` Jobs by exact `canfar.net/id`,
+including desktop-app children that share the id.
 
-Each surface uses distributed per-subject single-flight with fixed windows:
-User 2/3/5 minutes, Community 5/10/15 minutes, Platform 5/30/60 minutes. Prometheus or
-Mimir is optional and may supply current CPU/memory efficiency through fixed
-server-owned PromQL over Running Pods. The presence of
-`METRICS_PROVIDERS__PROMQL__BASE_URL` enables that source and absence disables
-it; there is no separate enable flag. It does not become an accounting source
-and callers never submit PromQL. The app may export application-state OTLP
-metrics, but not OTLP traces or logs, to an external endpoint.
+Public aggregation uses `flavorsReservation` / `reservingWorkloads` for User
+and Community, nominal quota and `flavorsUsage` for Platform capacity and
+allocation, and Job template requests plus Job count for Session. Optional
+instant PromQL efficiency covers User, Community, and Platform; Session may
+add optional `metrics.k8s.io` usage and duration PromQL efficiency. Cohorts,
+Running-Pod inventory as a primary source, separate quota/session CR kinds,
+lifetime accounting, producers, checkpoints, and usage-hours are excluded.
 
-The public response contains `reservingWorkloads`; User and Community expose
-`requests` plus optional `efficiency`; Platform exposes `capacity` and
-`allocated` plus optional `efficiency`; `Ready` and `Cached` remain. Optional
-efficiency failure returns HTTP 200 with `PartialData`. A primary Kueue failure
-returns 503 when no serviceable snapshot exists. The production chart owns no
-Redis, KSM, Prometheus/Mimir, or OTLP Collector; test fixtures may provide
-disposable instances.
-
-This decision supersedes the Pod-source and lifetime-accounting portions of
-ADRs 0001, 0002, 0004, 0007, 0008, and 0009, and the Cohort aggregation
-assumptions in the former Kueue design. There is no producer, checkpoint
-store, usage-hours field, accounting period, or Metrics-owned time-series
-database in the current service.
+Cache windows, failure matrices, PromQL shapes, and OpenAPI status semantics
+live in [`../specs.md`](../specs.md). Session's addition to this boundary is
+also indexed as [ADR-0011](0011-session-metrics-surface.md) for historical
+cites.

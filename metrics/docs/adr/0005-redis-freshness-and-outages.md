@@ -2,46 +2,28 @@
 
 ## Status
 
-Accepted. The surface source boundary is defined by
-[ADR-0010](0010-simple-kueue-metrics-service.md).
+Accepted.
 
 ## Decision
 
-Redis is one shared external cache for all Metrics replicas and read surfaces.
+Redis is the shared external cache for every Metrics replica and read surface.
 It stores authenticated, versioned snapshots and short-lived distributed
-leases. Raw User and Community values are protected in key identities. The
-production chart references Redis but does not provision, persist, replicate,
-back up, or operate it.
+leases. Subject-bearing key segments are HMAC-protected digests. The production
+chart references Redis but does not provision or operate it.
 
-Fresh/serviceable/retained windows are fixed:
+Fresh, serviceable-stale, and retained windows are fixed per surface (see
+[`../specs.md`](../specs.md)). Fresh snapshots return immediately. A stale
+serviceable request may return the stale snapshot while one lease winner
+performs a **request-triggered** refresh; there is no periodic refresh worker.
+A cold or unserviceable miss has one fill winner and cross-replica followers
+wait for the same publication.
 
-| Surface | Fresh | Serviceable stale | Retained, not served |
-| --- | ---: | ---: | ---: |
-| User | 2m | 3m | 5m |
-| Community | 5m | 10m | 15m |
-| Platform | 5m | 30m | 60m |
-
-Fresh snapshots return immediately. A stale-serviceable request may return
-the stale snapshot while one lease winner refreshes it. A cold or
-unserviceable request has one fill winner and cross-replica followers wait for
-the same publication. Leases have bounded lifetimes and owner-checked
-release. There is no background refresh worker.
-
-If the primary Kueue source fails, a complete serviceable snapshot may be
-served with stale cache provenance. If no serviceable snapshot exists, the API
-returns sanitized HTTP 503. An optional Prometheus/Mimir failure does not
-erase Kueue data: the API returns HTTP 200, omits efficiency, and marks
-`Ready=False`/`PartialData`.
+If the primary source fails, a complete serviceable snapshot may be served
+with stale cache provenance (`Ready=False`/`StaleData`). Otherwise the API
+returns sanitized HTTP 503. Optional PromQL or Session usage failure does not
+erase primary data: HTTP 200 with `Ready=False`/`PartialData`.
 
 Redis failure does not trigger an uncoordinated source read per request. A
-bounded process-local copy may serve a previously known serviceable snapshot
-according to the same policy, but it is not a second shared cache and it never
+bounded process-local L1 copy may serve a previously known serviceable
+snapshot under the same windows; it is not a second shared cache and never
 extends the serviceable window.
-
-## Consequences
-
-- Horizontal API replicas share one cache-coordination boundary.
-- Freshness is deterministic and differs by surface.
-- Redis operations and source fills require bounded timeouts.
-- Operators restore external Redis without flushing snapshots as a first step;
-  cache state is recovery evidence.

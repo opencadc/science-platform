@@ -278,7 +278,8 @@ def create_app(
         summary="CANFAR Science Platform Metrics API",
         description=(
             "API for Kueue ClusterQueue capacity, LocalQueue reservations, "
-            "and optional attributed efficiency across platform, user, and community reports."
+            "Session Job usage, and optional attributed efficiency across "
+            "platform, user, community, and session reports."
         ),
         lifespan=partial(
             _application_lifespan,

@@ -291,7 +291,10 @@ async def get_session_metrics(
     response_model_exclude_none=True,
     responses={
         400: {"model": Status, "description": "Malformed platform value."},
-        404: {"model": Status, "description": "Platform is not configured."},
+        404: {
+            "model": Status,
+            "description": "Path platform does not match METRICS_PLATFORM_NAME.",
+        },
         405: {"model": Status, "description": "The HTTP method is not allowed."},
         500: {"model": Status, "description": "The metrics report could not be produced."},
         503: {"model": Status, "description": "No serviceable report is available."},
