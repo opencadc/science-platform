@@ -1,237 +1,509 @@
-"""Kueue provider: quantities, kr8s fetch semantics, startup checks, fingerprint."""
+"""Focused tests for the Kueue-only Metrics provider."""
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+from typing import Any
 
 import httpx
 import kr8s
 import pytest
 
-from metrics.core.settings import KueueProviderConfig, ProviderConfigs, Settings
-from metrics.errors import ProviderExecutionError, RuntimeStartupError
-from metrics.providers.kueue import (
-    KueueProvider,
-    fetch_cluster_queue_docs,
-    format_resource_amount,
-    merge_resource_totals,
-    parse_resource_amount,
+from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
+from metrics.errors import (
+    ProviderExecutionError,
+    ProviderUnavailableError,
+    RuntimeStartupError,
+    SubjectNotFoundError,
 )
-from tests.fakes import FakeKueueApi
+from metrics.providers.kueue import KueueProvider
+
 
 pytestmark = pytest.mark.anyio
 
 
-def _settings(queues: list[str]) -> Settings:
+def _settings(*, queues: list[str] | None = None, namespaces: list[str] | None = None) -> Settings:
+    """Build valid mandatory-Redis settings for provider tests."""
     return Settings(
-        cluster_name="c",
-        providers=ProviderConfigs(kueue=KueueProviderConfig(cluster_queues=queues)),
-    )
-
-
-# --- Quantities (quantiphy-backed helpers; units per ADR-0002/0024) ---
-
-
-@pytest.mark.parametrize(
-    ("resource", "raw", "expected"),
-    [
-        ("cpu", "250m", 0.25),
-        ("cpu", "0", 0.0),
-        ("cpu", "1.5", 1.5),
-        ("memory", "512Mi", 0.5),
-        ("memory", "1.5Gi", 1.5),
-        ("memory", "1Ti", 1024.0),
-        ("memory", "1G", 0.9313225746154785),
-        ("ephemeral-storage", "5Ei", 5 * 2**30),
-        ("nvidia.com/gpu", "1.5", 1.5),
-        ("example.com/bandwidth", "1Mi", 1048576.0),
-    ],
-)
-def test_parse_resource_amounts_in_public_units(resource: str, raw: str, expected: float) -> None:
-    assert parse_resource_amount(resource, raw) == pytest.approx(expected)
-
-
-@pytest.mark.parametrize(
-    "raw",
-    [None, "", "-1", "NaN", "9223372036854775808", " 1Gi "],
-)
-def test_invalid_quantities_are_rejected(raw: object) -> None:
-    with pytest.raises(ProviderExecutionError):
-        parse_resource_amount("nvidia.com/gpu", raw)
-
-
-def test_formatting_units_precision_and_overflow() -> None:
-    assert format_resource_amount("cpu", 38.0) == "38"
-    assert format_resource_amount("cpu", 0.0005) == "0.0005"
-    assert format_resource_amount("cpu", 1e3) == "1000"
-    assert format_resource_amount("memory", 88.0) == "88Gi"
-
-    # Float noise must not leak: 0.1 * 3 prints as 0.3.
-    totals: dict[str, float] = {}
-    for _ in range(3):
-        merge_resource_totals(totals, "cpu", parse_resource_amount("cpu", "0.1"))
-    assert format_resource_amount("cpu", totals["cpu"]) == "0.3"
-
-    # Overflow is checked in base units (storage) and at 2**63 (everything).
-    with pytest.raises(ProviderExecutionError):
-        format_resource_amount("cpu", float(2**63))
-    with pytest.raises(ProviderExecutionError):
-        merge_resource_totals({"memory": 5 * 2**33}, "memory", 5 * 2**33)
-
-
-# --- fetch_cluster_queue_docs (kr8s access) ---
-
-
-async def test_fetch_orders_results_and_maps_missing_to_http_404() -> None:
-    api = FakeKueueApi(
-        {"cq-a": {"metadata": {"name": "cq-a"}}, "cq-b": {"metadata": {"name": "cq-b"}}}
-    )
-    assert await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", []) == []
-    docs = await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", ["cq-b", "cq-a"])
-    assert [d["metadata"]["name"] for d in docs] == ["cq-b", "cq-a"]
-    with pytest.raises(kr8s.ServerError) as exc_info:
-        await fetch_cluster_queue_docs(api, "kueue.x-k8s.io/v1beta2", ["cq-a", "cq-gone"])
-    assert exc_info.value.response is not None
-    assert exc_info.value.response.status_code == 404
-
-
-# --- platform() rejects corrupt upstream data without leaking payloads ---
-
-
-@pytest.mark.parametrize(
-    ("doc", "match"),
-    [
-        (
-            {
-                "spec": {
-                    "resourceGroups": [
-                        {
-                            "flavors": [
-                                {"resources": [{"name": "cpu", "nominalQuota": "bad-secret-value"}]}
-                            ]
-                        }
-                    ]
-                }
-            },
-            "invalid resource quantity",
-        ),
-        (
-            {
-                "spec": {
-                    "resourceGroups": [
-                        {"flavors": [{"resources": [{"name": "cpu", "nominalQuota": "1"}]}]}
-                    ]
-                },
-                "status": {
-                    "flavorsUsage": [{"resources": [{"name": "cpu", "total": "bad-secret-value"}]}]
-                },
-            },
-            "invalid resource quantity",
-        ),
-        ({"spec": {"resourceGroups": "secret-shape"}}, "invalid object shape"),
-    ],
-)
-async def test_platform_rejects_corrupt_documents(doc: dict, match: str) -> None:
-    provider = KueueProvider(_settings(["cq-a"]), api=FakeKueueApi({"cq-a": doc}))
-    with pytest.raises(ProviderExecutionError, match=match) as exc_info:
-        await provider.platform()
-    assert "secret" not in str(exc_info.value)
-
-
-@pytest.mark.parametrize(
-    ("error", "expected_message"),
-    [
-        (
-            httpx.ConnectError("raw transport secret at https://kubernetes.default.svc"),
-            "Failed querying Kueue objects (upstream request error)",
-        ),
-        (
-            kr8s.ServerError("secret detail", response=httpx.Response(500)),
-            "Kubernetes returned HTTP 500 querying Kueue objects",
-        ),
-        (
-            kr8s.ServerError("cq-a not found", response=httpx.Response(404)),
-            "Kubernetes returned HTTP 404 querying Kueue objects",
-        ),
-    ],
-)
-async def test_platform_sanitizes_upstream_errors(error: Exception, expected_message: str) -> None:
-    provider = KueueProvider(_settings(["cq-a"]), api=FakeKueueApi({"cq-a": error}))
-    with pytest.raises(ProviderExecutionError) as exc_info:
-        await provider.platform()
-    assert str(exc_info.value) == expected_message
-
-
-# --- startup validation (fail-fast, sanitized) ---
-
-
-@pytest.mark.parametrize(
-    ("queues", "docs", "match"),
-    [
-        ([], {}, "CLUSTER_QUEUES"),
-        (["cq-a", "cq-missing"], {"cq-a": {"metadata": {}}}, "'cq-missing'.*not found"),
-        (
-            ["cq-forbidden"],
-            {"cq-forbidden": kr8s.ServerError("Forbidden", response=httpx.Response(403))},
-            "'cq-forbidden'.*forbidden",
-        ),
-        (
-            ["cq-a"],
-            {"cq-a": httpx.ConnectError("secret at https://kubernetes.default.svc")},
-            "^Cannot reach Kubernetes API for Kueue startup checks$",
-        ),
-    ],
-)
-async def test_startup_fails_fast_with_sanitized_messages(
-    queues: list[str],
-    docs: dict[str, object],
-    match: str,
-) -> None:
-    provider = KueueProvider(_settings(queues), api=FakeKueueApi(docs))
-    with pytest.raises(RuntimeStartupError, match=match) as exc_info:
-        await provider.startup()
-    assert "kubernetes.default.svc" not in str(exc_info.value)
-
-
-async def test_startup_api_construction_failure_is_sanitized(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def broken_api(*_args: object, **_kwargs: object) -> object:
-        raise RuntimeError("secret kubeconfig path /home/user/.kube/config")
-
-    monkeypatch.setattr("metrics.providers.kueue.create_kube_api", broken_api)
-    provider = KueueProvider(_settings(["cq-a"]))
-    with pytest.raises(RuntimeStartupError) as exc_info:
-        await provider.startup()
-    assert str(exc_info.value) == "Cannot configure Kubernetes API access for Kueue startup checks"
-
-
-# --- identity ---
-
-
-def test_fingerprint_covers_identity_and_excludes_transport() -> None:
-    def fingerprint(
-        *, api_version: str = "kueue.x-k8s.io/v1beta2", queues=("cq-a", "cq-b"), timeout=10.0
-    ):
-        settings = Settings(
-            providers=ProviderConfigs(
-                kueue=KueueProviderConfig(
-                    cluster_queues=list(queues),
-                    kueue_api_version=api_version,
-                    kube_request_timeout_seconds=timeout,
-                )
+        cluster_name="cluster-a",
+        redis_url="redis://redis.test:6379/0",
+        cache=CacheConfig(key_secret="x" * 32),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(
+                cluster_queues=queues or ["cq-astronomy", "cq-physics"],
+                namespaces=namespaces or ["work-a", "work-b"],
             )
+        ),
+    )
+
+
+def _cluster_queue(name: str, community: str, *, cpu: str = "4") -> dict[str, Any]:
+    """Build one labelled ClusterQueue fixture."""
+    return {
+        "metadata": {"name": name, "labels": {"canfar.net/community": community}},
+        "spec": {
+            "resourceGroups": [{"flavors": [{"resources": [{"name": "cpu", "nominalQuota": cpu}]}]}]
+        },
+        "status": {
+            "flavorsReservation": [{"resources": [{"name": "cpu", "total": "2"}]}],
+            "flavorsUsage": [{"resources": [{"name": "cpu", "total": "1"}]}],
+            "reservingWorkloads": 2,
+        },
+    }
+
+
+def _local_queue(
+    name: str,
+    namespace: str,
+    username: str,
+    community: str,
+    cluster_queue: str,
+    *,
+    cpu: str = "1",
+    reserving: int = 1,
+) -> dict[str, Any]:
+    """Build one labelled LocalQueue fixture."""
+    return {
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "canfar.net/username": username,
+                "canfar.net/community": community,
+            },
+        },
+        "spec": {"clusterQueue": cluster_queue},
+        "status": {
+            "flavorsReservation": [{"resources": [{"name": "cpu", "total": cpu}]}],
+            "flavorsUsage": [],
+            "reservingWorkloads": reserving,
+        },
+    }
+
+
+class FakeKueueApi:
+    """Return ClusterQueue GETs and namespaced LocalQueue LISTs."""
+
+    def __init__(
+        self,
+        queues: dict[str, dict[str, Any]],
+        local_queues: dict[str, list[dict[str, Any]]],
+        *,
+        local_metadata: dict[str, dict[str, Any]] | None = None,
+    ):
+        self.queues = queues
+        self.local_queues = local_queues
+        self.local_metadata = local_metadata or {}
+        self.local_selectors: list[tuple[str, str | None]] = []
+        self.local_params: list[tuple[str, dict[str, str]]] = []
+
+    @contextlib.asynccontextmanager
+    async def call_api(
+        self,
+        *,
+        method: str,
+        version: str,
+        url: str,
+        namespace: str | None = None,
+        params: dict[str, str] | None = None,
+    ):
+        """Implement the small kr8s call_api surface used by the provider."""
+        del method, version
+        if url.startswith("clusterqueues/"):
+            name = url.rsplit("/", 1)[-1]
+            value = self.queues.get(name)
+            if value is None:
+                raise kr8s.ServerError("not found", response=httpx.Response(404))
+            yield httpx.Response(200, json=value)
+            return
+        assert namespace is not None
+        selector = None if params is None else params.get("labelSelector")
+        self.local_selectors.append((namespace, selector))
+        self.local_params.append((namespace, dict(params or {})))
+        yield httpx.Response(
+            200,
+            json={
+                "items": self.local_queues.get(namespace, []),
+                "metadata": self.local_metadata.get(namespace, {}),
+            },
         )
-        return KueueProvider(settings, api=FakeKueueApi()).cache_fingerprint()
-
-    baseline = fingerprint()
-    assert fingerprint(api_version="kueue.x-k8s.io/v1beta1") != baseline
-    assert fingerprint(queues=("cq-a", "cq-c")) != baseline
-    assert fingerprint(queues=("cq-b", "cq-a")) == baseline
-    assert fingerprint(timeout=99.0) == baseline
 
 
-async def test_shutdown_is_idempotent_and_releases_api() -> None:
-    provider = KueueProvider(_settings(["cq-a"]), api=FakeKueueApi())
-    await provider.shutdown()
-    await provider.shutdown()
-    assert provider._api is None  # noqa: SLF001 - lifecycle contract
+def _provider(
+    api: FakeKueueApi,
+    *,
+    queues: list[str] | None = None,
+    namespaces: list[str] | None = None,
+) -> KueueProvider:
+    """Construct a provider over the fake API."""
+    settings = _settings(queues=queues, namespaces=namespaces)
+    return KueueProvider(settings, api=api)
+
+
+async def test_platform_sums_capacity_allocation_and_reserving_workloads() -> None:
+    """Platform totals use configured ClusterQueues and exclude Cohorts."""
+    api = FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
+            "cq-physics": _cluster_queue("cq-physics", "physics", cpu="6"),
+        },
+        {"work-a": [], "work-b": []},
+    )
+
+    result = await _provider(api).read_platform()
+
+    assert result.capacity == {"cpu": "10"}
+    assert result.allocated == {"cpu": "2"}
+    assert result.reserving_workloads == 4
+
+
+async def test_clusterqueue_reads_use_bounded_concurrency_in_configured_order() -> None:
+    """Configured ClusterQueue GETs overlap without starting the full list at once."""
+    names = ["cq-a", "cq-b", "cq-c", "cq-d", "cq-e"]
+
+    class BlockingApi(FakeKueueApi):
+        def __init__(self) -> None:
+            super().__init__(
+                {name: _cluster_queue(name, "astronomy", cpu="1") for name in names},
+                {"work-a": []},
+            )
+            self.active = 0
+            self.max_active = 0
+            self.started: list[str] = []
+            self.bound_reached = asyncio.Event()
+            self.release = asyncio.Event()
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs):
+            url = kwargs["url"]
+            if not url.startswith("clusterqueues/"):
+                async with super().call_api(**kwargs) as response:
+                    yield response
+                return
+            self.started.append(url.rsplit("/", 1)[-1])
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+            if self.active == 4:
+                self.bound_reached.set()
+            try:
+                await self.release.wait()
+                async with super().call_api(**kwargs) as response:
+                    yield response
+            finally:
+                self.active -= 1
+
+    api = BlockingApi()
+    task = asyncio.create_task(_provider(api, queues=names, namespaces=["work-a"]).read_platform())
+    try:
+        async with asyncio.timeout(1):
+            await api.bound_reached.wait()
+        await asyncio.sleep(0)
+        assert api.started == names[:4]
+        assert api.max_active == 4
+        api.release.set()
+        result = await task
+    finally:
+        api.release.set()
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    assert result.capacity == {"cpu": "5"}
+    assert api.started == names
+
+
+async def test_clusterqueue_failure_cancels_siblings_and_propagates() -> None:
+    """One failed configured GET cancels every in-flight sibling before returning."""
+    names = ["cq-a", "cq-b", "cq-c", "cq-d", "cq-e"]
+
+    class FailingApi(FakeKueueApi):
+        def __init__(self) -> None:
+            super().__init__(
+                {name: _cluster_queue(name, "astronomy") for name in names},
+                {"work-a": []},
+            )
+            self.started: list[str] = []
+            self.cancelled: set[str] = set()
+            self.siblings_started = asyncio.Event()
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs):
+            name = kwargs["url"].rsplit("/", 1)[-1]
+            self.started.append(name)
+            if len(self.started) == 4:
+                self.siblings_started.set()
+            if name == "cq-a":
+                await self.siblings_started.wait()
+                raise kr8s.ServerError("failed", response=httpx.Response(500))
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                self.cancelled.add(name)
+                raise
+            raise AssertionError("unreachable")
+            yield
+
+    api = FailingApi()
+    with pytest.raises(ProviderUnavailableError, match="ClusterQueue access failed"):
+        async with asyncio.timeout(1):
+            await _provider(api, queues=names, namespaces=["work-a"]).read_platform()
+
+    assert api.started == names[:4]
+    assert api.cancelled == {"cq-b", "cq-c", "cq-d"}
+
+
+async def test_platform_accepts_empty_optional_status_fields() -> None:
+    """A configured ClusterQueue may omit zero reservation and usage fields."""
+    queue = _cluster_queue("cq-astronomy", "astronomy")
+    queue["status"] = {}
+    api = FakeKueueApi(
+        {"cq-astronomy": queue},
+        {"work-a": [], "work-b": []},
+    )
+
+    result = await _provider(api, queues=["cq-astronomy"]).read_platform()
+
+    assert result.capacity == {"cpu": "4"}
+    assert result.allocated == {"cpu": "0"}
+    assert result.reserving_workloads == 0
+
+
+async def test_user_accepts_empty_optional_status_fields() -> None:
+    """An otherwise valid LocalQueue may report no reservation or active work."""
+    local = _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
+    local["status"] = {
+        "reservingWorkloads": None,
+        "flavorsReservation": None,
+        "flavorsUsage": None,
+    }
+    api = FakeKueueApi(
+        {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+        {"work-a": [local], "work-b": []},
+    )
+
+    result = await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+    assert result.requests == {}
+    assert result.reserving_workloads == 0
+
+
+async def test_community_filters_configured_clusterqueues_by_exact_label() -> None:
+    """Community requests sum reservation values from matching ClusterQueues."""
+    api = FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
+            "cq-physics": _cluster_queue("cq-physics", "physics", cpu="6"),
+        },
+        {"work-a": [], "work-b": []},
+    )
+
+    result = await _provider(api).read_community("astronomy")
+
+    assert result.requests == {"cpu": "2"}
+    assert result.reserving_workloads == 2
+    with pytest.raises(SubjectNotFoundError):
+        await _provider(api).read_community("biology")
+
+
+async def test_user_aggregates_valid_localqueues_across_namespaces() -> None:
+    """Multiple namespaces aggregate while exact queue identity remains visible."""
+    api = FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy"),
+            "cq-physics": _cluster_queue("cq-physics", "physics"),
+        },
+        {
+            "work-a": [
+                _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy", cpu="1")
+            ],
+            "work-b": [_local_queue("bob-b", "work-b", "bob", "physics", "cq-physics", cpu="3")],
+        },
+    )
+
+    result = await _provider(api).read_user("bob")
+
+    assert result.requests == {"cpu": "4"}
+    assert result.reserving_workloads == 2
+    assert api.local_selectors == [
+        ("work-a", "canfar.net/username=bob"),
+        ("work-b", "canfar.net/username=bob"),
+    ]
+
+
+async def test_user_lists_namespaces_concurrently_in_configured_result_order() -> None:
+    """Reverse completion does not change configured namespace validation order."""
+    first = _local_queue("bob-a", "work-a", "alice", "astronomy", "cq-astronomy")
+    second = _local_queue("bob-b", "work-b", "bob", "astronomy", "cq-physics")
+
+    class ReverseCompletionApi(FakeKueueApi):
+        def __init__(self) -> None:
+            super().__init__(
+                {
+                    "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy"),
+                    "cq-physics": _cluster_queue("cq-physics", "physics"),
+                },
+                {"work-a": [first], "work-b": [second]},
+            )
+            self.started: list[str] = []
+            self.completed: list[str] = []
+            self.both_started = asyncio.Event()
+            self.second_completed = asyncio.Event()
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs):
+            namespace = kwargs.get("namespace")
+            if namespace is None:
+                async with super().call_api(**kwargs) as response:
+                    yield response
+                return
+            self.started.append(namespace)
+            if len(self.started) == 2:
+                self.both_started.set()
+            await self.both_started.wait()
+            if namespace == "work-a":
+                await self.second_completed.wait()
+            async with super().call_api(**kwargs) as response:
+                yield response
+            self.completed.append(namespace)
+            if namespace == "work-b":
+                self.second_completed.set()
+
+    api = ReverseCompletionApi()
+    with pytest.raises(ProviderExecutionError, match="username label did not match"):
+        async with asyncio.timeout(1):
+            await _provider(api).read_user("bob")
+
+    assert api.started == ["work-a", "work-b"]
+    assert api.completed == ["work-b", "work-a"]
+
+
+async def test_user_with_no_matching_localqueue_is_not_zero() -> None:
+    """A valid empty search is a not-found subject, not a zero report."""
+    api = FakeKueueApi(
+        {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+        {"work-a": [], "work-b": []},
+    )
+
+    with pytest.raises(SubjectNotFoundError):
+        await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda item: item["metadata"]["labels"].pop("canfar.net/username"),
+        lambda item: item["metadata"]["labels"].update({"canfar.net/community": "physics"}),
+        lambda item: item["spec"].update({"clusterQueue": "cq-outside"}),
+    ],
+)
+async def test_invalid_matching_localqueue_is_dependency_corruption(mutate) -> None:
+    """Matching queues with invalid identity never disappear from the total."""
+    local = _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
+    mutate(local)
+    api = FakeKueueApi(
+        {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+        {"work-a": [local], "work-b": []},
+    )
+
+    with pytest.raises(ProviderExecutionError):
+        await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+
+async def test_user_aggregates_distinct_localqueues_with_same_labels() -> None:
+    """Distinct LocalQueues with the same user and community labels are summed."""
+    first = _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
+    second = _local_queue("bob-b", "work-a", "bob", "astronomy", "cq-astronomy", cpu="2")
+    api = FakeKueueApi(
+        {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+        {"work-a": [first, second], "work-b": []},
+    )
+
+    result = await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+    assert result.requests == {"cpu": "3"}
+    assert result.reserving_workloads == 2
+
+
+async def test_duplicate_localqueue_object_identity_is_dependency_corruption() -> None:
+    """A repeated namespace/name LocalQueue object is not counted twice."""
+    first = _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
+    second = _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
+    api = FakeKueueApi(
+        {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+        {"work-a": [first, second], "work-b": []},
+    )
+
+    with pytest.raises(ProviderExecutionError, match="identity was duplicated"):
+        await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+
+async def test_configured_clusterqueue_requires_nonempty_community_label() -> None:
+    """A configured queue without the community boundary fails startup."""
+    queue = _cluster_queue("cq-astronomy", "astronomy")
+    queue["metadata"]["labels"]["canfar.net/community"] = ""
+    api = FakeKueueApi({"cq-astronomy": queue}, {"work-a": [], "work-b": []})
+
+    with pytest.raises(RuntimeStartupError):
+        await _provider(api, queues=["cq-astronomy"]).startup()
+
+
+async def test_startup_uses_one_bounded_localqueue_access_probe_per_namespace() -> None:
+    """Startup probes namespaces concurrently without following pagination tokens."""
+
+    class ConcurrentProbeApi(FakeKueueApi):
+        def __init__(self) -> None:
+            super().__init__(
+                {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+                {"work-a": [], "work-b": []},
+                local_metadata={
+                    "work-a": {"continue": "next-a"},
+                    "work-b": {"continue": "next-b"},
+                },
+            )
+            self.probe_started: list[str] = []
+            self.both_started = asyncio.Event()
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs):
+            namespace = kwargs.get("namespace")
+            if namespace is None:
+                async with super().call_api(**kwargs) as response:
+                    yield response
+                return
+            self.probe_started.append(namespace)
+            if len(self.probe_started) == 2:
+                self.both_started.set()
+            await self.both_started.wait()
+            async with super().call_api(**kwargs) as response:
+                yield response
+
+    api = ConcurrentProbeApi()
+
+    async with asyncio.timeout(1):
+        await _provider(api, queues=["cq-astronomy"]).startup()
+
+    assert api.probe_started == ["work-a", "work-b"]
+    assert len(api.local_params) == 2
+    assert dict(api.local_params) == {
+        "work-a": {"limit": "1"},
+        "work-b": {"limit": "1"},
+    }
+
+
+async def test_startup_validates_every_configured_clusterqueue_before_probing() -> None:
+    """Startup validates all configured ClusterQueues before namespace access probes."""
+    invalid = _cluster_queue("cq-physics", "physics")
+    invalid["metadata"]["labels"].pop("canfar.net/community")
+    api = FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy"),
+            "cq-physics": invalid,
+        },
+        {"work-a": [], "work-b": []},
+    )
+
+    with pytest.raises(RuntimeStartupError):
+        await _provider(api).startup()
+
+    assert api.local_params == []

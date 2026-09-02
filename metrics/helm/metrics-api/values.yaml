@@ -1,13 +1,19 @@
-# Default chart values (override with values-dev.yaml for local/dev flows)
+# Default chart values (override with values-dev.yaml for local/dev flows).
 image:
   repository: images.opencadc.org/platform/metrics
-  tag: latest
+  tag: v0.1.5
   pullPolicy: IfNotPresent
+
+replicaCount: 1
+terminationGracePeriodSeconds: 30
 
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
+  runAsGroup: 65532
   fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   allowPrivilegeEscalation: false
@@ -15,10 +21,48 @@ securityContext:
     drop:
       - ALL
 
-# -- Flat fail-closed Settings map. Supported provider/source keys are
-# METRICS_PROVIDERS__KUEUE__* and METRICS_SOURCES__PLATFORM=kueue; unknown
-# provider, source, cache, and Kueue fields fail application startup.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Public platform path segment for GET .../metrics/platform/{name}.
+platformName: canfar
+
+# Required stable lower-case DNS identity for this Metrics deployment. It scopes
+# cache identities and must match the Prometheus/Mimir cluster label.
+clusterName: ""
+
+# Additional METRICS_* settings. Kueue lists, Redis, PromQL, and OTLP are
+# rendered from the structured values below so secret-backed values cannot be
+# accidentally replaced by plaintext entries in this map.
 env: {}
+
+kueue:
+  # ClusterQueues served by this Metrics instance. These become resourceNames
+  # in the ClusterRole when rbac.create is enabled.
+  clusterQueues: []
+  # Namespaces containing User LocalQueues. A Role is rendered for each entry.
+  namespaces: []
+
+promql:
+  # Optional Prometheus or Mimir HTTP base URL. Empty disables efficiency.
+  baseUrl: ""
+  # Optional Mimir tenant header. It is rendered only when baseUrl is set.
+  mimirTenantId: ""
+
+otel:
+  # Optional operator-provided OTLP/HTTP endpoint. The chart never deploys a
+  # Collector; this value is only passed to the Metrics API.
+  endpoint: ""
+
+# Existing Secret containing the required cache HMAC/integrity key.
+cacheKeySecret:
+  name: metrics-api-cache
+  key: key-secret
 
 serviceAccount:
   create: false
@@ -27,10 +71,38 @@ serviceAccount:
 rbac:
   create: false
 
-# When enabling rbac.create, set serviceAccount.create: true (and optionally
-# serviceAccount.name) so the ClusterRoleBinding does not attach read access to
-# the namespace default ServiceAccount by accident.
+# The selected name is always assigned to the API Pod. Set create: true for a
+# chart-owned ServiceAccount, or leave it false and set name to an existing
+# ServiceAccount with the required Kueue read access.
+
+# Isolate the API Pod by default. External egress destinations must be allowed
+# explicitly for the deployed network topology.
+networkPolicy:
+  enabled: true
+  # Exact approved caller rules. Empty denies all ingress; a co-deployed Skaha
+  # caller must be supplied here by the release values.
+  ingress: []
+  egress:
+    dns:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - port: 53
+            protocol: UDP
+          - port: 53
+            protocol: TCP
+    # Required in deployed environments: allow the Kubernetes service CIDR on 443.
+    kubeApiServer: []
+    # Allow the configured external Redis endpoint.
+    redis: []
+    # Configure the operator-provided OTLP and PromQL destinations explicitly.
+    otlp: []
+    promql: []
 
 redis:
-  enabled: true
-  image: redis:7-alpine
+  # Existing Secret containing the one shared external Redis URL.
+  urlSecret:
+    name: metrics-api-redis
+    key: redis-url

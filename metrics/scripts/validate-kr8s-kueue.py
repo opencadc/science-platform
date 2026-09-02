@@ -121,9 +121,7 @@ async def main() -> int:
 
     # 6. Short watch: proves long-poll/streaming works through the same TLS path.
     try:
-        ClusterQueue = new_class(
-            kind="ClusterQueue", version=api_version, namespaced=False
-        )
+        ClusterQueue = new_class(kind="ClusterQueue", version=api_version, namespaced=False)
         events = 0
         async with asyncio.timeout(15):
             async for _event, _obj in api.watch(ClusterQueue):

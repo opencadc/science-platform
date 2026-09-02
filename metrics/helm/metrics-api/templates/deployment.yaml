@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "metrics-api.fullname" . }}-metrics-api
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "metrics-api") }}
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "metrics-api.selectorLabels" . | nindent 6 }}
@@ -16,10 +16,9 @@ spec:
         {{- include "metrics-api.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
-      {{- if .Values.serviceAccount.create }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "metrics-api.serviceAccountName" . }}
       automountServiceAccountToken: true
-      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -36,15 +35,10 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
-            {{- if .Values.redis.enabled }}
-            - name: METRICS_REDIS_URL
-              value: {{ printf "redis://%s-redis:6379/0" (include "metrics-api.fullname" .) | quote }}
-            {{- end }}
-            {{- range $k, $v := .Values.env }}
-            - name: {{ $k }}
-              value: {{ $v | quote }}
-            {{- end }}
+            {{- include "metrics-api.env" . | nindent 12 }}
           # Uvicorn does not accept connections until Kueue startup validation
           # (lifespan) finishes. Without a startupProbe, liveness hits :8000 while
           # the port is still closed → connection refused → restarts even when the
@@ -64,7 +58,7 @@ spec:
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: http
             periodSeconds: 10
             timeoutSeconds: 3

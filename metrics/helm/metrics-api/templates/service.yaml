@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "metrics-api.fullname" . }}-metrics-api
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "metrics-api") }}
   labels:
     {{- include "metrics-api.labels" . | nindent 4 }}
 spec:

@@ -71,6 +71,40 @@ public class GetActionResourceStatsTest {
     }
 
     @Test
+    public void statsViewReturns503WhenPlatformMetricsIsPartialOrStale() throws Exception {
+        final TestableGetAction get = new TestableGetAction(
+                PlatformMetricsFixtures.failingPlatformMetricsDAO(
+                        new IllegalArgumentException("invalid Metrics conditions")),
+                containerLimitRangeFixture(),
+                true);
+        get.configureStatsViewRequest();
+
+        try {
+            get.doAction();
+            Assert.fail("Expected TransientException");
+        } catch (TransientException transientException) {
+            Assert.assertEquals(PlatformMetricsUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+        }
+    }
+
+    @Test
+    public void statsViewReturns503WhenPlatformMetricsResourceDataIsInvalid() throws Exception {
+        final TestableGetAction get = new TestableGetAction(
+                PlatformMetricsFixtures.failingPlatformMetricsDAO(
+                        new IllegalArgumentException("invalid Metrics resource quantity")),
+                containerLimitRangeFixture(),
+                true);
+        get.configureStatsViewRequest();
+
+        try {
+            get.doAction();
+            Assert.fail("Expected TransientException");
+        } catch (TransientException transientException) {
+            Assert.assertEquals(PlatformMetricsUnavailableException.CLIENT_MESSAGE, transientException.getMessage());
+        }
+    }
+
+    @Test
     public void getResourceStatsThrowsWhenPlatformMetricsUnavailable() throws Exception {
         final TestableGetAction get = new TestableGetAction(
                 PlatformMetricsFixtures.failingPlatformMetricsDAO(), containerLimitRangeFixture(), true);

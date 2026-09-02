@@ -1,82 +1,133 @@
-# Environment contracts (Metrics service)
+# Metrics environment contract
 
-This document records how environment names map to runtime behavior and what
-this repository owns for local and delivery workflows.
+Metrics is deployed as one asynchronous FastAPI service. Environment-specific
+overlays supply its external dependencies and configuration. The wire contract
+lives in [`specs.md`](specs.md). The
+[Confluence API Contract](https://herzberg.atlassian.net/wiki/spaces/C/pages/2690809875/API+Contract)
+remains product-design authority; git specs may lead Confluence when they
+diverge. Platform-owned labels live in
+[`skaha/docs/labels.md`](../../skaha/docs/labels.md).
 
-## Environments
+## Environment names
 
-Deployment environments are `dev`, `integration`, `staging`, and `production`.
-They are deployment concepts (values files, clusters), not an application
-setting: the former `METRICS_ENVIRONMENT` field was removed as dead
-configuration (nothing in the service read it).
+The deployment environments are `dev`, `integration`, `staging`, and
+`production`. `dev` may use the reusable kind cluster; higher environments use
+an existing Kubernetes cluster and environment-owned overlays. Docker Compose
+is not a supported runtime contract.
 
-## Environment runtime contract
+## Required Kueue configuration
 
-The service is Kubernetes-first in every environment.
+Settings use the `METRICS_` prefix and `__` as the nested delimiter. List values
+are JSON arrays, not comma-separated strings.
 
-- `dev` requires kind, Helm, and `kubectl`. Test and verification flows assume
-  you can create or use a one-node kind cluster, install Kueue charts, apply
-  ClusterQueue fixture objects, deploy the metrics chart, and run Redis in the
-  cluster deployment path.
-- `integration`, `staging`, and `production` use an already operating
-  Kubernetes cluster. This repository deploys the service via Helm with
-  environment-specific values such as queue configuration and Redis endpoint.
-  These environments do not assume local kind provisioning.
+```bash
+export METRICS_CLUSTER_NAME='kind-metrics'
+export METRICS_PLATFORM_NAME='canfar'
+export METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
+export METRICS_PROVIDERS__KUEUE__NAMESPACES='["canfar-workloads","canfar-workloads-extra"]'
+```
 
-Docker Compose is not part of the supported development contract.
+`METRICS_CLUSTER_NAME` is mandatory at deployment time. It must be a real
+lower-case DNS identity, not an `unknown` sentinel. The value is part of every
+cache identity and must match the `cluster` identity used by the Prometheus or
+Mimir series queried by the optional efficiency provider.
 
-## 12-factor configuration model
+`METRICS_PLATFORM_NAME` (default `canfar`) is the only accepted
+`/metrics/platform/{platform}` path value; a mismatch returns 404.
 
-Runtime behavior is driven by `METRICS_*` environment variables and (when
-present) Kubernetes secret file sources; environment values override defaults
-(ADR-0001). Configuration is environment-only — no file-based config source.
+`CLUSTER_QUEUES` is the complete Platform set. Each named ClusterQueue must be
+readable and maps to one Community. `NAMESPACES` is the complete namespace set
+searched for User LocalQueues and Session Jobs. The service lists LocalQueues
+in every configured namespace and selects exact `canfar.net/username` labels.
 
-**Settings model:** The root model exposes `providers`, `sources`, and `cache`
-(not legacy `platform.*` / `user.*` trees). Nested Pydantic fields are set with
-`METRICS_` + the nested name using `__` as the delimiter, for example:
+Kubernetes endpoint, credentials, and CA trust come from the in-cluster
+ServiceAccount or kubeconfig. The Kueue API contract is
+`kueue.x-k8s.io/v1beta2`.
 
-- `METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` → must be a **JSON array of
-  strings** (for example `'["cq-proton","cq-neutron"]'`), not a comma-separated
-  plain string
-- `METRICS_SOURCES__PLATFORM` → `sources.platform` (which provider key backs
-  platform metrics; M4 uses `kueue`)
-- `METRICS_CACHE__BACKEND` / `METRICS_CACHE__TTL_SECONDS` → `cache` fields
+## External dependencies
 
-`METRICS_REDIS_URL` and other top-level `Settings` fields use the `METRICS_`
-prefix without extra nesting. Legacy flat aliases such as `METRICS_KUEUE_*` and
-`KUEUE_METRICS_*` are **not** part of the M4 settings surface; configure Kueue
-through `METRICS_PROVIDERS__KUEUE__*`.
+```bash
+export METRICS_CLUSTER_NAME='cluster.example'
+export METRICS_REDIS_URL='rediss://redis.example/0'
+export METRICS_CACHE__KEY_SECRET='<secret-reference-or-injected-value>'
+```
 
-Only `providers.kueue` is accepted. Unknown provider blocks and source names
-fail settings validation; `sources.platform` accepts only `kueue`. Kubernetes
-endpoint, credentials, and CA are discovered by kr8s from the service account
-or kubeconfig (ADR-0001) and are not settings. The reference chart
-`values-dev.yaml` and `scripts/kind-values.yaml` use this same closed Settings
-surface and are validated by the unit suite.
+Redis is one shared external cache for every Metrics replica and every surface.
+Production supplies its availability, persistence, replication, backup, and
+eviction policy. The production Helm charts consume an operator-provided Redis
+URL Secret and cache-integrity Secret; they do not chart-own Redis or accept a
+plaintext URL/key fallback. There is no cache backend selector: Redis is the
+only supported runtime cache, and `METRICS_CACHE__BACKEND` is not an application
+setting.
 
-Borrowed/lending response expansion is out of scope for this delivery; platform
-responses remain the existing `capacity` and `allocated` maps.
+Optional Prometheus/Mimir support is activated solely by the presence of its
+endpoint. Set `METRICS_PROVIDERS__PROMQL__BASE_URL` to enable the fixed
+server-owned query catalog; leave it absent to disable efficiency. There is no
+separate PromQL enable setting:
 
-## Cluster RBAC (Helm)
+```bash
+export METRICS_PROVIDERS__PROMQL__BASE_URL='https://mimir.example'
+export METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID='canfar'
+```
 
-When `rbac.create` is true, the chart installs a release-scoped `ClusterRole`
-and `ClusterRoleBinding`. Treat leftover cluster-scoped RBAC after uninstall as
-an operational cleanup task.
+The endpoint must be an HTTP(S) origin. Metrics POSTs to `{BASE_URL}/api/v1/query`
+and never accepts a caller-provided PromQL expression, URL, or header map. The
+Mimir tenant value is one typed deployment setting, not an arbitrary proxy
+header.
 
-## Repository ownership boundaries
+## Optional OTLP metrics
 
-This repository owns:
+```bash
+export METRICS_OTEL__METRICS_ENABLED='true'
+export METRICS_OTEL__EXPORTER_OTLP_ENDPOINT='https://otel.example/v1/metrics'
+```
 
-- application code and tests,
-- Helm chart contract for the metrics service,
-- local dev and CI scripts for Kubernetes-backed validation, and
-- milestone and architecture docs for service behavior.
+The app exports application-state metrics only when metrics export is enabled
+**and** an endpoint is provided. It does not export OTLP traces or logs, and
+there are no trace/log enable settings. The endpoint may be an external
+Collector, Alloy, or compatible OTLP metrics receiver. The production chart
+does not install any receiver.
 
-Higher-environment overlay repositories own promotion pipelines and environment
-specific deployment overlays.
+## Cache windows
 
-## Image and release contract
+Freshness and serviceability are fixed by surface (canonical numbers in
+`FRESHNESS_POLICIES` and [`specs.md`](specs.md)):
 
-- Release images: `images.opencadc.org/platform/metrics` on Git tags
-  `metrics-v*`, multi-arch `linux/amd64` and `linux/arm64`.
-- Non-tag CI does not publish release images.
+| Surface | Fresh | Serviceable stale | Retained for recovery |
+| --- | ---: | ---: | ---: |
+| Session | 30s | 60s | 3m |
+| User | 2m | 3m | 5m |
+| Community | 5m | 10m | 15m |
+| Platform | 5m | 30m | 60m |
+
+The service uses one stable Redis lease per surface and subject. Different
+subjects may fill concurrently. Stale serviceable snapshots may be returned
+while one request-triggered refresh runs; cold requests share the winner's
+result. Missing User, Community, and Session subjects use a bounded
+authenticated terminal outcome with the same subject retention policy, so
+followers reproduce the winner's 404.
+
+HTTP status codes and `Ready`/`Cached` reasons are defined in
+[`specs.md`](specs.md). Redis outage serves only a known serviceable snapshot;
+otherwise 503. Do not bypass Redis with an uncoordinated fill per request.
+
+## Ownership boundary
+
+The production Helm chart owns the Metrics Deployment, Service, dedicated
+ServiceAccount, least-privilege RBAC, configuration references, and probes. It
+does not own:
+
+- Redis;
+- kube-state-metrics;
+- Prometheus or Mimir; or
+- an OpenTelemetry Collector/Alloy OTLP metrics receiver.
+
+Disposable test profiles may provision those dependencies to validate the
+integration. A test fixture is not a production dependency claim.
+
+## Evidence boundary
+
+Repository tests prove only the checks they run. A local Prometheus-compatible
+fixture does not prove Mimir behavior, production Redis durability, cluster
+RBAC, or deployment readiness until those gates are run in their target
+environment.

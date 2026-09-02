@@ -1,0 +1,29 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "metrics-api.fullnameWithSuffix" (dict "context" . "suffix" "metrics-api") }}
+  labels:
+    {{- include "metrics-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "metrics-api.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- toYaml .Values.networkPolicy.ingress | nindent 4 }}
+  egress:
+    {{- $renderedEgress := false }}
+    {{- range $rules := .Values.networkPolicy.egress }}
+    {{- if $rules }}
+    {{- $renderedEgress = true }}
+    {{- toYaml $rules | nindent 4 }}
+    {{- end }}
+    {{- end }}
+    {{- if not $renderedEgress }}
+    []
+    {{- end }}
+{{- end }}

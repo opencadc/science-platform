@@ -1,5 +1,8 @@
 package org.opencadc.skaha.metrics;
 
+import io.kubernetes.client.openapi.models.V1Job;
+import java.util.List;
+
 /** Pod usage from the Kubernetes metrics API ({@code metrics.k8s.io}). */
 final class KubernetesPodUsageProvider implements PodUsageProvider {
 
@@ -10,7 +13,8 @@ final class KubernetesPodUsageProvider implements PodUsageProvider {
     }
 
     @Override
-    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) throws Exception {
+    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless, final List<V1Job> sessionJobs)
+            throws Exception {
         return podMetricsDAO.getPodMetrics(userID, omitHeadless);
     }
 }

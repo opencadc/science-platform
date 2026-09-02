@@ -1,156 +1,96 @@
 # CANFAR Science Platform Metrics API
 
-This service collects and serves CANFAR platform metrics through a versioned
-REST API. It is built as a 12-factor FastAPI service and packaged as a single
-container process.
+Metrics is one asynchronous FastAPI service. It reads current Kueue state and
+Session Jobs, serves a small versioned HTTP contract, and optionally asks an
+external Prometheus-compatible system for CPU and memory efficiency. Redis,
+Prometheus/Mimir, Kubernetes metrics exporters, and OTLP metrics receivers are
+deployment-owned dependencies rather than components of the production chart.
 
-## Kueue mode and RBAC
+## Authority
 
-When running in-cluster, the workload needs read access
-to `clusterqueues` in the `kueue.x-k8s.io` API group. Prefer
-creating a dedicated Kubernetes `ServiceAccount` via the chart
-(`serviceAccount.create: true`) whenever `rbac.create` is enabled, so cluster
-permissions are not bound to the namespace `default` ServiceAccount. See
-`docs/environment-contracts.md` for environment naming and nested
-`METRICS_*` configuration.
+- Product design:
+  [Confluence API Contract](https://herzberg.atlassian.net/wiki/spaces/C/pages/2690809875/API+Contract)
+- Implementation-of-record: [`docs/specs.md`](docs/specs.md) (may lead Confluence)
+- Deploy/env: [`docs/environment-contracts.md`](docs/environment-contracts.md)
+- Decisions (why): [`docs/adr/README.md`](docs/adr/README.md)
+- Glossary: [`CONTEXT.md`](CONTEXT.md)
+- Platform labels: [`../skaha/docs/labels.md`](../skaha/docs/labels.md)
 
 ## API routes
 
-The API exposes:
+```text
+GET /apis/canfar.net/v1alpha1/metrics/user/{username}
+GET /apis/canfar.net/v1alpha1/metrics/community/{community}
+GET /apis/canfar.net/v1alpha1/metrics/platform/{platform}
+GET /apis/canfar.net/v1alpha1/metrics/session/{id}
+GET /healthz
+GET /livez
+GET /readyz
+```
 
-- `GET /api/v1/metrics/platform`
-- `GET /healthz`
+The response is one `canfar.net/v1alpha1` `Metrics` object. Its `spec` echoes
+the selected subject and its `status` contains `observedAt`,
+`reservingWorkloads`, resources, and exactly one `Ready` plus one `Cached`
+condition. Source rules, cache windows, and failure semantics live in
+[`docs/specs.md`](docs/specs.md).
 
-## 12-factor runtime model
+## Configuration
 
-All runtime behavior is configured via environment variables prefixed with
-`METRICS_` (see `docs/environment-contracts.md`).
+Nested settings use `__`, and list values are JSON arrays. At minimum:
 
-- Configuration comes from environment variables; Kubernetes access is
-  discovered by kr8s from the service account (ADR-0001).
-- Pydantic `Settings` groups options under `providers`, `sources`, and `cache`
-  (nested env keys use `__`; see `docs/environment-contracts.md`).
-- The process remains stateless and uses TTL cache backends.
-- Structured logs are emitted to stdout through the app server runtime.
-- One service process is packaged per container image.
-- Environment-specific settings are supplied through Helm values; this
-  repository ships `dev` values only (`./helm/metrics-api/values-dev.yaml`
-  relative to the `metrics/` directory).
+```bash
+export METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
+export METRICS_PROVIDERS__KUEUE__NAMESPACES='["canfar-workloads","canfar-workloads-extra"]'
+export METRICS_CLUSTER_NAME='cluster.example'
+export METRICS_REDIS_URL='rediss://redis.example/0'
+export METRICS_CACHE__KEY_SECRET='<secret-reference-or-injected-value>'
+```
 
-## Local development
+Optional: `METRICS_PROVIDERS__PROMQL__BASE_URL`,
+`METRICS_OTEL__METRICS_ENABLED` with `METRICS_OTEL__EXPORTER_OTLP_ENDPOINT`.
+Full deploy contract: [`docs/environment-contracts.md`](docs/environment-contracts.md).
 
-Create and sync a development environment:
+## Development
 
 ```bash
 uv sync --group dev
-```
-
-Run tests and linting:
-
-```bash
-uv run pytest
 uv run ruff check src tests
+uv run pytest -m "not integration"
 ```
 
-Run Metrics-only pre-commit hooks (also driven from the repo root):
+Cluster-backed development uses kind, Helm, Kueue, and the supported lifecycle
+described in [`docs/dev-setup.md`](docs/dev-setup.md).
+
+### Inspect a running Metrics API
+
+The chart does not install a Kubernetes aggregated `APIService`. Therefore a
+bare command such as
+`kubectl get --raw '/apis/canfar.net/v1alpha1/metrics/user/bob'` queries
+kube-apiserver, not the Metrics Service. Use Kubernetes Service proxying or
+port-forward:
 
 ```bash
-pre-commit run --config metrics/.pre-commit-config.yaml --all-files
-```
+export METRICS_NAMESPACE='replace-with-metrics-namespace'
+export METRICS_SERVICE='replace-with-metrics-service'
 
-Run the repository root pre-commit checks (includes shared governance hooks):
+kubectl -n "$METRICS_NAMESPACE" port-forward \
+  "service/$METRICS_SERVICE" 8000:8000
+```
 
 ```bash
-pre-commit run --all-files
+curl --fail --show-error --silent \
+  'http://127.0.0.1:8000/apis/canfar.net/v1alpha1/metrics/user/bob'
+curl --fail --show-error --silent \
+  'http://127.0.0.1:8000/apis/canfar.net/v1alpha1/metrics/session/<id>'
 ```
 
-Run the API locally:
+Direct Kueue raw commands remain useful for source inspection:
 
 ```bash
-METRICS_CACHE__BACKEND=memory \
-METRICS_PROVIDERS__KUEUE__KUBE_API_URL=https://kubernetes.default.svc \
-METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-proton"]' \
-uv run python -m metrics.main
+kubectl get localqueues.kueue.x-k8s.io -A \
+  -l canfar.net/username=bob -o yaml
+kubectl get clusterqueues.kueue.x-k8s.io \
+  -l canfar.net/community=astronomy -o yaml
 ```
 
-`METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES` must be a JSON array string (not a
-comma-separated list). Use this command for process-level debugging. For
-supported `dev` operation with Kueue dependencies, follow the
-Kubernetes-first setup in `docs/dev-setup.md`.
-
-For roadmap-level environment naming across `dev`, integration, staging, and
-production, see `docs/environment-contracts.md`.
-
-Platform response expansion for borrowed/lending details is out of scope for
-this delivery; the API contract remains `capacity` and `allocated` maps only.
-
-### Kueue-backed platform metrics
-
-For **module responsibilities** and the **startup vs request** flow for
-Kueue-backed platform metrics, see `docs/kueue-platform.md` (aligned with M4
-provider runtime behavior).
-
-**Cluster dev setup** — one script, `docs/dev-setup.md`.
-
-## Local Kubernetes integration loop
-
-Local and CI both use a one-node **kind** cluster for smoke validation.
-
-### Iterative dev (keep your cluster)
-
-See `docs/dev-setup.md`. The supported flow is
-**`bash scripts/kind-smoke.sh`** (Helm Kueue, `scripts/test-setup.yaml`,
-Docker build + `kind load`, Helm deploy, integration tests).
-
-### One-shot verification (CI-style)
-
-```bash
-KIND_SMOKE_CI=1 bash scripts/kind-smoke.sh
-```
-
-`scripts/kind-smoke.sh` runs the full kind smoke and can leave the API
-port-forward up for local debugging. Stop it with
-`bash scripts/kind-smoke-teardown.sh`.
-
-## Container image
-
-Build the image from the service directory:
-
-```bash
-docker build -t canfar-metrics:local .
-```
-
-The image exposes port `8000` and includes a health check against `/healthz`.
-
-## Helm deployment
-
-The Helm chart lives in `metrics/helm/metrics-api` within this workspace.
-
-Development deployment example (run from `metrics/`):
-
-```bash
-helm upgrade --install metrics-api ./helm/metrics-api \
-  --namespace metrics \
-  --create-namespace \
-  -f ./helm/metrics-api/values-dev.yaml
-```
-
-You can also use the helper script:
-
-```bash
-helm upgrade --install metrics-api helm/metrics-api -n metrics \
-  --create-namespace -f helm/metrics-api/values-dev.yaml --wait
-```
-
-## CI workflows
-
-Lint, unit tests, Docker image validation, and kind smoke deployment run from
-`.github/workflows/ci.metrics.yml` in the parent repository on changes under
-`metrics/**`.
-
-Release container images (`linux/amd64`, `linux/arm64`) publish only on Git tags
-matching `metrics-v*` via `.github/workflows/cd.metrics.release.build.yml`.
-
-Release notes and versioning for Metrics follow the separate Metrics package in
-root `release-please-config.json`, using tags like `metrics-v0.1.0`. See
-`docs/releasing.md` for the Release Please and first-tag `0.1.0` workflow.
+Operator runbooks: [`docs/runbooks/index.md`](docs/runbooks/index.md).

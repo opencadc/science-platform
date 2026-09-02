@@ -1,24 +1,29 @@
-FROM python:3.13-alpine AS builder
+# Production Metrics image: locked uv install into python:3.13-slim, one worker.
+# Global UV pin selects the builder image; bumping it is an explicit change.
+ARG UV_VERSION=0.12.5
+
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
+FROM python:3.13-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_NO_DEV=1
+
+COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /build
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir --no-compile . \
-    && find /opt/venv -type d \( -name "test" -o -name "tests" \) -prune -exec rm -rf '{}' + \
-    && find /opt/venv -type f \( -name "*.pyi" -o -name "py.typed" \) -delete \
-    && rm -rf /opt/venv/lib/python*/site-packages/pip* \
-        /opt/venv/lib/python*/site-packages/setuptools* \
-        /opt/venv/lib/python*/site-packages/wheel* \
-        /opt/venv/bin/pip*
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-editable
 
-FROM python:3.13-alpine AS runtime
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -28,8 +33,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup -S -g 65532 metrics \
-    && adduser -S -D -H -h /nonexistent -G metrics -u 65532 metrics
+RUN groupadd --system --gid 65532 metrics \
+    && useradd --system --uid 65532 --gid metrics --home-dir /nonexistent --shell /usr/sbin/nologin metrics
 
 COPY --from=builder --chown=metrics:metrics /opt/venv /opt/venv
 
@@ -37,4 +42,5 @@ USER metrics
 
 EXPOSE 8000
 
+# Exactly one Uvicorn worker; scale with Pod replicas.
 CMD ["python", "-m", "metrics.main"]
