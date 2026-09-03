@@ -198,8 +198,7 @@ public class PostAction extends SessionAction {
 
                 validateName(name);
 
-                // check for no existing session for this user
-                // (rule: only 1 session of same type per user allowed)
+                // enforce per-user session limits (max interactive sessions; at most one desktop)
                 checkExistingSessions(validatedType);
 
                 // create a new session id
@@ -391,7 +390,8 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Check the count of existing non-headless and non desktop-app sessions for the user.
+     * Check the count of existing non-headless and non desktop-app sessions for the user. Desktop sessions are
+     * additionally limited to one active session per user.
      *
      * @param type The type of desired session to ensure not headless.
      * @param sessions The list of existing Session objects for the user.
@@ -411,6 +411,14 @@ public class PostAction extends SessionAction {
             if (count >= maxUserSessions) {
                 throw new IllegalArgumentException("User " + getUsername() + " has reached the maximum of "
                         + maxUserSessions + " active sessions.");
+            }
+
+            if (type.isDesktop()
+                    && sessions.stream()
+                            .filter(session -> SessionType.DESKTOP.applicationName.equals(session.getType()))
+                            .anyMatch(session -> session.getStatus().equalsIgnoreCase(Session.STATUS_RUNNING)
+                                    || session.getStatus().equalsIgnoreCase(Session.STATUS_PENDING))) {
+                throw new IllegalArgumentException("User " + getUsername() + " already has an active desktop session.");
             }
         }
     }

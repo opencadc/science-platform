@@ -171,4 +171,36 @@ public class UserStorageClientTest {
             // Good.
         }
     }
+
+    @Test
+    public void testCheckExistingDesktopSession() {
+        final PostAction testSubject = new PostAction(null) {
+            {
+                maxUserSessions = 5;
+            }
+
+            @Override
+            protected String getUsername() {
+                return "owner";
+            }
+        };
+
+        final List<Session> sessions = new ArrayList<>();
+
+        sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_RUNNING));
+        testSubject.checkExistingSessions(SessionType.DESKTOP, sessions);
+
+        sessions.clear();
+        sessions.add(TestUtils.createSession("id1", SessionType.DESKTOP, Session.STATUS_TERMINATING));
+        testSubject.checkExistingSessions(SessionType.DESKTOP, sessions);
+
+        sessions.clear();
+        sessions.add(TestUtils.createSession("id1", SessionType.DESKTOP, Session.STATUS_RUNNING));
+        try {
+            testSubject.checkExistingSessions(SessionType.DESKTOP, sessions);
+            Assert.fail("Should throw IllegalArgumentException");
+        } catch (IllegalArgumentException exception) {
+            Assert.assertTrue(exception.getMessage().contains("already has an active desktop session"));
+        }
+    }
 }
