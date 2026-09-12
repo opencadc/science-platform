@@ -1,323 +1,660 @@
-"""End-to-end smoke: FakeKueueApi -> KueueProvider -> service -> routes -> headers."""
+"""End-to-end smoke tests for the simplified queue-backed API."""
 
 from __future__ import annotations
 
-import importlib
-from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from datetime import UTC, datetime
+from decimal import Decimal
 
-import httpx
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-from opentelemetry.sdk.metrics import MeterProvider
 
 import metrics.core.factory as factory_module
-import metrics.main as main_module
-from metrics.cache import InMemoryTTLCache
+from metrics.cache import (
+    CacheIdentity,
+    CacheNotFound,
+    CacheUnavailable,
+    FRESHNESS_POLICIES,
+)
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
-from metrics.errors import RuntimeStartupError
-from metrics.http_cache import metrics_success_cache_headers, remaining_freshness_seconds
-from metrics.providers.kueue import KueueProvider
-from metrics.services.platform import CachedMetrics, PlatformMetricsService
-from metrics.telemetry import NoopMetricsRecorder
-from tests.fakes import FakeKueueApi, LifecycleProvider, cache_control_max_age
-
-CQ_A = {
-    "spec": {
-        "resourceGroups": [
-            {
-                "flavors": [
-                    {
-                        "resources": [
-                            {"name": "cpu", "nominalQuota": "10.1"},
-                            {"name": "memory", "nominalQuota": "20Gi"},
-                            {"name": "ephemeral-storage", "nominalQuota": "512Mi"},
-                            {"name": "nvidia.com/gpu", "nominalQuota": "0.1"},
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    "status": {
-        "flavorsUsage": [
-            {
-                "resources": [
-                    {"name": "cpu", "total": "100m", "borrowed": "500m"},
-                    {"name": "memory", "total": "2Gi", "borrowed": "1Gi"},
-                    {"name": "nvidia.com/gpu", "total": "0.1"},
-                ]
-            }
-        ]
-    },
-}
-CQ_B = {
-    "spec": {
-        "resourceGroups": [
-            {
-                "flavors": [
-                    {
-                        "resources": [
-                            {"name": "cpu", "nominalQuota": "5.2"},
-                            {"name": "ephemeral-storage", "nominalQuota": "1.5Gi"},
-                            {"name": "nvidia.com/gpu", "nominalQuota": "0.2"},
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    "status": {"flavorsUsage": [{"resources": [{"name": "nvidia.com/gpu", "total": "0.2"}]}]},
-}
+from metrics.errors import (
+    ProviderExecutionError,
+    ProviderUnavailableError,
+    RuntimeStartupError,
+    SubjectNotFoundError,
+)
+from metrics.services.metrics import MetricsService
+from metrics.services.models import (
+    CachedSnapshot,
+    CommunityObservation,
+    EfficiencyObservation,
+    PlatformObservation,
+    SessionObservation,
+    SessionUsageObservation,
+    UserObservation,
+)
+from tests.test_cache_helpers import FakeCacheCoordinator
 
 
 def _settings() -> Settings:
+    """Build valid in-memory application settings."""
     return Settings(
-        cluster_name="prod",
-        cache=CacheConfig(backend="memory", ttl_seconds=30),
-        providers=ProviderConfigs(kueue=KueueProviderConfig(cluster_queues=["cq-a", "cq-b"])),
+        cluster_name="cluster-a",
+        redis_url="redis://localhost:6379/0",
+        cache=CacheConfig(key_secret="x" * 32),
+        providers=ProviderConfigs(
+            kueue=KueueProviderConfig(cluster_queues=["cq-astronomy"], namespaces=["work-a"])
+        ),
+    )
+
+
+class FakeProvider:
+    """Return deterministic queue observations and record lifecycle calls."""
+
+    name = "kueue"
+
+    def __init__(
+        self,
+        *,
+        platform_error: BaseException | None = None,
+        user_error: BaseException | None = None,
+        community_error: BaseException | None = None,
+        startup_error: BaseException | None = None,
+        shutdown_error: BaseException | None = None,
+    ) -> None:
+        self.started = 0
+        self.stopped = 0
+        self.platform_error = platform_error
+        self.user_error = user_error
+        self.community_error = community_error
+        self.startup_error = startup_error
+        self.shutdown_error = shutdown_error
+
+    async def startup(self) -> None:
+        """Record the startup validation call."""
+        self.started += 1
+        if self.startup_error is not None:
+            raise self.startup_error
+
+    async def shutdown(self) -> None:
+        """Record the shutdown call."""
+        self.stopped += 1
+        if self.shutdown_error is not None:
+            raise self.shutdown_error
+
+    async def read_platform(self) -> PlatformObservation:
+        """Return one Platform observation."""
+        if self.platform_error is not None:
+            raise self.platform_error
+        return PlatformObservation(
+            cluster="cluster-a",
+            capacity={"cpu": "4"},
+            allocated={"cpu": "2"},
+            reserving_workloads=3,
+            observed_at=datetime.now(UTC),
+        )
+
+    async def read_user(self, user: str) -> UserObservation:
+        """Return one User observation."""
+        if self.user_error is not None:
+            raise self.user_error
+        return UserObservation(
+            user=user,
+            requests={"cpu": "1"},
+            reserving_workloads=1,
+            observed_at=datetime.now(UTC),
+        )
+
+    async def read_community(self, community: str) -> CommunityObservation:
+        """Return one Community observation."""
+        if self.community_error is not None:
+            raise self.community_error
+        return CommunityObservation(
+            community=community,
+            requests={"cpu": "2"},
+            reserving_workloads=2,
+            observed_at=datetime.now(UTC),
+        )
+
+    def cache_fingerprint(self) -> str:
+        """Return a stable fake provider fingerprint."""
+        return "fake"
+
+
+class FakeSessionProvider:
+    """Return deterministic session observations."""
+
+    name = "session"
+
+    def __init__(
+        self,
+        *,
+        session_error: BaseException | None = None,
+        startup_error: BaseException | None = None,
+        shutdown_error: BaseException | None = None,
+    ) -> None:
+        self.started = 0
+        self.stopped = 0
+        self.session_error = session_error
+        self.startup_error = startup_error
+        self.shutdown_error = shutdown_error
+
+    async def startup(self) -> None:
+        """Record the startup validation call."""
+        self.started += 1
+        if self.startup_error is not None:
+            raise self.startup_error
+
+    async def shutdown(self) -> None:
+        """Record the shutdown call."""
+        self.stopped += 1
+        if self.shutdown_error is not None:
+            raise self.shutdown_error
+
+    async def read_session(self, session_id: str) -> SessionObservation:
+        """Return one Session observation."""
+        if self.session_error is not None:
+            raise self.session_error
+        now = datetime.now(UTC)
+        return SessionObservation(
+            session=session_id,
+            requests={"cpu": "1", "memory": "1Gi"},
+            reserving_workloads=1,
+            observed_at=now,
+            start_time=now,
+            window_end=now,
+            has_running_pods=True,
+        )
+
+    def cache_fingerprint(self) -> str:
+        """Return a stable fake provider fingerprint."""
+        return "fake"
+
+
+class FakeUsageProvider:
+    """Return deterministic session usage."""
+
+    name = "kubemetrics"
+
+    def __init__(self, *, usage_error: BaseException | None = None) -> None:
+        self.usage_error = usage_error
+
+    async def startup(self) -> None:
+        """Satisfy the runtime lifecycle seam."""
+
+    async def shutdown(self) -> None:
+        """Satisfy the runtime lifecycle seam."""
+
+    async def read_session_usage(self, observation: SessionObservation) -> SessionUsageObservation:
+        """Return one usage observation."""
+        del observation
+        if self.usage_error is not None:
+            raise self.usage_error
+        return SessionUsageObservation(
+            usage={"cpu": "0.5", "memory": "1Gi"},
+            observed_at=datetime.now(UTC),
+        )
+
+
+def _cache(surface: str) -> FakeCacheCoordinator[CachedSnapshot]:
+    """Create one deterministic test cache seam."""
+    return FakeCacheCoordinator(
+        policy=FRESHNESS_POLICIES[surface],
+        created=lambda snapshot: snapshot.created,
     )
 
 
 def _runtime(
     *,
-    provider: object | None = None,
-    docs: dict[str, object] | None = None,
-) -> MetricsRuntime:
+    user_efficiency=None,
+    provider: FakeProvider | None = None,
+    session_provider: FakeSessionProvider | None = None,
+    usage_provider: FakeUsageProvider | None = None,
+    platform_cache=None,
+    user_cache=None,
+    community_cache=None,
+    session_cache=None,
+) -> tuple[MetricsRuntime, FakeProvider]:
+    """Build a complete injected runtime for route tests."""
     settings = _settings()
-    active = provider or KueueProvider(
-        settings, api=FakeKueueApi(docs or {"cq-a": CQ_A, "cq-b": CQ_B})
+    provider = provider or FakeProvider()
+    session_provider = session_provider or FakeSessionProvider()
+    usage_provider = usage_provider or FakeUsageProvider()
+    platform_cache = platform_cache or _cache("platform")
+    user_cache = user_cache or _cache("user")
+    community_cache = community_cache or _cache("community")
+    session_cache = session_cache or _cache("session")
+    service = MetricsService(
+        platform=provider.read_platform,
+        cache=platform_cache,
+        identity=lambda: CacheIdentity("platform", "canfar", "cluster-a", "kueue", "fake"),
+        platform_name="canfar",
+        user=provider.read_user,
+        user_cache=user_cache,
+        user_identity=lambda user: CacheIdentity("user", user, "cluster-a", "kueue", "fake"),
+        user_efficiency=user_efficiency,
+        community=provider.read_community,
+        community_cache=community_cache,
+        community_identity=lambda community: CacheIdentity(
+            "community", community, "cluster-a", "kueue", "fake"
+        ),
+        session=session_provider.read_session,
+        session_cache=session_cache,
+        session_identity=lambda session_id: CacheIdentity(
+            "session", session_id, "cluster-a", "session", "fake"
+        ),
+        session_usage=usage_provider.read_session_usage,
     )
-    service = PlatformMetricsService(
-        platform=active.platform,
-        cache=InMemoryTTLCache[CachedMetrics](ttl_seconds=30),
-        key=lambda: "platform:4:prod:",
+    return (
+        MetricsRuntime(
+            settings,
+            provider=provider,
+            session_provider=session_provider,
+            usage_provider=usage_provider,
+            metrics_service=service,
+            cache=platform_cache,
+            user_cache=user_cache,
+            community_cache=community_cache,
+            session_cache=session_cache,
+        ),
+        provider,
     )
-    return MetricsRuntime(settings, provider=active, platform_service=service)
 
 
-def test_platform_endpoint_serves_aggregated_kueue_data_with_cache_headers() -> None:
-    with TestClient(factory_module.create_app(settings=_settings(), runtime=_runtime())) as client:
-        response = client.get("/api/v1/metrics/platform")
+def test_routes_return_queue_state_and_cache_headers() -> None:
+    """All three surfaces expose reserving workloads and only two conditions."""
+    runtime, provider = _runtime()
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
         assert response.status_code == 200
-
-        # HTTP caching is header-based (ADR-0002): shared, bounded by TTL.
-        cache_control = response.headers["cache-control"]
-        assert "public" in cache_control
-        assert 25 <= cache_control_max_age(cache_control) <= 30
-        assert response.headers.get("date")
-        assert response.headers.get("expires")
-        created = datetime.fromisoformat(response.json()["metadata"]["created"])
-        assert created.tzinfo is not None
-
-        # Versioned envelope with no cache metadata in the body.
         payload = response.json()
-        assert set(payload) == {"version", "kind", "metadata", "status", "data"}
-        assert payload["version"] == "metrics.canfar.net/v1"
-        assert payload["kind"] == "PlatformMetrics"
-        assert payload["status"] == "Success"
-        assert "ttl" not in payload["metadata"] and "cached" not in payload["metadata"]
+        assert payload["status"]["reservingWorkloads"] == 3
+        assert payload["status"]["resources"] == [
+            {"name": "cpu", "capacity": "4", "allocated": "2"}
+        ]
+        assert {condition["type"] for condition in payload["status"]["conditions"]} == {
+            "Ready",
+            "Cached",
+        }
+        assert response.headers["cache-status"].startswith("metrics; fwd=uri-miss")
 
-        # Aggregation contract (ADR-0002): summed quotas, usage totals only,
-        # unit parity, zero-alignment, sorted open-ended maps.
-        data = payload["data"]
-        assert set(data) == {"scope", "cluster", "capacity", "allocated"}
-        assert data["cluster"] == "prod"
-        assert data["capacity"]["cpu"] == "15.3"
-        assert data["capacity"]["memory"] == "20Gi"
-        assert data["capacity"]["ephemeral-storage"] == "2Gi"
-        assert data["capacity"]["nvidia.com/gpu"] == "0.3"
-        assert data["allocated"]["cpu"] == "0.1"
-        assert data["allocated"]["memory"] == "2Gi"
-        assert data["allocated"]["ephemeral-storage"] == "0Gi"
-        assert data["allocated"]["nvidia.com/gpu"] == "0.3"
-        assert list(data["capacity"]) == sorted(data["capacity"])
-        assert set(data["allocated"]) == set(data["capacity"])
+        second = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+        assert second.status_code == 200
+        assert second.json()["status"]["conditions"][1]["reason"] == "FreshHit"
+        assert runtime._readiness._surfaces["platform"].source_reachable  # noqa: SLF001
 
-        # Second read is served from the same snapshot.
-        second = client.get("/api/v1/metrics/platform")
-        assert second.headers["last-modified"] == response.headers["last-modified"]
+        user = client.get("/apis/canfar.net/v1alpha1/metrics/user/bob")
+        assert user.status_code == 200
+        assert user.json()["status"]["reservingWorkloads"] == 1
 
-        # Removed route surface stays removed (ADR-0002).
-        assert client.get("/api/v1/metrics/users/u1").status_code == 404
-        assert client.get("/api/v1/metrics/users/u1/sessions/s1").status_code == 404
-        assert client.get("/metrics").status_code == 404
+        community = client.get("/apis/canfar.net/v1alpha1/metrics/community/astronomy")
+        assert community.status_code == 200
+        assert community.json()["status"]["reservingWorkloads"] == 2
+
+        assert client.get("/apis/canfar.net/v1alpha1/metrics/platform/other").status_code == 404
+        assert client.get("/api/v1/metrics/platform").status_code == 404
+    assert provider.started == 1
+    assert provider.stopped == 1
 
 
-@pytest.mark.parametrize(
-    ("broken_doc", "status_code", "code", "message"),
-    [
-        # Upstream failure -> 502; unavailable data -> 503. Raw upstream text
-        # and URLs must never reach the response body (ADR-0002).
-        (
-            httpx.ConnectError("secret at https://kubernetes.default.svc"),
-            502,
-            "platform_metrics_error",
-            "Platform metrics collection failed",
-        ),
-        (
-            {"spec": {}},
-            503,
-            "platform_metrics_unavailable",
-            "Could not load platform metrics from Kubernetes",
-        ),
-    ],
-)
-def test_provider_errors_map_to_sanitized_error_envelopes(
-    broken_doc: object,
-    status_code: int,
-    code: str,
-    message: str,
-) -> None:
-    # Healthy at startup; the upstream breaks afterwards, on the request path.
-    api = FakeKueueApi({"cq-a": CQ_A, "cq-b": CQ_B})
-    provider = KueueProvider(_settings(), api=api)
-    with TestClient(
-        factory_module.create_app(settings=_settings(), runtime=_runtime(provider=provider))
-    ) as client:
-        api.docs = {"cq-a": broken_doc, "cq-b": broken_doc}
-        response = client.get("/api/v1/metrics/platform")
+def test_enabled_efficiency_failure_is_cached_as_partial_data() -> None:
+    """Optional adapter failure keeps queue data but marks the report partial."""
+    calls = 0
 
-    assert response.status_code == status_code
-    assert response.headers["cache-control"] == "no-store"
-    payload = response.json()
-    assert set(payload) == {"version", "kind", "metadata", "status", "error"}
-    assert payload["kind"] == "Status"
-    assert payload["status"] == "Error"
-    assert payload["error"] == {"code": code, "message": message}
-    assert "secret" not in response.text
-    assert "kubernetes.default.svc" not in response.text
+    async def unavailable(_user: str) -> EfficiencyObservation:
+        nonlocal calls
+        calls += 1
+        raise ProviderUnavailableError("efficiency backend unavailable")
+
+    runtime, _provider = _runtime(user_efficiency=unavailable)
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        first = client.get("/apis/canfar.net/v1alpha1/metrics/user/bob")
+        second = client.get("/apis/canfar.net/v1alpha1/metrics/user/bob")
+
+    assert first.status_code == 200
+    assert first.json()["status"]["conditions"][0]["reason"] == "PartialData"
+    assert second.json()["status"]["conditions"][0]["reason"] == "PartialData"
+    assert calls == 1
 
 
-def test_generic_500_response_exposes_no_exception_details() -> None:
-    app = factory_module.create_app(settings=_settings(), runtime=_runtime())
-
-    @app.get("/boom")
-    async def boom() -> None:
-        raise ValueError("secret-token from https://internal.example")
-
-    with TestClient(app, raise_server_exceptions=False) as client:
-        response = client.get("/boom")
-
-    assert response.status_code == 500
-    assert response.json()["error"]["code"] == "internal_error"
-    assert "secret-token" not in response.text
-    assert "ValueError" not in response.text
-
-
-def test_http_cache_header_edge_cases() -> None:
-    created = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-    assert remaining_freshness_seconds(created, 60, now=created + timedelta(seconds=10)) == 50
-    assert remaining_freshness_seconds(created, 5, now=created + timedelta(seconds=10)) == 0
-
-    private = metrics_success_cache_headers(
-        snapshot_created=created,
-        configured_ttl=30,
-        shared_cache_public=False,
-        now=created,
-    )
-    assert "private" in private["Cache-Control"]
-
-    no_store = metrics_success_cache_headers(
-        snapshot_created=created,
-        configured_ttl=0,
-        shared_cache_public=True,
-        now=created,
-    )
-    assert no_store["Cache-Control"] == "no-store"
-    assert "Expires" not in no_store
-
-
-def test_constructed_and_injected_runtimes_share_lifecycle_and_cleanup(monkeypatch) -> None:
+def test_efficiency_observation_is_rendered_without_query_logic() -> None:
+    """Already-attributed CPU data is copied into the public response."""
     settings = _settings()
-    for injected in (False, True):
-        runtime = _runtime()
-        start, shutdown = AsyncMock(), AsyncMock()
-        build_runtime = MagicMock(return_value=runtime)
-        monkeypatch.setattr(runtime, "start", start)
-        monkeypatch.setattr(runtime, "shutdown", shutdown)
-        monkeypatch.setattr(MetricsRuntime, "from_settings", build_runtime)
-
-        app = factory_module.create_app(settings=settings, runtime=runtime if injected else None)
-        with TestClient(app) as client:
-            assert client.get("/healthz").status_code == 200
-            assert app.state.runtime is runtime
-
-        start.assert_awaited_once_with()
-        shutdown.assert_awaited_once_with()
-        if injected:
-            build_runtime.assert_not_called()
-        else:
-            build_runtime.assert_called_once()
-            assert build_runtime.call_args.args == (settings,)
-
-    # Startup failure still runs application cleanup.
-    provider = LifecycleProvider(startup_error=RuntimeStartupError("misconfigured"))
-    runtime = _runtime(provider=provider)
-    with pytest.raises(RuntimeStartupError, match="misconfigured"):
-        with TestClient(factory_module.create_app(settings=settings, runtime=runtime)):
-            pass
-    assert provider.events == ["startup", "provider shutdown"]
-
-
-def test_otel_wiring_instruments_and_uninstruments(monkeypatch) -> None:
-    meter_provider = MagicMock(spec=MeterProvider)
-    fastapi_instrumentor = MagicMock()
-    httpx_instrumentor = MagicMock()
-    monkeypatch.setattr(
-        factory_module,
-        "setup_telemetry",
-        lambda settings: (NoopMetricsRecorder(), meter_provider),
+    provider = FakeProvider()
+    platform_cache = _cache("platform")
+    user_cache = _cache("user")
+    community_cache = _cache("community")
+    service = MetricsService(
+        platform=provider.read_platform,
+        cache=platform_cache,
+        identity=lambda: CacheIdentity("platform", "canfar", "cluster-a", "kueue", "fake"),
+        user=provider.read_user,
+        user_cache=user_cache,
+        user_identity=lambda user: CacheIdentity("user", user, "cluster-a", "kueue", "fake"),
+        user_efficiency=lambda _user: _efficiency(),
+        community=provider.read_community,
+        community_cache=community_cache,
+        community_identity=lambda community: CacheIdentity(
+            "community", community, "cluster-a", "kueue", "fake"
+        ),
     )
-    monkeypatch.setattr(factory_module, "FastAPIInstrumentor", fastapi_instrumentor)
-    monkeypatch.setattr(factory_module, "HTTPXClientInstrumentor", httpx_instrumentor)
+    runtime = MetricsRuntime(
+        settings,
+        provider=provider,
+        session_provider=FakeSessionProvider(),
+        usage_provider=FakeUsageProvider(),
+        metrics_service=service,
+        cache=platform_cache,
+        user_cache=user_cache,
+        community_cache=community_cache,
+        session_cache=_cache("session"),
+    )
+    with TestClient(factory_module.create_app(settings=settings, runtime=runtime)) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/user/bob")
 
-    settings = Settings(otel_metrics_enabled=True, cache=CacheConfig(backend="memory"))
-    with TestClient(factory_module.create_app(settings=settings, runtime=_runtime())) as client:
-        assert client.get("/healthz").status_code == 200
-
-    fastapi_instrumentor.instrument_app.assert_called_once()
-    fastapi_instrumentor.uninstrument_app.assert_called_once()
-    httpx_instrumentor.return_value.instrument.assert_called_once()
-    httpx_instrumentor.return_value.uninstrument.assert_called_once()
-    meter_provider.shutdown.assert_called_once_with()
+    assert response.status_code == 200
+    assert response.json()["status"]["resources"][0]["efficiency"] == "0.5"
 
 
-def test_main_run_wires_settings_logging_app_and_server(monkeypatch) -> None:
-    settings = Settings(host="127.0.0.1", port=9000)
-    app = object()
-    monkeypatch.setattr(main_module, "Settings", MagicMock(return_value=settings))
-    monkeypatch.setattr(main_module, "create_app", MagicMock(return_value=app))
-    run_server = MagicMock()
-    monkeypatch.setattr(main_module.uvicorn, "run", run_server)
+async def _efficiency() -> EfficiencyObservation:
+    """Return a deterministic attributed efficiency observation."""
+    return EfficiencyObservation(
+        observed_at=datetime.now(UTC),
+        efficiencies={"cpu": Decimal("0.5"), "memory": Decimal("0.75")},
+    )
 
-    main_module.run()
 
-    run_server.assert_called_once_with(app, host="127.0.0.1", port=9000, log_level="info")
+class _UnavailableCache:
+    """Fail one cache surface as a required shared-cache outage would."""
+
+    backend_name = "redis"
+
+    def __init__(self, surface: str) -> None:
+        self.policy = FRESHNESS_POLICIES[surface]
+        self.available = False
+
+    async def get_or_fill(self, _identity, _fill):
+        """Raise the service-level cache outage."""
+        raise CacheUnavailable("shared cache unavailable")
+
+    async def shutdown(self) -> None:
+        """Satisfy the runtime cache lifecycle seam."""
+
+
+class _TerminalNotFoundCache:
+    """Expose the typed Redis terminal miss at the service boundary."""
+
+    backend_name = "redis"
+
+    def __init__(self, surface: str) -> None:
+        self.policy = FRESHNESS_POLICIES[surface]
+        self.available = True
+
+    async def get_or_fill(self, _identity, _fill):
+        """Raise the authenticated cache terminal outcome."""
+        raise CacheNotFound()
+
+    async def shutdown(self) -> None:
+        """Satisfy the runtime cache lifecycle seam."""
+
+
+def _assert_status(response, *, code: int, reason: str) -> None:
+    """Assert the stable sanitized Kubernetes Status envelope."""
+    assert response.status_code == code
+    body = response.json()
+    assert body["apiVersion"] == "v1"
+    assert body["kind"] == "Status"
+    assert body["status"] == "Failure"
+    assert body["reason"] == reason
+    assert body["code"] == code
+    assert "Traceback" not in response.text
+
+
+def test_http_health_openapi_and_sanitized_boundaries() -> None:
+    """Health, OpenAPI, validation, routing, and 404 errors keep stable contracts."""
+    runtime, _provider = _runtime()
+    app = factory_module.create_app(settings=_settings(), runtime=runtime)
+
+    with TestClient(app) as client:
+        assert client.get("/livez").json() == {"status": "ok"}
+        assert client.get("/healthz").json() == {"status": "ok"}
+        assert client.get("/readyz").json() == {"status": "ready"}
+
+        openapi = client.get("/openapi.json")
+        assert openapi.status_code == 200
+        assert all(
+            "422" not in operation.get("responses", {})
+            for path_item in openapi.json()["paths"].values()
+            for operation in path_item.values()
+            if isinstance(operation, dict)
+        )
+        assert "HTTPValidationError" not in openapi.json()["components"]["schemas"]
+
+        _assert_status(
+            client.get("/apis/canfar.net/v1alpha1/metrics/platform/a%2Fb"),
+            code=400,
+            reason="BadRequest",
+        )
+        _assert_status(client.get("/does-not-exist"), code=404, reason="NotFound")
+
+        method = client.post("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+        _assert_status(method, code=405, reason="Invalid")
+        assert "GET" in method.headers["allow"]
+
+
+def test_routes_do_not_use_last_modified_validation() -> None:
+    """Metrics responses do not expose HTTP Last-Modified or 304 semantics."""
+    runtime, _provider = _runtime()
+    app = factory_module.create_app(settings=_settings(), runtime=runtime)
+
+    with TestClient(app) as client:
+        paths = (
+            "/apis/canfar.net/v1alpha1/metrics/platform/canfar",
+            "/apis/canfar.net/v1alpha1/metrics/user/Bob",
+            "/apis/canfar.net/v1alpha1/metrics/community/Astronomy",
+        )
+        for path in paths:
+            first = client.get(path)
+            assert first.status_code == 200
+            assert "last-modified" not in first.headers
+            conditional = client.get(
+                path,
+                headers={"If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"},
+            )
+            assert conditional.status_code == 200
+            assert "last-modified" not in conditional.headers
+
+        user = client.get("/apis/canfar.net/v1alpha1/metrics/user/Bob")
+        assert user.json()["spec"] == {"user": "Bob"}
+        assert user.json()["metadata"]["name"].startswith("user-bob-")
 
 
 @pytest.mark.parametrize(
-    "module_name",
+    ("path", "provider_kwargs"),
     [
-        "metrics",
-        "metrics.core.settings",
-        "metrics.core.factory",
-        "metrics.providers.kueue",
-        "metrics.api.v1.routes",
-        "metrics.main",
+        (
+            "/apis/canfar.net/v1alpha1/metrics/platform/canfar",
+            {"platform_error": ProviderUnavailableError("platform offline")},
+        ),
+        (
+            "/apis/canfar.net/v1alpha1/metrics/user/bob",
+            {"user_error": ProviderExecutionError("user response invalid")},
+        ),
+        (
+            "/apis/canfar.net/v1alpha1/metrics/community/astronomy",
+            {"community_error": ProviderUnavailableError("community offline")},
+        ),
+    ],
+    ids=["platform-unavailable", "user-execution", "community-unavailable"],
+)
+def test_provider_failures_are_sanitized_as_service_unavailable(path, provider_kwargs) -> None:
+    """Expected provider failures do not expose upstream details."""
+    runtime, _provider = _runtime(provider=FakeProvider(**provider_kwargs))
+
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get(path)
+
+    _assert_status(response, code=503, reason="ServiceUnavailable")
+    assert "Retry-After" not in response.headers
+
+
+def test_cache_failure_is_sanitized_and_advertises_retry() -> None:
+    """A required cache outage returns the bounded retry hint."""
+    runtime, _provider = _runtime(platform_cache=_UnavailableCache("platform"))
+
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+
+    _assert_status(response, code=503, reason="ServiceUnavailable")
+    assert response.headers["retry-after"] == "1"
+
+
+@pytest.mark.parametrize(
+    ("surface", "path"),
+    [
+        ("user", "/apis/canfar.net/v1alpha1/metrics/user/bob"),
+        ("community", "/apis/canfar.net/v1alpha1/metrics/community/astronomy"),
     ],
 )
-def test_module_imports_construct_no_runtime_resources(module_name: str) -> None:
-    module = importlib.import_module(module_name)
-    resource_types = (
-        Settings,
-        FastAPI,
-        httpx.AsyncClient,
-        MetricsRuntime,
-        MeterProvider,
-        OTLPMetricExporter,
+def test_workload_cache_failure_flaps_public_readiness_until_recovery(
+    surface: str,
+    path: str,
+) -> None:
+    """User and Community cache outages make readiness fail until recovered."""
+    cache = _UnavailableCache(surface)
+    cache.available = True
+    runtime, _provider = _runtime(**{f"{surface}_cache": cache})
+
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        assert client.get("/readyz").status_code == 200
+
+        cache.available = False
+        response = client.get(path)
+        _assert_status(response, code=503, reason="ServiceUnavailable")
+        assert client.get("/readyz").status_code == 503
+
+        cache.available = True
+        assert client.get("/readyz").status_code == 200
+
+
+def test_unexpected_provider_failure_is_sanitized_as_internal_error() -> None:
+    """Unexpected source failures become a generic 500 response at the API boundary."""
+    runtime, _provider = _runtime(
+        provider=FakeProvider(platform_error=RuntimeError("secret upstream detail"))
     )
-    assert not any(isinstance(value, resource_types) for value in vars(module).values())
+
+    with TestClient(
+        factory_module.create_app(settings=_settings(), runtime=runtime),
+        raise_server_exceptions=False,
+    ) as client:
+        response = client.get("/apis/canfar.net/v1alpha1/metrics/platform/canfar")
+
+    _assert_status(response, code=500, reason="InternalError")
+    assert "secret upstream detail" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("path", "provider_kwargs"),
+    [
+        (
+            "/apis/canfar.net/v1alpha1/metrics/user/missing",
+            {"user_error": SubjectNotFoundError("no LocalQueue")},
+        ),
+        (
+            "/apis/canfar.net/v1alpha1/metrics/community/missing",
+            {"community_error": SubjectNotFoundError("no ClusterQueue")},
+        ),
+    ],
+    ids=["user-not-found", "community-not-found"],
+)
+def test_missing_workload_subjects_are_sanitized_as_not_found(path, provider_kwargs) -> None:
+    """Valid workload subjects without source data map to a stable 404."""
+    runtime, _provider = _runtime(provider=FakeProvider(**provider_kwargs))
+
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get(path)
+
+    _assert_status(response, code=404, reason="NotFound")
+
+
+@pytest.mark.parametrize(
+    ("surface", "path"),
+    [
+        ("user", "/apis/canfar.net/v1alpha1/metrics/user/bob"),
+        ("community", "/apis/canfar.net/v1alpha1/metrics/community/astronomy"),
+    ],
+)
+def test_cached_terminal_subject_miss_maps_to_404(surface: str, path: str) -> None:
+    """A Redis terminal miss remains a sanitized subject 404, never a 503."""
+    runtime, _provider = _runtime(**{f"{surface}_cache": _TerminalNotFoundCache(surface)})
+
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        assert runtime._readiness._surfaces[surface].source_reachable  # noqa: SLF001
+        response = client.get(path)
+        assert runtime._readiness._surfaces[surface].source_reachable  # noqa: SLF001
+
+    _assert_status(response, code=404, reason="NotFound")
+
+
+def test_lifespan_degrades_when_kueue_startup_fails() -> None:
+    """Redis-backed startup serves liveness while Kueue keeps readiness degraded."""
+    provider = FakeProvider(startup_error=RuntimeStartupError("startup validation failed"))
+    runtime, _provider = _runtime(provider=provider)
+    app = factory_module.create_app(settings=_settings(), runtime=runtime)
+
+    with TestClient(app) as client:
+        assert client.get("/livez").status_code == 200
+        assert client.get("/readyz").status_code == 503
+
+    assert provider.started >= 1
+    assert provider.stopped == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("cleanup_fails", [False, True], ids=["clean", "runtime-cleanup-error"])
+async def test_lifespan_finishes_runtime_cleanup_before_propagating_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+    cleanup_fails: bool,
+) -> None:
+    """Runtime cleanup completes, in order, without masking caller cancellation."""
+    events: list[str] = []
+    shutdown_started = asyncio.Event()
+    release_shutdown = asyncio.Event()
+
+    class CancellableRuntime:
+        async def start(self) -> None:
+            events.append("runtime-start")
+
+        async def shutdown(self) -> None:
+            events.append("runtime-shutdown-start")
+            shutdown_started.set()
+            await release_shutdown.wait()
+            events.append("runtime-shutdown-complete")
+            if cleanup_fails:
+                raise RuntimeError("runtime cleanup failed")
+
+    class RecordingTelemetry:
+        async def shutdown(self) -> None:
+            events.append("telemetry-shutdown")
+
+    telemetry = RecordingTelemetry()
+    monkeypatch.setattr(factory_module, "setup_telemetry", lambda _settings: telemetry)
+    app = factory_module.create_app(settings=_settings(), runtime=CancellableRuntime())
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+
+    exit_task = asyncio.create_task(lifespan.__aexit__(None, None, None))
+    await shutdown_started.wait()
+    exit_task.cancel("caller cancellation")
+    release_shutdown.set()
+
+    with pytest.raises(asyncio.CancelledError, match="caller cancellation"):
+        await exit_task
+
+    assert events == [
+        "runtime-start",
+        "runtime-shutdown-start",
+        "runtime-shutdown-complete",
+        "telemetry-shutdown",
+    ]

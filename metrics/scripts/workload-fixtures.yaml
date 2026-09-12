@@ -1,0 +1,400 @@
+# Applied in phases by metrics.dev.fixtures. All activity is finite and local.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: integration-idle
+  namespace: canfar-workloads
+  labels: &borrowing-job-labels
+    <<: &borrowing-pod-labels
+      metrics.canfar.net/fixture-phase: borrowing
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: borrowing-bob
+      canfar.net/username: bob
+      canfar.net/name: borrowing-bob
+      canfar.net/kind: headless
+      canfar.net/job: integration-idle
+      canfar.net/flavor: flexible
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-smoke
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *borrowing-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busy
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - dd if=/dev/zero of=/tmp/activity bs=1M count=8 && end=$(($(date +%s)+240)); while [ "$(date +%s)" -lt "$end" ]; do :; done
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 200Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: resource-shapes
+  namespace: canfar-workloads
+  labels: &shape-job-labels
+    <<: &shape-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: shapes-bob
+      canfar.net/username: bob
+      canfar.net/name: resource-shapes
+      canfar.net/kind: notebook
+      canfar.net/job: resource-shapes
+      canfar.net/flavor: flexible
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-smoke
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *shape-pod-labels
+    spec:
+      runtimeClassName: metrics-overhead
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: initialize
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "dd if=/dev/zero of=/tmp/init bs=1M count=4"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 96Mi
+            limits:
+              cpu: 200m
+              memory: 96Mi
+      containers:
+        - name: busy
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "end=$(($(date +%s)+240)); while [ \"$(date +%s)\" -lt \"$end\" ]; do :; done"]
+          securityContext: *container-security
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 150m
+              memory: 96Mi
+        - name: sidecar
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "end=$(($(date +%s)+240)); while [ \"$(date +%s)\" -lt \"$end\" ]; do :; done"]
+          securityContext: *container-security
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 75m
+              memory: 48Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pending-demand
+  namespace: canfar-workloads
+  labels: &pending-job-labels
+    <<: &pending-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: pending-bob
+      canfar.net/username: bob
+      canfar.net/name: pending-demand
+      canfar.net/kind: notebook
+      canfar.net/job: pending-demand
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-smoke
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *pending-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pending
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "dd if=/dev/zero of=/tmp/activity bs=1M count=8"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: terminal-control
+  namespace: canfar-workloads
+  labels: &terminal-job-labels
+    <<: &terminal-pod-labels
+      metrics.canfar.net/fixture-phase: controls
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: terminal-bob
+      canfar.net/username: bob
+      canfar.net/name: terminal-control
+      canfar.net/kind: headless
+      canfar.net/job: terminal-control
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-smoke
+spec:
+  suspend: true
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: *terminal-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: terminal
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "dd if=/dev/zero of=/tmp/activity bs=1M count=2"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 20m
+              memory: 24Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fair-warm-high
+  namespace: canfar-workloads
+  labels: &warm-job-labels
+    <<: &warm-pod-labels
+      metrics.canfar.net/fixture-phase: fair-warm
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-warm-alice
+      canfar.net/username: alice
+      canfar.net/name: fair-warm-high
+      canfar.net/kind: headless
+      canfar.net/job: fair-warm-high
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-fair-high
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *warm-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busy
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "end=$(($(date +%s)+240)); while [ \"$(date +%s)\" -lt \"$end\" ]; do :; done"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources: &fair-resources
+            requests:
+              cpu: 300m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fair-next-high
+  namespace: canfar-workloads
+  labels: &fair-high-job-labels
+    <<: &fair-high-pod-labels
+      metrics.canfar.net/fixture-phase: fair-contenders
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-next-high-alice
+      canfar.net/username: alice
+      canfar.net/name: fair-next-high
+      canfar.net/kind: headless
+      canfar.net/job: fair-next-high
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-fair-high
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *fair-high-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busy
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "end=$(($(date +%s)+240)); while [ \"$(date +%s)\" -lt \"$end\" ]; do :; done"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 300m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fair-next-low
+  namespace: canfar-workloads
+  labels: &fair-low-job-labels
+    <<: &fair-low-pod-labels
+      metrics.canfar.net/fixture-phase: fair-contenders
+      app.kubernetes.io/managed-by: skaha
+      app.kubernetes.io/part-of: canfar
+      canfar.net/id: fair-next-low-carol
+      canfar.net/username: carol
+      canfar.net/name: fair-next-low
+      canfar.net/kind: headless
+      canfar.net/job: fair-next-low
+      canfar.net/flavor: fixed
+      canfar.net/accelerator: none
+      canfar.net/community: astronomy
+      canfar.net/project: usage-fixtures
+    kueue.x-k8s.io/queue-name: lq-fair-low
+spec:
+  suspend: true
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels: *fair-low-pod-labels
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: &pod-security
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busy
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, "end=$(($(date +%s)+240)); while [ \"$(date +%s)\" -lt \"$end\" ]; do :; done"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 300m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi

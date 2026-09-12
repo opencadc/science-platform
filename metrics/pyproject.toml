@@ -12,15 +12,15 @@ dependencies = [
     "httpx>=0.28.1",
     "kr8s>=0.20.15",
     "opentelemetry-exporter-otlp-proto-http>=1.41.0",
-    "opentelemetry-instrumentation-fastapi>=0.62b0",
-    "opentelemetry-instrumentation-httpx>=0.62b0",
     "opentelemetry-sdk>=1.41.0",
     "pydantic>=2.13.1",
     "pydantic-settings>=2.13.1",
-    "quantiphy>=2.22.1",
     "redis>=7.4.0",
     "uvicorn>=0.44.0",
 ]
+
+[project.scripts]
+metrics-dev = "metrics.dev.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -37,11 +37,12 @@ markers = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.18.2",
     "pre-commit>=4.5.1",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pyyaml>=6.0.2",
     "ruff>=0.14.2",
+    "ty==0.0.74",
 ]
 
 [tool.ruff]
@@ -61,3 +62,6 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ty.src]
+include = ["src"]
