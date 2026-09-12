@@ -50,8 +50,8 @@ session launch. See
   (from **Metrics backend** via **MetricsDAO**) with **session resource
   ceiling** (from LimitRange or **resource context file**).
 - Session-list pod usage (`cpuCoresInUse`, `memoryInUse`) is fetched through
-  **MetricsDAO**; today from the Kubernetes metrics API, future from the
-  **Metrics backend**.
+  **MetricsDAO** from either the Kubernetes metrics API or the **Metrics
+  backend** session API (`SKAHA_POD_METRICS_SOURCE`).
 - **Session resource ceiling** is independent of **platform capacity**.
 
 ## Example dialogue
@@ -78,7 +78,6 @@ session launch. See
   server logs only.
 - On successful **platform stats**, `lastUpdate` reflects the Metrics snapshot
   time (`metadata.created`), not when Skaha assembled the response.
-- Session-list pod usage is temporarily sourced from the Kubernetes metrics API
-  inside **MetricsDAO**; when the Metrics backend exposes pod usage,
-  **MetricsDAO** will switch via configuration without changing session handler
-  call sites.
+- Session-list pod usage source is selected via `SKAHA_POD_METRICS_SOURCE`
+  (`kubernetes` default, `backend` for Metrics session HTTP API). Backend
+  session usage requires listed session Jobs to map usage to job names.

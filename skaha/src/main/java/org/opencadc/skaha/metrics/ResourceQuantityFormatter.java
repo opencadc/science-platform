@@ -1,7 +1,6 @@
 package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.util.StringUtil;
-import java.util.HashMap;
 import java.util.Map;
 import org.opencadc.skaha.utils.MemoryUnitConverter;
 
@@ -10,12 +9,7 @@ public final class ResourceQuantityFormatter {
 
     public static final String NONE = "<none>";
 
-    private static final Map<String, Integer> CORE_DIVIDENDS = new HashMap<>();
-
-    static {
-        ResourceQuantityFormatter.CORE_DIVIDENDS.put("m", 3);
-        ResourceQuantityFormatter.CORE_DIVIDENDS.put("n", 9);
-    }
+    private static final Map<String, Integer> CORE_DIVIDENDS = Map.of("m", 3, "n", 9);
 
     private ResourceQuantityFormatter() {}
 
@@ -49,24 +43,5 @@ public final class ResourceQuantityFormatter {
         }
         final long bytes = MemoryUnitConverter.toBytes(inK8sUnit);
         return String.format("%.2f", MemoryUnitConverter.toGigabytes(bytes));
-    }
-
-    static String toPlatformRamString(final String metricsMemory) {
-        if (metricsMemory == null || metricsMemory.isBlank()) {
-            return MemoryUnitConverter.formatHumanReadable(0L, MemoryUnitConverter.MemoryUnit.G);
-        }
-        final long bytes = MemoryUnitConverter.toBytes(metricsMemory.trim());
-        return MemoryUnitConverter.formatHumanReadable(bytes, MemoryUnitConverter.MemoryUnit.G);
-    }
-
-    static double parseCpuCores(final String cores) {
-        if (cores == null || cores.isBlank()) {
-            return 0.0;
-        }
-        try {
-            return Double.parseDouble(cores.trim());
-        } catch (NumberFormatException e) {
-            return 0.0;
-        }
     }
 }

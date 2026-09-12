@@ -126,8 +126,8 @@ public class SessionDAO {
         final String labelSelector = SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless);
         jobListRequest.labelSelector(labelSelector);
 
-        final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless);
         final List<V1Job> userJobs = jobListRequest.execute().getItems();
+        final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless, userJobs);
         LOGGER.debug("Found " + userJobs.size() + " jobs for user " + forUserID + " with selector " + labelSelector
                 + " before filtering.");
         final List<Session> sessions = userJobs.stream()
@@ -139,12 +139,20 @@ public class SessionDAO {
     }
 
     static PodResourceUsage loadPodResourceUsage(final String forUserID, final boolean omitHeadless) {
-        return loadPodResourceUsage(MetricsDAO.getDefault(), forUserID, omitHeadless);
+        return loadPodResourceUsage(forUserID, omitHeadless, List.of());
     }
 
     static PodResourceUsage loadPodResourceUsage(
-            final MetricsDAO metricsDAO, final String forUserID, final boolean omitHeadless) {
-        return metricsDAO.getPodResourceUsage(forUserID, omitHeadless);
+            final String forUserID, final boolean omitHeadless, final List<V1Job> userJobs) {
+        return loadPodResourceUsage(MetricsDAO.getDefault(), forUserID, omitHeadless, userJobs);
+    }
+
+    static PodResourceUsage loadPodResourceUsage(
+            final MetricsDAO metricsDAO,
+            final String forUserID,
+            final boolean omitHeadless,
+            final List<V1Job> userJobs) {
+        return metricsDAO.getPodResourceUsage(forUserID, omitHeadless, userJobs);
     }
 
     static String getConnectURL(

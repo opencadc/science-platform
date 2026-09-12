@@ -2,7 +2,6 @@ name: "CI: Testing"
 
 on:
     pull_request:
-      branches: [main]
       paths-ignore:
         - "metrics/**"
     push:

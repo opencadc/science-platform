@@ -2,7 +2,6 @@ name: "CI: Linting"
 
 on:
   pull_request:
-    branches: [main]
     paths-ignore:
       - "metrics/**"
   push:
