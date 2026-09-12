@@ -14,9 +14,10 @@ science-platform monorepo.
 - **`skaha/docs/adr/`** or **`metrics/docs/adr/`** — context-specific decisions
   for the area you are changing.
 
-Metrics implementation facts also live under `metrics/docs/` (`architecture.md`,
-`design.md`, `specs.md`, `learnings.md`, `environment-contracts.md`,
-`kueue-platform.md`). **Canonical decisions:** [`../adr/README.md`](../adr/README.md).
+Metrics implementation facts live under `metrics/docs/` (`specs.md`,
+`learnings.md`, `environment-contracts.md`, runbooks). **Canonical decisions:**
+[`../adr/README.md`](../adr/README.md). **Wire contract:**
+[`../specs.md`](../specs.md).
 
 If any glossary or ADR path is missing for the context you need, ask before
 inventing terms. Prefer crystallizing decisions in `CONTEXT.md` / ADRs rather
@@ -38,10 +39,10 @@ science-platform/
     ├── CONTEXT.md
     ├── docs/
     │   ├── adr/
-    │   ├── architecture.md
-    │   ├── design.md
     │   ├── specs.md
-    │   └── learnings.md
+    │   ├── environment-contracts.md
+    │   ├── learnings.md
+    │   └── runbooks/
     └── src/metrics/
 ```
 
@@ -57,5 +58,5 @@ Cross-context work: read both glossaries and the system ADRs under `docs/adr/`.
 If your output contradicts an existing ADR, surface it explicitly rather than
 silently overriding:
 
-> _Contradicts ADR-0002 (platform metrics contract: unit parity) — but worth
+> _Contradicts ADR-0010 (simple Kueue Metrics service) — but worth
 > reopening because…_

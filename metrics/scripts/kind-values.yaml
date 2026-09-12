@@ -5,23 +5,45 @@ image:
   tag: latest
   pullPolicy: Never
 
+replicaCount: 2
+
+clusterName: kind-metrics
+
+networkPolicy:
+  enabled: false
+
 serviceAccount:
   create: true
 
 rbac:
   create: true
 
+kueue:
+  clusterQueues:
+    - cq-proton
+    - cq-electron
+    - cq-fair
+  namespaces:
+    - canfar-workloads
+    - canfar-workloads-secondary
+
+cacheKeySecret:
+  name: metrics-test-cache-key
+  key: key-secret
+
 env:
-  METRICS_CLUSTER_NAME: "kind-metrics"
-  METRICS_SOURCES__PLATFORM: "kueue"
-  METRICS_CACHE__BACKEND: "redis"
-  # Short TTL for CI and local integration so platform snapshots refresh quickly.
-  METRICS_CACHE__TTL_SECONDS: "1"
-  METRICS_OTEL_METRICS_ENABLED: "false"
+  METRICS_PROVIDERS__PROMQL__BASE_URL: "http://metrics-test-prometheus.metrics.svc:9090"
+  METRICS_OTEL__EXPORTER_OTLP_ENDPOINT: "http://metrics-test-otel-collector.metrics.svc:4318"
+  METRICS_OTEL__EXPORT_INTERVAL_MILLIS: "1000"
+  METRICS_OTEL__DEPLOYMENT_ENVIRONMENT: "development"
+  METRICS_OTEL__KUBERNETES_NAMESPACE: "metrics"
   # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
-  # service account (ADR-0001); no transport settings are configured here.
+  # service account; no transport settings are configured here.
   # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
-  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron"]'
+  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron","cq-fair"]'
+  METRICS_PROVIDERS__KUEUE__NAMESPACES: '["canfar-workloads","canfar-workloads-secondary"]'
 
 redis:
-  enabled: true
+  urlSecret:
+    name: metrics-test-redis
+    key: redis-url
