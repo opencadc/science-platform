@@ -31,9 +31,6 @@ _SESSION_ID_LABEL = "label_canfar_net_id"
 _EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
 _NAMESPACE_LABEL = "namespace"
 _PROMQL_SCOPE = Literal["user", "community", "platform", "session"]
-_DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
-_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
-_DEFAULT_MAX_SERIES = 3_000
 _MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
 
 

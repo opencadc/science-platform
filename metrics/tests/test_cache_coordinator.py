@@ -371,10 +371,7 @@ async def test_cancelled_last_waiter_detaches_before_cleanup_finishes() -> None:
     finally:
         store.allow_release.set()
 
-    try:
-        result = await asyncio.wait_for(retry, timeout=0.5)
-    except BaseException as exc:  # noqa: BLE001 - assert the public cancellation outcome below
-        result = exc
+    result = await asyncio.wait_for(retry, timeout=0.5)
 
     assert not retry_read_timed_out
     assert isinstance(result, CacheResult)
