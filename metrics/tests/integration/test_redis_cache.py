@@ -296,7 +296,7 @@ async def test_cancellation_releases_real_redis_lease(redis_clients) -> None:
     await started.wait()
     request.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await request
+        await asyncio.wait_for(request, timeout=1.0)
 
     assert await redis.get(_keys().lease) is None
     await coordinator.shutdown()

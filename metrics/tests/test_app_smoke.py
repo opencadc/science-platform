@@ -650,7 +650,7 @@ async def test_lifespan_finishes_runtime_cleanup_before_propagating_cancellation
     release_shutdown.set()
 
     with pytest.raises(asyncio.CancelledError, match="caller cancellation"):
-        await exit_task
+        await asyncio.wait_for(exit_task, timeout=1.0)
 
     assert events == [
         "runtime-start",
