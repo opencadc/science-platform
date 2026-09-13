@@ -173,6 +173,8 @@ spec:
         {{- if (default false $mb.enabled) }}
         - name: SKAHA_METRICS_BACKEND_URL
           value: {{ include "skaha.metricsBackend.internalURL" . | quote }}
+        - name: SKAHA_METRICS_PLATFORM_NAME
+          value: {{ include "skaha.metricsBackend.platformName" . | quote }}
         {{- end }}
         - name: SKAHA_EXPERIMENTAL_FEATURE_GATES
           value: "{{ include "skaha.experimentalFeatureGates" $ }}"

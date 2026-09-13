@@ -21,7 +21,7 @@ spec:
               number: {{ .Values.service.port | default "8080" }}
       {{- $ming := $mb.ingress | default dict }}
       {{- if and (default false $mb.enabled) $ming.enabled }}
-      - path: {{ $ming.path | default "/metrics" }}
+      - path: {{ $ming.path | default "/apis/canfar.net/v1alpha1/metrics" }}
         pathType: Prefix
         backend:
           service:
