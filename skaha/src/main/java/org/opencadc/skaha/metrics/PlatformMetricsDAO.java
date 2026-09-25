@@ -137,7 +137,7 @@ class PlatformMetricsDAO {
             throw new IllegalArgumentException("invalid Metrics envelope");
         }
         final Instant created = Instant.parse(MetricsBackendHttp.text(status, "observedAt"));
-        requireReadyConditions(status, created);
+        requireConditions(status, created);
         final Map<String, String> capacity = new HashMap<>();
         final Map<String, String> allocated = new HashMap<>();
         final JsonElement resourcesElement = status.get("resources");
@@ -164,14 +164,16 @@ class PlatformMetricsDAO {
                 new PlatformMetrics.Metadata(created), new PlatformMetrics.Data(capacity, allocated));
     }
 
-    private static void requireReadyConditions(final JsonObject status, final Instant observedAt) {
+    private static void requireConditions(final JsonObject status, final Instant observedAt) {
         final JsonElement conditionsElement = status.get("conditions");
         if (conditionsElement == null || !conditionsElement.isJsonArray()) {
             throw new IllegalArgumentException("invalid Metrics conditions");
         }
+        // Every valid Ready pair is serviceable: StaleData is a snapshot inside its stale window,
+        // and on Platform PartialData means only optional efficiency is missing, so capacity and
+        // allocation are complete either way.
         int readyCount = 0;
         int cachedCount = 0;
-        JsonObject ready = null;
         for (JsonElement element : conditionsElement.getAsJsonArray()) {
             if (!element.isJsonObject()) {
                 throw new IllegalArgumentException("invalid Metrics conditions");
@@ -186,19 +188,14 @@ class PlatformMetricsDAO {
             }
             if ("Ready".equals(type)) {
                 readyCount++;
-                ready = condition;
             } else if ("Cached".equals(type)) {
                 cachedCount++;
             } else {
                 throw new IllegalArgumentException("invalid Metrics conditions");
             }
         }
-        if (readyCount != 1 || cachedCount != 1 || ready == null) {
+        if (readyCount != 1 || cachedCount != 1) {
             throw new IllegalArgumentException("invalid Metrics conditions");
-        }
-        if (!"True".equals(MetricsBackendHttp.text(ready, "status"))
-                || !"Available".equals(MetricsBackendHttp.text(ready, "reason"))) {
-            throw new IllegalArgumentException("platform Metrics are not ready");
         }
     }
 

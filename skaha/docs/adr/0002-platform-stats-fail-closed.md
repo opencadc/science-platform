@@ -7,7 +7,10 @@ Accepted
 ## Context
 
 Clients rely on platform stats for capacity planning. Partial or stale figures
-after upstream failure are worse than an explicit error.
+after upstream failure are worse than an explicit error. A Metrics snapshot
+inside its bounded stale window is not such a failure: it is complete data
+whose age `lastUpdate` reports, and Metrics stops serving it when the window
+ends.
 
 ## Decision
 

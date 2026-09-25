@@ -77,7 +77,7 @@ session launch. See
   HTTP 503 with a short stable client message; detailed diagnostics belong in
   server logs only.
 - On successful **platform stats**, `lastUpdate` reflects the Metrics snapshot
-  time (`metadata.created`), not when Skaha assembled the response.
+  time (`status.observedAt`), not when Skaha assembled the response.
 - Session-list pod usage source is selected via `SKAHA_POD_METRICS_SOURCE`
   (`kubernetes` default, `backend` for Metrics session HTTP API). Backend
   session usage requires listed session Jobs to map usage to job names.

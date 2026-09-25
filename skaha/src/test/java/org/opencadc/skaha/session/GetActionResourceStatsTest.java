@@ -71,7 +71,7 @@ public class GetActionResourceStatsTest {
     }
 
     @Test
-    public void statsViewReturns503WhenPlatformMetricsIsPartialOrStale() throws Exception {
+    public void statsViewReturns503WhenPlatformMetricsConditionsAreInvalid() throws Exception {
         final TestableGetAction get = new TestableGetAction(
                 PlatformMetricsFixtures.failingPlatformMetricsDAO(
                         new IllegalArgumentException("invalid Metrics conditions")),

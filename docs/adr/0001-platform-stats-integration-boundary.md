@@ -21,7 +21,7 @@ cluster totals from node listing or pod aggregation.
   setting), defaulting to `canfar`.
 - Skaha performs **no in-process cache** for platform stats; Metrics owns TTL
   and snapshot freshness.
-- Skaha accepts a platform response only when it is a usable, fresh
+- Skaha accepts a platform response only when it is a usable
   `canfar.net/v1alpha1` `Metrics` envelope with a well-formed
   `status.conditions` array containing exactly one `Ready` and exactly one
   `Cached` condition, with no unknown or duplicate types. Each condition must
@@ -30,17 +30,22 @@ cluster totals from node listing or pod aggregation.
   `Cached=True/{FreshHit,StaleHit}`, `Cached=False/Refreshed`, or
   `Cached=Unknown/RedisUnavailable`. Each condition also needs a
   timezone-aware RFC3339 `lastTransitionTime` no later than
-  `status.observedAt`; `Ready` must be `True`/`Available` for Skaha
-  acceptance. Metrics marks stale or incomplete data non-ready; Skaha does not
-  reinterpret it as current platform stats.
+  `status.observedAt`.
+- Every allowed `Ready` pair is serviceable platform data. `StaleData` is a
+  complete snapshot inside the Metrics stale window (Platform: 5 to 10 minutes
+  old) that Metrics serves while one request refreshes it; after the stale
+  window Metrics has no snapshot and answers 503. On Platform, `PartialData`
+  means only the optional efficiency is missing, so capacity and allocation are
+  complete. `lastUpdate` (`status.observedAt`) tells clients the data's age.
 - The Platform response may include `status.reservingWorkloads` and
   per-resource `efficiency`. Skaha deliberately ignores those optional fields
   and consumes only `capacity` and `allocated`, preserving their Kubernetes
   resource-quantity conversion into the existing session-stats shape.
 - On successful platform stats, `lastUpdate` reflects Metrics
   `status.observedAt`, not Skaha assembly time.
-- When Metrics is unreachable, its response is not `Ready=True`/`Available`,
-  or session ceilings cannot be loaded, platform stats returns **HTTP 503**
+- When Metrics is unreachable, its response is malformed or violates the
+  condition contract, or session ceilings cannot be loaded, platform stats
+  returns **HTTP 503**
   (fail closed) with stable client messages: **"Platform statistics
   unavailable"** (Metrics) and **"Session resource limits unavailable"**
   (LimitRange). No partial stats.

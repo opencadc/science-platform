@@ -128,20 +128,47 @@ public class PlatformMetricsDAOTest {
     }
 
     @Test
-    public void rejectsPartialReadyCondition() {
-        assertRejectsConditions(
-                """
-                [{"type":"Ready","status":"False","reason":"PartialData","lastTransitionTime":"2026-03-15T12:30:00Z"},
-                 {"type":"Cached","status":"False","reason":"Refreshed","lastTransitionTime":"2026-03-15T12:30:00Z"}]
-                """);
+    public void acceptsEveryServiceableReadyAndCachedPair() throws Exception {
+        final String[][] pairs = {
+            {"True", "Available", "True", "FreshHit"},
+            {"True", "Available", "False", "Refreshed"},
+            {"False", "PartialData", "False", "Refreshed"},
+            {"False", "StaleData", "True", "StaleHit"},
+            {"False", "StaleData", "Unknown", "RedisUnavailable"},
+        };
+        for (final String[] pair : pairs) {
+            final var envelope = JsonParser.parseString(FIXTURE_JSON).getAsJsonObject();
+            envelope.getAsJsonObject("status")
+                    .add(
+                            "conditions",
+                            JsonParser.parseString(String.format(
+                                    """
+                                    [{"type":"Ready","status":"%s","reason":"%s","lastTransitionTime":"2026-03-15T12:30:00Z"},
+                                     {"type":"Cached","status":"%s","reason":"%s","lastTransitionTime":"2026-03-15T12:30:00Z"}]
+                                    """,
+                                    (Object[]) pair)));
+            responseBody = envelope.toString();
+
+            final PlatformMetrics metrics = new PlatformMetricsDAO("http://127.0.0.1:" + port).getPlatformMetrics();
+
+            Assert.assertEquals(
+                    String.join("/", pair),
+                    Map.of("cpu", "100", "memory", "200Gi"),
+                    metrics.data().capacity());
+        }
     }
 
     @Test
-    public void rejectsStaleReadyCondition() {
+    public void rejectsReadyReasonsOutsideTheContract() {
         assertRejectsConditions(
                 """
-                [{"type":"Ready","status":"False","reason":"StaleData","lastTransitionTime":"2026-03-15T12:30:00Z"},
+                [{"type":"Ready","status":"True","reason":"StaleData","lastTransitionTime":"2026-03-15T12:30:00Z"},
                  {"type":"Cached","status":"True","reason":"StaleHit","lastTransitionTime":"2026-03-15T12:30:00Z"}]
+                """);
+        assertRejectsConditions(
+                """
+                [{"type":"Ready","status":"False","reason":"Unavailable","lastTransitionTime":"2026-03-15T12:30:00Z"},
+                 {"type":"Cached","status":"True","reason":"FreshHit","lastTransitionTime":"2026-03-15T12:30:00Z"}]
                 """);
     }
 
