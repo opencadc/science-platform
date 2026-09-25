@@ -64,7 +64,7 @@ repos:
             uv run ty check
         language: system
         pass_filenames: false
-        files: ^metrics/(src|tests|pyproject\.toml)/
+        files: ^metrics/(src/|tests/|pyproject\.toml$)
 
       - id: metrics-pytest-fast
         name: metrics fast TestClient smoke
@@ -77,7 +77,7 @@ repos:
             uv run pytest -m "not integration" -q
         language: system
         pass_filenames: false
-        files: ^metrics/(src|tests|pyproject\.toml|uv\.lock)/
+        files: ^metrics/(src/|tests/|pyproject\.toml$|uv\.lock$)
 
       # Manual / CI stages (not run on every commit).
       - id: metrics-image-smoke
@@ -92,7 +92,7 @@ repos:
         language: system
         pass_filenames: false
         stages: [manual]
-        files: ^metrics/(Dockerfile|pyproject\.toml|uv\.lock|src)/
+        files: ^metrics/(src/|Dockerfile$|pyproject\.toml$|uv\.lock$)
 
       - id: metrics-kind-smoke
         name: metrics kind smoke (manual)

@@ -10,6 +10,8 @@ from typing import Any
 import pytest
 import yaml
 
+import metrics
+
 METRICS_ROOT = Path(__file__).parents[1]
 CHART = METRICS_ROOT / "helm" / "metrics-api"
 
@@ -167,9 +169,13 @@ def test_default_render_contains_only_api_resources_and_external_secret_refs(
         assert "accounting" not in document["metadata"]["name"].lower()
 
     environment = _environment(documents)
-    assert _deployment(documents)["spec"]["template"]["spec"]["containers"][0]["image"] == (
-        "images.opencadc.org/platform/metrics:v0.1.5"
-    )
+    pod = _deployment(documents)["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+    assert container["image"] == f"images.opencadc.org/platform/metrics:v{metrics.__version__}"
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["lifecycle"]["preStop"] == {"sleep": {"seconds": 5}}
+    assert {"name": "tmp", "mountPath": "/tmp"} in container["volumeMounts"]
+    assert pod["terminationGracePeriodSeconds"] > 5
     assert environment["METRICS_REDIS_URL"]["valueFrom"] == {
         "secretKeyRef": {"name": "metrics-api-redis", "key": "redis-url"}
     }
@@ -710,3 +716,10 @@ def test_long_release_keeps_all_resource_names_within_dns_limit(tmp_path: Path) 
     assert all(
         document["metadata"].get("namespace") in expected_namespaces for document in documents
     )
+
+
+def test_chart_versions_follow_the_package_release() -> None:
+    """release-please keeps Chart.yaml in step, so the default image is this release."""
+    chart = yaml.safe_load((CHART / "Chart.yaml").read_text())
+    assert chart["appVersion"] == metrics.__version__
+    assert chart["version"] == metrics.__version__

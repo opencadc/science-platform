@@ -25,7 +25,7 @@ spec:
       {{- end }}
       containers:
         - name: metrics-api
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -39,10 +39,19 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
             {{- include "metrics-api.env" . | nindent 12 }}
-          # Uvicorn does not accept connections until Kueue startup validation
-          # (lifespan) finishes. Without a startupProbe, liveness hits :8000 while
-          # the port is still closed → connection refused → restarts even when the
-          # cluster is healthy. Startup probe gates liveness/readiness until /healthz works.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          lifecycle:
+            # Keep serving while the endpoint removal reaches every kube-proxy.
+            preStop:
+              sleep:
+                seconds: {{ .Values.preStopSleepSeconds }}
+          # Uvicorn does not accept connections until startup validation
+          # (lifespan) finishes. The startup probe gates liveness until /healthz
+          # answers. Readiness latches once Redis and the configured
+          # ClusterQueues pass one validation, so a later shared-dependency
+          # outage degrades responses instead of emptying the Service.
           startupProbe:
             httpGet:
               path: /healthz
@@ -62,3 +71,7 @@ spec:
               port: http
             periodSeconds: 10
             timeoutSeconds: 3
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

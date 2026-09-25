@@ -282,8 +282,8 @@ def create_app(
     runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
 
     app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
+        title="CANFAR Metrics API",
+        version="v1alpha1",
         summary="CANFAR Science Platform Metrics API",
         description=(
             "API for Kueue ClusterQueue capacity, LocalQueue reservations, "

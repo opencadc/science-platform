@@ -405,7 +405,11 @@ async def test_stalled_owner_is_fenced_and_cannot_overwrite_its_successor() -> N
     own = await first  # the fenced owner answers its own waiter with its genuine read
     assert own.value == Snap(1) and not own.cached
     stored = await fast._store.observe(
-        keys, token="x" * 32, fresh_floor_ms=POLICY.fresh_floor_ms, lease_ms=1, claim=False
+        keys,
+        token="test-cache-integrity-key-32-bytes",
+        fresh_floor_ms=POLICY.fresh_floor_ms,
+        lease_ms=1,
+        claim=False,
     )
     assert stored.stored is not None and stored.stored.value == Snap(42)
 

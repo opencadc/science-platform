@@ -47,6 +47,16 @@
                     "jsonpath": "$.package[?(@.name.value=='metrics')].version",
                     "path": "uv.lock",
                     "type": "toml"
+                },
+                {
+                    "type": "yaml",
+                    "path": "helm/metrics-api/Chart.yaml",
+                    "jsonpath": "$.version"
+                },
+                {
+                    "type": "yaml",
+                    "path": "helm/metrics-api/Chart.yaml",
+                    "jsonpath": "$.appVersion"
                 }
             ]
         }

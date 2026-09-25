@@ -17,9 +17,12 @@ COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /build
 
+# Dependencies first, so a source-only change reuses this layer.
 COPY pyproject.toml uv.lock README.md ./
-COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 
+COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 

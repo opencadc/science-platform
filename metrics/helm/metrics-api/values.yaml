@@ -1,11 +1,16 @@
 # Default chart values (override with values-dev.yaml for local/dev flows).
 image:
   repository: images.opencadc.org/platform/metrics
-  tag: v0.1.5
+  # Empty uses "v" + the chart appVersion, which release-please keeps equal to
+  # the package version.
+  tag: ""
   pullPolicy: IfNotPresent
 
 replicaCount: 1
 terminationGracePeriodSeconds: 30
+# Seconds to keep serving after termination starts, while endpoint removal
+# propagates. Must stay below terminationGracePeriodSeconds.
+preStopSleepSeconds: 5
 
 podSecurityContext:
   runAsNonRoot: true
@@ -17,6 +22,7 @@ podSecurityContext:
 
 securityContext:
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
@@ -45,7 +51,9 @@ kueue:
   # ClusterQueues served by this Metrics instance. These become resourceNames
   # in the ClusterRole when rbac.create is enabled.
   clusterQueues: []
-  # Namespaces containing User LocalQueues. A Role is rendered for each entry.
+  # Namespaces searched for User LocalQueues, Session Jobs, Pods, and
+  # PodMetrics; PromQL queries are scoped to them too. A Role is rendered for
+  # each entry.
   namespaces: []
 
 promql:

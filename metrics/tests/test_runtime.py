@@ -38,7 +38,7 @@ def _settings(**promql) -> Settings:
     return Settings(
         cluster_name="cluster-a",
         redis_url="redis://:hunter2@localhost:6379/0",
-        cache=CacheConfig(key_secret="x" * 32),
+        cache=CacheConfig(key_secret="test-cache-integrity-key-32-bytes"),
         providers=ProviderConfigs(
             kueue=KueueProviderConfig(cluster_queues=["cq-a"], namespaces=["work-a"]),
             promql=PromQLProviderConfig(**promql),

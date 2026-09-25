@@ -44,7 +44,7 @@ def _settings(**promql: object) -> Settings:
         {
             "cluster_name": "cluster-a",
             "redis_url": "redis://redis.test:6379/0",
-            "cache": {"key_secret": "x" * 32},
+            "cache": {"key_secret": "test-cache-integrity-key-32-bytes"},
             "providers": {
                 "kueue": {
                     "cluster_queues": ["cq-science", "cq-physics"],

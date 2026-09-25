@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import ipaddress
-import math
 import re
+import socket
+from collections.abc import Mapping
 from collections import Counter
 from typing import Literal
 from urllib.parse import urlsplit
@@ -27,6 +28,9 @@ _HOST_PATTERN = re.compile(rf"{_HOST_DNS_LABEL}(?:\.{_HOST_DNS_LABEL})*")
 _PLATFORM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 _REDIS_DATABASE_PATTERN = re.compile(r"^/[0-9]+$")
 
+_PLACEHOLDER_SECRETS = frozenset(
+    {"replace-with-at-least-32-random-bytes", "<secret-reference-or-injected-value>"}
+)
 LEASE_MARGIN_SECONDS = 2.0
 """Slack added to a fill lease for event-loop stalls; see ``RedisCoordinator``."""
 
@@ -130,13 +134,6 @@ def _normalize_kubernetes_names(
     return names
 
 
-def _finite_timeout(value: float, *, field_name: str) -> float:
-    """Reject non-finite timeout values."""
-    if not math.isfinite(value):
-        raise ValueError(f"{field_name} must be finite")
-    return value
-
-
 def _validate_redis_url(value: str) -> str:
     """Validate a Redis URL without copying credentials into errors."""
     normalized = value.strip()
@@ -238,12 +235,6 @@ class KueueProviderConfig(BaseModel):
             subdomain=False,
         )
 
-    @field_validator("kube_request_timeout_seconds")
-    @classmethod
-    def _validate_timeout(cls, value: float) -> float:
-        """Require a finite Kubernetes request timeout."""
-        return _finite_timeout(value, field_name="kube_request_timeout_seconds")
-
 
 class PromQLProviderConfig(BaseModel):
     """Bound optional Prometheus-compatible efficiency adapter settings.
@@ -291,12 +282,6 @@ class PromQLProviderConfig(BaseModel):
             raise ValueError("base_url path prefix is too long")
         return value
 
-    @field_validator("request_timeout_seconds")
-    @classmethod
-    def _validate_timeout(cls, value: float) -> float:
-        """Require a finite efficiency request timeout."""
-        return _finite_timeout(value, field_name="request_timeout_seconds")
-
 
 class ProviderConfigs(BaseModel):
     """Group the Kueue source and optional efficiency settings."""
@@ -340,6 +325,11 @@ class CacheConfig(BaseModel):
         secret = self.key_secret.get_secret_value()
         if len(secret.encode()) < 32:
             raise ValueError("key_secret must contain at least 32 UTF-8 bytes")
+        if secret in _PLACEHOLDER_SECRETS or len(set(secret)) == 1:
+            raise ValueError(
+                "key_secret is a placeholder; generate one with "
+                "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
         if self.cold_get_timeout_seconds <= self.lease_seconds:
             raise ValueError(
                 "cold_get_timeout_seconds must exceed the fill lease "
@@ -347,12 +337,6 @@ class CacheConfig(BaseModel):
             )
         if self.lease_seconds >= SHORTEST_STALE_WINDOW_SECONDS:
             raise ValueError("fill_timeout_seconds must leave the shortest stale window usable")
-        for field_name in (
-            "redis_command_timeout_seconds",
-            "fill_timeout_seconds",
-            "cold_get_timeout_seconds",
-        ):
-            _finite_timeout(getattr(self, field_name), field_name=field_name)
         return self
 
 
@@ -373,7 +357,11 @@ class OTelConfig(BaseModel):
     kubernetes_namespace: str = Field(
         default="unknown", min_length=1, max_length=_MAX_OTEL_NAMESPACE_LENGTH
     )
-    pod_uid: str = Field(default="unknown", min_length=1, max_length=_MAX_OTEL_POD_UID_LENGTH)
+    pod_uid: str = Field(
+        default_factory=lambda: socket.gethostname() or "unknown",
+        min_length=1,
+        max_length=_MAX_OTEL_POD_UID_LENGTH,
+    )
 
     @field_validator("exporter_otlp_endpoint", mode="before")
     @classmethod
@@ -420,8 +408,6 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
-    app_name: str = "CANFAR Metrics API"
-    app_version: str = "v1alpha1"
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
@@ -433,7 +419,7 @@ class Settings(BaseSettings):
     cluster_name: str
     platform_name: str = Field(default="canfar", min_length=1, max_length=63)
     providers: ProviderConfigs
-    cache: CacheConfig = Field(default_factory=CacheConfig)
+    cache: CacheConfig
     otel: OTelConfig = Field(default_factory=OTelConfig)
     redis_url: SecretStr
     redis_key_prefix: str = "metrics:"
@@ -481,8 +467,50 @@ class Settings(BaseSettings):
         """Require a bounded non-empty Redis key namespace."""
         return _canonical_text(value, field_name="redis_key_prefix", max_length=128)
 
-    @field_validator("startup_validation_timeout_seconds")
-    @classmethod
-    def _validate_startup_timeout(cls, value: float) -> float:
-        """Require a finite startup deadline."""
-        return _finite_timeout(value, field_name="startup_validation_timeout_seconds")
+
+_OTEL_FIELDS = (
+    "METRICS_ENABLED",
+    "EXPORTER_OTLP_ENDPOINT",
+    "SERVICE_NAME",
+    "EXPORT_INTERVAL_MILLIS",
+    "DEPLOYMENT_ENVIRONMENT",
+    "KUBERNETES_NAMESPACE",
+    "POD_UID",
+)
+RETIRED_ENVIRONMENT = {
+    **{f"METRICS_OTEL_{name}": f"METRICS_OTEL__{name}" for name in _OTEL_FIELDS},
+    "METRICS_ENVIRONMENT": "METRICS_OTEL__DEPLOYMENT_ENVIRONMENT",
+    "METRICS_LOGLEVEL": "METRICS_LOG_LEVEL",
+    "METRICS_CONFIG_FILE": None,
+    "METRICS_API_GROUP": None,
+    "METRICS_CACHE_CONTROL_PUBLIC": None,
+    "METRICS_SOURCES__PLATFORM": None,
+    "METRICS_CACHE__BACKEND": None,
+    "METRICS_CACHE__TTL_SECONDS": None,
+    "METRICS_CACHE__SCOPE_TTL_SECONDS": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_API_URL": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_API_TOKEN": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_VERIFY_TLS": None,
+    "METRICS_PROVIDERS__KUEUE__TOKEN_FILE": None,
+    "METRICS_PROVIDERS__KUEUE__CA_FILE": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_CLUSTERQUEUE_PATH": None,
+}
+"""Retired ``METRICS_*`` names mapped to their replacement, or ``None`` when removed."""
+
+
+def retired_environment(environ: Mapping[str, str]) -> list[str]:
+    """Describe every retired ``METRICS_*`` name set in ``environ``.
+
+    Retired top-level names would otherwise be ignored silently (for example,
+    single-underscore OTel keys turn telemetry off), so startup rejects them
+    with the replacement to use.
+    """
+    problems = []
+    for name in sorted(environ):
+        if name.upper() not in RETIRED_ENVIRONMENT:
+            continue
+        replacement = RETIRED_ENVIRONMENT[name.upper()]
+        problems.append(
+            f"{name} is no longer read; use {replacement}" if replacement else f"{name} was removed"
+        )
+    return problems

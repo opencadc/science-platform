@@ -14,7 +14,7 @@ from metrics.core.settings import (
     Settings,
 )
 
-_CACHE_SECRET = "x" * 32
+_CACHE_SECRET = "test-cache-integrity-key-32-bytes"
 
 
 def _settings(**kueue: object) -> Settings:
@@ -152,4 +152,26 @@ def test_cluster_name_requires_lowercase_dns() -> None:
             providers=ProviderConfigs(
                 kueue=KueueProviderConfig(cluster_queues=["cq-a"], namespaces=["work-a"])
             ),
+        )
+
+
+@pytest.mark.parametrize(
+    "secret",
+    ["replace-with-at-least-32-random-bytes", "<secret-reference-or-injected-value>", "a" * 40],
+)
+def test_placeholder_cache_secrets_are_rejected(secret: str) -> None:
+    with pytest.raises(ValidationError, match="placeholder"):
+        CacheConfig(key_secret=secret)
+
+
+def test_cold_wait_must_outlast_the_fill_lease() -> None:
+    config = CacheConfig(key_secret="test-cache-integrity-key-32-bytes")
+    assert config.lease_seconds == 13 and config.cold_get_timeout_seconds == 15
+    with pytest.raises(ValidationError, match="must exceed the fill lease"):
+        CacheConfig(key_secret="test-cache-integrity-key-32-bytes", cold_get_timeout_seconds=13)
+    with pytest.raises(ValidationError, match="shortest stale window"):
+        CacheConfig(
+            key_secret="test-cache-integrity-key-32-bytes",
+            fill_timeout_seconds=58,
+            cold_get_timeout_seconds=90,
         )

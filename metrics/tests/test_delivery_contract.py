@@ -36,7 +36,7 @@ def _settings_environment(values: dict[str, object]) -> dict[str, str]:
     if values.get("redis", {}).get("urlSecret"):
         environment.setdefault("METRICS_REDIS_URL", "redis://external.example:6379/0")
     if values.get("cacheKeySecret"):
-        environment.setdefault("METRICS_CACHE__KEY_SECRET", "x" * 32)
+        environment.setdefault("METRICS_CACHE__KEY_SECRET", "test-cache-integrity-key-32-bytes")
     return environment
 
 

@@ -28,6 +28,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/metrics"]
+# The kind/Helm lifecycle is development tooling; the production image never ships it.
+exclude = ["src/metrics/dev"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

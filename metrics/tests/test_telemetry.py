@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event, Lock
@@ -118,10 +120,9 @@ def _run_serialized(callback, instrument: _BlockingInstrument) -> None:
 
 def _settings_with_otel(otel: OTelConfig) -> Settings:
     return Settings.model_construct(
-        app_version="v1alpha1",
         cluster_name="cluster-a",
         redis_url="redis://localhost:6379/0",
-        cache=CacheConfig(key_secret="x" * 32),
+        cache=CacheConfig(key_secret="test-cache-integrity-key-32-bytes"),
         providers=ProviderConfigs(
             kueue=KueueProviderConfig(cluster_queues=["cq-a"], namespaces=["work-a"])
         ),
@@ -385,3 +386,36 @@ def test_metrics_endpoint_preserves_supported_otlp_forms(base: str, expected: st
 def test_metrics_endpoint_rejects_unsafe_url() -> None:
     with pytest.raises(ValueError, match="credentials, query, or fragment|query or fragment"):
         telemetry_setup._metrics_endpoint("http://collector:4318?token=secret")
+
+
+@pytest.mark.anyio
+async def test_exported_resource_names_the_release_and_instance(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """OTLP export carries the package release, not the API version, and logs its target."""
+    from metrics import __version__
+
+    caplog.set_level(logging.INFO, logger="metrics.telemetry.setup")
+    telemetry = setup_telemetry(
+        _settings_with_otel(
+            OTelConfig(
+                metrics_enabled=True,
+                exporter_otlp_endpoint="http://collector.example:4318",
+                pod_uid="pod-123",
+            )
+        )
+    )
+    try:
+        assert telemetry.meter_provider is not None
+        attributes = telemetry.meter_provider._sdk_config.resource.attributes  # noqa: SLF001
+        assert attributes["service.version"] == __version__
+        assert attributes["service.instance.id"] == "pod-123"
+        assert "endpoint=http://collector.example:4318/v1/metrics" in caplog.text
+    finally:
+        await telemetry.shutdown()
+
+
+def test_pod_uid_defaults_to_the_host_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replicas stay distinguishable without the downward-API pod UID."""
+    monkeypatch.setattr("socket.gethostname", lambda: "metrics-api-7d9f")
+    assert OTelConfig().pod_uid == "metrics-api-7d9f"
