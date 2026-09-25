@@ -206,7 +206,9 @@ class KueueProvider:
 
         return await fan_out(names, fetch)
 
-    async def _local_queues(self, username: str) -> list[tuple[str, dict[str, Any]]]:
+    async def _local_queues(
+        self, username: str, *, consistent: bool = False
+    ) -> list[tuple[str, dict[str, Any]]]:
         """List one user's LocalQueues in every configured namespace."""
         selector = label_selector(_USERNAME_LABEL, username)
 
@@ -217,6 +219,7 @@ class KueueProvider:
                 namespace=namespace,
                 kind="Kueue LocalQueue list",
                 selector=selector,
+                consistent=consistent,
             )
 
         docs_by_namespace = await fan_out(self._config.namespaces, fetch)
@@ -276,6 +279,9 @@ class KueueProvider:
         cluster_queues, local_queues = await concurrently(
             self._cluster_queues(), self._local_queues(username)
         )
+        if not local_queues:
+            # A cached list can trail a just-created LocalQueue; confirm before a 404.
+            local_queues = await self._local_queues(username, consistent=True)
         if not local_queues:
             raise SubjectNotFoundError("User has no matching LocalQueue")
         community_by_queue = {queue.name: queue.community for queue in cluster_queues}

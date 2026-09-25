@@ -102,7 +102,19 @@ async def test_list_follows_bounded_continue_tokens() -> None:
         version="v1", resource="pods", namespace="ns", kind="Pod list", selector="a=b"
     )
     assert items == [{"a": 1}, {"b": 2}]
+    # The first page reads the watch cache; a continue token carries its own version.
+    assert api.calls[0]["params"] == {
+        "limit": "100",
+        "labelSelector": "a=b",
+        "resourceVersion": "0",
+    }
     assert api.calls[1]["params"] == {"limit": "100", "labelSelector": "a=b", "continue": "t1"}
+
+    consistent = Api(httpx.Response(200, json={"items": []}))
+    await KubeReader(timeout=1, api=consistent).list_all(
+        version="v1", resource="pods", namespace="ns", kind="Pod list", consistent=True
+    )
+    assert "resourceVersion" not in consistent.calls[0]["params"]
 
     looping = Api(
         httpx.Response(200, json={"items": [], "metadata": {"continue": "t1"}}),

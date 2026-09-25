@@ -231,8 +231,18 @@ class KubeReader:
         namespace: str,
         kind: str,
         selector: str | None = None,
+        consistent: bool = False,
     ) -> list[dict[str, Any]]:
-        """List every matching object in one namespace with bounded pagination."""
+        """List every matching object in one namespace with bounded pagination.
+
+        By default the first page is served from the API server's watch cache
+        (``resourceVersion=0``): before Kubernetes 1.31 a list without a
+        resource version is read from etcd, which has no label index and
+        decodes every object in the namespace. A cached list may lag by
+        milliseconds, so callers confirm an empty result with
+        ``consistent=True`` before reporting a subject as missing. Continue
+        pages carry their own resource version in the token.
+        """
         items: list[dict[str, Any]] = []
         continue_token: str | None = None
         seen_tokens: set[str] = set()
@@ -242,6 +252,8 @@ class KubeReader:
                 params["labelSelector"] = selector
             if continue_token is not None:
                 params["continue"] = continue_token
+            elif not consistent:
+                params["resourceVersion"] = "0"
             payload = await self.get(
                 version=version, url=resource, kind=kind, namespace=namespace, params=params
             )

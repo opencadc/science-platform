@@ -303,7 +303,12 @@ retry-after: 1
 All Kubernetes reads use the pod's ServiceAccount (or a kubeconfig in
 development) through one reader that maps HTTP statuses itself: a denied
 request is a single request that fails the source read, and an expired token is
-refreshed in place and retried once. Kueue reads use the pinned
+refreshed in place and retried once. List reads (LocalQueues, Jobs, Pods) are
+served from the API server's watch cache, because before Kubernetes 1.31 a
+list without a resource version is read from etcd and scans the whole
+namespace. A cached list can trail by milliseconds, so an empty result is
+confirmed with one consistent read before a subject is reported missing.
+Kueue reads use the pinned
 `kueue.x-k8s.io/v1beta2` API. Cohorts are not a source, and Platform membership
 is never discovered by listing every ClusterQueue in the cluster.
 

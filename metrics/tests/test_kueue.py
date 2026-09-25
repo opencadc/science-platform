@@ -389,6 +389,13 @@ async def test_user_with_no_matching_localqueue_is_not_zero() -> None:
 
     with pytest.raises(SubjectNotFoundError):
         await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+    # Cached reads found nothing, so each namespace was confirmed consistently.
+    assert [params.get("resourceVersion") for _, params in api.local_params] == [
+        "0",
+        "0",
+        None,
+        None,
+    ]
 
 
 @pytest.mark.parametrize(

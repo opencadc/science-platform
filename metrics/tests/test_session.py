@@ -378,6 +378,32 @@ async def test_session_provider_missing_job_is_not_found() -> None:
         await provider.read_session("missing")
 
 
+async def test_empty_cached_job_list_is_confirmed_before_not_found() -> None:
+    """A Job the watch cache has not seen yet is found by one consistent read."""
+
+    class LaggingCacheApi(FakeKubernetesApi):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            self.job_versions: list[str | None] = []
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs: Any):
+            params = kwargs.get("params") or {}
+            if kwargs["url"] == "jobs":
+                self.job_versions.append(params.get("resourceVersion"))
+                if params.get("resourceVersion") == "0":
+                    yield httpx.Response(200, json={"items": [], "metadata": {}})
+                    return
+            async with super().call_api(**kwargs) as response:
+                yield response
+
+    api = LaggingCacheApi(jobs={"work-a": [_job("desktop", "work-a", "sess-new")]})
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-new")
+
+    assert observation.reserving_workloads == 1
+    assert api.job_versions == ["0", None]  # the cached read, then the consistent one
+
+
 async def test_kubemetrics_sums_running_pod_usage() -> None:
     """Usage excludes pause containers, non-Running pods, and formats public units."""
     api = FakeKubernetesApi(

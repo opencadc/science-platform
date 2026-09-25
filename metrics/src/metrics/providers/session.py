@@ -183,7 +183,13 @@ class SessionProvider:
         self._kube = KubeReader(timeout=self._config.kube_request_timeout_seconds, api=api)
 
     async def _list(
-        self, version: str, resource: str, kind: str, session_id: str
+        self,
+        version: str,
+        resource: str,
+        kind: str,
+        session_id: str,
+        *,
+        consistent: bool = False,
     ) -> list[tuple[str, dict[str, Any]]]:
         """List one session's objects of a kind across configured namespaces."""
         selector = label_selector(_SESSION_LABEL, session_id)
@@ -195,6 +201,7 @@ class SessionProvider:
                 namespace=namespace,
                 kind=kind,
                 selector=selector,
+                consistent=consistent,
             )
 
         docs_by_namespace = await fan_out(self._config.namespaces, fetch)
@@ -226,6 +233,11 @@ class SessionProvider:
             self._list(_JOB_API_VERSION, "jobs", "Job list", session_id),
             self._pods(session_id),
         )
+        if not job_docs:
+            # A cached list can trail a just-created Job; confirm before a 404.
+            job_docs = await self._list(
+                _JOB_API_VERSION, "jobs", "Job list", session_id, consistent=True
+            )
         if not job_docs:
             raise SubjectNotFoundError("Session has no matching Job")
         seen: set[tuple[str, str]] = set()
