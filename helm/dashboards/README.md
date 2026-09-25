@@ -178,15 +178,16 @@ metrics scraped into Prometheus (`kueue_*`). Only the Queue dashboard needs Kueu
 
 Platform Services carries four rows fed by OpenTelemetry rather than by the exporters
 above. Skaha is instrumented by the OpenTelemetry Java agent baked into its image; the
-metrics service uses the Python SDK plus FastAPI and httpx instrumentation. Both push
-OTLP.
+metrics service records its own instruments with the Python SDK and has no HTTP-framework
+instrumentation, because a raw request path would put user and session names into labels.
+Both push OTLP.
 
 | Row | Kind | Collapsed |
 |---|---|---|
 | Skaha API — requests and latency | generic | no |
 | Skaha JVM runtime | runtime, Java-only | **yes** |
 | Metrics API — requests and latency | generic | no |
-| Metrics API — custom instruments | bespoke | no |
+| Metrics API — cache and sources | bespoke | no |
 
 **The generic row is a template, deliberately identical per service.** Adding a third
 instrumented service means copying that row and changing two things: the job variable and
@@ -204,9 +205,17 @@ disambiguates them, and Grafana keys panels by id, not title.
 | Route breakdown | table: volume, p95, 5xx share, sortable — same 5xx basis as the headline stat, so a colour means the same thing in both |
 | Outbound dependency | `http.client.*` p95 by peer |
 
+The metrics service fills the generic row from its own request instrument rather than an
+HTTP one: `canfar.metrics.compute.duration_seconds` split by `metrics.scope` (the four
+surfaces) and `result.status`, with Redis command latency as its outbound dependency.
+Health and readiness probes never reach that instrument, so nothing needs excluding.
+
 Each service then gets its own row for the instruments it chooses to record — the
-bespoke half. For the metrics service that is cache hit ratio, compute duration and
-per-provider latency, none of which a generic agent could infer.
+bespoke half. For the metrics service that is lookups by cache result, lease and fill
+outcomes, the age of served snapshots, per-source latency, and per-replica readiness and
+Redis health, none of which a generic agent could infer. A contract test,
+`metrics/tests/test_dashboard_contract.py`, drives every instrument, derives the series and
+labels the service exports, and fails CI when a dashboard queries anything else.
 
 Two traps in that template, both learned the hard way:
 
@@ -246,44 +255,44 @@ count({"jvm.memory.used_bytes"})
 sum by ("http.route") (rate({"http.server.request.duration_seconds_count"}[$__rate_interval]))
 ```
 
-Label names keep their dots too — `http.route`, `service.name`, `cache.hit`. The
+Label names keep their dots too — `http.route`, `service.name`, `cache.result`. The
 unquoted spelling is not an error, it simply matches nothing, so a panel written from
 habit fails silently. If your receiver escapes to underscores instead, these panels need
 the names rewritten.
 
-**The two services are on different semantic-convention generations.** The Java agent
-emits the stable names (`http.server.request.duration_seconds`, label `http.route`,
-seconds); the Python SDK emits the legacy ones (`http.server.duration_milliseconds`,
-label `http.target`, milliseconds). No single query spans both, which is why the rows are
-separate and carry different units. Routes are templated on the Java side
-(`/skaha/v1/session/*`) but raw paths on the Python side, so the latter is worth watching
-for cardinality if an endpoint ever puts an identifier in its path.
+**The two services describe requests differently.** The Java agent emits the stable HTTP
+names (`http.server.request.duration_seconds`, label `http.route`, seconds), with routes
+templated (`/skaha/v1/session/*`). The metrics service emits no HTTP metrics; its request
+instrument is `canfar.metrics.compute.duration_seconds`, labelled by surface and outcome
+but never by subject. No single query spans both, which is why the rows are separate.
 
 **Instance identity is weak, and uneven between SDKs.** The Java agent sets
 `service.instance.id` to a random UUID per JVM, so JVM panels cannot be joined to a pod
 and a restart appears as a new instance; the per-replica panels are labelled by that id
-because it is the only identity available. The Python SDK sets no instance id at all, so
-its replicas are indistinguishable and their series merge. "Replicas reporting" counts
-reporting instances, which means a service whose SDK omits the id reads 1 however many
-replicas it runs — stated in that panel's description rather than hidden.
+because it is the only identity available. The metrics service sets
+`service.instance.id` to its pod UID, so its replicas are counted correctly and each maps
+to one pod. "Replicas reporting" counts reporting instances, which means a service whose
+SDK omits the id reads 1 however many replicas it runs — stated in that panel's
+description rather than hidden.
 
 **A full request URL is not available on client metrics.** OpenTelemetry's HTTP client
 metric convention deliberately omits it to bound cardinality: `url.full` exists only as a
 span attribute, and traces are not exported here. Outbound panels therefore name a peer
 as method plus `server.address:server.port`, which is as specific as the metric allows.
-The legacy convention the Python SDK emits carries no peer dimension at all, so that
-service's outbound panel breaks down by status only.
+The metrics service's only outbound dependency on the request path is Redis, shown per
+operation (`observe`, `publish`, `cooldown`, `release`, `ping`).
 
 Two variables, `$skaha_job` and `$metrics_job`, resolve the service names. Neither is
-hardcoded: each is a `label_values` query over a metric only that service emits, so a
+hardcoded: each is a `label_values` query over a metric only that service emits (for the
+metrics service, `canfar.metrics.readiness`, exported from startup), so a
 deployment that sets a different `OTEL_SERVICE_NAME` still resolves. Note that if two
 releases export the same service name, their series merge and these panels will show the
 sum.
 
 A health probe can dominate request volume — on one deployment during development the
-readiness probe was over 99.9% of all requests the metrics service saw. The rate and
-latency panels for real endpoints exclude it explicitly; the by-endpoint panels include
-it so its share stays visible.
+readiness probe was over 99.9% of all requests the metrics service saw. Skaha's rate and
+latency panels exclude it explicitly and its by-route panels include it so its share stays
+visible; the metrics service's request instrument never records probes.
 
 ## Label contract
 
