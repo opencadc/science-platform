@@ -205,7 +205,7 @@ class KueueProviderConfig(BaseModel):
     namespaces: list[str] = Field(
         min_length=1,
         max_length=MAX_NAMESPACES,
-        description="Namespaces searched for User LocalQueues.",
+        description="Namespaces searched for LocalQueues, Session Jobs and Pods, and PodMetrics.",
     )
     kueue_api_version: Literal["kueue.x-k8s.io/v1beta2"] = "kueue.x-k8s.io/v1beta2"
     kube_request_timeout_seconds: float = Field(

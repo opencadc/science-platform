@@ -73,19 +73,21 @@ class Sessions:
         pods_reachable: bool = True,
         age: timedelta = timedelta(minutes=10),
         error: BaseException | None = None,
+        reserving: int = 1,
     ) -> None:
         self.running = running
         self.pods_reachable = pods_reachable
         self.age = age
         self.error = error
+        self.reserving = reserving
 
     async def read_session(self, session_id: str) -> SessionObservation:
         if self.error is not None:
             raise self.error
         return SessionObservation(
             session=session_id,
-            requests={"cpu": "1", "memory": "1Gi"},
-            reserving_workloads=1,
+            requests={"cpu": "1", "memory": "1Gi"} if self.reserving else {},
+            reserving_workloads=self.reserving,
             observed_at=NOW,
             start_time=NOW - self.age,
             window_end=NOW,
@@ -303,6 +305,14 @@ async def test_young_sessions_skip_efficiency_instead_of_reporting_partial() -> 
         sessions=Sessions(age=timedelta(seconds=20)), efficiency=efficiency
     ).session("s1")
     assert efficiency.calls == [] and not snapshot.partial
+
+
+async def test_finished_sessions_skip_efficiency_they_could_not_report() -> None:
+    efficiency = Efficiency()
+    snapshot = await _loader(
+        sessions=Sessions(running=False, reserving=0), efficiency=efficiency
+    ).session("s1")
+    assert efficiency.calls == [] and snapshot.efficiency is None and not snapshot.partial
 
 
 async def test_session_empty_usage_is_omitted() -> None:

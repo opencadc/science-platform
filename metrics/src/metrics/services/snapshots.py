@@ -214,7 +214,11 @@ class SnapshotLoader:
         )
 
     async def session(self, session_id: str) -> CachedSnapshot:
-        """Read one Session's Jobs, then its usage and duration efficiency together."""
+        """Read one Session's Jobs, then its usage and duration efficiency together.
+
+        Efficiency is reported per requested resource, so a session without
+        active Jobs (no requests) or with a window under a minute skips it.
+        """
         observation = await self._primary(
             "session", "session", lambda: self._session.read_session(session_id)
         )
@@ -233,6 +237,7 @@ class SnapshotLoader:
         start_time = observation.start_time
         if (
             source is not None
+            and observation.reserving_workloads > 0
             and start_time is not None
             and (observation.window_end - start_time).total_seconds() >= _MIN_SESSION_WINDOW_SECONDS
         ):
