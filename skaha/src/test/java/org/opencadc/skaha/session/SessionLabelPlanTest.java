@@ -9,6 +9,7 @@ public class SessionLabelPlanTest {
     @Test
     public void projectionsSplitJobMetadataAndSelector() {
         final Map<SessionLabels.Key, String> values = new EnumMap<>(SessionLabels.Key.class);
+        values.put(SessionLabels.Key.COMMUNITY, "astronomy");
         values.put(SessionLabels.Key.ID, "session-123");
         values.put(SessionLabels.Key.USERNAME, "alice");
         values.put(SessionLabels.Key.NAME, "Analysis");
