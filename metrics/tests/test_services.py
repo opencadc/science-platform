@@ -264,7 +264,7 @@ async def test_optional_cancellation_propagates() -> None:
     await asyncio.sleep(0.01)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.wait_for(task, timeout=5)
 
 
 # ------------------------------------------------------------------- Session

@@ -267,5 +267,5 @@ async def test_shutdown_releases_the_real_lease(redis_clients) -> None:
     assert await redis_clients[0].exists(_keys().lease) == 1
     await coordinator.shutdown()
     with pytest.raises(CacheUnavailable):
-        await waiter
+        await asyncio.wait_for(waiter, timeout=5)
     assert await redis_clients[0].exists(_keys().lease) == 0

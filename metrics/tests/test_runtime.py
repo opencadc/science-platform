@@ -365,7 +365,7 @@ async def test_start_cancellation_closes_resources_and_propagates() -> None:
     await kueue.validate_entered.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.wait_for(task, timeout=5)
     assert kueue.shutdowns == 1 and not runtime.ready
 
 

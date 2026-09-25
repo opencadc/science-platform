@@ -538,7 +538,7 @@ async def test_shutdown_releases_the_lease_and_maps_waiters_to_503() -> None:
     await asyncio.sleep(0.05)
     await a.shutdown()
     with pytest.raises(CacheUnavailable):
-        await waiter
+        await asyncio.wait_for(waiter, timeout=5)
     await asyncio.sleep(0.02)
     assert await redis.exists(a._keys(IDENTITY).lease) == 0
     with pytest.raises(CacheUnavailable):
@@ -634,6 +634,8 @@ async def test_at_most_one_fill_per_subject_under_random_multi_replica_traffic(s
             try:
                 await coordinator.get_or_fill(identity, source_for(identity.subject_value))
             except (CacheUnavailable, CacheInternalError):
+                # Injected source failures are expected outcomes here; the
+                # property under test is one fill per subject at a time.
                 pass
             await asyncio.sleep(rng.uniform(0, 0.02))
 
