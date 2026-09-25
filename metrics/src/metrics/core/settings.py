@@ -26,7 +26,12 @@ _HOST_DNS_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HOST_PATTERN = re.compile(rf"{_HOST_DNS_LABEL}(?:\.{_HOST_DNS_LABEL})*")
 _PLATFORM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 _REDIS_DATABASE_PATTERN = re.compile(r"^/[0-9]+$")
-_COLD_FILL_REDIS_COMMANDS = 10
+
+LEASE_MARGIN_SECONDS = 2.0
+"""Slack added to a fill lease for event-loop stalls; see ``RedisCoordinator``."""
+
+SHORTEST_STALE_WINDOW_SECONDS = 60.0
+"""Shortest stale window in ``FRESHNESS_POLICIES`` (Session)."""
 
 MAX_CLUSTER_QUEUES = 256
 MAX_NAMESPACES = 256
@@ -47,6 +52,7 @@ _MAX_REDIS_COMMAND_TIMEOUT_SECONDS = 30.0
 _MAX_CACHE_FILL_TIMEOUT_SECONDS = 300.0
 _MAX_CACHE_COLD_GET_TIMEOUT_SECONDS = 600.0
 _MAX_CACHE_L1_ENTRIES = 10_000
+_MAX_CACHE_FAILURE_COOLDOWN_SECONDS = 60.0
 _MAX_OTEL_EXPORT_INTERVAL_MILLIS = 60 * 60 * 1000
 _MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS = 300.0
 _PROMQL_BASE_PATH_MAX_LENGTH = 128
@@ -315,20 +321,32 @@ class CacheConfig(BaseModel):
         default=15.0, gt=0, le=_MAX_CACHE_COLD_GET_TIMEOUT_SECONDS
     )
     l1_max_entries: int = Field(default=128, gt=0, le=_MAX_CACHE_L1_ENTRIES)
+    failure_cooldown_seconds: float = Field(
+        default=5.0, gt=0, le=_MAX_CACHE_FAILURE_COOLDOWN_SECONDS
+    )
+
+    @property
+    def lease_seconds(self) -> float:
+        """Return the fill lease: one source call plus two Redis commands and a margin."""
+        return (
+            self.fill_timeout_seconds
+            + 2 * self.redis_command_timeout_seconds
+            + LEASE_MARGIN_SECONDS
+        )
 
     @model_validator(mode="after")
     def _validate_cache_contract(self) -> CacheConfig:
-        """Require Redis integrity and finite cache deadlines."""
+        """Require Redis integrity and deadlines that let followers take over a lease."""
         secret = self.key_secret.get_secret_value()
         if len(secret.encode()) < 32:
             raise ValueError("key_secret must contain at least 32 UTF-8 bytes")
-        minimum = self.fill_timeout_seconds + (
-            _COLD_FILL_REDIS_COMMANDS * self.redis_command_timeout_seconds
-        )
-        if self.cold_get_timeout_seconds < minimum:
+        if self.cold_get_timeout_seconds <= self.lease_seconds:
             raise ValueError(
-                "cold_get_timeout_seconds must cover the bounded cold-fill Redis command path"
+                "cold_get_timeout_seconds must exceed the fill lease "
+                "(fill_timeout_seconds + 2 * redis_command_timeout_seconds + 2)"
             )
+        if self.lease_seconds >= SHORTEST_STALE_WINDOW_SECONDS:
+            raise ValueError("fill_timeout_seconds must leave the shortest stale window usable")
         for field_name in (
             "redis_command_timeout_seconds",
             "fill_timeout_seconds",

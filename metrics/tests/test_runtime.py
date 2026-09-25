@@ -27,7 +27,6 @@ from metrics.services.metrics import MetricsService
 from metrics.services.models import (
     CachedSnapshot,
     CommunityObservation,
-    EfficiencyObservation,
     PlatformObservation,
     SessionObservation,
     SessionUsageObservation,
@@ -150,31 +149,18 @@ def test_cache_payload_type_has_no_lifetime_fields() -> None:
     assert not hasattr(CachedSnapshot, "running_pods")
 
 
-def test_runtime_cache_schema_revision_separates_failure_envelopes() -> None:
-    """New signed failure categories cannot be read as the old envelope shape."""
-    assert runtime_module._SCHEMA_REVISION == "8"  # noqa: SLF001
+def test_runtime_cache_schema_revision_separates_two_stage_payloads() -> None:
+    """Two-stage payloads and lease markers live in a keyspace older pods never read."""
+    assert runtime_module._SCHEMA_REVISION == "9"  # noqa: SLF001
 
 
-def test_runtime_cache_freshness_uses_primary_observation_timestamp() -> None:
-    """Cache ageing ignores an older optional efficiency observation."""
-    runtime = MetricsRuntime.from_settings(_settings(), recorder=NoopMetricsRecorder())
-    primary = PlatformObservation(
-        cluster="cluster-a",
-        capacity={"cpu": "1"},
-        allocated={"cpu": "0"},
-        reserving_workloads=0,
-        observed_at=datetime(2025, 1, 1, 12, tzinfo=UTC),
-    )
-    snapshot = CachedSnapshot(
-        observation=primary,
-        created=primary.observed_at - timedelta(minutes=1),
-        efficiency=EfficiencyObservation(
-            primary.observed_at - timedelta(minutes=1),
-            {"cpu": 0, "memory": 0},
-        ),
-    )
-
-    assert runtime._caches[0]._created(snapshot) == primary.observed_at  # noqa: SLF001
+def test_runtime_lease_expires_before_cold_waiters_give_up() -> None:
+    """A crashed owner's lease ends inside every follower's cold budget."""
+    settings = _settings()
+    runtime = MetricsRuntime.from_settings(settings, recorder=NoopMetricsRecorder())
+    for cache in runtime._caches:  # noqa: SLF001
+        assert cache._lease_ms == round(settings.cache.lease_seconds * 1000)  # noqa: SLF001
+        assert cache._lease_ms < settings.cache.cold_get_timeout_seconds * 1000  # noqa: SLF001
 
 
 class _LifecycleProvider:
@@ -349,7 +335,6 @@ def _test_cache(surface: str) -> FakeCacheCoordinator[CachedSnapshot]:
     """Build one deterministic cache seam for an injected runtime."""
     return FakeCacheCoordinator(
         policy=FRESHNESS_POLICIES[surface],
-        created=lambda snapshot: snapshot.created,
     )
 
 

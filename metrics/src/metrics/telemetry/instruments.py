@@ -24,24 +24,15 @@ _SECONDS_BUCKETS = (
     10.0,
 )
 CacheLookupResult = Literal["hit", "miss", "stale"]
-_SCOPES = frozenset({"platform", "user", "community", "other"})
+_SCOPES = frozenset({"platform", "user", "community", "session", "other"})
 _CACHE_RESULTS = frozenset({"hit", "miss", "stale", "other"})
 _STATUSES = frozenset(
     {"ok", "error", "not_found", "cancelled", "timeout", "partial", "degraded", "other"}
 )
 _BACKENDS = frozenset({"redis", "other"})
-_PROVIDERS = frozenset({"kueue", "promql", "other"})
-_LEASE_OUTCOMES = frozenset({"acquired", "contended", "error", "other"})
-_REDIS_OPERATIONS = frozenset(
-    {
-        "ping",
-        "get",
-        "lease_acquire",
-        "commit",
-        "lease_release",
-        "other",
-    }
-)
+_PROVIDERS = frozenset({"kueue", "session", "promql", "other"})
+_LEASE_OUTCOMES = frozenset({"acquired", "contended", "cooldown", "error", "other"})
+_REDIS_OPERATIONS = frozenset({"ping", "observe", "publish", "cooldown", "release", "other"})
 _LIFECYCLE_OPERATIONS = frozenset({"startup", "shutdown", "other"})
 
 

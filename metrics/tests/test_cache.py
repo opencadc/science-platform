@@ -1,149 +1,84 @@
-"""Public cache identity, freshness, envelope, and memory contracts."""
+"""Public cache identity, freshness, and memory contracts."""
 
-from datetime import UTC, datetime, timedelta
+import pytest
 
-from metrics.cache import CacheFailureCategory
 from metrics.cache import (
-    CacheEnvelope,
-    CacheIdentity,
     FRESHNESS_POLICIES,
+    CacheIdentity,
     Freshness,
     FreshnessPolicy,
     MemorySnapshots,
     cache_keys,
 )
+from metrics.core.settings import SHORTEST_STALE_WINDOW_SECONDS
 
 SECRET = b"cache-test-secret"
-NOW = datetime(2025, 1, 1, tzinfo=UTC)
 IDENTITY = CacheIdentity("user", "bob", "cluster-a", "kueue", "v1")
 
 
-def test_cache_keys_have_exactly_two_stable_opaque_keys() -> None:
-    keys = cache_keys(
+def _keys(identity: CacheIdentity = IDENTITY, schema: str = "2"):
+    return cache_keys(
         prefix="metrics:",
-        identity=IDENTITY,
+        identity=identity,
         secret=SECRET,
-        schema_revision="2",
+        schema_revision=schema,
         source_revision="kueue",
         query_revision="1",
     )
+
+
+def test_cache_keys_have_exactly_two_stable_opaque_keys_in_one_slot() -> None:
+    keys = _keys()
 
     assert keys.value == f"{keys.base}:value"
     assert keys.lease == f"{keys.base}:lease"
-    assert keys.value != keys.lease
     assert "bob" not in keys.base
-    assert keys.identity_digest
+    # One Redis Cluster hash tag holds the digest, so both keys share a slot.
+    assert keys.base.count("{") == 1 and keys.base.endswith("}")
+    assert keys == _keys()
 
 
-def test_cache_key_digest_changes_when_subject_identity_changes() -> None:
-    first = cache_keys(
-        prefix="metrics:",
-        identity=IDENTITY,
-        secret=SECRET,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
+def test_cache_key_changes_with_subject_identity_and_revisions() -> None:
+    alice = CacheIdentity("user", "alice", "cluster-a", "kueue", "v1")
+
+    assert _keys().base != _keys(alice).base
+    assert _keys(schema="2").base != _keys(schema="3").base
+
+
+def test_production_freshness_windows_are_two_stage() -> None:
+    assert FRESHNESS_POLICIES == {
+        "platform": FreshnessPolicy(300, 600),
+        "user": FreshnessPolicy(120, 240),
+        "community": FreshnessPolicy(300, 600),
+        "session": FreshnessPolicy(30, 60),
+    }
+    assert min(policy.stale_seconds for policy in FRESHNESS_POLICIES.values()) == (
+        SHORTEST_STALE_WINDOW_SECONDS
     )
-    second = cache_keys(
-        prefix="metrics:",
-        identity=CacheIdentity("user", "alice", "cluster-a", "kueue", "v1"),
-        secret=SECRET,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-    )
-
-    assert first.base != second.base
-    assert first.identity_digest != second.identity_digest
 
 
-def test_production_freshness_windows() -> None:
-    assert FRESHNESS_POLICIES["user"] == FreshnessPolicy(2 * 60, 3 * 60, 5 * 60)
-    assert FRESHNESS_POLICIES["community"] == FreshnessPolicy(5 * 60, 10 * 60, 15 * 60)
-    assert FRESHNESS_POLICIES["platform"] == FreshnessPolicy(5 * 60, 30 * 60, 60 * 60)
+def test_policy_stages_come_from_remaining_ttl_with_exact_boundaries() -> None:
+    policy = FreshnessPolicy(30, 60)
+
+    assert policy.stale_ms == 60_000
+    assert policy.fresh_floor_ms == 30_000
+    assert policy.classify(60_000) is Freshness.FRESH  # age 0
+    assert policy.classify(30_000) is Freshness.FRESH  # age == fresh window
+    assert policy.classify(29_999) is Freshness.STALE
+    assert policy.classify(1) is Freshness.STALE
+    assert policy.classify(0) is None  # age == stale window: Redis deleted it
+    assert policy.classify(-2) is None
+    assert policy.age_seconds(45_000) == 15
+    assert policy.age_seconds(60_500) == 0
 
 
-def test_freshness_policy_has_four_positive_states_and_remaining_ttl() -> None:
-    policy = FreshnessPolicy(2, 10, 15)
-
-    assert policy.classify(NOW, now=NOW) is Freshness.FRESH
-    assert policy.classify(NOW - timedelta(seconds=3), now=NOW) is Freshness.STALE
-    assert policy.classify(NOW - timedelta(seconds=11), now=NOW) is Freshness.RETAINED
-    assert policy.classify(NOW - timedelta(seconds=16), now=NOW) is Freshness.PURGED
-    assert policy.remaining_seconds(NOW - timedelta(seconds=5), now=NOW) == 10
-    assert policy.terminal_is_fresh(NOW + timedelta(seconds=1), now=NOW) is False
-    assert policy.terminal_is_fresh(NOW + timedelta(seconds=1), now=NOW + timedelta(seconds=1))
+@pytest.mark.parametrize(("fresh", "stale"), [(60, 60), (0, 60), (61, 60), (-1, 10)])
+def test_policy_requires_fresh_below_stale(fresh: float, stale: float) -> None:
+    with pytest.raises(ValueError):
+        FreshnessPolicy(fresh, stale)
 
 
-def test_envelope_signs_created_identity_revisions_kind_and_value() -> None:
-    keys = cache_keys(
-        prefix="metrics:",
-        identity=IDENTITY,
-        secret=SECRET,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-    )
-    envelope = CacheEnvelope(
-        format="metrics-cache-v2",
-        identity_digest=keys.identity_digest,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-        kind="value",
-        created=NOW,
-        value={"count": 1},
-        integrity="",
-    ).sign(SECRET)
-
-    restored = CacheEnvelope.model_validate_json(envelope.model_dump_json())
-    assert restored.verify(SECRET)
-    assert restored.created == NOW
-    assert restored.value == {"count": 1}
-    assert restored.kind == "value"
-
-
-def test_negative_envelope_is_the_same_signed_format_with_no_value() -> None:
-    envelope = CacheEnvelope(
-        format="metrics-cache-v2",
-        identity_digest="digest",
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-        kind="not_found",
-        created=NOW,
-        value=None,
-        integrity="",
-    ).sign(SECRET)
-
-    assert envelope.kind == "not_found"
-    assert envelope.value is None
-    assert envelope.verify(SECRET)
-
-
-def test_failure_envelope_signs_only_a_bounded_category() -> None:
-    envelope = CacheEnvelope(
-        format="metrics-cache-v2",
-        identity_digest="digest",
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-        kind="failure",
-        created=NOW,
-        value=None,
-        failure_category=CacheFailureCategory.INTERNAL,
-        integrity="",
-    ).sign(SECRET)
-
-    encoded = envelope.model_dump_json()
-    restored = CacheEnvelope.model_validate_json(encoded)
-
-    assert restored.failure_category is CacheFailureCategory.INTERNAL
-    assert "source failure details" not in encoded
-    assert restored.verify(SECRET)
-
-
-def test_memory_is_bounded_and_supports_terminal_eviction() -> None:
+def test_memory_is_bounded_and_supports_eviction() -> None:
     memory = MemorySnapshots[int](max_entries=1)
     memory.put("one", 1)
     memory.put("two", 2)

@@ -201,7 +201,6 @@ def _cache(surface: str) -> FakeCacheCoordinator[CachedSnapshot]:
     """Create one deterministic test cache seam."""
     return FakeCacheCoordinator(
         policy=FRESHNESS_POLICIES[surface],
-        created=lambda snapshot: snapshot.created,
     )
 
 

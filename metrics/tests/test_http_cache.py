@@ -2,52 +2,48 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from metrics.api.v1alpha1.routes import router
-from metrics.http_cache import metrics_success_cache_headers, remaining_freshness_seconds
+from metrics.http_cache import metrics_success_cache_headers
 from metrics.services.models import MetricsResult, PlatformObservation
 
 
-def test_remaining_freshness_preserves_negative_stale_ttl() -> None:
-    created = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-
-    assert remaining_freshness_seconds(created, 60, now=created + timedelta(seconds=10)) == 50
-    assert remaining_freshness_seconds(created, 5, now=created + timedelta(seconds=10)) == -5
+def test_success_headers_report_age_and_remaining_fresh_time() -> None:
+    assert metrics_success_cache_headers(
+        age_seconds=0.2, fresh_seconds=300, cached=False, cache_available=True
+    ) == {
+        "Cache-Control": "no-store",
+        "Age": "0",
+        "Cache-Status": "metrics; fwd=uri-miss; ttl=299",
+    }
+    assert (
+        metrics_success_cache_headers(
+            age_seconds=40.9, fresh_seconds=300, cached=True, cache_available=True
+        )["Cache-Status"]
+        == "metrics; hit; ttl=259"
+    )
 
 
 def test_success_headers_identify_stale_and_unavailable_snapshots() -> None:
-    created = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-
     stale = metrics_success_cache_headers(
-        snapshot_created=created,
-        configured_ttl=30,
-        cached=True,
-        stale=True,
-        cache_available=True,
-        now=created + timedelta(seconds=40),
+        age_seconds=40, fresh_seconds=30, cached=True, cache_available=True
     )
     unavailable = metrics_success_cache_headers(
-        snapshot_created=created,
-        configured_ttl=30,
-        cached=True,
-        stale=False,
-        cache_available=False,
-        now=created,
+        age_seconds=5, fresh_seconds=30, cached=True, cache_available=False
     )
 
     assert stale == {
-        "Date": "Thu, 01 Jan 2026 12:00:40 GMT",
         "Cache-Control": "no-store",
         "Age": "40",
         "Cache-Status": "metrics; hit; ttl=-10",
     }
-    assert unavailable["Cache-Control"] == "no-store"
-    assert 'detail="redis-unavailable"' in unavailable["Cache-Status"]
+    assert "Date" not in stale  # the ASGI server owns the single Date header
+    assert unavailable["Cache-Status"] == 'metrics; hit; ttl=25; detail="redis-unavailable"'
 
 
 def test_conditional_header_does_not_suppress_metrics_body() -> None:
@@ -65,6 +61,7 @@ def test_conditional_header_does_not_suppress_metrics_body() -> None:
             ),
             created=created,
             cached=True,
+            age_seconds=12,
         )
 
     runtime = SimpleNamespace(
@@ -87,5 +84,6 @@ def test_conditional_header_does_not_suppress_metrics_body() -> None:
     assert response.json()["kind"] == "Metrics"
     assert response.json()["status"]["reservingWorkloads"] == 3
     assert response.headers["cache-control"] == "no-store"
+    assert response.headers["age"] == "12"
     assert "last-modified" not in response.headers
     assert "etag" not in response.headers

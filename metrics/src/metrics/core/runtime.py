@@ -11,6 +11,8 @@ from time import perf_counter
 from typing import Any, Literal, Protocol, cast
 
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
+from redis.backoff import NoBackoff
 
 from metrics.cache import (
     FRESHNESS_POLICIES,
@@ -20,7 +22,7 @@ from metrics.cache import (
     RedisSnapshots,
     RedisUnavailable,
 )
-from metrics.core.settings import Settings
+from metrics.core.settings import LEASE_MARGIN_SECONDS, Settings
 from metrics.errors import ProviderUnavailableError, RuntimeStartupError
 from metrics.providers.kueue import KueueProvider
 from metrics.providers.kubemetrics import KubeMetricsProvider
@@ -37,7 +39,7 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 _logger = logging.getLogger(__name__)
 _KUEUE_SURFACES: tuple[MetricsSurface, ...] = ("platform", "user", "community")
-_SCHEMA_REVISION = "8"
+_SCHEMA_REVISION = "9"
 _SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
 
@@ -170,6 +172,11 @@ def build_cache(
         settings.redis_url,
         socket_connect_timeout=settings.cache.redis_command_timeout_seconds,
         socket_timeout=settings.cache.redis_command_timeout_seconds,
+        # One immediate retry absorbs a dropped pooled connection. Every
+        # script is safe to resend: OBSERVE recognises its own token and
+        # SETTLE is token-fenced.
+        retry=Retry(NoBackoff(), 1),
+        client_name="canfar-metrics",
     )
     store = RedisSnapshots[CachedSnapshot](
         redis=redis_client,
@@ -187,9 +194,10 @@ def build_cache(
             key_prefix=settings.redis_key_prefix,
             key_secret=secret_bytes,
             policy=policy,
-            created=lambda snapshot: snapshot.observation.observed_at,
             fill_timeout=settings.cache.fill_timeout_seconds,
             cold_timeout=settings.cache.cold_get_timeout_seconds,
+            lease_margin=LEASE_MARGIN_SECONDS,
+            failure_cooldown=settings.cache.failure_cooldown_seconds,
             max_l1_entries=settings.cache.l1_max_entries,
             telemetry=recorder,
         ),

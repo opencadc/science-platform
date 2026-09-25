@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -51,27 +50,6 @@ SubjectPath = Annotated[
 ]
 
 router = APIRouter(tags=["metrics"])
-
-
-def _set_cache_headers(
-    *,
-    response: Response,
-    created: datetime,
-    ttl: int,
-    cached: bool,
-    stale: bool,
-    available: bool,
-) -> None:
-    """Attach internal snapshot metadata to a successful response."""
-    headers = metrics_success_cache_headers(
-        snapshot_created=created,
-        configured_ttl=ttl,
-        cached=cached,
-        stale=stale,
-        cache_available=available,
-        now=datetime.now(UTC),
-    )
-    response.headers.update(headers)
 
 
 def get_runtime(request: Request) -> MetricsRuntime:
@@ -208,7 +186,7 @@ def _subject_response(
     )
 
 
-def _ttl_seconds(runtime: MetricsRuntime, kind: str) -> int:
+def _ttl_seconds(runtime: MetricsRuntime, kind: str) -> float:
     """Return the fresh-cache window for one report surface."""
     if kind == "platform":
         return runtime.metrics_service.cache_ttl_seconds
@@ -228,13 +206,13 @@ async def _serve(
     """Load one subject report and attach cache metadata headers."""
     value = _subject_value(value, kind)
     result = await runtime.metrics_service.get(MetricsSubject(kind=kind, value=value))
-    _set_cache_headers(
-        response=response,
-        created=result.created,
-        ttl=_ttl_seconds(runtime, kind),
-        cached=result.cached,
-        stale=result.stale,
-        available=result.cache_available,
+    response.headers.update(
+        metrics_success_cache_headers(
+            age_seconds=result.age_seconds,
+            fresh_seconds=_ttl_seconds(runtime, kind),
+            cached=result.cached,
+            cache_available=result.cache_available,
+        )
     )
     observation = result.observation
     if kind == "platform":

@@ -1,30 +1,32 @@
-"""Real-Redis proofs for the two-key cache contract."""
+"""Real-Redis proofs for the two-stage, two-key cache contract."""
 
 from __future__ import annotations
 
 import asyncio
 import os
-import subprocess
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from redis.asyncio import Redis
 
 from metrics.cache import (
+    CacheFailureCategory,
     CacheIdentity,
+    CacheInternalError,
     CacheNotFound,
     CacheUnavailable,
     FreshnessPolicy,
     RedisCoordinator,
     RedisSnapshots,
+    StoredSnapshot,
     cache_keys,
 )
 
 pytestmark = [pytest.mark.anyio, pytest.mark.integration]
 
 SECRET = b"integration-cache-secret-is-32-bytes"
-IDENTITY = CacheIdentity("platform", "", "integration", "stub", "v1")
+IDENTITY = CacheIdentity("platform", "canfar", "integration", "stub", "v1")
+POLICY = FreshnessPolicy(0.5, 1.5)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +34,29 @@ class Snapshot:
     """Typed real-Redis test value."""
 
     value: int
-    created: datetime
+
+
+class Source:
+    """Count source calls and the maximum number running at once."""
+
+    def __init__(self, delay: float = 0.05) -> None:
+        self.calls = 0
+        self.running = 0
+        self.max_running = 0
+        self.delay = delay
+        self.fail: BaseException | None = None
+
+    async def __call__(self) -> Snapshot:
+        self.calls += 1
+        self.running += 1
+        self.max_running = max(self.max_running, self.running)
+        try:
+            await asyncio.sleep(self.delay)
+            if self.fail is not None:
+                raise self.fail
+            return Snapshot(self.calls)
+        finally:
+            self.running -= 1
 
 
 def _redis_url() -> str:
@@ -50,7 +74,7 @@ def _store(redis: Redis) -> RedisSnapshots[Snapshot]:
         value_type=Snapshot,
         secret=SECRET,
         command_timeout=0.5,
-        schema_revision="2",
+        schema_revision="9",
         source_revision="1",
         query_revision="0",
     )
@@ -62,29 +86,26 @@ def _keys(identity: CacheIdentity = IDENTITY):
         prefix="integration:",
         identity=identity,
         secret=SECRET,
-        schema_revision="2",
+        schema_revision="9",
         source_revision="1",
         query_revision="0",
     )
 
 
-def _coordinator(
-    redis: Redis,
-    *,
-    policy: FreshnessPolicy | None = None,
-    clock=None,
-) -> RedisCoordinator[Snapshot]:
-    """Build one coordinator against the shared Redis instance."""
+def _coordinator(redis: Redis, **kwargs) -> RedisCoordinator[Snapshot]:
+    """Build one coordinator (one replica) against the shared Redis instance."""
     return RedisCoordinator(
         store=_store(redis),
         key_prefix="integration:",
         key_secret=SECRET,
-        policy=policy or FreshnessPolicy(1, 5, 10),
-        created=lambda snapshot: snapshot.created,
-        fill_timeout=2,
-        cold_timeout=3,
+        policy=kwargs.pop("policy", POLICY),
+        fill_timeout=kwargs.pop("fill_timeout", 0.5),
+        cold_timeout=kwargs.pop("cold_timeout", 2.0),
+        lease_margin=0.2,
+        failure_cooldown=kwargs.pop("failure_cooldown", 0.3),
         poll_min=0.005,
-        clock=clock,
+        poll_max=0.02,
+        **kwargs,
     )
 
 
@@ -103,243 +124,148 @@ async def redis_clients():
         await second.aclose()
 
 
-async def test_two_coordinators_and_100_requests_issue_one_fill(redis_clients) -> None:
-    """The stable lease coordinates a cross-process-sized cold burst."""
-    first_redis, second_redis = redis_clients
-    first = _coordinator(first_redis)
-    second = _coordinator(second_redis)
-    fills = 0
-
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        await asyncio.sleep(0.05)
-        return Snapshot(42, datetime.now(UTC))
-
-    requests = [
-        asyncio.create_task((first if index % 2 else second).get_or_fill(IDENTITY, fill))
-        for index in range(100)
-    ]
-    results = await asyncio.gather(*requests)
-
-    assert fills == 1
-    assert {result.value.value for result in results} == {42}
-    await first.shutdown()
-    await second.shutdown()
+async def test_two_replicas_and_100_requests_issue_one_fill(redis_clients) -> None:
+    """The lease coordinates a cross-process-sized cold burst."""
+    first, second = (_coordinator(client) for client in redis_clients)
+    source = Source(delay=0.1)
+    results = await asyncio.gather(
+        *((first if index % 2 else second).get_or_fill(IDENTITY, source) for index in range(100))
+    )
+    assert source.calls == 1 and {result.value for result in results} == {Snapshot(1)}
+    ttl = await redis_clients[0].pttl(_keys().value)
+    assert 1_300 < ttl <= 1_500  # the snapshot lives exactly for the stale window
+    assert await redis_clients[0].exists(_keys().lease) == 0
 
 
 async def test_stale_requests_return_stale_and_start_one_refresh(redis_clients) -> None:
-    """A stale burst returns immediately while one Redis lease refreshes."""
-    first_redis, second_redis = redis_clients
-    policy = FreshnessPolicy(1, 5, 10)
-    first = _coordinator(first_redis, policy=policy)
-    second = _coordinator(second_redis, policy=policy)
-    fills = 0
-    refresh_started = asyncio.Event()
-
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        if fills == 2:
-            refresh_started.set()
-        created = datetime.now(UTC)
-        if fills == 1:
-            created -= timedelta(seconds=2)
-        await asyncio.sleep(0.05)
-        return Snapshot(fills, created)
-
-    initial = await first.get_or_fill(IDENTITY, fill)
-    assert initial.stale
-    results = await asyncio.gather(
-        *(coordinator.get_or_fill(IDENTITY, fill) for coordinator in [first, second] * 10)
+    """Stale readers never wait; one replica refreshes."""
+    first, second = (_coordinator(client) for client in redis_clients)
+    source = Source(delay=0.01)
+    await first.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.55)
+    source.delay = 0.2
+    started = asyncio.get_running_loop().time()
+    stale = await asyncio.gather(
+        *((first if index % 2 else second).get_or_fill(IDENTITY, source) for index in range(60))
     )
-    assert all(result.stale for result in results)
-    await asyncio.wait_for(refresh_started.wait(), timeout=1)
-    for _ in range(100):
-        if fills == 2:
-            break
-        await asyncio.sleep(0.01)
-    assert fills == 2
-    await first.shutdown()
-    await second.shutdown()
+    assert asyncio.get_running_loop().time() - started < 0.15
+    assert all(result.stale and result.value == Snapshot(1) for result in stale)
+    await asyncio.sleep(0.3)
+    refreshed = await second.get_or_fill(IDENTITY, source)
+    assert not refreshed.stale and refreshed.value == Snapshot(2)
+    assert source.calls == 2 and source.max_running == 1
 
 
-async def test_lease_key_is_stable_across_wall_clock_boundary(redis_clients) -> None:
-    """The same subject has one lease key before and after time advances."""
-    redis, _ = redis_clients
-    store = _store(redis)
-    keys = _keys()
-    assert keys.lease == _keys().lease
-    assert await store.acquire_lease(keys=keys, token="old", lease_seconds=0.05)
-    await asyncio.sleep(0.08)
-    assert await store.acquire_lease(keys=keys, token="new", lease_seconds=1)
-    await store.release_lease(keys=keys, token="new")
+async def test_value_is_gone_at_the_end_of_the_stale_window(redis_clients) -> None:
+    """Nothing is retained past the stale window."""
+    coordinator = _coordinator(redis_clients[0])
+    await coordinator.get_or_fill(IDENTITY, Source(delay=0.01))
+    await asyncio.sleep(1.55)
+    assert await redis_clients[0].exists(_keys().value) == 0
 
 
-async def test_expired_owner_cannot_release_new_owner(redis_clients) -> None:
-    """Owner-checked release cannot delete a later lease owner."""
-    redis, _ = redis_clients
-    store = _store(redis)
-    keys = _keys()
-    assert await store.acquire_lease(keys=keys, token="old", lease_seconds=0.05)
-    await asyncio.sleep(0.08)
-    assert await store.acquire_lease(keys=keys, token="new", lease_seconds=1)
-    await store.release_lease(keys=keys, token="old")
-    assert not await store.acquire_lease(keys=keys, token="third", lease_seconds=1)
-    await store.release_lease(keys=keys, token="new")
+async def test_failed_refresh_turns_the_lease_into_a_bounded_cooldown(redis_clients) -> None:
+    """A failed refresh blocks retries on every replica until the cooldown ends."""
+    first, second = (_coordinator(client) for client in redis_clients)
+    source = Source(delay=0.01)
+    await first.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.55)
+    source.fail = RuntimeError("source down")
+    await first.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.05)
+    assert await redis_clients[0].get(_keys().lease) == b"!internal"
+    for _ in range(5):
+        assert (await second.get_or_fill(IDENTITY, source)).stale
+    assert source.calls == 2
+    await asyncio.sleep(0.3)
+    source.fail = None
+    await second.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.05)
+    assert source.calls == 3
 
 
-async def test_fenced_commit_cannot_publish_private_value(redis_clients) -> None:
-    """A token that lost its lease cannot overwrite the authoritative value."""
-    redis, _ = redis_clients
-    store = _store(redis)
-    keys = _keys()
-    assert await store.acquire_lease(keys=keys, token="old", lease_seconds=0.05)
-    await asyncio.sleep(0.08)
-    assert await store.acquire_lease(keys=keys, token="new", lease_seconds=1)
-
-    assert not await store.commit(
-        keys=keys,
-        token="old",
-        created=datetime.now(UTC),
-        value=Snapshot(1, datetime.now(UTC)),
-        ttl_seconds=5,
-    )
-    assert await store.commit(
-        keys=keys,
-        token="new",
-        created=datetime.now(UTC),
-        value=Snapshot(2, datetime.now(UTC)),
-        ttl_seconds=5,
-    )
-    assert (await store.read(keys)).value.value == 2  # type: ignore[union-attr]
+async def test_cold_failure_is_shared_through_the_cooldown(redis_clients) -> None:
+    """Cold followers on another replica fail fast with the same sanitized outcome."""
+    first, second = (_coordinator(client) for client in redis_clients)
+    source = Source(delay=0.01)
+    source.fail = ValueError("private detail")
+    with pytest.raises(CacheInternalError):
+        await first.get_or_fill(IDENTITY, source)
+    with pytest.raises(CacheInternalError):
+        await second.get_or_fill(IDENTITY, source)
+    assert source.calls == 1
 
 
-async def test_terminal_revalidates_after_two_minutes_not_retention(redis_clients) -> None:
-    """A negative terminal expires on the fresh window and is requeried."""
-    redis, _ = redis_clients
-    policy = FreshnessPolicy(1, 3, 5)
-    coordinator = _coordinator(redis, policy=policy)
-    fills = 0
+async def test_not_found_is_shared_for_the_fresh_window(redis_clients) -> None:
+    """A not-found tombstone lives for the fresh window only."""
+    first, second = (_coordinator(client) for client in redis_clients)
+    calls = 0
 
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        if fills == 1:
-            raise CacheNotFound()
-        return Snapshot(4, datetime.now(UTC))
+    async def missing() -> Snapshot:
+        nonlocal calls
+        calls += 1
+        raise CacheNotFound()
 
     with pytest.raises(CacheNotFound):
-        await coordinator.get_or_fill(IDENTITY, fill)
+        await first.get_or_fill(IDENTITY, missing)
+    assert 400 < await redis_clients[0].pttl(_keys().value) <= 500
     with pytest.raises(CacheNotFound):
-        await coordinator.get_or_fill(IDENTITY, fill)
-    await asyncio.sleep(1.1)
-    result = await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert result.value.value == 4
-    assert fills == 2
-    await coordinator.shutdown()
+        await second.get_or_fill(IDENTITY, missing)
+    assert calls == 1
 
 
-async def test_remaining_retention_ttl_is_based_on_created_time(redis_clients) -> None:
-    """An old positive publication never receives a fresh full-retention TTL."""
-    redis, _ = redis_clients
-    policy = FreshnessPolicy(1, 5, 10)
-    coordinator = _coordinator(redis, policy=policy)
-    created = datetime.now(UTC) - timedelta(seconds=3)
-
-    result = await coordinator.get_or_fill(
-        IDENTITY,
-        lambda: _snapshot(5, created),
-    )
+async def test_expired_owner_cannot_publish_over_or_release_its_successor(redis_clients) -> None:
+    """Every owner exit is fenced on the lease token in Lua."""
+    store = _store(redis_clients[0])
     keys = _keys()
-    ttl_ms = await redis.pttl(keys.value)
+    first = await store.observe(keys, token="a" * 32, fresh_floor_ms=500, lease_ms=50, claim=True)
+    assert first.claimed
+    await asyncio.sleep(0.08)
+    second = await store.observe(
+        keys, token="b" * 32, fresh_floor_ms=500, lease_ms=5_000, claim=True
+    )
+    assert second.claimed
+    assert not await store.publish(
+        keys, token="a" * 32, stored=StoredSnapshot(Snapshot(1)), ttl_ms=1_000
+    )
+    assert not await store.cool_down(
+        keys, token="a" * 32, category=CacheFailureCategory.INTERNAL, cooldown_ms=1_000
+    )
+    assert not await store.release(keys, token="a" * 32)
+    assert await redis_clients[0].get(keys.lease) == b"b" * 32
+    assert await store.publish(
+        keys, token="b" * 32, stored=StoredSnapshot(Snapshot(2)), ttl_ms=1_000
+    )
 
-    assert result.value.value == 5
-    assert 0 < ttl_ms <= 7500
-    await coordinator.shutdown()
 
-
-async def test_identity_binding_rejects_copied_alice_payload(redis_clients) -> None:
-    """A valid signed Alice envelope is not valid under Bob's value key."""
-    redis, _ = redis_clients
-    store = _store(redis)
+async def test_identity_binding_rejects_a_copied_payload(redis_clients) -> None:
+    """A payload copied under another subject key is unreadable and refilled."""
+    store = _store(redis_clients[0])
     alice = _keys(CacheIdentity("user", "alice", "integration", "stub", "v1"))
     bob = _keys(CacheIdentity("user", "bob", "integration", "stub", "v1"))
-    assert await store.acquire_lease(keys=alice, token="alice", lease_seconds=1)
-    assert await store.commit(
-        keys=alice,
-        token="alice",
-        created=datetime.now(UTC),
-        value=Snapshot(11, datetime.now(UTC)),
-        ttl_seconds=5,
+    await redis_clients[0].set(
+        bob.value, store.encode(alice, StoredSnapshot(Snapshot(1))), px=1_000
     )
-    payload = await redis.get(alice.value)
-    await redis.set(bob.value, payload, px=5000)
-
-    assert await store.read(bob) is None
+    seen = await store.observe(bob, token="a" * 32, fresh_floor_ms=500, lease_ms=1_000, claim=True)
+    assert seen.stored is None and seen.unreadable
 
 
-async def test_cancellation_releases_real_redis_lease(redis_clients) -> None:
-    """Cancellation during source work leaves no owner lease behind."""
-    redis, _ = redis_clients
-    coordinator = _coordinator(redis)
-    started = asyncio.Event()
-    release = asyncio.Event()
+async def test_scripts_reload_after_script_flush(redis_clients) -> None:
+    """EVALSHA falls back to EVAL after Redis loses its script cache."""
+    store = _store(redis_clients[0])
+    await store.observe(_keys(), token="a" * 32, fresh_floor_ms=1, lease_ms=10, claim=False)
+    await redis_clients[0].script_flush()
+    seen = await store.observe(_keys(), token="a" * 32, fresh_floor_ms=1, lease_ms=10, claim=True)
+    assert seen.claimed
 
-    async def fill() -> Snapshot:
-        started.set()
-        await release.wait()
-        return Snapshot(1, datetime.now(UTC))
 
-    request = asyncio.create_task(coordinator.get_or_fill(IDENTITY, fill))
-    await started.wait()
-    request.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(request, timeout=1.0)
-
-    assert await redis.get(_keys().lease) is None
+async def test_shutdown_releases_the_real_lease(redis_clients) -> None:
+    """A cancelled owner releases its lease through the fenced script."""
+    coordinator = _coordinator(redis_clients[0])
+    waiter = asyncio.create_task(coordinator.get_or_fill(IDENTITY, Source(delay=5)))
+    await asyncio.sleep(0.05)
+    assert await redis_clients[0].exists(_keys().lease) == 1
     await coordinator.shutdown()
-
-
-async def test_l1_terminal_invalidation_survives_redis_outage(redis_clients) -> None:
-    """An observed terminal evicts L1 before an outage can resurrect it."""
-    container = os.environ.get("METRICS_TEST_REDIS_CONTAINER")
-    if not container:
-        pytest.skip("METRICS_TEST_REDIS_CONTAINER is not configured")
-    redis, _ = redis_clients
-    policy = FreshnessPolicy(1, 3, 5)
-    coordinator = _coordinator(redis, policy=policy)
-
-    await coordinator.get_or_fill(IDENTITY, lambda: _snapshot(1, datetime.now(UTC)))
-    store = _store(redis)
-    keys = _keys()
-    assert await store.acquire_lease(keys=keys, token="terminal", lease_seconds=1)
-    assert await store.commit(
-        keys=keys,
-        token="terminal",
-        created=datetime.now(UTC),
-        value=None,
-        ttl_seconds=1,
-        not_found=True,
-    )
-    with pytest.raises(CacheNotFound):
-        await coordinator.get_or_fill(IDENTITY, _never_called)
-
-    await asyncio.to_thread(subprocess.run, ["docker", "pause", container], check=True)
-    try:
-        with pytest.raises(CacheUnavailable):
-            await coordinator.get_or_fill(IDENTITY, _never_called)
-    finally:
-        await asyncio.to_thread(subprocess.run, ["docker", "unpause", container], check=True)
-    await coordinator.shutdown()
-
-
-async def _snapshot(value: int, created: datetime) -> Snapshot:
-    """Return one immediate source value."""
-    return Snapshot(value, created)
-
-
-async def _never_called() -> Snapshot:
-    """Fail if the cache bypasses Redis during an outage."""
-    raise AssertionError("source should not run")
+    with pytest.raises(CacheUnavailable):
+        await waiter
+    assert await redis_clients[0].exists(_keys().lease) == 0

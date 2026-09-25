@@ -50,7 +50,6 @@ def _service(
         cache=platform_cache
         or FakeCacheCoordinator(
             policy=FRESHNESS_POLICIES["platform"],
-            created=lambda observation: observation.created,
         ),
         identity=lambda: CacheIdentity("platform", "canfar", "cluster-a", "kueue"),
         platform_name="canfar",
@@ -59,14 +58,12 @@ def _service(
         user_cache=user_cache
         or FakeCacheCoordinator(
             policy=FRESHNESS_POLICIES["user"],
-            created=lambda observation: observation.created,
         ),
         user_identity=lambda username: CacheIdentity("user", username, "cluster-a", "kueue"),
         community=community_loader or default_community,
         community_cache=community_cache
         or FakeCacheCoordinator(
             policy=FRESHNESS_POLICIES["community"],
-            created=lambda observation: observation.created,
         ),
         community_identity=lambda name: CacheIdentity("community", name, "cluster-a", "kueue"),
         telemetry=telemetry,
@@ -229,7 +226,6 @@ async def test_expected_provider_failure_is_source_unavailable_at_cache_owner(
         def __init__(self, cache_surface: str) -> None:
             super().__init__(
                 policy=FRESHNESS_POLICIES[cache_surface],
-                created=lambda snapshot: snapshot.created,
             )
             self.source_failures = 0
             self.internal_failures = 0
@@ -438,7 +434,6 @@ async def test_coordinator_is_the_only_cache_lookup_telemetry_owner() -> None:
         def __init__(self, recorder: Recorder) -> None:
             super().__init__(
                 policy=FRESHNESS_POLICIES["platform"],
-                created=lambda observation: observation.created,
             )
             self.recorder = recorder
 

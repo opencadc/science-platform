@@ -1,4 +1,4 @@
-"""Small, signed cache contracts shared by the Redis adapter and coordinator."""
+"""Cache contracts shared by the Redis adapter and the coordinator."""
 
 from __future__ import annotations
 
@@ -6,22 +6,18 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, Generic, Literal, TypeVar
-
-from pydantic import BaseModel, ConfigDict, model_validator
+from typing import Generic, Literal, TypeVar
 
 Value = TypeVar("Value")
 
 
 class Freshness(StrEnum):
-    """Describe how old a positive observation is."""
+    """Name the only two stages of a stored snapshot."""
 
     FRESH = "fresh"
     STALE = "stale"
-    RETAINED = "retained"
-    PURGED = "purged"
 
 
 class CacheFailureCategory(StrEnum):
@@ -33,65 +29,53 @@ class CacheFailureCategory(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class FreshnessPolicy:
-    """Define fresh, serviceable-stale, and physical-retention windows."""
+    """Define the fresh and stale windows of one surface.
 
-    fresh_seconds: int
-    stale_seconds: int
-    retention_seconds: int
+    A snapshot is written to Redis with a TTL equal to the stale window,
+    measured from the start of the fill that produced it. Its stage is read
+    from the remaining Redis TTL, so no replica or source clock is ever
+    compared with another. When the TTL reaches zero the snapshot no longer
+    exists.
+    """
+
+    fresh_seconds: float
+    stale_seconds: float
 
     def __post_init__(self) -> None:
-        """Require strictly ordered positive windows."""
-        if not 0 < self.fresh_seconds < self.stale_seconds <= self.retention_seconds:
-            raise ValueError("freshness boundaries must satisfy 0 < fresh < stale <= retention")
+        """Require 0 < fresh < stale."""
+        if not 0 < self.fresh_seconds < self.stale_seconds:
+            raise ValueError("freshness windows must satisfy 0 < fresh < stale")
 
-    @staticmethod
-    def _normalise(value: datetime) -> datetime:
-        """Return one timezone-aware UTC timestamp."""
-        if value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value.astimezone(UTC)
+    @property
+    def stale_ms(self) -> int:
+        """Return the Redis TTL, in milliseconds, of a snapshot of age zero."""
+        return round(self.stale_seconds * 1000)
 
-    def age_seconds(self, created: datetime, *, now: datetime | None = None) -> float:
-        """Return non-negative age, treating a future observation as invalid."""
-        clock = self._normalise(now or datetime.now(UTC))
-        observed = self._normalise(created)
-        return (clock - observed).total_seconds()
+    @property
+    def fresh_floor_ms(self) -> int:
+        """Return the smallest remaining TTL at which a snapshot is still fresh."""
+        return round((self.stale_seconds - self.fresh_seconds) * 1000)
 
-    def classify(self, created: datetime, *, now: datetime | None = None) -> Freshness:
-        """Classify a positive observation from its signed creation time."""
-        age = self.age_seconds(created, now=now)
-        if age < 0:
-            return Freshness.PURGED
-        if age <= self.fresh_seconds:
-            return Freshness.FRESH
-        if age <= self.stale_seconds:
-            return Freshness.STALE
-        if age <= self.retention_seconds:
-            return Freshness.RETAINED
-        return Freshness.PURGED
+    def classify(self, ttl_ms: int) -> Freshness | None:
+        """Return the stage for a remaining Redis TTL, or ``None`` once expired.
 
-    def terminal_is_fresh(self, created: datetime, *, now: datetime | None = None) -> bool:
-        """Return whether a negative terminal may still suppress a requery."""
-        age = self.age_seconds(created, now=now)
-        return 0 <= age <= self.fresh_seconds
+        Age equal to the fresh window is still fresh; age equal to the stale
+        window is expired because Redis has already deleted the key.
+        """
+        if ttl_ms <= 0:
+            return None
+        return Freshness.FRESH if ttl_ms >= self.fresh_floor_ms else Freshness.STALE
 
-    def remaining_seconds(
-        self,
-        created: datetime,
-        *,
-        max_age_seconds: int | None = None,
-        now: datetime | None = None,
-    ) -> float:
-        """Return time remaining before an observation's physical expiry."""
-        max_age = self.retention_seconds if max_age_seconds is None else max_age_seconds
-        return max(0.0, max_age - max(0.0, self.age_seconds(created, now=now)))
+    def age_seconds(self, ttl_ms: int) -> float:
+        """Return the snapshot age implied by its remaining Redis TTL."""
+        return max(0.0, self.stale_seconds - ttl_ms / 1000)
 
 
 FRESHNESS_POLICIES = {
-    "platform": FreshnessPolicy(5 * 60, 30 * 60, 60 * 60),
-    "user": FreshnessPolicy(2 * 60, 3 * 60, 5 * 60),
-    "community": FreshnessPolicy(5 * 60, 10 * 60, 15 * 60),
-    "session": FreshnessPolicy(30, 60, 3 * 60),
+    "platform": FreshnessPolicy(5 * 60, 10 * 60),
+    "user": FreshnessPolicy(2 * 60, 4 * 60),
+    "community": FreshnessPolicy(5 * 60, 10 * 60),
+    "session": FreshnessPolicy(30, 60),
 }
 
 
@@ -123,19 +107,18 @@ class CacheIdentity:
 
 @dataclass(frozen=True, slots=True)
 class CacheKeys:
-    """Name exactly the value and lease keys for one opaque subject."""
+    """Name the value and lease keys of one opaque subject."""
 
     base: str
-    identity_digest: str = ""
 
     @property
     def value(self) -> str:
-        """Return the stable signed-envelope key."""
+        """Return the authenticated snapshot or not-found key."""
         return f"{self.base}:value"
 
     @property
     def lease(self) -> str:
-        """Return the stable token-owned lease key."""
+        """Return the refresher-token or failure-cooldown key."""
         return f"{self.base}:lease"
 
 
@@ -148,61 +131,33 @@ def cache_keys(
     source_revision: str,
     query_revision: str,
 ) -> CacheKeys:
-    """Derive two opaque keys and the identity digest signed in their value."""
+    """Derive the two opaque keys of one identity.
+
+    The HMAC digest hides subject values from Redis key paths. It is wrapped
+    in a Redis Cluster hash tag so both keys share one slot and the two-key
+    scripts stay valid on a clustered Redis.
+    """
     digest = hmac.new(secret, identity.canonical(), hashlib.sha256).hexdigest()
-    base = f"{prefix}{schema_revision}:{source_revision}:{query_revision}:{identity.subject_kind}:{digest}"
-    return CacheKeys(base=base, identity_digest=digest)
-
-
-class CacheEnvelope(BaseModel):
-    """Hold one authenticated value, terminal, or failed-fill outcome."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    format: Literal["metrics-cache-v2"]
-    identity_digest: str
-    schema_revision: str
-    source_revision: str
-    query_revision: str
-    kind: Literal["value", "not_found", "failure"]
-    created: datetime
-    value: Any | None = None
-    failure_category: CacheFailureCategory | None = None
-    integrity: str
-
-    @model_validator(mode="after")
-    def validate_payload(self) -> CacheEnvelope:
-        """Reject envelopes whose kind and bounded payload disagree."""
-        if self.kind == "failure":
-            if self.value is not None or self.failure_category is None:
-                raise ValueError("failure envelopes require only a failure category")
-        elif self.failure_category is not None:
-            raise ValueError("only failure envelopes may carry a failure category")
-        return self
-
-    def signed_bytes(self) -> bytes:
-        """Serialize every field except the HMAC in canonical JSON."""
-        return json.dumps(
-            self.model_dump(mode="json", exclude={"integrity"}),
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-
-    def sign(self, secret: bytes) -> CacheEnvelope:
-        """Return a copy signed with the configured HMAC secret."""
-        digest = hmac.new(secret, self.signed_bytes(), hashlib.sha256).hexdigest()
-        return self.model_copy(update={"integrity": digest})
-
-    def verify(self, secret: bytes) -> bool:
-        """Verify the canonical HMAC in constant time."""
-        expected = hmac.new(secret, self.signed_bytes(), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(self.integrity, expected)
+    return CacheKeys(
+        f"{prefix}{schema_revision}:{source_revision}:{query_revision}:"
+        f"{identity.subject_kind}:{{{digest}}}"
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class CacheResult(Generic[Value]):
-    """Return a value with request-local cache and source provenance."""
+    """Return a value with request-local cache and source provenance.
+
+    Attributes:
+        value: The served snapshot.
+        cached: Whether a stored snapshot answered this request.
+        stale: Whether the snapshot is past its fresh window.
+        cache_available: Whether Redis answered the lookup.
+        source_reachable: ``True`` when this request's fill read the source,
+            ``None`` when the source was not probed.
+        serviceable_until: Wall-clock end of the snapshot's stale window.
+        age_seconds: Snapshot age measured from the start of its fill.
+    """
 
     value: Value
     cached: bool
@@ -210,6 +165,7 @@ class CacheResult(Generic[Value]):
     cache_available: bool = True
     source_reachable: bool | None = None
     serviceable_until: datetime | None = None
+    age_seconds: float = 0.0
 
 
 class CacheUnavailable(RuntimeError):
@@ -245,22 +201,8 @@ class CacheFillTimeout(CacheUnavailable):
 
 
 class CacheNotFound(RuntimeError):
-    """Represent an authenticated subject-level not-found terminal."""
+    """Represent an authenticated subject-level not-found result."""
 
-    def __init__(
-        self,
-        message: str = "subject not found",
-        *,
-        cache_available: bool = True,
-        source_reachable: bool | None = None,
-    ) -> None:
-        """Attach request-local provenance without changing HTTP mapping."""
+    def __init__(self, message: str = "subject not found") -> None:
+        """Keep the sanitized not-found message."""
         super().__init__(message)
-        self.cache_available = cache_available
-        self.source_reachable = source_reachable
-
-
-def serviceable_until(created: datetime, policy: FreshnessPolicy) -> datetime:
-    """Return the end of a positive observation's serviceable window."""
-    observed = policy._normalise(created)
-    return observed + timedelta(seconds=policy.stale_seconds)

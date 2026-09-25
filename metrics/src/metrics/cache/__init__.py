@@ -5,16 +5,15 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Protocol, TypeVar
 
-from metrics.cache.coordination import RedisCoordinator
+from metrics.cache.coordination import RedisCoordinator, describe_failure
 from metrics.cache.memory import MemorySnapshots
 from metrics.cache.models import (
     FRESHNESS_POLICIES,
-    CacheEnvelope,
-    CacheFillTimeout,
     CacheFailureCategory,
+    CacheFillTimeout,
     CacheIdentity,
-    CacheKeys,
     CacheInternalError,
+    CacheKeys,
     CacheNotFound,
     CacheResult,
     CacheUnavailable,
@@ -23,9 +22,9 @@ from metrics.cache.models import (
     cache_keys,
 )
 from metrics.cache.redis import (
+    Observation,
     RedisSnapshots,
     RedisUnavailable,
-    StoredFailure,
     StoredNotFound,
     StoredSnapshot,
 )
@@ -41,7 +40,10 @@ class CacheCoordinator(Protocol[Value]):
 
     @property
     def available(self) -> bool:
-        """Return the latest durable-cache health bit."""
+        """Return whether the latest Redis command succeeded."""
+
+    async def ping(self) -> None:
+        """Run one bounded Redis health check."""
 
     async def get_or_fill(
         self,
@@ -57,9 +59,8 @@ class CacheCoordinator(Protocol[Value]):
 __all__ = [
     "FRESHNESS_POLICIES",
     "CacheCoordinator",
-    "CacheEnvelope",
-    "CacheFillTimeout",
     "CacheFailureCategory",
+    "CacheFillTimeout",
     "CacheIdentity",
     "CacheInternalError",
     "CacheKeys",
@@ -69,11 +70,12 @@ __all__ = [
     "Freshness",
     "FreshnessPolicy",
     "MemorySnapshots",
+    "Observation",
     "RedisCoordinator",
     "RedisSnapshots",
     "RedisUnavailable",
-    "StoredFailure",
     "StoredNotFound",
     "StoredSnapshot",
     "cache_keys",
+    "describe_failure",
 ]

@@ -223,14 +223,14 @@ def test_redis_operation_vocabulary_preserves_cache_coordination_names() -> None
     meter = _FakeMeter()
     recorder = OpenTelemetryMetricsRecorder(meter=meter)
 
-    for operation in ("lease_acquire", "commit", "lease_release"):
+    for operation in ("observe", "publish", "cooldown", "release", "get"):
         recorder.record_redis(operation=operation, outcome="ok", seconds=0)
 
     operations = [
         attributes["db.operation.name"]
         for _value, attributes in meter.instruments["canfar.metrics.redis.duration"].calls
     ]
-    assert operations == ["lease_acquire", "commit", "lease_release"]
+    assert operations == ["observe", "publish", "cooldown", "release", "other"]
 
 
 def test_lease_outcome_vocabulary_preserves_errors_and_bounds_unknown_values() -> None:

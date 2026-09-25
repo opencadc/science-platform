@@ -1,319 +1,297 @@
-"""Public Redis-adapter tests without reimplementing its Lua scripts."""
+"""Redis adapter contracts, run against the real Lua scripts on fakeredis."""
 
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 import pytest
+from fakeredis import FakeAsyncRedis
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from metrics.cache import (
     CacheFailureCategory,
     CacheIdentity,
     RedisSnapshots,
-    StoredFailure,
+    RedisUnavailable,
     StoredNotFound,
+    StoredSnapshot,
+    cache_keys,
 )
-from metrics.cache import RedisUnavailable, cache_keys
 from metrics.telemetry import MetricsRecorder
 
-SECRET = b"cache-test-secret"
+pytestmark = pytest.mark.anyio
+
+SECRET = b"k" * 32
 IDENTITY = CacheIdentity("user", "bob", "cluster-a", "kueue", "v1")
-NOW = datetime(2025, 1, 1, tzinfo=UTC)
+TOKEN = "a" * 32
+OTHER = "b" * 32
 
 
-@dataclass(frozen=True, slots=True)
-class Snapshot:
-    """Small typed value for adapter validation tests."""
-
-    value: int
-    created: datetime
+@dataclass(frozen=True)
+class Snap:
+    n: int
 
 
-class RedisFake:
-    """Record Redis calls and return configured command results."""
-
+class Recorder(MetricsRecorder):
     def __init__(self) -> None:
-        self.values: dict[str, object] = {}
-        self.eval_result: object = 1
-        self.eval_calls: list[tuple[str, int, tuple[object, ...]]] = []
-        self.block_get = False
-        self.get_started = asyncio.Event()
+        self.redis: list[tuple[str, str]] = []
 
-    async def ping(self) -> object:
-        """Return a successful health response."""
-        return True
-
-    async def get(self, name: str) -> object:
-        """Return one stored fake value."""
-        if self.block_get:
-            self.get_started.set()
-            await asyncio.Future()
-        return self.values.get(name)
-
-    async def set(
-        self, name: str, value: object, *, nx: bool = False, px: int | None = None
-    ) -> object:
-        """Record one lease SET and honor NX for the fake seam."""
-        del px
-        if nx and name in self.values:
-            return None
-        self.values[name] = value
-        return True
-
-    async def eval(self, script: str, numkeys: int, *keys_and_args: object) -> object:
-        """Return a configured Lua result without interpreting the script."""
-        self.eval_calls.append((script, numkeys, keys_and_args))
-        return self.eval_result
+    def record_redis(self, *, operation: str, outcome: str, seconds: float) -> None:
+        self.redis.append((operation, outcome))
 
 
 def _keys(identity: CacheIdentity = IDENTITY):
-    """Build one test identity's two keys."""
     return cache_keys(
         prefix="metrics:",
         identity=identity,
         secret=SECRET,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
+        schema_revision="9",
+        source_revision="kueue-v2",
+        query_revision="0",
     )
 
 
-def _store(redis: RedisFake) -> RedisSnapshots[Snapshot]:
-    """Build an adapter with deterministic test revisions."""
-    return RedisSnapshots(
+def _store(redis, telemetry: MetricsRecorder | None = None) -> RedisSnapshots[Snap]:
+    return RedisSnapshots[Snap](
         redis=redis,
-        value_type=Snapshot,
+        value_type=Snap,
         secret=SECRET,
-        command_timeout=0.05,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
+        command_timeout=0.2,
+        schema_revision="9",
+        source_revision="kueue-v2",
+        query_revision="0",
+        telemetry=telemetry,
     )
 
 
-def _payload(
-    store: RedisSnapshots[Snapshot],
-    keys,
-    *,
-    kind: str = "value",
-    failure_category: CacheFailureCategory | None = None,
-) -> str:
-    """Create a valid signed payload for a read seam test."""
-    value = Snapshot(3, NOW) if kind == "value" else None
-    return store._sign(  # noqa: SLF001
-        keys=keys,
-        kind=kind,
-        created=NOW,
-        value=value,
-        failure_category=failure_category,
+async def _observe(store: RedisSnapshots[Snap], *, token: str = TOKEN, claim: bool = True, **kw):
+    return await store.observe(
+        _keys(),
+        token=token,
+        fresh_floor_ms=500,
+        lease_ms=kw.pop("lease_ms", 1_000),
+        claim=claim,
+        **kw,
     )
 
 
-@pytest.mark.anyio
-async def test_read_accepts_typed_positive_envelope() -> None:
-    """Valid signatures and revisions decode through the public read method."""
-    redis = RedisFake()
+def test_payload_round_trips_and_is_bound_to_its_key() -> None:
+    store = _store(FakeAsyncRedis())
+    keys = _keys()
+    raw = store.encode(keys, StoredSnapshot(Snap(7)))
+
+    assert raw[:1] == b"v"
+    assert store.decode(keys, raw) == StoredSnapshot(Snap(7))
+    assert store.decode(keys, store.encode(keys, StoredNotFound())) == StoredNotFound()
+    other = _keys(CacheIdentity("user", "alice", "cluster-a", "kueue", "v1"))
+    assert store.decode(other, raw) is None  # a payload copied under another subject
+    assert store.decode(keys, raw[:-1] + b"8") is None  # tampered body
+    assert store.decode(keys, b"x" + raw[1:]) is None  # unknown kind
+    assert store.decode(keys, b"n" + raw[1:65] + b"extra") is None
+
+
+def test_unreadable_values_never_raise() -> None:
+    store = _store(FakeAsyncRedis())
+    keys = _keys()
+    good = store.encode(keys, StoredSnapshot(Snap(1)))
+
+    assert store.decode(keys, b"") is None
+    assert store.decode(keys, b"v") is None
+    assert store.decode(keys, "v".encode() + "é".encode() * 32 + b"{}") is None
+    forged = b"v" + store._mac(keys.value, b"v", b"not json") + b"not json"
+    assert store.decode(keys, forged) is None
+    wrong_shape = b"v" + store._mac(keys.value, b"v", b'{"x":1}') + b'{"x":1}'
+    assert store.decode(keys, wrong_shape) is None
+    assert store.decode(keys, good) is not None
+
+
+async def test_observe_claims_only_absent_stale_or_forced_values() -> None:
+    redis = FakeAsyncRedis()
     store = _store(redis)
     keys = _keys()
-    redis.values[keys.value] = _payload(store, keys)
 
-    result = await store.read(keys)
+    absent = await _observe(store)
+    assert absent.stored is None and absent.claimed and not absent.unreadable
+    assert await redis.get(keys.lease) == TOKEN.encode()
+    await redis.delete(keys.lease)
 
-    assert result is not None
-    assert result.value == Snapshot(3, NOW)  # type: ignore[union-attr]
-    assert result.created == NOW  # type: ignore[union-attr]
+    await redis.set(keys.value, store.encode(keys, StoredSnapshot(Snap(1))), px=900)
+    fresh = await _observe(store)
+    assert fresh.stored == StoredSnapshot(Snap(1)) and not fresh.claimed
+    assert 800 < fresh.ttl_ms <= 900
 
+    await redis.pexpire(keys.value, 400)  # below the 500 ms fresh floor: stale
+    stale = await _observe(store)
+    assert stale.stored == StoredSnapshot(Snap(1)) and stale.claimed
 
-@pytest.mark.anyio
-async def test_read_rejects_payload_copied_between_subject_keys() -> None:
-    """The signed identity digest prevents Alice data from serving Bob."""
-    redis = RedisFake()
-    store = _store(redis)
-    alice_keys = _keys(CacheIdentity("user", "alice", "cluster-a", "kueue", "v1"))
-    bob_keys = _keys()
-    redis.values[bob_keys.value] = _payload(store, alice_keys)
+    second = await _observe(store, token=OTHER)
+    assert second.stored is not None and not second.claimed and second.cooldown is None
 
-    assert await store.read(bob_keys) is None
-
-
-@pytest.mark.anyio
-async def test_read_returns_authenticated_negative_envelope() -> None:
-    """The one envelope format carries a signed not-found creation time."""
-    redis = RedisFake()
-    store = _store(redis)
-    keys = _keys()
-    redis.values[keys.value] = _payload(store, keys, kind="not_found")
-
-    result = await store.read(keys)
-
-    assert isinstance(result, StoredNotFound)
-    assert result.created == NOW
+    await redis.delete(keys.lease)
+    unclaimed = await _observe(store, claim=False)
+    assert not unclaimed.claimed and await redis.exists(keys.lease) == 0
 
 
-@pytest.mark.anyio
-async def test_read_returns_signed_failure_category_and_rejects_tampering() -> None:
-    """Failure state carries no source text and cannot be changed unsigned."""
-    redis = RedisFake()
+async def test_live_not_found_is_never_claimed_over() -> None:
+    redis = FakeAsyncRedis()
     store = _store(redis)
     keys = _keys()
-    redis.values[keys.value] = _payload(
-        store,
-        keys,
-        kind="failure",
-        failure_category=CacheFailureCategory.SOURCE_UNAVAILABLE,
+    await redis.set(keys.value, store.encode(keys, StoredNotFound()), px=100)
+
+    seen = await _observe(store)
+    assert seen.stored == StoredNotFound() and not seen.claimed
+
+
+async def test_unreadable_fresh_value_is_claimed_only_when_forced() -> None:
+    redis = FakeAsyncRedis()
+    store = _store(redis)
+    keys = _keys()
+    await redis.set(keys.value, b"v" + b"0" * 64 + b"{}", px=900)
+
+    plain = await _observe(store)
+    assert plain.unreadable and not plain.claimed and plain.stored is None
+    forced = await _observe(store, force=True)
+    assert forced.unreadable and forced.claimed
+
+    await redis.set(keys.value, b"v" + b"0" * 64)  # no TTL at all
+    await redis.delete(keys.lease)
+    persistent = await _observe(store)
+    assert persistent.stored is None and persistent.unreadable and persistent.claimed
+
+
+async def test_retried_observe_recognises_its_own_claim() -> None:
+    redis = FakeAsyncRedis()
+    store = _store(redis)
+    keys = _keys()
+    # The first attempt applied SET NX but its reply was lost; the client resent it.
+    await redis.set(keys.lease, TOKEN, px=1_000)
+
+    assert (await _observe(store)).claimed
+    assert not (await _observe(store, token=OTHER)).claimed
+    assert not (await _observe(store, claim=False)).claimed
+
+
+async def test_cooldown_marker_is_reported_and_blocks_claims() -> None:
+    redis = FakeAsyncRedis()
+    store = _store(redis)
+    keys = _keys()
+    assert (await _observe(store)).claimed
+    assert await store.cool_down(
+        keys, token=TOKEN, category=CacheFailureCategory.INTERNAL, cooldown_ms=300
     )
 
-    result = await store.read(keys)
-
-    assert isinstance(result, StoredFailure)
-    assert result.category is CacheFailureCategory.SOURCE_UNAVAILABLE
-
-    payload = json.loads(redis.values[keys.value])
-    payload["failure_category"] = CacheFailureCategory.INTERNAL.value
-    redis.values[keys.value] = json.dumps(payload)
-    assert await store.read(keys) is None
+    seen = await _observe(store, token=OTHER)
+    assert not seen.claimed and seen.cooldown is CacheFailureCategory.INTERNAL
+    assert 200 < await redis.pttl(keys.lease) <= 300
+    await redis.set(keys.lease, "!bogus", px=300)
+    assert (await _observe(store, token=OTHER)).cooldown is CacheFailureCategory.INTERNAL
 
 
-@pytest.mark.anyio
-async def test_read_treats_malformed_or_tampered_state_as_a_miss() -> None:
-    """Untrusted Redis bytes never cross the typed cache seam."""
-    redis = RedisFake()
+async def test_settle_modes_are_fenced_on_the_lease_token() -> None:
+    redis = FakeAsyncRedis()
     store = _store(redis)
     keys = _keys()
-    redis.values[keys.value] = "not-json"
-    assert await store.read(keys) is None
+    await _observe(store)
 
-    redis.values[keys.value] = _payload(store, keys)
-    payload = json.loads(redis.values[keys.value])
-    payload["value"]["value"] = 99
-    redis.values[keys.value] = json.dumps(payload)
-    assert await store.read(keys) is None
-
-
-@pytest.mark.anyio
-async def test_commit_is_always_fenced_and_uses_only_two_keys() -> None:
-    """The adapter sends the stable value and lease keys to one Lua commit."""
-    redis = RedisFake()
-    store = _store(redis)
-    keys = _keys()
-    redis.eval_result = 0
-
-    committed = await store.commit(
-        keys=keys,
-        token="owner",
-        created=NOW,
-        value=Snapshot(1, NOW),
-        ttl_seconds=12.5,
+    assert not await store.publish(keys, token=OTHER, stored=StoredSnapshot(Snap(9)), ttl_ms=900)
+    assert not await store.cool_down(
+        keys, token=OTHER, category=CacheFailureCategory.INTERNAL, cooldown_ms=100
     )
+    assert not await store.release(keys, token=OTHER)
+    assert await redis.get(keys.lease) == TOKEN.encode()
+    assert await redis.exists(keys.value) == 0
 
-    assert committed is False
-    _script, numkeys, args = redis.eval_calls[-1]
-    assert numkeys == 2
-    assert args[:2] == (keys.value, keys.lease)
-    assert args[3] == "owner"
-    assert args[4] == 12500
-    assert "latest" not in args[0]
+    assert await store.publish(keys, token=TOKEN, stored=StoredSnapshot(Snap(2)), ttl_ms=900)
+    assert await redis.exists(keys.lease) == 0
+    assert 800 < await redis.pttl(keys.value) <= 900
+    assert not await store.release(keys, token=TOKEN)  # the publish already freed it
 
 
-@pytest.mark.anyio
-async def test_negative_commit_carries_created_time_and_fresh_ttl() -> None:
-    """Terminal publication uses the caller's two-minute policy TTL."""
-    redis = RedisFake()
+async def test_cooldown_never_outlives_an_existing_value() -> None:
+    redis = FakeAsyncRedis()
     store = _store(redis)
     keys = _keys()
+    await redis.set(keys.value, store.encode(keys, StoredSnapshot(Snap(1))), px=150)
+    await _observe(store)
 
-    assert await store.commit(
-        keys=keys,
-        token="owner",
-        created=NOW,
-        value=None,
-        ttl_seconds=120,
-        not_found=True,
+    assert await store.cool_down(
+        keys, token=TOKEN, category=CacheFailureCategory.SOURCE_UNAVAILABLE, cooldown_ms=5_000
     )
-    payload = json.loads(redis.eval_calls[-1][2][2])
-    assert payload["kind"] == "not_found"
-    assert payload["created"].startswith("2025-01-01T00:00:00")
-    assert redis.eval_calls[-1][2][4] == 120000
+    assert await redis.pttl(keys.lease) <= 150
+    assert await redis.get(keys.lease) == b"!source_unavailable"
 
 
-@pytest.mark.anyio
-async def test_failure_commit_carries_only_the_bounded_category() -> None:
-    """A failed fill is serialized without its exception text."""
-    redis = RedisFake()
+async def test_scripts_are_reloaded_after_a_script_flush() -> None:
+    redis = FakeAsyncRedis()
     store = _store(redis)
-    keys = _keys()
-
-    assert await store.commit(
-        keys=keys,
-        token="owner",
-        created=NOW,
-        value=None,
-        ttl_seconds=5,
-        failure_category=CacheFailureCategory.INTERNAL,
-    )
-
-    payload = json.loads(redis.eval_calls[-1][2][2])
-    assert payload["kind"] == "failure"
-    assert payload["failure_category"] == "internal"
-    assert "exception text" not in json.dumps(payload)
+    assert (await _observe(store)).claimed
+    await redis.script_flush()
+    await redis.delete(_keys().lease)
+    assert (await _observe(store)).claimed
 
 
-@pytest.mark.anyio
-async def test_lease_release_is_owner_checked_by_lua_seam() -> None:
-    """Release uses one lease key and the exact token."""
-    redis = RedisFake()
-    store = _store(redis)
-    keys = _keys()
+class _Broken:
+    def __init__(self, reply=None, error: Exception | None = None, delay: float = 0) -> None:
+        self.reply, self.error, self.delay = reply, error, delay
 
-    await store.release_lease(keys=keys, token="owner")
+    async def _answer(self, *_args):
+        await asyncio.sleep(self.delay)
+        if self.error is not None:
+            raise self.error
+        return self.reply
 
-    _script, numkeys, args = redis.eval_calls[-1]
-    assert numkeys == 1
-    assert args == (keys.lease, "owner")
+    def ping(self):
+        return self._answer()
+
+    def eval(self, *args):
+        return self._answer(*args)
+
+    def evalsha(self, *args):
+        return self._answer(*args)
 
 
-@pytest.mark.anyio
-async def test_command_timeout_maps_to_redis_unavailable() -> None:
-    """Every Redis command has a finite deadline."""
-    redis = RedisFake()
-    redis.block_get = True
-    store = _store(redis)
-
+@pytest.mark.parametrize(
+    "client",
+    [
+        _Broken(error=RedisConnectionError("down")),
+        _Broken(delay=1.0),
+        _Broken(reply=[b"v", "x", 0, None, -2]),
+        _Broken(reply=[b"v", 1]),
+    ],
+)
+async def test_observe_failures_are_bounded_redis_unavailable(client) -> None:
+    recorder = Recorder()
     with pytest.raises(RedisUnavailable):
-        await store.read(_keys())
+        await _observe(_store(client, recorder))
+    assert recorder.redis[-1][0] == "observe"
 
 
-@pytest.mark.anyio
-async def test_telemetry_failure_does_not_break_cache_commands() -> None:
-    """Observability failures are isolated from lease and commit behavior."""
+async def test_invalid_settle_and_ping_results_are_redis_unavailable() -> None:
+    with pytest.raises(RedisUnavailable):
+        await _store(_Broken(reply=7)).release(_keys(), token=TOKEN)
+    with pytest.raises(RedisUnavailable):
+        await _store(_Broken(reply=False)).ping()
 
-    class BrokenTelemetry(MetricsRecorder):
-        """Raise from every Redis observation."""
 
-        def record_redis(self, **_details: object) -> None:
-            """Raise a synthetic recorder failure."""
-            raise RuntimeError("telemetry failed")
-
-    redis = RedisFake()
-    store = RedisSnapshots(
-        redis=redis,
-        value_type=Snapshot,
-        secret=SECRET,
-        command_timeout=0.05,
-        schema_revision="2",
-        source_revision="kueue",
-        query_revision="1",
-        telemetry=BrokenTelemetry(),
-    )
-
+async def test_telemetry_names_every_redis_operation() -> None:
+    recorder = Recorder()
+    store = _store(FakeAsyncRedis(), recorder)
+    keys = _keys()
     await store.ping()
-    assert await store.commit(
-        keys=_keys(),
-        token="owner",
-        created=NOW,
-        value=Snapshot(1, NOW),
-        ttl_seconds=5,
-    )
+    await _observe(store)
+    await store.cool_down(keys, token=TOKEN, category=CacheFailureCategory.INTERNAL, cooldown_ms=1)
+    await asyncio.sleep(0.01)
+    await _observe(store)
+    await store.publish(keys, token=TOKEN, stored=StoredSnapshot(Snap(1)), ttl_ms=10)
+    await store.release(keys, token=TOKEN)
+
+    assert [name for name, _ in recorder.redis] == [
+        "ping",
+        "observe",
+        "cooldown",
+        "observe",
+        "publish",
+        "release",
+    ]
+    assert {outcome for _, outcome in recorder.redis} == {"ok"}

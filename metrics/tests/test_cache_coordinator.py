@@ -1,747 +1,625 @@
-"""Public coordinator contracts for freshness, leases, provenance, and fills."""
+"""Multi-replica coordinator contracts run against the real Lua scripts.
+
+Each ``replica`` is one ``RedisCoordinator`` with its own client wrapper over a
+shared fakeredis server, so tests observe exactly what several Metrics pods
+sharing one Redis would do. Windows are shortened to fractions of a second.
+"""
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import logging
+import random
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fakeredis import FakeAsyncRedis
+from pydantic.dataclasses import dataclass
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from metrics.cache import (
-    CacheFailureCategory,
     CacheIdentity,
     CacheInternalError,
     CacheNotFound,
-    CacheResult,
     CacheUnavailable,
     FreshnessPolicy,
     RedisCoordinator,
-    RedisUnavailable,
+    RedisSnapshots,
+    describe_failure,
 )
-from metrics.cache.redis import StoredFailure, StoredNotFound, StoredSnapshot
 from metrics.telemetry import MetricsRecorder
 
-NOW = datetime(2025, 1, 1, tzinfo=UTC)
-POLICY = FreshnessPolicy(2, 10, 15)
-IDENTITY = CacheIdentity("user", "bob", "cluster-a", "kueue", "v1")
+pytestmark = pytest.mark.anyio
+IDENTITY = CacheIdentity("platform", "canfar", "c", "kueue", "v1")
+POLICY = FreshnessPolicy(0.3, 0.9)  # fresh 300 ms, stale 900 ms
+SECRET = b"k" * 32
 
 
-@dataclass(frozen=True, slots=True)
-class Snapshot:
-    """Minimal source value with a signed observation time."""
-
-    value: int
-    created: datetime
+@dataclass(frozen=True)
+class Snap:
+    n: int
 
 
-class Store:
-    """Small coordinator protocol fake; Redis Lua is covered by integration tests."""
+class Client:
+    """Share one fake Redis server, count scripts, and fail on demand."""
 
-    schema_revision = "2"
-    source_revision = "kueue"
-    query_revision = "1"
+    def __init__(self, redis: FakeAsyncRedis) -> None:
+        self.redis = redis
+        self.down = False
+        self.lose_reply = False
+        self.scripts = 0
 
+    def _guard(self) -> None:
+        if self.down:
+            raise RedisConnectionError("down")
+
+    async def ping(self):
+        self._guard()
+        return await self.redis.ping()
+
+    def _answered(self, reply):
+        if self.lose_reply:
+            self.lose_reply = False
+            raise RedisConnectionError("reply lost after the script ran")
+        return reply
+
+    async def eval(self, *args):
+        self._guard()
+        return self._answered(await self.redis.eval(*args))
+
+    async def evalsha(self, *args):
+        self._guard()
+        self.scripts += 1
+        return self._answered(await self.redis.evalsha(*args))
+
+
+class Recorder(MetricsRecorder):
     def __init__(self) -> None:
-        self.values: dict[str, StoredSnapshot[Snapshot] | StoredNotFound | StoredFailure] = {}
-        self.leases: dict[str, str] = {}
-        self.fail_reads = False
-        self.fail_all = False
-        self.read_count = 0
-        self.commit_count = 0
-        self.lease_acquires = 0
+        self.lookups: list[tuple[str, str]] = []
+        self.leases: list[str] = []
+        self.fills: list[str] = []
 
-    def seed(self, snapshot: StoredSnapshot[Snapshot] | StoredNotFound | StoredFailure) -> None:
-        """Seed the one subject used by a test."""
-        self.values.clear()
-        self.values["subject"] = snapshot
+    def record_cache_lookup(self, *, backend, result, scope, age_seconds=None) -> None:
+        self.lookups.append((result, scope))
 
-    async def ping(self) -> None:
-        """Satisfy the durable-store seam."""
-        if self.fail_all:
-            raise RedisUnavailable("down")
+    def record_lease(self, *, outcome: str, scope: str) -> None:
+        self.leases.append(outcome)
 
-    async def read(self, keys) -> StoredSnapshot[Snapshot] | StoredNotFound | StoredFailure | None:
-        """Return the subject value or a bounded outage."""
-        self.read_count += 1
-        if self.fail_reads or self.fail_all:
-            raise RedisUnavailable("down")
-        return self.values.get(keys.base, self.values.get("subject"))
-
-    async def acquire_lease(self, *, keys, token: str, lease_seconds: float) -> bool:
-        """Model SET NX PX without reproducing the production Lua script."""
-        del lease_seconds
-        self.lease_acquires += 1
-        if self.fail_all:
-            raise RedisUnavailable("down")
-        if keys.base in self.leases:
-            return False
-        self.leases[keys.base] = token
-        return True
-
-    async def commit(
-        self,
-        *,
-        keys,
-        token: str,
-        created: datetime,
-        value: Snapshot | None,
-        ttl_seconds: float,
-        not_found: bool = False,
-        failure_category: CacheFailureCategory | None = None,
-    ) -> bool:
-        """Commit only for the current token and release the fake lease."""
-        del ttl_seconds
-        self.commit_count += 1
-        if self.fail_all:
-            raise RedisUnavailable("down")
-        if self.leases.get(keys.base) != token:
-            return False
-        if not_found:
-            stored = StoredNotFound(created)
-        elif failure_category is not None:
-            stored = StoredFailure(created, failure_category)
-        else:
-            stored = StoredSnapshot(value, created)
-        self.values[keys.base] = stored
-        self.leases.pop(keys.base, None)
-        return True
-
-    async def release_lease(self, *, keys, token: str) -> None:
-        """Release only the matching fake owner."""
-        if self.leases.get(keys.base) == token:
-            self.leases.pop(keys.base, None)
+    def record_fill_duration(self, *, seconds: float, outcome: str, scope: str) -> None:
+        self.fills.append(outcome)
 
 
-def _coordinator(
-    store: Store,
+class Source:
+    """Count source calls and the maximum number running at once."""
+
+    def __init__(self, delay: float = 0.05) -> None:
+        self.calls = 0
+        self.running = 0
+        self.max_running = 0
+        self.delay = delay
+        self.fail: BaseException | None = None
+
+    async def __call__(self) -> Snap:
+        self.calls += 1
+        self.running += 1
+        self.max_running = max(self.max_running, self.running)
+        try:
+            await asyncio.sleep(self.delay)
+            if self.fail is not None:
+                raise self.fail
+            return Snap(self.calls)
+        finally:
+            self.running -= 1
+
+
+def replica(
+    redis: FakeAsyncRedis,
     *,
-    clock=lambda: NOW,
-    **kwargs,
-) -> RedisCoordinator[Snapshot]:
-    """Build one coordinator against the protocol fake."""
-    return RedisCoordinator(
+    schema: str = "9",
+    policy: FreshnessPolicy = POLICY,
+    wall=None,
+    fill_timeout: float = 0.5,
+    cooldown: float = 0.2,
+    cold_timeout: float = 1.5,
+    telemetry: MetricsRecorder | None = None,
+) -> tuple[Client, RedisCoordinator[Snap]]:
+    client = Client(redis)
+    store = RedisSnapshots[Snap](
+        redis=client,
+        value_type=Snap,
+        secret=SECRET,
+        command_timeout=0.1,
+        schema_revision=schema,
+        source_revision="kueue-v2",
+        query_revision="0",
+    )
+    coordinator = RedisCoordinator[Snap](
         store=store,
         key_prefix="metrics:",
-        key_secret=b"cache-test-secret",
-        policy=POLICY,
-        created=lambda value: value.created,
-        fill_timeout=kwargs.pop("fill_timeout", 1),
-        cold_timeout=kwargs.pop("cold_timeout", 1),
-        poll_min=kwargs.pop("poll_min", 0.001),
-        clock=clock,
-        **kwargs,
+        key_secret=SECRET,
+        policy=policy,
+        fill_timeout=fill_timeout,
+        cold_timeout=cold_timeout,
+        lease_margin=0.2,
+        failure_cooldown=cooldown,
+        poll_min=0.005,
+        poll_max=0.02,
+        wall_clock=wall,
+        telemetry=telemetry,
     )
+    return client, coordinator
 
 
-def _stored(value: int, age: float = 0) -> StoredSnapshot[Snapshot]:
-    """Create one positive stored observation."""
-    return StoredSnapshot(
-        Snapshot(value, NOW - timedelta(seconds=age)), NOW - timedelta(seconds=age)
+# ---------------------------------------------------------------------- fresh
+
+
+async def test_cold_burst_across_replicas_fills_once_and_ttl_is_the_stale_window() -> None:
+    redis = FakeAsyncRedis()
+    replicas = [replica(redis)[1] for _ in range(3)]
+    source = Source(delay=0.1)
+    results = await asyncio.gather(
+        *(replicas[i % 3].get_or_fill(IDENTITY, source) for i in range(90))
     )
+    assert source.calls == 1
+    assert {r.value for r in results} == {Snap(1)}
+    assert sum(not r.cached for r in results) == 1
+    assert sum(r.source_reachable is True for r in results) == 1
+    assert all(not r.stale and r.cache_available for r in results)
+    keys = replicas[0]._keys(IDENTITY)
+    assert 700 < await redis.pttl(keys.value) <= 900  # R1: TTL == stale - age
+    assert await redis.exists(keys.lease) == 0  # publish freed the lease
 
 
-@pytest.mark.anyio
-async def test_fresh_hit_does_not_call_source_and_has_request_provenance() -> None:
-    """Fresh durable data is cached and reports that source was not probed."""
-    store = Store()
-    store.seed(_stored(1))
-    coordinator = _coordinator(store)
-    called = False
+async def test_concurrent_requests_on_one_replica_share_one_observe() -> None:
+    redis = FakeAsyncRedis()
+    client, coordinator = replica(redis)
+    source = Source(delay=0.01)
+    await coordinator.get_or_fill(IDENTITY, source)
+    client.scripts = 0
+    results = await asyncio.gather(*(coordinator.get_or_fill(IDENTITY, source) for _ in range(50)))
+    assert client.scripts == 1 and all(r.cached and not r.stale for r in results)
 
-    async def fill() -> Snapshot:
-        nonlocal called
-        called = True
-        return Snapshot(2, NOW)
 
-    result = await coordinator.get_or_fill(IDENTITY, fill)
+async def test_fresh_hits_report_age_and_serviceable_end() -> None:
+    redis = FakeAsyncRedis()
+    _, coordinator = replica(redis)
+    source = Source(delay=0.01)
+    filled = await coordinator.get_or_fill(IDENTITY, source)
+    assert filled.age_seconds < 0.1 and filled.source_reachable is True
+    await asyncio.sleep(0.1)
+    hit = await coordinator.get_or_fill(IDENTITY, source)
+    assert hit.cached and 0.08 < hit.age_seconds < 0.3
+    assert hit.serviceable_until is not None
+    remaining = (hit.serviceable_until - datetime.now(UTC)).total_seconds()
+    assert 0.5 < remaining <= 0.9
 
-    assert result == CacheResult(
-        Snapshot(1, NOW),
-        cached=True,
-        stale=False,
-        cache_available=True,
-        source_reachable=None,
-        serviceable_until=NOW + timedelta(seconds=10),
+
+# ---------------------------------------------------------------------- stale
+
+
+async def test_stale_burst_serves_stale_immediately_and_refreshes_once() -> None:
+    redis = FakeAsyncRedis()
+    replicas = [replica(redis, policy=FreshnessPolicy(0.5, 1.5))[1] for _ in range(3)]
+    source = Source(delay=0.2)
+    await replicas[0].get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.55)  # past fresh, inside stale
+
+    started = asyncio.get_running_loop().time()
+    wave = await asyncio.gather(
+        *(replicas[i % 3].get_or_fill(IDENTITY, source) for i in range(120))
     )
-    assert not called
-    await coordinator.shutdown()
+    elapsed = asyncio.get_running_loop().time() - started
+    assert elapsed < 0.1  # nobody waited on the 200 ms source call
+    assert all(r.stale and r.cached and r.value == Snap(1) for r in wave)
+    assert all(r.age_seconds > 0.5 for r in wave)
+    await asyncio.sleep(0.05)
+    second = await asyncio.gather(
+        *(replicas[i % 3].get_or_fill(IDENTITY, source) for i in range(60))
+    )  # during the refresh
+    assert all(r.stale for r in second)
+    await asyncio.sleep(0.25)
+    fresh = await asyncio.gather(*(r.get_or_fill(IDENTITY, source) for r in replicas))
+    assert source.calls == 2 and source.max_running == 1
+    assert all(not r.stale and r.value == Snap(2) for r in fresh)
 
 
-@pytest.mark.anyio
-async def test_stale_hit_returns_immediately_and_starts_one_leased_refresh() -> None:
-    """Stale callers receive stale data while one background owner refreshes."""
-    store = Store()
-    store.seed(_stored(1, age=3))
-    coordinator = _coordinator(store)
-    started = asyncio.Event()
-    release = asyncio.Event()
-    fills = 0
+async def test_a_local_refresh_owner_suppresses_further_claims() -> None:
+    redis = FakeAsyncRedis()
+    client, coordinator = replica(redis)
+    source = Source(delay=0.01)
+    await coordinator.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.35)
+    source.delay = 0.2
+    for _ in range(10):  # sequential stale reads while the one refresh runs
+        assert (await coordinator.get_or_fill(IDENTITY, source)).stale
+    keys = coordinator._keys(IDENTITY)
+    assert await redis.get(keys.lease) is not None
+    assert source.calls == 2
+    await asyncio.sleep(0.25)
+    assert not (await coordinator.get_or_fill(IDENTITY, source)).stale
+    assert client.scripts >= 11
 
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        started.set()
-        await release.wait()
-        return Snapshot(2, NOW)
 
-    result = await coordinator.get_or_fill(IDENTITY, fill)
-    await started.wait()
-    assert result.value == Snapshot(1, NOW - timedelta(seconds=3))
-    assert result.cached and result.stale
-    assert result.source_reachable is None
-    assert fills == 1
+async def test_failed_refresh_cools_down_across_replicas_and_keeps_serving_stale(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    redis = FakeAsyncRedis()
+    replicas = [replica(redis, cooldown=0.25)[1] for _ in range(2)]
+    source = Source(delay=0.01)
+    await replicas[0].get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.32)
+    source.fail = RuntimeError("kueue down")
+    with caplog.at_level(logging.WARNING, logger="metrics.cache.coordination"):
+        await replicas[0].get_or_fill(IDENTITY, source)  # claims and fails once
+        await asyncio.sleep(0.05)
+    assert "cache fill failed scope=platform category=internal error=RuntimeError" in caplog.text
+    assert "kueue down" not in caplog.text
+    for _ in range(10):  # 150 ms of stale traffic inside the cooldown
+        results = await asyncio.gather(*(r.get_or_fill(IDENTITY, source) for r in replicas))
+        assert all(r.stale and r.value == Snap(1) for r in results)
+        await asyncio.sleep(0.015)
+    assert source.calls == 2  # the fill and the one failed refresh
+    await asyncio.sleep(0.15)  # cooldown over
+    source.fail = None
+    await replicas[1].get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.05)
+    assert source.calls == 3
 
-    release.set()
-    for _ in range(20):
-        await asyncio.sleep(0.01)
-        if any(key != "subject" for key in store.values):
-            break
-    await coordinator.shutdown()
-    assert any(
-        value == StoredSnapshot(Snapshot(2, NOW), NOW)
-        for key, value in store.values.items()
-        if key != "subject"
+
+async def test_cooldown_never_outlives_the_stale_value() -> None:
+    redis = FakeAsyncRedis()
+    _, coordinator = replica(redis, cooldown=0.3)
+    source = Source(delay=0.01)
+    await coordinator.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.8)  # 100 ms of the stale window left
+    source.fail = RuntimeError("down")
+    await coordinator.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.03)
+    keys = coordinator._keys(IDENTITY)
+    assert (await redis.get(keys.lease)).startswith(b"!")
+    assert await redis.pttl(keys.lease) <= await redis.pttl(keys.value) + 5
+    await asyncio.sleep(0.1)  # value and cooldown gone together
+    source.fail = None
+    result = await coordinator.get_or_fill(IDENTITY, source)
+    assert not result.cached and source.calls == 3
+
+
+# ----------------------------------------------------------------------- cold
+
+
+async def test_cold_failure_is_shared_and_fails_fast_during_cooldown() -> None:
+    redis = FakeAsyncRedis()
+    replicas = [replica(redis, cooldown=0.3)[1] for _ in range(3)]
+    source = Source(delay=0.05)
+    source.fail = ValueError("secret detail")
+    results = await asyncio.gather(
+        *(replicas[i % 3].get_or_fill(IDENTITY, source) for i in range(30)),
+        return_exceptions=True,
     )
+    assert source.calls == 1
+    assert all(isinstance(r, CacheInternalError) and "secret" not in str(r) for r in results)
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(CacheInternalError):
+        await replicas[2].get_or_fill(IDENTITY, source)
+    assert asyncio.get_running_loop().time() - started < 0.05 and source.calls == 1
+    await asyncio.sleep(0.3)
+    source.fail = None
+    assert (await replicas[1].get_or_fill(IDENTITY, source)).value == Snap(2)
 
 
-@pytest.mark.anyio
-async def test_stale_burst_starts_one_local_refresh() -> None:
-    """Concurrent stale reads share one local refresh task for an identity."""
-    store = Store()
-    store.seed(_stored(1, age=3))
-    coordinator = _coordinator(store)
-    started = asyncio.Event()
-    release = asyncio.Event()
-
-    async def fill() -> Snapshot:
-        started.set()
-        await release.wait()
-        return Snapshot(2, NOW)
-
-    results = await asyncio.gather(*(coordinator.get_or_fill(IDENTITY, fill) for _ in range(10)))
-
-    assert all(result.stale for result in results)
-    await started.wait()
-    assert store.lease_acquires == 1
-    release.set()
-    await coordinator.shutdown()
+async def test_expected_source_failures_are_source_unavailable_everywhere() -> None:
+    redis = FakeAsyncRedis()
+    a, b = replica(redis)[1], replica(redis)[1]
+    source = Source(delay=0.01)
+    source.fail = CacheUnavailable("kueue 403", cache_available=True, source_reachable=False)
+    for coordinator in (a, b):
+        with pytest.raises(CacheUnavailable) as failure:
+            await coordinator.get_or_fill(IDENTITY, source)
+        assert failure.value.cache_available is True
+        assert failure.value.source_reachable is False
+        assert "403" not in str(failure.value)
+    assert source.calls == 1
 
 
-@pytest.mark.anyio
-async def test_cold_followers_share_one_fill_and_re_read_the_winner() -> None:
-    """Cold followers poll Redis instead of invoking the source themselves."""
-    store = Store()
-    first_started = asyncio.Event()
-    release = asyncio.Event()
-    fills = 0
-    first = _coordinator(store)
-    second = _coordinator(store)
-
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        first_started.set()
-        await release.wait()
-        return Snapshot(7, NOW)
-
-    requests = [
-        asyncio.create_task((first if index % 2 else second).get_or_fill(IDENTITY, fill))
-        for index in range(20)
-    ]
-    await first_started.wait()
-    release.set()
-    results = await asyncio.gather(*requests)
-
-    assert fills == 1
-    assert {result.value for result in results} == {Snapshot(7, NOW)}
-    assert sum(not result.cached for result in results) == 1
-    assert sum(result.source_reachable is True for result in results) == 1
-    assert sum(result.source_reachable is None for result in results) == 19
-    await first.shutdown()
-    await second.shutdown()
-
-
-@pytest.mark.anyio
-async def test_same_key_cold_burst_reads_once_per_coordinator() -> None:
-    """A local burst shares its initial durable read while replicas coordinate the fill."""
-
-    class GatedStore(Store):
-        """Hold durable reads until both coordinators have entered the burst."""
-
-        def __init__(self) -> None:
-            super().__init__()
-            self.reads_released = asyncio.Event()
-
-        async def read(self, keys):
-            result = await super().read(keys)
-            await self.reads_released.wait()
-            return result
-
-    store = GatedStore()
-    first = _coordinator(store)
-    second = _coordinator(store)
-    fill_started = asyncio.Event()
-    fill_release = asyncio.Event()
-    fills = 0
-
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        fill_started.set()
-        await fill_release.wait()
-        return Snapshot(7, NOW)
-
-    requests = [
-        asyncio.create_task(first.get_or_fill(IDENTITY, fill)),
-        asyncio.create_task(second.get_or_fill(IDENTITY, fill)),
-    ]
-    while store.read_count < 2:
-        await asyncio.sleep(0)
-
-    requests.extend(
-        asyncio.create_task((first if index % 2 else second).get_or_fill(IDENTITY, fill))
-        for index in range(18)
-    )
-    await asyncio.sleep(0.01)
-
-    assert store.read_count == 2
-    store.reads_released.set()
-    await fill_started.wait()
-    fill_release.set()
-    results = await asyncio.gather(*requests)
-
-    assert fills == 1
-    assert {result.value for result in results} == {Snapshot(7, NOW)}
-    await first.shutdown()
-    await second.shutdown()
-
-
-@pytest.mark.anyio
-async def test_cancelled_last_waiter_detaches_before_cleanup_finishes() -> None:
-    """A same-key retry cannot attach to a flight that is being cancelled."""
-
-    class GatedReleaseStore(Store):
-        """Hold the cancelled owner's release to expose the retry window."""
-
-        def __init__(self) -> None:
-            super().__init__()
-            self.release_started = asyncio.Event()
-            self.allow_release = asyncio.Event()
-            self.retry_read_started = asyncio.Event()
-
-        async def read(self, keys):
-            result = await super().read(keys)
-            if self.read_count >= 3:
-                self.retry_read_started.set()
-            return result
-
-        async def release_lease(self, *, keys, token: str) -> None:
-            if not self.release_started.is_set():
-                self.release_started.set()
-                await self.allow_release.wait()
-            await super().release_lease(keys=keys, token=token)
-
-    store = GatedReleaseStore()
-    coordinator = _coordinator(store, cold_timeout=0.5)
-    source_started = asyncio.Event()
+async def test_not_found_is_shared_for_the_fresh_window() -> None:
+    redis = FakeAsyncRedis()
+    a, b = replica(redis)[1], replica(redis)[1]
     calls = 0
 
-    async def fill() -> Snapshot:
+    async def missing() -> Snap:
         nonlocal calls
         calls += 1
-        source_started.set()
-        if calls == 1:
-            await asyncio.Future()
-        return Snapshot(2, NOW)
-
-    request = asyncio.create_task(coordinator.get_or_fill(IDENTITY, fill))
-    await source_started.wait()
-    request.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(request, timeout=1.0)
-    await store.release_started.wait()
-
-    retry = asyncio.create_task(coordinator.get_or_fill(IDENTITY, fill))
-    retry_read_timed_out = False
-    try:
-        await asyncio.wait_for(store.retry_read_started.wait(), timeout=0.5)
-    except TimeoutError:
-        retry_read_timed_out = True
-    finally:
-        store.allow_release.set()
-
-    result = await asyncio.wait_for(retry, timeout=0.5)
-
-    assert not retry_read_timed_out
-    assert isinstance(result, CacheResult)
-    assert result.value == Snapshot(2, NOW)
-    assert calls == 2
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_failed_cold_burst_shares_one_source_failure_outcome() -> None:
-    """A failed cold fill is coordinated instead of retried by every follower."""
-    store = Store()
-    first = _coordinator(store, cold_timeout=0.5)
-    second = _coordinator(store, cold_timeout=0.5)
-    started = asyncio.Event()
-    calls = 0
-
-    async def fill() -> Snapshot:
-        nonlocal calls
-        calls += 1
-        started.set()
-        await asyncio.sleep(0.01)
-        raise RuntimeError("source unavailable")
-
-    requests = [
-        asyncio.create_task((first if index % 2 else second).get_or_fill(IDENTITY, fill))
-        for index in range(10)
-    ]
-    await started.wait()
-    results = await asyncio.gather(*requests, return_exceptions=True)
-
-    assert calls == 1
-    assert all(isinstance(result, CacheInternalError) for result in results)
-    assert all("source unavailable" not in str(result) for result in results)
-    stored = next(value for key, value in store.values.items() if key != "subject")
-    assert isinstance(stored, StoredFailure)
-    assert stored.category is CacheFailureCategory.INTERNAL
-    await first.shutdown()
-    await second.shutdown()
-
-
-@pytest.mark.anyio
-async def test_expected_source_failure_has_the_same_owner_and_follower_outcome() -> None:
-    """Source-unavailable failures retain one sanitized 503 category everywhere."""
-    store = Store()
-    owner = _coordinator(store)
-    follower = _coordinator(store)
-
-    async def fill() -> Snapshot:
-        raise CacheUnavailable("private source failure")
-
-    with pytest.raises(CacheUnavailable) as owner_error:
-        await owner.get_or_fill(IDENTITY, fill)
-    with pytest.raises(CacheUnavailable) as follower_error:
-        await follower.get_or_fill(IDENTITY, _never_called)
-
-    assert not isinstance(owner_error.value, CacheInternalError)
-    assert not isinstance(follower_error.value, CacheInternalError)
-    assert owner_error.value.args == follower_error.value.args
-    assert "private source failure" not in str(owner_error.value)
-    assert owner_error.value.cache_available
-    assert owner_error.value.source_reachable is False
-    stored = next(value for key, value in store.values.items() if key != "subject")
-    assert isinstance(stored, StoredFailure)
-    assert stored.category is CacheFailureCategory.SOURCE_UNAVAILABLE
-    await owner.shutdown()
-    await follower.shutdown()
-
-
-@pytest.mark.anyio
-async def test_different_identities_fill_independently() -> None:
-    """Per-identity coordination does not serialize unrelated subjects."""
-    store = Store()
-    coordinator = _coordinator(store)
-    entered = asyncio.Event()
-    release = asyncio.Event()
-    active = 0
-    peak = 0
-
-    async def fill(value: int) -> Snapshot:
-        nonlocal active, peak
-        active += 1
-        peak = max(peak, active)
-        if active == 2:
-            entered.set()
-        await release.wait()
-        active -= 1
-        return Snapshot(value, NOW)
-
-    one = asyncio.create_task(
-        coordinator.get_or_fill(
-            CacheIdentity("user", "one", "cluster-a", "kueue"),
-            lambda: fill(1),
-        )
-    )
-    two = asyncio.create_task(
-        coordinator.get_or_fill(
-            CacheIdentity("user", "two", "cluster-a", "kueue"),
-            lambda: fill(2),
-        )
-    )
-    await entered.wait()
-    assert peak == 2
-    release.set()
-    assert {result.value for result in await asyncio.gather(one, two)} == {
-        Snapshot(1, NOW),
-        Snapshot(2, NOW),
-    }
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_negative_terminal_requeries_after_the_two_minute_fresh_window() -> None:
-    """A stale negative cannot suppress a newly created subject."""
-    store = Store()
-    store.seed(StoredNotFound(NOW - timedelta(seconds=3)))
-    coordinator = _coordinator(store)
-    fills = 0
-
-    async def fill() -> Snapshot:
-        nonlocal fills
-        fills += 1
-        return Snapshot(9, NOW)
-
-    result = await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert result.value == Snapshot(9, NOW)
-    assert result.source_reachable
-    assert fills == 1
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_fresh_negative_is_authoritative_404_and_does_not_call_source() -> None:
-    """A fresh terminal returns a typed not-found with cache provenance."""
-    store = Store()
-    store.seed(StoredNotFound(NOW))
-    coordinator = _coordinator(store)
-    called = False
-
-    async def fill() -> Snapshot:
-        nonlocal called
-        called = True
-        return Snapshot(1, NOW)
-
-    with pytest.raises(CacheNotFound) as caught:
-        await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert caught.value.cache_available
-    assert caught.value.source_reachable is None
-    assert not called
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_source_not_found_winner_reports_successful_source_probe() -> None:
-    """A source terminal committed by this request carries positive provenance."""
-    store = Store()
-    coordinator = _coordinator(store)
-
-    async def fill() -> Snapshot:
         raise CacheNotFound()
 
-    with pytest.raises(CacheNotFound) as caught:
-        await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert caught.value.cache_available
-    assert caught.value.source_reachable is True
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_terminal_observation_evicts_l1_before_a_redis_outage() -> None:
-    """A cached positive cannot resurrect after an authoritative terminal."""
-    store = Store()
-    store.seed(_stored(1))
-    coordinator = _coordinator(store)
-
-    await coordinator.get_or_fill(IDENTITY, _never_called)
-    store.seed(StoredNotFound(NOW))
     with pytest.raises(CacheNotFound):
-        await coordinator.get_or_fill(IDENTITY, _never_called)
+        await a.get_or_fill(IDENTITY, missing)
+    keys = a._keys(IDENTITY)
+    assert 200 < await redis.pttl(keys.value) <= 300
+    with pytest.raises(CacheNotFound):
+        await b.get_or_fill(IDENTITY, missing)
+    assert calls == 1
+    await asyncio.sleep(0.32)
+    with pytest.raises(CacheNotFound):
+        await b.get_or_fill(IDENTITY, missing)
+    assert calls == 2
 
-    store.fail_reads = True
+
+async def test_value_expires_at_the_stale_window_then_cold_fill() -> None:
+    redis = FakeAsyncRedis()
+    _, coordinator = replica(redis)
+    source = Source(delay=0.01)
+    await coordinator.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.92)
+    assert await redis.exists(coordinator._keys(IDENTITY).value) == 0  # R1: nothing retained
+    result = await coordinator.get_or_fill(IDENTITY, source)
+    assert not result.cached and source.calls == 2
+
+
+async def test_fill_that_outlives_the_stale_window_is_not_published() -> None:
+    redis = FakeAsyncRedis()
+    _, coordinator = replica(redis, policy=FreshnessPolicy(0.05, 0.1), fill_timeout=1.0)
+    source = Source(delay=0.15)
     with pytest.raises(CacheUnavailable):
-        await coordinator.get_or_fill(IDENTITY, _never_called)
-    await coordinator.shutdown()
+        await coordinator.get_or_fill(IDENTITY, source)
+    keys = coordinator._keys(IDENTITY)
+    assert await redis.exists(keys.value) == 0
+    assert (await redis.get(keys.lease)).startswith(b"!")
 
 
-@pytest.mark.anyio
-async def test_fenced_private_not_found_waits_for_authoritative_winner() -> None:
-    """A fenced 404 waits for a later positive winner rather than leaking it."""
+async def test_fill_timeout_cools_down_as_source_unavailable() -> None:
+    redis = FakeAsyncRedis()
+    recorder = Recorder()
+    _, coordinator = replica(redis, fill_timeout=0.05, telemetry=recorder)
+    with pytest.raises(CacheUnavailable) as failure:
+        await coordinator.get_or_fill(IDENTITY, Source(delay=1.0))
+    assert failure.value.source_reachable is False
+    assert recorder.fills == ["timeout"]
+    lease = await redis.get(coordinator._keys(IDENTITY).lease)
+    assert lease == b"!source_unavailable"
 
-    class FencedStore(Store):
-        """Return a fenced terminal while a winner publishes a value."""
 
-        async def commit(self, **kwargs) -> bool:
-            if kwargs["not_found"]:
-                self.values["subject"] = StoredSnapshot(Snapshot(8, NOW), NOW)
-                self.leases.pop(kwargs["keys"].base, None)
-                return False
-            return await super().commit(**kwargs)
+async def test_crashed_owner_is_taken_over_inside_the_cold_budget() -> None:
+    redis = FakeAsyncRedis()
+    _, coordinator = replica(redis)
+    keys = coordinator._keys(IDENTITY)
+    await redis.set(keys.lease, "0" * 32, px=coordinator._lease_ms)  # dead pod's lease
+    assert coordinator._lease_ms < 1_500  # lease 0.9 s < cold 1.5 s
+    source = Source(delay=0.01)
+    result = await coordinator.get_or_fill(IDENTITY, source)
+    assert result.value == Snap(1) and source.calls == 1
 
-    store = FencedStore()
-    coordinator = _coordinator(store, cold_timeout=0.5)
 
-    async def fill() -> Snapshot:
+async def test_stalled_owner_is_fenced_and_cannot_overwrite_its_successor() -> None:
+    redis = FakeAsyncRedis()
+    _, slow = replica(redis, fill_timeout=5.0)
+    _, fast = replica(redis)
+    keys = slow._keys(IDENTITY)
+    stalled = Source(delay=0.6)  # still running when its lease is lost
+    first = asyncio.create_task(slow.get_or_fill(IDENTITY, stalled))
+    await asyncio.sleep(0.05)
+    await redis.delete(keys.lease)  # model lease expiry during a long stall
+    other = Source(delay=0.01)
+    other.calls = 41
+    successor = await fast.get_or_fill(IDENTITY, other)
+    assert successor.value == Snap(42)
+    own = await first  # the fenced owner answers its own waiter with its genuine read
+    assert own.value == Snap(1) and not own.cached
+    stored = await fast._store.observe(
+        keys, token="x" * 32, fresh_floor_ms=POLICY.fresh_floor_ms, lease_ms=1, claim=False
+    )
+    assert stored.stored is not None and stored.stored.value == Snap(42)
+
+
+async def test_lost_claim_reply_is_released_and_the_next_request_fills() -> None:
+    redis = FakeAsyncRedis()
+    client, coordinator = replica(redis)
+    client.lose_reply = True
+    with pytest.raises(CacheUnavailable) as outage:
+        await coordinator.get_or_fill(IDENTITY, Source(delay=0.01))
+    assert outage.value.cache_available is False
+    await asyncio.sleep(0.02)  # the fenced release runs in the background
+    assert await redis.exists(coordinator._keys(IDENTITY).lease) == 0
+    source = Source(delay=0.01)
+    assert (await coordinator.get_or_fill(IDENTITY, source)).value == Snap(1)
+
+
+async def test_unreadable_value_is_overwritten_by_one_fill() -> None:
+    redis = FakeAsyncRedis()
+    replicas = [replica(redis)[1] for _ in range(3)]
+    keys = replicas[0]._keys(IDENTITY)
+    await redis.set(keys.value, b"v" + b"0" * 64 + b"{}", px=900)  # fresh-looking forgery
+    source = Source(delay=0.05)
+    results = await asyncio.gather(
+        *(replicas[i % 3].get_or_fill(IDENTITY, source) for i in range(30))
+    )
+    assert source.calls == 1 and {r.value for r in results} == {Snap(1)}
+
+
+async def test_schema_revisions_use_disjoint_keys() -> None:
+    redis = FakeAsyncRedis()
+    _, old = replica(redis, schema="8")
+    _, new = replica(redis, schema="9")
+    source = Source(delay=0.01)
+    await old.get_or_fill(IDENTITY, source)
+    result = await new.get_or_fill(IDENTITY, source)
+    assert not result.cached and source.calls == 2
+
+
+async def test_replica_wall_clock_skew_changes_nothing_but_serviceable_until() -> None:
+    redis = FakeAsyncRedis()
+    ahead = replica(redis, wall=lambda: datetime.now(UTC) + timedelta(seconds=30))[1]
+    behind = replica(redis, wall=lambda: datetime.now(UTC) - timedelta(seconds=30))[1]
+    source = Source(delay=0.01)
+    await ahead.get_or_fill(IDENTITY, source)
+    result = await behind.get_or_fill(IDENTITY, source)
+    assert result.cached and not result.stale and source.calls == 1
+    assert result.serviceable_until is not None
+    assert result.serviceable_until < datetime.now(UTC)  # expressed in the reader's clock
+
+
+# ---------------------------------------------------------------- redis outage
+
+
+async def test_redis_outage_serves_l1_with_its_real_stage_and_never_calls_the_source() -> None:
+    redis = FakeAsyncRedis()
+    client, coordinator = replica(redis)
+    source = Source(delay=0.01)
+    await coordinator.get_or_fill(IDENTITY, source)
+    client.down = True
+    fresh = await coordinator.get_or_fill(IDENTITY, source)
+    assert fresh.cached and not fresh.stale and not fresh.cache_available
+    assert not coordinator.available
+    await asyncio.sleep(0.35)
+    stale = await coordinator.get_or_fill(IDENTITY, source)
+    assert stale.stale and not stale.cache_available and stale.age_seconds > 0.3
+    await asyncio.sleep(0.6)
+    with pytest.raises(CacheUnavailable) as closed:
+        await coordinator.get_or_fill(IDENTITY, source)
+    assert closed.value.cache_available is False and source.calls == 1
+    client.down = False
+    await coordinator.ping()
+    assert coordinator.available
+
+
+async def test_not_found_evicts_the_outage_copy() -> None:
+    redis = FakeAsyncRedis()
+    client, coordinator = replica(redis, policy=FreshnessPolicy(0.05, 0.9))
+    await coordinator.get_or_fill(IDENTITY, Source(delay=0.01))
+    await asyncio.sleep(0.06)
+
+    async def missing() -> Snap:
         raise CacheNotFound()
 
-    result = await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert result.value == Snapshot(8, NOW)
-    assert result.cached
-    assert result.source_reachable is True
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_re_read_after_lease_avoids_redundant_source_query() -> None:
-    """A publication between miss and lease acquisition wins on the re-read."""
-
-    class PublishedBetweenReads(Store):
-        """Publish a value on the second read."""
-
-        async def read(self, keys):
-            result = await super().read(keys)
-            if self.read_count == 2:
-                self.values[keys.base] = StoredSnapshot(Snapshot(3, NOW), NOW)
-                return self.values[keys.base]
-            return result
-
-    store = PublishedBetweenReads()
-    coordinator = _coordinator(store)
-    called = False
-
-    async def fill() -> Snapshot:
-        nonlocal called
-        called = True
-        return Snapshot(4, NOW)
-
-    result = await coordinator.get_or_fill(IDENTITY, fill)
-
-    assert result.value == Snapshot(3, NOW)
-    assert result.source_reachable is None
-    assert not called
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_redis_l1_fallback_reports_source_not_probed() -> None:
-    """A serviceable local fallback changes cache health but not source state."""
-    store = Store()
-    store.seed(_stored(1))
-    coordinator = _coordinator(store)
-
-    await coordinator.get_or_fill(IDENTITY, _never_called)
-    store.fail_reads = True
-    result = await coordinator.get_or_fill(IDENTITY, _never_called)
-
-    assert result.value == Snapshot(1, NOW)
-    assert result.stale
-    assert not result.cache_available
-    assert result.source_reachable is None
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_stale_lookup_keeps_one_cache_decision_when_clock_advances() -> None:
-    """A stale decision cannot become a fresh-looking result on a later clock read."""
-    store = Store()
-    store.seed(_stored(1, age=3))
-    clock_values = iter(
-        [
-            NOW + timedelta(seconds=3),
-            NOW + timedelta(seconds=3),
-            NOW + timedelta(seconds=3),
-            NOW + timedelta(seconds=11),
-        ]
-    )
-    coordinator = _coordinator(store, clock=lambda: next(clock_values))
-
-    result = await coordinator.get_or_fill(IDENTITY, _never_called)
-
-    assert result.stale
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_cancellation_releases_the_owner_lease() -> None:
-    """Cancelled source work propagates cancellation and cleans its lease."""
-    store = Store()
-    coordinator = _coordinator(store)
-    started = asyncio.Event()
-    stop = asyncio.Event()
-
-    async def fill() -> Snapshot:
-        started.set()
-        await stop.wait()
-        return Snapshot(1, NOW)
-
-    request = asyncio.create_task(coordinator.get_or_fill(IDENTITY, fill))
-    await started.wait()
-    request.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(request, timeout=1.0)
-
-    assert not store.leases
-    await coordinator.shutdown()
-
-
-@pytest.mark.anyio
-async def test_redis_outage_never_invokes_source() -> None:
-    """A cold Redis outage fails closed instead of bypassing the cache."""
-    store = Store()
-    store.fail_all = True
-    coordinator = _coordinator(store)
-    called = False
-
-    async def fill() -> Snapshot:
-        nonlocal called
-        called = True
-        return Snapshot(1, NOW)
-
+    await coordinator.get_or_fill(IDENTITY, missing)  # stale hit starts the refresh
+    await asyncio.sleep(0.03)
+    client.down = True
     with pytest.raises(CacheUnavailable):
-        await coordinator.get_or_fill(IDENTITY, fill)
-    assert not called
-    await coordinator.shutdown()
+        await coordinator.get_or_fill(IDENTITY, missing)
 
 
-@pytest.mark.anyio
-async def test_telemetry_failure_does_not_change_coordinator_result() -> None:
-    """Cache operations survive recorder exceptions."""
-
-    class BrokenTelemetry(MetricsRecorder):
-        """Raise from every cache observation."""
-
-        def record_cache_lookup(self, **_details: object) -> None:
-            """Raise a synthetic lookup error."""
-            raise RuntimeError("telemetry failed")
-
-        def record_lease(self, **_details: object) -> None:
-            """Raise a synthetic lease error."""
-            raise RuntimeError("telemetry failed")
-
-        def record_fill_duration(self, **_details: object) -> None:
-            """Raise a synthetic fill error."""
-            raise RuntimeError("telemetry failed")
-
-    store = Store()
-    coordinator = RedisCoordinator(
-        store=store,
-        key_prefix="metrics:",
-        key_secret=b"cache-test-secret",
-        policy=POLICY,
-        created=lambda value: value.created,
-        telemetry=BrokenTelemetry(),
-        clock=lambda: NOW,
-    )
-
-    result = await coordinator.get_or_fill(IDENTITY, lambda: _snapshot(1))
-
-    assert result.value == Snapshot(1, NOW)
-    await coordinator.shutdown()
+# ------------------------------------------------------ cancellation, shutdown
 
 
-async def _snapshot(value: int) -> Snapshot:
-    """Return one immediate source value."""
-    return Snapshot(value, NOW)
+async def test_cancelled_waiter_does_not_cancel_the_shared_fill() -> None:
+    redis = FakeAsyncRedis()
+    _, a = replica(redis)
+    _, b = replica(redis)
+    source = Source(delay=0.2)
+    waiter = asyncio.create_task(a.get_or_fill(IDENTITY, source))
+    await asyncio.sleep(0.05)
+    waiter.cancel()
+    follower = await b.get_or_fill(IDENTITY, source)
+    assert follower.value == Snap(1) and source.calls == 1
 
 
-async def _never_called() -> Snapshot:
-    """Fail if a test accidentally bypasses the cache contract."""
-    raise AssertionError("source should not run")
+async def test_follower_deadline_on_healthy_redis_keeps_cache_available() -> None:
+    redis = FakeAsyncRedis()
+    _, owner = replica(redis, fill_timeout=1.0)
+    _, follower = replica(redis, cold_timeout=0.1)
+    asyncio.create_task(owner.get_or_fill(IDENTITY, Source(delay=0.5)))
+    await asyncio.sleep(0.02)
+    with pytest.raises(CacheUnavailable) as timeout:
+        await follower.get_or_fill(IDENTITY, Source())
+    assert timeout.value.cache_available is True
+    await owner.shutdown()
+
+
+async def test_shutdown_releases_the_lease_and_maps_waiters_to_503() -> None:
+    redis = FakeAsyncRedis()
+    _, a = replica(redis)
+    source = Source(delay=1.0)
+    waiter = asyncio.create_task(a.get_or_fill(IDENTITY, source))
+    await asyncio.sleep(0.05)
+    await a.shutdown()
+    with pytest.raises(CacheUnavailable):
+        await waiter
+    await asyncio.sleep(0.02)
+    assert await redis.exists(a._keys(IDENTITY).lease) == 0
+    with pytest.raises(CacheUnavailable):
+        await a.get_or_fill(IDENTITY, source)
+    _, b = replica(redis)
+    assert (await b.get_or_fill(IDENTITY, Source(delay=0.01))).value == Snap(1)
+
+
+# ------------------------------------------------------------------ telemetry
+
+
+async def test_telemetry_records_stage_and_lease_outcomes() -> None:
+    redis = FakeAsyncRedis()
+    recorder = Recorder()
+    _, a = replica(redis, telemetry=recorder, cooldown=0.1)
+    _, b = replica(redis, telemetry=recorder)
+    source = Source(delay=0.1)
+    await asyncio.gather(a.get_or_fill(IDENTITY, source), b.get_or_fill(IDENTITY, source))
+    assert sorted(recorder.leases) == ["acquired", "contended"]
+    assert recorder.fills == ["ok"]
+    await a.get_or_fill(IDENTITY, source)
+    await asyncio.sleep(0.35)
+    source.delay = 0.01
+    await a.get_or_fill(IDENTITY, source)
+    assert [result for result, _ in recorder.lookups] == ["miss", "miss", "hit", "stale"]
+
+
+def test_failure_description_names_types_and_http_status_only() -> None:
+    class Response:
+        status_code = 403
+
+    class ServerError(Exception):
+        response = Response()
+
+    try:
+        try:
+            raise ServerError("clusterqueues bob is forbidden")
+        except ServerError as exc:
+            raise ValueError("user bob") from exc
+    except ValueError as outer:
+        description = describe_failure(outer)
+    assert description == "ValueError <- ServerError(403)"
+
+
+# ---------------------------------------------------------------- property: R2
+
+
+@pytest.mark.parametrize("seed", range(6))
+async def test_at_most_one_fill_per_subject_under_random_multi_replica_traffic(seed: int) -> None:
+    rng = random.Random(seed)
+    redis = FakeAsyncRedis()
+    replicas = [
+        replica(redis, policy=FreshnessPolicy(0.08, 0.25), fill_timeout=0.2, cooldown=0.03)[1]
+        for _ in range(rng.choice([2, 4, 8]))
+    ]
+    subjects = [CacheIdentity("user", f"u{i}", "c", "kueue", "v1") for i in range(3)]
+    running: dict[str, int] = {}
+    worst = 0
+    fills = 0
+
+    def source_for(subject: str):
+        async def fill() -> Snap:
+            nonlocal worst, fills
+            fills += 1
+            running[subject] = running.get(subject, 0) + 1
+            worst = max(worst, running[subject])
+            try:
+                await asyncio.sleep(rng.uniform(0.005, 0.06))
+                if rng.random() < 0.2:
+                    raise RuntimeError("flaky source")
+                return Snap(fills)
+            finally:
+                running[subject] -= 1
+
+        return fill
+
+    async def client(index: int) -> None:
+        for _ in range(40):
+            identity = rng.choice(subjects)
+            coordinator = replicas[(index + rng.randrange(len(replicas))) % len(replicas)]
+            try:
+                await coordinator.get_or_fill(identity, source_for(identity.subject_value))
+            except (CacheUnavailable, CacheInternalError):
+                pass
+            await asyncio.sleep(rng.uniform(0, 0.02))
+
+    await asyncio.gather(*(client(i) for i in range(12)))
+    assert worst == 1 and fills > 3
+    for coordinator in replicas:
+        await coordinator.shutdown()

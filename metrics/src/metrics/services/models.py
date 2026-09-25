@@ -326,6 +326,7 @@ class MetricsResult:
     usage: dict[str, str] | None = None
     ready: bool = True
     ready_reason: Literal["Available", "PartialData"] = "Available"
+    age_seconds: float = 0.0
 
     @property
     def ready_condition(

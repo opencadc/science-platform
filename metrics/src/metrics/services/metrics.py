@@ -177,22 +177,22 @@ class MetricsService:
         return self._serviceable_until.get(surface)
 
     @property
-    def cache_ttl_seconds(self) -> int:
+    def cache_ttl_seconds(self) -> float:
         """Return the Platform fresh-cache window."""
         return self._cache.policy.fresh_seconds
 
     @property
-    def user_cache_ttl_seconds(self) -> int:
+    def user_cache_ttl_seconds(self) -> float:
         """Return the User fresh-cache window."""
         return self._workloads["user"].cache.policy.fresh_seconds
 
     @property
-    def community_cache_ttl_seconds(self) -> int:
+    def community_cache_ttl_seconds(self) -> float:
         """Return the Community fresh-cache window."""
         return self._workloads["community"].cache.policy.fresh_seconds
 
     @property
-    def session_cache_ttl_seconds(self) -> int:
+    def session_cache_ttl_seconds(self) -> float:
         """Return the Session fresh-cache window."""
         if self._session is None:
             raise RuntimeError("Session cache is not configured")
@@ -260,11 +260,7 @@ class MetricsService:
         except CacheUnavailable as exc:
             self._raise_unavailable(kind, exc)
         except CacheNotFound as exc:
-            self._mark_subject_not_found(
-                kind,
-                cache_available=exc.cache_available,
-                source_reachable=exc.source_reachable,
-            )
+            self._mark_subject_not_found(kind, cache_available=True, source_reachable=None)
             raise AppError(code=f"{kind}_not_found", status_code=404) from exc
         except Exception:
             self._mark_surface_failure(kind)
@@ -414,7 +410,7 @@ class MetricsService:
             return await loader(session_id)
         except SubjectNotFoundError as exc:
             status = "not_found"
-            raise CacheNotFound(source_reachable=True) from exc
+            raise CacheNotFound() from exc
         except ProviderUnavailableError as exc:
             status = "error"
             raise CacheUnavailable(
@@ -582,7 +578,7 @@ class MetricsService:
             return await loader(subject)
         except SubjectNotFoundError as exc:
             status = "not_found"
-            raise CacheNotFound(source_reachable=True) from exc
+            raise CacheNotFound() from exc
         except ProviderUnavailableError as exc:
             status = "error"
             raise CacheUnavailable(
@@ -634,6 +630,7 @@ class MetricsService:
             usage=snapshot.usage,
             ready=snapshot.ready,
             ready_reason=snapshot.ready_reason,
+            age_seconds=result.age_seconds,
         )
 
     def _mark_surface_result(
