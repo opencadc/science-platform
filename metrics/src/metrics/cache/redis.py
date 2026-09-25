@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Generic, Protocol, TypeAlias, TypeVar, cast
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 from redis.asyncio import Redis
 from redis.exceptions import NoScriptError, RedisError
 
@@ -217,7 +217,7 @@ class RedisSnapshots(Generic[Value]):
             return StoredNotFound() if not body else None
         try:
             return StoredSnapshot(self._adapter.validate_json(body))
-        except (ValidationError, ValueError):
+        except ValueError:  # includes pydantic's ValidationError
             return None
 
     async def ping(self) -> None:

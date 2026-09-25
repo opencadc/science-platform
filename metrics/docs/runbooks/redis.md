@@ -31,6 +31,7 @@ readiness.
 | `metrics runtime not ready: dependency validation failed error=…` | A readiness validation failed; the error names exception types, HTTP status, and Metrics' own messages only |
 | `User LocalQueue` / `Session Job` / `PromQL efficiency` `access could not be verified at startup error=…` | A startup probe failed; readiness is unaffected, but that surface will likely return 503 or `PartialData` |
 | `cache fill failed scope=<surface> category=<category> error=…` | One fill failed; its owner logs it once, and no replica retries until the failure cooldown ends |
+| `cache payload rejected scope=<surface>; refilling` | A stored payload failed authentication or decoding (a foreign writer or tampering; a new key secret uses new keys instead). One request overwrites it |
 | `optional <efficiency\|usage> unavailable scope=<surface> error=…` | An optional read failed; the report is served with `PartialData` |
 | `optional <efficiency\|usage> skipped scope=<surface>: fill deadline reached` | At most 0.5 s of the fill budget was left after the primary read; the report is served with `PartialData` |
 | `optional pod state unavailable scope=session` | The Session Pod list failed; Job data is served with `PartialData` |

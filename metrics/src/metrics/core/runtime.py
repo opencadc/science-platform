@@ -281,8 +281,6 @@ class MetricsRuntime:
             async with asyncio.timeout(timeout):
                 await asyncio.gather(*(cache.ping() for cache in self._caches().values()))
                 await self._kueue.validate_platform()
-        except asyncio.CancelledError:
-            raise
         except Exception as exc:
             _logger.warning(
                 "metrics runtime not ready: dependency validation failed error=%s",
@@ -312,8 +310,6 @@ class MetricsRuntime:
         try:
             async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
                 await probe()
-        except asyncio.CancelledError:
-            raise
         except Exception as exc:
             _logger.warning(
                 "%s access could not be verified at startup error=%s", name, describe_failure(exc)

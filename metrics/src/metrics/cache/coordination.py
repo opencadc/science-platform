@@ -317,6 +317,10 @@ class RedisCoordinator(Generic[Value]):
                 seen = replace(seen, claimed=False)
             if seen.claimed:
                 self._telemetry.record_lease(outcome="acquired", scope=scope)
+                if seen.unreadable:
+                    # Only a new key secret, a foreign writer, or tampering
+                    # produces this; the claimer overwrites it once.
+                    _logger.warning("cache payload rejected scope=%s; refilling", scope)
             if seen.unreadable and not seen.claimed and not force:
                 force = True  # overwrite through one owner; never spin on it
                 continue
