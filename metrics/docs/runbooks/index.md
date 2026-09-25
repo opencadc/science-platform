@@ -8,16 +8,17 @@ in [`../specs.md`](../specs.md).
 
 | Symptom | Runbook | First safe proof |
 | --- | --- | --- |
-| `/readyz` fails or reports Redis unavailable | [Redis outage and readiness](redis.md) | `/healthz`, `/livez`, `/readyz`, one report GET, and a bounded Redis `PING` |
+| New pods never become ready, or reports carry `RedisUnavailable` or 503s | [Redis outage and readiness](redis.md) | `/readyz`, one report GET, the pod's log lines, and a bounded Redis `PING` |
 | A release or chart change must be backed out | [Rollback and verification](rollback.md) | Confirm the owning release, then prove probes, routes, cache headers, and source output |
 | A User, Community, or Session report is missing | [Skaha session labels](../../../skaha/docs/labels.md) | Inspect configured namespaces, LocalQueue/Job labels, referenced ClusterQueue, and exact label equality |
 
 ## Safety boundaries
 
-- `/healthz` and `/livez` describe process liveness; `/readyz` describes
-  coordinated readiness and does not replace a report request.
-- Do not use `FLUSHDB`, delete snapshot pointers, or bypass Redis with a source
-  read for every request as an outage response.
+- `/healthz` and `/livez` describe process liveness. `/readyz` latches after
+  the pod first validates Redis and the configured ClusterQueues, so it does
+  not follow later outages and does not replace a report request.
+- Do not use `FLUSHDB`, delete cache or lease keys, or bypass Redis with a
+  source read for every request as an outage response.
 - Current queue reservations are not measured usage. Optional efficiency is a
   current Prometheus/Mimir ratio (or Session duration utilization) and is not a
   historical series.

@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended: Session requests and counts come from active Jobs only, and
+each Job's request is its effective pod request.
 
 ## Decision
 
@@ -16,12 +17,15 @@ Platform. Session primary source is `batch/v1` Jobs by exact `canfar.net/id`,
 including desktop-app children that share the id.
 
 Public aggregation uses `flavorsReservation` / `reservingWorkloads` for User
-and Community, nominal quota and `flavorsUsage` for Platform capacity and
-allocation, and Job template requests plus Job count for Session. Optional
-instant PromQL efficiency covers User, Community, and Platform; Session may
-add optional `metrics.k8s.io` usage and duration PromQL efficiency. Cohorts,
-Running-Pod inventory as a primary source, separate quota/session CR kinds,
-lifetime accounting, producers, checkpoints, and usage-hours are excluded.
+and Community, and nominal quota and `flavorsUsage` for Platform capacity and
+allocation. For Session it uses the active Jobs (not `Complete`, not `Failed`,
+not suspended) and each Job's effective pod request, computed as Kubernetes
+and Kueue compute it, so a Session reports what Kueue actually reserves and a
+finished session reports nothing reserved. Optional instant PromQL efficiency
+covers User, Community, and Platform; Session may add optional
+`metrics.k8s.io` usage and duration PromQL efficiency. Cohorts, Running-Pod
+inventory as a primary source, separate quota/session CR kinds, lifetime
+accounting, producers, checkpoints, and usage-hours are excluded.
 
 Cache windows, failure matrices, PromQL shapes, and OpenAPI status semantics
 live in [`../specs.md`](../specs.md). Session's addition to this boundary is

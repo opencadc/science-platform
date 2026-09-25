@@ -20,6 +20,7 @@ From `metrics/`:
 
 ```bash
 uv run ruff check src tests
+uv run ty check
 uv run pytest --cov=src --cov-report=term-missing -m "not integration"
 ```
 
@@ -37,7 +38,13 @@ local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
 - Session reports aggregate Jobs labelled `canfar.net/id` in the configured
   namespaces, including desktop-app children that share the id.
 - `flavorsReservation` is the source for public User/Community request totals;
-  `reservingWorkloads` is the public workload count (Job count for Session).
+  `reservingWorkloads` is the public workload count. For Session, requests are
+  the effective pod requests of active Jobs (not `Complete`, `Failed`, or
+  suspended) and the count is the active Job count.
+- Snapshots have two stages, fresh and stale, fixed per surface in
+  `FRESHNESS_POLICIES`. A stale snapshot is served while exactly one request
+  across all replicas refreshes it; do not add a retained stage, a periodic
+  refresher, or a second cache.
 - Prometheus/Mimir is optional and receives fixed, server-owned PromQL for
   current (or Session duration) CPU and memory efficiency. The presence of
   `METRICS_PROVIDERS__PROMQL__BASE_URL` enables it; absence disables it.
