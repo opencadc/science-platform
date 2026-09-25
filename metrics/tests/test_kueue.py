@@ -7,7 +7,6 @@ import contextlib
 from typing import Any
 
 import httpx
-import kr8s
 import pytest
 
 from metrics.core.settings import CacheConfig, KueueProviderConfig, ProviderConfigs, Settings
@@ -107,6 +106,7 @@ class FakeKueueApi:
         url: str,
         namespace: str | None = None,
         params: dict[str, str] | None = None,
+        raise_for_status: bool = True,
     ):
         """Implement the small kr8s call_api surface used by the provider."""
         del method, version
@@ -114,7 +114,8 @@ class FakeKueueApi:
             name = url.rsplit("/", 1)[-1]
             value = self.queues.get(name)
             if value is None:
-                raise kr8s.ServerError("not found", response=httpx.Response(404))
+                yield httpx.Response(404)
+                return
             yield httpx.Response(200, json=value)
             return
         assert namespace is not None
@@ -235,7 +236,8 @@ async def test_clusterqueue_failure_cancels_siblings_and_propagates() -> None:
                 self.siblings_started.set()
             if name == "cq-a":
                 await self.siblings_started.wait()
-                raise kr8s.ServerError("failed", response=httpx.Response(500))
+                yield httpx.Response(500)
+                return
             try:
                 await asyncio.Future()
             except asyncio.CancelledError:
@@ -245,7 +247,7 @@ async def test_clusterqueue_failure_cancels_siblings_and_propagates() -> None:
             yield
 
     api = FailingApi()
-    with pytest.raises(ProviderUnavailableError, match="ClusterQueue access failed"):
+    with pytest.raises(ProviderUnavailableError, match="ClusterQueue request returned HTTP 500"):
         async with asyncio.timeout(1):
             await _provider(api, queues=names, namespaces=["work-a"]).read_platform()
 

@@ -127,7 +127,9 @@ def describe_failure(exc: BaseException) -> str:
     current: BaseException | None = exc
     while current is not None and id(current) not in seen and len(parts) < _MAX_CHAIN:
         seen.add(id(current))
-        status = getattr(getattr(current, "response", None), "status_code", None)
+        status = getattr(current, "status_code", None)
+        if status is None:
+            status = getattr(getattr(current, "response", None), "status_code", None)
         name = type(current).__name__
         parts.append(f"{name}({status})" if isinstance(status, int) else name)
         current = current.__cause__ or current.__context__

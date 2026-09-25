@@ -9,7 +9,6 @@ from decimal import Decimal
 from typing import Any
 
 import httpx
-import kr8s
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,12 +70,14 @@ def _job(
                 "resources": {"requests": {"cpu": init_cpu, "memory": "128Mi"}},
             }
         )
-    init_containers.append({"name": "pause", "resources": {"requests": {"cpu": "10m"}}})
     status: dict[str, Any] = {}
     if start_time is not None:
         status["startTime"] = start_time
     if completion_time is not None:
         status["completionTime"] = completion_time
+        status["conditions"] = [
+            {"type": "Complete", "status": "True", "lastTransitionTime": completion_time}
+        ]
     return {
         "metadata": {
             "name": name,
@@ -148,6 +149,7 @@ class FakeKubernetesApi:
         url: str,
         namespace: str | None = None,
         params: dict[str, str] | None = None,
+        raise_for_status: bool = True,
     ):
         """Implement the small kr8s call_api surface used by Session providers."""
         del method, params
@@ -163,7 +165,7 @@ class FakeKubernetesApi:
             payload = {"items": self.pod_metrics.get(namespace, [])}
             yield httpx.Response(200, json=payload)
             return
-        raise kr8s.ServerError("unexpected request", response=httpx.Response(404))
+        yield httpx.Response(404)
 
 
 class _TerminalNotFoundCache:
@@ -214,7 +216,7 @@ def _session_service(
 
 
 async def test_session_provider_aggregates_jobs_and_window_times() -> None:
-    """Session requests sum non-pause containers and derive timing inputs."""
+    """Session requests sum each active Job's effective pod request."""
     api = FakeKubernetesApi(
         jobs={
             "work-a": [
@@ -229,10 +231,133 @@ async def test_session_provider_aggregates_jobs_and_window_times() -> None:
 
     assert observation.session == "sess-1"
     assert observation.reserving_workloads == 2
-    assert observation.requests["cpu"] == "1.6"
-    assert observation.requests["memory"] == "1.125Gi"
+    # The init container runs before the app containers, so it adds nothing.
+    assert observation.requests["cpu"] == "1.5"
+    assert observation.requests["memory"] == "1Gi"
     assert observation.start_time == datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     assert observation.has_running_pods is True
+
+
+def _with_pod_spec(job: dict[str, Any], pod_spec: dict[str, Any]) -> dict[str, Any]:
+    job["spec"]["template"]["spec"] = pod_spec
+    return job
+
+
+def _container(name: str, cpu: str, memory: str = "0", **extra: Any) -> dict[str, Any]:
+    return {"name": name, "resources": {"requests": {"cpu": cpu, "memory": memory}}, **extra}
+
+
+async def test_session_requests_follow_the_kubernetes_effective_pod_request() -> None:
+    """Init peaks, native sidecars, and pod overhead follow the scheduler's formula."""
+    pod_spec = {
+        "initContainers": [
+            _container("setup", "3"),  # peak before the sidecar starts
+            _container("proxy", "250m", "64Mi", restartPolicy="Always"),
+            _container("migrate", "1", "2Gi"),  # runs beside the sidecar: 1.25 cpu, 2.0625Gi
+        ],
+        "containers": [_container("main", "1", "1Gi"), _container("pause", "500m")],
+        "overhead": {"cpu": "100m", "memory": "32Mi"},
+    }
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_with_pod_spec(_job("desktop", "work-a", "sess-1"), pod_spec)]}
+    )
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    # cpu: max(3, 0.25 + 1, 1 + 0.5 + 0.25) + 0.1 overhead
+    # memory: max(0.0625 + 2, 1 + 0.0625) Gi + 32Mi overhead
+    assert observation.requests == {"cpu": "3.1", "memory": "2.09375Gi"}
+
+
+async def test_finished_and_suspended_jobs_do_not_reserve() -> None:
+    """Only admitted, unfinished Jobs contribute requests and reserving workloads."""
+    failed = _job("failed", "work-a", "sess-1", cpu="2")
+    failed["status"]["conditions"] = [
+        {"type": "Failed", "status": "True", "lastTransitionTime": "2026-01-01T13:00:00Z"}
+    ]
+    suspended = _job("queued", "work-a", "sess-1", cpu="4", start_time=None)
+    suspended["spec"]["suspend"] = True
+    api = FakeKubernetesApi(
+        jobs={
+            "work-a": [
+                _job("desktop", "work-a", "sess-1", cpu="1"),
+                _job("app", "work-a", "sess-1", completion_time="2026-01-01T12:30:00Z"),
+                failed,
+                suspended,
+            ]
+        }
+    )
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    assert observation.reserving_workloads == 1
+    assert observation.requests == {"cpu": "1", "memory": "0.5Gi"}
+
+
+async def test_fully_finished_session_is_found_with_no_reservation() -> None:
+    """A session whose Jobs all finished still exists; it reserves nothing."""
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_job("app", "work-a", "sess-1", completion_time="2026-01-01T12:30:00Z")]}
+    )
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    assert observation.reserving_workloads == 0 and observation.requests == {}
+    assert observation.window_end == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
+
+
+async def test_window_ends_at_the_latest_terminal_time_including_failures() -> None:
+    """Expired (Failed) Jobs end at their terminal condition, not at read time."""
+    expired = _job("notebook", "work-a", "sess-1", start_time="2026-01-01T09:00:00Z")
+    expired["status"]["conditions"] = [
+        {"type": "FailureTarget", "status": "True", "lastTransitionTime": "2026-01-01T09:59:00Z"},
+        {"type": "Failed", "status": "True", "lastTransitionTime": "2026-01-01T10:00:00Z"},
+    ]
+    done = _job("app", "work-a", "sess-1", completion_time="2026-01-01T09:30:00Z")
+    api = FakeKubernetesApi(jobs={"work-a": [expired, done]})
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    assert observation.start_time == datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
+    assert observation.window_end == datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
+
+
+async def test_window_stays_open_while_any_job_is_unfinished() -> None:
+    """A running Job keeps the window open even when the pod list is unavailable."""
+    api = FakeKubernetesApi(
+        jobs={
+            "work-a": [
+                _job("desktop", "work-a", "sess-1"),
+                _job("app", "work-a", "sess-1", completion_time="2026-01-01T12:30:00Z"),
+            ]
+        }
+    )
+    before = datetime.now(UTC)
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+
+    assert observation.window_end >= before.replace(microsecond=0)
+    assert observation.has_running_pods is False
+
+
+async def test_usage_skips_metrics_api_when_no_pod_is_running() -> None:
+    """No Running pod means no PodMetrics request at all."""
+
+    class CountingApi(FakeKubernetesApi):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            self.metrics_calls = 0
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs: Any):
+            if kwargs["version"] == "metrics.k8s.io/v1beta1":
+                self.metrics_calls += 1
+            async with super().call_api(**kwargs) as response:
+                yield response
+
+    api = CountingApi(
+        jobs={"work-a": [_job("desktop", "work-a", "sess-1")]},
+        pods={"work-a": [_pod("pod-a", "work-a", "sess-1", phase="Pending")]},
+    )
+    observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
+    usage = await KubeMetricsProvider(_settings(), api=api).read_session_usage(observation)
+
+    assert usage.usage == {} and api.metrics_calls == 0
 
 
 async def test_session_provider_missing_job_is_not_found() -> None:
@@ -539,9 +664,11 @@ async def test_session_provider_soft_fails_when_pod_list_unavailable() -> None:
             url: str,
             namespace: str | None = None,
             params: dict[str, str] | None = None,
+            raise_for_status: bool = True,
         ):
             if version == "v1" and url == "pods":
-                raise kr8s.ServerError("pod list failed", response=httpx.Response(503))
+                yield httpx.Response(503)
+                return
             async with super().call_api(
                 method=method,
                 version=version,
