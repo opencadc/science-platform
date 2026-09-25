@@ -434,12 +434,14 @@ class Settings(BaseSettings):
     @field_validator("cluster_name")
     @classmethod
     def _validate_cluster_name(cls, value: str) -> str:
-        """Require the lower-case DNS name used by cache identity."""
+        """Require the real lower-case DNS name used by cache identity."""
         normalized = _canonical_text(
             value, field_name="cluster_name", max_length=253, ascii_only=True
         )
         if not _is_dns_subdomain(normalized):
             raise ValueError("cluster_name must be a bounded lower-case DNS name")
+        if normalized == "unknown":
+            raise ValueError("cluster_name must name the real cluster, not unknown")
         return normalized
 
     @field_validator("platform_name")

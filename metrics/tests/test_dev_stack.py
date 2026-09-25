@@ -798,18 +798,10 @@ def test_test_dependencies_are_disposable_only() -> None:
 
 def test_kind_values_reference_external_test_services() -> None:
     values = yaml.safe_load((METRICS_ROOT / "scripts" / "kind-values.yaml").read_text())
-    env = values["env"]
-    assert env["METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES"] == (
-        '["cq-proton","cq-electron","cq-fair"]'
-    )
-    assert env["METRICS_PROVIDERS__KUEUE__NAMESPACES"] == (
-        '["canfar-workloads","canfar-workloads-secondary"]'
-    )
-    assert not any(name.endswith("__ENABLED") for name in env)
     assert values["redis"]["urlSecret"]["name"] == "metrics-test-redis"
     assert values["cacheKeySecret"]["name"] == "metrics-test-cache-key"
-    assert "metrics-test-prometheus" in env["METRICS_PROVIDERS__PROMQL__BASE_URL"]
-    assert "metrics-test-otel-collector" in env["METRICS_OTEL__EXPORTER_OTLP_ENDPOINT"]
+    assert "metrics-test-prometheus" in values["promql"]["baseUrl"]
+    assert "metrics-test-otel-collector" in values["otel"]["endpoint"]
 
 
 def test_kind_smoke_wrapper_uses_the_single_lifecycle() -> None:

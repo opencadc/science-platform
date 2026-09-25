@@ -211,6 +211,14 @@ does not own:
 Disposable test profiles may provision those dependencies to validate the
 integration. A test fixture is not a production dependency claim.
 
+In the `metrics-api` chart, the Kueue lists (`kueue.clusterQueues`,
+`kueue.namespaces`), `clusterName`, `platformName`, the Redis and cache-key
+Secret references, `promql.*`, and `otel.endpoint` are structured values. The
+chart uses the Kueue lists for RBAC and renders all of them into the
+environment. `env` passes any other `METRICS_*` setting through unchanged, and
+setting one of the rendered keys there fails the render. The chart only
+requires values; Metrics validates them at startup.
+
 ## Evidence boundary
 
 Repository tests prove only the checks they run. A local Prometheus-compatible

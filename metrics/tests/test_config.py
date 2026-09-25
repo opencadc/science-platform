@@ -142,11 +142,12 @@ def test_cache_secret_and_cluster_name_are_mandatory() -> None:
         CacheConfig.model_validate({"backend": "memory", "key_secret": _CACHE_SECRET})
 
 
-def test_cluster_name_requires_lowercase_dns() -> None:
-    """The cluster identity remains a required lower-case DNS name."""
+@pytest.mark.parametrize("name", ["Cluster-A", "cluster_a", "unknown"])
+def test_cluster_name_requires_a_real_lowercase_dns_name(name: str) -> None:
+    """The cluster identity is a required lower-case DNS name, never the sentinel."""
     with pytest.raises(ValidationError):
         Settings(
-            cluster_name="Cluster-A",
+            cluster_name=name,
             redis_url="redis://localhost:6379/0",
             cache=CacheConfig(key_secret=_CACHE_SECRET),
             providers=ProviderConfigs(

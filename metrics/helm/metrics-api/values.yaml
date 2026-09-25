@@ -42,9 +42,10 @@ platformName: canfar
 # cache identities and must match the Prometheus/Mimir cluster label.
 clusterName: ""
 
-# Additional METRICS_* settings. Kueue lists, Redis, PromQL, and OTLP are
-# rendered from the structured values below so secret-backed values cannot be
-# accidentally replaced by plaintext entries in this map.
+# Additional METRICS_* settings, passed through unchanged; Metrics validates
+# them at startup. Kueue lists, Redis, the cache key, PromQL, and OTLP come from
+# the structured values below, and setting one of their keys here fails the
+# render so a plaintext entry can never replace a Secret reference.
 env: {}
 
 kueue:
