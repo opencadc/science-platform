@@ -482,6 +482,26 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
+        # The Collector image has no shell, cat, or tar, so the smoke reads the
+        # file exporter's evidence through this reader.
+        - name: evidence
+          image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+          command: ["sh", "-c", "trap 'exit 0' TERM; while :; do sleep 3600 & wait; done"]
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          volumeMounts:
+            - name: evidence
+              mountPath: /var/lib/otel
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
       volumes:
         - name: config
           configMap:
