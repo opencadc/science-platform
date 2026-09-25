@@ -296,7 +296,7 @@ async def test_cancellation_releases_real_redis_lease(redis_clients) -> None:
     await started.wait()
     request.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await request
+        await asyncio.wait_for(request, timeout=1.0)
 
     assert await redis.get(_keys().lease) is None
     await coordinator.shutdown()
@@ -324,12 +324,12 @@ async def test_l1_terminal_invalidation_survives_redis_outage(redis_clients) -> 
         not_found=True,
     )
     with pytest.raises(CacheNotFound):
-        await coordinator.get_or_fill(IDENTITY, lambda: _never_called())
+        await coordinator.get_or_fill(IDENTITY, _never_called)
 
     await asyncio.to_thread(subprocess.run, ["docker", "pause", container], check=True)
     try:
         with pytest.raises(CacheUnavailable):
-            await coordinator.get_or_fill(IDENTITY, lambda: _never_called())
+            await coordinator.get_or_fill(IDENTITY, _never_called)
     finally:
         await asyncio.to_thread(subprocess.run, ["docker", "unpause", container], check=True)
     await coordinator.shutdown()

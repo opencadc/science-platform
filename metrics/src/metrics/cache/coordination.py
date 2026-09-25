@@ -145,6 +145,7 @@ class RedisCoordinator(Generic[Value]):
                 age_seconds=age,
             )
         except Exception:
+            # A recorder failure must not change the cache lookup outcome.
             pass
 
     def _record_lease(self, *, outcome: str, scope: str) -> None:
@@ -152,6 +153,7 @@ class RedisCoordinator(Generic[Value]):
         try:
             self._telemetry.record_lease(outcome=outcome, scope=scope)
         except Exception:
+            # Lease ownership must not depend on telemetry availability.
             pass
 
     def _record_fill(self, *, seconds: float, outcome: str, scope: str) -> None:
@@ -163,6 +165,7 @@ class RedisCoordinator(Generic[Value]):
                 scope=scope,
             )
         except Exception:
+            # Preserve the source-fill outcome if duration recording fails.
             pass
 
     async def ping(self) -> None:

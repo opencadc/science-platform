@@ -359,7 +359,7 @@ async def test_cancelled_last_waiter_detaches_before_cleanup_finishes() -> None:
     await source_started.wait()
     request.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await request
+        await asyncio.wait_for(request, timeout=1.0)
     await store.release_started.wait()
 
     retry = asyncio.create_task(coordinator.get_or_fill(IDENTITY, fill))
@@ -371,10 +371,7 @@ async def test_cancelled_last_waiter_detaches_before_cleanup_finishes() -> None:
     finally:
         store.allow_release.set()
 
-    try:
-        result = await asyncio.wait_for(retry, timeout=0.5)
-    except BaseException as exc:  # noqa: BLE001 - assert the public cancellation outcome below
-        result = exc
+    result = await asyncio.wait_for(retry, timeout=0.5)
 
     assert not retry_read_timed_out
     assert isinstance(result, CacheResult)
@@ -679,7 +676,7 @@ async def test_cancellation_releases_the_owner_lease() -> None:
     await started.wait()
     request.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await request
+        await asyncio.wait_for(request, timeout=1.0)
 
     assert not store.leases
     await coordinator.shutdown()

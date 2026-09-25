@@ -17,9 +17,6 @@ from pathlib import Path
 from metrics.dev.fixtures import apply_fixtures
 from metrics.errors import ProviderExecutionError
 from metrics.providers.promql import (
-    _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS,
-    _DEFAULT_MAX_SAMPLE_AGE_SECONDS,
-    _DEFAULT_MAX_SERIES,
     _query,
     _validate_response,
 )
@@ -57,6 +54,9 @@ _ACCOUNTING_PROFILE_CLUSTER_KINDS = "clusterrole,clusterrolebinding"
 _PROMETHEUS_READY_DEADLINE_SECONDS = 60.0
 _PROMETHEUS_READY_POLL_INTERVAL_SECONDS = 1.0
 _PROMETHEUS_REQUEST_TIMEOUT_SECONDS = 5.0
+_DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
+_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
+_DEFAULT_MAX_SERIES = 3_000
 
 
 class DevStackError(RuntimeError):
@@ -648,6 +648,7 @@ def _stop_smoke_forwards(*forwards: subprocess.Popen) -> None:
         try:
             process.terminate()
         except ProcessLookupError:
+            # The forward already exited; the wait loop below still reaps it.
             pass
     for process in forwards:
         try:
