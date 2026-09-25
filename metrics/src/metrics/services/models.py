@@ -173,6 +173,7 @@ class SessionObservation:
     has_running_pods: bool
     pods_reachable: bool = True
     running_pods_by_namespace: dict[str, frozenset[str]] = field(default_factory=dict)
+    job_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the queue count, timestamps, and observation time."""

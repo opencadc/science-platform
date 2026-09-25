@@ -75,7 +75,12 @@ class EfficiencySource(Protocol):
         """Read one Community's efficiency."""
 
     async def read_session(
-        self, session_id: str, *, start_time: datetime, window_end: datetime
+        self,
+        session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        job_names: tuple[str, ...] = (),
     ) -> EfficiencyObservation:
         """Read one Session's duration efficiency."""
 
@@ -236,7 +241,10 @@ class SnapshotLoader:
                     "session",
                     "efficiency",
                     lambda: source.read_session(
-                        session_id, start_time=start_time, window_end=observation.window_end
+                        session_id,
+                        start_time=start_time,
+                        window_end=observation.window_end,
+                        job_names=observation.job_names,
                     ),
                     self._budget(self._efficiency_timeout),
                 )

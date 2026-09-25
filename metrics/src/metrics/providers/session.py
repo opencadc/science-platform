@@ -262,6 +262,7 @@ class SessionProvider:
             has_running_pods=bool(running),
             pods_reachable=pods is not None,
             running_pods_by_namespace=running,
+            job_names=tuple(sorted({name for _namespace, name in seen})),
         )
 
     async def startup(self) -> None:

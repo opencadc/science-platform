@@ -171,7 +171,7 @@ spec:
           image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.16.0
           args:
             - --resources=pods
-            - --metric-labels-allowlist=pods=[canfar.net/username,canfar.net/community]
+            - --metric-labels-allowlist=pods=[canfar.net/username,canfar.net/community,canfar.net/id]
           ports:
             - name: http
               containerPort: 8080

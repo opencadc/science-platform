@@ -56,7 +56,6 @@ _PROMETHEUS_READY_POLL_INTERVAL_SECONDS = 1.0
 _PROMETHEUS_REQUEST_TIMEOUT_SECONDS = 5.0
 _DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
 _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
-_DEFAULT_MAX_SERIES = 3_000
 
 
 class DevStackError(RuntimeError):
@@ -525,10 +524,8 @@ def _wait_for_prometheus_readiness(process: subprocess.Popen, port: str) -> None
                 payload = json.loads(response.read())
             _validate_response(
                 payload,
-                max_series=_DEFAULT_MAX_SERIES,
                 max_sample_age_seconds=_DEFAULT_MAX_SAMPLE_AGE_SECONDS,
                 future_sample_tolerance_seconds=_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS,
-                cutoff=None,
             )
             return
         except (OSError, ProviderExecutionError, ValueError) as error:

@@ -92,6 +92,7 @@ class Sessions:
             has_running_pods=self.running,
             pods_reachable=self.pods_reachable,
             running_pods_by_namespace={"work-a": frozenset({"pod"})} if self.running else {},
+            job_names=(f"{session_id}-desktop",),
         )
 
 
@@ -136,9 +137,15 @@ class Efficiency:
         return await self._answer(f"community:{community}")
 
     async def read_session(
-        self, session_id: str, *, start_time: datetime, window_end: datetime
+        self,
+        session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        job_names: tuple[str, ...] = (),
     ) -> EfficiencyObservation:
-        return await self._answer(f"session:{session_id}:{(window_end - start_time).seconds}")
+        seconds = (window_end - start_time).seconds
+        return await self._answer(f"session:{session_id}:{seconds}:{','.join(job_names)}")
 
 
 class Recorder(MetricsRecorder):
@@ -271,7 +278,7 @@ async def test_session_reads_usage_and_efficiency_together() -> None:
     assert not snapshot.partial
     # Usage ages the report; duration efficiency does not.
     assert snapshot.created == NOW - timedelta(seconds=30)
-    assert efficiency.calls == ["session:s1:600"]
+    assert efficiency.calls == ["session:s1:600:s1-desktop"]
 
 
 async def test_session_without_running_pods_skips_usage() -> None:

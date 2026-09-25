@@ -184,7 +184,7 @@ class _SessionEfficiency:
     def __init__(self, read) -> None:
         self._read = read
 
-    async def read_session(self, session_id, *, start_time, window_end):
+    async def read_session(self, session_id, *, start_time, window_end, job_names=()):
         return await self._read(session_id)
 
 
@@ -246,6 +246,7 @@ async def test_session_provider_aggregates_jobs_and_window_times() -> None:
     assert observation.requests["memory"] == "1Gi"
     assert observation.start_time == datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     assert observation.has_running_pods is True
+    assert observation.job_names == ("app", "desktop")
 
 
 def _with_pod_spec(job: dict[str, Any], pod_spec: dict[str, Any]) -> dict[str, Any]:

@@ -447,17 +447,6 @@ async def test_invalid_json_and_response_size_fail_as_execution_errors() -> None
         await client.aclose()
 
 
-async def test_naive_cutoff_is_rejected_before_http_request() -> None:
-    calls: list[httpx.Request] = []
-    client = _client(_successful_payload(_timestamp()), calls)
-    try:
-        with pytest.raises(ProviderExecutionError, match="timezone-aware"):
-            await PromQLProvider(_settings(), client=client).read_user("ada", datetime(2025, 1, 1))
-    finally:
-        await client.aclose()
-    assert calls == []
-
-
 async def test_missing_endpoint_is_not_an_active_provider() -> None:
     calls: list[httpx.Request] = []
     client = _client(_successful_payload(_timestamp()), calls)
@@ -489,18 +478,50 @@ async def test_read_session_posts_window_end_as_query_time() -> None:
     assert body["time"] == [str(window_end.timestamp())]
 
 
-def test_session_cpu_efficiency_uses_avg_over_time_and_duration_seconds() -> None:
-    """Session CPU efficiency scales requests by the bounded window duration."""
+def test_session_efficiency_integrates_requests_only_while_pods_run() -> None:
+    """Requests are integrated on one subquery step and joined to the Running phase."""
     query = promql_module._session_query(
         session_id="sess-1",
         cluster="cluster-a",
         namespaces=["workloads"],
         duration_seconds=1800,
     )
-    assert "avg_over_time(" in query
-    assert "sum_over_time(" not in query.split("or")[0]
-    assert "* 1800" in query
-    assert "* 60" not in query
+    cpu, memory = query.split(" or ")
+    assert "increase(container_cpu_usage_seconds_total" in cpu
+    assert "[1800s:60s]" in cpu and cpu.count("[1800s:60s]") == 1
+    assert ") * 60)" in cpu  # step seconds turn the request sum into core-seconds
+    assert 'phase="Running"' in cpu and 'phase="Running"' in memory
+    assert memory.count("[1800s:60s]") == 2  # numerator and denominator share one step
+    assert "avg_over_time" not in query and "__WINDOW__" not in query
+    assert query.count('label_canfar_net_id="sess-1"') == 4  # one pod selection per term
+
+
+def test_session_selectors_are_scoped_to_the_sessions_job_pods() -> None:
+    """Every heavy selector carries the Job-name pod matcher when names are known."""
+    query = promql_module._session_query(
+        session_id="s1",
+        cluster="cluster-a",
+        namespaces=["workloads"],
+        duration_seconds=600,
+        job_names=("desktop-s1", "app.s1"),
+    )
+    pods = r'pod=~"^(?:app\\.s1|desktop\\-s1)-.+$"'  # PromQL string escaping
+    for metric in (
+        "container_cpu_usage_seconds_total",
+        "container_memory_working_set_bytes",
+        "kube_pod_container_resource_requests",
+        "kube_pod_status_phase",
+    ):
+        for selector in query.split(metric)[1:]:
+            assert selector.split("}", 1)[0].count(pods) == 1, metric
+    assert "pod=~" not in query.split("kube_pod_labels")[1].split("}", 1)[0]
+
+
+def test_session_window_is_at_least_one_step_and_at_most_six_hours() -> None:
+    def window(seconds: int) -> str:
+        return promql_module._render_window(seconds)
+
+    assert (window(5), window(600), window(10**6)) == ("60s", "600s", "21600s")
 
 
 def test_session_sample_age_is_validated_against_evaluation_time() -> None:
@@ -514,9 +535,7 @@ def test_session_sample_age_is_validated_against_evaluation_time() -> None:
     with pytest.raises(ProviderExecutionError, match="stale or future"):
         promql_module._validate_response(
             payload,
-            max_series=10,
             max_sample_age_seconds=600,
             future_sample_tolerance_seconds=5,
-            cutoff=None,
             evaluation_time=evaluation_time,
         )

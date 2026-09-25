@@ -220,7 +220,9 @@ class FakeEfficiency:
     async def read_community(self, community: str) -> EfficiencyObservation:
         return await self._answer()
 
-    async def read_session(self, session_id, *, start_time, window_end) -> EfficiencyObservation:
+    async def read_session(
+        self, session_id, *, start_time, window_end, job_names=()
+    ) -> EfficiencyObservation:
         return await self._answer()
 
 

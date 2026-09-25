@@ -51,7 +51,6 @@ _MAX_KUBE_REQUEST_TIMEOUT_SECONDS = 300.0
 _MAX_PROMQL_REQUEST_TIMEOUT_SECONDS = 300.0
 _MAX_PROMQL_SAMPLE_AGE_SECONDS = 7 * 24 * 60 * 60
 _MAX_PROMQL_FUTURE_TOLERANCE_SECONDS = 60 * 60
-_MAX_PROMQL_SERIES = 10_000
 _MAX_REDIS_COMMAND_TIMEOUT_SECONDS = 30.0
 _MAX_CACHE_FILL_TIMEOUT_SECONDS = 300.0
 _MAX_CACHE_COLD_GET_TIMEOUT_SECONDS = 600.0
@@ -254,7 +253,6 @@ class PromQLProviderConfig(BaseModel):
     future_sample_tolerance_seconds: int = Field(
         default=30, ge=0, le=_MAX_PROMQL_FUTURE_TOLERANCE_SECONDS
     )
-    max_series: int = Field(default=3_000, gt=0, le=_MAX_PROMQL_SERIES)
     max_response_bytes: int = Field(
         default=_PROMQL_DEFAULT_MAX_RESPONSE_BYTES,
         gt=0,
@@ -494,6 +492,7 @@ RETIRED_ENVIRONMENT = {
     "METRICS_PROVIDERS__KUEUE__TOKEN_FILE": None,
     "METRICS_PROVIDERS__KUEUE__CA_FILE": None,
     "METRICS_PROVIDERS__KUEUE__KUBE_CLUSTERQUEUE_PATH": None,
+    "METRICS_PROVIDERS__PROMQL__MAX_SERIES": None,
 }
 """Retired ``METRICS_*`` names mapped to their replacement, or ``None`` when removed."""
 
