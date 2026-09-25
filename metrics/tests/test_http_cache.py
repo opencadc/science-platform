@@ -29,6 +29,13 @@ def test_success_headers_report_age_and_remaining_fresh_time() -> None:
     )
 
 
+def test_ttl_turns_negative_as_soon_as_the_fresh_window_ends() -> None:
+    headers = metrics_success_cache_headers(
+        age_seconds=300.2, fresh_seconds=300, cached=True, cache_available=True
+    )
+    assert headers["Age"] == "300" and headers["Cache-Status"] == "metrics; hit; ttl=-1"
+
+
 def test_success_headers_identify_stale_and_unavailable_snapshots() -> None:
     stale = metrics_success_cache_headers(
         age_seconds=40, fresh_seconds=30, cached=True, cache_available=True

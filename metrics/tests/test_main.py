@@ -26,8 +26,15 @@ def test_run_configures_application_logging_before_uvicorn(
         log_level=configured_level,
     )
     default_log_config = deepcopy(main_module.uvicorn.config.LOGGING_CONFIG)
+    events: list[str] = []
+    monkeypatch.setattr(main_module, "configuration_errors", lambda _environ: [])
     monkeypatch.setattr(main_module, "Settings", lambda: settings)
-    monkeypatch.setattr(main_module, "create_app", lambda settings: object())
+    monkeypatch.setattr(
+        main_module.logging.config, "dictConfig", lambda _config: events.append("logging")
+    )
+    monkeypatch.setattr(
+        main_module, "create_app", lambda settings: events.append("app") or object()
+    )
 
     def fake_uvicorn_run(_app: object, **kwargs: object) -> None:
         """Observe application logging configuration at Uvicorn startup."""
@@ -47,6 +54,7 @@ def test_run_configures_application_logging_before_uvicorn(
 
     main_module.run()
 
+    assert events == ["logging", "app"]  # startup log lines are not dropped
     assert main_module.uvicorn.config.LOGGING_CONFIG == default_log_config
 
 

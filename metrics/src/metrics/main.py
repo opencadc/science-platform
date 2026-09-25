@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging.config
 import os
 import sys
 from collections.abc import Mapping
@@ -59,6 +60,8 @@ def run() -> None:
         "level": stdlib_level.upper(),
         "propagate": False,
     }
+    # Configure logging before the app is built so startup lines are kept.
+    logging.config.dictConfig(log_config)
     app = create_app(settings=settings)
     uvicorn.run(
         app,

@@ -7,6 +7,8 @@ response. The server's ``Date`` header comes from the ASGI server.
 
 from __future__ import annotations
 
+import math
+
 
 def metrics_success_cache_headers(
     *,
@@ -31,7 +33,7 @@ def metrics_success_cache_headers(
     Returns:
         HTTP response headers describing the snapshot and cache outcome.
     """
-    ttl = int(fresh_seconds - age_seconds)
+    ttl = math.floor(fresh_seconds - age_seconds)
     if not cache_available:
         cache_status = f'metrics; hit; ttl={ttl}; detail="redis-unavailable"'
     elif cached:
@@ -40,6 +42,6 @@ def metrics_success_cache_headers(
         cache_status = f"metrics; fwd=uri-miss; ttl={ttl}"
     return {
         "Cache-Control": "no-store",
-        "Age": str(max(0, int(age_seconds))),
+        "Age": str(max(0, math.floor(age_seconds))),
         "Cache-Status": cache_status,
     }
