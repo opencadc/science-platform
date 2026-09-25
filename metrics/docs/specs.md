@@ -569,6 +569,7 @@ Skaha is the production consumer:
 | `schemas` | Public `Metrics` and `Status` models |
 | `telemetry` | Optional OTLP application metrics |
 | `http_cache` | `Age` and `Cache-Status` headers |
+| `names` | Kubernetes label-value and DNS-label grammars shared by settings, routes, and providers |
 | `dev` | Local kind lifecycle (development only, not in the wheel) |
 
 There is no accounting package, Cohort provider, Pod-inventory-as-primary

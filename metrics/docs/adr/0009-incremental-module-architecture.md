@@ -9,7 +9,7 @@ module.
 
 Evolve `metrics/src/metrics` in place. Keep the explicit `api`, `core`,
 `providers`, `schemas`, `services`, `cache`, and `telemetry` seams, plus
-top-level `http_cache`, `errors`, and `dev` helpers. The runtime composes one
+top-level `http_cache`, `errors`, `names`, and `dev` helpers. The runtime composes one
 deep `get(subject)` use case that hides source selection, aggregation, cache
 freshness, optional efficiency or usage, and condition inputs.
 
