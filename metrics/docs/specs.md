@@ -514,7 +514,7 @@ the pod UID (or host name):
 | Instrument | Unit | Attributes |
 | --- | --- | --- |
 | `canfar.metrics.compute.duration` | s | `metrics.scope`, `result.status` |
-| `canfar.metrics.cache.lookups` | 1 | `cache.backend`, `cache.result` (`hit`, `stale`, `miss`), `metrics.scope` |
+| `canfar.metrics.cache.lookups` | 1 | `cache.backend`, `cache.result` (`hit`, `stale`, `miss`, `invalid` for a payload that failed authentication or decoding), `metrics.scope` |
 | `canfar.metrics.cache.age` | s | as lookups |
 | `canfar.metrics.cache.leases` | 1 | `lease.outcome` (`acquired`, `contended`, `cooldown`, `error`), `metrics.scope` |
 | `canfar.metrics.cache.fill.duration` | s | `result.status` (`ok`, `not_found`, `timeout`, `error`, `cancelled`), `metrics.scope` |

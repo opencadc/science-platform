@@ -324,7 +324,9 @@ class MetricsRuntime:
                 await asyncio.gather(*(cache.ping() for cache in self._caches().values()))
             self._started = True
             self._telemetry.record_readiness(False)
-            if self._efficiency is not None:
+            if self._efficiency is None:
+                _logger.info("PromQL efficiency disabled: no endpoint configured")
+            else:
                 await self._probe("PromQL efficiency", self._efficiency.startup)
             await asyncio.gather(
                 self._probe("User LocalQueue", self._kueue.probe_local_queues),

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import TypeAdapter
 
 import metrics.core.runtime as runtime_module
 from metrics.cache import FRESHNESS_POLICIES, CacheIdentity, RedisUnavailable
@@ -22,6 +25,7 @@ from metrics.errors import ProviderUnavailableError, RuntimeStartupError
 from metrics.providers.promql import PromQLProvider
 from metrics.services.metrics import MetricsService
 from metrics.services.models import (
+    CachedSnapshot,
     CommunityObservation,
     PlatformObservation,
     SessionObservation,
@@ -71,6 +75,30 @@ def test_an_endpoint_enables_the_promql_provider() -> None:
 def test_runtime_cache_schema_revision_separates_two_stage_payloads() -> None:
     """Two-stage payloads and lease markers live in a keyspace older pods never read."""
     assert runtime_module._SCHEMA_REVISION == "9"  # noqa: SLF001
+
+
+def _without_prose(node: object) -> object:
+    """Drop titles and descriptions so docstring edits do not count as payload changes."""
+    if isinstance(node, dict):
+        return {
+            key: _without_prose(value)
+            for key, value in node.items()
+            if key not in {"title", "description"}
+        }
+    if isinstance(node, list):
+        return [_without_prose(value) for value in node]
+    return node
+
+
+def test_stored_payload_shape_is_pinned_to_the_schema_revision() -> None:
+    """A change to the cached payload's shape must come with a schema revision bump.
+
+    If this fails, bump ``_SCHEMA_REVISION`` in ``core/runtime.py`` (old and new
+    pods then use disjoint keys) and record the new revision and digest here.
+    """
+    schema = _without_prose(TypeAdapter(CachedSnapshot).json_schema())
+    digest = hashlib.sha256(json.dumps(schema, sort_keys=True).encode()).hexdigest()[:16]
+    assert (runtime_module._SCHEMA_REVISION, digest) == ("9", "7d400942ff584de9")  # noqa: SLF001
 
 
 def test_runtime_lease_expires_before_cold_waiters_give_up() -> None:

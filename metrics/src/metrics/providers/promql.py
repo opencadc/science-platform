@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -20,6 +21,7 @@ from metrics.services.resources import MEASURED_RESOURCES
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 
+_logger = logging.getLogger(__name__)
 _CPU_USAGE_METRIC = "container_cpu_usage_seconds_total"
 _MEMORY_USAGE_METRIC = "container_memory_working_set_bytes"
 _POD_REQUEST_METRIC = "kube_pod_container_resource_requests"
@@ -453,11 +455,18 @@ class PromQLProvider:
 
     async def startup(self) -> None:
         """Create the provider-owned HTTP client when an endpoint is configured."""
-        if self._endpoint is not None and self._client is None:
+        if self._endpoint is None:
+            return
+        if self._client is None:
             self._client = httpx.AsyncClient(
                 headers=self._headers,
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
+        _logger.info(
+            "PromQL efficiency enabled host=%s timeout=%ss (capped by the fill deadline)",
+            urlsplit(self._endpoint).netloc,
+            _REQUEST_TIMEOUT_SECONDS,
+        )
 
     async def shutdown(self) -> None:
         """Close only an HTTP client owned by this provider."""

@@ -64,7 +64,8 @@ repos:
             uv run ty check
         language: system
         pass_filenames: false
-        files: ^metrics/(src/|tests/|pyproject\.toml$)
+        # ty checks src only (pyproject [tool.ty.src]).
+        files: ^metrics/(src/|pyproject\.toml$|uv\.lock$)
 
       - id: metrics-pytest-fast
         name: metrics fast TestClient smoke

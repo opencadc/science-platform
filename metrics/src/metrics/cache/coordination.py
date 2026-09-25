@@ -287,6 +287,7 @@ class RedisCoordinator(Generic[Value]):
         delay = self._poll_min
         force = False
         first = True
+        rejected = False
         while True:
             token = uuid.uuid4().hex
             # A local owner already holds (or just settled) the lease; never race it.
@@ -321,6 +322,7 @@ class RedisCoordinator(Generic[Value]):
                     # Only a new key secret, a foreign writer, or tampering
                     # produces this; the claimer overwrites it once.
                     _logger.warning("cache payload rejected scope=%s; refilling", scope)
+            rejected = rejected or seen.unreadable
             if seen.unreadable and not seen.claimed and not force:
                 force = True  # overwrite through one owner; never spin on it
                 continue
@@ -353,7 +355,10 @@ class RedisCoordinator(Generic[Value]):
 
             if first:
                 self._telemetry.record_cache_lookup(
-                    backend=self.backend_name, result="miss", scope=scope, age_seconds=None
+                    backend=self.backend_name,
+                    result="invalid" if rejected else "miss",
+                    scope=scope,
+                    age_seconds=None,
                 )
             if seen.claimed:
                 owner = self._start_owner(keys, fill, scope, token)

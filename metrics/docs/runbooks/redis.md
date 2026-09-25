@@ -28,6 +28,7 @@ readiness.
 | --- | --- |
 | `Redis is unavailable at startup error=…` then `Application startup validation failed; see configuration docs` | The pod could not reach Redis while starting and exits |
 | `metrics runtime ready` | This pod latched readiness |
+| `PromQL efficiency enabled host=… timeout=5s` or `PromQL efficiency disabled: no endpoint configured` | Whether this pod reads efficiency |
 | `metrics runtime not ready: dependency validation failed error=…` | A readiness validation failed; the error names exception types, HTTP status, and Metrics' own messages only |
 | `User LocalQueue` / `Session Job` / `PromQL efficiency` `access could not be verified at startup error=…` | A startup probe failed; readiness is unaffected, but that surface will likely return 503 or `PartialData` |
 | `cache fill failed scope=<surface> category=<category> error=…` | One fill failed; its owner logs it once, and no replica retries until the failure cooldown ends |

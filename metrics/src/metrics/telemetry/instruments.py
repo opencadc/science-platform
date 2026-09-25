@@ -11,9 +11,9 @@ _SECONDS_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 
 _REDIS_BUCKETS = (0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5)
 # Cache ages span the surface windows: Session 30/60 s up to Platform 300/600 s.
 _AGE_BUCKETS = (1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 180.0, 240.0, 300.0, 450.0, 600.0)
-CacheLookupResult = Literal["hit", "miss", "stale"]
+CacheLookupResult = Literal["hit", "miss", "stale", "invalid"]
 _SCOPES = frozenset({"platform", "user", "community", "session", "other"})
-_CACHE_RESULTS = frozenset({"hit", "miss", "stale", "other"})
+_CACHE_RESULTS = frozenset({"hit", "miss", "stale", "invalid", "other"})
 _STATUSES = frozenset(
     {"ok", "error", "not_found", "cancelled", "timeout", "partial", "degraded", "other"}
 )

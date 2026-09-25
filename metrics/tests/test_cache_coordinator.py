@@ -429,7 +429,8 @@ async def test_lost_claim_reply_is_released_and_the_next_request_fills() -> None
 
 async def test_unreadable_value_is_overwritten_by_one_fill(caplog) -> None:
     redis = FakeAsyncRedis()
-    replicas = [replica(redis)[1] for _ in range(3)]
+    recorder = Recorder()
+    replicas = [replica(redis, telemetry=recorder)[1] for _ in range(3)]
     keys = replicas[0]._keys(IDENTITY)
     await redis.set(keys.value, b"v" + b"0" * 64 + b"{}", px=900)  # fresh-looking forgery
     source = Source(delay=0.05)
@@ -439,6 +440,9 @@ async def test_unreadable_value_is_overwritten_by_one_fill(caplog) -> None:
     assert source.calls == 1 and {r.value for r in results} == {Snap(1)}
     rejected = [r for r in caplog.records if "cache payload rejected" in r.getMessage()]
     assert len(rejected) == 1
+    # One lookup per replica flight; the claimer's reports the rejected payload.
+    results = [result for result, _ in recorder.lookups]
+    assert len(results) == 3 and "invalid" in results
 
 
 async def test_schema_revisions_use_disjoint_keys() -> None:
