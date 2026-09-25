@@ -25,6 +25,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Generic, Protocol, TypeVar
@@ -50,6 +51,17 @@ Value = TypeVar("Value")
 
 _logger = logging.getLogger(__name__)
 _MAX_CHAIN = 6
+_FILL_DEADLINE: ContextVar[float | None] = ContextVar("metrics_fill_deadline", default=None)
+
+
+def fill_budget() -> float | None:
+    """Return the seconds left before the running source fill is cancelled.
+
+    Returns ``None`` outside a fill. Fills use it to bound optional work so it
+    never turns a complete primary read into a failed fill.
+    """
+    deadline = _FILL_DEADLINE.get()
+    return None if deadline is None else deadline - asyncio.get_running_loop().time()
 
 
 class _CoordinatorStore(Protocol[Value]):
@@ -394,12 +406,15 @@ class RedisCoordinator(Generic[Value]):
         """Fill once under the lease and leave through exactly one fenced exit."""
         started = self._now()
         outcome = "ok"
+        deadline = _FILL_DEADLINE.set(started + self._fill_timeout)
         try:
             try:
                 async with asyncio.timeout(self._fill_timeout):
                     value = await fill()
             except TimeoutError as exc:
                 raise CacheFillTimeout() from exc
+            finally:
+                _FILL_DEADLINE.reset(deadline)
         except asyncio.CancelledError:
             outcome = "cancelled"
             self._release_later(keys, token)

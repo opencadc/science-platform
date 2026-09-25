@@ -116,7 +116,7 @@ def test_promql_endpoint_alone_controls_efficiency_activation() -> None:
 def test_cache_secret_and_cluster_name_are_mandatory() -> None:
     """Redis integrity and cache identity inputs cannot use production defaults."""
     assert _settings().cluster_name == "cluster-a"
-    assert _settings().redis_url == "redis://localhost:6379/0"
+    assert _settings().redis_url.get_secret_value() == "redis://localhost:6379/0"
     assert _settings().cache.key_secret.get_secret_value() == _CACHE_SECRET
     with pytest.raises(ValidationError):
         Settings(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Protocol, TypeVar
 
-from metrics.cache.coordination import RedisCoordinator, describe_failure
+from metrics.cache.coordination import RedisCoordinator, describe_failure, fill_budget
 from metrics.cache.memory import MemorySnapshots
 from metrics.cache.models import (
     FRESHNESS_POLICIES,
@@ -78,4 +78,5 @@ __all__ = [
     "StoredSnapshot",
     "cache_keys",
     "describe_failure",
+    "fill_budget",
 ]

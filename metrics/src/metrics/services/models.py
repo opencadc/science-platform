@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -95,7 +94,7 @@ def _decimal_plain_length(result: Decimal, digits: tuple[int, ...], exponent: in
 
 @dataclass(frozen=True, slots=True)
 class MetricsSubject:
-    """Select one platform, user, or community report."""
+    """Select one Platform, User, Community, or Session report."""
 
     kind: MetricsSurface
     value: str = ""
@@ -215,138 +214,44 @@ class CommunityObservation:
 
 @dataclass(frozen=True, slots=True)
 class CachedSnapshot:
-    """Store one observation and optional usage or efficiency in one cache fill."""
+    """Store one observation and its optional enrichment from one cache fill.
+
+    Attributes:
+        observation: The primary source observation.
+        created: Conservative report time: the oldest timestamp among the
+            observation and any usage or instant efficiency it carries.
+        efficiency: Optional CPU and memory efficiency.
+        usage: Optional live Session usage.
+        partial: Whether an optional source that should have contributed failed.
+    """
 
     observation: PlatformObservation | UserObservation | CommunityObservation | SessionObservation
     created: datetime
     efficiency: EfficiencyObservation | None = None
     usage: dict[str, str] | None = None
-    ready: bool = True
-    ready_reason: Literal["Available", "PartialData"] = "Available"
+    partial: bool = False
 
     def __post_init__(self) -> None:
-        """Validate cache timestamp and optional readiness state."""
+        """Normalise the report timestamp to UTC."""
         object.__setattr__(self, "created", _normalise_observed_at(self.created))
-        if not self.ready and self.ready_reason != "PartialData":
-            raise ValueError("unready cache snapshots must use PartialData")
-        if self.ready and self.ready_reason != "Available":
-            raise ValueError("ready cache snapshots must use Available")
 
 
-@dataclass(slots=True)
-class SurfaceReadiness:
-    """Track source, snapshot, and cache availability for one surface."""
+@dataclass(frozen=True, slots=True)
+class Report:
+    """Return one served snapshot with its cache provenance.
 
-    source_reachable: bool = False
-    snapshot_complete: bool = False
-    snapshot_serviceable: bool = False
-    cache_available: bool = True
+    Attributes:
+        snapshot: The cached observation and optional enrichment.
+        cached: Whether a stored snapshot answered the request.
+        stale: Whether the snapshot is past its fresh window.
+        cache_available: Whether Redis answered the lookup.
+        age_seconds: Snapshot age measured from the start of its fill.
+        fresh_seconds: Fresh window of the snapshot's surface.
+    """
 
-    @property
-    def ready(self) -> bool:
-        """Return whether this surface has a safe serving path."""
-        return self.cache_available and (
-            self.source_reachable or (self.snapshot_complete and self.snapshot_serviceable)
-        )
-
-
-@dataclass(slots=True)
-class ReadinessState:
-    """Coordinate process readiness without probing dependencies on demand."""
-
-    _surfaces: dict[MetricsSurface, SurfaceReadiness]
-    _started: bool = False
-
-    def __init__(self, surfaces: Iterable[MetricsSurface] = ("platform",)) -> None:
-        """Create readiness state for the configured report surfaces."""
-        self._surfaces = {surface: SurfaceReadiness() for surface in surfaces}
-
-    @property
-    def surfaces(self) -> tuple[MetricsSurface, ...]:
-        """Return the tracked report surfaces."""
-        return tuple(self._surfaces)
-
-    @property
-    def ready(self) -> bool:
-        """Return Platform serviceability with every shared cache available."""
-        platform = self._surfaces.get("platform")
-        return self._started and platform is not None and platform.ready and self.cache_available
-
-    @property
-    def cache_available(self) -> bool:
-        """Return whether every tracked shared cache is available."""
-        return bool(self._surfaces) and all(
-            surface.cache_available for surface in self._surfaces.values()
-        )
-
-    def start(self) -> None:
-        """Mark the runtime as serving."""
-        self._started = True
-
-    def stop(self) -> None:
-        """Mark the runtime stopped and clear dependency observations."""
-        self._started = False
-        for surface in self._surfaces.values():
-            surface.source_reachable = False
-            surface.snapshot_complete = False
-            surface.snapshot_serviceable = False
-            surface.cache_available = False
-
-    def mark_source(self, surface: MetricsSurface, *, reachable: bool) -> None:
-        """Record source reachability for one report surface."""
-        self._surfaces[surface].source_reachable = reachable
-
-    def mark_snapshot(
-        self,
-        surface: MetricsSurface,
-        *,
-        complete: bool,
-        serviceable: bool,
-    ) -> None:
-        """Record whether a complete serviceable snapshot is available."""
-        state = self._surfaces[surface]
-        state.snapshot_complete = complete
-        state.snapshot_serviceable = serviceable
-
-    def mark_cache(self, surface: MetricsSurface, *, available: bool) -> None:
-        """Record cache availability for one report surface."""
-        self._surfaces[surface].cache_available = available
-
-
-@dataclass(slots=True)
-class MetricsResult:
-    """Return an observation with cache and readiness provenance."""
-
-    observation: PlatformObservation | UserObservation | CommunityObservation | SessionObservation
-    created: datetime
+    snapshot: CachedSnapshot
     cached: bool
-    stale: bool = False
-    cache_available: bool = True
-    efficiency: EfficiencyObservation | None = None
-    usage: dict[str, str] | None = None
-    ready: bool = True
-    ready_reason: Literal["Available", "PartialData"] = "Available"
-    age_seconds: float = 0.0
-
-    @property
-    def ready_condition(
-        self,
-    ) -> tuple[Literal["True", "False"], Literal["Available", "PartialData", "StaleData"]]:
-        """Return the public Ready condition for this result."""
-        if self.stale:
-            return "False", "StaleData"
-        return ("True", "Available") if self.ready else ("False", self.ready_reason)
-
-    @property
-    def cached_condition(
-        self,
-    ) -> tuple[
-        Literal["True", "False", "Unknown"],
-        Literal["FreshHit", "StaleHit", "Refreshed", "RedisUnavailable"],
-    ]:
-        """Return the public Cached condition for this result."""
-        if not self.cache_available:
-            return "Unknown", "RedisUnavailable"
-        if self.stale:
-            return "True", "StaleHit"
-        return ("True", "FreshHit") if self.cached else ("False", "Refreshed")
+    stale: bool
+    cache_available: bool
+    age_seconds: float
+    fresh_seconds: float

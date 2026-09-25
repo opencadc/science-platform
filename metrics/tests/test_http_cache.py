@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from metrics.api.v1alpha1.routes import router
 from metrics.http_cache import metrics_success_cache_headers
-from metrics.services.models import MetricsResult, PlatformObservation
+from metrics.services.models import CachedSnapshot, PlatformObservation, Report
 
 
 def test_success_headers_report_age_and_remaining_fresh_time() -> None:
@@ -50,26 +50,24 @@ def test_conditional_header_does_not_suppress_metrics_body() -> None:
     """A conditional request still receives the complete current report."""
     created = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-    async def get_platform(_subject) -> MetricsResult:
-        return MetricsResult(
-            observation=PlatformObservation(
-                cluster="cluster-a",
-                capacity={"cpu": "4"},
-                allocated={"cpu": "2"},
-                reserving_workloads=3,
-                observed_at=created,
-            ),
-            created=created,
+    async def get_platform(_subject) -> Report:
+        observation = PlatformObservation(
+            cluster="cluster-a",
+            capacity={"cpu": "4"},
+            allocated={"cpu": "2"},
+            reserving_workloads=3,
+            observed_at=created,
+        )
+        return Report(
+            snapshot=CachedSnapshot(observation=observation, created=created),
             cached=True,
+            stale=False,
+            cache_available=True,
             age_seconds=12,
+            fresh_seconds=300,
         )
 
-    runtime = SimpleNamespace(
-        metrics_service=SimpleNamespace(
-            get=get_platform,
-            cache_ttl_seconds=300,
-        )
-    )
+    runtime = SimpleNamespace(metrics_service=SimpleNamespace(get=get_platform))
     app = FastAPI()
     app.state.runtime = runtime
     app.include_router(router)

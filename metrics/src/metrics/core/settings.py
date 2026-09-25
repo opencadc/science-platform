@@ -435,7 +435,7 @@ class Settings(BaseSettings):
     providers: ProviderConfigs
     cache: CacheConfig = Field(default_factory=CacheConfig)
     otel: OTelConfig = Field(default_factory=OTelConfig)
-    redis_url: str
+    redis_url: SecretStr
     redis_key_prefix: str = "metrics:"
 
     @field_validator("host")
@@ -471,9 +471,9 @@ class Settings(BaseSettings):
 
     @field_validator("redis_url")
     @classmethod
-    def _validate_redis(cls, value: str) -> str:
-        """Validate the configured Redis URL."""
-        return _validate_redis_url(value)
+    def _validate_redis(cls, value: SecretStr) -> SecretStr:
+        """Validate the configured Redis URL without exposing its credentials."""
+        return SecretStr(_validate_redis_url(value.get_secret_value()))
 
     @field_validator("redis_key_prefix")
     @classmethod

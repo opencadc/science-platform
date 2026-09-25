@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation, ROUND_UP, localcontext
-from typing import Literal
-
 from metrics.errors import ProviderExecutionError
 
 
@@ -114,7 +112,7 @@ def _validate_resource_amount(resource_name: str, value: object) -> Decimal:
     return decimal_value
 
 
-def _plain_decimal(value: Decimal) -> str:
+def plain_decimal(value: Decimal) -> str:
     """Render a bounded Decimal without exponent notation."""
     if value.is_zero():
         return "0"
@@ -140,7 +138,7 @@ def _plain_decimal(value: Decimal) -> str:
 def format_resource_amount(resource_name: str, value: object) -> str:
     """Format one public-unit amount for the Metrics response."""
     decimal_value = _validate_resource_amount(resource_name, value)
-    text = _plain_decimal(decimal_value)
+    text = plain_decimal(decimal_value)
     return f"{text}Gi" if resource_name.lower() in _STORAGE_RESOURCES else text
 
 
@@ -155,10 +153,3 @@ def merge_resource_totals(target: dict[str, Decimal], name: str, delta: object) 
         )
         total = current + increment
     target[name] = _validate_resource_amount(name, total)
-
-
-RESOURCE_UNITS: dict[str, Literal["cores", "GiB", "units"]] = {
-    "cpu": "cores",
-    "memory": "GiB",
-    "nvidia.com/gpu": "units",
-}

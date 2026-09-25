@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 StatusReason = Literal[
     "BadRequest",
     "NotFound",
-    "Invalid",
+    "MethodNotAllowed",
     "ServiceUnavailable",
     "InternalError",
 ]
