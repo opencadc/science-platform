@@ -55,7 +55,9 @@ async def test_forbidden_is_one_request_with_a_sanitized_status_error() -> None:
     assert denied.value.status_code == 403 and len(api.calls) == 1
     assert "bob" not in str(denied.value) and api.reauthentications == 0
     assert isinstance(denied.value, ProviderUnavailableError)
-    assert describe_failure(denied.value) == "KubeStatusError(403)"
+    assert describe_failure(denied.value) == (
+        "KubeStatusError(403): ClusterQueue request returned HTTP 403"
+    )
 
 
 async def test_unauthorized_refreshes_the_token_in_place_and_retries_once() -> None:

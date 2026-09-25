@@ -580,6 +580,18 @@ def test_failure_description_names_types_and_http_status_only() -> None:
         description = describe_failure(outer)
     assert description == "ValueError <- ServerError(403)"
 
+    from metrics.errors import ProviderExecutionError
+
+    try:
+        try:
+            raise ServerError("clusterqueues bob is forbidden")
+        except ServerError as exc:
+            raise ProviderExecutionError("PromQL returned no efficiency series") from exc
+    except ProviderExecutionError as own:
+        assert describe_failure(own) == (
+            "ProviderExecutionError: PromQL returned no efficiency series <- ServerError(403)"
+        )
+
 
 # ---------------------------------------------------------------- property: R2
 

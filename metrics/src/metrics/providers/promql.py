@@ -257,8 +257,7 @@ def _session_query(
         f"and on ({_JOIN_LABELS}) {running}"
     )
     memory_used = (
-        f"sum(sum_over_time(({working_set})[{window}:{step}]) "
-        f"and on ({_JOIN_LABELS}) {selected})"
+        f"sum(sum_over_time(({working_set})[{window}:{step}]) and on ({_JOIN_LABELS}) {selected})"
     )
     cpu_ratio = f"({cpu_used}) / ({requested('cpu', 'core')} * {_SUBQUERY_STEP_SECONDS})"
     memory_ratio = f"({memory_used}) / ({requested('memory', 'byte')})"

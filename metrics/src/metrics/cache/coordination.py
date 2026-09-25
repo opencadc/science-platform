@@ -51,6 +51,7 @@ Value = TypeVar("Value")
 
 _logger = logging.getLogger(__name__)
 _MAX_CHAIN = 6
+_MAX_MESSAGE = 160
 _FILL_DEADLINE: ContextVar[float | None] = ContextVar("metrics_fill_deadline", default=None)
 
 
@@ -129,10 +130,12 @@ class _Outcome(Generic[Value]):
 
 
 def describe_failure(exc: BaseException) -> str:
-    """Summarise an exception chain by type and HTTP status, never by message.
+    """Summarise an exception chain without exposing subject values.
 
-    Messages can carry subject values, so only exception types and the HTTP
-    status of any upstream response are rendered.
+    Each link is its type and the HTTP status of any upstream response.
+    Metrics' own exceptions also carry their message, which is a fixed
+    description by construction; third-party messages can embed URLs and
+    label selectors, so they are never rendered.
     """
     parts: list[str] = []
     seen: set[int] = set()
@@ -142,8 +145,12 @@ def describe_failure(exc: BaseException) -> str:
         status = getattr(current, "status_code", None)
         if status is None:
             status = getattr(getattr(current, "response", None), "status_code", None)
-        name = type(current).__name__
-        parts.append(f"{name}({status})" if isinstance(status, int) else name)
+        part = type(current).__name__
+        if isinstance(status, int):
+            part += f"({status})"
+        if type(current).__module__.startswith("metrics.") and str(current):
+            part += f": {str(current)[:_MAX_MESSAGE]}"
+        parts.append(part)
         current = current.__cause__ or current.__context__
     return " <- ".join(parts)
 
