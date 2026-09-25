@@ -14,8 +14,9 @@ checks.
 - Helm
 - Python 3.13 and `uv`
 
-Run commands from `metrics/`. Use the repository's pinned kind/Kubernetes and
-Kueue versions for CI-equivalent checks.
+Run commands from `metrics/`. kind 0.32.0 is the minimum supported version (newer
+releases are accepted). Use the repository's pinned Kubernetes node image and
+Kueue version for CI-equivalent checks.
 
 ## Fast local loop
 

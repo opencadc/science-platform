@@ -139,9 +139,10 @@ def assert_safe_context() -> None:
 def _ensure_cluster() -> None:
     """Create only the approved cluster, or verify the existing one."""
     version = _output(["kind", "version"])
-    match = re.search(r"\bv?(\d+\.\d+\.\d+)\b", version)
-    if not match or match.group(1) != KIND_VERSION:
-        raise DevStackError(f"kind {KIND_VERSION} required; found {version}")
+    match = re.search(r"\bv?(\d+)\.(\d+)\.(\d+)\b", version)
+    minimum = tuple(int(part) for part in KIND_VERSION.split("."))
+    if not match or tuple(int(part) for part in match.groups()) < minimum:
+        raise DevStackError(f"kind >= {KIND_VERSION} required; found {version}")
     _run(["docker", "info"], capture=True)
     if KIND_CLUSTER not in _clusters():
         _run(

@@ -112,6 +112,37 @@ def test_local_stack_versions_and_scope_are_pinned() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("reported", "accepted"),
+    [
+        ("kind v0.31.9 go1.24.0 linux/amd64", False),
+        ("kind v0.32.0 go1.24.0 linux/amd64", True),
+        ("kind v0.33.0 go1.25.0 darwin/arm64", True),
+        ("kind v1.0.0 go1.26.0 linux/amd64", True),
+    ],
+)
+def test_kind_version_is_a_minimum(
+    monkeypatch: pytest.MonkeyPatch, reported: str, accepted: bool
+) -> None:
+    def output(command: list[str]) -> str:
+        if command == ["kind", "version"]:
+            return reported
+        raise AssertionError("stop after the version gate")
+
+    monkeypatch.setattr(stack, "_output", output)
+    monkeypatch.setattr(
+        stack,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("version gate passed")),
+    )
+    if accepted:
+        with pytest.raises(AssertionError, match="version gate passed"):
+            stack._ensure_cluster()
+    else:
+        with pytest.raises(stack.DevStackError, match=r"kind >= 0\.32\.0 required"):
+            stack._ensure_cluster()
+
+
 def test_metrics_dev_has_one_supported_lifecycle() -> None:
     parser = build_parser()
     assert not hasattr(parser.parse_args(["up"]), "profile")
