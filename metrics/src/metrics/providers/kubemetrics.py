@@ -20,6 +20,7 @@ from metrics.providers.kube import (
 )
 from metrics.services.models import SessionObservation, SessionUsageObservation
 from metrics.services.resources import (
+    MEASURED_RESOURCES,
     format_resource_amount,
     merge_resource_totals,
     parse_resource_amount,
@@ -28,7 +29,6 @@ from metrics.services.resources import (
 
 _METRICS_API_VERSION = "metrics.k8s.io/v1beta1"
 _SESSION_LABEL = "canfar.net/id"
-_USAGE_RESOURCES = ("cpu", "memory")
 
 
 def _container_usage(container: dict[str, Any]) -> dict[str, Decimal]:
@@ -37,7 +37,7 @@ def _container_usage(container: dict[str, Any]) -> dict[str, Decimal]:
     if not isinstance(usage, dict):
         return {}
     totals: dict[str, Decimal] = {}
-    for resource_name in _USAGE_RESOURCES:
+    for resource_name in sorted(MEASURED_RESOURCES):
         raw = usage.get(resource_name)
         if raw is not None:
             merge_resource_totals(totals, resource_name, parse_resource_amount(resource_name, raw))

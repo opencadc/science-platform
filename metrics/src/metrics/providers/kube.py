@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any, TypeVar
@@ -23,8 +22,9 @@ import kr8s
 import kr8s.asyncio
 
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
+from metrics.names import LABEL_VALUE
+from metrics.services.models import as_utc
 
-LABEL_VALUE = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 MAX_RESULT_OBJECTS = 3_000
 _MAX_LIST_PAGES = 1_000
 _MAX_CONTINUE_TOKEN_LENGTH = 4_096
@@ -105,9 +105,10 @@ def parse_timestamp(value: object, message: str) -> datetime:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ProviderExecutionError(message) from exc
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ProviderExecutionError(message)
-    return parsed.astimezone(UTC)
+    try:
+        return as_utc(parsed)
+    except ValueError as exc:
+        raise ProviderExecutionError(message) from exc
 
 
 async def fan_out(

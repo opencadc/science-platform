@@ -21,11 +21,11 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from metrics.names import DNS_LABEL, LABEL_VALUE
 
-_DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+
 _HOST_DNS_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HOST_PATTERN = re.compile(rf"{_HOST_DNS_LABEL}(?:\.{_HOST_DNS_LABEL})*")
-_PLATFORM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 _REDIS_DATABASE_PATTERN = re.compile(r"^/[0-9]+$")
 
 _PLACEHOLDER_SECRETS = frozenset(
@@ -88,9 +88,7 @@ def _canonical_text(
 
 def _is_dns_subdomain(value: str) -> bool:
     """Return whether a value follows Kubernetes DNS subdomain naming rules."""
-    return len(value) <= 253 and all(
-        _DNS_LABEL_PATTERN.fullmatch(part) for part in value.split(".")
-    )
+    return len(value) <= 253 and all(DNS_LABEL.fullmatch(part) for part in value.split("."))
 
 
 def _validate_dns_or_ip_host(value: str, *, field_name: str) -> str:
@@ -123,7 +121,7 @@ def _normalize_kubernetes_names(
         name = item.strip()
         if not name:
             raise ValueError(f"{field_name} must not contain empty names")
-        valid = _is_dns_subdomain(name) if subdomain else bool(_DNS_LABEL_PATTERN.fullmatch(name))
+        valid = _is_dns_subdomain(name) if subdomain else bool(DNS_LABEL.fullmatch(name))
         if not valid:
             raise ValueError(f"{field_name} must use Kubernetes {grammar} names")
         names.append(name)
@@ -383,7 +381,7 @@ class OTelConfig(BaseModel):
     def _validate_namespace(cls, value: str) -> str:
         """Require one Kubernetes namespace label."""
         normalized = _canonical_text(value, field_name="kubernetes_namespace", ascii_only=True)
-        if not _DNS_LABEL_PATTERN.fullmatch(normalized):
+        if not DNS_LABEL.fullmatch(normalized):
             raise ValueError("kubernetes_namespace must be a Kubernetes DNS label")
         return normalized
 
@@ -415,7 +413,7 @@ class Settings(BaseSettings):
         le=_MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS,
     )
     cluster_name: str
-    platform_name: str = Field(default="canfar", min_length=1, max_length=63)
+    platform_name: str = "canfar"
     providers: ProviderConfigs
     cache: CacheConfig
     otel: OTelConfig = Field(default_factory=OTelConfig)
@@ -447,11 +445,9 @@ class Settings(BaseSettings):
     @field_validator("platform_name")
     @classmethod
     def _validate_platform_name(cls, value: str) -> str:
-        """Require a path-safe public platform subject."""
-        normalized = _canonical_text(
-            value, field_name="platform_name", max_length=63, ascii_only=True
-        )
-        if _PLATFORM_NAME_PATTERN.fullmatch(normalized) is None:
+        """Require a path-safe public platform subject (a label value)."""
+        normalized = value.strip()
+        if LABEL_VALUE.fullmatch(normalized) is None:
             raise ValueError("platform_name must be a path-safe label value")
         return normalized
 

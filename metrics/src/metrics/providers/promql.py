@@ -16,6 +16,7 @@ import httpx
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
 from metrics.services.models import EfficiencyObservation, bounded_decimal
+from metrics.services.resources import MEASURED_RESOURCES
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 
@@ -28,7 +29,6 @@ _JOIN_LABELS = "cluster,namespace,pod"
 _USER_LABEL = "label_canfar_net_username"
 _COMMUNITY_LABEL = "label_canfar_net_community"
 _SESSION_ID_LABEL = "label_canfar_net_id"
-_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
 _NAMESPACE_LABEL = "namespace"
 _PROMQL_SCOPE = Literal["user", "community", "platform", "session"]
 _MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
@@ -362,7 +362,7 @@ def _validate_response(
         ):
             raise ProviderExecutionError("PromQL returned an invalid efficiency series")
         resource = labels["resource"]
-        if resource not in _EFFICIENCY_RESOURCES:
+        if resource not in MEASURED_RESOURCES:
             raise ProviderExecutionError("PromQL returned an unknown efficiency resource")
         if resource in efficiencies:
             raise ProviderExecutionError("PromQL returned duplicate efficiency resources")
@@ -379,7 +379,7 @@ def _validate_response(
             raise ProviderExecutionError("PromQL returned a stale or future sample")
         efficiencies[resource] = _sample_value(sample[1])
 
-    if set(efficiencies) != _EFFICIENCY_RESOURCES or observed_at is None:
+    if set(efficiencies) != MEASURED_RESOURCES or observed_at is None:
         raise ProviderExecutionError("PromQL efficiency vector is incomplete")
     return EfficiencyObservation(observed_at=observed_at, efficiencies=efficiencies)
 

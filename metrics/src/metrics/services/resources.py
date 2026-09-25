@@ -7,13 +7,18 @@ from decimal import Decimal, InvalidOperation, ROUND_UP, localcontext
 from metrics.errors import ProviderExecutionError
 
 
+STORAGE_RESOURCES = frozenset({"memory", "ephemeral-storage"})
+"""Resources reported in GiB; every other resource is reported in base units."""
+
+MEASURED_RESOURCES = frozenset({"cpu", "memory"})
+"""Resources with live usage and efficiency."""
+
 _GIB = Decimal(2**30)
 _NANO = Decimal("0.000000001")
 _MAX_QUANTITY = Decimal(2**63 - 1)
 _MIN_EXPONENT = -(2**31)
 _MAX_EXPONENT = 2**31 - 1
 _MAX_FORMATTED_AMOUNT_LENGTH = 4_096
-_STORAGE_RESOURCES = frozenset({"memory", "ephemeral-storage"})
 _INVALID_QUANTITY_MESSAGE = "Kubernetes resource data contained an invalid resource quantity"
 _NUMBER = r"[0-9]+(?:\.[0-9]*)?|\.[0-9]+"
 _QUANTITY_RE = re.compile(
@@ -92,7 +97,7 @@ def parse_resource_amount(resource_name: str, raw: object) -> Decimal:
         with localcontext() as context:
             context.prec = max(128, len(value.as_tuple().digits) + 32)
             value = value.quantize(_NANO, rounding=ROUND_UP)
-    if resource_name.lower() in _STORAGE_RESOURCES:
+    if resource_name in STORAGE_RESOURCES:
         with localcontext() as context:
             context.prec = max(64, len(value.as_tuple().digits) + 32)
             return value / _GIB
@@ -104,32 +109,40 @@ def _validate_resource_amount(resource_name: str, value: object) -> Decimal:
     decimal_value = _as_decimal(value)
     with localcontext() as context:
         context.prec = max(64, len(decimal_value.as_tuple().digits) + 32)
-        base_value = (
-            decimal_value * _GIB if resource_name.lower() in _STORAGE_RESOURCES else decimal_value
-        )
+        base_value = decimal_value * _GIB if resource_name in STORAGE_RESOURCES else decimal_value
     if base_value < 0 or base_value > _MAX_QUANTITY:
         raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
     return decimal_value
+
+
+def plain_length(value: Decimal) -> int:
+    """Return the length of a finite Decimal written without an exponent.
+
+    Raises:
+        ValueError: If ``value`` is not finite.
+    """
+    sign, digits, exponent = value.as_tuple()
+    if not isinstance(exponent, int):
+        raise ValueError("decimal value is not finite")
+    position = len(digits) + exponent
+    if exponent >= 0:
+        length = position
+    elif position > 0:
+        length = len(digits) + 1
+    else:
+        length = 2 - position + len(digits)
+    return length + sign
 
 
 def plain_decimal(value: Decimal) -> str:
     """Render a bounded Decimal without exponent notation."""
     if value.is_zero():
         return "0"
-    digits = len(value.as_tuple().digits)
-    exponent = value.as_tuple().exponent
-    if not isinstance(exponent, int):
-        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
-    position = digits + exponent
-    if exponent >= 0:
-        plain_length = position
-    elif position > 0:
-        plain_length = digits + 1
-    else:
-        plain_length = 2 - position + digits
-    if value.as_tuple().sign:
-        plain_length += 1
-    if plain_length > _MAX_FORMATTED_AMOUNT_LENGTH:
+    try:
+        too_long = plain_length(value) > _MAX_FORMATTED_AMOUNT_LENGTH
+    except ValueError as exc:
+        raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE) from exc
+    if too_long:
         raise ProviderExecutionError(_INVALID_QUANTITY_MESSAGE)
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
@@ -139,17 +152,16 @@ def format_resource_amount(resource_name: str, value: object) -> str:
     """Format one public-unit amount for the Metrics response."""
     decimal_value = _validate_resource_amount(resource_name, value)
     text = plain_decimal(decimal_value)
-    return f"{text}Gi" if resource_name.lower() in _STORAGE_RESOURCES else text
+    return f"{text}Gi" if resource_name in STORAGE_RESOURCES else text
 
 
-def merge_resource_totals(target: dict[str, Decimal], name: str, delta: object) -> None:
-    """Add one validated resource quantity to an aggregate map."""
-    current = _as_decimal(target.get(name, Decimal(0)))
-    increment = _as_decimal(delta)
+def merge_resource_totals(target: dict[str, Decimal], name: str, delta: Decimal) -> None:
+    """Add one parsed quantity to an aggregate map, keeping the total in bounds."""
+    current = target.get(name, Decimal(0))
     with localcontext() as context:
         context.prec = max(
             128,
-            len(current.as_tuple().digits) + len(increment.as_tuple().digits) + 32,
+            len(current.as_tuple().digits) + len(delta.as_tuple().digits) + 32,
         )
-        total = current + increment
+        total = current + delta
     target[name] = _validate_resource_amount(name, total)

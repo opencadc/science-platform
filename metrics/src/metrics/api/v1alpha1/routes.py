@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Path, Request, Response
 
 from metrics.core.runtime import MetricsRuntime
 from metrics.http_cache import metrics_success_cache_headers
+from metrics.names import DNS_LABEL, LABEL_VALUE_PATTERN
 from metrics.schemas.metrics import (
     Condition,
     Metrics,
@@ -30,8 +31,6 @@ from metrics.services.models import (
 )
 from metrics.services.resources import plain_decimal
 
-_LABEL_VALUE_PATTERN = r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$"
-_DNS_LABEL = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _METADATA_NAME_MAX_LENGTH = 63
 _SUBJECT_DIGEST_LENGTH = 12
 
@@ -40,7 +39,7 @@ SubjectPath = Annotated[
     Path(
         min_length=1,
         max_length=63,
-        pattern=_LABEL_VALUE_PATTERN,
+        pattern=LABEL_VALUE_PATTERN,
         description="A Kubernetes label value identifying the requested subject.",
     ),
 ]
@@ -63,7 +62,7 @@ def _subject_name(kind: str, value: str) -> str:
     if (
         value == normalized
         and len(candidate) <= _METADATA_NAME_MAX_LENGTH
-        and _DNS_LABEL.fullmatch(candidate)
+        and DNS_LABEL.fullmatch(candidate)
     ):
         return candidate
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-") or "subject"

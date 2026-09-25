@@ -8,23 +8,26 @@ from decimal import Decimal, InvalidOperation
 import re
 from typing import Literal
 
+from metrics.services.resources import MEASURED_RESOURCES, plain_length
 
 MetricsSurface = Literal["platform", "user", "community", "session"]
 
-DEFAULT_PLATFORM_NAME = "canfar"
 MAX_DECIMAL_INPUT_LENGTH = 4_096
 MAX_DECIMAL_DIGITS = 2_048
 MAX_DECIMAL_EXPONENT = 4_096
 MAX_DECIMAL_ADJUSTED = 1_000
 MAX_DECIMAL_PLAIN_LENGTH = 4_096
 _DECIMAL_TEXT = re.compile(r"^[+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
-_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
 
 
-def _normalise_observed_at(value: datetime) -> datetime:
-    """Require an aware timestamp and normalize it to UTC."""
+def as_utc(value: datetime) -> datetime:
+    """Require a timezone-aware datetime and return it in UTC.
+
+    Raises:
+        ValueError: If ``value`` is naive.
+    """
     if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("observation timestamps must be timezone-aware")
+        raise ValueError("timestamps must be timezone-aware")
     return value.astimezone(UTC)
 
 
@@ -51,7 +54,7 @@ def bounded_decimal(value: object) -> Decimal:
         len(digits) > MAX_DECIMAL_DIGITS
         or abs(exponent) > MAX_DECIMAL_EXPONENT
         or not -MAX_DECIMAL_ADJUSTED <= result.adjusted() <= MAX_DECIMAL_ADJUSTED
-        or _decimal_plain_length(result, digits, exponent) > MAX_DECIMAL_PLAIN_LENGTH
+        or plain_length(result) > MAX_DECIMAL_PLAIN_LENGTH
     ):
         raise ValueError("decimal value exceeds the bounded metric policy")
     return Decimal(0) if result.is_zero() else result
@@ -80,18 +83,6 @@ def _coerce_decimal(value: object) -> Decimal:
     return result
 
 
-def _decimal_plain_length(result: Decimal, digits: tuple[int, ...], exponent: int) -> int:
-    """Calculate the bounded fixed-point output length for one Decimal."""
-    decimal_position = len(digits) + exponent
-    if exponent >= 0:
-        plain_length = len(digits) + exponent
-    elif decimal_position > 0:
-        plain_length = len(digits) + 1
-    else:
-        plain_length = 2 - decimal_position + len(digits)
-    return plain_length + int(bool(result.as_tuple().sign))
-
-
 @dataclass(frozen=True, slots=True)
 class MetricsSubject:
     """Select one Platform, User, Community, or Session report."""
@@ -114,15 +105,15 @@ class EfficiencyObservation:
 
     def __post_init__(self) -> None:
         """Validate timestamps, resource names, and bounded ratios."""
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
         normalized: dict[str, Decimal] = {}
         for resource, value in self.efficiencies.items():
-            if resource not in _EFFICIENCY_RESOURCES:
+            if resource not in MEASURED_RESOURCES:
                 raise ValueError("efficiency observations support only cpu and memory")
             normalized[resource] = bounded_decimal(value)
         if not normalized:
             raise ValueError("efficiency observations must contain at least one resource")
-        if set(normalized) != _EFFICIENCY_RESOURCES:
+        if set(normalized) != MEASURED_RESOURCES:
             raise ValueError("efficiency observations must contain cpu and memory together")
         object.__setattr__(self, "efficiencies", normalized)
 
@@ -141,7 +132,7 @@ class PlatformObservation:
         """Validate the queue count and observation timestamp."""
         if self.reserving_workloads < 0:
             raise ValueError("reserving_workloads must be non-negative")
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +148,7 @@ class UserObservation:
         """Validate the queue count and observation timestamp."""
         if self.reserving_workloads < 0:
             raise ValueError("reserving_workloads must be non-negative")
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,10 +170,10 @@ class SessionObservation:
         """Validate the queue count, timestamps, and observation time."""
         if self.reserving_workloads < 0:
             raise ValueError("reserving_workloads must be non-negative")
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
-        object.__setattr__(self, "window_end", _normalise_observed_at(self.window_end))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
+        object.__setattr__(self, "window_end", as_utc(self.window_end))
         if self.start_time is not None:
-            object.__setattr__(self, "start_time", _normalise_observed_at(self.start_time))
+            object.__setattr__(self, "start_time", as_utc(self.start_time))
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,7 +185,7 @@ class SessionUsageObservation:
 
     def __post_init__(self) -> None:
         """Validate the usage observation timestamp."""
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,7 +201,7 @@ class CommunityObservation:
         """Validate the queue count and observation timestamp."""
         if self.reserving_workloads < 0:
             raise ValueError("reserving_workloads must be non-negative")
-        object.__setattr__(self, "observed_at", _normalise_observed_at(self.observed_at))
+        object.__setattr__(self, "observed_at", as_utc(self.observed_at))
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,7 +225,7 @@ class CachedSnapshot:
 
     def __post_init__(self) -> None:
         """Normalise the report timestamp to UTC."""
-        object.__setattr__(self, "created", _normalise_observed_at(self.created))
+        object.__setattr__(self, "created", as_utc(self.created))
 
 
 @dataclass(frozen=True, slots=True)

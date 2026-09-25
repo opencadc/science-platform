@@ -2,25 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from metrics.services.models import as_utc
+from metrics.services.resources import MEASURED_RESOURCES, STORAGE_RESOURCES
 
 _MAX_WIRE_VALUE_LENGTH = 4_096
 _CANONICAL_DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$")
-_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
-_USAGE_RESOURCES = frozenset({"cpu", "memory"})
-_STORAGE_RESOURCE_NAMES = frozenset({"memory", "ephemeral-storage"})
-
-
-def _normalize_utc(value: datetime) -> datetime:
-    """Require an aware datetime and normalize it to UTC."""
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("datetime values must be timezone-aware")
-    return value.astimezone(UTC)
 
 
 class WireModel(BaseModel):
@@ -79,9 +71,9 @@ class ResourceMetrics(WireModel):
         for field_name in ("capacity", "allocated", "requests", "usage", "efficiency"):
             value = values.get(field_name)
             if value is not None:
-                if field_name == "efficiency" and name not in _EFFICIENCY_RESOURCES:
+                if field_name == "efficiency" and name not in MEASURED_RESOURCES:
                     raise ValueError("efficiency is supported only for cpu and memory")
-                if field_name == "usage" and name not in _USAGE_RESOURCES:
+                if field_name == "usage" and name not in MEASURED_RESOURCES:
                     raise ValueError("usage is supported only for cpu and memory")
                 _validate_wire_value(name, field_name, value)
         return values
@@ -109,7 +101,7 @@ def _validate_wire_value(resource_name: str, field_name: str, value: object) -> 
         raise ValueError(f"{field_name} must be a bounded plain decimal")
     if field_name == "efficiency":
         valid = _CANONICAL_DECIMAL.fullmatch(value) is not None
-    elif resource_name in _STORAGE_RESOURCE_NAMES:
+    elif resource_name in STORAGE_RESOURCES:
         valid = value.endswith("Gi") and _CANONICAL_DECIMAL.fullmatch(value[:-2]) is not None
     else:
         valid = _CANONICAL_DECIMAL.fullmatch(value) is not None
@@ -140,7 +132,7 @@ class Condition(WireModel):
     @classmethod
     def _normalize_last_transition_time(cls, value: datetime) -> datetime:
         """Require an aware transition timestamp and normalize it to UTC."""
-        return _normalize_utc(value)
+        return as_utc(value)
 
     @model_validator(mode="after")
     def _validate_status_reason(self) -> Condition:
@@ -183,7 +175,7 @@ class MetricsStatus(WireModel):
     @classmethod
     def _normalize_observed_at(cls, value: datetime) -> datetime:
         """Require an aware observation timestamp and normalize it to UTC."""
-        return _normalize_utc(value)
+        return as_utc(value)
 
     @model_validator(mode="after")
     def _validate_report_invariants(self) -> MetricsStatus:
