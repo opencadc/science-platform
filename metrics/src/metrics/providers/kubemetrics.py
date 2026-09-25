@@ -6,7 +6,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError
 from metrics.providers.kube import (
     KubeApi,
@@ -50,10 +49,9 @@ class KubeMetricsProvider:
 
     name = "kubemetrics"
 
-    def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
-        """Attach validated settings and an optional kr8s-compatible API fake."""
-        config = settings.providers.kueue
-        self._kube = KubeReader(timeout=config.kube_request_timeout_seconds, api=api)
+    def __init__(self, api: KubeApi | None = None) -> None:
+        """Attach an optional kr8s-compatible API fake."""
+        self._kube = KubeReader(api=api)
 
     async def read_session_usage(self, observation: SessionObservation) -> SessionUsageObservation:
         """Sum usage of the session's Running pods, reading only namespaces that have one."""

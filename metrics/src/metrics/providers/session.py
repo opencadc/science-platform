@@ -181,7 +181,7 @@ class SessionProvider:
     def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         self._config: KueueProviderConfig = settings.providers.kueue
-        self._kube = KubeReader(timeout=self._config.kube_request_timeout_seconds, api=api)
+        self._kube = KubeReader(api=api)
 
     async def _list(
         self,

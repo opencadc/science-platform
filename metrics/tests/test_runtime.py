@@ -74,12 +74,13 @@ def test_runtime_cache_schema_revision_separates_two_stage_payloads() -> None:
 
 
 def test_runtime_lease_expires_before_cold_waiters_give_up() -> None:
-    """A crashed owner's lease ends inside every follower's cold budget."""
-    settings = _settings()
-    runtime = MetricsRuntime.from_settings(settings, recorder=NoopMetricsRecorder())
+    """A crashed owner's lease ends inside every follower's cold budget and stale window."""
+    runtime = MetricsRuntime.from_settings(_settings(), recorder=NoopMetricsRecorder())
     for cache in runtime.metrics_service.caches.values():
-        assert cache._lease_ms == round(settings.cache.lease_seconds * 1000)  # noqa: SLF001
-        assert cache._lease_ms < settings.cache.cold_get_timeout_seconds * 1000  # noqa: SLF001
+        # fill 10 s + two 0.5 s Redis commands + 2 s margin
+        assert cache._lease_ms == 13_000  # noqa: SLF001
+        assert cache._lease_ms < cache._cold_timeout * 1000  # noqa: SLF001
+        assert cache._lease_ms < cache.policy.stale_ms
 
 
 def test_redis_client_is_lazy_retries_once_and_names_itself() -> None:
@@ -102,9 +103,9 @@ def test_cache_identity_is_opaque_and_stable_across_operational_settings() -> No
         return runtime.metrics_service._identity("platform", "canfar").canonical()  # noqa: SLF001
 
     base = platform_key(_settings(base_url="https://mimir.example"))
-    slower = platform_key(_settings(base_url="https://mimir.example", request_timeout_seconds=9))
+    same = platform_key(_settings(base_url="https://mimir.example"))
     other = platform_key(_settings(base_url="https://other.example"))
-    assert base == slower and base != other
+    assert base == same and base != other
 
 
 # ----------------------------------------------------------------- lifecycle

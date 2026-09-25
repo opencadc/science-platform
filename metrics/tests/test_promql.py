@@ -355,11 +355,10 @@ async def test_stale_and_future_timestamps_follow_configured_bounds(
     calls: list[httpx.Request] = []
     client = _client(_successful_payload(timestamp), calls)
     try:
+        monkeypatch.setattr(promql_module, "_MAX_SAMPLE_AGE_SECONDS", 600)
+        monkeypatch.setattr(promql_module, "_FUTURE_SAMPLE_TOLERANCE_SECONDS", 5)
         with pytest.raises(ProviderExecutionError, match="stale or future"):
-            await PromQLProvider(
-                _settings(max_sample_age_seconds=600, future_sample_tolerance_seconds=5),
-                client=client,
-            ).read_user("ada")
+            await PromQLProvider(_settings(), client=client).read_user("ada")
     finally:
         await client.aclose()
 
@@ -420,7 +419,9 @@ async def test_http_status_failures_are_classified(
         await client.aclose()
 
 
-async def test_invalid_json_and_response_size_fail_as_execution_errors() -> None:
+async def test_invalid_json_and_response_size_fail_as_execution_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[httpx.Request] = []
     client = _client(httpx.Response(200, content=b"not-json"), calls)
     try:
@@ -438,11 +439,9 @@ async def test_invalid_json_and_response_size_fail_as_execution_errors() -> None
     )
     client = _client(oversized, calls)
     try:
+        monkeypatch.setattr(promql_module, "_MAX_RESPONSE_BYTES", len(body) - 1)
         with pytest.raises(ProviderExecutionError, match="byte limit"):
-            await PromQLProvider(
-                _settings(max_response_bytes=len(body) - 1),
-                client=client,
-            ).read_user("ada")
+            await PromQLProvider(_settings(), client=client).read_user("ada")
     finally:
         await client.aclose()
 

@@ -31,6 +31,8 @@ _MAX_LIST_PAGES = 1_000
 _MAX_CONTINUE_TOKEN_LENGTH = 4_096
 _LIST_PAGE_LIMIT = 100
 _READ_CONCURRENCY = 4
+REQUEST_TIMEOUT_SECONDS = 5.0
+"""Deadline of one Kubernetes API request."""
 _TRANSPORT_ERRORS = (kr8s.APITimeoutError, kr8s.ConnectionClosedError, httpx.HTTPError)
 
 _Input = TypeVar("_Input")
@@ -193,7 +195,9 @@ async def concurrently(
 class KubeReader:
     """Read Kubernetes JSON through one lazily bound kr8s API handle."""
 
-    def __init__(self, *, timeout: float, api: KubeApi | None = None) -> None:
+    def __init__(
+        self, *, timeout: float = REQUEST_TIMEOUT_SECONDS, api: KubeApi | None = None
+    ) -> None:
         """Keep the request timeout and an optional pre-bound (or fake) API."""
         self._timeout = timeout
         self._api = api

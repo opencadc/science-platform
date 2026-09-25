@@ -40,6 +40,9 @@ Value = TypeVar("Value")
 CommandResult = TypeVar("CommandResult")
 _RedisArgument: TypeAlias = bytes | str | int | float
 
+COMMAND_TIMEOUT_SECONDS = 0.5
+"""Deadline of one Redis command, including its connection."""
+
 _SNAPSHOT = b"v"
 _NOT_FOUND = b"n"
 _MAC_LENGTH = 64
@@ -150,10 +153,10 @@ class RedisSnapshots(Generic[Value]):
         redis: Redis | _AsyncRedis,
         value_type: type[Value],
         secret: bytes,
-        command_timeout: float,
         schema_revision: str,
         source_revision: str,
         query_revision: str,
+        command_timeout: float = COMMAND_TIMEOUT_SECONDS,
         telemetry: MetricsRecorder | None = None,
     ) -> None:
         """Configure validation, authentication, bounded commands, and key revisions."""

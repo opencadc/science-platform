@@ -10,7 +10,6 @@ from metrics.cache import (
     MemorySnapshots,
     cache_keys,
 )
-from metrics.core.settings import SHORTEST_STALE_WINDOW_SECONDS
 
 SECRET = b"cache-test-secret"
 IDENTITY = CacheIdentity("user", "bob", "cluster-a", "kueue", "v1")
@@ -52,9 +51,6 @@ def test_production_freshness_windows_are_two_stage() -> None:
         "community": FreshnessPolicy(300, 600),
         "session": FreshnessPolicy(30, 60),
     }
-    assert min(policy.stale_seconds for policy in FRESHNESS_POLICIES.values()) == (
-        SHORTEST_STALE_WINDOW_SECONDS
-    )
 
 
 def test_policy_stages_come_from_remaining_ttl_with_exact_boundaries() -> None:

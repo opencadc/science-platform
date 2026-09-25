@@ -31,12 +31,6 @@ _REDIS_DATABASE_PATTERN = re.compile(r"^/[0-9]+$")
 _PLACEHOLDER_SECRETS = frozenset(
     {"replace-with-at-least-32-random-bytes", "<secret-reference-or-injected-value>"}
 )
-LEASE_MARGIN_SECONDS = 2.0
-"""Slack added to a fill lease for event-loop stalls; see ``RedisCoordinator``."""
-
-SHORTEST_STALE_WINDOW_SECONDS = 60.0
-"""Shortest stale window in ``FRESHNESS_POLICIES`` (Session)."""
-
 MAX_CLUSTER_QUEUES = 256
 MAX_NAMESPACES = 256
 _MAX_REDIS_URL_LENGTH = 512
@@ -47,20 +41,8 @@ _MAX_OTEL_SERVICE_NAME_LENGTH = 128
 _MAX_OTEL_ENVIRONMENT_LENGTH = 63
 _MAX_OTEL_NAMESPACE_LENGTH = 63
 _MAX_OTEL_POD_UID_LENGTH = 128
-_MAX_KUBE_REQUEST_TIMEOUT_SECONDS = 300.0
-_MAX_PROMQL_REQUEST_TIMEOUT_SECONDS = 300.0
-_MAX_PROMQL_SAMPLE_AGE_SECONDS = 7 * 24 * 60 * 60
-_MAX_PROMQL_FUTURE_TOLERANCE_SECONDS = 60 * 60
-_MAX_REDIS_COMMAND_TIMEOUT_SECONDS = 30.0
-_MAX_CACHE_FILL_TIMEOUT_SECONDS = 300.0
-_MAX_CACHE_COLD_GET_TIMEOUT_SECONDS = 600.0
-_MAX_CACHE_L1_ENTRIES = 10_000
-_MAX_CACHE_FAILURE_COOLDOWN_SECONDS = 60.0
 _MAX_OTEL_EXPORT_INTERVAL_MILLIS = 60 * 60 * 1000
-_MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS = 300.0
 _PROMQL_BASE_PATH_MAX_LENGTH = 128
-_PROMQL_DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
-_PROMQL_HARD_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 
 def _canonical_text(
@@ -205,10 +187,6 @@ class KueueProviderConfig(BaseModel):
         max_length=MAX_NAMESPACES,
         description="Namespaces searched for LocalQueues, Session Jobs and Pods, and PodMetrics.",
     )
-    kueue_api_version: Literal["kueue.x-k8s.io/v1beta2"] = "kueue.x-k8s.io/v1beta2"
-    kube_request_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=_MAX_KUBE_REQUEST_TIMEOUT_SECONDS
-    )
 
     @field_validator("cluster_queues")
     @classmethod
@@ -244,18 +222,6 @@ class PromQLProviderConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     base_url: AnyHttpUrl | None = None
-    request_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=_MAX_PROMQL_REQUEST_TIMEOUT_SECONDS
-    )
-    max_sample_age_seconds: int = Field(default=300, gt=0, le=_MAX_PROMQL_SAMPLE_AGE_SECONDS)
-    future_sample_tolerance_seconds: int = Field(
-        default=30, ge=0, le=_MAX_PROMQL_FUTURE_TOLERANCE_SECONDS
-    )
-    max_response_bytes: int = Field(
-        default=_PROMQL_DEFAULT_MAX_RESPONSE_BYTES,
-        gt=0,
-        le=_PROMQL_HARD_MAX_RESPONSE_BYTES,
-    )
     mimir_tenant_id: str | None = Field(default=None, min_length=1, max_length=150)
 
     @field_validator("base_url")
@@ -289,35 +255,19 @@ class ProviderConfigs(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    """Configure mandatory shared Redis integrity and bounded local fallback."""
+    """Hold the shared Redis cache's integrity key.
+
+    Cache deadlines and bounds are constants of the cache package; see
+    ``RedisCoordinator``.
+    """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     key_secret: SecretStr
-    redis_command_timeout_seconds: float = Field(
-        default=0.5, gt=0, le=_MAX_REDIS_COMMAND_TIMEOUT_SECONDS
-    )
-    fill_timeout_seconds: float = Field(default=10.0, gt=0, le=_MAX_CACHE_FILL_TIMEOUT_SECONDS)
-    cold_get_timeout_seconds: float = Field(
-        default=15.0, gt=0, le=_MAX_CACHE_COLD_GET_TIMEOUT_SECONDS
-    )
-    l1_max_entries: int = Field(default=128, gt=0, le=_MAX_CACHE_L1_ENTRIES)
-    failure_cooldown_seconds: float = Field(
-        default=5.0, gt=0, le=_MAX_CACHE_FAILURE_COOLDOWN_SECONDS
-    )
-
-    @property
-    def lease_seconds(self) -> float:
-        """Return the fill lease: one source call plus two Redis commands and a margin."""
-        return (
-            self.fill_timeout_seconds
-            + 2 * self.redis_command_timeout_seconds
-            + LEASE_MARGIN_SECONDS
-        )
 
     @model_validator(mode="after")
-    def _validate_cache_contract(self) -> CacheConfig:
-        """Require Redis integrity and deadlines that let followers take over a lease."""
+    def _validate_key_secret(self) -> CacheConfig:
+        """Require a real, sufficiently long integrity key."""
         secret = self.key_secret.get_secret_value()
         if len(secret.encode()) < 32:
             raise ValueError("key_secret must contain at least 32 UTF-8 bytes")
@@ -326,13 +276,6 @@ class CacheConfig(BaseModel):
                 "key_secret is a placeholder; generate one with "
                 "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
-        if self.cold_get_timeout_seconds <= self.lease_seconds:
-            raise ValueError(
-                "cold_get_timeout_seconds must exceed the fill lease "
-                "(fill_timeout_seconds + 2 * redis_command_timeout_seconds + 2)"
-            )
-        if self.lease_seconds >= SHORTEST_STALE_WINDOW_SECONDS:
-            raise ValueError("fill_timeout_seconds must leave the shortest stale window usable")
         return self
 
 
@@ -407,18 +350,12 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
-    startup_validation_timeout_seconds: float = Field(
-        default=60.0,
-        gt=0,
-        le=_MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS,
-    )
     cluster_name: str
     platform_name: str = "canfar"
     providers: ProviderConfigs
     cache: CacheConfig
     otel: OTelConfig = Field(default_factory=OTelConfig)
     redis_url: SecretStr
-    redis_key_prefix: str = "metrics:"
 
     @field_validator("host")
     @classmethod
@@ -457,12 +394,6 @@ class Settings(BaseSettings):
         """Validate the configured Redis URL without exposing its credentials."""
         return SecretStr(_validate_redis_url(value.get_secret_value()))
 
-    @field_validator("redis_key_prefix")
-    @classmethod
-    def _validate_prefix(cls, value: str) -> str:
-        """Require a bounded non-empty Redis key namespace."""
-        return _canonical_text(value, field_name="redis_key_prefix", max_length=128)
-
 
 _OTEL_FIELDS = (
     "METRICS_ENABLED",
@@ -491,6 +422,8 @@ RETIRED_ENVIRONMENT = {
     "METRICS_PROVIDERS__KUEUE__CA_FILE": None,
     "METRICS_PROVIDERS__KUEUE__KUBE_CLUSTERQUEUE_PATH": None,
     "METRICS_PROVIDERS__PROMQL__MAX_SERIES": None,
+    "METRICS_STARTUP_VALIDATION_TIMEOUT_SECONDS": None,
+    "METRICS_REDIS_KEY_PREFIX": None,
 }
 """Retired ``METRICS_*`` names mapped to their replacement, or ``None`` when removed."""
 

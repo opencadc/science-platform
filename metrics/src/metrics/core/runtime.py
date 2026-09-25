@@ -23,7 +23,8 @@ from metrics.cache import (
     RedisUnavailable,
     describe_failure,
 )
-from metrics.core.settings import LEASE_MARGIN_SECONDS, Settings
+from metrics.cache.redis import COMMAND_TIMEOUT_SECONDS
+from metrics.core.settings import Settings
 from metrics.errors import RuntimeStartupError
 from metrics.providers.kubemetrics import KubeMetricsProvider
 from metrics.providers.kueue import KueueProvider
@@ -36,6 +37,9 @@ from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 _logger = logging.getLogger(__name__)
 _SURFACES: tuple[MetricsSurface, ...] = ("platform", "user", "community", "session")
+_KEY_PREFIX = "metrics:"
+_VALIDATION_TIMEOUT_SECONDS = 60.0
+"""Bound on one startup probe or readiness validation."""
 _SCHEMA_REVISION = "9"
 _SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
@@ -97,8 +101,8 @@ def build_redis(settings: Settings) -> Redis:
     """Create the one Redis client every surface cache shares; no I/O happens here."""
     return Redis.from_url(
         settings.redis_url.get_secret_value(),
-        socket_connect_timeout=settings.cache.redis_command_timeout_seconds,
-        socket_timeout=settings.cache.redis_command_timeout_seconds,
+        socket_connect_timeout=COMMAND_TIMEOUT_SECONDS,
+        socket_timeout=COMMAND_TIMEOUT_SECONDS,
         # One immediate retry absorbs a dropped pooled connection. Every
         # script is safe to resend: OBSERVE recognises its own token and
         # SETTLE is token-fenced.
@@ -119,7 +123,6 @@ def build_cache(
         redis=redis,
         value_type=CachedSnapshot,
         secret=secret,
-        command_timeout=settings.cache.redis_command_timeout_seconds,
         schema_revision=_SCHEMA_REVISION,
         source_revision=_SOURCE_REVISION,
         query_revision=_QUERY_REVISION,
@@ -127,14 +130,9 @@ def build_cache(
     )
     return RedisCoordinator[CachedSnapshot](
         store=store,
-        key_prefix=settings.redis_key_prefix,
+        key_prefix=_KEY_PREFIX,
         key_secret=secret,
         policy=FRESHNESS_POLICIES[surface],
-        fill_timeout=settings.cache.fill_timeout_seconds,
-        cold_timeout=settings.cache.cold_get_timeout_seconds,
-        lease_margin=LEASE_MARGIN_SECONDS,
-        failure_cooldown=settings.cache.failure_cooldown_seconds,
-        max_l1_entries=settings.cache.l1_max_entries,
         telemetry=recorder,
     )
 
@@ -205,7 +203,7 @@ class MetricsRuntime:
         """Wire providers, one shared Redis client, four surface caches, and the service."""
         kueue = KueueProvider(settings)
         session = SessionProvider(settings)
-        usage = KubeMetricsProvider(settings)
+        usage = KubeMetricsProvider()
         efficiency = (
             PromQLProvider(settings, telemetry=recorder)
             if settings.providers.promql.base_url is not None
@@ -233,8 +231,6 @@ class MetricsRuntime:
             session=session,
             usage=usage,
             efficiency=efficiency,
-            usage_timeout_seconds=settings.providers.kueue.kube_request_timeout_seconds,
-            efficiency_timeout_seconds=settings.providers.promql.request_timeout_seconds,
             telemetry=recorder,
         )
         service = MetricsService(
@@ -276,7 +272,7 @@ class MetricsRuntime:
 
     async def _validate(self) -> bool:
         """Prove Redis and the Platform source reachable together, then latch readiness."""
-        timeout = self._settings.startup_validation_timeout_seconds
+        timeout = _VALIDATION_TIMEOUT_SECONDS
         try:
             async with asyncio.timeout(timeout):
                 await asyncio.gather(*(cache.ping() for cache in self._caches().values()))
@@ -308,7 +304,7 @@ class MetricsRuntime:
     async def _probe(self, name: str, probe: Callable[[], Awaitable[None]]) -> None:
         """Warn when a non-Platform surface's source access cannot be proven."""
         try:
-            async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
+            async with asyncio.timeout(_VALIDATION_TIMEOUT_SECONDS):
                 await probe()
         except Exception as exc:
             _logger.warning(
@@ -324,7 +320,7 @@ class MetricsRuntime:
         started = perf_counter()
         outcome = "ok"
         try:
-            async with asyncio.timeout(self._settings.startup_validation_timeout_seconds):
+            async with asyncio.timeout(_VALIDATION_TIMEOUT_SECONDS):
                 await asyncio.gather(*(cache.ping() for cache in self._caches().values()))
             self._started = True
             self._telemetry.record_readiness(False)

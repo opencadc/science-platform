@@ -32,6 +32,10 @@ _SESSION_ID_LABEL = "label_canfar_net_id"
 _NAMESPACE_LABEL = "namespace"
 _PROMQL_SCOPE = Literal["user", "community", "platform", "session"]
 _MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
+_REQUEST_TIMEOUT_SECONDS = 5.0
+_MAX_SAMPLE_AGE_SECONDS = 300
+_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
+_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 def _validation_now() -> datetime:
@@ -428,10 +432,6 @@ class PromQLProvider:
                 (parsed.scheme, parsed.netloc, f"{base_path}/api/v1/query", "", "")
             )
         self._tenant = self._config.mimir_tenant_id
-        self._request_timeout_seconds = self._config.request_timeout_seconds
-        self._max_sample_age_seconds = self._config.max_sample_age_seconds
-        self._future_sample_tolerance_seconds = self._config.future_sample_tolerance_seconds
-        self._max_response_bytes = self._config.max_response_bytes
         self._headers = {"X-Scope-OrgID": self._tenant} if self._tenant else None
         self._client = client
         self._owns_client = client is None
@@ -456,7 +456,7 @@ class PromQLProvider:
         if self._endpoint is not None and self._client is None:
             self._client = httpx.AsyncClient(
                 headers=self._headers,
-                timeout=self._request_timeout_seconds,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
             )
 
     async def shutdown(self) -> None:
@@ -520,8 +520,8 @@ class PromQLProvider:
             payload = await self._request(query, evaluation_time=evaluation_time)
             return _validate_response(
                 payload,
-                max_sample_age_seconds=self._max_sample_age_seconds,
-                future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
+                max_sample_age_seconds=_MAX_SAMPLE_AGE_SECONDS,
+                future_sample_tolerance_seconds=_FUTURE_SAMPLE_TOLERANCE_SECONDS,
                 evaluation_time=evaluation_time,
             )
         except asyncio.CancelledError:
@@ -572,7 +572,7 @@ class PromQLProvider:
                 headers=self._headers,
             ) as response:
                 response.raise_for_status()
-                body = await _bounded_response_body(response, self._max_response_bytes)
+                body = await _bounded_response_body(response, _MAX_RESPONSE_BYTES)
             try:
                 return json.loads(body)
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:

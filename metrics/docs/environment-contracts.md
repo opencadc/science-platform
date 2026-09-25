@@ -96,13 +96,6 @@ does not install any receiver.
 | `METRICS_HOST` | `0.0.0.0` | host name or IP | Listen address |
 | `METRICS_PORT` | 8000 | 1–65535 | Listen port |
 | `METRICS_LOG_LEVEL` | `info` | `critical`, `error`, `warning`, `info`, `debug`, `trace` | Log level |
-| `METRICS_STARTUP_VALIDATION_TIMEOUT_SECONDS` | 60 | ≤ 300 | Bound on each startup probe and readiness validation |
-| `METRICS_PROVIDERS__KUEUE__KUBE_REQUEST_TIMEOUT_SECONDS` | 5 | ≤ 300 | One Kubernetes API request |
-| `METRICS_PROVIDERS__KUEUE__KUEUE_API_VERSION` | `kueue.x-k8s.io/v1beta2` | that value only | Pinned Kueue API |
-| `METRICS_PROVIDERS__PROMQL__REQUEST_TIMEOUT_SECONDS` | 5 | ≤ 300 | Upper bound of one efficiency read (also limited by the fill) |
-| `METRICS_PROVIDERS__PROMQL__MAX_SAMPLE_AGE_SECONDS` | 300 | ≤ 7 days | Oldest accepted instant sample |
-| `METRICS_PROVIDERS__PROMQL__FUTURE_SAMPLE_TOLERANCE_SECONDS` | 30 | ≤ 1 hour | Accepted clock skew for sample times |
-| `METRICS_PROVIDERS__PROMQL__MAX_RESPONSE_BYTES` | 4 MiB | ≤ 16 MiB | Largest accepted PromQL response |
 | `METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID` | — | 1–150 characters | Sent as `X-Scope-OrgID` |
 | `METRICS_OTEL__SERVICE_NAME` | `canfar-metrics` | 1–128 characters | OTLP `service.name` |
 | `METRICS_OTEL__EXPORT_INTERVAL_MILLIS` | 60000 | ≤ 1 hour | OTLP export interval |
@@ -131,22 +124,31 @@ authenticated not-found for the fresh window, so every replica returns the
 same 404 without re-reading the source. The full request flow is in
 [`specs.md`](specs.md#cache).
 
-## Cache tuning
+## Cache key and fixed bounds
 
-| Variable | Default | Bound | Meaning |
-| --- | ---: | --- | --- |
-| `METRICS_CACHE__KEY_SECRET` | — | ≥ 32 bytes, not a placeholder or one repeated character | Key digests and payload MACs. Rotating it moves every subject to new keys: the first requests refill, and old keys expire within their stale window |
-| `METRICS_CACHE__REDIS_COMMAND_TIMEOUT_SECONDS` | 0.5 | ≤ 30 | Connect and socket timeout of each Redis command; a dropped connection is retried once |
-| `METRICS_CACHE__FILL_TIMEOUT_SECONDS` | 10 | ≤ 300 | One source fill, including optional enrichment |
-| `METRICS_CACHE__COLD_GET_TIMEOUT_SECONDS` | 15 | ≤ 600 | How long a cold request waits for another replica's fill |
-| `METRICS_CACHE__FAILURE_COOLDOWN_SECONDS` | 5 | ≤ 60 | Pause after a failed fill; capped at the surface's fresh window |
-| `METRICS_CACHE__L1_MAX_ENTRIES` | 128 | ≤ 10000 | Snapshots each surface keeps per replica for Redis outages (four surfaces per replica) |
-| `METRICS_REDIS_KEY_PREFIX` | `metrics:` | 1–128 printable characters, no whitespace | Prefix of every key |
+`METRICS_CACHE__KEY_SECRET` is the only cache setting: at least 32 bytes, not
+a placeholder or one repeated character. It keys the subject digests and the
+payload MACs. Rotating it moves every subject to new keys: the first requests
+refill, and old keys expire within their stale window.
 
-The fill lease is `FILL_TIMEOUT + 2 × REDIS_COMMAND_TIMEOUT + 2` seconds
-(13 seconds by default). Startup rejects a configuration where the lease is
-not shorter than `COLD_GET_TIMEOUT` (waiters could never replace a crashed
-owner) or not shorter than 60 seconds (the Session stale window).
+Deadlines and bounds are constants of the code, not settings, so no
+configuration can put them out of order:
+
+| Bound | Value | Meaning |
+| --- | ---: | --- |
+| Redis command | 0.5 s | Connect and socket timeout of each command; a dropped connection is retried once |
+| Fill | 10 s | One source fill, including optional enrichment |
+| Lease | 13 s | One fill, two Redis commands, and a 2-second margin |
+| Cold wait | 15 s | How long a cold request waits for another replica's fill; always longer than the lease, so waiters replace a crashed owner |
+| Failure cooldown | 5 s | Pause after a failed fill, capped at the surface's fresh window |
+| Outage copy | 128 per surface | Snapshots each replica keeps for Redis outages |
+| Kubernetes request | 5 s | One API request; also bounds the Session usage read |
+| PromQL request | 5 s | One efficiency read, further limited by the time left in the fill |
+| PromQL sample age | 300 s old, 30 s ahead | Accepted instant-sample times |
+| PromQL response | 4 MiB | Largest accepted response |
+| Startup validation | 60 s | Each startup probe and readiness validation |
+
+Every key starts with `metrics:`.
 
 Keys look like `metrics:<revision>:<source>:<query>:<surface>:{<digest>}:value`
 and `…:lease`. The hash tag keeps both keys of a subject in one Redis Cluster
@@ -165,8 +167,9 @@ The process exits with status 2 before serving when a retired name is set,
 when a setting is invalid, or when `METRICS_CACHE__KEY_SECRET` is a
 placeholder. It prints one line per problem and never a value. Retired names
 are reported first, alone; fix them and the remaining problems are reported
-on the next start. Cache-contract problems (placeholder secret, lease longer
-than the cold wait) name `METRICS_CACHE`. Three separate runs:
+on the next start. A placeholder secret is reported against `METRICS_CACHE`,
+and a removed nested setting (such as `METRICS_CACHE__FILL_TIMEOUT_SECONDS`)
+as "Extra inputs are not permitted". Three separate runs:
 
 ```text
 metrics: invalid configuration: METRICS_OTEL_METRICS_ENABLED is no longer read; use METRICS_OTEL__METRICS_ENABLED
@@ -188,6 +191,7 @@ metrics: invalid configuration: METRICS_CACHE: Value error, key_secret is a plac
 | `METRICS_CACHE__BACKEND`, `METRICS_CACHE__TTL_SECONDS`, `METRICS_CACHE__SCOPE_TTL_SECONDS` | removed; Redis and the windows are fixed |
 | `METRICS_PROVIDERS__PROMQL__MAX_SERIES` | removed |
 | `METRICS_PROVIDERS__KUEUE__KUBE_API_URL`, `__KUBE_API_TOKEN`, `__KUBE_VERIFY_TLS`, `__TOKEN_FILE`, `__CA_FILE`, `__KUBE_CLUSTERQUEUE_PATH` | removed; the ServiceAccount or kubeconfig supplies the API |
+| `METRICS_STARTUP_VALIDATION_TIMEOUT_SECONDS`, `METRICS_REDIS_KEY_PREFIX` | removed; fixed in code |
 | `METRICS_CONFIG_FILE`, `METRICS_API_GROUP`, `METRICS_CACHE_CONTROL_PUBLIC`, `METRICS_SOURCES__PLATFORM` | removed |
 
 `/readyz` becomes ready once Redis answers and every configured ClusterQueue

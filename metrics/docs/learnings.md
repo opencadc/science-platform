@@ -29,8 +29,8 @@ contract lives in [`specs.md`](specs.md).
     never replaced. A failed fill needs a short cooldown, or every waiter
     retries a failing source.
   - Evidence: `tests/test_cache_redis.py` and `tests/test_cache_coordinator.py`.
-  - Action taken: Startup rejects `COLD_GET_TIMEOUT <= lease`; the failure
-    cooldown is `METRICS_CACHE__FAILURE_COOLDOWN_SECONDS`.
+  - Action taken: The deadlines are constants (lease 13 s, cold wait 15 s,
+    failure cooldown 5 s), so no configuration can put them out of order.
 
 - Date: September 24, 2026
   - Context: Readiness during shared outages.

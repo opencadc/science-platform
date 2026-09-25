@@ -388,8 +388,7 @@ to `METRICS_CLUSTER_NAME` and the configured namespaces, and join the
 `Running` pod phase.
 
 Efficiency is read after the primary source proves the subject exists, and
-only within the time left in the fill (at most
-`METRICS_PROVIDERS__PROMQL__REQUEST_TIMEOUT_SECONDS`). Platform, User, and
+only within the time left in the fill (at most 5 seconds). Platform, User, and
 Community efficiency is read only when `reservingWorkloads` is above zero.
 Session efficiency is read only when the session has active Jobs and its
 window is at least one minute long; efficiency is reported per requested
@@ -456,9 +455,8 @@ stale window.
   is published, a failure is recorded, or the cold-wait deadline passes.
 - **Not found**: a subject-level not-found is published for the fresh window,
   so every replica answers 404 without re-reading the source.
-- **Failed fill**: the lease becomes a failure cooldown
-  (`METRICS_CACHE__FAILURE_COOLDOWN_SECONDS`, at most the fresh window and
-  never longer than the stale snapshot it protects). During the cooldown stale
+- **Failed fill**: the lease becomes a failure cooldown (5 seconds, at most
+  the fresh window and never longer than the stale snapshot it protects). During the cooldown stale
   snapshots keep being served and cold requests fail fast, with 503 after a
   source failure or 500 after an internal one; no replica calls the source
   until it ends.
@@ -467,9 +465,9 @@ stale window.
   until that snapshot's Redis TTL would have ended; otherwise 503 with
   `Retry-After: 1`.
 
-The lease lasts one fill plus two Redis commands plus a 2-second margin
-(13 seconds by default) and always ends before a cold waiter gives up
-(`METRICS_CACHE__COLD_GET_TIMEOUT_SECONDS`, 15 seconds by default), so waiters
+The lease lasts one 10-second fill plus two 0.5-second Redis commands plus a
+2-second margin (13 seconds) and always ends before a cold waiter gives up
+(15 seconds), so waiters
 take over the lease of a crashed replica. Every owner exit (publish, cooldown,
 release) is fenced on the lease token in Lua, so an owner that stalled past its
 lease can never overwrite its successor. A client-side retry of the claim

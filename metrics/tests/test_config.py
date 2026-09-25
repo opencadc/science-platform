@@ -165,14 +165,9 @@ def test_placeholder_cache_secrets_are_rejected(secret: str) -> None:
         CacheConfig(key_secret=secret)
 
 
-def test_cold_wait_must_outlast_the_fill_lease() -> None:
-    config = CacheConfig(key_secret="test-cache-integrity-key-32-bytes")
-    assert config.lease_seconds == 13 and config.cold_get_timeout_seconds == 15
-    with pytest.raises(ValidationError, match="must exceed the fill lease"):
-        CacheConfig(key_secret="test-cache-integrity-key-32-bytes", cold_get_timeout_seconds=13)
-    with pytest.raises(ValidationError, match="shortest stale window"):
-        CacheConfig(
-            key_secret="test-cache-integrity-key-32-bytes",
-            fill_timeout_seconds=58,
-            cold_get_timeout_seconds=90,
+def test_cache_deadlines_are_not_settings() -> None:
+    """Cache deadlines are constants, so no configuration can break the lease order."""
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        CacheConfig.model_validate(
+            {"key_secret": "test-cache-integrity-key-32-bytes", "fill_timeout_seconds": 20}
         )

@@ -366,7 +366,7 @@ async def test_usage_skips_metrics_api_when_no_pod_is_running() -> None:
         pods={"work-a": [_pod("pod-a", "work-a", "sess-1", phase="Pending")]},
     )
     observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
-    usage = await KubeMetricsProvider(_settings(), api=api).read_session_usage(observation)
+    usage = await KubeMetricsProvider(api=api).read_session_usage(observation)
 
     assert usage.usage == {} and api.metrics_calls == 0
 
@@ -422,9 +422,7 @@ async def test_kubemetrics_sums_running_pod_usage() -> None:
         },
     )
     session_observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
-    usage_observation = await KubeMetricsProvider(_settings(), api=api).read_session_usage(
-        session_observation
-    )
+    usage_observation = await KubeMetricsProvider(api=api).read_session_usage(session_observation)
 
     assert usage_observation.usage == {"cpu": "0.5", "memory": "1Gi"}
     assert usage_observation.observed_at == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
@@ -448,9 +446,7 @@ async def test_kubemetrics_observed_at_uses_oldest_podmetrics_timestamp() -> Non
         },
     )
     session_observation = await SessionProvider(_settings(), api=api).read_session("sess-1")
-    usage_observation = await KubeMetricsProvider(_settings(), api=api).read_session_usage(
-        session_observation
-    )
+    usage_observation = await KubeMetricsProvider(api=api).read_session_usage(session_observation)
 
     assert usage_observation.observed_at == datetime(2026, 1, 1, 12, 20, tzinfo=UTC)
 
@@ -464,7 +460,7 @@ async def test_session_service_returns_usage_and_efficiency() -> None:
         pod_metrics={"work-a": [_pod_metrics("desktop-pod")]},
     )
     session_provider = SessionProvider(_settings(), api=api)
-    usage_provider = KubeMetricsProvider(_settings(), api=api)
+    usage_provider = KubeMetricsProvider(api=api)
 
     async def efficiency(session_id: str) -> EfficiencyObservation:
         assert session_id == "sess-1"
@@ -570,7 +566,7 @@ async def test_session_service_omits_efficiency_without_start_time() -> None:
 
     report = await _session_service(
         session_provider=SessionProvider(_settings(), api=api),
-        usage_loader=KubeMetricsProvider(_settings(), api=api).read_session_usage,
+        usage_loader=KubeMetricsProvider(api=api).read_session_usage,
         session_efficiency=efficiency,
     ).get(MetricsSubject("session", "sess-1"))
 
@@ -591,7 +587,7 @@ async def test_session_service_marks_partial_when_efficiency_fails() -> None:
     )
     report = await _session_service(
         session_provider=SessionProvider(_settings(), api=api),
-        usage_loader=KubeMetricsProvider(_settings(), api=api).read_session_usage,
+        usage_loader=KubeMetricsProvider(api=api).read_session_usage,
         session_efficiency=failing_efficiency,
     ).get(MetricsSubject("session", "sess-1"))
 
@@ -710,7 +706,7 @@ async def test_session_service_marks_partial_when_pods_unreachable() -> None:
 
     report = await _session_service(
         session_provider=StaticSessionProvider(),
-        usage_loader=KubeMetricsProvider(_settings(), api=FakeKubernetesApi()).read_session_usage,
+        usage_loader=KubeMetricsProvider(api=FakeKubernetesApi()).read_session_usage,
     ).get(MetricsSubject("session", "sess-1"))
 
     assert report.snapshot.partial
@@ -740,9 +736,7 @@ async def test_session_cache_terminal_miss_maps_to_not_found() -> None:
     with pytest.raises(AppError) as exc:
         await _session_service(
             session_provider=SessionProvider(_settings(), api=FakeKubernetesApi()),
-            usage_loader=KubeMetricsProvider(
-                _settings(), api=FakeKubernetesApi()
-            ).read_session_usage,
+            usage_loader=KubeMetricsProvider(api=FakeKubernetesApi()).read_session_usage,
             session_cache=_TerminalNotFoundCache(),
         ).get(MetricsSubject("session", "missing"))
     assert exc.value.status_code == 404

@@ -39,6 +39,7 @@ from metrics.services.resources import (
 
 _COMMUNITY_LABEL = "canfar.net/community"
 _USERNAME_LABEL = "canfar.net/username"
+_KUEUE_API_VERSION = "kueue.x-k8s.io/v1beta2"
 
 
 def _required_label(labels: dict[str, str], name: str, kind: str) -> str:
@@ -189,7 +190,7 @@ class KueueProvider:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         self._settings = settings
         self._config = settings.providers.kueue
-        self._kube = KubeReader(timeout=self._config.kube_request_timeout_seconds, api=api)
+        self._kube = KubeReader(api=api)
 
     async def _cluster_queues(self) -> list[_ClusterQueue]:
         """Read and parse every configured ClusterQueue with named GETs."""
@@ -199,7 +200,7 @@ class KueueProvider:
 
         async def fetch(name: str) -> _ClusterQueue:
             doc = await self._kube.get(
-                version=self._config.kueue_api_version,
+                version=_KUEUE_API_VERSION,
                 url=f"clusterqueues/{name}",
                 kind="Kueue ClusterQueue",
             )
@@ -215,7 +216,7 @@ class KueueProvider:
 
         async def fetch(namespace: str) -> list[dict[str, Any]]:
             return await self._kube.list_all(
-                version=self._config.kueue_api_version,
+                version=_KUEUE_API_VERSION,
                 resource="localqueues",
                 namespace=namespace,
                 kind="Kueue LocalQueue list",
@@ -234,7 +235,7 @@ class KueueProvider:
         """Return a stable cache revision for the configured Kueue population."""
         raw = json.dumps(
             {
-                "api_version": self._config.kueue_api_version,
+                "api_version": _KUEUE_API_VERSION,
                 "cluster_queues": self._config.cluster_queues,
                 "namespaces": self._config.namespaces,
             },
@@ -343,7 +344,7 @@ class KueueProvider:
 
         async def probe(namespace: str) -> None:
             await self._kube.probe(
-                version=self._config.kueue_api_version,
+                version=_KUEUE_API_VERSION,
                 resource="localqueues",
                 namespace=namespace,
                 kind="Kueue LocalQueue list",
