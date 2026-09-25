@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.1.6](https://github.com/opencadc/science-platform/compare/metrics-v0.1.5...metrics-v0.1.6) (2026-09-25)
+
+
+### Features
+
+* CANFAR Science Platform Grafana dashboards ([#1147](https://github.com/opencadc/science-platform/issues/1147)) ([faca289](https://github.com/opencadc/science-platform/commit/faca289eb5ae3da86f0342fcaef5a282e5078c49))
+* **metrics:** add cached four-surface usage API ([#1181](https://github.com/opencadc/science-platform/issues/1181)) ([8fe82b2](https://github.com/opencadc/science-platform/commit/8fe82b2b8fa48f7a1932a6117e02ae08afa14362))
+
+
+### Bug Fixes
+
+* **dashboards:** query the instruments the metrics service exports ([fe51411](https://github.com/opencadc/science-platform/commit/fe51411ef5c438eb90d874dc6170b2335cfdc9fc))
+* **metrics:** fail fast on retired or placeholder settings and harden delivery ([5de97a5](https://github.com/opencadc/science-platform/commit/5de97a507d462056d2d46bd2351c1271f567fe10))
+* **metrics:** floor Cache-Status ttl and keep startup log lines ([db7045c](https://github.com/opencadc/science-platform/commit/db7045ca595eae18362d3109c857be84105f477e))
+* **metrics:** integrate Session efficiency over each pod's Running time ([5fa3401](https://github.com/opencadc/science-platform/commit/5fa3401843b9624e7b63f80b273a617b3f843463))
+* **metrics:** log Metrics-owned failure messages ([d412562](https://github.com/opencadc/science-platform/commit/d412562a2f8e257d12ab4327ad6b34a65d7f6429))
+* **metrics:** log rejected cache payloads and drop no-op except clauses ([e1b1e1e](https://github.com/opencadc/science-platform/commit/e1b1e1e2c108f37d9e9199733db4f2614b9adb28))
+* **metrics:** report rejected payloads and efficiency status, pin the payload schema ([afad554](https://github.com/opencadc/science-platform/commit/afad5541557aab93940fca60a5629017dac11bea))
+* **metrics:** report Session requests from active Jobs and share Kubernetes reads ([8b18d5a](https://github.com/opencadc/science-platform/commit/8b18d5ad992de550944857f0c4d094421b0fc2ab))
+* **metrics:** serve two-stage snapshots through one refresher and correct Session reports ([d220810](https://github.com/opencadc/science-platform/commit/d22081071266a7a80884c280dd28a5f57640d750))
+* **metrics:** skip Session efficiency for sessions without active Jobs ([8b9fd35](https://github.com/opencadc/science-platform/commit/8b9fd35ea3dea7595e4298ff97bd91bb704d9c9f))
+* **metrics:** treat the kind version pin as a minimum ([ba2ac64](https://github.com/opencadc/science-platform/commit/ba2ac64a457769864f06248e52d6cf81fd10ff42))
+* **skaha:** adjust build configuration ([60b5ba8](https://github.com/opencadc/science-platform/commit/60b5ba865121d1db8a9d10cb404c1ba3bb0af4f9))
+* **skaha:** correct session name parameter ([6aa171d](https://github.com/opencadc/science-platform/commit/6aa171da30c4ea74a76dbc99c671f8c0adfc71b1))
+
+
+### Performance Improvements
+
+* **metrics:** read Kubernetes lists from the watch cache ([34e58cb](https://github.com/opencadc/science-platform/commit/34e58cbbe5fb189daabbe77d18eee80bc28aa518))
+
+
+### Documentation
+
+* **metrics:** align spec, glossary, ADRs, and runbooks with the code ([7ce9881](https://github.com/opencadc/science-platform/commit/7ce9881138162959f4b1347688fff61702ac0365))
+* **metrics:** ignore AI adapter dirs and fix ADR/docs cleanup ([399416b](https://github.com/opencadc/science-platform/commit/399416b2b825ba3ea3190dd9d825f5843d1b6e59))
+* **metrics:** list the names module in the package map ([c0d92d7](https://github.com/opencadc/science-platform/commit/c0d92d7b0acf3ddf6cde032c60c2c04003ff7f7b))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([9bc7d92](https://github.com/opencadc/science-platform/commit/9bc7d9296b9e598204d7b511517e642f84d7df04))
+* **metrics:** retire harness and milestone plans in favor of ADRs ([0cf4955](https://github.com/opencadc/science-platform/commit/0cf49556c5364bc8f0cfd40c2859af4188120660))
+* **skaha:** document session labels and drop planning scratch ([dc95b0c](https://github.com/opencadc/science-platform/commit/dc95b0c1f74c190693bc97cf6914ebfd5b3e20d1))
+
 ## [0.1.5](https://github.com/opencadc/science-platform/compare/metrics-v0.1.4...metrics-v0.1.5) (2026-05-13)
 
 

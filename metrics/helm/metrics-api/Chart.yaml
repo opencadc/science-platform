@@ -1,6 +1,8 @@
 apiVersion: v2
 name: metrics-api
-description: CANFAR Metrics API chart for operator-configured deployments with external services
+description: >-
+  CANFAR Metrics API chart for operator-configured deployments with external
+  services
 type: application
-version: 0.1.5
-appVersion: "0.1.5"
+version: 0.1.6
+appVersion: 0.1.6
