@@ -16,6 +16,7 @@ from metrics.errors import (
     SubjectNotFoundError,
 )
 from metrics.providers.kube import (
+    KubeApi,
     KubeReader,
     concurrently,
     fan_out,
@@ -177,7 +178,7 @@ class SessionProvider:
 
     name = "session"
 
-    def __init__(self, settings: Settings, api: Any | None = None) -> None:
+    def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         self._config: KueueProviderConfig = settings.providers.kueue
         self._kube = KubeReader(timeout=self._config.kube_request_timeout_seconds, api=api)

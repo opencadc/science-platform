@@ -14,8 +14,9 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import httpx
 import kr8s
@@ -36,6 +37,38 @@ _Input = TypeVar("_Input")
 _Output = TypeVar("_Output")
 _First = TypeVar("_First")
 _Second = TypeVar("_Second")
+
+
+class KubeAuth(Protocol):
+    """The credential handle of a kr8s API client."""
+
+    token: str | None
+
+    async def reauthenticate(self) -> None:
+        """Reload credentials, for example a rotated ServiceAccount token."""
+
+
+class KubeApi(Protocol):
+    """The slice of the kr8s API client that ``KubeReader`` uses."""
+
+    @property
+    def auth(self) -> KubeAuth:
+        """Return the client's credential handle."""
+        ...
+
+    def call_api(
+        self,
+        method: str = "GET",
+        version: str = "v1",
+        base: str = "",
+        namespace: str | None = None,
+        url: str = "",
+        raise_for_status: bool = True,
+        stream: bool = False,
+        **kwargs: Any,
+    ) -> AbstractAsyncContextManager[httpx.Response]:
+        """Send one request and yield its response."""
+        ...
 
 
 class KubeStatusError(ProviderUnavailableError):
@@ -160,13 +193,13 @@ async def concurrently(
 class KubeReader:
     """Read Kubernetes JSON through one lazily bound kr8s API handle."""
 
-    def __init__(self, *, timeout: float, api: Any | None = None) -> None:
+    def __init__(self, *, timeout: float, api: KubeApi | None = None) -> None:
         """Keep the request timeout and an optional pre-bound (or fake) API."""
         self._timeout = timeout
         self._api = api
         self._credentials = asyncio.Lock()
 
-    async def _bound(self) -> Any:
+    async def _bound(self) -> KubeApi:
         """Bind the kr8s API from in-cluster credentials or kubeconfig once."""
         if self._api is None:
             try:
@@ -177,7 +210,7 @@ class KubeReader:
             self._api = api
         return self._api
 
-    async def _refresh_credentials(self, api: Any) -> None:
+    async def _refresh_credentials(self, api: KubeApi) -> None:
         """Reload a rotated ServiceAccount token without closing the shared client."""
         async with self._credentials:
             await api.auth.reauthenticate()

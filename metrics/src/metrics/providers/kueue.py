@@ -16,6 +16,7 @@ from metrics.errors import (
     SubjectNotFoundError,
 )
 from metrics.providers.kube import (
+    KubeApi,
     MAX_RESULT_OBJECTS,
     KubeReader,
     concurrently,
@@ -184,7 +185,7 @@ class KueueProvider:
 
     name = "kueue"
 
-    def __init__(self, settings: Settings, api: Any | None = None) -> None:
+    def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         self._settings = settings
         self._config = settings.providers.kueue

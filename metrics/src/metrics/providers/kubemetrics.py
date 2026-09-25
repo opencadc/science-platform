@@ -9,6 +9,7 @@ from typing import Any
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError
 from metrics.providers.kube import (
+    KubeApi,
     MAX_RESULT_OBJECTS,
     KubeReader,
     fan_out,
@@ -49,7 +50,7 @@ class KubeMetricsProvider:
 
     name = "kubemetrics"
 
-    def __init__(self, settings: Settings, api: Any | None = None) -> None:
+    def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         config = settings.providers.kueue
         self._kube = KubeReader(timeout=config.kube_request_timeout_seconds, api=api)
