@@ -37,7 +37,7 @@ Mimir series queried by the optional efficiency provider.
 
 `CLUSTER_QUEUES` is the complete Platform set. Each named ClusterQueue must be
 readable and maps to one Community. `NAMESPACES` is the complete namespace set
-searched for User LocalQueues and Session Jobs. The service lists LocalQueues
+searched for User LocalQueues, Session Jobs and Pods, and PodMetrics. The service lists LocalQueues
 in every configured namespace and selects exact `canfar.net/username` labels.
 
 Kubernetes endpoint, credentials, and CA trust come from the in-cluster
@@ -49,7 +49,7 @@ ServiceAccount or kubeconfig. The Kueue API contract is
 ```bash
 export METRICS_CLUSTER_NAME='cluster.example'
 export METRICS_REDIS_URL='rediss://redis.example/0'
-export METRICS_CACHE__KEY_SECRET='<secret-reference-or-injected-value>'
+export METRICS_CACHE__KEY_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
 
 Redis is one shared external cache for every Metrics replica and every surface.
@@ -83,33 +83,123 @@ export METRICS_OTEL__EXPORTER_OTLP_ENDPOINT='https://otel.example/v1/metrics'
 ```
 
 The app exports application-state metrics only when metrics export is enabled
-**and** an endpoint is provided. It does not export OTLP traces or logs, and
+**and** an endpoint is provided; enabling export without an endpoint is a
+startup error. It does not export OTLP traces or logs, and
 there are no trace/log enable settings. The endpoint may be an external
 Collector, Alloy, or compatible OTLP metrics receiver. The production chart
 does not install any receiver.
 
+## Other settings
+
+| Variable | Default | Bound | Meaning |
+| --- | --- | --- | --- |
+| `METRICS_HOST` | `0.0.0.0` | host name or IP | Listen address |
+| `METRICS_PORT` | 8000 | 1–65535 | Listen port |
+| `METRICS_LOG_LEVEL` | `info` | `critical`, `error`, `warning`, `info`, `debug`, `trace` | Log level |
+| `METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID` | — | 1–150 characters | Sent as `X-Scope-OrgID` |
+| `METRICS_OTEL__SERVICE_NAME` | `canfar-metrics` | 1–128 characters | OTLP `service.name` |
+| `METRICS_OTEL__EXPORT_INTERVAL_MILLIS` | 60000 | ≤ 1 hour | OTLP export interval |
+| `METRICS_OTEL__DEPLOYMENT_ENVIRONMENT` | `unknown` | 1–63 characters | OTLP `deployment.environment.name` |
+| `METRICS_OTEL__KUBERNETES_NAMESPACE` | `unknown` | DNS label | OTLP `k8s.namespace.name` |
+| `METRICS_OTEL__POD_UID` | host name | 1–128 characters | OTLP `service.instance.id`; the charts set the pod UID |
+
 ## Cache windows
 
-Freshness and serviceability are fixed by surface (canonical numbers in
-`FRESHNESS_POLICIES` and [`specs.md`](specs.md)):
+Windows are fixed by surface in `FRESHNESS_POLICIES`
+(`src/metrics/cache/models.py`) and are not environment settings:
 
-| Surface | Fresh | Serviceable stale | Retained for recovery |
-| --- | ---: | ---: | ---: |
-| Session | 30s | 60s | 3m |
-| User | 2m | 3m | 5m |
-| Community | 5m | 10m | 15m |
-| Platform | 5m | 30m | 60m |
+| Surface | Fresh | Stale (Redis TTL) |
+| --- | ---: | ---: |
+| Platform | 5m | 10m |
+| User | 2m | 4m |
+| Community | 5m | 10m |
+| Session | 30s | 60s |
 
-The service uses one stable Redis lease per surface and subject. Different
-subjects may fill concurrently. Stale serviceable snapshots may be returned
-while one request-triggered refresh runs; cold requests share the winner's
-result. Missing User, Community, and Session subjects use a bounded
-authenticated terminal outcome with the same subject retention policy, so
-followers reproduce the winner's 404.
+A snapshot has two stages only. It is written with a Redis TTL equal to its
+stale window, measured from the start of its fill, and is gone when that TTL
+ends; nothing is retained for recovery. A stale snapshot is served while
+exactly one request, on one replica, refreshes it. Cold requests share one
+fill. Missing User, Community, and Session subjects are published as an
+authenticated not-found for the fresh window, so every replica returns the
+same 404 without re-reading the source. The full request flow is in
+[`specs.md`](specs.md#cache).
+
+## Cache key and fixed bounds
+
+`METRICS_CACHE__KEY_SECRET` is the only cache setting: at least 32 bytes, not
+a placeholder or one repeated character. It keys the subject digests and the
+payload MACs. Rotating it moves every subject to new keys: the first requests
+refill, and old keys expire within their stale window.
+
+Deadlines and bounds are constants of the code, not settings, so no
+configuration can put them out of order:
+
+| Bound | Value | Meaning |
+| --- | ---: | --- |
+| Redis command | 0.5 s | Connect and socket timeout of each command; a dropped connection is retried once |
+| Fill | 10 s | One source fill, including optional enrichment |
+| Lease | 13 s | One fill, two Redis commands, and a 2-second margin |
+| Cold wait | 15 s | How long a cold request waits for another replica's fill; always longer than the lease, so waiters replace a crashed owner |
+| Failure cooldown | 5 s | Pause after a failed fill, capped at the surface's fresh window |
+| Outage copy | 128 per surface | Snapshots each replica keeps for Redis outages |
+| Kubernetes request | 5 s | One API request; also bounds the Session usage read |
+| PromQL request | 5 s | One efficiency read, further limited by the time left in the fill |
+| PromQL sample age | 300 s old, 30 s ahead | Accepted instant-sample times |
+| PromQL response | 4 MiB | Largest accepted response |
+| Startup validation | 60 s | Each startup probe and readiness validation |
+
+Every key starts with `metrics:`.
+
+Keys look like `metrics:<revision>:<source>:<query>:<surface>:{<digest>}:value`
+and `…:lease`. The hash tag keeps both keys of a subject in one Redis Cluster
+slot. The Lua scripts run with `EVALSHA`, falling back to `EVAL` when Redis
+does not have the script cached (first use, or after a restart); Redis must
+allow both.
 
 HTTP status codes and `Ready`/`Cached` reasons are defined in
-[`specs.md`](specs.md). Redis outage serves only a known serviceable snapshot;
-otherwise 503. Do not bypass Redis with an uncoordinated fill per request.
+[`specs.md`](specs.md). During a Redis outage a replica serves only snapshots
+it already holds, never past their Redis TTL; otherwise 503 with
+`Retry-After: 1`. The source is never read without a Redis lease.
+
+## Startup validation
+
+The process exits with status 2 before serving when a retired name is set,
+when a setting is invalid, or when `METRICS_CACHE__KEY_SECRET` is a
+placeholder. It prints one line per problem and never a value. Retired names
+are reported first, alone; fix them and the remaining problems are reported
+on the next start. A placeholder secret is reported against `METRICS_CACHE`,
+and a removed nested setting (such as `METRICS_CACHE__FILL_TIMEOUT_SECONDS`)
+as "Extra inputs are not permitted". Three separate runs:
+
+```text
+metrics: invalid configuration: METRICS_OTEL_METRICS_ENABLED is no longer read; use METRICS_OTEL__METRICS_ENABLED
+```
+
+```text
+metrics: invalid configuration: METRICS_CACHE__KEY_SECRET: Field required
+```
+
+```text
+metrics: invalid configuration: METRICS_CACHE: Value error, key_secret is a placeholder; generate one with python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+| Retired name | Replacement |
+| --- | --- |
+| `METRICS_OTEL_<FIELD>` (single underscore) | `METRICS_OTEL__<FIELD>` |
+| `METRICS_ENVIRONMENT` | `METRICS_OTEL__DEPLOYMENT_ENVIRONMENT` |
+| `METRICS_LOGLEVEL` | `METRICS_LOG_LEVEL` |
+| `METRICS_CACHE__BACKEND`, `METRICS_CACHE__TTL_SECONDS`, `METRICS_CACHE__SCOPE_TTL_SECONDS` | removed; Redis and the windows are fixed |
+| `METRICS_PROVIDERS__PROMQL__MAX_SERIES` | removed |
+| `METRICS_PROVIDERS__KUEUE__KUBE_API_URL`, `__KUBE_API_TOKEN`, `__KUBE_VERIFY_TLS`, `__TOKEN_FILE`, `__CA_FILE`, `__KUBE_CLUSTERQUEUE_PATH` | removed; the ServiceAccount or kubeconfig supplies the API |
+| `METRICS_STARTUP_VALIDATION_TIMEOUT_SECONDS`, `METRICS_REDIS_KEY_PREFIX` | removed; fixed in code |
+| `METRICS_CONFIG_FILE`, `METRICS_API_GROUP`, `METRICS_CACHE_CONTROL_PUBLIC`, `METRICS_SOURCES__PLATFORM` | removed |
+
+`/readyz` becomes ready once Redis answers and every configured ClusterQueue
+is readable and well formed, then stays ready until shutdown
+([ADR-0012](adr/0012-latched-readiness.md)). A pod that cannot reach Redis
+at all during startup exits instead, and Kubernetes restarts it. LocalQueue
+and Job list access are checked at startup and logged, but do not gate
+readiness; PromQL is not contacted until the first efficiency read.
 
 ## Ownership boundary
 
@@ -124,6 +214,14 @@ does not own:
 
 Disposable test profiles may provision those dependencies to validate the
 integration. A test fixture is not a production dependency claim.
+
+In the `metrics-api` chart, the Kueue lists (`kueue.clusterQueues`,
+`kueue.namespaces`), `clusterName`, `platformName`, the Redis and cache-key
+Secret references, `promql.*`, and `otel.endpoint` are structured values. The
+chart uses the Kueue lists for RBAC and renders all of them into the
+environment. `env` passes any other `METRICS_*` setting through unchanged, and
+setting one of the rendered keys there fails the render. The chart only
+requires values; Metrics validates them at startup.
 
 ## Evidence boundary
 

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import ipaddress
-import math
 import re
+import socket
+from collections.abc import Mapping
 from collections import Counter
 from typing import Literal
 from urllib.parse import urlsplit
@@ -20,14 +21,16 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from metrics.names import DNS_LABEL, LABEL_VALUE
 
-_DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+
 _HOST_DNS_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HOST_PATTERN = re.compile(rf"{_HOST_DNS_LABEL}(?:\.{_HOST_DNS_LABEL})*")
-_PLATFORM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$")
 _REDIS_DATABASE_PATTERN = re.compile(r"^/[0-9]+$")
-_COLD_FILL_REDIS_COMMANDS = 10
 
+_PLACEHOLDER_SECRETS = frozenset(
+    {"replace-with-at-least-32-random-bytes", "<secret-reference-or-injected-value>"}
+)
 MAX_CLUSTER_QUEUES = 256
 MAX_NAMESPACES = 256
 _MAX_REDIS_URL_LENGTH = 512
@@ -38,20 +41,8 @@ _MAX_OTEL_SERVICE_NAME_LENGTH = 128
 _MAX_OTEL_ENVIRONMENT_LENGTH = 63
 _MAX_OTEL_NAMESPACE_LENGTH = 63
 _MAX_OTEL_POD_UID_LENGTH = 128
-_MAX_KUBE_REQUEST_TIMEOUT_SECONDS = 300.0
-_MAX_PROMQL_REQUEST_TIMEOUT_SECONDS = 300.0
-_MAX_PROMQL_SAMPLE_AGE_SECONDS = 7 * 24 * 60 * 60
-_MAX_PROMQL_FUTURE_TOLERANCE_SECONDS = 60 * 60
-_MAX_PROMQL_SERIES = 10_000
-_MAX_REDIS_COMMAND_TIMEOUT_SECONDS = 30.0
-_MAX_CACHE_FILL_TIMEOUT_SECONDS = 300.0
-_MAX_CACHE_COLD_GET_TIMEOUT_SECONDS = 600.0
-_MAX_CACHE_L1_ENTRIES = 10_000
 _MAX_OTEL_EXPORT_INTERVAL_MILLIS = 60 * 60 * 1000
-_MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS = 300.0
 _PROMQL_BASE_PATH_MAX_LENGTH = 128
-_PROMQL_DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
-_PROMQL_HARD_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 
 def _canonical_text(
@@ -79,9 +70,7 @@ def _canonical_text(
 
 def _is_dns_subdomain(value: str) -> bool:
     """Return whether a value follows Kubernetes DNS subdomain naming rules."""
-    return len(value) <= 253 and all(
-        _DNS_LABEL_PATTERN.fullmatch(part) for part in value.split(".")
-    )
+    return len(value) <= 253 and all(DNS_LABEL.fullmatch(part) for part in value.split("."))
 
 
 def _validate_dns_or_ip_host(value: str, *, field_name: str) -> str:
@@ -114,7 +103,7 @@ def _normalize_kubernetes_names(
         name = item.strip()
         if not name:
             raise ValueError(f"{field_name} must not contain empty names")
-        valid = _is_dns_subdomain(name) if subdomain else bool(_DNS_LABEL_PATTERN.fullmatch(name))
+        valid = _is_dns_subdomain(name) if subdomain else bool(DNS_LABEL.fullmatch(name))
         if not valid:
             raise ValueError(f"{field_name} must use Kubernetes {grammar} names")
         names.append(name)
@@ -122,13 +111,6 @@ def _normalize_kubernetes_names(
     if duplicates:
         raise ValueError(f"duplicate {field_name}: {', '.join(duplicates)}")
     return names
-
-
-def _finite_timeout(value: float, *, field_name: str) -> float:
-    """Reject non-finite timeout values."""
-    if not math.isfinite(value):
-        raise ValueError(f"{field_name} must be finite")
-    return value
 
 
 def _validate_redis_url(value: str) -> str:
@@ -203,11 +185,7 @@ class KueueProviderConfig(BaseModel):
     namespaces: list[str] = Field(
         min_length=1,
         max_length=MAX_NAMESPACES,
-        description="Namespaces searched for User LocalQueues.",
-    )
-    kueue_api_version: Literal["kueue.x-k8s.io/v1beta2"] = "kueue.x-k8s.io/v1beta2"
-    kube_request_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=_MAX_KUBE_REQUEST_TIMEOUT_SECONDS
+        description="Namespaces searched for LocalQueues, Session Jobs and Pods, and PodMetrics.",
     )
 
     @field_validator("cluster_queues")
@@ -232,12 +210,6 @@ class KueueProviderConfig(BaseModel):
             subdomain=False,
         )
 
-    @field_validator("kube_request_timeout_seconds")
-    @classmethod
-    def _validate_timeout(cls, value: float) -> float:
-        """Require a finite Kubernetes request timeout."""
-        return _finite_timeout(value, field_name="kube_request_timeout_seconds")
-
 
 class PromQLProviderConfig(BaseModel):
     """Bound optional Prometheus-compatible efficiency adapter settings.
@@ -250,19 +222,6 @@ class PromQLProviderConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     base_url: AnyHttpUrl | None = None
-    request_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=_MAX_PROMQL_REQUEST_TIMEOUT_SECONDS
-    )
-    max_sample_age_seconds: int = Field(default=300, gt=0, le=_MAX_PROMQL_SAMPLE_AGE_SECONDS)
-    future_sample_tolerance_seconds: int = Field(
-        default=30, ge=0, le=_MAX_PROMQL_FUTURE_TOLERANCE_SECONDS
-    )
-    max_series: int = Field(default=3_000, gt=0, le=_MAX_PROMQL_SERIES)
-    max_response_bytes: int = Field(
-        default=_PROMQL_DEFAULT_MAX_RESPONSE_BYTES,
-        gt=0,
-        le=_PROMQL_HARD_MAX_RESPONSE_BYTES,
-    )
     mimir_tenant_id: str | None = Field(default=None, min_length=1, max_length=150)
 
     @field_validator("base_url")
@@ -285,12 +244,6 @@ class PromQLProviderConfig(BaseModel):
             raise ValueError("base_url path prefix is too long")
         return value
 
-    @field_validator("request_timeout_seconds")
-    @classmethod
-    def _validate_timeout(cls, value: float) -> float:
-        """Require a finite efficiency request timeout."""
-        return _finite_timeout(value, field_name="request_timeout_seconds")
-
 
 class ProviderConfigs(BaseModel):
     """Group the Kueue source and optional efficiency settings."""
@@ -302,39 +255,27 @@ class ProviderConfigs(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    """Configure mandatory shared Redis integrity and bounded local fallback."""
+    """Hold the shared Redis cache's integrity key.
+
+    Cache deadlines and bounds are constants of the cache package; see
+    ``RedisCoordinator``.
+    """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     key_secret: SecretStr
-    redis_command_timeout_seconds: float = Field(
-        default=0.5, gt=0, le=_MAX_REDIS_COMMAND_TIMEOUT_SECONDS
-    )
-    fill_timeout_seconds: float = Field(default=10.0, gt=0, le=_MAX_CACHE_FILL_TIMEOUT_SECONDS)
-    cold_get_timeout_seconds: float = Field(
-        default=15.0, gt=0, le=_MAX_CACHE_COLD_GET_TIMEOUT_SECONDS
-    )
-    l1_max_entries: int = Field(default=128, gt=0, le=_MAX_CACHE_L1_ENTRIES)
 
     @model_validator(mode="after")
-    def _validate_cache_contract(self) -> CacheConfig:
-        """Require Redis integrity and finite cache deadlines."""
+    def _validate_key_secret(self) -> CacheConfig:
+        """Require a real, sufficiently long integrity key."""
         secret = self.key_secret.get_secret_value()
         if len(secret.encode()) < 32:
             raise ValueError("key_secret must contain at least 32 UTF-8 bytes")
-        minimum = self.fill_timeout_seconds + (
-            _COLD_FILL_REDIS_COMMANDS * self.redis_command_timeout_seconds
-        )
-        if self.cold_get_timeout_seconds < minimum:
+        if secret in _PLACEHOLDER_SECRETS or len(set(secret)) == 1:
             raise ValueError(
-                "cold_get_timeout_seconds must cover the bounded cold-fill Redis command path"
+                "key_secret is a placeholder; generate one with "
+                "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
-        for field_name in (
-            "redis_command_timeout_seconds",
-            "fill_timeout_seconds",
-            "cold_get_timeout_seconds",
-        ):
-            _finite_timeout(getattr(self, field_name), field_name=field_name)
         return self
 
 
@@ -355,7 +296,11 @@ class OTelConfig(BaseModel):
     kubernetes_namespace: str = Field(
         default="unknown", min_length=1, max_length=_MAX_OTEL_NAMESPACE_LENGTH
     )
-    pod_uid: str = Field(default="unknown", min_length=1, max_length=_MAX_OTEL_POD_UID_LENGTH)
+    pod_uid: str = Field(
+        default_factory=lambda: socket.gethostname() or "unknown",
+        min_length=1,
+        max_length=_MAX_OTEL_POD_UID_LENGTH,
+    )
 
     @field_validator("exporter_otlp_endpoint", mode="before")
     @classmethod
@@ -379,7 +324,7 @@ class OTelConfig(BaseModel):
     def _validate_namespace(cls, value: str) -> str:
         """Require one Kubernetes namespace label."""
         normalized = _canonical_text(value, field_name="kubernetes_namespace", ascii_only=True)
-        if not _DNS_LABEL_PATTERN.fullmatch(normalized):
+        if not DNS_LABEL.fullmatch(normalized):
             raise ValueError("kubernetes_namespace must be a Kubernetes DNS label")
         return normalized
 
@@ -402,23 +347,15 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
-    app_name: str = "CANFAR Metrics API"
-    app_version: str = "v1alpha1"
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
-    startup_validation_timeout_seconds: float = Field(
-        default=60.0,
-        gt=0,
-        le=_MAX_STARTUP_VALIDATION_TIMEOUT_SECONDS,
-    )
     cluster_name: str
-    platform_name: str = Field(default="canfar", min_length=1, max_length=63)
+    platform_name: str = "canfar"
     providers: ProviderConfigs
-    cache: CacheConfig = Field(default_factory=CacheConfig)
+    cache: CacheConfig
     otel: OTelConfig = Field(default_factory=OTelConfig)
-    redis_url: str
-    redis_key_prefix: str = "metrics:"
+    redis_url: SecretStr
 
     @field_validator("host")
     @classmethod
@@ -432,39 +369,78 @@ class Settings(BaseSettings):
     @field_validator("cluster_name")
     @classmethod
     def _validate_cluster_name(cls, value: str) -> str:
-        """Require the lower-case DNS name used by cache identity."""
+        """Require the real lower-case DNS name used by cache identity."""
         normalized = _canonical_text(
             value, field_name="cluster_name", max_length=253, ascii_only=True
         )
         if not _is_dns_subdomain(normalized):
             raise ValueError("cluster_name must be a bounded lower-case DNS name")
+        if normalized == "unknown":
+            raise ValueError("cluster_name must name the real cluster, not unknown")
         return normalized
 
     @field_validator("platform_name")
     @classmethod
     def _validate_platform_name(cls, value: str) -> str:
-        """Require a path-safe public platform subject."""
-        normalized = _canonical_text(
-            value, field_name="platform_name", max_length=63, ascii_only=True
-        )
-        if _PLATFORM_NAME_PATTERN.fullmatch(normalized) is None:
+        """Require a path-safe public platform subject (a label value)."""
+        normalized = value.strip()
+        if LABEL_VALUE.fullmatch(normalized) is None:
             raise ValueError("platform_name must be a path-safe label value")
         return normalized
 
     @field_validator("redis_url")
     @classmethod
-    def _validate_redis(cls, value: str) -> str:
-        """Validate the configured Redis URL."""
-        return _validate_redis_url(value)
+    def _validate_redis(cls, value: SecretStr) -> SecretStr:
+        """Validate the configured Redis URL without exposing its credentials."""
+        return SecretStr(_validate_redis_url(value.get_secret_value()))
 
-    @field_validator("redis_key_prefix")
-    @classmethod
-    def _validate_prefix(cls, value: str) -> str:
-        """Require a bounded non-empty Redis key namespace."""
-        return _canonical_text(value, field_name="redis_key_prefix", max_length=128)
 
-    @field_validator("startup_validation_timeout_seconds")
-    @classmethod
-    def _validate_startup_timeout(cls, value: float) -> float:
-        """Require a finite startup deadline."""
-        return _finite_timeout(value, field_name="startup_validation_timeout_seconds")
+_OTEL_FIELDS = (
+    "METRICS_ENABLED",
+    "EXPORTER_OTLP_ENDPOINT",
+    "SERVICE_NAME",
+    "EXPORT_INTERVAL_MILLIS",
+    "DEPLOYMENT_ENVIRONMENT",
+    "KUBERNETES_NAMESPACE",
+    "POD_UID",
+)
+RETIRED_ENVIRONMENT = {
+    **{f"METRICS_OTEL_{name}": f"METRICS_OTEL__{name}" for name in _OTEL_FIELDS},
+    "METRICS_ENVIRONMENT": "METRICS_OTEL__DEPLOYMENT_ENVIRONMENT",
+    "METRICS_LOGLEVEL": "METRICS_LOG_LEVEL",
+    "METRICS_CONFIG_FILE": None,
+    "METRICS_API_GROUP": None,
+    "METRICS_CACHE_CONTROL_PUBLIC": None,
+    "METRICS_SOURCES__PLATFORM": None,
+    "METRICS_CACHE__BACKEND": None,
+    "METRICS_CACHE__TTL_SECONDS": None,
+    "METRICS_CACHE__SCOPE_TTL_SECONDS": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_API_URL": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_API_TOKEN": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_VERIFY_TLS": None,
+    "METRICS_PROVIDERS__KUEUE__TOKEN_FILE": None,
+    "METRICS_PROVIDERS__KUEUE__CA_FILE": None,
+    "METRICS_PROVIDERS__KUEUE__KUBE_CLUSTERQUEUE_PATH": None,
+    "METRICS_PROVIDERS__PROMQL__MAX_SERIES": None,
+    "METRICS_STARTUP_VALIDATION_TIMEOUT_SECONDS": None,
+    "METRICS_REDIS_KEY_PREFIX": None,
+}
+"""Retired ``METRICS_*`` names mapped to their replacement, or ``None`` when removed."""
+
+
+def retired_environment(environ: Mapping[str, str]) -> list[str]:
+    """Describe every retired ``METRICS_*`` name set in ``environ``.
+
+    Retired top-level names would otherwise be ignored silently (for example,
+    single-underscore OTel keys turn telemetry off), so startup rejects them
+    with the replacement to use.
+    """
+    problems = []
+    for name in sorted(environ):
+        if name.upper() not in RETIRED_ENVIRONMENT:
+            continue
+        replacement = RETIRED_ENVIRONMENT[name.upper()]
+        problems.append(
+            f"{name} is no longer read; use {replacement}" if replacement else f"{name} was removed"
+        )
+    return problems

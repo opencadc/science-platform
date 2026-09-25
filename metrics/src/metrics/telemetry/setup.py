@@ -12,6 +12,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 
+from metrics import __version__
 from metrics.core.settings import Settings, _validate_otel_endpoint
 from metrics.telemetry.instruments import (
     MetricsRecorder,
@@ -73,12 +74,13 @@ def setup_telemetry(settings: Settings) -> Telemetry:
     config = settings.otel
     endpoint = config.exporter_otlp_endpoint
     if not config.metrics_enabled or not endpoint:
+        _logger.info("OTLP metrics export disabled")
         return Telemetry(NoopMetricsRecorder())
 
     resource = Resource.create(
         {
             "service.name": config.service_name,
-            "service.version": settings.app_version,
+            "service.version": __version__,
             "deployment.environment.name": config.deployment_environment,
             "canfar.cluster.name": settings.cluster_name,
             "k8s.namespace.name": config.kubernetes_namespace,
@@ -97,8 +99,9 @@ def setup_telemetry(settings: Settings) -> Telemetry:
             ],
         )
         recorder = OpenTelemetryMetricsRecorder(
-            meter=meter_provider.get_meter(_METER_NAME, settings.app_version),
+            meter=meter_provider.get_meter(_METER_NAME, __version__),
         )
+        _logger.info("OTLP metrics export enabled endpoint=%s", _metrics_endpoint(endpoint))
         return Telemetry(recorder, meter_provider=meter_provider)
     except Exception:
         if meter_provider is not None:

@@ -146,15 +146,15 @@
         "name": "metrics_job",
         "type": "query",
         "label": "Metrics job",
-        "description": "OpenTelemetry job name for the metrics API, discovered from the custom instruments only it exports.",
+        "description": "OpenTelemetry job name for the metrics API, discovered from its readiness instrument, which every replica exports from startup.",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({\"canfar.metrics.http.requests_total\"}, job)",
+        "definition": "label_values({\"canfar.metrics.readiness\"}, job)",
         "query": {
           "qryType": 1,
-          "query": "label_values({\"canfar.metrics.http.requests_total\"}, job)",
+          "query": "label_values({\"canfar.metrics.readiness\"}, job)",
           "refId": "metrics_job-variable-query"
         },
         "refresh": 2,
@@ -2511,7 +2511,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Instances currently exporting telemetry. Compare with the Deployment replica count above: one that is running but silent here has a broken agent or a blocked exporter. This counts reporting instances, so a service whose SDK does not set `service.instance.id` reports 1 however many replicas it runs.",
+      "description": "Metrics replicas currently exporting telemetry, one per `service.instance.id` (the chart sets it to the pod UID). Compare with the Deployment replica count above: a replica that runs but is missing here has a blocked exporter.",
       "targets": [
         {
           "expr": "count(group by (instance) (target_info{job=~\"$metrics_job\"}))",
@@ -2569,10 +2569,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Real API traffic, with the readiness probe excluded. The probe is the overwhelming majority of requests this service receives, so any rate including it measures the kubelet rather than users.",
+      "description": "Report requests answered per second across replicas, from the service's own request instrument. Health and readiness probes are not reports and are not counted.",
       "targets": [
         {
-          "expr": "sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__rate_interval]))\nor vector(0)",
+          "expr": "sum(rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))\nor vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -2623,10 +2623,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Share of real requests answered 5xx over the selected range, readiness probe excluded so the ratio is not diluted by probe traffic that can never fail. Reads No data rather than 0% when no real request arrived in range.",
+      "description": "Share of report requests that failed with a sanitized 5xx over the selected range. An unknown subject is a `not_found`, not an error. Reads No data rather than 0% when no report was requested in range.",
       "targets": [
         {
-          "expr": "(sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\",\"http.status_code\"=~\"5..\"}[$__range]))\n  or vector(0))\n/ (sum(rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__range])) > 0)",
+          "expr": "(sum(rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\",\"result.status\"=\"error\"}[$__range]))\n  or vector(0))\n/ (sum(rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__range])) > 0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -2688,10 +2688,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "95th percentile response time for real endpoints over the whole selected range, not the refresh window \u2014 this traffic is sparse enough that a short window is usually empty. Milliseconds here, seconds on the Skaha panels.",
+      "description": "95th percentile time to answer a report over the selected range, including any wait for a cache fill. Answers from a stored snapshot take milliseconds, so the tail is cold fills.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__range])))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -2703,7 +2703,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2713,11 +2713,11 @@
               },
               {
                 "color": "yellow",
-                "value": 500
+                "value": 0.5
               },
               {
                 "color": "red",
-                "value": 2000
+                "value": 2
               }
             ]
           }
@@ -2741,7 +2741,7 @@
     {
       "id": 37,
       "type": "timeseries",
-      "title": "Requests by endpoint",
+      "title": "Requests by surface",
       "gridPos": {
         "x": 0,
         "y": 66,
@@ -2752,16 +2752,16 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Traffic per endpoint, readiness probe included so its share stays visible. `http.target` is a raw path rather than a templated route, so an endpoint that ever carries an identifier in its path would create one series per value \u2014 the one cardinality risk in this section.",
+      "description": "Report requests per surface. Subjects are never labels, so this stays at four series however many users, communities, or sessions exist.",
       "targets": [
         {
-          "expr": "sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
+          "expr": "sum by (\"metrics.scope\") (rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "{{http.target}}"
+          "legendFormat": "{{metrics.scope}}"
         }
       ],
       "fieldConfig": {
@@ -2817,10 +2817,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Response time spread for real endpoints, probe excluded \u2014 it is fast enough and frequent enough to flatten every percentile if left in. Gaps are honest: a percentile over a window with no requests has no value.",
+      "description": "Report response time spread. Gaps are honest: a percentile over a window with no requests has no value.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -2829,7 +2829,7 @@
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.90, sum by (le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -2838,7 +2838,7 @@
           "legendFormat": "p90"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\",\"http.target\"!=\"/healthz\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
           "refId": "C",
           "datasource": {
             "type": "prometheus",
@@ -2849,7 +2849,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -2868,11 +2868,11 @@
               },
               {
                 "color": "yellow",
-                "value": 500
+                "value": 0.5
               },
               {
                 "color": "red",
-                "value": 2000
+                "value": 2
               }
             ]
           },
@@ -2903,7 +2903,7 @@
     {
       "id": 39,
       "type": "table",
-      "title": "Endpoint breakdown",
+      "title": "Surface breakdown",
       "gridPos": {
         "x": 0,
         "y": 75,
@@ -2914,10 +2914,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Every endpoint with its volume, tail latency and error share over the selected range. Sort by p95 to find what to optimise, by requests to find what matters. A blank p95 means no traffic in range.",
+      "description": "Every surface with its volume, tail latency, and error share over the selected range, on the same basis as the headline stats. A blank p95 means no traffic in range.",
       "targets": [
         {
-          "expr": "sum by (\"http.target\") (increase({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range]))",
+          "expr": "sum by (\"metrics.scope\") (increase({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__range]))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -2927,7 +2927,7 @@
           "format": "table"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (\"http.target\",le) (rate({\"http.server.duration_milliseconds_bucket\",job=~\"$metrics_job\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (\"metrics.scope\",le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__range])))",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -2937,7 +2937,7 @@
           "format": "table"
         },
         {
-          "expr": "(\n  sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\",\"http.status_code\"=~\"5..\"}[$__range]))\n  or\n  (sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"http.target\") (rate({\"http.server.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__range])), 0.0000001)",
+          "expr": "(\n  sum by (\"metrics.scope\") (rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\",\"result.status\"=\"error\"}[$__range]))\n  or\n  (sum by (\"metrics.scope\") (rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__range])) * 0)\n)\n/ clamp_min(sum by (\"metrics.scope\") (rate({\"canfar.metrics.compute.duration_seconds_count\",job=~\"$metrics_job\"}[$__range])), 0.0000001)",
           "refId": "C",
           "datasource": {
             "type": "prometheus",
@@ -2962,7 +2962,7 @@
               "Time 3": true
             },
             "renameByName": {
-              "http.target": "Route",
+              "metrics.scope": "Surface",
               "Value #A": "Requests",
               "Value #B": "p95",
               "Value #C": "Error share"
@@ -3001,7 +3001,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "s"
               },
               {
                 "id": "custom.cellOptions",
@@ -3020,11 +3020,11 @@
                     },
                     {
                       "color": "yellow",
-                      "value": 500
+                      "value": 0.5
                     },
                     {
                       "color": "red",
-                      "value": 2000
+                      "value": 2
                     }
                   ]
                 }
@@ -3103,7 +3103,7 @@
     {
       "id": 40,
       "type": "timeseries",
-      "title": "Outbound HTTP calls (httpx)",
+      "title": "Redis command latency (p95) and errors",
       "gridPos": {
         "x": 12,
         "y": 75,
@@ -3114,30 +3114,30 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Calls this service makes outward, via httpx instrumentation. Unlike the Skaha equivalent there is no peer dimension \u2014 the legacy convention this SDK emits carries method, scheme and status but not the host \u2014 so this shows latency and rate by status only. For which upstream is slow, use the provider duration panel below, which the service instruments itself.",
+      "description": "The shared Redis is the only outbound dependency on the request path: `observe` runs for every report, `publish`, `cooldown`, and `release` end a fill, and `ping` checks readiness. Each command is bounded at 0.5 s, so a p95 near that bound means Redis is the bottleneck. The right axis is failed commands per second.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (\"http.status_code\",le) (rate({\"http.client.duration_milliseconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (\"db.operation.name\",le) (rate({\"canfar.metrics.redis.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "p95 status {{http.status_code}}"
+          "legendFormat": "p95 {{db.operation.name}}"
         },
         {
-          "expr": "sum by (\"http.status_code\") (rate({\"http.client.duration_milliseconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
+          "expr": "sum by (\"db.operation.name\") (rate({\"canfar.metrics.redis.duration_seconds_count\",job=~\"$metrics_job\",\"result.status\"=\"error\"}[$__rate_interval]))",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "calls/s status {{http.status_code}}"
+          "legendFormat": "errors/s {{db.operation.name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -3156,11 +3156,11 @@
               },
               {
                 "color": "yellow",
-                "value": 500
+                "value": 0.1
               },
               {
                 "color": "red",
-                "value": 2000
+                "value": 0.4
               }
             ]
           },
@@ -3173,12 +3173,12 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "calls/s.*"
+              "options": "errors/s.*"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "reqps"
+                "value": "ops"
               },
               {
                 "id": "custom.axisPlacement",
@@ -3208,7 +3208,7 @@
     {
       "id": 41,
       "type": "row",
-      "title": "Metrics API \u2014 custom instruments",
+      "title": "Metrics API \u2014 cache and sources",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -3226,17 +3226,17 @@
       "gridPos": {
         "x": 0,
         "y": 85,
-        "w": 8,
+        "w": 4,
         "h": 5
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Share of cache lookups served from the cache over the selected range. The service's own instrument, not an inference. A falling ratio means more requests reach the providers, which is what makes compute duration rise. Reads No data rather than 0% when no lookup happened in range: a zero ratio would imply the cache never hits.",
+      "description": "Share of lookups answered from a stored snapshot, fresh or stale, over the selected range. The rest read the source (`miss`) or found a payload that failed authentication (`invalid`). One lookup is counted per group of concurrent requests on a replica. Reads No data rather than 0% when no lookup happened in range.",
       "targets": [
         {
-          "expr": "sum(increase({\"canfar.metrics.cache.lookups_total\",\"cache.hit\"=\"true\"}[$__range]))\n/\n(sum(increase({\"canfar.metrics.cache.lookups_total\"}[$__range])) > 0)",
+          "expr": "(sum(increase({\"canfar.metrics.cache.lookups_total\",job=~\"$metrics_job\",\"cache.result\"=~\"hit|stale\"}[$__range]))\n  or vector(0))\n/ (sum(increase({\"canfar.metrics.cache.lookups_total\",job=~\"$metrics_job\"}[$__range])) > 0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -3287,21 +3287,21 @@
     {
       "id": 43,
       "type": "stat",
-      "title": "Compute p95",
+      "title": "Fill p95",
       "gridPos": {
-        "x": 8,
+        "x": 4,
         "y": 85,
-        "w": 8,
+        "w": 4,
         "h": 5
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "End-to-end time to build a metrics response on a cache miss. Compare with provider duration: if the two track each other, the cost is the upstream call rather than anything this service does.",
+      "description": "95th percentile time of one cache fill (the primary read plus optional usage and efficiency) over the range. Fills are cancelled at 10 s.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"canfar.metrics.compute.duration_seconds_bucket\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({\"canfar.metrics.cache.fill.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__range])))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -3327,7 +3327,7 @@
               },
               {
                 "color": "red",
-                "value": 10
+                "value": 8
               }
             ]
           }
@@ -3351,21 +3351,21 @@
     {
       "id": 44,
       "type": "stat",
-      "title": "Slowest provider p95",
+      "title": "Slowest source p95",
       "gridPos": {
-        "x": 16,
+        "x": 8,
         "y": 85,
-        "w": 8,
+        "w": 4,
         "h": 5
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "The upstream provider with the worst tail latency over the range, named. Providers are the services the metrics API reads from to answer a request.",
+      "description": "The source with the worst tail latency over the range, named: `kueue` for Platform, User, and Community, `session` for Session Jobs, `promql` for efficiency.",
       "targets": [
         {
-          "expr": "topk(1, histogram_quantile(0.95, sum by (\"provider.name\",le) (rate({\"canfar.metrics.provider.duration_seconds_bucket\"}[$__range]))))",
+          "expr": "topk(1, histogram_quantile(0.95, sum by (\"provider.name\",le) (rate({\"canfar.metrics.provider.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__range]))))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -3416,7 +3416,7 @@
     {
       "id": 45,
       "type": "timeseries",
-      "title": "Cache lookups, hit against miss",
+      "title": "Cache lookups by result",
       "gridPos": {
         "x": 0,
         "y": 90,
@@ -3427,16 +3427,16 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Lookup rate split by outcome and backend. Rising misses against flat hits means entries are expiring faster than they are reused, or that request keys vary more than expected.",
+      "description": "Lookup rate by result: `hit` fresh, `stale` served while one request refreshes, `miss` read the source, `invalid` a payload that failed authentication. Rising misses against flat hits mean snapshots expire before they are reused.",
       "targets": [
         {
-          "expr": "sum by (\"cache.backend\",\"cache.hit\") (rate({\"canfar.metrics.cache.lookups_total\"}[$__rate_interval]))",
+          "expr": "sum by (\"cache.result\") (rate({\"canfar.metrics.cache.lookups_total\",job=~\"$metrics_job\"}[$__rate_interval]))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "legendFormat": "{{cache.backend}} hit={{cache.hit}}"
+          "legendFormat": "{{cache.result}}"
         }
       ],
       "fieldConfig": {
@@ -3481,7 +3481,7 @@
     {
       "id": 46,
       "type": "timeseries",
-      "title": "Provider call duration and outcome",
+      "title": "Source read duration and outcome",
       "gridPos": {
         "x": 12,
         "y": 90,
@@ -3492,10 +3492,10 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Time spent inside each upstream provider, with call rate and outcome alongside. This is usually where a slow metrics response originates, and `result.status` separates a provider that is slow from one that is failing.",
+      "description": "Time spent reading each source, with the read rate and outcome alongside. `result.status` separates a source that is slow from one that is failing.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (\"provider.name\",le) (rate({\"canfar.metrics.provider.duration_seconds_bucket\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (\"provider.name\",le) (rate({\"canfar.metrics.provider.duration_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -3504,7 +3504,7 @@
           "legendFormat": "p95 {{provider.name}}"
         },
         {
-          "expr": "sum by (\"provider.name\",\"result.status\") (rate({\"canfar.metrics.provider.duration_seconds_count\"}[$__rate_interval]))",
+          "expr": "sum by (\"provider.name\",\"result.status\") (rate({\"canfar.metrics.provider.duration_seconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -3565,6 +3565,464 @@
             ]
           }
         ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 47,
+      "type": "stat",
+      "title": "Reads stopped by a cooldown",
+      "gridPos": {
+        "x": 12,
+        "y": 85,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Lookups over the range that met a failure cooldown and answered without calling the source. Non-zero means a source failed; the fill owner logged `cache fill failed` with the cause.",
+      "targets": [
+        {
+          "expr": "sum(increase({\"canfar.metrics.cache.leases_total\",job=~\"$metrics_job\",\"lease.outcome\"=\"cooldown\"}[$__range]))\nor vector(0)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 48,
+      "type": "stat",
+      "title": "Replicas ready",
+      "gridPos": {
+        "x": 16,
+        "y": 85,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Replicas whose readiness has latched. Readiness latches once Redis and the configured ClusterQueues validate and then stays set, so this does not drop during a later outage; compare it with Replicas reporting.",
+      "targets": [
+        {
+          "expr": "sum({\"canfar.metrics.readiness\",job=~\"$metrics_job\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 49,
+      "type": "stat",
+      "title": "Replicas with Redis",
+      "gridPos": {
+        "x": 20,
+        "y": 85,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Replicas whose latest Redis command succeeded. Fewer than Replicas ready means those replicas are serving their outage copy or answering 503.",
+      "targets": [
+        {
+          "expr": "sum({\"canfar.metrics.redis.health\",job=~\"$metrics_job\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 50,
+      "type": "timeseries",
+      "title": "Lease outcomes",
+      "gridPos": {
+        "x": 0,
+        "y": 99,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "`acquired`: this request became the one refresher for its subject; `contended`: another request held the lease; `cooldown`: a recent failure stopped the read; `error`: Redis did not answer. Across all replicas, acquired can never exceed one per stale or missing snapshot.",
+      "targets": [
+        {
+          "expr": "sum by (\"lease.outcome\") (rate({\"canfar.metrics.cache.leases_total\",job=~\"$metrics_job\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{lease.outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "lineInterpolation": "linear",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 51,
+      "type": "timeseries",
+      "title": "Fills by outcome",
+      "gridPos": {
+        "x": 12,
+        "y": 99,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Source fills per second by outcome. `not_found` is a subject that does not exist and is cached for its fresh window; `timeout` and `error` start a failure cooldown.",
+      "targets": [
+        {
+          "expr": "sum by (\"result.status\") (rate({\"canfar.metrics.cache.fill.duration_seconds_count\",job=~\"$metrics_job\"}[$__rate_interval]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{result.status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "lineInterpolation": "linear",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 52,
+      "type": "timeseries",
+      "title": "Age of served snapshots (p95)",
+      "gridPos": {
+        "x": 0,
+        "y": 108,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "How old served snapshots are, per surface. Fresh windows are 300 s for platform and community, 120 s for user, and 30 s for session, and nothing is served past twice that. A p95 above the fresh window means stale data is being served while refreshes run or fail.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (\"metrics.scope\",le) (rate({\"canfar.metrics.cache.age_seconds_bucket\",job=~\"$metrics_job\"}[$__rate_interval])))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "{{metrics.scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "lineInterpolation": "smooth"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          },
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 53,
+      "type": "timeseries",
+      "title": "Readiness and Redis per replica",
+      "gridPos": {
+        "x": 12,
+        "y": 108,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Per replica: `ready` is 1 once readiness has latched; `redis` is 1 while the latest Redis command succeeded.",
+      "targets": [
+        {
+          "expr": "max by (instance) ({\"canfar.metrics.readiness\",job=~\"$metrics_job\"})",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "ready {{instance}}"
+        },
+        {
+          "expr": "max by (instance) ({\"canfar.metrics.redis.health\",job=~\"$metrics_job\"})",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "legendFormat": "redis {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "pointSize": 5,
+            "spanNulls": false,
+            "lineInterpolation": "stepAfter"
+          },
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "max": 1,
+          "decimals": 0
+        },
+        "overrides": []
       },
       "options": {
         "legend": {

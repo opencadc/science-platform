@@ -7,41 +7,20 @@ from typing import Literal
 
 from opentelemetry.metrics import Meter
 
-_SECONDS_BUCKETS = (
-    0.005,
-    0.01,
-    0.025,
-    0.05,
-    0.075,
-    0.1,
-    0.25,
-    0.5,
-    0.75,
-    1.0,
-    2.5,
-    5.0,
-    7.5,
-    10.0,
-)
-CacheLookupResult = Literal["hit", "miss", "stale"]
-_SCOPES = frozenset({"platform", "user", "community", "other"})
-_CACHE_RESULTS = frozenset({"hit", "miss", "stale", "other"})
+_SECONDS_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
+_REDIS_BUCKETS = (0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5)
+# Cache ages span the surface windows: Session 30/60 s up to Platform 300/600 s.
+_AGE_BUCKETS = (1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 180.0, 240.0, 300.0, 450.0, 600.0)
+CacheLookupResult = Literal["hit", "miss", "stale", "invalid"]
+_SCOPES = frozenset({"platform", "user", "community", "session", "other"})
+_CACHE_RESULTS = frozenset({"hit", "miss", "stale", "invalid", "other"})
 _STATUSES = frozenset(
     {"ok", "error", "not_found", "cancelled", "timeout", "partial", "degraded", "other"}
 )
 _BACKENDS = frozenset({"redis", "other"})
-_PROVIDERS = frozenset({"kueue", "promql", "other"})
-_LEASE_OUTCOMES = frozenset({"acquired", "contended", "error", "other"})
-_REDIS_OPERATIONS = frozenset(
-    {
-        "ping",
-        "get",
-        "lease_acquire",
-        "commit",
-        "lease_release",
-        "other",
-    }
-)
+_PROVIDERS = frozenset({"kueue", "session", "promql", "other"})
+_LEASE_OUTCOMES = frozenset({"acquired", "contended", "cooldown", "error", "other"})
+_REDIS_OPERATIONS = frozenset({"ping", "observe", "publish", "cooldown", "release", "other"})
 _LIFECYCLE_OPERATIONS = frozenset({"startup", "shutdown", "other"})
 
 
@@ -118,7 +97,7 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             name="canfar.metrics.cache.age",
             unit="s",
             description="Age of cache snapshots returned to callers.",
-            explicit_bucket_boundaries_advisory=_SECONDS_BUCKETS,
+            explicit_bucket_boundaries_advisory=_AGE_BUCKETS,
         )
         self._leases = meter.create_counter(
             name="canfar.metrics.cache.leases",
@@ -152,12 +131,12 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             name="canfar.metrics.redis.duration",
             unit="s",
             description="Redis operation duration.",
-            explicit_bucket_boundaries_advisory=_SECONDS_BUCKETS,
+            explicit_bucket_boundaries_advisory=_REDIS_BUCKETS,
         )
         self._redis_health = meter.create_up_down_counter(
             name="canfar.metrics.redis.health",
             unit="1",
-            description="Redis health checks: one for success, zero for failure.",
+            description="Latest Redis command outcome: one for success, zero for failure.",
         )
         self._lifecycle_duration = meter.create_histogram(
             name="canfar.metrics.lifecycle.duration",
@@ -241,12 +220,12 @@ class OpenTelemetryMetricsRecorder(MetricsRecorder):
             self._provider_errors.add(1, attributes=attributes)
 
     def record_redis(self, *, operation: str, outcome: str, seconds: float) -> None:
-        """Observe Redis latency and update health after ping operations."""
+        """Observe Redis latency and track health from every completed command."""
         operation = _bounded(operation, _REDIS_OPERATIONS)
         outcome = _bounded(outcome, _STATUSES)
         attributes = {"db.operation.name": operation, "result.status": outcome}
         self._redis_duration.record(max(seconds, 0.0), attributes=attributes)
-        if operation == "ping":
+        if outcome in {"ok", "error"}:
             value = 1 if outcome == "ok" else 0
             with self._state_lock:
                 self._redis_health.add(value - self._last_redis_health)

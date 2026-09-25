@@ -16,21 +16,25 @@ class FakeCacheCoordinator(Generic[Value]):
 
     backend_name = "redis"
 
-    def __init__(self, *, policy: FreshnessPolicy, created: Callable[[Value], datetime]) -> None:
+    def __init__(self, *, policy: FreshnessPolicy) -> None:
         """Create a deterministic successful-result double."""
         self.policy = policy
         self.available = True
-        self._created = created
         self._values: dict[bytes, Value] = {}
 
-    def _serviceable_until(self, value: Value) -> datetime:
-        """Return the positive observation's serviceability deadline."""
-        created = self._created(value)
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=UTC)
-        else:
-            created = created.astimezone(UTC)
-        return created + timedelta(seconds=self.policy.stale_seconds)
+    def _result(self, value: Value, *, cached: bool) -> CacheResult[Value]:
+        """Return one fresh result whose stale window starts now."""
+        return CacheResult(
+            value,
+            cached=cached,
+            stale=False,
+            cache_available=True,
+            source_reachable=None if cached else True,
+            serviceable_until=datetime.now(UTC) + timedelta(seconds=self.policy.stale_seconds),
+        )
+
+    async def ping(self) -> None:
+        """Satisfy the readiness seam."""
 
     async def get_or_fill(
         self,
@@ -41,24 +45,10 @@ class FakeCacheCoordinator(Generic[Value]):
         key = identity.canonical()
         value = self._values.get(key)
         if value is not None:
-            return CacheResult(
-                value,
-                cached=True,
-                stale=False,
-                cache_available=True,
-                source_reachable=None,
-                serviceable_until=self._serviceable_until(value),
-            )
+            return self._result(value, cached=True)
         value = await fill()
         self._values[key] = value
-        return CacheResult(
-            value,
-            cached=False,
-            stale=False,
-            cache_available=True,
-            source_reachable=True,
-            serviceable_until=self._serviceable_until(value),
-        )
+        return self._result(value, cached=False)
 
     async def shutdown(self) -> None:
         """Satisfy the runtime lifecycle seam."""

@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException
 from starlette.types import ExceptionHandler
 
 from metrics.api.v1alpha1.routes import router
+from metrics.cache import describe_failure
 from metrics.core.runtime import MetricsRuntime
 from metrics.core.settings import Settings
 from metrics.errors import AppError, RuntimeStartupError
@@ -27,7 +28,7 @@ _logger = logging.getLogger(__name__)
 _STATUS_REASONS: dict[int, tuple[StatusReason, str]] = {
     400: ("BadRequest", "The request is malformed."),
     404: ("NotFound", "The requested resource was not found."),
-    405: ("Invalid", "The requested method is not allowed."),
+    405: ("MethodNotAllowed", "The requested method is not allowed."),
     503: ("ServiceUnavailable", "The requested metrics report could not be produced."),
 }
 _SAFE_HTTP_EXCEPTION_HEADERS = frozenset({"allow", "retry-after", "www-authenticate"})
@@ -177,7 +178,7 @@ def _install_openapi(app: FastAPI) -> None:
     setattr(app, "openapi", custom_openapi)
 
 
-def _install_health_routes(app: FastAPI, runtime: MetricsRuntime, telemetry: Telemetry) -> None:
+def _install_health_routes(app: FastAPI, runtime: MetricsRuntime) -> None:
     """Install liveness and readiness endpoints outside the public API schema."""
 
     @app.get("/livez", include_in_schema=False)
@@ -188,9 +189,8 @@ def _install_health_routes(app: FastAPI, runtime: MetricsRuntime, telemetry: Tel
 
     @app.get("/readyz", include_in_schema=False)
     async def readiness() -> JSONResponse:
-        """Report readiness and trigger bounded recovery after a cache outage."""
+        """Report readiness, validating Redis and the Platform source until they pass once."""
         ready = await runtime.check_readiness()
-        telemetry.recorder.record_readiness(ready)
         return JSONResponse(
             status_code=200 if ready else 503, content={"status": "ready" if ready else "not ready"}
         )
@@ -209,8 +209,18 @@ def _status_response(status_code: int, *, headers: dict[str, str] | None = None)
     )
 
 
-async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+def _route(request: Request) -> str:
+    """Return the matched route template, never the concrete path with its subject."""
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or "unmatched"
+
+
+async def _handle_app_error(request: Request, exc: AppError) -> JSONResponse:
     """Map expected application failures to sanitized Status responses."""
+    if exc.status_code >= 500:
+        _logger.warning(
+            "request failed status=%s code=%s route=%s", exc.status_code, exc.code, _route(request)
+        )
     headers = {"Cache-Control": "no-store"}
     if exc.retry_after is not None:
         headers["Retry-After"] = str(exc.retry_after)
@@ -229,12 +239,11 @@ async def _handle_validation_error(_request: Request, _exc: RequestValidationErr
 
 async def _handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
     """Fail closed with a sanitized response for unexpected exceptions."""
-    route = request.scope.get("route")
     _logger.error(
-        "Unhandled request failure type=%s method=%s route=%s",
-        type(exc).__name__,
+        "Unhandled request failure error=%s method=%s route=%s",
+        describe_failure(exc),
         request.method,
-        getattr(route, "path", None) or "unmatched",
+        _route(request),
     )
     return _status_response(500)
 
@@ -273,8 +282,8 @@ def create_app(
     runtime = runtime or MetricsRuntime.from_settings(settings, recorder=telemetry.recorder)
 
     app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
+        title="CANFAR Metrics API",
+        version="v1alpha1",
         summary="CANFAR Science Platform Metrics API",
         description=(
             "API for Kueue ClusterQueue capacity, LocalQueue reservations, "
@@ -289,6 +298,6 @@ def create_app(
     )
     app.include_router(router)
     _install_openapi(app)
-    _install_health_routes(app, runtime, telemetry)
+    _install_health_routes(app, runtime)
     _install_exception_handlers(app)
     return app

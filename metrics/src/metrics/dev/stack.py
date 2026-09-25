@@ -56,7 +56,6 @@ _PROMETHEUS_READY_POLL_INTERVAL_SECONDS = 1.0
 _PROMETHEUS_REQUEST_TIMEOUT_SECONDS = 5.0
 _DEFAULT_MAX_SAMPLE_AGE_SECONDS = 300
 _DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
-_DEFAULT_MAX_SERIES = 3_000
 
 
 class DevStackError(RuntimeError):
@@ -139,9 +138,10 @@ def assert_safe_context() -> None:
 def _ensure_cluster() -> None:
     """Create only the approved cluster, or verify the existing one."""
     version = _output(["kind", "version"])
-    match = re.search(r"\bv?(\d+\.\d+\.\d+)\b", version)
-    if not match or match.group(1) != KIND_VERSION:
-        raise DevStackError(f"kind {KIND_VERSION} required; found {version}")
+    match = re.search(r"\bv?(\d+)\.(\d+)\.(\d+)\b", version)
+    minimum = tuple(int(part) for part in KIND_VERSION.split("."))
+    if not match or tuple(int(part) for part in match.groups()) < minimum:
+        raise DevStackError(f"kind >= {KIND_VERSION} required; found {version}")
     _run(["docker", "info"], capture=True)
     if KIND_CLUSTER not in _clusters():
         _run(
@@ -524,10 +524,8 @@ def _wait_for_prometheus_readiness(process: subprocess.Popen, port: str) -> None
                 payload = json.loads(response.read())
             _validate_response(
                 payload,
-                max_series=_DEFAULT_MAX_SERIES,
                 max_sample_age_seconds=_DEFAULT_MAX_SAMPLE_AGE_SECONDS,
                 future_sample_tolerance_seconds=_DEFAULT_FUTURE_SAMPLE_TOLERANCE_SECONDS,
-                cutoff=None,
             )
             return
         except (OSError, ProviderExecutionError, ValueError) as error:

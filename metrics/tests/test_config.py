@@ -14,7 +14,7 @@ from metrics.core.settings import (
     Settings,
 )
 
-_CACHE_SECRET = "x" * 32
+_CACHE_SECRET = "test-cache-integrity-key-32-bytes"
 
 
 def _settings(**kueue: object) -> Settings:
@@ -116,7 +116,7 @@ def test_promql_endpoint_alone_controls_efficiency_activation() -> None:
 def test_cache_secret_and_cluster_name_are_mandatory() -> None:
     """Redis integrity and cache identity inputs cannot use production defaults."""
     assert _settings().cluster_name == "cluster-a"
-    assert _settings().redis_url == "redis://localhost:6379/0"
+    assert _settings().redis_url.get_secret_value() == "redis://localhost:6379/0"
     assert _settings().cache.key_secret.get_secret_value() == _CACHE_SECRET
     with pytest.raises(ValidationError):
         Settings(
@@ -142,14 +142,32 @@ def test_cache_secret_and_cluster_name_are_mandatory() -> None:
         CacheConfig.model_validate({"backend": "memory", "key_secret": _CACHE_SECRET})
 
 
-def test_cluster_name_requires_lowercase_dns() -> None:
-    """The cluster identity remains a required lower-case DNS name."""
+@pytest.mark.parametrize("name", ["Cluster-A", "cluster_a", "unknown"])
+def test_cluster_name_requires_a_real_lowercase_dns_name(name: str) -> None:
+    """The cluster identity is a required lower-case DNS name, never the sentinel."""
     with pytest.raises(ValidationError):
         Settings(
-            cluster_name="Cluster-A",
+            cluster_name=name,
             redis_url="redis://localhost:6379/0",
             cache=CacheConfig(key_secret=_CACHE_SECRET),
             providers=ProviderConfigs(
                 kueue=KueueProviderConfig(cluster_queues=["cq-a"], namespaces=["work-a"])
             ),
+        )
+
+
+@pytest.mark.parametrize(
+    "secret",
+    ["replace-with-at-least-32-random-bytes", "<secret-reference-or-injected-value>", "a" * 40],
+)
+def test_placeholder_cache_secrets_are_rejected(secret: str) -> None:
+    with pytest.raises(ValidationError, match="placeholder"):
+        CacheConfig(key_secret=secret)
+
+
+def test_cache_deadlines_are_not_settings() -> None:
+    """Cache deadlines are constants, so no configuration can break the lease order."""
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        CacheConfig.model_validate(
+            {"key_secret": "test-cache-integrity-key-32-bytes", "fill_timeout_seconds": 20}
         )

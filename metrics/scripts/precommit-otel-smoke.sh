@@ -110,14 +110,22 @@ routes = [
     "/apis/canfar.net/v1alpha1/metrics/user/bob",
     "/apis/canfar.net/v1alpha1/metrics/community/astronomy",
 ]
-payloads = []
-for route in routes:
+
+
+def _read(route: str) -> object:
+    """Read one report route or stop the smoke with a bounded reason."""
     try:
-        payloads.append(_request_json(route))
+        return _request_json(route)
     except urllib.error.HTTPError as error:
         raise SystemExit(f"{route} returned HTTP {error.code}{_error_body(error)}") from error
     except RuntimeError as error:
         raise SystemExit(f"{route} could not be reached: {error}; see {forward_log}") from error
+
+
+payloads = [_read(route) for route in routes]
+# A second read of each route is a Redis hit, which is what records snapshot age.
+for route in routes:
+    _read(route)
 
 payload_path.write_text(json.dumps(payloads, sort_keys=True), encoding="utf-8")
 time.sleep(4)
@@ -135,7 +143,7 @@ if [[ -z "$collector_pod" ]]; then
 fi
 
 if ! kubectl --context "$context" --namespace "$namespace" \
-  cp -c collector "$collector_pod:/var/lib/otel/evidence.json" "$tmp/evidence.json"; then
+  exec -c evidence "$collector_pod" -- cat /var/lib/otel/evidence.json >"$tmp/evidence.json"; then
   echo "OTLP metrics smoke failed: could not copy Collector evidence from $collector_pod" >&2
   exit 1
 fi
@@ -277,10 +285,11 @@ for forbidden in sorted(payload_markers):
     if forbidden and forbidden in raw:
         raise SystemExit(f"API payload value leaked into Collector evidence: {forbidden!r}")
 
-# These are the application-state instruments recorded by the healthy startup,
-# Redis-backed cold fills, and the three API requests above. Compute duration and
-# provider errors are declared by the recorder but are not recorded on this path.
+# These are the application-state instruments recorded by the healthy startup
+# and the fill-then-hit API reads above. Provider errors are recorded only when
+# a source fails, so the healthy path does not require them.
 required_metrics = (
+    "canfar.metrics.compute.duration",
     "canfar.metrics.cache.lookups",
     "canfar.metrics.cache.age",
     "canfar.metrics.cache.leases",

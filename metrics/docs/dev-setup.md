@@ -14,8 +14,9 @@ checks.
 - Helm
 - Python 3.13 and `uv`
 
-Run commands from `metrics/`. Use the repository's pinned kind/Kubernetes and
-Kueue versions for CI-equivalent checks.
+Run commands from `metrics/`. kind 0.32.0 is the minimum supported version (newer
+releases are accepted). Use the repository's pinned Kubernetes node image and
+Kueue version for CI-equivalent checks.
 
 ## Fast local loop
 
@@ -25,10 +26,20 @@ uv run ruff check src tests
 uv run pytest -m "not integration"
 ```
 
-The application test suite should inject Kueue, Redis, and optional PromQL
-fakes. It must exercise the same service interfaces as the deployed process:
-fresh hits, stale refresh, cold single-flight, subject isolation, source
-errors, 404 subjects, and optional `PartialData` responses.
+Unit tests inject Kueue, Session, usage, and PromQL fakes and run the cache
+against `fakeredis` with its Lua engine, so several simulated replicas share
+one Redis and the real OBSERVE and SETTLE scripts. They cover fresh hits,
+stale refresh by exactly one request, cold single-flight, failure cooldowns,
+subject isolation, source errors, 404 subjects, and `PartialData`.
+
+Integration tests marked `integration` need a real Redis or the kind stack
+below. The Redis tests skip unless `METRICS_TEST_REDIS_URL` names a disposable
+database they may flush:
+
+```bash
+METRICS_TEST_REDIS_URL='redis://127.0.0.1:6379/15' \
+  uv run pytest -m integration tests/integration/test_redis_cache.py
+```
 
 ## Kubernetes smoke loop
 
@@ -48,7 +59,9 @@ METRICS_PROVIDERS__KUEUE__NAMESPACES='["canfar-workloads"]'
 
 Fixtures should create LocalQueues with exact User and Community labels,
 ClusterQueues with exact Community labels, and workloads that exercise pending
-and reserving states. Each LocalQueue's Community label must equal its
+and reserving states. Session checks need Jobs labelled `canfar.net/id` in a
+configured namespace; the Jobs must pass the namespace's Pod Security and
+carry the `kueue.x-k8s.io/queue-name` label to be admitted. Each LocalQueue's Community label must equal its
 referenced ClusterQueue's label. Fixture names are not identity sources.
 
 These fixtures represent the output of a trusted platform provisioning or
@@ -87,8 +100,16 @@ must carry the authoritative two `canfar.net` labels. An admitted Pod may additi
 `kueue.x-k8s.io/local-queue-name` as corroborating metadata; PromQL attribution
 still uses the `canfar` labels.
 
+Session `usage` needs the `metrics.k8s.io` API. The disposable stack does not
+install metrics-server; without it, reports for sessions with Running pods
+are served with `PartialData`. To exercise usage locally, install the upstream metrics-server
+manifest with `--kubelet-insecure-tls` added to its container arguments (kind
+kubelets use self-signed certificates).
+
 For the optional efficiency gate, add disposable KSM and Prometheus/Mimir
-fixtures, enable the KSM label allowlist, and add the stable `cluster` label to
+fixtures, enable the KSM label allowlist (`canfar.net/username`,
+`canfar.net/community`, and `canfar.net/id`, as in
+`scripts/test-dependencies.yaml`), and add the stable `cluster` label to
 every ingested series used by the fixed query. `external_labels.cluster` is
 appropriate on the remote-write path to Mimir but is insufficient by itself
 for a local Prometheus query. The fixture must propagate authoritative labels
@@ -141,10 +162,11 @@ UV_CACHE_DIR=/tmp/canfar-uv-cache bash scripts/precommit-otel-smoke.sh
 
 The script first proves the current context is the exact `kind-metrics` target,
 then restarts the disposable Collector and API, flushes Redis, and makes real
-`/readyz`, Platform, User, and Community API requests. The Collector has one
-metrics pipeline and its file exporter is the evidence source. The smoke
-requires the application instruments emitted by that healthy startup and those
-Redis-backed cold reads:
+`/readyz` requests and two reads each of Platform, User, and Community: a fill
+and then a Redis hit. The Collector has one metrics pipeline and its file
+exporter is the evidence source, read through a small reader container because
+the Collector image has no shell. The smoke requires the application
+instruments emitted by that healthy startup and those reads:
 
 - `canfar.metrics.cache.lookups`, `canfar.metrics.cache.age`,
   `canfar.metrics.cache.leases`, and `canfar.metrics.cache.fill.duration`;
@@ -152,9 +174,9 @@ Redis-backed cold reads:
 - `canfar.metrics.redis.duration` and `canfar.metrics.redis.health`; and
 - `canfar.metrics.readiness` and `canfar.metrics.lifecycle.duration`.
 
-The recorder also declares compute-duration and provider-error instruments, but
-the current production request path does not record them, so this healthy-path
-smoke does not require them. The privacy proof rejects fixture User/Community
+It also requires `canfar.metrics.compute.duration`, recorded once per report
+request. Provider errors are recorded only when a source fails, so this
+healthy-path smoke does not require them. The privacy proof rejects fixture User/Community
 identities and selectors, opaque Redis key markers, response payload fields and
 values, and any missing application metric evidence. It does not require HTTP
 request auto-instrumentation. Port-forward processes and temporary evidence are

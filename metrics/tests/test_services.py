@@ -1,470 +1,415 @@
-"""Focused service tests for optional efficiency and primary-source cancellation."""
+"""Snapshot assembly and service error mapping at the service seam."""
 
 from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from decimal import Decimal
-
 import pytest
 
-from metrics.cache import CacheFillTimeout, CacheIdentity, CacheUnavailable, FRESHNESS_POLICIES
+from metrics.cache import (
+    FRESHNESS_POLICIES,
+    CacheIdentity,
+    CacheNotFound,
+    CacheResult,
+    CacheUnavailable,
+)
+from metrics.cache.coordination import _FILL_DEADLINE
 from metrics.errors import AppError, ProviderExecutionError, ProviderUnavailableError
+from metrics.errors import SubjectNotFoundError
 from metrics.services.metrics import MetricsService
 from metrics.services.models import (
+    CachedSnapshot,
     CommunityObservation,
     EfficiencyObservation,
     MetricsSubject,
     PlatformObservation,
+    SessionObservation,
+    SessionUsageObservation,
     UserObservation,
 )
+from metrics.services.snapshots import SnapshotLoader
 from metrics.telemetry import MetricsRecorder
 from tests.test_cache_helpers import FakeCacheCoordinator
 
-
+pytestmark = pytest.mark.anyio
 NOW = datetime(2025, 1, 1, tzinfo=UTC)
 
 
-def _service(
+class Kueue:
+    """Return deterministic queue observations or configured failures."""
+
+    def __init__(self, *, reserving: int = 2, error: BaseException | None = None) -> None:
+        self.reserving = reserving
+        self.error = error
+        self.calls: list[str] = []
+
+    async def read_platform(self) -> PlatformObservation:
+        self.calls.append("platform")
+        if self.error is not None:
+            raise self.error
+        return PlatformObservation("cluster-a", {"cpu": "4"}, {"cpu": "1"}, self.reserving, NOW)
+
+    async def read_user(self, username: str) -> UserObservation:
+        self.calls.append(f"user:{username}")
+        if self.error is not None:
+            raise self.error
+        return UserObservation(username, {"cpu": "1"}, self.reserving, NOW)
+
+    async def read_community(self, community: str) -> CommunityObservation:
+        self.calls.append(f"community:{community}")
+        if self.error is not None:
+            raise self.error
+        return CommunityObservation(community, {"cpu": "2"}, self.reserving, NOW)
+
+
+class Sessions:
+    """Return one deterministic Session observation."""
+
+    def __init__(
+        self,
+        *,
+        running: bool = True,
+        pods_reachable: bool = True,
+        age: timedelta = timedelta(minutes=10),
+        error: BaseException | None = None,
+        reserving: int = 1,
+    ) -> None:
+        self.running = running
+        self.pods_reachable = pods_reachable
+        self.age = age
+        self.error = error
+        self.reserving = reserving
+
+    async def read_session(self, session_id: str) -> SessionObservation:
+        if self.error is not None:
+            raise self.error
+        return SessionObservation(
+            session=session_id,
+            requests={"cpu": "1", "memory": "1Gi"} if self.reserving else {},
+            reserving_workloads=self.reserving,
+            observed_at=NOW,
+            start_time=NOW - self.age,
+            window_end=NOW,
+            has_running_pods=self.running,
+            pods_reachable=self.pods_reachable,
+            running_pods_by_namespace={"work-a": frozenset({"pod"})} if self.running else {},
+            job_names=(f"{session_id}-desktop",),
+        )
+
+
+class Usage:
+    """Return live usage or fail."""
+
+    def __init__(self, *, error: BaseException | None = None, delay: float = 0) -> None:
+        self.error = error
+        self.delay = delay
+        self.calls = 0
+
+    async def read_session_usage(self, observation: SessionObservation) -> SessionUsageObservation:
+        self.calls += 1
+        await asyncio.sleep(self.delay)
+        if self.error is not None:
+            raise self.error
+        return SessionUsageObservation({"cpu": "0.5"}, NOW - timedelta(seconds=30))
+
+
+class Efficiency:
+    """Return efficiency, fail, or stall, and record what was asked."""
+
+    def __init__(self, *, error: BaseException | None = None, delay: float = 0) -> None:
+        self.error = error
+        self.delay = delay
+        self.calls: list[str] = []
+
+    async def _answer(self, what: str) -> EfficiencyObservation:
+        self.calls.append(what)
+        await asyncio.sleep(self.delay)
+        if self.error is not None:
+            raise self.error
+        return EfficiencyObservation(NOW - timedelta(minutes=1), {"cpu": "0.5", "memory": "0.25"})
+
+    async def read_platform(self) -> EfficiencyObservation:
+        return await self._answer("platform")
+
+    async def read_user(self, username: str) -> EfficiencyObservation:
+        return await self._answer(f"user:{username}")
+
+    async def read_community(self, community: str) -> EfficiencyObservation:
+        return await self._answer(f"community:{community}")
+
+    async def read_session(
+        self,
+        session_id: str,
+        *,
+        start_time: datetime,
+        window_end: datetime,
+        job_names: tuple[str, ...] = (),
+    ) -> EfficiencyObservation:
+        seconds = (window_end - start_time).seconds
+        return await self._answer(f"session:{session_id}:{seconds}:{','.join(job_names)}")
+
+
+class Recorder(MetricsRecorder):
+    def __init__(self) -> None:
+        self.providers: list[tuple[str, str, str]] = []
+        self.compute: list[tuple[str, str]] = []
+
+    def record_provider_duration(self, *, provider, scope, status, seconds) -> None:
+        self.providers.append((provider, scope, status))
+
+    def record_compute_duration(self, *, seconds, status, scope) -> None:
+        self.compute.append((scope, status))
+
+
+def _loader(
     *,
-    platform,
-    platform_efficiency=None,
-    platform_cache=None,
-    telemetry=None,
-    user_loader=None,
-    user_cache=None,
-    community_loader=None,
-    community_cache=None,
-) -> MetricsService:
-    """Build one service at the public Metrics subject seam."""
-
-    async def default_user(username: str) -> UserObservation:
-        return UserObservation(username, {"cpu": "1"}, 0, NOW)
-
-    async def default_community(name: str) -> CommunityObservation:
-        return CommunityObservation(name, {"cpu": "1"}, 0, NOW)
-
-    return MetricsService(
-        platform=platform,
-        cache=platform_cache
-        or FakeCacheCoordinator(
-            policy=FRESHNESS_POLICIES["platform"],
-            created=lambda observation: observation.created,
-        ),
-        identity=lambda: CacheIdentity("platform", "canfar", "cluster-a", "kueue"),
-        platform_name="canfar",
-        platform_efficiency=platform_efficiency,
-        user=user_loader or default_user,
-        user_cache=user_cache
-        or FakeCacheCoordinator(
-            policy=FRESHNESS_POLICIES["user"],
-            created=lambda observation: observation.created,
-        ),
-        user_identity=lambda username: CacheIdentity("user", username, "cluster-a", "kueue"),
-        community=community_loader or default_community,
-        community_cache=community_cache
-        or FakeCacheCoordinator(
-            policy=FRESHNESS_POLICIES["community"],
-            created=lambda observation: observation.created,
-        ),
-        community_identity=lambda name: CacheIdentity("community", name, "cluster-a", "kueue"),
-        telemetry=telemetry,
+    kueue: Kueue | None = None,
+    sessions: Sessions | None = None,
+    usage: Usage | None = None,
+    efficiency: Efficiency | None = None,
+    telemetry: MetricsRecorder | None = None,
+) -> SnapshotLoader:
+    return SnapshotLoader(
+        kueue=kueue or Kueue(),
+        session=sessions or Sessions(),
+        usage=usage or Usage(),
+        efficiency=efficiency,
+        usage_timeout_seconds=0.2,
         efficiency_timeout_seconds=0.2,
+        telemetry=telemetry,
     )
 
 
-async def _platform() -> PlatformObservation:
-    """Return one deterministic Kueue observation."""
-    return PlatformObservation("cluster-a", {"cpu": "1"}, {"cpu": "0"}, 0, NOW)
+# ------------------------------------------------------------- Kueue surfaces
 
 
-async def _efficiency() -> EfficiencyObservation:
-    """Return one deterministic efficiency observation."""
-    return EfficiencyObservation(NOW, {"cpu": 0, "memory": 0})
+async def test_platform_without_efficiency_is_the_primary_observation() -> None:
+    snapshot = await _loader().platform()
+    assert snapshot == CachedSnapshot(snapshot.observation, created=NOW)
+    assert not snapshot.partial and snapshot.efficiency is None
 
 
-@pytest.mark.anyio
-async def test_accepted_old_efficiency_keeps_conservative_report_timestamp() -> None:
-    """A valid report still exposes the older optional observation time."""
-    old_efficiency_time = NOW - timedelta(minutes=1)
-
-    async def old_efficiency() -> EfficiencyObservation:
-        return EfficiencyObservation(old_efficiency_time, {"cpu": 0, "memory": 0})
-
-    result = await _service(platform=_platform, platform_efficiency=old_efficiency).get(
-        MetricsSubject("platform", "canfar")
-    )
-
-    assert result.ready
-    assert result.efficiency is not None
-    assert result.created == old_efficiency_time
+async def test_efficiency_is_added_after_the_primary_read_with_a_conservative_time() -> None:
+    efficiency = Efficiency()
+    kueue = Kueue()
+    snapshot = await _loader(kueue=kueue, efficiency=efficiency).platform()
+    assert kueue.calls == ["platform"] and efficiency.calls == ["platform"]
+    assert snapshot.efficiency is not None and not snapshot.partial
+    assert snapshot.created == NOW - timedelta(minutes=1)
 
 
-@pytest.mark.anyio
-async def test_ordinary_optional_exception_returns_partial_queue_data() -> None:
-    """An unexpected optional-provider exception does not erase Kueue data."""
-
-    async def unavailable() -> EfficiencyObservation:
-        raise RuntimeError("optional backend failed")
-
-    result = await _service(platform=_platform, platform_efficiency=unavailable).get(
-        MetricsSubject("platform", "canfar")
-    )
-
-    assert result.observation.cluster == "cluster-a"
-    assert result.efficiency is None
-    assert not result.ready
-    assert result.ready_reason == "PartialData"
+@pytest.mark.parametrize("surface", ["platform", "user", "community"])
+async def test_idle_subjects_do_not_query_efficiency(surface: str) -> None:
+    efficiency = Efficiency()
+    loader = _loader(kueue=Kueue(reserving=0), efficiency=efficiency)
+    read = {
+        "platform": loader.platform,
+        "user": lambda: loader.user("bob"),
+        "community": lambda: loader.community("astro"),
+    }[surface]
+    snapshot = await read()
+    assert efficiency.calls == [] and snapshot.efficiency is None and not snapshot.partial
 
 
-@pytest.mark.anyio
-async def test_optional_provider_cancellation_propagates() -> None:
-    """Provider cancellation is not converted into a partial success."""
-
-    async def cancelled() -> EfficiencyObservation:
-        raise asyncio.CancelledError
-
-    with pytest.raises(asyncio.CancelledError):
-        await _service(platform=_platform, platform_efficiency=cancelled).get(
-            MetricsSubject("platform", "canfar")
-        )
-
-
-@pytest.mark.anyio
-async def test_efficiency_cancellation_cancels_primary_without_waiting_for_timeout() -> None:
-    """An optional cancellation immediately releases a blocked Kueue read."""
-    primary_started = asyncio.Event()
-    primary_cancelled = asyncio.Event()
-    request_finished = asyncio.Event()
-
-    async def primary() -> PlatformObservation:
-        primary_started.set()
-        try:
-            await asyncio.Future()
-        except asyncio.CancelledError:
-            primary_cancelled.set()
-            raise
-
-    async def cancelled() -> EfficiencyObservation:
-        await asyncio.sleep(0)
-        raise asyncio.CancelledError
-
-    request = asyncio.create_task(
-        _service(platform=primary, platform_efficiency=cancelled).get(
-            MetricsSubject("platform", "canfar")
-        )
-    )
-    request.add_done_callback(lambda _task: request_finished.set())
-    await primary_started.wait()
-
-    try:
-        await asyncio.wait_for(request_finished.wait(), timeout=0.2)
-        with pytest.raises(asyncio.CancelledError):
-            await request
-    finally:
-        if not request.done():
-            request.cancel()
-        await asyncio.gather(request, return_exceptions=True)
-
-    assert primary_cancelled.is_set()
-
-
-@pytest.mark.anyio
-async def test_primary_failure_cancels_and_awaits_optional_work() -> None:
-    """A primary failure releases a blocked optional task before it returns."""
-    optional_started = asyncio.Event()
-    optional_cancelled = asyncio.Event()
-
-    async def primary() -> PlatformObservation:
-        await asyncio.sleep(0)
-        raise ProviderUnavailableError("Kueue unavailable")
-
-    async def optional() -> EfficiencyObservation:
-        optional_started.set()
-        try:
-            await asyncio.Future()
-        except asyncio.CancelledError:
-            optional_cancelled.set()
-            raise
-
-    request = asyncio.create_task(
-        _service(platform=primary, platform_efficiency=optional).get(
-            MetricsSubject("platform", "canfar")
-        )
-    )
-    await optional_started.wait()
-
-    with pytest.raises(AppError) as caught:
-        await asyncio.wait_for(request, timeout=0.2)
-    assert caught.value.code == "platform_metrics_unavailable"
-    assert optional_cancelled.is_set()
-
-
-@pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("surface", "provider_error"),
+    "efficiency", [Efficiency(error=ProviderExecutionError("empty vector")), Efficiency(delay=1)]
+)
+async def test_failed_or_slow_efficiency_keeps_queue_data_as_partial(
+    efficiency: Efficiency, caplog: pytest.LogCaptureFixture
+) -> None:
+    snapshot = await _loader(efficiency=efficiency).user("bob")
+    assert snapshot.partial and snapshot.efficiency is None
+    assert snapshot.observation.requests == {"cpu": "1"}
+    assert "optional efficiency unavailable scope=user" in caplog.text
+    assert "bob" not in caplog.text
+
+
+async def test_unknown_user_never_reaches_efficiency() -> None:
+    efficiency = Efficiency()
+    loader = _loader(kueue=Kueue(error=SubjectNotFoundError("no queue")), efficiency=efficiency)
+    with pytest.raises(CacheNotFound):
+        await loader.user("ghost")
+    assert efficiency.calls == []
+
+
+@pytest.mark.parametrize(
+    "error", [ProviderUnavailableError("403"), ProviderExecutionError("bad payload")]
+)
+async def test_source_failures_become_source_unavailable_with_the_cause_chained(
+    error: Exception,
+) -> None:
+    recorder = Recorder()
+    with pytest.raises(CacheUnavailable) as failure:
+        await _loader(kueue=Kueue(error=error), telemetry=recorder).community("astro")
+    assert failure.value.cache_available is True and failure.value.source_reachable is False
+    assert failure.value.__cause__ is error
+    assert recorder.providers == [("kueue", "community", "error")]
+
+
+async def test_optional_reads_stop_at_the_fill_deadline(caplog: pytest.LogCaptureFixture) -> None:
+    efficiency = Efficiency()
+    token = _FILL_DEADLINE.set(asyncio.get_running_loop().time() + 0.3)  # < publish reserve
+    try:
+        snapshot = await _loader(efficiency=efficiency).platform()
+    finally:
+        _FILL_DEADLINE.reset(token)
+    assert snapshot.partial and efficiency.calls == []
+    assert "fill deadline reached" in caplog.text
+
+
+async def test_optional_cancellation_propagates() -> None:
+    efficiency = Efficiency(delay=5)
+    task = asyncio.create_task(_loader(efficiency=efficiency).platform())
+    await asyncio.sleep(0.01)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=5)
+
+
+# ------------------------------------------------------------------- Session
+
+
+async def test_session_reads_usage_and_efficiency_together() -> None:
+    usage = Usage(delay=0.1)
+    efficiency = Efficiency(delay=0.1)
+    started = asyncio.get_running_loop().time()
+    snapshot = await _loader(usage=usage, efficiency=efficiency).session("s1")
+    assert asyncio.get_running_loop().time() - started < 0.19
+    assert snapshot.usage == {"cpu": "0.5"} and snapshot.efficiency is not None
+    assert not snapshot.partial
+    # Usage ages the report; duration efficiency does not.
+    assert snapshot.created == NOW - timedelta(seconds=30)
+    assert efficiency.calls == ["session:s1:600:s1-desktop"]
+
+
+async def test_session_without_running_pods_skips_usage() -> None:
+    usage = Usage()
+    snapshot = await _loader(sessions=Sessions(running=False), usage=usage).session("s1")
+    assert usage.calls == 0 and snapshot.usage is None and not snapshot.partial
+
+
+async def test_session_usage_failure_is_partial_only_with_running_pods() -> None:
+    snapshot = await _loader(usage=Usage(error=ProviderUnavailableError("down"))).session("s1")
+    assert snapshot.partial and snapshot.usage is None
+
+
+async def test_session_with_unreachable_pods_is_partial() -> None:
+    snapshot = await _loader(sessions=Sessions(running=False, pods_reachable=False)).session("s1")
+    assert snapshot.partial
+
+
+async def test_young_sessions_skip_efficiency_instead_of_reporting_partial() -> None:
+    efficiency = Efficiency()
+    snapshot = await _loader(
+        sessions=Sessions(age=timedelta(seconds=20)), efficiency=efficiency
+    ).session("s1")
+    assert efficiency.calls == [] and not snapshot.partial
+
+
+async def test_finished_sessions_skip_efficiency_they_could_not_report() -> None:
+    efficiency = Efficiency()
+    snapshot = await _loader(
+        sessions=Sessions(running=False, reserving=0), efficiency=efficiency
+    ).session("s1")
+    assert efficiency.calls == [] and snapshot.efficiency is None and not snapshot.partial
+
+
+async def test_session_empty_usage_is_omitted() -> None:
+    class Empty(Usage):
+        async def read_session_usage(self, observation):
+            return SessionUsageObservation({}, NOW)
+
+    snapshot = await _loader(usage=Empty()).session("s1")
+    assert snapshot.usage is None and not snapshot.partial
+
+
+# ------------------------------------------------------------------- service
+
+
+def _service(
+    cache=None, *, telemetry: MetricsRecorder | None = None, loader: SnapshotLoader | None = None
+) -> MetricsService:
+    caches = {
+        surface: FakeCacheCoordinator(policy=policy)
+        for surface, policy in FRESHNESS_POLICIES.items()
+    }
+    if cache is not None:
+        caches["user"] = cache
+    return MetricsService(
+        platform_name="canfar",
+        caches=caches,
+        identity=lambda kind, subject: CacheIdentity(kind, subject, "cluster-a", "kueue"),
+        loader=loader or _loader(),
+        telemetry=telemetry,
+    )
+
+
+async def test_service_reports_cache_provenance_and_the_fresh_window() -> None:
+    service = _service()
+    first = await service.get(MetricsSubject("user", "bob"))
+    second = await service.get(MetricsSubject("user", "bob"))
+    assert not first.cached and second.cached
+    assert second.fresh_seconds == 120 and not second.stale and second.cache_available
+
+
+async def test_platform_subject_must_match_the_configured_name() -> None:
+    recorder = Recorder()
+    with pytest.raises(AppError) as missing:
+        await _service(telemetry=recorder).get(MetricsSubject("platform", "other"))
+    assert (missing.value.status_code, missing.value.code) == (404, "platform_not_found")
+    assert recorder.compute == [("platform", "not_found")]
+
+
+class Failing(FakeCacheCoordinator):
+    def __init__(self, error: Exception) -> None:
+        super().__init__(policy=FRESHNESS_POLICIES["user"])
+        self.error = error
+
+    async def get_or_fill(self, identity, fill) -> CacheResult:
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "code", "retry"),
     [
-        ("platform", ProviderUnavailableError("Kueue unavailable")),
-        ("platform", ProviderExecutionError("Kueue response invalid")),
-        ("user", ProviderUnavailableError("LocalQueue unavailable")),
-        ("user", ProviderExecutionError("LocalQueue response invalid")),
-    ],
-    ids=[
-        "platform-unavailable",
-        "platform-execution",
-        "user-unavailable",
-        "user-execution",
+        (CacheNotFound(), 404, "user_not_found", None),
+        (CacheUnavailable("redis down"), 503, "metrics_cache_unavailable", 1),
+        (
+            CacheUnavailable("source", cache_available=True, source_reachable=False),
+            503,
+            "user_metrics_unavailable",
+            None,
+        ),
+        (
+            CacheUnavailable("follower timeout", cache_available=True),
+            503,
+            "user_metrics_unavailable",
+            None,
+        ),
     ],
 )
-async def test_expected_provider_failure_is_source_unavailable_at_cache_owner(
-    surface: str,
-    provider_error: Exception,
+async def test_cache_outcomes_map_to_sanitized_http_errors(
+    error: Exception, status: int, code: str, retry: int | None
 ) -> None:
-    """Expected provider failures retain source-unavailable cache semantics."""
+    with pytest.raises(AppError) as mapped:
+        await _service(Failing(error)).get(MetricsSubject("user", "bob"))
+    assert (mapped.value.status_code, mapped.value.code, mapped.value.retry_after) == (
+        status,
+        code,
+        retry,
+    )
 
-    class OwnerCache(FakeCacheCoordinator):
-        """Observe the exception category crossing the cache-fill boundary."""
 
-        def __init__(self, cache_surface: str) -> None:
-            super().__init__(
-                policy=FRESHNESS_POLICIES[cache_surface],
-                created=lambda snapshot: snapshot.created,
-            )
-            self.source_failures = 0
-            self.internal_failures = 0
-
-        async def get_or_fill(self, identity, fill):
-            """Classify the fill exception as a cache owner would."""
-            try:
-                return await super().get_or_fill(identity, fill)
-            except CacheUnavailable:
-                self.source_failures += 1
-                raise
-            except Exception:
-                self.internal_failures += 1
-                raise
-
-    class Recorder(MetricsRecorder):
-        """Capture the provider outcome without constructing OTLP instruments."""
-
-        def __init__(self) -> None:
-            self.provider_statuses: list[tuple[str, str]] = []
-
-        def record_provider_duration(
-            self,
-            *,
-            provider: str,
-            scope: str,
-            status: str,
-            seconds: float,
-        ) -> None:
-            """Record one provider status while ignoring dimensions not under test."""
-            del provider, seconds
-            self.provider_statuses.append((scope, status))
-
-    async def failed_platform() -> PlatformObservation:
-        raise provider_error
-
-    async def failed_user(_username: str) -> UserObservation:
-        raise provider_error
-
-    owner_cache = OwnerCache(surface)
+async def test_unexpected_failures_propagate_and_are_recorded() -> None:
     recorder = Recorder()
-    if surface == "platform":
-        service = _service(
-            platform=failed_platform,
-            platform_cache=owner_cache,
-            telemetry=recorder,
+    with pytest.raises(RuntimeError):
+        await _service(Failing(RuntimeError("bug")), telemetry=recorder).get(
+            MetricsSubject("user", "bob")
         )
-        subject = MetricsSubject("platform", "canfar")
-    else:
-        service = _service(
-            platform=_platform,
-            user_loader=failed_user,
-            user_cache=owner_cache,
-            telemetry=recorder,
-        )
-        subject = MetricsSubject("user", "bob")
-
-    with pytest.raises(AppError) as caught:
-        await service.get(subject)
-
-    assert caught.value.status_code == 503
-    assert caught.value.code == f"{surface}_metrics_unavailable"
-    assert owner_cache.source_failures == 1
-    assert owner_cache.internal_failures == 0
-    assert recorder.provider_statuses == [(surface, "error")]
-
-
-@pytest.mark.anyio
-async def test_user_snapshot_is_not_global_readiness_evidence() -> None:
-    """One User subject cannot establish a service-wide cached snapshot."""
-    service = _service(platform=_platform)
-
-    await service.get(MetricsSubject("user", "bob"))
-
-    state = service.readiness._surfaces["user"]  # noqa: SLF001
-    assert state.source_reachable
-    assert not state.snapshot_complete
-    assert not state.snapshot_serviceable
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize("surface", ["user", "community"])
-async def test_workload_source_failure_does_not_flap_shared_readiness(surface: str) -> None:
-    """A User or Community subject read error stays off the global probe."""
-
-    async def unavailable_user(_username: str) -> UserObservation:
-        raise ProviderUnavailableError("LocalQueue read failed")
-
-    async def unavailable_community(_community: str) -> CommunityObservation:
-        raise ProviderUnavailableError("ClusterQueue read failed")
-
-    loader = unavailable_user if surface == "user" else unavailable_community
-    service = _service(
-        platform=_platform,
-        **{f"{surface}_loader": loader},
-    )
-    service.readiness.start()
-    for tracked_surface in service.readiness.surfaces:
-        service.readiness.mark_source(tracked_surface, reachable=True)
-
-    subject = (
-        MetricsSubject("user", "bob")
-        if surface == "user"
-        else MetricsSubject("community", "astronomy")
-    )
-    with pytest.raises(AppError) as caught:
-        await service.get(subject)
-
-    assert caught.value.code == f"{surface}_metrics_unavailable"
-    assert service.readiness.ready
-    assert service.readiness._surfaces[surface].source_reachable  # noqa: SLF001
-
-
-class _RecoverableCacheOutage:
-    """Expose one mutable shared-cache failure to the service seam."""
-
-    backend_name = "redis"
-
-    def __init__(self, surface: str) -> None:
-        self.policy = FRESHNESS_POLICIES[surface]
-        self.available = True
-
-    async def get_or_fill(self, _identity, _fill):
-        """Fail the request and record the cache outage."""
-        self.available = False
-        raise CacheUnavailable("shared cache unavailable")
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize("surface", ["user", "community"])
-async def test_workload_cache_failure_flaps_readiness_until_recovery(surface: str) -> None:
-    """A shared User or Community cache outage blocks readiness until synced."""
-    cache = _RecoverableCacheOutage(surface)
-    service = _service(platform=_platform, **{f"{surface}_cache": cache})
-    service.readiness.start()
-    for tracked_surface in service.readiness.surfaces:
-        service.readiness.mark_source(tracked_surface, reachable=True)
-        service.readiness.mark_cache(tracked_surface, available=True)
-
-    subject = (
-        MetricsSubject("user", "bob")
-        if surface == "user"
-        else MetricsSubject("community", "astronomy")
-    )
-    assert service.readiness.ready
-
-    with pytest.raises(AppError) as caught:
-        await service.get(subject)
-
-    assert caught.value.code == "metrics_cache_unavailable"
-    assert not service.readiness._surfaces[surface].cache_available  # noqa: SLF001
-    assert not service.readiness.cache_available
-    assert not service.readiness.ready
-
-    cache.available = True
-    service.sync_cache_readiness()
-
-    assert service.readiness.cache_available
-    assert service.readiness.ready
-
-
-@pytest.mark.anyio
-async def test_source_timeout_preserves_cache_availability_provenance() -> None:
-    """A bounded source timeout is not misreported as a Redis outage."""
-
-    class TimedOutCache:
-        """Expose a source-fill timeout through the cache interface."""
-
-        backend_name = "redis"
-        policy = FRESHNESS_POLICIES["platform"]
-        available = True
-
-        async def get_or_fill(self, _identity, _fill):
-            """Return the typed source timeout outcome."""
-            raise CacheFillTimeout()
-
-    service = _service(platform=_platform)
-    service._cache = TimedOutCache()  # noqa: SLF001
-
-    with pytest.raises(AppError) as caught:
-        await service.get(MetricsSubject("platform", "canfar"))
-
-    assert caught.value.code == "platform_metrics_unavailable"
-    state = service.readiness._surfaces["platform"]  # noqa: SLF001
-    assert state.cache_available
-    assert not state.source_reachable
-
-
-@pytest.mark.anyio
-async def test_coordinator_is_the_only_cache_lookup_telemetry_owner() -> None:
-    """Service orchestration does not duplicate coordinator cache lookups."""
-
-    class Recorder(MetricsRecorder):
-        """Count cache lookup observations from the test coordinator."""
-
-        def __init__(self) -> None:
-            self.lookups = 0
-
-        def record_cache_lookup(self, **_details: object) -> None:
-            """Count one lookup observation."""
-            self.lookups += 1
-
-    class RecordingCache(FakeCacheCoordinator):
-        """Record the lookup that a real coordinator would own."""
-
-        def __init__(self, recorder: Recorder) -> None:
-            super().__init__(
-                policy=FRESHNESS_POLICIES["platform"],
-                created=lambda observation: observation.created,
-            )
-            self.recorder = recorder
-
-        async def get_or_fill(self, identity, fill):
-            """Return the value and emit one coordinator-owned lookup."""
-            result = await super().get_or_fill(identity, fill)
-            self.recorder.record_cache_lookup(
-                backend=self.backend_name,
-                result="hit" if result.cached else "miss",
-                scope=identity.subject_kind,
-            )
-            return result
-
-    recorder = Recorder()
-    service = _service(
-        platform=_platform,
-        platform_cache=RecordingCache(recorder),
-        telemetry=recorder,
-    )
-
-    await service.get(MetricsSubject("platform", "canfar"))
-
-    assert recorder.lookups == 1
+    assert recorder.compute == [("user", "error")]
 
 
 def test_efficiency_observation_requires_cpu_and_memory_together() -> None:
-    """Partial efficiency vectors are rejected at the shared model boundary."""
-    with pytest.raises(ValueError, match="cpu and memory together"):
-        EfficiencyObservation(NOW, {"cpu": Decimal("0.5")})
+    with pytest.raises(ValueError):
+        EfficiencyObservation(NOW, {"cpu": "1"})

@@ -6,7 +6,12 @@ invent a production release name or namespace from the local kind profile.
 
 ## Rollback boundary
 
-An application/chart rollback changes image and configuration state. It does
+An application/chart rollback changes image and configuration state. The cache
+schema revision is part of every Redis key, so releases with different
+revisions never read each other's snapshots and a rollback needs no cache
+cleanup; the first requests after it refill. Roll back the environment
+variables with the image: a newer release rejects retired names and an older
+one may ignore new ones. It does
 not repair external Redis, Kueue metadata, Prometheus/Mimir attribution, or
 RBAC. Preserve external cache data and source evidence while the release is
 changed.
@@ -22,12 +27,14 @@ Set only values for the environment being inspected:
 ```bash
 export METRICS_BASE_URL='<metrics-base-url>'
 export METRICS_NAMESPACE='<metrics-namespace>'
+# metrics-api chart: app.kubernetes.io/name=metrics-api
+# Skaha chart:       app.kubernetes.io/name=skaha-metrics-api
+export METRICS_SELECTOR='<pod-label-selector>'
 export METRICS_USER='<canonical-username>'
 export METRICS_COMMUNITY='<canonical-community>'
 export METRICS_SESSION='<canonical-session-id>'
 
-kubectl -n "$METRICS_NAMESPACE" get pods \
-  -l app.kubernetes.io/name=metrics-api -o wide
+kubectl -n "$METRICS_NAMESPACE" get pods -l "$METRICS_SELECTOR" -o wide
 curl -sS -i "$METRICS_BASE_URL/healthz"
 curl -sS -i "$METRICS_BASE_URL/livez"
 curl -sS -i "$METRICS_BASE_URL/readyz"
@@ -43,8 +50,10 @@ curl -sS -i \
 
 Confirm:
 
-- the API Pod is Running and its readiness probe reaches `/readyz`;
-- the three probes return the expected liveness/readiness status;
+- every API Pod is Running and Ready; a new Pod that restarts logged
+  `Redis is unavailable at startup`, and one that stays unready logged
+  `metrics runtime not ready` with the failed dependency;
+- the three probes return 200;
 - successful reports retain the `Metrics` envelope, `observedAt`,
   `reservingWorkloads`, and exactly one `Ready` plus one `Cached` condition;
 - User/Community values are `requests` and optional current `efficiency`;

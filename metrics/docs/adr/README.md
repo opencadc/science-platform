@@ -10,11 +10,12 @@ diverge.
 | ADR | Title | Status |
 | --- | --- | --- |
 | [0001](0001-runtime-architecture.md) | Runtime architecture and Kueue client boundary | Accepted |
-| [0005](0005-redis-freshness-and-outages.md) | Redis freshness and outage policy | Accepted |
-| [0006](0006-opentelemetry-contract.md) | Application-state OTLP metrics | Accepted |
+| [0005](0005-redis-freshness-and-outages.md) | Redis freshness, single-flight, and outages | Accepted |
+| [0006](0006-opentelemetry-contract.md) | Optional application-state OTLP metrics | Accepted |
 | [0009](0009-incremental-module-architecture.md) | Incremental Python package architecture | Accepted |
 | [0010](0010-simple-kueue-metrics-service.md) | Simple Kueue Metrics service (product boundary) | Accepted |
 | [0011](0011-session-metrics-surface.md) | Session Metrics surface (pointer to 0010 / specs) | Accepted |
+| [0012](0012-latched-readiness.md) | Latched readiness | Accepted |
 
 Former ADRs 0002, 0003, 0004, 0007, and 0008 were removed after their durable
 content was folded into 0001, 0010, or specs. Numbers are not reused.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,6 +10,10 @@ from typing import Any
 
 import pytest
 import yaml
+
+import metrics
+from metrics.core.settings import Settings
+from metrics.main import configuration_errors
 
 METRICS_ROOT = Path(__file__).parents[1]
 CHART = METRICS_ROOT / "helm" / "metrics-api"
@@ -116,39 +121,6 @@ def _write_deployable_values(tmp_path: Path, **overrides: Any) -> Path:
     return _write_values(tmp_path, values)
 
 
-def test_chart_metadata_describes_api_only_external_services() -> None:
-    """The chart metadata must not advertise chart-owned dependencies."""
-    chart = yaml.safe_load((CHART / "Chart.yaml").read_text(encoding="utf-8"))
-    assert chart["description"] == (
-        "CANFAR Metrics API chart for operator-configured deployments with external services"
-    )
-
-
-def test_dev_values_define_complete_external_fixture_configuration() -> None:
-    """The disposable profile names every queue, namespace, and external secret."""
-    values = yaml.safe_load((CHART / "values-dev.yaml").read_text(encoding="utf-8"))
-    assert values["clusterName"] == "dev-cluster"
-    assert values["kueue"]["clusterQueues"] == ["cq-proton", "cq-electron"]
-    assert values["kueue"]["namespaces"] == ["canfar-workloads"]
-    assert values["redis"]["urlSecret"] == {
-        "name": "metrics-dev-redis",
-        "key": "redis-url",
-    }
-    assert values["cacheKeySecret"] == {"name": "metrics-dev-cache", "key": "key-secret"}
-    assert "collector" not in values
-    assert "accounting" not in values
-    assert "METRICS_OTEL__METRICS_ENABLED" not in values["env"]
-    assert "METRICS_CLUSTER_NAME" not in values["env"]
-    assert "METRICS_CACHE__BACKEND" not in values["env"]
-    assert not any(key.endswith(("__TRACES_ENABLED", "__LOGS_ENABLED")) for key in values["env"])
-
-
-def test_values_do_not_expose_obsolete_cache_backend_selector() -> None:
-    """Redis Secret references are the sole cache deployment contract."""
-    values = yaml.safe_load((CHART / "values.yaml").read_text(encoding="utf-8"))
-    assert "cacheBackend" not in values
-
-
 def test_default_render_contains_only_api_resources_and_external_secret_refs(
     tmp_path: Path,
 ) -> None:
@@ -167,9 +139,13 @@ def test_default_render_contains_only_api_resources_and_external_secret_refs(
         assert "accounting" not in document["metadata"]["name"].lower()
 
     environment = _environment(documents)
-    assert _deployment(documents)["spec"]["template"]["spec"]["containers"][0]["image"] == (
-        "images.opencadc.org/platform/metrics:v0.1.5"
-    )
+    pod = _deployment(documents)["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+    assert container["image"] == f"images.opencadc.org/platform/metrics:v{metrics.__version__}"
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["lifecycle"]["preStop"] == {"sleep": {"seconds": 5}}
+    assert {"name": "tmp", "mountPath": "/tmp"} in container["volumeMounts"]
+    assert pod["terminationGracePeriodSeconds"] > 5
     assert environment["METRICS_REDIS_URL"]["valueFrom"] == {
         "secretKeyRef": {"name": "metrics-api-redis", "key": "redis-url"}
     }
@@ -177,7 +153,6 @@ def test_default_render_contains_only_api_resources_and_external_secret_refs(
         "secretKeyRef": {"name": "metrics-api-cache", "key": "key-secret"}
     }
     assert environment["METRICS_CLUSTER_NAME"]["value"] == "test-cluster"
-    assert "METRICS_CACHE__BACKEND" not in environment
     assert all(
         not name.startswith("METRICS_ACCOUNTING")
         and "LIFETIME" not in name
@@ -254,36 +229,6 @@ def test_structured_values_wire_kueue_lists_optional_backends_and_secrets(tmp_pa
     assert len(environment) == len(
         _deployment(documents)["spec"]["template"]["spec"]["containers"][0]["env"]
     )
-
-
-def test_env_json_lists_are_supported_when_structured_lists_are_empty(tmp_path: Path) -> None:
-    """Operators can provide the approved JSON list settings through env values."""
-    values = _write_values(
-        tmp_path,
-        {
-            "clusterName": "env-cluster",
-            "serviceAccount": {"create": True},
-            "rbac": {"create": True},
-            "env": {
-                "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES": '["cq-env"]',
-                "METRICS_PROVIDERS__KUEUE__NAMESPACES": '["env-workloads"]',
-                "METRICS_PROVIDERS__PROMQL__BASE_URL": "http://prometheus.metrics:9090",
-                "METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID": "env-tenant",
-                "METRICS_OTEL__EXPORTER_OTLP_ENDPOINT": "http://otel.metrics:4318",
-            },
-        },
-    )
-    environment = _environment(_render("env-boundary", values_file=values))
-    assert environment["METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES"]["value"] == '["cq-env"]'
-    assert environment["METRICS_PROVIDERS__KUEUE__NAMESPACES"]["value"] == '["env-workloads"]'
-    assert environment["METRICS_PROVIDERS__PROMQL__BASE_URL"]["value"] == (
-        "http://prometheus.metrics:9090"
-    )
-    assert environment["METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID"]["value"] == "env-tenant"
-    assert environment["METRICS_OTEL__EXPORTER_OTLP_ENDPOINT"]["value"] == (
-        "http://otel.metrics:4318"
-    )
-    assert environment["METRICS_OTEL__METRICS_ENABLED"]["value"] == "true"
 
 
 def test_rbac_grants_kueue_and_session_workload_reads(tmp_path: Path) -> None:
@@ -412,74 +357,68 @@ def test_deployment_requires_kueue_lists_even_without_owned_rbac(tmp_path: Path)
 
 
 @pytest.mark.parametrize(
-    "override",
+    "key",
     [
-        {"clusterName": "unknown"},
-        {"clusterName": "Cluster-A"},
-        {"clusterName": "cluster_a"},
+        "METRICS_REDIS_URL",
+        "METRICS_CACHE__KEY_SECRET",
+        "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES",
+        "METRICS_PROVIDERS__PROMQL__BASE_URL",
+        "METRICS_OTEL__METRICS_ENABLED",
+        "METRICS_PLATFORM_NAME",
     ],
 )
-def test_cluster_identity_is_a_real_lowercase_dns_name(
-    tmp_path: Path,
-    override: dict[str, Any],
+def test_env_cannot_set_keys_the_chart_renders(tmp_path: Path, key: str) -> None:
+    """A second, possibly plaintext, source for a rendered key fails the render."""
+    values = _write_deployable_values(tmp_path, env={key: "anything"})
+    assert f"env.{key} is rendered from structured values" in _render_error(
+        "duplicate-source", values_file=values
+    )
+
+
+def test_deployment_requires_a_cluster_name(tmp_path: Path) -> None:
+    """Metrics validates the identity; the chart only requires one."""
+    values = _write_deployable_values(tmp_path, clusterName="")
+    assert "clusterName is required" in _render_error("no-cluster-name", values_file=values)
+
+
+def test_duplicate_kueue_entries_render_once(tmp_path: Path) -> None:
+    """RBAC must not render two objects with one name for a repeated entry."""
+    values = _write_complete_values(
+        tmp_path,
+        kueue={"clusterQueues": ["cq-a", "cq-a"], "namespaces": ["work", "work"]},
+    )
+    documents = _render("duplicates", values_file=values)
+    assert len([document for document in documents if document["kind"] == "Role"]) == 1
+    assert _environment(documents)["METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES"]["value"] == (
+        '["cq-a"]'
+    )
+
+
+@pytest.mark.parametrize(
+    "values_path",
+    [CHART / "values-dev.yaml", METRICS_ROOT / "scripts" / "kind-values.yaml"],
+    ids=["values-dev", "kind-values"],
+)
+def test_rendered_environment_is_accepted_by_settings(
+    monkeypatch: pytest.MonkeyPatch, values_path: Path
 ) -> None:
-    """Deployment identity rejects the unknown sentinel and non-DNS names."""
-    error = _render_error(
-        "invalid-cluster-identity",
-        values_file=_write_deployable_values(tmp_path, **override),
-    )
-    assert "lower-case DNS cluster identity" in error
-
-
-def test_obsolete_cache_backend_env_is_stripped_for_legacy_redis(tmp_path: Path) -> None:
-    """The legacy Redis value may transition without reaching CacheConfig."""
-    values = _write_deployable_values(
-        tmp_path,
-        env={"METRICS_CACHE__BACKEND": "redis"},
-    )
-    environment = _environment(_render("legacy-redis-cache", values_file=values))
-    assert "METRICS_CACHE__BACKEND" not in environment
-
-
-def test_obsolete_cache_backend_env_rejects_other_values(tmp_path: Path) -> None:
-    """An obsolete key cannot silently select a different cache implementation."""
-    values = _write_deployable_values(
-        tmp_path,
-        env={"METRICS_CACHE__BACKEND": "memory"},
-    )
-    assert "must be exactly redis" in _render_error("memory-cache", values_file=values)
-
-
-def test_rbac_requires_complete_kueue_configuration(tmp_path: Path) -> None:
-    """The chart must reject an incomplete fixture/configuration contract."""
-    values = _write_values(
-        tmp_path,
-        {
-            "clusterName": "test-cluster",
-            "serviceAccount": {"create": True},
-            "rbac": {"create": True},
-            "kueue": {"clusterQueues": ["cq-only"], "namespaces": []},
-        },
-    )
-    error = _render_error("incomplete-kueue", values_file=values)
-    assert "Kueue namespace" in error
-
-
-def test_structured_and_env_kueue_configuration_must_match(tmp_path: Path) -> None:
-    """Duplicate configuration surfaces cannot silently describe different fixtures."""
-    values = _write_values(
-        tmp_path,
-        {
-            "clusterName": "test-cluster",
-            "rbac": {"create": True},
-            "kueue": {"clusterQueues": ["cq-one"], "namespaces": ["workloads"]},
-            "env": {
-                "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES": '["cq-two"]',
-            },
-        },
-    )
-    error = _render_error("mismatched-kueue", values_file=values)
-    assert "must match" in error
+    """Every shipped profile renders an environment that Metrics accepts at startup."""
+    references = {
+        "METRICS_REDIS_URL": "redis://external.example:6379/0",
+        "METRICS_CACHE__KEY_SECRET": "rendered-profile-cache-key-0123456789",
+        "METRICS_OTEL__POD_UID": "pod-uid",
+    }
+    for name in tuple(os.environ):
+        if name.startswith("METRICS_"):
+            monkeypatch.delenv(name)
+    environment = {
+        name: entry["value"] if "value" in entry else references[name]
+        for name, entry in _environment(_render("profile", values_file=values_path)).items()
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    assert configuration_errors(environment) == []
+    assert Settings().providers.kueue.cluster_queues
 
 
 def test_optional_efficiency_and_telemetry_are_omitted_by_default(tmp_path: Path) -> None:
@@ -490,26 +429,6 @@ def test_optional_efficiency_and_telemetry_are_omitted_by_default(tmp_path: Path
     assert "METRICS_PROVIDERS__PROMQL__BASE_URL" not in environment
     assert "METRICS_PROVIDERS__PROMQL__MIMIR_TENANT_ID" not in environment
     assert "METRICS_OTEL__EXPORTER_OTLP_ENDPOINT" not in environment
-    assert "METRICS_OTEL__METRICS_ENABLED" not in environment
-    assert not any(key.endswith(("__TRACES_ENABLED", "__LOGS_ENABLED")) for key in environment)
-
-
-def test_explicit_otel_toggles_are_removed_without_an_endpoint(tmp_path: Path) -> None:
-    """OTLP signal toggles cannot override endpoint-driven activation."""
-    values = _write_values(
-        tmp_path,
-        {
-            "clusterName": "test-cluster",
-            "kueue": {
-                "clusterQueues": ["cq-test"],
-                "namespaces": ["metrics-workloads"],
-            },
-            "env": {
-                "METRICS_OTEL__METRICS_ENABLED": "false",
-            },
-        },
-    )
-    environment = _environment(_render("disabled-otel-toggles", values_file=values))
     assert "METRICS_OTEL__METRICS_ENABLED" not in environment
     assert not any(key.endswith(("__TRACES_ENABLED", "__LOGS_ENABLED")) for key in environment)
 
@@ -710,3 +629,10 @@ def test_long_release_keeps_all_resource_names_within_dns_limit(tmp_path: Path) 
     assert all(
         document["metadata"].get("namespace") in expected_namespaces for document in documents
     )
+
+
+def test_chart_versions_follow_the_package_release() -> None:
+    """release-please keeps Chart.yaml in step, so the default image is this release."""
+    chart = yaml.safe_load((CHART / "Chart.yaml").read_text())
+    assert chart["appVersion"] == metrics.__version__
+    assert chart["version"] == metrics.__version__

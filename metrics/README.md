@@ -19,7 +19,7 @@ deployment-owned dependencies rather than components of the production chart.
 ## API routes
 
 ```text
-GET /apis/canfar.net/v1alpha1/metrics/user/{username}
+GET /apis/canfar.net/v1alpha1/metrics/user/{user}
 GET /apis/canfar.net/v1alpha1/metrics/community/{community}
 GET /apis/canfar.net/v1alpha1/metrics/platform/{platform}
 GET /apis/canfar.net/v1alpha1/metrics/session/{id}
@@ -31,8 +31,18 @@ GET /readyz
 The response is one `canfar.net/v1alpha1` `Metrics` object. Its `spec` echoes
 the selected subject and its `status` contains `observedAt`,
 `reservingWorkloads`, resources, and exactly one `Ready` plus one `Cached`
-condition. Source rules, cache windows, and failure semantics live in
-[`docs/specs.md`](docs/specs.md).
+condition. Source rules, response examples, cache windows, and failure
+semantics live in [`docs/specs.md`](docs/specs.md).
+
+Reports are cached in Redis in two stages: fresh, then stale. A stale report is
+served immediately while exactly one request across every replica refreshes it:
+
+| Surface | Fresh | Stale |
+| --- | ---: | ---: |
+| Platform | 5 minutes | 10 minutes |
+| User | 2 minutes | 4 minutes |
+| Community | 5 minutes | 10 minutes |
+| Session | 30 seconds | 60 seconds |
 
 ## Configuration
 
@@ -43,8 +53,11 @@ export METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
 export METRICS_PROVIDERS__KUEUE__NAMESPACES='["canfar-workloads","canfar-workloads-extra"]'
 export METRICS_CLUSTER_NAME='cluster.example'
 export METRICS_REDIS_URL='rediss://redis.example/0'
-export METRICS_CACHE__KEY_SECRET='<secret-reference-or-injected-value>'
+export METRICS_CACHE__KEY_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
+
+Startup exits with status 2 and one line per problem when a setting is
+invalid, retired, or a placeholder.
 
 Optional: `METRICS_PROVIDERS__PROMQL__BASE_URL`,
 `METRICS_OTEL__METRICS_ENABLED` with `METRICS_OTEL__EXPORTER_OTLP_ENDPOINT`.

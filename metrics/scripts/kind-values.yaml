@@ -31,17 +31,17 @@ cacheKeySecret:
   name: metrics-test-cache-key
   key: key-secret
 
+promql:
+  baseUrl: "http://metrics-test-prometheus.metrics.svc:9090"
+
+otel:
+  endpoint: "http://metrics-test-otel-collector.metrics.svc:4318"
+
+# Kubernetes endpoint, credentials, and CA come from the pod's ServiceAccount.
 env:
-  METRICS_PROVIDERS__PROMQL__BASE_URL: "http://metrics-test-prometheus.metrics.svc:9090"
-  METRICS_OTEL__EXPORTER_OTLP_ENDPOINT: "http://metrics-test-otel-collector.metrics.svc:4318"
   METRICS_OTEL__EXPORT_INTERVAL_MILLIS: "1000"
   METRICS_OTEL__DEPLOYMENT_ENVIRONMENT: "development"
   METRICS_OTEL__KUBERNETES_NAMESPACE: "metrics"
-  # Kubernetes endpoint/credentials/CA are discovered by kr8s from the pod's
-  # service account; no transport settings are configured here.
-  # JSON array: pydantic-settings decodes nested env with json.loads for list fields.
-  METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES: '["cq-proton","cq-electron","cq-fair"]'
-  METRICS_PROVIDERS__KUEUE__NAMESPACES: '["canfar-workloads","canfar-workloads-secondary"]'
 
 redis:
   urlSecret:

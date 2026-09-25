@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "metrics/**"
+      - "helm/dashboards/**"
       - ".github/workflows/ci.metrics.yml"
   push:
     branches: [main]
     paths:
       - "metrics/**"
+      - "helm/dashboards/**"
       - ".github/workflows/ci.metrics.yml"
   workflow_dispatch:
 

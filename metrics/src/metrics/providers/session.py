@@ -5,12 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
-
-import kr8s
-import kr8s.asyncio
 
 from metrics.core.settings import KueueProviderConfig, Settings
 from metrics.errors import (
@@ -18,15 +15,18 @@ from metrics.errors import (
     ProviderUnavailableError,
     SubjectNotFoundError,
 )
-from metrics.providers.kueue import (
-    _REQUEST_ERRORS,
-    _bounded_map,
-    _json_response,
-    _list,
-    _mapping,
-    _observation_time,
-    _validate_subject,
-    create_kube_api,
+from metrics.providers.kube import (
+    KubeApi,
+    KubeReader,
+    concurrently,
+    fan_out,
+    label_selector,
+    labels_of,
+    mapping,
+    name_of,
+    observation_time,
+    parse_timestamp,
+    sequence,
 )
 from metrics.services.models import SessionObservation
 from metrics.services.resources import (
@@ -39,159 +39,13 @@ from metrics.services.resources import (
 _JOB_API_VERSION = "batch/v1"
 _POD_API_VERSION = "v1"
 _SESSION_LABEL = "canfar.net/id"
-_PAUSE_CONTAINERS = frozenset({"pause", "POD"})
-_MAX_LIST_PAGES = 1_000
-_MAX_CONTINUE_TOKEN_LENGTH = 4_096
-_MAX_RESULT_OBJECTS = 3_000
-_LIST_PAGE_LIMIT = 100
-
-
-def _parse_timestamp(value: object, message: str) -> datetime:
-    """Parse one RFC3339 Kubernetes timestamp into UTC."""
-    if not isinstance(value, str) or not value:
-        raise ProviderExecutionError(message)
-    normalized = value.replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise ProviderExecutionError(message) from exc
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ProviderExecutionError(message)
-    return parsed.astimezone(UTC)
-
-
-async def _fetch_paged_docs(
-    api: Any,
-    *,
-    api_version: str,
-    resource: str,
-    namespace: str,
-    label_selector: str | None = None,
-    kind: str,
-) -> list[dict[str, Any]]:
-    """List all objects in one namespace with bounded pagination."""
-    items: list[dict[str, Any]] = []
-    continue_token: str | None = None
-    seen_tokens: set[str] = set()
-    for _page in range(_MAX_LIST_PAGES):
-        params = {"limit": str(_LIST_PAGE_LIMIT)}
-        if label_selector:
-            params["labelSelector"] = label_selector
-        if continue_token is not None:
-            params["continue"] = continue_token
-        async with api.call_api(
-            method="GET",
-            version=api_version,
-            namespace=namespace,
-            url=resource,
-            params=params,
-        ) as response:
-            payload = _json_response(response, kind)
-        page_items = payload.get("items")
-        if not isinstance(page_items, list) or not all(
-            isinstance(item, dict) for item in page_items
-        ):
-            raise ProviderExecutionError(f"{kind} list contained an invalid object shape")
-        if len(items) + len(page_items) > _MAX_RESULT_OBJECTS:
-            raise ProviderExecutionError(f"{kind} result exceeded the result limit")
-        items.extend(page_items)
-
-        metadata = payload.get("metadata")
-        if metadata is None:
-            return items
-        if not isinstance(metadata, dict):
-            raise ProviderExecutionError(f"{kind} list metadata was invalid")
-        next_token = metadata.get("continue")
-        if next_token in (None, ""):
-            return items
-        if (
-            not isinstance(next_token, str)
-            or len(next_token) > _MAX_CONTINUE_TOKEN_LENGTH
-            or next_token in seen_tokens
-        ):
-            raise ProviderExecutionError(f"{kind} pagination token was invalid")
-        seen_tokens.add(next_token)
-        continue_token = next_token
-    raise ProviderExecutionError(f"{kind} list exceeded the pagination limit")
-
-
-async def fetch_job_docs(
-    api: Any,
-    api_version: str,
-    namespace: str,
-    *,
-    label_selector: str | None = None,
-) -> list[dict[str, Any]]:
-    """List all Jobs in one configured namespace."""
-    return await _fetch_paged_docs(
-        api,
-        api_version=api_version,
-        resource="jobs",
-        namespace=namespace,
-        label_selector=label_selector,
-        kind="Job",
-    )
-
-
-async def fetch_pod_docs(
-    api: Any,
-    api_version: str,
-    namespace: str,
-    *,
-    label_selector: str | None = None,
-) -> list[dict[str, Any]]:
-    """List all Pods in one configured namespace."""
-    return await _fetch_paged_docs(
-        api,
-        api_version=api_version,
-        resource="pods",
-        namespace=namespace,
-        label_selector=label_selector,
-        kind="Pod",
-    )
-
-
-async def probe_job_access(api: Any, api_version: str, namespace: str) -> None:
-    """Probe namespaced Job list access without following pagination."""
-    async with api.call_api(
-        method="GET",
-        version=api_version,
-        namespace=namespace,
-        url="jobs",
-        params={"limit": "1"},
-    ) as response:
-        payload = _json_response(response, "Job access probe")
-    items = payload.get("items")
-    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
-        raise ProviderExecutionError("Job access probe returned an invalid list")
-
-
-def _required_label(labels: dict[str, str], name: str) -> str:
-    """Require one nonempty exact label value."""
-    value = labels.get(name)
-    if not isinstance(value, str) or not value:
-        raise ProviderExecutionError(f"Job was missing a nonempty {name} label")
-    return value
-
-
-def _job_labels(doc: dict[str, Any]) -> dict[str, str]:
-    """Return a validated Job label map."""
-    metadata = _mapping(doc.get("metadata"), "Job metadata was invalid")
-    labels = _mapping(metadata.get("labels"), "Job labels were missing or invalid")
-    if not all(isinstance(name, str) and isinstance(value, str) for name, value in labels.items()):
-        raise ProviderExecutionError("Job labels were invalid")
-    return labels
+_TERMINAL_CONDITIONS = frozenset({"Complete", "Failed"})
 
 
 def _container_requests(container: dict[str, Any]) -> dict[str, Decimal]:
-    """Sum one container's resource requests."""
-    name = container.get("name")
-    if not isinstance(name, str) or name in _PAUSE_CONTAINERS:
-        return {}
+    """Return one container's resource requests in public units."""
     resources = container.get("resources")
-    if not isinstance(resources, dict):
-        return {}
-    requests = resources.get("requests")
+    requests = resources.get("requests") if isinstance(resources, dict) else None
     if not isinstance(requests, dict):
         return {}
     totals: dict[str, Decimal] = {}
@@ -202,21 +56,110 @@ def _container_requests(container: dict[str, Any]) -> dict[str, Decimal]:
     return totals
 
 
-def _pod_template_requests(doc: dict[str, Any]) -> dict[str, Decimal]:
-    """Aggregate requests from all non-pause containers in one Job template."""
-    spec = _mapping(doc.get("spec"), "Job spec was invalid")
-    template = _mapping(spec.get("template"), "Job pod template was invalid")
-    pod_spec = _mapping(template.get("spec"), "Job pod spec was invalid")
-    totals: dict[str, Decimal] = {}
-    for field in ("initContainers", "containers"):
-        containers = pod_spec.get(field)
-        if containers is None:
-            continue
-        for container_value in _list(containers, f"Job {field} were invalid"):
-            container = _mapping(container_value, "Job container was invalid")
-            for name, value in _container_requests(container).items():
-                merge_resource_totals(totals, name, value)
+def _add(left: dict[str, Decimal], right: dict[str, Decimal]) -> dict[str, Decimal]:
+    """Return the per-resource sum of two maps."""
+    totals = dict(left)
+    for name, value in right.items():
+        merge_resource_totals(totals, name, value)
     return totals
+
+
+def _peak(left: dict[str, Decimal], right: dict[str, Decimal]) -> dict[str, Decimal]:
+    """Return the per-resource maximum of two maps."""
+    return {
+        name: max(left.get(name, Decimal(0)), right.get(name, Decimal(0)))
+        for name in {*left, *right}
+    }
+
+
+def _pod_requests(doc: dict[str, Any]) -> dict[str, Decimal]:
+    """Return a Job pod template's effective request, as Kubernetes and Kueue compute it.
+
+    Per resource: the larger of the peak init-container request (each regular
+    init container plus the sidecars started before it) and the sum of the
+    app containers plus every sidecar, plus any pod overhead.
+    """
+    spec = mapping(doc.get("spec"), "Job spec was invalid")
+    template = mapping(spec.get("template"), "Job pod template was invalid")
+    pod_spec = mapping(template.get("spec"), "Job pod spec was invalid")
+    sidecars: dict[str, Decimal] = {}
+    init_peak: dict[str, Decimal] = {}
+    for value in sequence(pod_spec.get("initContainers") or [], "Job initContainers were invalid"):
+        container = mapping(value, "Job init container was invalid")
+        requests = _container_requests(container)
+        if container.get("restartPolicy") == "Always":
+            sidecars = _add(sidecars, requests)
+            init_peak = _peak(init_peak, sidecars)
+        else:
+            init_peak = _peak(init_peak, _add(sidecars, requests))
+    running: dict[str, Decimal] = dict(sidecars)
+    for value in sequence(pod_spec.get("containers") or [], "Job containers were invalid"):
+        running = _add(running, _container_requests(mapping(value, "Job container was invalid")))
+    effective = _peak(init_peak, running)
+    overhead = pod_spec.get("overhead")
+    if overhead is not None:
+        overhead_map = mapping(overhead, "Job pod overhead was invalid")
+        effective = _add(
+            effective,
+            {name: parse_resource_amount(name, raw) for name, raw in overhead_map.items()},
+        )
+    return effective
+
+
+@dataclass(frozen=True, slots=True)
+class _Job:
+    """Hold the parts of one session Job that Metrics reports."""
+
+    requests: dict[str, Decimal]
+    reserving: bool
+    start_time: datetime | None
+    end_time: datetime | None
+
+
+def _job(doc: dict[str, Any], session_id: str) -> _Job:
+    """Validate one matching Job and derive its reservation and timing.
+
+    A Job reserves quota while it is neither finished (a true ``Complete`` or
+    ``Failed`` condition) nor suspended (Kueue has not admitted it). A finished
+    Job ends at ``completionTime``, or else at its terminal condition's
+    transition time.
+    """
+    if labels_of(doc, "Job").get(_SESSION_LABEL) != session_id:
+        raise ProviderExecutionError("Job session label did not match selector")
+    spec = mapping(doc.get("spec"), "Job spec was invalid")
+    status = doc.get("status")
+    status = status if isinstance(status, dict) else {}
+    terminal: datetime | None = None
+    finished = False
+    conditions = status.get("conditions")
+    for condition in conditions if isinstance(conditions, list) else []:
+        if (
+            isinstance(condition, dict)
+            and condition.get("type") in _TERMINAL_CONDITIONS
+            and condition.get("status") == "True"
+        ):
+            finished = True
+            raw_time = status.get("completionTime") or condition.get("lastTransitionTime")
+            try:
+                terminal = parse_timestamp(raw_time, "Job terminal time was invalid")
+            except ProviderExecutionError:
+                terminal = None  # an unparseable end leaves the window open
+    raw_start = status.get("startTime")
+    start = None if raw_start is None else parse_timestamp(raw_start, "Job startTime was invalid")
+    return _Job(
+        requests=_pod_requests(doc),
+        reserving=not finished and spec.get("suspend") is not True,
+        start_time=start,
+        end_time=terminal if finished else None,
+    )
+
+
+def _pod_phase(doc: dict[str, Any]) -> str:
+    """Return one Pod's phase."""
+    phase = mapping(doc.get("status"), "Pod status was invalid").get("phase")
+    if not isinstance(phase, str) or not phase:
+        raise ProviderExecutionError("Pod phase was missing or invalid")
+    return phase
 
 
 def _running_pods_by_namespace(
@@ -225,210 +168,126 @@ def _running_pods_by_namespace(
     """Index Running pod names by namespace from one labelled Pod list."""
     running: dict[str, set[str]] = {}
     for namespace, doc in pods:
-        if _pod_phase(doc) != "Running":
-            continue
-        metadata = _mapping(doc.get("metadata"), "Pod metadata was invalid")
-        name = metadata.get("name")
-        if not isinstance(name, str):
-            raise ProviderExecutionError("Pod metadata name was missing or invalid")
-        running.setdefault(namespace, set()).add(name)
+        if _pod_phase(doc) == "Running":
+            running.setdefault(namespace, set()).add(name_of(doc, "Pod"))
     return {namespace: frozenset(names) for namespace, names in running.items()}
-
-
-def _pod_phase(doc: dict[str, Any]) -> str:
-    """Return one Pod's phase."""
-    status = _mapping(doc.get("status"), "Pod status was invalid")
-    phase = status.get("phase")
-    if not isinstance(phase, str) or not phase:
-        raise ProviderExecutionError("Pod phase was missing or invalid")
-    return phase
-
-
-@dataclass(frozen=True, slots=True)
-class _SessionWindow:
-    """Hold session timing inputs for optional efficiency."""
-
-    start_time: datetime | None
-    window_end: datetime
-    has_running_pods: bool
 
 
 class SessionProvider:
     """Read Session observations from labelled Jobs and Pods."""
 
-    def __init__(self, settings: Settings, api: Any | None = None) -> None:
+    name = "session"
+
+    def __init__(self, settings: Settings, api: KubeApi | None = None) -> None:
         """Attach validated settings and an optional kr8s-compatible API fake."""
         self._config: KueueProviderConfig = settings.providers.kueue
-        self._api = api
+        self._kube = KubeReader(api=api)
 
-    @property
-    def name(self) -> str:
-        """Return the stable provider name used in telemetry."""
-        return "session"
-
-    async def _ensure_api(self) -> Any:
-        """Create and retain the Kubernetes API handle on first use."""
-        if self._api is None:
-            try:
-                self._api = await create_kube_api(self._config)
-            except Exception as exc:
-                raise ProviderUnavailableError("Could not configure Kubernetes API access") from exc
-        return self._api
-
-    async def _jobs(self, session_id: str) -> list[tuple[str, dict[str, Any]]]:
-        """Read every matching Job across configured namespaces."""
-        api = await self._ensure_api()
-        selector = f"{_SESSION_LABEL}={_validate_subject(session_id)}"
+    async def _list(
+        self,
+        version: str,
+        resource: str,
+        kind: str,
+        session_id: str,
+        *,
+        consistent: bool = False,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """List one session's objects of a kind across configured namespaces."""
+        selector = label_selector(_SESSION_LABEL, session_id)
 
         async def fetch(namespace: str) -> list[dict[str, Any]]:
-            return await fetch_job_docs(
-                api,
-                _JOB_API_VERSION,
-                namespace,
-                label_selector=selector,
+            return await self._kube.list_all(
+                version=version,
+                resource=resource,
+                namespace=namespace,
+                kind=kind,
+                selector=selector,
+                consistent=consistent,
             )
 
-        try:
-            docs_by_namespace = await _bounded_map(self._config.namespaces, fetch)
-        except kr8s.ServerError as exc:
-            raise ProviderUnavailableError("Configured Job namespace access failed") from exc
-        except _REQUEST_ERRORS as exc:
-            raise ProviderUnavailableError("Job namespace access failed") from exc
+        docs_by_namespace = await fan_out(self._config.namespaces, fetch)
         return [
             (namespace, doc)
             for namespace, docs in zip(self._config.namespaces, docs_by_namespace, strict=True)
             for doc in docs
         ]
 
-    async def _pods(self, session_id: str) -> list[tuple[str, dict[str, Any]]]:
-        """Read every matching Pod across configured namespaces."""
-        api = await self._ensure_api()
-        selector = f"{_SESSION_LABEL}={_validate_subject(session_id)}"
-
-        async def fetch(namespace: str) -> list[dict[str, Any]]:
-            return await fetch_pod_docs(
-                api,
-                _POD_API_VERSION,
-                namespace,
-                label_selector=selector,
-            )
-
+    async def _pods(self, session_id: str) -> list[tuple[str, dict[str, Any]]] | None:
+        """List the session's Pods, or return ``None`` when pod state is unavailable."""
         try:
-            docs_by_namespace = await _bounded_map(self._config.namespaces, fetch)
-        except kr8s.ServerError as exc:
-            raise ProviderUnavailableError("Configured Pod namespace access failed") from exc
-        except _REQUEST_ERRORS as exc:
-            raise ProviderUnavailableError("Pod namespace access failed") from exc
-        return [
-            (namespace, doc)
-            for namespace, docs in zip(self._config.namespaces, docs_by_namespace, strict=True)
-            for doc in docs
-        ]
-
-    @staticmethod
-    def _session_window(
-        jobs: list[tuple[str, dict[str, Any]]],
-        pods: list[tuple[str, dict[str, Any]]],
-    ) -> _SessionWindow:
-        """Derive session timing from Job and Pod status."""
-        start_time: datetime | None = None
-        completion_time: datetime | None = None
-        has_running_pods = False
-        for _namespace, doc in pods:
-            if _pod_phase(doc) == "Running":
-                has_running_pods = True
-        for _namespace, doc in jobs:
-            status = doc.get("status")
-            if not isinstance(status, dict):
-                continue
-            raw_start = status.get("startTime")
-            if raw_start is not None:
-                parsed_start = _parse_timestamp(raw_start, "Job startTime was invalid")
-                start_time = parsed_start if start_time is None else min(start_time, parsed_start)
-            raw_completion = status.get("completionTime")
-            if raw_completion is not None:
-                parsed_completion = _parse_timestamp(
-                    raw_completion, "Job completionTime was invalid"
-                )
-                completion_time = (
-                    parsed_completion
-                    if completion_time is None
-                    else max(completion_time, parsed_completion)
-                )
-        now = _observation_time()
-        window_end = now if has_running_pods or completion_time is None else completion_time
-        return _SessionWindow(start_time, window_end, has_running_pods)
+            return await self._list(_POD_API_VERSION, "pods", "Pod list", session_id)
+        except (ProviderUnavailableError, ProviderExecutionError):
+            return None
 
     def cache_fingerprint(self) -> str:
         """Return a stable cache revision for the configured Job population."""
         raw = json.dumps(
-            {
-                "api_version": _JOB_API_VERSION,
-                "namespaces": self._config.namespaces,
-            },
+            {"api_version": _JOB_API_VERSION, "namespaces": self._config.namespaces},
             separators=(",", ":"),
             sort_keys=True,
         )
         return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
     async def read_session(self, session_id: str) -> SessionObservation:
-        """Aggregate matching Jobs and derive session timing for one id."""
-        session_id = _validate_subject(session_id)
-        jobs = await self._jobs(session_id)
-        if not jobs:
+        """Aggregate one session's active Jobs and derive its timing window."""
+        job_docs, pods = await concurrently(
+            self._list(_JOB_API_VERSION, "jobs", "Job list", session_id),
+            self._pods(session_id),
+        )
+        if not job_docs:
+            # A cached list can trail a just-created Job; confirm before a 404.
+            job_docs = await self._list(
+                _JOB_API_VERSION, "jobs", "Job list", session_id, consistent=True
+            )
+        if not job_docs:
             raise SubjectNotFoundError("Session has no matching Job")
-        pods_reachable = True
-        try:
-            pods = await self._pods(session_id)
-        except (ProviderUnavailableError, ProviderExecutionError):
-            pods = []
-            pods_reachable = False
-        requests: dict[str, Decimal] = {}
-        seen_jobs: set[tuple[str, str]] = set()
-        for namespace, doc in jobs:
-            metadata = _mapping(doc.get("metadata"), "Job metadata was invalid")
-            name = metadata.get("name")
-            if not isinstance(name, str) or not name:
-                raise ProviderExecutionError("Job metadata name was missing or invalid")
-            identity = (namespace, name)
-            if identity in seen_jobs:
+        seen: set[tuple[str, str]] = set()
+        jobs: list[_Job] = []
+        for namespace, doc in job_docs:
+            identity = (namespace, name_of(doc, "Job"))
+            if identity in seen:
                 raise ProviderExecutionError("Job identity was duplicated")
-            seen_jobs.add(identity)
-            labels = _job_labels(doc)
-            if _required_label(labels, _SESSION_LABEL) != session_id:
-                raise ProviderExecutionError("Job session label did not match selector")
-            for resource_name, value in _pod_template_requests(doc).items():
-                merge_resource_totals(requests, resource_name, value)
-        window = self._session_window(jobs, pods)
+            seen.add(identity)
+            jobs.append(_job(doc, session_id))
+
+        requests: dict[str, Decimal] = {}
+        for job in jobs:
+            if job.reserving:
+                requests = _add(requests, job.requests)
+        now = observation_time()
+        starts = [job.start_time for job in jobs if job.start_time is not None]
+        start_time = min(starts) if starts else None
+        ends = [job.end_time for job in jobs if job.end_time is not None]
+        window_end = now if len(ends) < len(jobs) else max(ends)
+        if start_time is not None and window_end < start_time:
+            window_end = start_time
+        running = _running_pods_by_namespace(pods) if pods is not None else {}
         return SessionObservation(
             session=session_id,
             requests={
                 name: format_resource_amount(name, value)
                 for name, value in sorted(requests.items())
             },
-            reserving_workloads=len(jobs),
-            observed_at=_observation_time(),
-            start_time=window.start_time,
-            window_end=window.window_end,
-            has_running_pods=window.has_running_pods,
-            pods_reachable=pods_reachable,
-            running_pods_by_namespace=_running_pods_by_namespace(pods) if pods_reachable else {},
+            reserving_workloads=sum(job.reserving for job in jobs),
+            observed_at=now,
+            start_time=start_time,
+            window_end=window_end,
+            has_running_pods=bool(running),
+            pods_reachable=pods is not None,
+            running_pods_by_namespace=running,
+            job_names=tuple(sorted({name for _namespace, name in seen})),
         )
 
     async def startup(self) -> None:
         """Validate Job list access once per configured namespace."""
-        api = await self._ensure_api()
 
         async def probe(namespace: str) -> None:
-            await probe_job_access(api, _JOB_API_VERSION, namespace)
+            await self._kube.probe(
+                version=_JOB_API_VERSION, resource="jobs", namespace=namespace, kind="Job list"
+            )
 
-        try:
-            await _bounded_map(self._config.namespaces, probe)
-        except kr8s.ServerError as exc:
-            raise ProviderUnavailableError("Configured Job namespace access failed") from exc
-        except _REQUEST_ERRORS as exc:
-            raise ProviderUnavailableError("Job namespace access failed") from exc
+        await fan_out(self._config.namespaces, probe)
 
     async def shutdown(self) -> None:
         """Release the provider's API handle reference."""
-        self._api = None
+        self._kube.close()

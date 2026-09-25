@@ -112,6 +112,37 @@ def test_local_stack_versions_and_scope_are_pinned() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("reported", "accepted"),
+    [
+        ("kind v0.31.9 go1.24.0 linux/amd64", False),
+        ("kind v0.32.0 go1.24.0 linux/amd64", True),
+        ("kind v0.33.0 go1.25.0 darwin/arm64", True),
+        ("kind v1.0.0 go1.26.0 linux/amd64", True),
+    ],
+)
+def test_kind_version_is_a_minimum(
+    monkeypatch: pytest.MonkeyPatch, reported: str, accepted: bool
+) -> None:
+    def output(command: list[str]) -> str:
+        if command == ["kind", "version"]:
+            return reported
+        raise AssertionError("stop after the version gate")
+
+    monkeypatch.setattr(stack, "_output", output)
+    monkeypatch.setattr(
+        stack,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("version gate passed")),
+    )
+    if accepted:
+        with pytest.raises(AssertionError, match="version gate passed"):
+            stack._ensure_cluster()
+    else:
+        with pytest.raises(stack.DevStackError, match=r"kind >= 0\.32\.0 required"):
+            stack._ensure_cluster()
+
+
 def test_metrics_dev_has_one_supported_lifecycle() -> None:
     parser = build_parser()
     assert not hasattr(parser.parse_args(["up"]), "profile")
@@ -767,51 +798,7 @@ def test_test_dependencies_are_disposable_only() -> None:
 
 def test_kind_values_reference_external_test_services() -> None:
     values = yaml.safe_load((METRICS_ROOT / "scripts" / "kind-values.yaml").read_text())
-    env = values["env"]
-    assert env["METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES"] == (
-        '["cq-proton","cq-electron","cq-fair"]'
-    )
-    assert env["METRICS_PROVIDERS__KUEUE__NAMESPACES"] == (
-        '["canfar-workloads","canfar-workloads-secondary"]'
-    )
-    assert not any(name.endswith("__ENABLED") for name in env)
     assert values["redis"]["urlSecret"]["name"] == "metrics-test-redis"
     assert values["cacheKeySecret"]["name"] == "metrics-test-cache-key"
-    assert "metrics-test-prometheus" in env["METRICS_PROVIDERS__PROMQL__BASE_URL"]
-    assert "metrics-test-otel-collector" in env["METRICS_OTEL__EXPORTER_OTLP_ENDPOINT"]
-
-
-def test_kind_smoke_wrapper_uses_the_single_lifecycle() -> None:
-    script = (METRICS_ROOT / "scripts" / "kind-smoke.sh").read_text(encoding="utf-8")
-    assert "uv run metrics-dev up" in script
-    assert "exec uv run metrics-dev smoke" in script
-    assert "profile" not in script
-
-
-def test_dev_setup_documents_retired_accounting_profile_migration() -> None:
-    documentation = (METRICS_ROOT / "docs" / "dev-setup.md").read_text(encoding="utf-8")
-    section = documentation.split("## Retired accounting profile migration", 1)[1].split("## ", 1)[
-        0
-    ]
-    normalized = " ".join(section.split())
-    assert "lack Helm ownership/release tracking" in section
-    assert (
-        "The Role/RoleBinding inspect/delete pair must be repeated for every "
-        "`METRICS_PROVIDERS__KUEUE__NAMESPACES` entry; `canfar-workloads` and "
-        "`canfar-workloads-secondary` are only the disposable fixture's configured examples."
-    ) in normalized
-    commands = (
-        "kubectl --context kind-metrics --namespace metrics get deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace metrics delete deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting --ignore-not-found --wait",
-        "kubectl --context kind-metrics --namespace canfar-workloads get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace canfar-workloads delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-        "kubectl --context kind-metrics --namespace canfar-workloads-secondary get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace canfar-workloads-secondary delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-        "kubectl --context kind-metrics get clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics delete clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-    )
-    assert all(command in section for command in commands)
-    delete_lines = [line for line in section.splitlines() if " delete " in line]
-    assert all(
-        "-A" not in line and "--all" not in line and "*" not in line for line in delete_lines
-    )
+    assert "metrics-test-prometheus" in values["promql"]["baseUrl"]
+    assert "metrics-test-otel-collector" in values["otel"]["endpoint"]

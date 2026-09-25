@@ -2,7 +2,7 @@
 # external test fixtures; this values file never enables chart-owned services.
 image:
   repository: images.opencadc.org/platform/metrics
-  tag: v0.1.5
+  tag: ""
   pullPolicy: IfNotPresent
 
 clusterName: dev-cluster

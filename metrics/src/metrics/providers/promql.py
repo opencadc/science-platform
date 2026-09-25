@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -16,9 +17,11 @@ import httpx
 from metrics.core.settings import Settings
 from metrics.errors import ProviderExecutionError, ProviderUnavailableError
 from metrics.services.models import EfficiencyObservation, bounded_decimal
+from metrics.services.resources import MEASURED_RESOURCES
 from metrics.telemetry import MetricsRecorder, NoopMetricsRecorder
 
 
+_logger = logging.getLogger(__name__)
 _CPU_USAGE_METRIC = "container_cpu_usage_seconds_total"
 _MEMORY_USAGE_METRIC = "container_memory_working_set_bytes"
 _POD_REQUEST_METRIC = "kube_pod_container_resource_requests"
@@ -28,10 +31,13 @@ _JOIN_LABELS = "cluster,namespace,pod"
 _USER_LABEL = "label_canfar_net_username"
 _COMMUNITY_LABEL = "label_canfar_net_community"
 _SESSION_ID_LABEL = "label_canfar_net_id"
-_EFFICIENCY_RESOURCES = frozenset({"cpu", "memory"})
 _NAMESPACE_LABEL = "namespace"
 _PROMQL_SCOPE = Literal["user", "community", "platform", "session"]
 _MAX_SESSION_WINDOW_SECONDS = 6 * 60 * 60
+_REQUEST_TIMEOUT_SECONDS = 5.0
+_MAX_SAMPLE_AGE_SECONDS = 300
+_FUTURE_SAMPLE_TOLERANCE_SECONDS = 30
+_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 def _validation_now() -> datetime:
@@ -181,116 +187,21 @@ def _label_resource(expression: str, resource: str) -> str:
     return f'label_replace(({expression}), "resource", "{resource}", "__name__", ".*")'
 
 
-_WINDOW_PLACEHOLDER = "__WINDOW__"
-
-
-def _session_selected_pods(
-    *,
-    session_id: str,
-    cluster: str,
-    namespaces: str,
-) -> str:
-    """Select session Pods through a window-stable label join."""
-    labels = _selector(
-        _POD_LABELS_METRIC,
-        cluster=cluster,
-        namespaces=namespaces,
-        matchers=(_matcher(_SESSION_ID_LABEL, "=", session_id),),
-    )
-    return f"max_over_time({labels}[{_WINDOW_PLACEHOLDER}])"
+_SUBQUERY_STEP_SECONDS = 60
 
 
 def _render_window(duration_seconds: int) -> str:
     """Render one bounded PromQL range selector."""
-    bounded = min(max(duration_seconds, 1), _MAX_SESSION_WINDOW_SECONDS)
+    bounded = min(max(duration_seconds, _SUBQUERY_STEP_SECONDS), _MAX_SESSION_WINDOW_SECONDS)
     return f"{bounded}s"
 
 
-def _session_cpu_efficiency(
-    selected_pods: str,
-    *,
-    cluster: str,
-    namespaces: str,
-    window: str,
-    duration_seconds: int,
-) -> str:
-    """Return CPU duration efficiency for one session window."""
-    usage_source = _selector(
-        _CPU_USAGE_METRIC,
-        cluster=cluster,
-        namespaces=namespaces,
-        matchers=(
-            _matcher("pod", "!=", ""),
-            _matcher("container", "!=", ""),
-            _matcher("container", "!=", "POD"),
-            _matcher("container", "!=", "pause"),
-            _matcher("image", "!=", ""),
-        ),
-    )
-    request_source = _selector(
-        _POD_REQUEST_METRIC,
-        cluster=cluster,
-        namespaces=namespaces,
-        matchers=(
-            _matcher("resource", "=", "cpu"),
-            _matcher("unit", "=", "core"),
-            _matcher("pod", "!=", ""),
-            _matcher("container", "!=", ""),
-            _matcher("container", "!=", "POD"),
-            _matcher("container", "!=", "pause"),
-        ),
-    )
-    usage = (
-        f"sum(increase({usage_source}[{window}]) and on (cluster,namespace,pod) {selected_pods})"
-    )
-    requested = (
-        f"sum(avg_over_time({request_source}[{window}]) "
-        f"and on (cluster,namespace,pod) {selected_pods})"
-    )
-    return f"({usage}) / ({requested} * {duration_seconds})"
-
-
-def _session_memory_efficiency(
-    selected_pods: str,
-    *,
-    cluster: str,
-    namespaces: str,
-    window: str,
-) -> str:
-    """Return memory duration efficiency for one session window."""
-    usage_source = _selector(
-        _MEMORY_USAGE_METRIC,
-        cluster=cluster,
-        namespaces=namespaces,
-        matchers=(
-            _matcher("pod", "!=", ""),
-            _matcher("container", "!=", ""),
-            _matcher("container", "!=", "POD"),
-            _matcher("container", "!=", "pause"),
-        ),
-    )
-    request_source = _selector(
-        _POD_REQUEST_METRIC,
-        cluster=cluster,
-        namespaces=namespaces,
-        matchers=(
-            _matcher("resource", "=", "memory"),
-            _matcher("unit", "=", "byte"),
-            _matcher("pod", "!=", ""),
-            _matcher("container", "!=", ""),
-            _matcher("container", "!=", "POD"),
-            _matcher("container", "!=", "pause"),
-        ),
-    )
-    usage = (
-        f"sum(sum_over_time({usage_source}[{window}]) "
-        f"and on (cluster,namespace,pod) {selected_pods})"
-    )
-    requested = (
-        f"sum(sum_over_time({request_source}[{window}]) "
-        f"and on (cluster,namespace,pod) {selected_pods})"
-    )
-    return f"({usage}) / ({requested})"
+def _job_pods(job_names: tuple[str, ...]) -> tuple[str, ...]:
+    """Match only pods created by the session's Jobs (``<job>-<suffix>``)."""
+    if not job_names:
+        return ()
+    pattern = "^(?:" + "|".join(re.escape(name) for name in sorted(job_names)) + ")-.+$"
+    return (_matcher("pod", "=~", pattern),)
 
 
 def _session_query(
@@ -299,28 +210,63 @@ def _session_query(
     cluster: str,
     namespaces: list[str],
     duration_seconds: int,
+    job_names: tuple[str, ...] = (),
 ) -> str:
-    """Render the server-owned session duration efficiency query."""
+    """Render the server-owned session duration efficiency query.
+
+    CPU efficiency is core-seconds used over the window divided by
+    core-seconds requested while each pod was Running. Memory efficiency is
+    the mean working set divided by the mean request while Running. Both
+    request integrals and the memory numerator sample one fixed subquery
+    step, so scrape intervals cancel out and a short-lived pod is charged
+    only for the time it ran.
+    """
     namespace_pattern = _namespace_regex(namespaces)
     window = _render_window(duration_seconds)
-    selected = _session_selected_pods(
-        session_id=session_id,
-        cluster=cluster,
-        namespaces=namespace_pattern,
-    ).replace(_WINDOW_PLACEHOLDER, window)
-    cpu_ratio = _session_cpu_efficiency(
-        selected,
-        cluster=cluster,
-        namespaces=namespace_pattern,
-        window=window,
-        duration_seconds=duration_seconds,
+    step = f"{_SUBQUERY_STEP_SECONDS}s"
+    pods = _job_pods(job_names)
+    containers = (
+        _matcher("pod", "!=", ""),
+        _matcher("container", "!=", ""),
+        _matcher("container", "!=", "POD"),
+        _matcher("container", "!=", "pause"),
+        *pods,
     )
-    memory_ratio = _session_memory_efficiency(
-        selected,
-        cluster=cluster,
-        namespaces=namespace_pattern,
-        window=window,
+
+    def selector(metric: str, *matchers: str) -> str:
+        return _selector(metric, cluster=cluster, namespaces=namespace_pattern, matchers=matchers)
+
+    labels = selector(_POD_LABELS_METRIC, _matcher(_SESSION_ID_LABEL, "=", session_id))
+    selected = f"max_over_time({labels}[{window}])"
+    phase = selector(_POD_PHASE_METRIC, _matcher("phase", "=", "Running"), *pods)
+    running = f"(max by ({_JOIN_LABELS}) ({phase}) == 1)"
+
+    def requested(resource: str, unit: str) -> str:
+        requests = selector(
+            _POD_REQUEST_METRIC,
+            _matcher("resource", "=", resource),
+            _matcher("unit", "=", unit),
+            *containers,
+        )
+        while_running = f"sum by ({_JOIN_LABELS}) ({requests}) * on ({_JOIN_LABELS}) {running}"
+        return (
+            f"sum(sum_over_time(({while_running})[{window}:{step}]) "
+            f"and on ({_JOIN_LABELS}) {selected})"
+        )
+
+    cpu_used = (
+        f"sum(increase({selector(_CPU_USAGE_METRIC, *containers, _matcher('image', '!=', ''))}"
+        f"[{window}]) and on ({_JOIN_LABELS}) {selected})"
     )
+    working_set = (
+        f"sum by ({_JOIN_LABELS}) ({selector(_MEMORY_USAGE_METRIC, *containers)}) "
+        f"and on ({_JOIN_LABELS}) {running}"
+    )
+    memory_used = (
+        f"sum(sum_over_time(({working_set})[{window}:{step}]) and on ({_JOIN_LABELS}) {selected})"
+    )
+    cpu_ratio = f"({cpu_used}) / ({requested('cpu', 'core')} * {_SUBQUERY_STEP_SECONDS})"
+    memory_ratio = f"({memory_used}) / ({requested('memory', 'byte')})"
     return f"{_label_resource(cpu_ratio, 'cpu')} or {_label_resource(memory_ratio, 'memory')}"
 
 
@@ -352,16 +298,7 @@ def _query(
     return f"{_label_resource(cpu_ratio, 'cpu')} or {_label_resource(memory_ratio, 'memory')}"
 
 
-def _normalise_cutoff(value: datetime | None) -> datetime | None:
-    """Normalize an optional caller observation time to UTC."""
-    if value is None:
-        return None
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ProviderExecutionError("PromQL observation time must be timezone-aware")
-    return value.astimezone(UTC)
-
-
-def _result_vector(payload: Any, max_series: int) -> list[Any]:
+def _result_vector(payload: Any) -> list[Any]:
     """Validate the Prometheus success envelope and return its vector."""
     if not isinstance(payload, dict) or payload.get("status") != "success":
         raise ProviderExecutionError("PromQL API did not return success")
@@ -369,8 +306,10 @@ def _result_vector(payload: Any, max_series: int) -> list[Any]:
     if not isinstance(data, dict) or data.get("resultType") != "vector":
         raise ProviderExecutionError("PromQL API did not return an instant vector")
     result = data.get("result")
-    if not isinstance(result, list) or len(result) > max_series or not result:
-        raise ProviderExecutionError("PromQL vector cardinality exceeded the configured limit")
+    if not isinstance(result, list):
+        raise ProviderExecutionError("PromQL API returned an invalid vector")
+    if not result:
+        raise ProviderExecutionError("PromQL returned no efficiency series")
     return result
 
 
@@ -400,20 +339,17 @@ def _sample_value(value: Any) -> Decimal:
 def _validate_response(
     payload: Any,
     *,
-    max_series: int,
     max_sample_age_seconds: int,
     future_sample_tolerance_seconds: int,
-    cutoff: datetime | None,
     evaluation_time: datetime | None = None,
 ) -> EfficiencyObservation:
     """Validate and normalize controlled CPU and memory efficiency samples."""
-    result = _result_vector(payload, max_series)
+    result = _result_vector(payload)
     if len(result) != 2:
         raise ProviderExecutionError("PromQL efficiency vector must contain cpu and memory")
 
     validation_now = evaluation_time or _validation_now()
     now_seconds = Decimal(str(validation_now.timestamp()))
-    cutoff_seconds = Decimal(str(cutoff.timestamp())) if cutoff is not None else None
     observed_timestamp: Decimal | None = None
     observed_at: datetime | None = None
     efficiencies: dict[str, Decimal] = {}
@@ -432,7 +368,7 @@ def _validate_response(
         ):
             raise ProviderExecutionError("PromQL returned an invalid efficiency series")
         resource = labels["resource"]
-        if resource not in _EFFICIENCY_RESOURCES:
+        if resource not in MEASURED_RESOURCES:
             raise ProviderExecutionError("PromQL returned an unknown efficiency resource")
         if resource in efficiencies:
             raise ProviderExecutionError("PromQL returned duplicate efficiency resources")
@@ -447,13 +383,9 @@ def _validate_response(
         age = now_seconds - sample_timestamp
         if age > Decimal(max_sample_age_seconds) or age < -Decimal(future_sample_tolerance_seconds):
             raise ProviderExecutionError("PromQL returned a stale or future sample")
-        if cutoff_seconds is not None and sample_timestamp > cutoff_seconds + Decimal(
-            future_sample_tolerance_seconds
-        ):
-            raise ProviderExecutionError("PromQL returned a sample after the requested cutoff")
         efficiencies[resource] = _sample_value(sample[1])
 
-    if set(efficiencies) != _EFFICIENCY_RESOURCES or observed_at is None:
+    if set(efficiencies) != MEASURED_RESOURCES or observed_at is None:
         raise ProviderExecutionError("PromQL efficiency vector is incomplete")
     return EfficiencyObservation(observed_at=observed_at, efficiencies=efficiencies)
 
@@ -502,11 +434,6 @@ class PromQLProvider:
                 (parsed.scheme, parsed.netloc, f"{base_path}/api/v1/query", "", "")
             )
         self._tenant = self._config.mimir_tenant_id
-        self._request_timeout_seconds = self._config.request_timeout_seconds
-        self._max_sample_age_seconds = self._config.max_sample_age_seconds
-        self._future_sample_tolerance_seconds = self._config.future_sample_tolerance_seconds
-        self._max_series = self._config.max_series
-        self._max_response_bytes = self._config.max_response_bytes
         self._headers = {"X-Scope-OrgID": self._tenant} if self._tenant else None
         self._client = client
         self._owns_client = client is None
@@ -528,11 +455,18 @@ class PromQLProvider:
 
     async def startup(self) -> None:
         """Create the provider-owned HTTP client when an endpoint is configured."""
-        if self._endpoint is not None and self._client is None:
+        if self._endpoint is None:
+            return
+        if self._client is None:
             self._client = httpx.AsyncClient(
                 headers=self._headers,
-                timeout=self._request_timeout_seconds,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
             )
+        _logger.info(
+            "PromQL efficiency enabled host=%s timeout=%ss (capped by the fill deadline)",
+            urlsplit(self._endpoint).netloc,
+            _REQUEST_TIMEOUT_SECONDS,
+        )
 
     async def shutdown(self) -> None:
         """Close only an HTTP client owned by this provider."""
@@ -540,21 +474,17 @@ class PromQLProvider:
         if client is not None and self._owns_client:
             await client.aclose()
 
-    async def read_user(
-        self, username: str, observed_at: datetime | None = None
-    ) -> EfficiencyObservation:
+    async def read_user(self, username: str) -> EfficiencyObservation:
         """Read current efficiency for one exact user label value."""
-        return await self._read("user", username, observed_at)
+        return await self._read("user", username)
 
-    async def read_community(
-        self, community: str, observed_at: datetime | None = None
-    ) -> EfficiencyObservation:
+    async def read_community(self, community: str) -> EfficiencyObservation:
         """Read current efficiency for one exact community label value."""
-        return await self._read("community", community, observed_at)
+        return await self._read("community", community)
 
-    async def read_platform(self, observed_at: datetime | None = None) -> EfficiencyObservation:
+    async def read_platform(self) -> EfficiencyObservation:
         """Read current efficiency for all labelled workload Pods in scope."""
-        return await self._read("platform", None, observed_at)
+        return await self._read("platform", None)
 
     async def read_session(
         self,
@@ -562,42 +492,25 @@ class PromQLProvider:
         *,
         start_time: datetime,
         window_end: datetime,
-        observed_at: datetime | None = None,
+        job_names: tuple[str, ...] = (),
     ) -> EfficiencyObservation:
         """Read duration efficiency for one session over its bounded window."""
         if window_end < start_time:
             raise ProviderExecutionError("Session efficiency window end precedes its start")
+        if not isinstance(session_id, str) or not session_id:
+            raise ProviderExecutionError("PromQL session id must be a non-empty string")
         duration_seconds = int(
             min((window_end - start_time).total_seconds(), _MAX_SESSION_WINDOW_SECONDS)
         )
-        return await self._read_session(
-            session_id,
-            duration_seconds,
-            window_end,
-            observed_at,
-        )
-
-    async def _read_session(
-        self,
-        session_id: str,
-        duration_seconds: int,
-        evaluation_time: datetime,
-        observed_at: datetime | None,
-    ) -> EfficiencyObservation:
-        """Execute and validate one fixed session duration query."""
-        if not isinstance(session_id, str) or not session_id:
-            raise ProviderExecutionError("PromQL session id must be a non-empty string")
         query = _session_query(
             session_id=session_id,
             cluster=self._cluster,
             namespaces=self._namespaces,
             duration_seconds=duration_seconds,
+            job_names=job_names,
         )
         return await self._execute_efficiency_read(
-            scope="session",
-            query=query,
-            evaluation_time=evaluation_time,
-            observed_at=observed_at,
+            scope="session", query=query, evaluation_time=window_end
         )
 
     async def _execute_efficiency_read(
@@ -606,22 +519,18 @@ class PromQLProvider:
         scope: str,
         query: str,
         evaluation_time: datetime | None = None,
-        observed_at: datetime | None = None,
     ) -> EfficiencyObservation:
         """Execute one fixed query and validate its efficiency vector."""
         if self._endpoint is None:
             raise ProviderUnavailableError("PromQL endpoint is not configured")
-        cutoff = _normalise_cutoff(observed_at)
         started = perf_counter()
         status = "ok"
         try:
             payload = await self._request(query, evaluation_time=evaluation_time)
             return _validate_response(
                 payload,
-                max_series=self._max_series,
-                max_sample_age_seconds=self._max_sample_age_seconds,
-                future_sample_tolerance_seconds=self._future_sample_tolerance_seconds,
-                cutoff=cutoff,
+                max_sample_age_seconds=_MAX_SAMPLE_AGE_SECONDS,
+                future_sample_tolerance_seconds=_FUTURE_SAMPLE_TOLERANCE_SECONDS,
                 evaluation_time=evaluation_time,
             )
         except asyncio.CancelledError:
@@ -638,12 +547,7 @@ class PromQLProvider:
                 seconds=perf_counter() - started,
             )
 
-    async def _read(
-        self,
-        scope: _PROMQL_SCOPE,
-        subject: str | None,
-        observed_at: datetime | None,
-    ) -> EfficiencyObservation:
+    async def _read(self, scope: _PROMQL_SCOPE, subject: str | None) -> EfficiencyObservation:
         """Execute and validate one fixed instant query."""
         if scope != "platform" and (not isinstance(subject, str) or not subject):
             raise ProviderExecutionError("PromQL subject must be a non-empty string")
@@ -653,11 +557,7 @@ class PromQLProvider:
             cluster=self._cluster,
             namespaces=self._namespaces,
         )
-        return await self._execute_efficiency_read(
-            scope=scope,
-            query=query,
-            observed_at=observed_at,
-        )
+        return await self._execute_efficiency_read(scope=scope, query=query)
 
     async def _request(
         self,
@@ -681,13 +581,11 @@ class PromQLProvider:
                 headers=self._headers,
             ) as response:
                 response.raise_for_status()
-                body = await _bounded_response_body(response, self._max_response_bytes)
+                body = await _bounded_response_body(response, _MAX_RESPONSE_BYTES)
             try:
                 return json.loads(body)
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise ProviderExecutionError("PromQL response was not valid JSON") from exc
-        except ProviderExecutionError:
-            raise
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code >= 500:
                 raise ProviderUnavailableError("PromQL backend is unavailable") from exc
