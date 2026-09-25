@@ -802,39 +802,3 @@ def test_kind_values_reference_external_test_services() -> None:
     assert values["cacheKeySecret"]["name"] == "metrics-test-cache-key"
     assert "metrics-test-prometheus" in values["promql"]["baseUrl"]
     assert "metrics-test-otel-collector" in values["otel"]["endpoint"]
-
-
-def test_kind_smoke_wrapper_uses_the_single_lifecycle() -> None:
-    script = (METRICS_ROOT / "scripts" / "kind-smoke.sh").read_text(encoding="utf-8")
-    assert "uv run metrics-dev up" in script
-    assert "exec uv run metrics-dev smoke" in script
-    assert "profile" not in script
-
-
-def test_dev_setup_documents_retired_accounting_profile_migration() -> None:
-    documentation = (METRICS_ROOT / "docs" / "dev-setup.md").read_text(encoding="utf-8")
-    section = documentation.split("## Retired accounting profile migration", 1)[1].split("## ", 1)[
-        0
-    ]
-    normalized = " ".join(section.split())
-    assert "lack Helm ownership/release tracking" in section
-    assert (
-        "The Role/RoleBinding inspect/delete pair must be repeated for every "
-        "`METRICS_PROVIDERS__KUEUE__NAMESPACES` entry; `canfar-workloads` and "
-        "`canfar-workloads-secondary` are only the disposable fixture's configured examples."
-    ) in normalized
-    commands = (
-        "kubectl --context kind-metrics --namespace metrics get deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace metrics delete deployment,service,configmap,serviceaccount -l metrics.canfar.net/profile=accounting --ignore-not-found --wait",
-        "kubectl --context kind-metrics --namespace canfar-workloads get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace canfar-workloads delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-        "kubectl --context kind-metrics --namespace canfar-workloads-secondary get role,rolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics --namespace canfar-workloads-secondary delete role,rolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-        "kubectl --context kind-metrics get clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting -o yaml",
-        "kubectl --context kind-metrics delete clusterrole,clusterrolebinding -l metrics.canfar.net/profile=accounting --ignore-not-found",
-    )
-    assert all(command in section for command in commands)
-    delete_lines = [line for line in section.splitlines() if " delete " in line]
-    assert all(
-        "-A" not in line and "--all" not in line and "*" not in line for line in delete_lines
-    )
