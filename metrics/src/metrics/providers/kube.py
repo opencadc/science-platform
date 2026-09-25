@@ -56,7 +56,6 @@ class KubeApi(Protocol):
     @property
     def auth(self) -> KubeAuth:
         """Return the client's credential handle."""
-        ...
 
     def call_api(
         self,
@@ -70,7 +69,6 @@ class KubeApi(Protocol):
         **kwargs: Any,
     ) -> AbstractAsyncContextManager[httpx.Response]:
         """Send one request and yield its response."""
-        ...
 
 
 class KubeStatusError(ProviderUnavailableError):
