@@ -1,0 +1,51 @@
+{{- $mb := .Values.metricsBackend | default dict }}
+{{- $networkPolicy := $mb.networkPolicy | default dict }}
+{{- if and (default false $mb.enabled) (default true $networkPolicy.enabled) }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-networkpolicy") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "skaha.metricsBackend.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- $ingress := $networkPolicy.ingress | default dict }}
+    {{- $skaha := $ingress.skaha | default dict }}
+    {{- $skahaPorts := list (dict "port" 8000 "protocol" "TCP") }}
+    {{- $additionalIngress := $ingress.additional | default list }}
+    {{- if hasKey $skaha "ports" }}
+    {{- $skahaPorts = $skaha.ports }}
+    {{- end }}
+    {{- if $skahaPorts }}
+    - from:
+        - podSelector:
+            matchLabels:
+              run: {{ printf "%s-skaha-tomcat" $.Release.Name }}
+      ports:
+        {{- toYaml $skahaPorts | nindent 8 }}
+    {{- end }}
+    {{- if and (not $skahaPorts) (not $additionalIngress) }}
+    []
+    {{- end }}
+    {{- with $additionalIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    {{- $renderedEgress := false }}
+    {{- range $rules := ($networkPolicy.egress | default dict) }}
+    {{- if $rules }}
+    {{- $renderedEgress = true }}
+    {{- toYaml $rules | nindent 4 }}
+    {{- end }}
+    {{- end }}
+    {{- if not $renderedEgress }}
+    []
+    {{- end }}
+{{- end }}
