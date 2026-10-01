@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.0](https://github.com/opencadc/science-platform/compare/1.4.0...1.5.0) (2026-10-01)
+
+
+### Features
+
+* CANFAR Science Platform Grafana dashboards ([#1147](https://github.com/opencadc/science-platform/issues/1147)) ([faca289](https://github.com/opencadc/science-platform/commit/faca289eb5ae3da86f0342fcaef5a282e5078c49))
+* **metrics:** add cached four-surface usage API ([#1181](https://github.com/opencadc/science-platform/issues/1181)) ([8fe82b2](https://github.com/opencadc/science-platform/commit/8fe82b2b8fa48f7a1932a6117e02ae08afa14362))
+* show session names in browser titles ([038672c](https://github.com/opencadc/science-platform/commit/038672ce66d66d56c2b1e22fcbcf262bb5bc8360))
+* show session names in browser titles ([7ffd984](https://github.com/opencadc/science-platform/commit/7ffd984b6f5c36a86066437d77634b57eb195088))
+
+
+### Bug Fixes
+
+* **dashboards:** OOM attribution, drilldown rework, and a consistency pass ([#1169](https://github.com/opencadc/science-platform/issues/1169)) ([d0d8a46](https://github.com/opencadc/science-platform/commit/d0d8a46885655bad5702bca53cd225ff64e674df))
+* **dashboards:** query the instruments the metrics service exports ([fe51411](https://github.com/opencadc/science-platform/commit/fe51411ef5c438eb90d874dc6170b2335cfdc9fc))
+* fix to expire cache in Redis when needed ([0541f88](https://github.com/opencadc/science-platform/commit/0541f88a9cffb7fd4697b06373c767733a49e1b0))
+* **metrics:** fail fast on retired or placeholder settings and harden delivery ([5de97a5](https://github.com/opencadc/science-platform/commit/5de97a507d462056d2d46bd2351c1271f567fe10))
+* **metrics:** serve two-stage snapshots through one refresher and correct Session reports ([d220810](https://github.com/opencadc/science-platform/commit/d22081071266a7a80884c280dd28a5f57640d750))
+* working around ci error when building helm chart ([90843e6](https://github.com/opencadc/science-platform/commit/90843e6e2693240570bbf8b24c4ec54ac35b5699))
+
 ## [1.4.0](https://github.com/opencadc/science-platform/compare/1.3.0...1.4.0) (2026-07-31)
 
 
