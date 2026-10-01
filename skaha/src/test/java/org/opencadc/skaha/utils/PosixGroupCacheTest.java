@@ -189,4 +189,30 @@ public class PosixGroupCacheTest {
         Assert.assertEquals(2, queryCount.get());
         Assert.assertEquals(Set.of(expectedGroup), results);
     }
+
+    @Test
+    public void testExpiredCacheEntryIsRefetched() throws Exception {
+        final GroupURI groupURI = groupUri("expired-group");
+        final PosixGroup firstGroup = posixGroup(groupURI, 6001);
+        final PosixGroup refreshedGroup = posixGroup(groupURI, 6002);
+        final AtomicInteger queryCount = new AtomicInteger();
+
+        final PosixMapperClient client = mock(PosixMapperClient.class);
+        when(client.getGID(anyList())).thenAnswer(invocation -> {
+            if (queryCount.incrementAndGet() == 1) {
+                return List.of(firstGroup);
+            }
+            return List.of(refreshedGroup);
+        });
+
+        final PosixGroupCache cache = new PosixGroupCache(client);
+        Assert.assertEquals(Set.of(firstGroup), cache.toGIDs(List.of(groupURI)));
+
+        PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(groupURI, new PosixGroupCache.CachedPosixGroup(firstGroup, 0L));
+
+        final Set<PosixGroup> refreshed = cache.toGIDs(List.of(groupURI));
+
+        Assert.assertEquals(2, queryCount.get());
+        Assert.assertEquals(Set.of(refreshedGroup), refreshed);
+    }
 }

@@ -91,6 +91,10 @@ public class K8SUtil {
     static final String SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS";
     static final long SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT = 86400L; // 1 day
 
+    // Environment variable for in-process POSIX user-group (URI→GID) cache TTL in seconds.
+    static final String SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS_ENV = "SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS";
+    static final long SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS_DEFAULT = 86400L; // 1 day
+
     private static final Logger log = Logger.getLogger(K8SUtil.class);
 
     public static String getSessionsHostName() {
@@ -223,6 +227,31 @@ public class K8SUtil {
             }
         }
         return K8SUtil.SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS_DEFAULT; // Default to 1 day
+    }
+
+    /**
+     * Obtain the POSIX user-group cache TTL in seconds. Configurable via the SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS
+     * environment variable. {@code 0} disables caching.
+     *
+     * @return long of seconds for the POSIX user-group cache TTL. Default is 86400 seconds (1 day).
+     */
+    public static long getPosixUserGroupCacheTTLSeconds() {
+        final String ttlString = System.getenv(K8SUtil.SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS_ENV);
+        if (StringUtil.hasText(ttlString)) {
+            try {
+                final long ttlSeconds = Long.parseLong(ttlString);
+                if (ttlSeconds < 0) {
+                    log.warn("POSIX user-group cache TTL seconds cannot be negative: " + ttlString
+                            + ". Using default of 86400 seconds.");
+                    return K8SUtil.SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS_DEFAULT;
+                }
+                return ttlSeconds;
+            } catch (NumberFormatException nfe) {
+                log.warn("Invalid POSIX user-group cache TTL seconds: " + ttlString
+                        + ". Using default of 86400 seconds.");
+            }
+        }
+        return K8SUtil.SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS_DEFAULT;
     }
 
     /**

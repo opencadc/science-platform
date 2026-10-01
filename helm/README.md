@@ -33,6 +33,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.init.imagePullPolicy | string | `"IfNotPresent"` | Image pull policy for the bootstrap init container. |
 | deployment.skaha.podAnnotations | object | `{}` | Annotations added to the Skaha API Pod template metadata. |
 | deployment.skaha.posixMapperCacheTTLSeconds | string | `"86400"` | TTL in seconds for cached POSIX mapper entries. |
+| deployment.skaha.posixUserGroupCacheTTLSeconds | string | `"86400"` | TTL in seconds for the in-process POSIX user-group (URI to GID) cache. |
 | deployment.skaha.registryHosts | string | `"images.canfar.net"` | Space-delimited list of image registry hosts allowed for sessions. |
 | deployment.skaha.resources.limits.cpu | string | `"2000m"` | CPU limit for the Skaha API container. |
 | deployment.skaha.resources.limits.memory | string | `"3Gi"` | Memory limit for the Skaha API container. |

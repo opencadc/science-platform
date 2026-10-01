@@ -9,10 +9,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import javax.security.auth.Subject;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
+import org.opencadc.skaha.K8SUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,12 +31,21 @@ import org.slf4j.LoggerFactory;
  *
  * <p>If the mapper returns fewer groups than requested (e.g. empty body on first call), one retry runs before toGIDs
  * throws.
+ *
+ * <p>Entries expire after {@link K8SUtil#getPosixUserGroupCacheTTLSeconds()} (default 86400). {@code 0} disables
+ * caching.
  */
 public class PosixGroupCache {
     private static final Logger LOGGER = LoggerFactory.getLogger(PosixGroupCache.class);
     private static final int POSIX_MAPPER_GID_QUERY_BATCH_SIZE = 20;
     private static final Object GROUP_LOAD_LOCK = new Object();
-    static final ConcurrentHashMap<GroupURI, PosixGroup> GROUP_URI_POSIX_GROUP_CACHE = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<GroupURI, CachedPosixGroup> GROUP_URI_POSIX_GROUP_CACHE = new ConcurrentHashMap<>();
+
+    record CachedPosixGroup(PosixGroup group, long expiresAtMillis) {
+        boolean live() {
+            return System.currentTimeMillis() < expiresAtMillis;
+        }
+    }
 
     private final PosixMapperClient posixMapperClient;
 
@@ -59,7 +70,7 @@ public class PosixGroupCache {
         final List<GroupURI> missingGroupURIs = new ArrayList<>();
 
         groupURIS.stream().filter(Objects::nonNull).forEach(groupURI -> {
-            final PosixGroup cachedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(groupURI);
+            final PosixGroup cachedGroup = PosixGroupCache.liveGroup(groupURI);
             if (cachedGroup != null) {
                 results.add(cachedGroup);
             } else {
@@ -72,12 +83,12 @@ public class PosixGroupCache {
                     new ArrayList<>(new LinkedHashSet<>(missingGroupURIs)), this.posixMapperClient);
 
             missingGroupURIs.forEach(missingGroupURI -> {
-                final PosixGroup fetchedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(missingGroupURI);
+                final CachedPosixGroup fetchedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(missingGroupURI);
                 if (fetchedGroup == null) {
                     throw new IllegalStateException(
                             "POSIX Mapper did not return a group mapping for " + missingGroupURI);
                 }
-                results.add(fetchedGroup);
+                results.add(fetchedGroup.group());
             });
         }
 
@@ -111,11 +122,23 @@ public class PosixGroupCache {
     private static List<GroupURI> uncachedGroupURIs(final List<GroupURI> groupURIs) {
         final List<GroupURI> uncachedGroupURIs = new ArrayList<>();
         for (final GroupURI groupURI : groupURIs) {
-            if (!PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.containsKey(groupURI)) {
+            if (PosixGroupCache.liveGroup(groupURI) == null) {
                 uncachedGroupURIs.add(groupURI);
             }
         }
         return uncachedGroupURIs;
+    }
+
+    static PosixGroup liveGroup(final GroupURI groupURI) {
+        final CachedPosixGroup cachedGroup = PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.get(groupURI);
+        if (cachedGroup == null) {
+            return null;
+        }
+        if (!cachedGroup.live()) {
+            PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.remove(groupURI, cachedGroup);
+            return null;
+        }
+        return cachedGroup.group();
     }
 
     private static void fetchAndCacheGroupBatches(
@@ -134,8 +157,14 @@ public class PosixGroupCache {
             final List<PosixGroup> fetchedGroups =
                     Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
                             () -> posixMapperClient.getGID(uncachedBatch));
-            fetchedGroups.forEach(posixGroup ->
-                    PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(posixGroup.getGroupURI(), posixGroup));
+            fetchedGroups.forEach(PosixGroupCache::cacheGroup);
         }
+    }
+
+    private static void cacheGroup(final PosixGroup posixGroup) {
+        final long ttlSeconds = Math.max(0L, K8SUtil.getPosixUserGroupCacheTTLSeconds());
+        PosixGroupCache.GROUP_URI_POSIX_GROUP_CACHE.put(
+                posixGroup.getGroupURI(),
+                new CachedPosixGroup(posixGroup, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(ttlSeconds)));
     }
 }
