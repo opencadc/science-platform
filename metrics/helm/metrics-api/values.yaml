@@ -7,6 +7,10 @@ image:
   pullPolicy: IfNotPresent
 
 replicaCount: 1
+
+# Optional exact name for the API Deployment, Service, and NetworkPolicy.
+# Empty keeps the release-derived name. Other chart objects append their suffix.
+fullnameOverride: ""
 terminationGracePeriodSeconds: 30
 # Seconds to keep serving after termination starts, while endpoint removal
 # propagates. Must stay below terminationGracePeriodSeconds.

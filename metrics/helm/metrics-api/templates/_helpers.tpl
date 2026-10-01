@@ -17,6 +17,14 @@
 
 {{- define "metrics-api.fullnameWithSuffix" -}}
 {{- $suffix := .suffix | trunc 62 | trimSuffix "-" }}
+{{- $override := .context.Values.fullnameOverride | default "" | toString | trim }}
+{{- if $override }}
+{{- if eq $suffix "metrics-api" }}
+{{- $override | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" ($override | trunc (int (sub 62 (len $suffix))) | trimSuffix "-") $suffix | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- else }}
 {{- $baseLength := int (sub 62 (len $suffix)) }}
 {{- $base := include "metrics-api.baseName" .context }}
 {{- if gt (len $base) $baseLength }}
@@ -31,6 +39,7 @@
 {{- printf "%s-%s" $base $suffix | trimSuffix "-" }}
 {{- else }}
 {{- $suffix }}
+{{- end }}
 {{- end }}
 {{- end }}
 
