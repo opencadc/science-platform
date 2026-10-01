@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# One argument expected: the skaha session ID, which makes up part of the connect url
+# The Skaha session ID makes up part of the connect URL. The session name is
+# injected into the workload and used to distinguish concurrent browser tabs.
+
+SESSION_NAME="${skaha_sessionname:-$(hostname)}"
 
 mkdir -p ${HOME}
 cd ${HOME}
@@ -18,4 +21,5 @@ jupyter lab \
 	--ServerApp.base_url=session/notebook/"$1" \
 	--ServerApp.root_dir=/ \
 	--ServerApp.allow_origin="*" \
+	--LabApp.app_name="${SESSION_NAME} - JupyterLab" \
 	${JUPYTERLAB_ARGS}
