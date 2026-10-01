@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/opencadc/science-platform/compare/metrics-v0.1.6...metrics-v0.1.7) (2026-10-01)
+
+
+### Features
+
+* **metrics:** name API objects from fullnameOverride ([aca2a9e](https://github.com/opencadc/science-platform/commit/aca2a9e58391bedb5196af1da349b9f9dc3a3fcc))
+
 ## [0.1.6](https://github.com/opencadc/science-platform/compare/metrics-v0.1.5...metrics-v0.1.6) (2026-09-25)
 
 
