@@ -47,7 +47,7 @@ deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
     # -- Container image for the Skaha API service.
-    image: images.opencadc.org/platform/skaha:1.4.0
+    image: images.opencadc.org/platform/skaha:1.5.0
     # -- Image pull policy for the Skaha API container.
     imagePullPolicy: Always
 
@@ -81,6 +81,11 @@ deployment:
     # This is used to cache POSIX user and group information to reduce load on the POSIX Mapper service.
     # -- TTL in seconds for cached POSIX mapper entries.
     posixMapperCacheTTLSeconds: "86400"
+
+    # Optionally set the TTL for Skaha's in-process POSIX user-group (URI to GID) cache, in seconds.
+    # Defaults to 86400 seconds (1 day) if not set. Set to 0 to disable caching.
+    # -- TTL in seconds for the in-process POSIX user-group (URI to GID) cache.
+    posixUserGroupCacheTTLSeconds: "86400"
 
     # Mount an RSA **public** key for cookie/signature verification as `/config/<path>` via Kubernetes Secret projection.
     # The Secret **data** entry must always be **`RsaSignaturePub.key`** (e.g. `kubectl create secret generic ... --from-file=RsaSignaturePub.key=./your-public.pem`).

@@ -70,6 +70,10 @@ spec:
         - name: SKAHA_POSIX_MAPPER_CACHE_TTL_SECONDS
           value: "{{ .Values.deployment.skaha.posixMapperCacheTTLSeconds }}"
       {{- end }}
+      {{- if .Values.deployment.skaha.posixUserGroupCacheTTLSeconds }}
+        - name: SKAHA_POSIX_USER_GROUP_CACHE_TTL_SECONDS
+          value: "{{ .Values.deployment.skaha.posixUserGroupCacheTTLSeconds }}"
+      {{- end }}
         - name: SKAHA_SESSIONS_HOSTNAME
           value: "{{ .Values.deployment.skaha.sessions.hostname | default .Values.deployment.hostname }}"
         - name: SKAHA_HOSTNAME
