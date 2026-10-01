@@ -26,7 +26,7 @@ jobs:
         with:
             fetch-depth: 0
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -73,7 +73,7 @@ jobs:
             echo "Downloaded artifacts:"
             ls -lah $GITHUB_WORKSPACE
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
           files: jacocoTestReport.xml
