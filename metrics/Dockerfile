@@ -1,7 +1,7 @@
 # Production Metrics image: locked uv install into python:3.13-slim, one worker.
 # Base images are pinned by digest; Dependabot (.github/dependabot.yml) bumps
 # the tag and digest together so security patches still arrive.
-FROM ghcr.io/astral-sh/uv:0.12.20@sha256:100047e74f30778ab704942321a09750d6158739573ff58bf3924085cc6cd2d8 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.22@sha256:f513a91fc62fe7c17567eee97230dd198e43edb8a9fbecca843714a4358fe1bc AS uv
 
 FROM python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS builder
 
