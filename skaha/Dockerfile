@@ -17,8 +17,6 @@ RUN set -eux \
     && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core \
     && dnf -y config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo \
     && dnf -y install --nodocs --assumeyes --setopt=install_weak_deps=False \
-        acl \
-        attr \
         containerd.io \
         docker-ce \
         docker-ce-cli \
