@@ -12,8 +12,8 @@ public class PlatformMetricsTest {
 
     @Test
     public void holdsPlatformCapacityAndAllocationFromFixture() {
-        final Map<String, String> capacity = Map.of("cpu", "64", "memory", "512Gi");
-        final Map<String, String> allocated = Map.of("cpu", "12.5", "memory", "128Gi");
+        final Map<String, String> capacity = Map.of("cpu", "64", "memory", "512Gi", "nvidia.com/gpu", "50");
+        final Map<String, String> allocated = Map.of("cpu", "12.5", "memory", "128Gi", "nvidia.com/gpu", "48");
 
         final PlatformMetrics metrics = new PlatformMetrics(
                 new PlatformMetrics.Metadata(SNAPSHOT_CREATED), new PlatformMetrics.Data(capacity, allocated));
@@ -43,6 +43,35 @@ public class PlatformMetricsTest {
         Assert.assertEquals(12.5, fields.requestedCPUCores(), 0.0);
         Assert.assertEquals("549.756G", fields.ramAvailable());
         Assert.assertEquals("137.439G", fields.requestedRAM());
+        Assert.assertEquals(Integer.valueOf(50), fields.gpuAvailable());
+        Assert.assertEquals(Integer.valueOf(48), fields.requestedGPU());
+    }
+
+    @Test
+    public void toClusterResourceFieldsMapsMissingGpuToZero() {
+        final PlatformMetrics metrics = new PlatformMetrics(
+                new PlatformMetrics.Metadata(SNAPSHOT_CREATED),
+                new PlatformMetrics.Data(
+                        Map.of("cpu", "64", "memory", "512Gi"), Map.of("cpu", "12.5", "memory", "128Gi")));
+
+        final PlatformMetrics.ClusterResourceFields fields = metrics.toClusterResourceFields();
+
+        Assert.assertEquals(Integer.valueOf(0), fields.gpuAvailable());
+        Assert.assertEquals(Integer.valueOf(0), fields.requestedGPU());
+    }
+
+    @Test
+    public void toClusterResourceFieldsMapsFractionalGpuToZero() {
+        final PlatformMetrics metrics = new PlatformMetrics(
+                new PlatformMetrics.Metadata(SNAPSHOT_CREATED),
+                new PlatformMetrics.Data(
+                        Map.of("cpu", "64", "memory", "512Gi", "nvidia.com/gpu", "1.5"),
+                        Map.of("cpu", "12.5", "memory", "128Gi", "nvidia.com/gpu", "0.5")));
+
+        final PlatformMetrics.ClusterResourceFields fields = metrics.toClusterResourceFields();
+
+        Assert.assertEquals(Integer.valueOf(0), fields.gpuAvailable());
+        Assert.assertEquals(Integer.valueOf(0), fields.requestedGPU());
     }
 
     @Test

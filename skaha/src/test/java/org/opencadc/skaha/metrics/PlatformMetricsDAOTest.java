@@ -34,7 +34,8 @@ public class PlatformMetricsDAOTest {
                 "observedAt": "2026-03-15T12:30:00Z",
                 "resources": [
                   {"name": "cpu", "capacity": "100", "allocated": "25"},
-                  {"name": "memory", "capacity": "200Gi", "allocated": "50Gi"}
+                  {"name": "memory", "capacity": "200Gi", "allocated": "50Gi"},
+                  {"name": "nvidia.com/gpu", "capacity": "50", "allocated": "48"}
                 ],
                 "conditions": [
                   {
@@ -101,9 +102,11 @@ public class PlatformMetricsDAOTest {
         Assert.assertEquals(
                 Instant.parse("2026-03-15T12:30:00Z"), metrics.metadata().created());
         Assert.assertEquals(
-                Map.of("cpu", "100", "memory", "200Gi"), metrics.data().capacity());
+                Map.of("cpu", "100", "memory", "200Gi", "nvidia.com/gpu", "50"),
+                metrics.data().capacity());
         Assert.assertEquals(
-                Map.of("cpu", "25", "memory", "50Gi"), metrics.data().allocated());
+                Map.of("cpu", "25", "memory", "50Gi", "nvidia.com/gpu", "48"),
+                metrics.data().allocated());
     }
 
     @Test
@@ -118,13 +121,17 @@ public class PlatformMetricsDAOTest {
         final PlatformMetrics metrics = new PlatformMetricsDAO("http://127.0.0.1:" + port).getPlatformMetrics();
 
         Assert.assertEquals(
-                Map.of("cpu", "100", "memory", "200Gi"), metrics.data().capacity());
+                Map.of("cpu", "100", "memory", "200Gi", "nvidia.com/gpu", "50"),
+                metrics.data().capacity());
         Assert.assertEquals(
-                Map.of("cpu", "25", "memory", "50Gi"), metrics.data().allocated());
+                Map.of("cpu", "25", "memory", "50Gi", "nvidia.com/gpu", "48"),
+                metrics.data().allocated());
         Assert.assertEquals(100.0, metrics.toClusterResourceFields().cpuCoresAvailable(), 0.0);
         Assert.assertEquals(25.0, metrics.toClusterResourceFields().requestedCPUCores(), 0.0);
         Assert.assertEquals("214.748G", metrics.toClusterResourceFields().ramAvailable());
         Assert.assertEquals("53.687G", metrics.toClusterResourceFields().requestedRAM());
+        Assert.assertEquals(Integer.valueOf(50), metrics.toClusterResourceFields().gpuAvailable());
+        Assert.assertEquals(Integer.valueOf(48), metrics.toClusterResourceFields().requestedGPU());
     }
 
     @Test
@@ -153,7 +160,7 @@ public class PlatformMetricsDAOTest {
 
             Assert.assertEquals(
                     String.join("/", pair),
-                    Map.of("cpu", "100", "memory", "200Gi"),
+                    Map.of("cpu", "100", "memory", "200Gi", "nvidia.com/gpu", "50"),
                     metrics.data().capacity());
         }
     }
@@ -215,7 +222,8 @@ public class PlatformMetricsDAOTest {
         final PlatformMetrics metrics = dao.getPlatformMetrics();
 
         Assert.assertEquals(
-                Map.of("cpu", "100", "memory", "200Gi"), metrics.data().capacity());
+                Map.of("cpu", "100", "memory", "200Gi", "nvidia.com/gpu", "50"),
+                metrics.data().capacity());
     }
 
     @Test

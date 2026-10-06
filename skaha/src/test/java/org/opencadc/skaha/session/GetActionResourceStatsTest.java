@@ -170,6 +170,7 @@ public class GetActionResourceStatsTest {
         final JsonObject json = new Gson().toJsonTree(stats).getAsJsonObject();
         final JsonObject cores = json.getAsJsonObject("cores");
         final JsonObject ram = json.getAsJsonObject("ram");
+        final JsonObject gpu = json.getAsJsonObject("gpu");
 
         Assert.assertEquals(
                 expectedClusterFields.cpuCoresAvailable(),
@@ -183,6 +184,10 @@ public class GetActionResourceStatsTest {
                 expectedClusterFields.ramAvailable(), ram.get("ramAvailable").getAsString());
         Assert.assertEquals(
                 expectedClusterFields.requestedRAM(), ram.get("requestedRAM").getAsString());
+        Assert.assertEquals(
+                expectedClusterFields.gpuAvailable().intValue(), gpu.get("gpuAvailable").getAsInt());
+        Assert.assertEquals(
+                expectedClusterFields.requestedGPU().intValue(), gpu.get("requestedGPU").getAsInt());
 
         Assert.assertEquals(
                 8.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);
@@ -191,6 +196,7 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals("24G", ram.getAsJsonObject("maxRAM").get("ram").getAsString());
         Assert.assertEquals(
                 8.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
+        Assert.assertEquals(7, gpu.get("maxGPU").getAsInt());
     }
 
     @Test
@@ -207,6 +213,7 @@ public class GetActionResourceStatsTest {
         final JsonObject json = new Gson().toJsonTree(stats).getAsJsonObject();
         final JsonObject cores = json.getAsJsonObject("cores");
         final JsonObject ram = json.getAsJsonObject("ram");
+        final JsonObject gpu = json.getAsJsonObject("gpu");
 
         Assert.assertEquals(
                 5.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);
@@ -215,14 +222,32 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals("20Gi", ram.getAsJsonObject("maxRAM").get("ram").getAsString());
         Assert.assertEquals(
                 5.0, ram.getAsJsonObject("maxRAM").get("withCPUCores").getAsDouble(), 0.0);
+        Assert.assertEquals(0, gpu.get("maxGPU").getAsInt());
     }
 
     private static V1LimitRangeItem containerLimitRangeFixture() {
         final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
-        containerLimitRange.setDefaultRequest(
-                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
-        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+        containerLimitRange.setMax(Map.of(
+                "cpu",
+                Quantity.fromString("8"),
+                "memory",
+                Quantity.fromString("24Gi"),
+                "nvidia.com/gpu",
+                Quantity.fromString("7")));
+        containerLimitRange.setDefaultRequest(Map.of(
+                "cpu",
+                Quantity.fromString("1"),
+                "memory",
+                Quantity.fromString("2Gi"),
+                "nvidia.com/gpu",
+                Quantity.fromString("0")));
+        containerLimitRange.setDefault(Map.of(
+                "cpu",
+                Quantity.fromString("4"),
+                "memory",
+                Quantity.fromString("16Gi"),
+                "nvidia.com/gpu",
+                Quantity.fromString("0")));
         return containerLimitRange;
     }
 

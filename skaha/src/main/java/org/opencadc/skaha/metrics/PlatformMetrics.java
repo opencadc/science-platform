@@ -20,6 +20,7 @@ public record PlatformMetrics(Metadata metadata, Data data) {
 
     private static final String CPU_RESOURCE = "cpu";
     private static final String MEMORY_RESOURCE = "memory";
+    private static final String GPU_RESOURCE = "nvidia.com/gpu";
     private static final BigDecimal MAX_KUBERNETES_QUANTITY = new BigDecimal("9223372036854775807");
 
     /**
@@ -45,21 +46,27 @@ public record PlatformMetrics(Metadata metadata, Data data) {
     }
 
     /**
-     * Cluster-wide CPU and RAM figures mapped from {@link PlatformMetrics} for legacy
+     * Cluster-wide CPU, RAM, and GPU figures mapped from {@link PlatformMetrics} for legacy
      * {@code org.opencadc.skaha.session.ResourceStats} fields.
      *
-     * <p>{@code cpuCoresAvailable} and {@code ramAvailable} carry <strong>platform capacity</strong>;
-     * {@code requestedCPUCores} and {@code requestedRAM} carry <strong>platform allocation</strong> (legacy names
-     * retained for API compatibility). Session ceiling ({@code maxCPUCores}, {@code maxRAM}) is populated separately in
+     * <p>{@code cpuCoresAvailable}, {@code ramAvailable}, and {@code gpuAvailable} carry
+     * <strong>platform capacity</strong>; {@code requestedCPUCores}, {@code requestedRAM}, and {@code requestedGPU}
+     * carry <strong>platform allocation</strong> (legacy names retained for API compatibility). Session ceilings
+     * ({@code maxCPUCores}, {@code maxRAM}, {@code maxGPU}) are populated separately in
      * {@link org.opencadc.skaha.session.GetAction#getResourceStats()}.
      */
     public record ClusterResourceFields(
-            Double requestedCPUCores, String requestedRAM, Double cpuCoresAvailable, String ramAvailable) {}
+            Double requestedCPUCores,
+            String requestedRAM,
+            Double cpuCoresAvailable,
+            String ramAvailable,
+            Integer requestedGPU,
+            Integer gpuAvailable) {}
 
     /**
      * Maps platform capacity and allocation from Metrics to cluster ResourceStats fields.
      *
-     * @return cluster CPU/RAM capacity and allocation (no session ceiling)
+     * @return cluster CPU/RAM/GPU capacity and allocation (no session ceiling)
      */
     public ClusterResourceFields toClusterResourceFields() {
         final Data metricsData = data();
@@ -67,7 +74,9 @@ public record PlatformMetrics(Metadata metadata, Data data) {
                 strictCpuCores(metricsData.allocated().get(CPU_RESOURCE)),
                 strictLegacyMemory(metricsData.allocated().get(MEMORY_RESOURCE)),
                 strictCpuCores(metricsData.capacity().get(CPU_RESOURCE)),
-                strictLegacyMemory(metricsData.capacity().get(MEMORY_RESOURCE)));
+                strictLegacyMemory(metricsData.capacity().get(MEMORY_RESOURCE)),
+                optionalGpuCount(metricsData.allocated().get(GPU_RESOURCE)),
+                optionalGpuCount(metricsData.capacity().get(GPU_RESOURCE)));
     }
 
     private static Map<String, String> validateResourceMap(
@@ -123,5 +132,24 @@ public record PlatformMetrics(Metadata metadata, Data data) {
 
     private static String strictLegacyMemory(final String raw) {
         return MemoryUnitConverter.formatHumanReadable(requireMemoryBytes(raw), MemoryUnitConverter.MemoryUnit.G);
+    }
+
+    /**
+     * Parse a whole GPU device count for platform stats. Missing, blank, fractional, or unparsable values become
+     * {@code 0} so clusters without GPU quota still return CPU/RAM stats.
+     */
+    private static Integer optionalGpuCount(final String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0;
+        }
+        try {
+            final BigDecimal number = Quantity.fromString(raw.trim()).getNumber();
+            if (number == null || number.signum() < 0 || number.stripTrailingZeros().scale() > 0) {
+                return 0;
+            }
+            return number.intValueExact();
+        } catch (RuntimeException ex) {
+            return 0;
+        }
     }
 }
