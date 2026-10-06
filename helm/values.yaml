@@ -47,7 +47,7 @@ deployment:
   hostname: myhost.example.com  # Change this!
   skaha:
     # -- Container image for the Skaha API service.
-    image: images.opencadc.org/platform/skaha:1.5.2
+    image: images.opencadc.org/platform/skaha:1.6.0
     # -- Image pull policy for the Skaha API container.
     imagePullPolicy: Always
 

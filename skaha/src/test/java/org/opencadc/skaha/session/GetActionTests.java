@@ -203,7 +203,7 @@ public class GetActionTests {
     @Test
     public void testListSessions() throws Exception {
         GetAction get = new TestGetAction();
-        String json = get.listSessions(null, null, false);
+        String json = get.listSessions(null, null);
         log.info("json: \n" + json);
         List<Session> sessions1 = get.getAllSessions(null);
         Gson gson = new Gson();

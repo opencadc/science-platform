@@ -1,6 +1,5 @@
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.CertUtil;
@@ -153,8 +152,7 @@ public class UserStorageClient {
             // Only CADC installations will have a cred service configured.
             if (credServiceID != null) {
                 final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL =
-                        registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
+                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10);
 
                 if (credServiceURL != null) {
                     final VOSpaceClient cavernClient = new VOSpaceClient(userStorageConfiguration.serviceURI);
