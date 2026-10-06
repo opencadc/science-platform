@@ -185,9 +185,11 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals(
                 expectedClusterFields.requestedRAM(), ram.get("requestedRAM").getAsString());
         Assert.assertEquals(
-                expectedClusterFields.gpuAvailable().intValue(), gpu.get("gpuAvailable").getAsInt());
+                expectedClusterFields.gpuAvailable().intValue(),
+                gpu.get("gpuAvailable").getAsInt());
         Assert.assertEquals(
-                expectedClusterFields.requestedGPU().intValue(), gpu.get("requestedGPU").getAsInt());
+                expectedClusterFields.requestedGPU().intValue(),
+                gpu.get("requestedGPU").getAsInt());
 
         Assert.assertEquals(
                 8.0, cores.getAsJsonObject("maxCPUCores").get("cpuCores").getAsDouble(), 0.0);

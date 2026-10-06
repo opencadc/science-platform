@@ -130,8 +130,10 @@ public class PlatformMetricsDAOTest {
         Assert.assertEquals(25.0, metrics.toClusterResourceFields().requestedCPUCores(), 0.0);
         Assert.assertEquals("214.748G", metrics.toClusterResourceFields().ramAvailable());
         Assert.assertEquals("53.687G", metrics.toClusterResourceFields().requestedRAM());
-        Assert.assertEquals(Integer.valueOf(50), metrics.toClusterResourceFields().gpuAvailable());
-        Assert.assertEquals(Integer.valueOf(48), metrics.toClusterResourceFields().requestedGPU());
+        Assert.assertEquals(
+                Integer.valueOf(50), metrics.toClusterResourceFields().gpuAvailable());
+        Assert.assertEquals(
+                Integer.valueOf(48), metrics.toClusterResourceFields().requestedGPU());
     }
 
     @Test

@@ -49,9 +49,9 @@ public record PlatformMetrics(Metadata metadata, Data data) {
      * Cluster-wide CPU, RAM, and GPU figures mapped from {@link PlatformMetrics} for legacy
      * {@code org.opencadc.skaha.session.ResourceStats} fields.
      *
-     * <p>{@code cpuCoresAvailable}, {@code ramAvailable}, and {@code gpuAvailable} carry
-     * <strong>platform capacity</strong>; {@code requestedCPUCores}, {@code requestedRAM}, and {@code requestedGPU}
-     * carry <strong>platform allocation</strong> (legacy names retained for API compatibility). Session ceilings
+     * <p>{@code cpuCoresAvailable}, {@code ramAvailable}, and {@code gpuAvailable} carry <strong>platform
+     * capacity</strong>; {@code requestedCPUCores}, {@code requestedRAM}, and {@code requestedGPU} carry
+     * <strong>platform allocation</strong> (legacy names retained for API compatibility). Session ceilings
      * ({@code maxCPUCores}, {@code maxRAM}, {@code maxGPU}) are populated separately in
      * {@link org.opencadc.skaha.session.GetAction#getResourceStats()}.
      */
@@ -144,7 +144,9 @@ public record PlatformMetrics(Metadata metadata, Data data) {
         }
         try {
             final BigDecimal number = Quantity.fromString(raw.trim()).getNumber();
-            if (number == null || number.signum() < 0 || number.stripTrailingZeros().scale() > 0) {
+            if (number == null
+                    || number.signum() < 0
+                    || number.stripTrailingZeros().scale() > 0) {
                 return 0;
             }
             return number.intValueExact();

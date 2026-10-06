@@ -8,8 +8,7 @@ import org.mockito.Mockito;
 /** Stable platform metrics values for unit and integration tests. */
 public final class PlatformMetricsFixtures {
     public static final Instant SNAPSHOT_CREATED = Instant.parse("2026-01-01T00:00:00Z");
-    public static final Map<String, String> CAPACITY =
-            Map.of("cpu", "64", "memory", "512Gi", "nvidia.com/gpu", "50");
+    public static final Map<String, String> CAPACITY = Map.of("cpu", "64", "memory", "512Gi", "nvidia.com/gpu", "50");
     public static final Map<String, String> ALLOCATED =
             Map.of("cpu", "12.5", "memory", "128Gi", "nvidia.com/gpu", "48");
 
