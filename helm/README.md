@@ -82,6 +82,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | grafanaDashboards.sidecarLabelValue | string | `"1"` | Value for `sidecarLabel`. |
 | ingress.enabled | bool | `true` | Enable ingress routing for the Skaha API. |
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
+| livenessProbe | object | `{"httpGet":{"path":"/skaha/availability","port":"http"},"periodSeconds":30}` | HTTP liveness probe for the Skaha API container. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | metricsBackend.enabled | bool | `false` | When true, install Kueue-read ClusterRole/Binding first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden). |
 | metricsBackend.env | object | `{}` | Map of METRICS_* environment variables for the Metrics container; configuration is environment-only. GitOps supplies per-environment values — at minimum METRICS_CLUSTER_NAME and METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES (JSON array string, for example '["cq-a"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings; images after v0.1.5 fail startup on the removed keys (METRICS_PROVIDERS__KUEUE__KUBE_API_URL / KUBE_API_TOKEN / TOKEN_FILE / CA_FILE / KUBE_VERIFY_TLS / KUBE_CLUSTERQUEUE_PATH / HTTP__*, METRICS_CACHE__SCOPE_TTL_SECONDS, METRICS_CONFIG_FILE). See metrics/docs/environment-contracts.md. |
@@ -101,6 +102,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | podSecurityContext | object | `{}` |  |
 | rbac.clusterRole.create | bool | `true` |  |
 | rbac.create | bool | `true` |  |
+| readinessProbe | object | `{"httpGet":{"path":"/skaha/availability","port":"http"},"periodSeconds":15}` | HTTP readiness probe for the Skaha API container. |
 | redis.architecture | string | `"standalone"` | Redis deployment architecture. |
 | redis.auth.enabled | bool | `false` | Enable Redis authentication. |
 | redis.image.repository | string | `"redis"` | Redis image repository used by the bundled chart dependency. |
@@ -118,6 +120,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | securityContext | object | `{}` | Optional Pod-level security context for the Skaha API Deployment. |
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
 | serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
+| startupProbe | object | `{"failureThreshold":30,"httpGet":{"path":"/skaha/availability","port":"http"},"initialDelaySeconds":10,"periodSeconds":10,"timeoutSeconds":30}` | HTTP startup probe for the Skaha API container. |
 | telemetry.controller | bool | `false` | Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination. |
 | telemetry.metrics | bool | `false` | Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version. |
 | telemetry.otlp.destination | string | `""` | OTLP HTTP collector endpoint where enabled telemetry services POST metrics. |

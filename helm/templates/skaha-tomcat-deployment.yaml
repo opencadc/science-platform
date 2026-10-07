@@ -212,10 +212,23 @@ spec:
             memory: {{ .Values.deployment.skaha.resources.limits.memory }}
             cpu: {{ .Values.deployment.skaha.resources.limits.cpu }}
         ports:
-        - containerPort: 8080
+        - name: http
+          containerPort: 8080
           protocol: TCP
         {{- with .Values.deployment.skaha.extraPorts }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.startupProbe }}
+        startupProbe:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         {{- with .Values.securityContext }}
         securityContext:

@@ -577,6 +577,29 @@ service:
   # -- Service port exposed for the Skaha API Service.
   port: 8080
 
+# -- HTTP liveness probe for the Skaha API container.
+livenessProbe:
+  httpGet:
+    path: /skaha/availability
+    port: http
+  periodSeconds: 60
+# -- HTTP readiness probe for the Skaha API container.
+readinessProbe:
+  httpGet:
+    path: /skaha/availability
+    port: http
+  periodSeconds: 15
+
+# -- HTTP startup probe for the Skaha API container.
+startupProbe:
+  httpGet:
+    path: /skaha/availability
+    port: http
+  initialDelaySeconds: 10
+  timeoutSeconds: 30
+  periodSeconds: 5
+  failureThreshold: 30
+
 ingress:
   # Selectively disable ingress if desired.  This is enabled by default.
   # -- Enable ingress routing for the Skaha API.
