@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/opencadc/science-platform/compare/1.5.0...1.5.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* docker fixes ([cb9dfcc](https://github.com/opencadc/science-platform/commit/cb9dfcc219555cf4a1b3f8240c27fac64a63d6cc))
+
 ## [1.5.0](https://github.com/opencadc/science-platform/compare/1.4.0...1.5.0) (2026-10-01)
 
 
