@@ -1,5 +1,6 @@
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.auth.AuthMethod;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.cred.CertUtil;
@@ -285,7 +286,26 @@ public class UserStorageClient {
         final URI nodeURI =
                 URI.create(this.userStorageConfiguration.userHomeBaseURI + "/" + owner + "/" + relativePath);
         final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
-        transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
+        final Protocol protocol = new Protocol(VOS.PROTOCOL_HTTPS_PUT);
+        final AuthMethod authMethod = AuthenticationUtil.getAuthMethod(AuthenticationUtil.getCurrentSubject());
+
+        switch (authMethod) {
+            case TOKEN:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_TOKEN);
+                break;
+            case CERT:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_CERT);
+                break;
+            case COOKIE:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_COOKIE);
+            default:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_ANON);
+                break;
+        }
+
+        LOGGER.debug("UserStorageClient.upload() - Using security method: " + protocol.getSecurityMethod());
+
+        transfer.getProtocols().add(protocol);
 
         final ClientTransfer clientTransfer = voSpaceClient.createTransfer(transfer);
         clientTransfer.setFile(file);
