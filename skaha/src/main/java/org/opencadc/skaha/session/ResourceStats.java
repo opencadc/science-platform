@@ -30,7 +30,6 @@
  *  products derived from this           promouvoir les produits dérivés
  *  software without specific prior      de ce logiciel sans autorisation
  *  written permission.                  préalable et particulière
- *                                       par écrit.
  *
  *  This file is part of the             Ce fichier fait partie du projet
  *  OpenCADC project.                    OpenCADC.
@@ -75,6 +74,7 @@ package org.opencadc.skaha.session;
 public class ResourceStats {
     private final Core cores = new Core();
     private final Ram ram = new Ram();
+    private final Gpu gpu = new Gpu();
 
     public ResourceStats(
             Double requestedCPUCores,
@@ -84,7 +84,10 @@ public class ResourceStats {
             Double mCores,
             String withRAM,
             String mRAM,
-            Double withCores) {
+            Double withCores,
+            Integer requestedGPU,
+            Integer gpuAvailable,
+            Integer maxGPU) {
         MaxCoreResource maxCores = new MaxCoreResource();
         maxCores.cpuCores = mCores;
         maxCores.withRam = withRAM;
@@ -98,6 +101,10 @@ public class ResourceStats {
         ram.maxRAM = maxRAM;
         ram.ramAvailable = ramAvailable;
         ram.requestedRAM = requestedRAM;
+
+        gpu.requestedGPU = requestedGPU == null ? 0 : requestedGPU;
+        gpu.gpuAvailable = gpuAvailable == null ? 0 : gpuAvailable;
+        gpu.maxGPU = maxGPU == null ? 0 : maxGPU;
     }
 
     static class Core {
@@ -110,6 +117,12 @@ public class ResourceStats {
         String requestedRAM = "0G";
         String ramAvailable = "0G";
         MaxRamResource maxRAM;
+    }
+
+    static class Gpu {
+        Integer requestedGPU = 0;
+        Integer gpuAvailable = 0;
+        Integer maxGPU = 0;
     }
 
     static class MaxCoreResource {

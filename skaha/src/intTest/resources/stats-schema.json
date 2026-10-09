@@ -50,6 +50,16 @@
       },
       "required": [],
       "additionalProperties": false
+    },
+    "gpu": {
+      "type": "object",
+      "properties": {
+        "requestedGPU": { "type": "integer" },
+        "gpuAvailable": { "type": "integer" },
+        "maxGPU": { "type": "integer" }
+      },
+      "required": [],
+      "additionalProperties": false
     }
   },
   "required": [],

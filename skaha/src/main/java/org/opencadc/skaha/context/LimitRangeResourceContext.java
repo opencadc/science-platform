@@ -178,6 +178,18 @@ public class LimitRangeResourceContext {
                         this.maximumValues, LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY));
     }
 
+    /**
+     * Per-session GPU ceiling from LimitRange {@code max["nvidia.com/gpu"]}.
+     *
+     * @return maximum GPUs a session may request, or {@code 0} when the LimitRange omits GPU
+     */
+    public int getMaxGPUCount() {
+        if (!hasGPULimits()) {
+            return 0;
+        }
+        return getTotalGPUCounts().getMaximum();
+    }
+
     private boolean hasGPULimits() {
         return this.maximumValues.containsKey(LimitRangeResourceContext.LIMIT_RANGE_GPU_KEY);
     }
