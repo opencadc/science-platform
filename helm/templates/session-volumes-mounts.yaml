@@ -20,4 +20,6 @@
         - mountPath: "/scratch"
           name: scratch-dir
           subPath: "${skaha.sessionid}"
+        - mountPath: "/dev/shm"
+          name: dshm-volume
 {{- end }}
