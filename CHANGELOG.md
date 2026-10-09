@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0](https://github.com/opencadc/science-platform/compare/1.5.0...1.6.0) (2026-10-09)
+
+
+### Features
+
+* **skaha:** consume usage metrics and align Helm deployment ([ac50bec](https://github.com/opencadc/science-platform/commit/ac50bec09b3fb6e2bfdc9ff5897895feb1b0b363))
+* **skaha:** expose GPU capacity in platform stats ([7a4d83a](https://github.com/opencadc/science-platform/commit/7a4d83aea9bc761f1b79d449b2fba8689db5adcc))
+
+
+### Bug Fixes
+
+* docker fixes ([cb9dfcc](https://github.com/opencadc/science-platform/commit/cb9dfcc219555cf4a1b3f8240c27fac64a63d6cc))
+
 ## [1.5.0](https://github.com/opencadc/science-platform/compare/1.4.0...1.5.0) (2026-10-01)
 
 
