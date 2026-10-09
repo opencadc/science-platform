@@ -207,6 +207,7 @@ public class GetAction extends SessionAction {
             final String withRAM;
             final String maxRAMStr;
             final double withCores;
+            final int maxGPU;
             if (isSessionLimitRangeEnabled()) {
                 final LimitRangeResourceContext limitRangeResourceContext = loadLimitRangeResourceContext();
                 maxCores = limitRangeResourceContext.getTotalCoreCounts().getMaximum();
@@ -216,6 +217,7 @@ public class GetAction extends SessionAction {
                                 limitRangeResourceContext.getTotalMemoryCounts().getMaximum(),
                         MemoryUnitConverter.MemoryUnit.G);
                 withRAM = maxRAMStr;
+                maxGPU = limitRangeResourceContext.getMaxGPUCount();
             } else {
                 final ResourceContexts resourceContexts = loadResourceContexts();
                 maxCores = resourceContexts.getDefaultLimitCores();
@@ -223,6 +225,7 @@ public class GetAction extends SessionAction {
                 maxRAMStr = MemoryUnitConverter.formatHumanReadable(
                         resourceContexts.getDefaultLimitRAM().doubleValue(), MemoryUnitConverter.MemoryUnit.Gi);
                 withRAM = maxRAMStr;
+                maxGPU = 0;
             }
             return new ResourceStats(
                     clusterFields.requestedCPUCores(),
@@ -232,7 +235,10 @@ public class GetAction extends SessionAction {
                     maxCores,
                     withRAM,
                     maxRAMStr,
-                    withCores);
+                    withCores,
+                    clusterFields.requestedGPU(),
+                    clusterFields.gpuAvailable(),
+                    maxGPU);
         } catch (PlatformMetricsUnavailableException | SessionLimitRangeUnavailableException unavailable) {
             throw unavailable;
         } catch (Exception e) {

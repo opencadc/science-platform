@@ -79,6 +79,7 @@ public class SessionBuilderTest {
     @Test
     public void fromJobReadsCanonicalLabelsAndFlavor() {
         final V1Job job = jobWithLabels(SessionLabels.canonical(Map.of(
+                SessionLabels.Key.COMMUNITY, "astronomy",
                 SessionLabels.Key.ID, "session-123",
                 SessionLabels.Key.USERNAME, "alice",
                 SessionLabels.Key.NAME, "analysis",

@@ -1,6 +1,9 @@
 package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.util.StringUtil;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.util.List;
 import java.util.Map;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -47,13 +50,13 @@ public class MetricsDAOTest {
         final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
         final PodMetrics podMetrics = new PodMetrics(Map.of("pod-1", "250m"), Map.of("pod-1", "1Gi"));
 
-        Mockito.when(podProvider.getPodMetrics("alice", true)).thenReturn(podMetrics);
+        Mockito.when(podProvider.getPodMetrics("alice", true, List.of())).thenReturn(podMetrics);
 
         final MetricsDAO dao = new MetricsDAO(platformDao, podProvider);
         final PodResourceUsage usage = dao.getPodResourceUsage("alice", true);
 
         Assert.assertEquals("0.250", usage.cpu().get("pod-1"));
-        Mockito.verify(podProvider).getPodMetrics("alice", true);
+        Mockito.verify(podProvider).getPodMetrics("alice", true, List.of());
     }
 
     @Test
@@ -61,7 +64,7 @@ public class MetricsDAOTest {
         final PlatformMetricsDAO platformDao = Mockito.mock(PlatformMetricsDAO.class);
         final PodUsageProvider podProvider = Mockito.mock(PodUsageProvider.class);
 
-        Mockito.when(podProvider.getPodMetrics("alice", false))
+        Mockito.when(podProvider.getPodMetrics("alice", false, List.of()))
                 .thenThrow(new RuntimeException("metrics API unavailable"));
 
         final MetricsDAO dao = new MetricsDAO(platformDao, podProvider);
@@ -87,17 +90,31 @@ public class MetricsDAOTest {
     }
 
     @Test
-    public void fromEnvironmentSelectsBackendProviderWhenConfigured() {
-        final String previous = System.getenv(PodUsageProvider.SKAHA_POD_METRICS_SOURCE);
-        try {
-            // Cannot set env in Java easily; test the backend class directly
-            final PodUsageProvider provider = new MetricsBackendPodUsageProvider();
-            Assert.assertThrows(UnsupportedOperationException.class, () -> provider.getPodMetrics("alice", false));
-        } finally {
-            // env unchanged in test JVM
-            if (previous != null) {
-                // no-op: documented limitation
-            }
-        }
+    public void getPodResourceUsageUsesBackendSessionApiForListedJobs() throws Exception {
+        final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
+        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
+                .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
+
+        final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(sessionMetricsDAO));
+        final List<V1Job> jobs = List.of(new V1Job()
+                .metadata(new V1ObjectMeta().name("job-a-main").labels(Map.of("canfar.net/id", "session-a"))));
+
+        final PodResourceUsage usage = dao.getPodResourceUsage("alice", false, jobs);
+
+        Assert.assertEquals("0.500", usage.cpu().get("job-a-main"));
+        Assert.assertEquals("0.54", usage.memory().get("job-a-main"));
+    }
+
+    @Test
+    public void backendProviderReturnsEmptyWithoutJobs() {
+        final MetricsDAO dao =
+                new MetricsDAO(null, new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused")));
+        Assert.assertEquals(PodResourceUsage.empty(), dao.getPodResourceUsage("alice", false, List.of()));
+    }
+
+    @Test
+    public void backendProviderGetPodMetricsReturnsEmptyWithoutJobs() throws Exception {
+        final PodUsageProvider provider = new MetricsBackendPodUsageProvider(new SessionMetricsDAO("http://unused"));
+        Assert.assertEquals(PodMetrics.empty(), provider.getPodMetrics("alice", false, List.of()));
     }
 }

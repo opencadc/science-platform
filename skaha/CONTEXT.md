@@ -9,11 +9,11 @@ Shared cross-context vocabulary: [`../CONTEXT-MAP.md`](../CONTEXT-MAP.md).
 ## Language
 
 **Platform stats**: JSON from `GET /v1/session?view=stats` (no session ID).
-Cluster-wide CPU/RAM figures plus per-session resource ceilings. _Avoid_: "stats
+Cluster-wide CPU/RAM/GPU figures plus per-session resource ceilings. _Avoid_: "stats
 view", "system stats" (unless referring to the schema name).
 
-**Session resource ceiling**: Maximum CPU and memory a single user session pod
-may request (per-pod limit). Not cluster totals. _Avoid_: "max available",
+**Session resource ceiling**: Maximum CPU, memory, and GPUs a single user session
+pod may request (per-pod limit). Not cluster totals. _Avoid_: "max available",
 "node max".
 
 **Resource context file**: Static `k8s-resources.json` mounted at `/config`;
@@ -30,13 +30,16 @@ stats** capacity/allocation and session-list pod usage. Callers use
 _Avoid_: `SkahaMetricsDAO`, `PlatformMetricsDAO`, `PodMetricsDAO` in
 session-layer specs (implementation details).
 
-**Platform capacity** (consumer view): Cluster CPU/memory totals Skaha reads
-from the Metrics backend (`data.capacity`). _Avoid_: "available" alone (legacy
-field names overload this term).
+**Platform capacity** (consumer view): Cluster CPU/memory/GPU totals Skaha reads
+from the Metrics backend (`status.resources[].capacity`). Legacy stats fields
+such as `cpuCoresAvailable` and `gpuAvailable` carry this meaning. _Avoid_:
+"available" alone (legacy field names overload this term).
 
-**Platform allocation** (consumer view): Cluster CPU/memory already allocated,
-read from Metrics `data.allocated`. _Avoid_: "requested" alone when meaning
-cluster totals (legacy Skaha used "requested" for pod sums).
+**Platform allocation** (consumer view): Cluster CPU/memory/GPU already
+allocated, read from Metrics `status.resources[].allocated`. Legacy stats fields
+such as `requestedCPUCores` and `requestedGPU` carry this meaning. _Avoid_:
+"requested" alone when meaning cluster totals (legacy Skaha used "requested" for
+pod sums).
 
 **Interactive workload labels**: Pods counted for Metrics interactive quota must
 carry user, allocation class (`fixed` / `flexible`), and exactly one configured
@@ -50,8 +53,8 @@ session launch. See
   (from **Metrics backend** via **MetricsDAO**) with **session resource
   ceiling** (from LimitRange or **resource context file**).
 - Session-list pod usage (`cpuCoresInUse`, `memoryInUse`) is fetched through
-  **MetricsDAO**; today from the Kubernetes metrics API, future from the
-  **Metrics backend**.
+  **MetricsDAO** from either the Kubernetes metrics API or the **Metrics
+  backend** session API (`SKAHA_POD_METRICS_SOURCE`).
 - **Session resource ceiling** is independent of **platform capacity**.
 
 ## Example dialogue
@@ -67,8 +70,11 @@ session launch. See
 
 ## Flagged ambiguities
 
-- Legacy Skaha fields `requestedCPUCores` / `requestedRAM` in platform stats
-  carry **platform allocation** semantics; names stay for API compatibility.
+- Legacy Skaha fields `requestedCPUCores` / `requestedRAM` / `requestedGPU` in
+  platform stats carry **platform allocation** semantics; names stay for API
+  compatibility.
+- `maxGPU` is the LimitRange `max["nvidia.com/gpu"]` (Helm
+  `deployment.skaha.sessions.limitRange.spec.max`); missing GPU max is `0`.
 - If Skaha cannot reach the **Metrics backend**, only **platform stats** fails
   (HTTP 503); other session endpoints continue.
 - Skaha does not cache Metrics responses; each **platform stats** request calls
@@ -77,8 +83,7 @@ session launch. See
   HTTP 503 with a short stable client message; detailed diagnostics belong in
   server logs only.
 - On successful **platform stats**, `lastUpdate` reflects the Metrics snapshot
-  time (`metadata.created`), not when Skaha assembled the response.
-- Session-list pod usage is temporarily sourced from the Kubernetes metrics API
-  inside **MetricsDAO**; when the Metrics backend exposes pod usage,
-  **MetricsDAO** will switch via configuration without changing session handler
-  call sites.
+  time (`status.observedAt`), not when Skaha assembled the response.
+- Session-list pod usage source is selected via `SKAHA_POD_METRICS_SOURCE`
+  (`kubernetes` default, `backend` for Metrics session HTTP API). Backend
+  session usage requires listed session Jobs to map usage to job names.

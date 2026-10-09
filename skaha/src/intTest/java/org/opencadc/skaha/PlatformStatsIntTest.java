@@ -72,11 +72,14 @@ public class PlatformStatsIntTest {
                     PlatformMetricsFixtures.fixedPlatformMetrics().toClusterResourceFields();
             final JSONObject cores = stats.getJSONObject("cores");
             final JSONObject ram = stats.getJSONObject("ram");
+            final JSONObject gpu = stats.getJSONObject("gpu");
 
             Assert.assertEquals(expected.cpuCoresAvailable(), cores.getDouble("cpuCoresAvailable"), 0.0);
             Assert.assertEquals(expected.requestedCPUCores(), cores.getDouble("requestedCPUCores"), 0.0);
             Assert.assertEquals(expected.ramAvailable(), ram.getString("ramAvailable"));
             Assert.assertEquals(expected.requestedRAM(), ram.getString("requestedRAM"));
+            Assert.assertEquals(expected.gpuAvailable().intValue(), gpu.getInt("gpuAvailable"));
+            Assert.assertEquals(expected.requestedGPU().intValue(), gpu.getInt("requestedGPU"));
             return null;
         });
     }
@@ -96,11 +99,15 @@ public class PlatformStatsIntTest {
     private static void assertClusterTotalsPresent(final JSONObject stats) {
         final JSONObject cores = stats.getJSONObject("cores");
         final JSONObject ram = stats.getJSONObject("ram");
+        final JSONObject gpu = stats.getJSONObject("gpu");
         Assert.assertTrue(cores.has("cpuCoresAvailable"));
         Assert.assertTrue(cores.has("requestedCPUCores"));
         Assert.assertTrue(ram.has("ramAvailable"));
         Assert.assertTrue(ram.has("requestedRAM"));
         Assert.assertTrue(cores.has("maxCPUCores"));
         Assert.assertTrue(ram.has("maxRAM"));
+        Assert.assertTrue(gpu.has("gpuAvailable"));
+        Assert.assertTrue(gpu.has("requestedGPU"));
+        Assert.assertTrue(gpu.has("maxGPU"));
     }
 }
