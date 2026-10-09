@@ -275,7 +275,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $customEnv := $mb.env | default dict -}}
 {{- $raw := get $customEnv "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" | default "" | toString | trim -}}
 {{- if not $raw -}}
-{{- fail "metricsBackend.enabled requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" -}}
+{{- fail "metricsBackend requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" -}}
 {{- end -}}
 {{- $configured := fromJsonArray $raw -}}
 {{- if not (kindIs "slice" $configured) -}}
@@ -373,7 +373,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- else if $hasConfigured -}}
 {{- $configuredJSON -}}
 {{- else -}}
-{{- fail "metricsBackend.enabled requires metricsBackend.rbac.namespaces or METRICS_PROVIDERS__KUEUE__NAMESPACES" -}}
+{{- fail "metricsBackend requires metricsBackend.rbac.namespaces or METRICS_PROVIDERS__KUEUE__NAMESPACES" -}}
 {{- end -}}
 {{- end }}
 

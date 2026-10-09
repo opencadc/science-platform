@@ -1,9 +1,8 @@
 {{- $mb := .Values.metricsBackend | default dict }}
-{{- if (default false $mb.enabled) }}
 {{- $img := $mb.image | default dict }}
 {{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
 {{- if not $queueConfig }}
-{{- fail "metricsBackend.enabled requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" }}
+{{- fail "metricsBackend requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" }}
 {{- end }}
 {{- $_ := include "skaha.metricsBackend.clusterName" . }}
 apiVersion: apps/v1
@@ -72,4 +71,3 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-{{- end }}

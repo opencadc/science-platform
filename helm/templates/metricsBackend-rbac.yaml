@@ -4,16 +4,16 @@
 {{- if hasKey $mbRbac "enabled" }}
 {{- $rbacEnabled = $mbRbac.enabled }}
 {{- end }}
-{{- if and (default false $mb.enabled) $rbacEnabled }}
+{{- if $rbacEnabled }}
 {{- $_ := include "skaha.metricsBackend.platformName" . }}
 {{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
 {{- $queues := fromJsonArray $queueConfig }}
 {{- $kueueNamespaceConfig := include "skaha.metricsBackend.rbacKueueNamespaces" . | trim }}
 {{- $kueueNamespaces := fromJsonArray $kueueNamespaceConfig }}
 {{/*
-  Kueue read ClusterRole / ClusterRoleBinding. With metricsBackend.enabled Helm renders these
-  before the metrics Deployment and Service (Helm builtin kind install order applies RBAC before
-  typical workload kinds). Apply failures (for example forbidden cluster RBAC) fail the release
+  Kueue read ClusterRole / ClusterRoleBinding. Helm renders these before the metrics
+  Deployment and Service (Helm builtin kind install order applies RBAC before typical
+  workload kinds). Apply failures (for example forbidden cluster RBAC) fail the release
   before those workload resources reconcile.
 */}}
 apiVersion: rbac.authorization.k8s.io/v1

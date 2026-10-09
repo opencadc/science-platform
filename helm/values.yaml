@@ -620,10 +620,8 @@ telemetry:
     # -- Export interval in seconds for enabled telemetry services.
     interval: 30
 
-# Optional science-platform Metrics API in the same release as Skaha (see README).
+# Science-platform Metrics API in the same release as Skaha (see README).
 metricsBackend:
-  # -- When true, install the least-privilege Kueue-read RBAC first (Helm kind order), then Metrics Service and Deployment. Applies fail if cluster RBAC cannot be created (for example forbidden).
-  enabled: false
   # -- Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps.
   platformName: canfar
   # -- Required stable lower-case DNS identity for this Metrics deployment. It scopes cache identities and must match the Prometheus/Mimir cluster label.
@@ -631,7 +629,7 @@ metricsBackend:
   rbac:
     # -- When true, create the least-privilege ClusterQueue and configured-namespace LocalQueue RBAC. Set false to provide those permissions out of band while keeping the Metrics workload enabled.
     enabled: true
-    # -- Namespaces in which Metrics lists LocalQueues for User metrics. Set this explicitly when Metrics is enabled; these must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied.
+    # -- Namespaces in which Metrics lists LocalQueues for User metrics. These must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied.
     namespaces: []
   # -- Fixed replica count for the Metrics API (no HPA in this chart version).
   replicaCount: 1
@@ -671,7 +669,7 @@ metricsBackend:
       key: redis-url
   # -- Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic.
   networkPolicy:
-    # -- Create a default-deny Metrics NetworkPolicy when metricsBackend is enabled.
+    # -- Create a default-deny Metrics NetworkPolicy.
     enabled: true
     # -- Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name.
     ingress:
@@ -721,7 +719,7 @@ metricsBackend:
     # configured with an external rewrite.
     path: /apis/canfar.net/v1alpha1/metrics
   test:
-    # -- Run helm test hook that retries /readyz until success (requires metricsBackend.enabled).
+    # -- Run helm test hook that retries /readyz until success.
     enabled: true
     # -- Image for the helm test hook Pod.
     image: busybox:1.37.0
