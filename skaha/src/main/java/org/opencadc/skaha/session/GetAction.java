@@ -150,9 +150,8 @@ public class GetAction extends SessionAction {
                     // List the sessions
                     String typeFilter = syncInput.getParameter("type");
                     String statusFilter = syncInput.getParameter("status");
-                    boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
 
-                    json = listSessions(typeFilter, statusFilter, allUsers);
+                    json = listSessions(typeFilter, statusFilter);
                 }
 
                 syncOutput.setHeader("Content-Type", "application/json");
@@ -180,15 +179,14 @@ public class GetAction extends SessionAction {
 
         if (requestType.equals(REQUEST_TYPE_APP)) {
             if (appID == null) {
-                String statusFilter = syncInput.getParameter("status");
-                boolean allUsers = SESSION_LIST_VIEW_ALL.equals(view);
-                String json = listSessions(SessionAction.TYPE_DESKTOP_APP, statusFilter, allUsers);
+                final String statusFilter = syncInput.getParameter("status");
+                final String json = listSessions(SessionAction.TYPE_DESKTOP_APP, statusFilter);
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else if (sessionID == null) {
                 throw new IllegalArgumentException("Missing session ID for desktop-app ID " + appID);
             } else {
-                String json = getSingleDesktopApp(sessionID, appID);
+                final String json = getSingleDesktopApp(sessionID, appID);
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             }
@@ -235,9 +233,7 @@ public class GetAction extends SessionAction {
                     withRAM,
                     maxRAMStr,
                     withCores);
-        } catch (PlatformMetricsUnavailableException unavailable) {
-            throw unavailable;
-        } catch (SessionLimitRangeUnavailableException unavailable) {
+        } catch (PlatformMetricsUnavailableException | SessionLimitRangeUnavailableException unavailable) {
             throw unavailable;
         } catch (Exception e) {
             log.error(e);
@@ -293,10 +289,9 @@ public class GetAction extends SessionAction {
         return gson.toJson(filteredSessions);
     }
 
-    String listSessions(String typeFilter, String statusFilter, boolean allUsers) throws Exception {
+    String listSessions(String typeFilter, String statusFilter) throws Exception {
 
-        final String forUser = allUsers ? null : getUsername();
-        final List<Session> sessions = getAllSessions(forUser);
+        final List<Session> sessions = getAllSessions(getUsername());
 
         log.debug("typeFilter=" + typeFilter);
         log.debug("statusFilter=" + statusFilter);
@@ -311,21 +306,9 @@ public class GetAction extends SessionAction {
             filteredSessions.removeAll(unwantedDesktopAppSessions);
         }
 
-        // if for all users, only show public information
-        String json;
         final Gson gson =
                 new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        if (allUsers) {
-            final List<PublicSession> publicSessions = new ArrayList<>(filteredSessions.size());
-            for (final Session s : filteredSessions) {
-                publicSessions.add(new PublicSession(s.getUserid(), s.getType(), s.getStatus(), s.getStartTime()));
-            }
-            json = gson.toJson(publicSessions);
-        } else {
-            json = gson.toJson(filteredSessions);
-        }
-
-        return json;
+        return gson.toJson(filteredSessions);
     }
 
     public List<Session> filter(List<Session> sessions, String typeFilter, String statusFilter) {

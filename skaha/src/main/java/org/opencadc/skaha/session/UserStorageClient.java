@@ -153,8 +153,7 @@ public class UserStorageClient {
             // Only CADC installations will have a cred service configured.
             if (credServiceID != null) {
                 final RegistryClient registryClient = new RegistryClient();
-                final URL credServiceURL =
-                        registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10, AuthMethod.CERT);
+                final URL credServiceURL = registryClient.getServiceURL(credServiceID, Standards.CRED_PROXY_10);
 
                 if (credServiceURL != null) {
                     final VOSpaceClient cavernClient = new VOSpaceClient(userStorageConfiguration.serviceURI);
@@ -287,7 +286,26 @@ public class UserStorageClient {
         final URI nodeURI =
                 URI.create(this.userStorageConfiguration.userHomeBaseURI + "/" + owner + "/" + relativePath);
         final Transfer transfer = new Transfer(nodeURI, Direction.pushToVoSpace);
-        transfer.getProtocols().add(new Protocol(VOS.PROTOCOL_HTTPS_PUT));
+        final Protocol protocol = new Protocol(VOS.PROTOCOL_HTTPS_PUT);
+        final AuthMethod authMethod = AuthenticationUtil.getAuthMethod(AuthenticationUtil.getCurrentSubject());
+
+        switch (authMethod) {
+            case TOKEN:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_TOKEN);
+                break;
+            case CERT:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_CERT);
+                break;
+            case COOKIE:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_COOKIE);
+            default:
+                protocol.setSecurityMethod(Standards.SECURITY_METHOD_ANON);
+                break;
+        }
+
+        LOGGER.debug("UserStorageClient.upload() - Using security method: " + protocol.getSecurityMethod());
+
+        transfer.getProtocols().add(protocol);
 
         final ClientTransfer clientTransfer = voSpaceClient.createTransfer(transfer);
         clientTransfer.setFile(file);
