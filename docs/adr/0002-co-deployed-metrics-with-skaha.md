@@ -11,9 +11,9 @@ every environment. Deployment and RBAC should stay in one Helm release.
 
 ## Decision
 
-- Skaha and Metrics ship as **one Helm release** with a boolean toggle for the
-  Metrics workload (`metricsBackend.enabled`), not as a separate Argo CD app for
-  Metrics alone.
+- Skaha and Metrics ship as **one Helm release**. The Metrics workload is
+  required and always enabled; it is not a separate Argo CD app for Metrics
+  alone.
 - The Metrics pod uses a **dedicated Kubernetes ServiceAccount**, distinct from
   the Skaha API workload identity. Operators may provide an existing Metrics
   ServiceAccount by setting `metricsBackend.serviceAccount.create=false` and
@@ -22,9 +22,9 @@ every environment. Deployment and RBAC should stay in one Helm release.
   resource-restricted ClusterRole/ClusterRoleBinding for configured
   ClusterQueues and one namespaced Role/RoleBinding per configured namespace
   for LocalQueue `list`.
-- Skaha receives an internal base URL (`SKAHA_METRICS_BACKEND_URL`) pointing at
-  the in-cluster Metrics Service when Metrics is enabled. Public ingress for
-  Metrics is optional and environment-specific.
+- Skaha always receives an internal base URL (`SKAHA_METRICS_BACKEND_URL`)
+  pointing at the in-cluster Metrics Service. Public ingress for Metrics is
+  optional and environment-specific.
 - Metrics requires a real lower-case DNS `metricsBackend.clusterName`, which is
   rendered as `METRICS_CLUSTER_NAME` for cache identity and PromQL cluster-label
   matching.

@@ -1,6 +1,7 @@
 {{- $mb := .Values.metricsBackend | default dict }}
 {{- $test := $mb.test | default dict }}
-{{- if and (default false $mb.enabled) (default true $test.enabled) }}
+{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
+{{- if (default true $test.enabled) }}
 apiVersion: v1
 kind: Pod
 metadata:

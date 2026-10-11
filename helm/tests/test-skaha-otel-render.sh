@@ -21,6 +21,7 @@ fi
 render_skaha_deployment() {
     helm template otel-test "${chart_dir}" \
         --show-only templates/skaha-tomcat-deployment.yaml \
+        "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         "$@"
 }
@@ -30,7 +31,6 @@ render_metrics_rbac() {
         --show-only templates/metricsBackend-rbac.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true \
         --set metricsBackend.rbac.enabled=true \
         "$@"
 }
@@ -40,7 +40,6 @@ render_metrics_deployment() {
         --show-only templates/metricsBackend-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true \
         "$@"
 }
 
@@ -49,7 +48,6 @@ render_metrics_networkpolicy() {
         --show-only templates/metricsBackend-networkpolicy.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true \
         "$@"
 }
 
@@ -233,6 +231,10 @@ assert_render_fails \
     --set deployment.skaha.extraEnv[0].name=CATALINA_OPTS \
     --set deployment.skaha.extraEnv[0].value=-Xmx1g
 
+assert_render_fails \
+    "metricsBackend is required and always enabled; remove metricsBackend.enabled" \
+    --set metricsBackend.enabled=false
+
 metrics_rbac_render="$(
     render_metrics_rbac
 )"
@@ -370,8 +372,7 @@ metrics_contract_render="$(
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         --set deployment.skaha.serviceAccountName=shared-skaha \
-        --set serviceAccount.create=false \
-        --set metricsBackend.enabled=true
+        --set serviceAccount.create=false
 )"
 if [[ $(grep -c -F 'serviceAccountName: shared-skaha' <<<"${metrics_contract_render}") -ne 1 ]]; then
     printf 'Expected only the Skaha Pod to use serviceAccountName shared-skaha\n' >&2
@@ -387,15 +388,14 @@ assert_contains "${metrics_contract_render}" 'name: SKAHA_METRICS_BACKEND_URL'
 assert_contains "${metrics_contract_render}" 'value: "http://metrics-contract-test-skaha-metrics-api-svc.canfar.svc.cluster.local:8000"'
 assert_env_value "${metrics_contract_render}" "METRICS_PLATFORM_NAME" "canfar"
 assert_env_value "${metrics_contract_render}" "SKAHA_METRICS_PLATFORM_NAME" "canfar"
-assert_contains "${metrics_contract_render}" 'image: "images.opencadc.org/platform/metrics:v0.1.5"'
+assert_contains "${metrics_contract_render}" 'image: "images.opencadc.org/platform/metrics:v0.1.7"'
 
 metrics_probe_render="$(
     helm template metrics-probe-test "${chart_dir}" \
         --show-only templates/metricsBackend-deployment.yaml \
         --show-only templates/skaha-tomcat-deployment.yaml \
         "${metrics_required_args[@]}" \
-        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"
 assert_readiness_probe "${metrics_probe_render}"
 assert_liveness_probe "${metrics_probe_render}"
@@ -406,7 +406,6 @@ metrics_env_render="$(
         --show-only templates/skaha-tomcat-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true \
         --set metricsBackend.platformName=chart-platform \
         --set metricsBackend.redis.urlSecret.name=production-redis \
         --set metricsBackend.redis.urlSecret.key=redis-url \
@@ -463,8 +462,7 @@ long_name_render="$(
         --show-only templates/metricsBackend-deployment.yaml \
         --show-only templates/metricsBackend-service.yaml \
         "${metrics_required_args[@]}" \
-        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"
 deployment_name="$(awk '/^kind: Deployment/{capture=1; next} capture && /^  name:/{print $2; exit}' <<<"${long_name_render}")"
 service_name="$(awk '/^kind: Service/{capture=1; next} capture && /^  name:/{print $2; exit}' <<<"${long_name_render}")"
@@ -486,8 +484,7 @@ long_variant_render="$(
     helm template "${long_release_variant}" "${chart_dir}" \
         --show-only templates/metricsBackend-deployment.yaml \
         "${metrics_required_args[@]}" \
-        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"
 variant_deployment_name="$(awk '/^kind: Deployment/{capture=1; next} capture && /^  name:/{print $2; exit}' <<<"${long_variant_render}")"
 if [[ -z ${variant_deployment_name} || ${deployment_name} == "${variant_deployment_name}" ]]; then
@@ -499,8 +496,7 @@ metrics_ingress_default="$(
     helm template metrics-ingress-default "${chart_dir}" \
         --show-only templates/skaha-ingress.yaml \
         "${metrics_required_args[@]}" \
-        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"
 assert_not_contains "${metrics_ingress_default}" "skaha-metrics-api-svc"
 
@@ -509,7 +505,6 @@ metrics_ingress_enabled="$(
         --show-only templates/skaha-ingress.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.enabled=true \
         --set metricsBackend.ingress.enabled=true
 )"
 assert_contains "${metrics_ingress_enabled}" "skaha-metrics-api-svc"

@@ -1,5 +1,5 @@
 {{- $mb := .Values.metricsBackend | default dict }}
-{{- if (default false $mb.enabled) }}
+{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -16,4 +16,3 @@ spec:
       port: 8000
       targetPort: http
       protocol: TCP
-{{- end }}
