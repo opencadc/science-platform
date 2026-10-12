@@ -44,7 +44,7 @@ roleRef:
   name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "skaha.metricsBackend.serviceAccountName" . }}
+    name: {{ include "skaha.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- range $kueueNamespace := $kueueNamespaces }}
 ---
@@ -82,7 +82,7 @@ roleRef:
   name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "skaha.metricsBackend.serviceAccountName" $ }}
+    name: {{ include "skaha.serviceAccountName" $ }}
     namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- end }}

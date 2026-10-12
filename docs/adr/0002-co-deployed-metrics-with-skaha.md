@@ -14,10 +14,11 @@ every environment. Deployment and RBAC should stay in one Helm release.
 - Skaha and Metrics ship as **one Helm release**. The Metrics workload is
   required and always enabled; it is not a separate Argo CD app for Metrics
   alone.
-- The Metrics pod uses a **dedicated Kubernetes ServiceAccount**, distinct from
-  the Skaha API workload identity. Operators may provide an existing Metrics
-  ServiceAccount by setting `metricsBackend.serviceAccount.create=false` and
-  `metricsBackend.serviceAccount.name`.
+- Skaha, Metrics, chart-owned Jobs, and Helm test Pods always use the same
+  Kubernetes ServiceAccount, resolved by the Skaha chart's `serviceAccount`
+  settings (or `deployment.skaha.serviceAccountName`). Metrics has no separate
+  ServiceAccount template or identity override. The Bitnami Redis dependency
+  retains its own ServiceAccount configuration.
 - Kueue read permissions for Metrics live in the Skaha chart as a
   resource-restricted ClusterRole/ClusterRoleBinding for configured
   ClusterQueues and one namespaced Role/RoleBinding per configured namespace
@@ -47,13 +48,13 @@ every environment. Deployment and RBAC should stay in one Helm release.
 - GitOps (e.g. keel-deploy) supplies Metrics runtime config via Helm values
   (`metricsBackend.env` and the operator-provided Redis URL Secret). The cache
   integrity Secret is chart-managed and must not be set in `metricsBackend.env`.
-- Argo CD deployers merge `helm/argocd/metrics-cache-secret.patch.yaml` into
-  their Skaha Application before deploying the chart. Both the narrowly scoped
+- Argo CD deployers configure the exact cache Secret name, namespace, and
+  `/data/key-secret` ignore rule directly in their Skaha Application. Both the narrowly scoped
   ignore rule and sync option are required. No bootstrap Job or extra Secret
   API permissions are needed. Non-cascading Application deletion preserves the
   installed resources and key by design.
 - When `metricsBackend.rbac.enabled` is false, deployers must pre-provision
-  the dedicated or operator-provided Metrics ServiceAccount with Kueue
+  the shared Skaha ServiceAccount with Kueue
   `ClusterQueue` `get` access for the configured queues and LocalQueue `list`
   access in every configured namespace.
 

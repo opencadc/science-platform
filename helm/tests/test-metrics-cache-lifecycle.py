@@ -5,7 +5,8 @@ Requires Docker, kind, kubectl, Helm and PyYAML. Run with:
 uv run --no-project --with pyyaml==6.0.3 python helm/tests/test-metrics-cache-lifecycle.py
 The cluster is deleted on exit. --kubeconfig uses an existing disposable cluster
 and leaves it running; never point this test at a shared or production cluster.
-Only the chart-owned Secret and two key-consuming replicas are deployed.
+The fixture deploys the production Secret, ServiceAccount, Services, NetworkPolicy,
+and test hooks with two lightweight HTTP/key consumers, not the full application stack.
 """
 
 import argparse
@@ -24,7 +25,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 ARGO_VERSION = "v3.5.5"
 APP = "cache-lifecycle"
-RELEASE = "canfar-skaha-long-production-release-name-1234567890"
+# Exceed the Metrics hash threshold while keeping existing Skaha names within DNS limits.
+RELEASE = "canfar-skaha-long-production-release-name-1234"
 NAMESPACE = "cache-lifecycle"
 
 
@@ -43,6 +45,137 @@ def wait_for(description, predicate, timeout=240):
             return
         time.sleep(2)
     raise AssertionError(f"Timed out: {description}")
+
+
+def validate_shared_identity():
+    command("helm", "dependency", "build", str(ROOT))
+    required = [
+        "--set",
+        "metricsBackend.clusterName=test-cluster",
+        "--set",
+        "metricsBackend.redis.urlSecret.name=test-redis",
+        "--set-string",
+        'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]',
+        "--set-string",
+        'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["cache-lifecycle"]',
+        "--set",
+        "deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://example.org~cavern",
+    ]
+    cases = [
+        ("default", [], RELEASE, 1),
+        ("custom", ["--set", "serviceAccount.name=shared-custom"], "shared-custom", 1),
+        (
+            "existing",
+            [
+                "--set",
+                "serviceAccount.create=false",
+                "--set",
+                "serviceAccount.name=shared-existing",
+            ],
+            "shared-existing",
+            0,
+        ),
+        (
+            "legacy Skaha name",
+            ["--set", "deployment.skaha.serviceAccountName=shared-legacy"],
+            "shared-legacy",
+            1,
+        ),
+        (
+            "obsolete Metrics override",
+            ["--set", "metricsBackend.serviceAccount.name=forbidden-metrics-only"],
+            RELEASE,
+            1,
+        ),
+    ]
+    for label, arguments, expected, account_count in cases:
+        documents = list(
+            yaml.safe_load_all(
+                command(
+                    "helm",
+                    "template",
+                    RELEASE,
+                    str(ROOT),
+                    "--namespace",
+                    NAMESPACE,
+                    *required,
+                    *arguments,
+                )
+            )
+        )
+        accounts = []
+        workloads = []
+        for document in documents:
+            if (
+                not document
+                or document.get("metadata", {})
+                .get("labels", {})
+                .get("app.kubernetes.io/name")
+                == "redis"
+            ):
+                continue
+            kind = document["kind"]
+            if kind == "ServiceAccount":
+                accounts.append(document["metadata"]["name"])
+            if kind == "Pod":
+                pod = document["spec"]
+            elif kind in ("Deployment", "Job"):
+                pod = document["spec"]["template"]["spec"]
+            elif kind == "CronJob":
+                pod = document["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+            else:
+                pod = None
+            if pod is not None:
+                workloads.append(document["metadata"]["name"])
+                assert pod.get("serviceAccountName") == expected, (label, workloads[-1])
+            if kind in ("RoleBinding", "ClusterRoleBinding"):
+                for subject in document["subjects"]:
+                    if subject["kind"] == "ServiceAccount":
+                        assert (
+                            subject["name"] == expected
+                            and subject["namespace"] == NAMESPACE
+                        )
+        assert len(workloads) >= 6, (
+            "Expected Skaha, Metrics, two cache Jobs, and two test Pods"
+        )
+        assert len(accounts) == account_count and all(
+            name == expected for name in accounts
+        )
+        print(
+            f"PASS: {label} uses one identity across all first-party workloads and RBAC",
+            flush=True,
+        )
+
+    documents = list(
+        yaml.safe_load_all(
+            command(
+                "helm",
+                "template",
+                RELEASE,
+                str(ROOT),
+                "--namespace",
+                NAMESPACE,
+                *required,
+                "--set",
+                "metricsBackend.test.enabled=false",
+                "--set",
+                "metricsBackend.networkPolicy.enabled=false",
+            )
+        )
+    )
+    assert not any(
+        document
+        and document["kind"] == "NetworkPolicy"
+        and document["metadata"]["name"].endswith("skaha-metrics-api-networkpolicy")
+        for document in documents
+    )
+    assert not any(
+        document
+        and document["kind"] == "Pod"
+        and document["metadata"]["name"].endswith("metrics-test")
+        for document in documents
+    )
+    print("PASS: disabled Metrics test and NetworkPolicy do not render", flush=True)
 
 
 def run(kubeconfig, directory):
@@ -116,53 +249,92 @@ def run(kubeconfig, directory):
         }
     )
 
-    # Copy production templates verbatim. Other Skaha/Redis/Kueue workloads are outside this test.
+    # Copy production manifests verbatim; HTTP/key consumers stand in for application processes.
     chart = directory / "chart"
     (chart / "templates").mkdir(parents=True)
     metadata = yaml.safe_load((ROOT / "Chart.yaml").read_text())
     metadata.pop("dependencies")
     (chart / "Chart.yaml").write_text(yaml.safe_dump(metadata))
-    shutil.copy(ROOT / "values.yaml", chart / "values.yaml")
-    for name in ["_helpers.tpl", "metricsBackend-cache-secret.yaml"]:
+    values = yaml.safe_load((ROOT / "values.yaml").read_text())
+    values["serviceAccount"]["name"] = "shared-skaha"
+    (chart / "values.yaml").write_text(yaml.safe_dump(values))
+    for name in [
+        "_helpers.tpl",
+        "metrics-cache-secret.yaml",
+        "serviceaccount.yaml",
+        "metrics-service.yaml",
+        "metrics-networkpolicy.yaml",
+        "skaha-tomcat-expose.yaml",
+    ]:
         shutil.copy(ROOT / "templates" / name, chart / "templates" / name)
+    (chart / "templates/tests").mkdir()
+    for name in ["test-metrics.yaml", "test-connection.yaml"]:
+        shutil.copy(ROOT / "templates/tests" / name, chart / "templates/tests" / name)
     (chart / "templates/consumer.yaml").write_text("""
+{{- range $role := list "skaha" "metrics" }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: key-consumer
+  name: key-consumer-{{ $role }}
+  labels:
+    app: key-consumer
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: key-consumer
+      role: {{ $role }}
   template:
     metadata:
       labels:
         app: key-consumer
+        role: {{ $role }}
+        {{- if eq $role "metrics" }}
+        {{- include "skaha.metricsBackend.selectorLabels" $ | nindent 8 }}
+        {{- else }}
+        run: {{ $.Release.Name }}-skaha-tomcat
+        {{- end }}
     spec:
+      serviceAccountName: {{ include "skaha.serviceAccountName" $ }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
       containers:
         - name: consumer
-          image: "{{ .Values.metricsBackend.image.repository }}:{{ .Values.metricsBackend.image.tag }}"
+          image: "{{ $.Values.metricsBackend.image.repository }}:{{ $.Values.metricsBackend.image.tag }}"
           command: ["python", "-c"]
           args:
             - |
-              import hashlib, os, pathlib, time
+              import base64, hashlib, http.server, json, os, pathlib
               value = hashlib.sha256(os.environ["KEY"].encode()).hexdigest()
               pathlib.Path("/tmp/key-fingerprint").write_text(value)
-              time.sleep(86400)
+              token = pathlib.Path("/var/run/secrets/kubernetes.io/serviceaccount/token").read_text().split(".")[1]
+              subject = json.loads(base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)))["sub"]
+              pathlib.Path("/tmp/identity").write_text(subject)
+              class Handler(http.server.BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      self.send_response(200)
+                      self.end_headers()
+                  def log_message(self, *args):
+                      pass
+              http.server.ThreadingHTTPServer(("", int(os.environ["PORT"])), Handler).serve_forever()
+          ports:
+            - name: http
+              containerPort: {{ if eq $role "metrics" }}8000{{ else }}8080{{ end }}
           env:
+            - name: PORT
+              value: {{ if eq $role "metrics" }}"8000"{{ else }}"8080"{{ end }}
             - name: KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "skaha.metricsBackend.cacheSecretName" . }}
-                  key: {{ include "skaha.metricsBackend.cacheSecretKey" . }}
+                  name: {{ include "skaha.metricsBackend.cacheSecretName" $ }}
+                  key: {{ include "skaha.metricsBackend.cacheSecretKey" $ }}
           readinessProbe:
             exec:
               command: ["python", "-c", "from pathlib import Path; assert Path('/tmp/key-fingerprint').exists()"]
             periodSeconds: 2
+{{- end }}
 """)
     repository_name = f"cache-chart-{time.time_ns()}"
     repository = directory / "repository"
@@ -277,14 +449,17 @@ spec:
     assert cache_secret_name != f"{RELEASE}-skaha-metrics-cache", (
         "Expected the long-release name regression to exercise hashing"
     )
-    configuration = (ROOT / "argocd/metrics-cache-secret.patch.yaml").read_text()
-    configuration = configuration.replace(
-        "CACHE_SECRET_NAME", cache_secret_name
-    ).replace("RELEASE_NAMESPACE", NAMESPACE)
-    configuration = yaml.safe_load(configuration)["spec"]
-    application["spec"]["ignoreDifferences"] = configuration["ignoreDifferences"]
-    application["spec"]["syncPolicy"]["syncOptions"].extend(
-        configuration["syncPolicy"]["syncOptions"]
+    application["spec"]["ignoreDifferences"] = [
+        {
+            "group": "",
+            "kind": "Secret",
+            "name": cache_secret_name,
+            "namespace": NAMESPACE,
+            "jsonPointers": ["/data/key-secret"],
+        }
+    ]
+    application["spec"]["syncPolicy"]["syncOptions"].append(
+        "RespectIgnoreDifferences=true"
     )
 
     def sync():
@@ -366,6 +541,60 @@ spec:
     expected = hashlib.sha256(base64.b64decode(first["data"]["key-secret"])).hexdigest()
     assert first["immutable"] is True
     assert fingerprints() == [expected, expected]
+    pods = json.loads(
+        kubectl("get", "pods", "-n", NAMESPACE, "-l", "app=key-consumer", "-o", "json")
+    )["items"]
+    for pod in pods:
+        assert pod["spec"]["serviceAccountName"] == "shared-skaha"
+        identity = kubectl(
+            "exec",
+            "-n",
+            NAMESPACE,
+            pod["metadata"]["name"],
+            "--",
+            "cat",
+            "/tmp/identity",
+        )
+        assert identity == f"system:serviceaccount:{NAMESPACE}:shared-skaha"
+    print(
+        "PASS: both running replicas have the shared Skaha ServiceAccount token identity",
+        flush=True,
+    )
+
+    # Argo CD skips Helm test hooks. Explicitly execute the rendered Metrics test Pod here.
+    hook = yaml.safe_load(
+        command(
+            "helm",
+            "template",
+            RELEASE,
+            str(chart),
+            "--namespace",
+            NAMESPACE,
+            "--show-only",
+            "templates/tests/test-metrics.yaml",
+        )
+    )
+    apply(hook, NAMESPACE)
+    kubectl(
+        "wait",
+        "-n",
+        NAMESPACE,
+        f"pod/{hook['metadata']['name']}",
+        "--for=jsonpath={.status.phase}=Succeeded",
+        "--timeout=120s",
+    )
+    assert (
+        json.loads(
+            kubectl(
+                "get", "pod", hook["metadata"]["name"], "-n", NAMESPACE, "-o", "json"
+            )
+        )["spec"]["serviceAccountName"]
+        == "shared-skaha"
+    )
+    print(
+        "PASS: Metrics test hook uses the shared ServiceAccount and reaches the live fixture Service",
+        flush=True,
+    )
     for iteration in range(3):
         previous = status()["status"]["reconciledAt"]
         kubectl(
@@ -395,15 +624,18 @@ spec:
         assert secret()["metadata"]["uid"] == first["metadata"]["uid"]
         assert secret()["data"] == first["data"]
 
-    kubectl("rollout", "restart", "deployment/key-consumer", "-n", NAMESPACE)
     kubectl(
-        "rollout",
-        "status",
-        "deployment/key-consumer",
-        "-n",
-        NAMESPACE,
-        "--timeout=120s",
+        "rollout", "restart", "deployment", "-n", NAMESPACE, "-l", "app=key-consumer"
     )
+    for role in ("skaha", "metrics"):
+        kubectl(
+            "rollout",
+            "status",
+            f"deployment/key-consumer-{role}",
+            "-n",
+            NAMESPACE,
+            "--timeout=120s",
+        )
     assert fingerprints() == [expected, expected]
     print("PASS: replacement replicas use the same key", flush=True)
 
@@ -457,11 +689,56 @@ spec:
     assert fingerprints() == [expected, expected]
     print("PASS: fresh installation generates a new key for both replicas", flush=True)
 
+    # Verify Helm itself executes both production test hooks against a native Helm release.
+    native_namespace = "helm-test-hooks"
+    command(
+        "helm",
+        "install",
+        "helm-test",
+        str(chart),
+        "--namespace",
+        native_namespace,
+        "--create-namespace",
+        "--kubeconfig",
+        str(kubeconfig),
+        "--wait",
+        "--timeout",
+        "120s",
+    )
+    command(
+        "helm",
+        "test",
+        "helm-test",
+        "--namespace",
+        native_namespace,
+        "--kubeconfig",
+        str(kubeconfig),
+        "--timeout",
+        "120s",
+    )
+    command(
+        "helm",
+        "uninstall",
+        "helm-test",
+        "--namespace",
+        native_namespace,
+        "--kubeconfig",
+        str(kubeconfig),
+    )
+    print(
+        "PASS: helm test executes both readiness/connection hooks in the live fixture cluster",
+        flush=True,
+    )
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kubeconfig", type=Path)
+    parser.add_argument("--render-only", action="store_true")
     arguments = parser.parse_args()
+    validate_shared_identity()
+    if arguments.render_only:
+        return
     cluster = "skaha-cache-lifecycle-test"
     with tempfile.TemporaryDirectory(prefix="skaha-cache-lifecycle-") as temp:
         directory = Path(temp)

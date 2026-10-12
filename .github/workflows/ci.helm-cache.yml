@@ -3,9 +3,7 @@ name: "CI: Helm Cache Lifecycle"
 on:
   pull_request:
     paths:
-      - "helm/argocd/**"
-      - "helm/templates/metricsBackend-cache-secret.yaml"
-      - "helm/templates/_helpers.tpl"
+      - "helm/templates/**"
       - "helm/tests/test-metrics-cache-*.py"
       - "helm/Chart.yaml"
       - "helm/values.yaml"
@@ -13,9 +11,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "helm/argocd/**"
-      - "helm/templates/metricsBackend-cache-secret.yaml"
-      - "helm/templates/_helpers.tpl"
+      - "helm/templates/**"
       - "helm/tests/test-metrics-cache-*.py"
       - "helm/Chart.yaml"
       - "helm/values.yaml"

@@ -254,37 +254,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $clusterName -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.serviceAccountName" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
-{{- $serviceAccount := $mb.serviceAccount | default dict -}}
-{{- $create := true -}}
-{{- if hasKey $serviceAccount "create" -}}
-{{- $create = get $serviceAccount "create" -}}
-{{- end -}}
-{{- $configuredName := get $serviceAccount "name" | default "" | toString | trim -}}
-{{- $name := $configuredName -}}
-{{- if $create -}}
-{{- $name = default (include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-sa")) $configuredName -}}
-{{- else -}}
-{{- $name = required "metricsBackend.serviceAccount.name is required when metricsBackend.serviceAccount.create is false" $configuredName -}}
-{{- end -}}
-{{- if or (gt (len $name) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" $name)) -}}
-{{- fail "metricsBackend.serviceAccount.name must be a lower-case DNS name" -}}
-{{- end -}}
-{{- $mbRbac := $mb.rbac | default dict -}}
-{{- $rbacEnabled := true -}}
-{{- if hasKey $mbRbac "enabled" -}}
-{{- $rbacEnabled = get $mbRbac "enabled" -}}
-{{- end -}}
-{{- if and $rbacEnabled (eq $name "default") -}}
-{{- fail "metricsBackend.serviceAccount.name must not be default when metricsBackend.rbac.enabled is true" -}}
-{{- end -}}
-{{- if eq $name (include "skaha.serviceAccountName" .) -}}
-{{- fail "metricsBackend.serviceAccount.name must be distinct from the Skaha ServiceAccount" -}}
-{{- end -}}
-{{- $name -}}
-{{- end }}
-
 {{- define "skaha.metricsBackend.clusterQueues" -}}
 {{- $mb := .Values.metricsBackend | default dict -}}
 {{- $customEnv := $mb.env | default dict -}}

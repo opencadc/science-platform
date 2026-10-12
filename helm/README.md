@@ -111,10 +111,6 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | metricsBackend.replicaCount | int | `1` | Fixed replica count for the Metrics API (no HPA in this chart version). |
 | metricsBackend.resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Metrics API container. |
 | metricsBackend.revisionHistoryLimit | int | `3` | revisionHistoryLimit for the Metrics API Deployment. |
-| metricsBackend.serviceAccount.annotations | object | `{}` | Annotations added to the dedicated Metrics ServiceAccount. |
-| metricsBackend.serviceAccount.automount | bool | `true` | Automatically mount the Metrics ServiceAccount token. |
-| metricsBackend.serviceAccount.create | bool | `true` | Create a dedicated Metrics ServiceAccount instead of inheriting Skaha's controller identity. |
-| metricsBackend.serviceAccount.name | string | `""` | Optional operator-provided Metrics ServiceAccount name. When create is false this must already exist and be bound to the configured least-privilege Kueue reads. |
 | metricsBackend.test.enabled | bool | `true` | Run helm test hook that retries /readyz until success. |
 | metricsBackend.test.image | string | `"busybox:1.37.0"` | Image for the helm test hook Pod. |
 | metricsBackend.test.maxWaitSeconds | int | `180` | Maximum seconds to wait for Metrics /readyz (should exceed startupProbe worst case plus scheduling margin). |
@@ -137,7 +133,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | secrets | string | `nil` |  |
 | securityContext | object | `{}` | Optional Pod-level security context for the Skaha API Deployment. |
 | service.port | int | `8080` | Service port exposed for the Skaha API Service. |
-| serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | ServiceAccount used by the Skaha API Pod. |
+| serviceAccount | object | `{"annotations":{},"automount":true,"create":true,"name":""}` | Shared ServiceAccount used by Skaha, Metrics, chart Jobs, and Helm test Pods. |
 | telemetry.controller | bool | `false` | Enable OpenTelemetry metrics for the Skaha controller Tomcat workload (`OTEL_SERVICE_NAME=skaha-controller`). Requires telemetry.otlp.destination. |
 | telemetry.metrics | bool | `false` | Reserved for future OpenTelemetry metrics emitted by the Python metrics backend (`OTEL_SERVICE_NAME=skaha-metrics`). Must remain false in this chart version. |
 | telemetry.otlp.destination | string | `""` | OTLP HTTP collector endpoint where enabled telemetry services POST metrics. |
@@ -255,9 +251,9 @@ Omit `existingSecret.name` (leave default empty) when you do not use this stackâ
 
 ## metricsBackend install ordering
 
-The Metrics API is required and always installed with Skaha. The chart emits a dedicated Metrics `ServiceAccount`, a Kueue `ClusterRole`/`ClusterRoleBinding`, one namespaced `Role`/`RoleBinding` per configured LocalQueue namespace, the Metrics `Service`, the Metrics `NetworkPolicy`, and the Metrics `Deployment`. Setting `metricsBackend.enabled=false` fails the render. The Metrics ServiceAccount is distinct from Skaha's controller identity and receives only `get` on configured ClusterQueues plus `list` on LocalQueues in configured namespaces. Configure the JSON namespace list with `METRICS_PROVIDERS__KUEUE__NAMESPACES` or `metricsBackend.rbac.namespaces`; when both are supplied they must match. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go), so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken Metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
+The Metrics API is required and always installed with Skaha. The chart emits one shared Skaha/Metrics `ServiceAccount`, a Kueue `ClusterRole`/`ClusterRoleBinding`, one namespaced `Role`/`RoleBinding` per configured LocalQueue namespace, the Metrics `Service`, the Metrics `NetworkPolicy`, and the Metrics `Deployment`. Setting `metricsBackend.enabled=false` fails the render. Skaha, Metrics, chart-owned Jobs, and test Pods all use the same ServiceAccount resolved by `serviceAccount` or `deployment.skaha.serviceAccountName`. There is no Metrics-specific ServiceAccount setting. The Metrics bindings add configured ClusterQueue and namespaced Kueue/Job/Pod reads to that shared identity. Bitnami Redis retains its dependency-managed identity. Configure the JSON namespace list with `METRICS_PROVIDERS__KUEUE__NAMESPACES` or `metricsBackend.rbac.namespaces`; when both are supplied they must match. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go), so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken Metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
 
-If `metricsBackend.rbac.enabled=false`, this chart will not create any Metrics RBAC. The chart still validates the configured ClusterQueue and namespace lists. In that mode, the deployer is responsible for ensuring the dedicated or operator-provided Metrics ServiceAccount already has `get` permission on each configured Kueue `ClusterQueue` and `list` permission on LocalQueues in every configured namespace.
+If `metricsBackend.rbac.enabled=false`, this chart will not create any Metrics RBAC. The chart still validates the configured ClusterQueue and namespace lists. In that mode, the deployer is responsible for ensuring the shared Skaha ServiceAccount already has `get` permission on each configured Kueue `ClusterQueue` and `list` permission on LocalQueues in every configured namespace.
 
 ## metricsBackend NetworkPolicy
 
@@ -280,7 +276,7 @@ Metrics uses one shared external Redis URL via operator-provided `metricsBackend
 
 ### Argo CD cache-key lifecycle
 
-Argo CD renders Helm charts offline, so `lookup` cannot retrieve the live key. Before deploying this chart, merge [`argocd/metrics-cache-secret.patch.yaml`](argocd/metrics-cache-secret.patch.yaml) into the Skaha Application, replacing its placeholders with the rendered cache Secret's `metadata.name` and namespace. Long release names are truncated and hashed by the chart, so use the rendered name rather than reconstructing it. Preserve existing rules and options. The rule ignores only `/data/key-secret` on this release's cache Secret; `RespectIgnoreDifferences=true` also preserves that live value during sync. Both settings are required. The immutable Secret rejects accidental changes if the sync option is omitted.
+Argo CD renders Helm charts offline, so `lookup` cannot retrieve the live key. The Skaha Applications in keel-deploy configure `ignoreDifferences` directly: an exact Secret name and namespace match, with `jsonPointers: ["/data/key-secret"]`. They also set `RespectIgnoreDifferences=true`. Both settings are required to preserve the key on later syncs, including deployments installed from scratch. Use the rendered Secret's `metadata.name` because long release names are hashed. All other Secret fields and resources remain reconciled. The immutable Secret rejects accidental changes if the sync option is omitted.
 
 Refreshes, full syncs, image upgrades, and replacement replicas keep the same key. Helm uninstall or **cascading** Argo CD Application deletion removes the Secret, and a fresh install generates a new key. Non-cascading deletion preserves the installed resources and key by design. There are no Secret hooks, keep annotations, bootstrap Jobs, or additional ServiceAccount permissions.
 
@@ -290,8 +286,20 @@ Run the lifecycle regression test with Docker running:
 uv run --no-project --with pyyaml==6.0.3 python helm/tests/test-metrics-cache-lifecycle.py
 ```
 
-The test creates and removes a disposable kind cluster with Argo CD. It installs the production Secret template and two key-consuming replicas, uses a long Helm release name to verify the hashed Secret name matches the ignore rule, then verifies refresh, full sync, restart, non-cascading deletion, cascading uninstall, and reinstall. It does not exercise the rest of the Skaha/Metrics application stack.
+The test first validates the shared ServiceAccount in full-chart renders for default, custom, existing, and legacy Skaha configurations, including an ignored Metrics identity override. It then creates and removes a disposable kind cluster with Argo CD, deploys the production Secret/ServiceAccount/Service/test-hook templates with two lightweight HTTP/key consumers, and checks their projected ServiceAccount identities. It verifies cache refresh, full sync, restart, deletion, and reinstall with a long release name, explicitly runs the Metrics test Pod, and runs both hooks through `helm test` on a native Helm fixture release. The fixture uses separate Skaha and Metrics consumers with the production Services and Metrics NetworkPolicy. It does not run the full Skaha/Metrics application stack.
 
-## Upgrading to chart 1.9.0
+## Required deployment configuration
 
 Metrics is now required. Remove `metricsBackend.enabled` and configure `metricsBackend.clusterName`, `metricsBackend.redis.urlSecret`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. The operator-provided `metricsBackend.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.
+
+## Running chart tests
+
+The Pods under `templates/tests` are Helm `test` hooks. After a native Helm install, run:
+
+```sh
+helm test <release> --namespace <namespace>
+```
+
+Helm creates those Pods in that cluster and reports success when they exit with status 0. The Metrics hook retries the running Metrics Service's `/readyz` endpoint; the Skaha hook checks HTTP connectivity to the running Skaha Service. They use the shared ServiceAccount without mounting its API token. The Metrics NetworkPolicy allows only the labelled Metrics test Pod to reach port 8000 when that test is enabled.
+
+`helm template` and the shell render tests validate YAML offline. Argo CD skips Helm `test` hooks during sync and does not create Helm release history, so `helm test` is not available for an Argo-only deployment. Run rendered test Pods explicitly against that deployment, or configure a separate Argo PostSync test if automatic checks are wanted. The lifecycle CI uses a disposable local kind cluster; these checks have not been run against CANFAR staging or production.

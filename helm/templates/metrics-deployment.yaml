@@ -21,7 +21,7 @@ spec:
       labels:
         {{- include "skaha.metricsBackend.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "skaha.metricsBackend.serviceAccountName" . }}
+      serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
