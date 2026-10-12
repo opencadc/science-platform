@@ -28,12 +28,11 @@ every environment. Deployment and RBAC should stay in one Helm release.
 - Metrics requires a real lower-case DNS `metricsBackend.clusterName`, which is
   rendered as `METRICS_CLUSTER_NAME` for cache identity and PromQL cluster-label
   matching.
-- Metrics uses one operator-provided shared external Redis deployment. Helm
-  receives its URL through `metricsBackend.redis.urlSecret` and its cache
-  integrity key through `metricsBackend.cacheKeySecret`; Metrics does not use a
-  Bitnami or other chart-owned Redis instance. There is no cache backend
-  selector: the required external Redis URL and integrity-key Secret references
-  are the complete cache deployment contract.
+- Metrics uses one operator-provided shared external Redis deployment via
+  `metricsBackend.redis.urlSecret`. The chart owns the cache integrity Secret:
+  generated once with `uuidv4` on install, reused via `lookup` on upgrade, and
+  deleted with the release. Metrics does not use a Bitnami or other chart-owned
+  Redis instance. There is no cache backend selector.
 - OTLP is metrics-only and external. This release does not own a traces/logs
   pipeline or an OpenTelemetry Collector.
 - Authoritative deploy chart: `deployments/helm/applications/skaha`. The chart
@@ -41,9 +40,9 @@ every environment. Deployment and RBAC should stay in one Helm release.
 
 ## Consequences
 
-- GitOps (e.g. keel-deploy) supplies full Metrics runtime config via Helm values
-  (`metricsBackend.env` map and operator-provided Secret references for the
-  external Redis URL and cache integrity key).
+- GitOps (e.g. keel-deploy) supplies Metrics runtime config via Helm values
+  (`metricsBackend.env` and the operator-provided Redis URL Secret). The cache
+  integrity Secret is chart-managed and must not be set in `metricsBackend.env`.
 - When `metricsBackend.rbac.enabled` is false, deployers must pre-provision
   the dedicated or operator-provided Metrics ServiceAccount with Kueue
   `ClusterQueue` `get` access for the configured queues and LocalQueue `list`

@@ -634,12 +634,6 @@ metricsBackend:
   # -- Optional external OTLP/HTTP endpoint for Metrics application-state metrics. When set, the chart enables OTLP metrics export.
   otlp:
     endpoint: ""
-  # -- Required operator-provided Secret containing the Metrics cache HMAC/integrity key. The secret value is never rendered or accepted from the env map.
-  cacheKeySecret:
-    # -- Name of an operator-provided Secret containing the cache integrity key.
-    name: ""
-    # -- Key in the cache integrity Secret.
-    key: key-secret
   redis:
     # -- Existing Secret containing the single external Redis URL used by Metrics. Metrics never uses the chart's Skaha Redis dependency for this cache.
     urlSecret:

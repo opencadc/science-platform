@@ -5,7 +5,6 @@ chart_dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 metrics_required_args=(
     --set metricsBackend.clusterName=prod-cluster
-    --set metricsBackend.cacheKeySecret.name=metrics-cache
     --set metricsBackend.redis.urlSecret.name=metrics-redis
     --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
     --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
@@ -337,17 +336,11 @@ assert_metrics_render_fails \
     "metricsBackend.redis.urlSecret.name is required" \
     --set metricsBackend.redis.urlSecret.name=
 
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.name is required" \
-    --set metricsBackend.cacheKeySecret.name=
 
 assert_metrics_render_fails \
     "metricsBackend.redis.urlSecret.key is required" \
     --set metricsBackend.redis.urlSecret.key=
 
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.key is required" \
-    --set metricsBackend.cacheKeySecret.key=
 
 assert_metrics_render_fails \
     "metricsBackend.clusterName must be a real lower-case DNS cluster identity" \
@@ -357,11 +350,6 @@ assert_metrics_render_fails \
     "metricsBackend.redis.urlSecret.name is required" \
     --set metricsBackend.redis.urlSecret.name= \
     --set metricsBackend.env.METRICS_REDIS_URL=redis://plaintext.example/0
-
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.name is required" \
-    --set metricsBackend.cacheKeySecret.name= \
-    --set metricsBackend.env.METRICS_CACHE__KEY_SECRET=plaintext-cache-key
 
 metrics_contract_render="$(
     helm template metrics-contract-test "${chart_dir}" \
@@ -390,6 +378,17 @@ assert_env_value "${metrics_contract_render}" "METRICS_PLATFORM_NAME" "canfar"
 assert_env_value "${metrics_contract_render}" "SKAHA_METRICS_PLATFORM_NAME" "canfar"
 assert_contains "${metrics_contract_render}" 'image: "images.opencadc.org/platform/metrics:v0.1.7"'
 
+metrics_cache_secret_render="$(
+    helm template metrics-cache-secret-test "${chart_dir}" \
+        --show-only templates/metricsBackend-cache-secret.yaml \
+        "${metrics_required_args[@]}" \
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
+)"
+assert_contains "${metrics_cache_secret_render}" "kind: Secret"
+assert_contains "${metrics_cache_secret_render}" "name: metrics-cache-secret-test-skaha-metrics-cache"
+assert_contains "${metrics_cache_secret_render}" "key-secret:"
+assert_not_contains "${metrics_cache_secret_render}" "METRICS_CACHE__KEY_SECRET"
+
 metrics_probe_render="$(
     helm template metrics-probe-test "${chart_dir}" \
         --show-only templates/metricsBackend-deployment.yaml \
@@ -409,8 +408,6 @@ metrics_env_render="$(
         --set metricsBackend.platformName=chart-platform \
         --set metricsBackend.redis.urlSecret.name=production-redis \
         --set metricsBackend.redis.urlSecret.key=redis-url \
-        --set metricsBackend.cacheKeySecret.name=production-cache \
-        --set metricsBackend.cacheKeySecret.key=cache-key \
         --set metricsBackend.env.METRICS_PLATFORM_NAME=env-platform \
         --set metricsBackend.env.METRICS_OTEL__POD_UID=unsafe-pod-uid \
         --set metricsBackend.env.METRICS_CACHE__BACKEND=redis \
@@ -435,8 +432,8 @@ assert_single_env_name "${metrics_env_render}" "METRICS_CACHE__KEY_SECRET"
 assert_contains "${metrics_env_render}" 'fieldPath: metadata.uid'
 assert_contains "${metrics_env_render}" 'name: "production-redis"'
 assert_contains "${metrics_env_render}" 'key: "redis-url"'
-assert_contains "${metrics_env_render}" 'name: "production-cache"'
-assert_contains "${metrics_env_render}" 'key: "cache-key"'
+assert_contains "${metrics_env_render}" 'name: "metrics-env-test-skaha-metrics-cache"'
+assert_contains "${metrics_env_render}" 'key: "key-secret"'
 assert_contains "${metrics_env_render}" 'value: "env-platform"'
 assert_env_value "${metrics_env_render}" "METRICS_CLUSTER_NAME" "prod-cluster"
 assert_not_contains "${metrics_env_render}" 'METRICS_CACHE__BACKEND'

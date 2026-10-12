@@ -1,10 +1,7 @@
-{{- $mb := .Values.metricsBackend | default dict }}
 {{- $_ := include "skaha.metricsBackend.assertRequired" . }}
+{{- $mb := .Values.metricsBackend | default dict }}
 {{- $img := $mb.image | default dict }}
-{{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
-{{- if not $queueConfig }}
-{{- fail "metricsBackend requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" }}
-{{- end }}
+{{- $_ := include "skaha.metricsBackend.clusterQueues" . }}
 {{- $_ := include "skaha.metricsBackend.clusterName" . }}
 apiVersion: apps/v1
 kind: Deployment

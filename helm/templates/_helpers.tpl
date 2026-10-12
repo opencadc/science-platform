@@ -198,6 +198,14 @@ Headless jobs PriorityClass name for SKAHA_HEADLESS_PRIORITY_CLASS from the effe
 {{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-svc") -}}
 {{- end }}
 
+{{- define "skaha.metricsBackend.cacheSecretName" -}}
+{{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-cache") -}}
+{{- end }}
+
+{{- define "skaha.metricsBackend.cacheSecretKey" -}}
+key-secret
+{{- end }}
+
 {{- define "skaha.metricsBackend.internalURL" -}}
 {{- printf "http://%s.%s.svc.%s:8000" (include "skaha.metricsBackend.serviceName" .) .Release.Namespace .Values.kubernetesClusterDomain -}}
 {{- end }}
@@ -384,16 +392,11 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.rbacKueueNamespaces" -}}
-{{- include "skaha.metricsBackend.kueueNamespaces" . -}}
-{{- end }}
-
 {{- define "skaha.metricsBackend.env" -}}
 {{- $mb := .Values.metricsBackend | default dict -}}
 {{- $customEnv := $mb.env | default dict -}}
 {{- $redis := $mb.redis | default dict -}}
 {{- $redisURLSecret := $redis.urlSecret | default dict -}}
-{{- $cacheKeySecret := $mb.cacheKeySecret | default dict -}}
 {{- $prometheus := $mb.prometheus | default dict -}}
 {{- $prometheusURL := trim (get $prometheus "url" | default "" | toString) -}}
 {{- $otlp := $mb.otlp | default dict -}}
@@ -410,8 +413,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- $redisSecretName := required "metricsBackend.redis.urlSecret.name is required" (get $redisURLSecret "name" | default "" | toString | trim) -}}
 {{- $redisSecretKey := required "metricsBackend.redis.urlSecret.key is required" (get $redisURLSecret "key" | default "" | toString | trim) -}}
-{{- $cacheSecretName := required "metricsBackend.cacheKeySecret.name is required" (get $cacheKeySecret "name" | default "" | toString | trim) -}}
-{{- $cacheSecretKey := required "metricsBackend.cacheKeySecret.key is required" (get $cacheKeySecret "key" | default "" | toString | trim) -}}
 {{- $_ := unset $env "METRICS_PLATFORM_NAME" -}}
 {{- $_ := unset $env "METRICS_CLUSTER_NAME" -}}
 {{- $_ := unset $env "METRICS_OTEL__POD_UID" -}}
@@ -448,8 +449,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 - name: METRICS_CACHE__KEY_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ $cacheSecretName | quote }}
-      key: {{ $cacheSecretKey | quote }}
+      name: {{ include "skaha.metricsBackend.cacheSecretName" . | quote }}
+      key: {{ include "skaha.metricsBackend.cacheSecretKey" . | quote }}
 {{- if $prometheusURL }}
 - name: METRICS_PROVIDERS__PROMQL__BASE_URL
   value: {{ $prometheusURL | quote }}
