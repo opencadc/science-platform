@@ -144,4 +144,22 @@ may be appended under `metricsBackend.networkPolicy.ingress.additional`.
 
 The chart owns `METRICS_PLATFORM_NAME`, the required lower-case DNS `METRICS_CLUSTER_NAME`, and `METRICS_OTEL__POD_UID` from the Pod's downward API. Values for those reserved variables in `metricsBackend.env` cannot create duplicate entries; `unknown` is not a valid cluster identity. The obsolete `METRICS_CACHE__BACKEND` key is never rendered; a transitional custom value is accepted only when it is exactly `redis`, then stripped before it reaches Settings.
 
-Metrics uses one shared external Redis URL via operator-provided `metricsBackend.redis.urlSecret`. The chart owns the cache integrity Secret (`<release>-skaha-metrics-cache`): it generates a `uuidv4` value on first install, reuses the existing Secret data on upgrade via `lookup`, and deletes it with the release. Plaintext `METRICS_CACHE__KEY_SECRET` in `metricsBackend.env` is stripped and never accepted as configuration. Metrics does not chart-own Redis and exposes no cache backend selector. The configured ClusterQueue and namespace lists are required. Prometheus/Mimir efficiency is enabled only when `metricsBackend.prometheus.url` is set, and application-state OTLP metrics are enabled only when `metricsBackend.otlp.endpoint` is set.
+Metrics uses one shared external Redis URL via operator-provided `metricsBackend.redis.urlSecret`. The chart owns the immutable cache integrity Secret (`<release>-skaha-metrics-cache`). Helm's `randBytes 32` generates a base64-encoded value from 32 cryptographically random bytes on install, and `lookup` reuses the existing Secret during native Helm upgrades. Plaintext `METRICS_CACHE__KEY_SECRET` in `metricsBackend.env` is stripped and never accepted as configuration. Metrics does not chart-own Redis and exposes no cache backend selector. The configured ClusterQueue and namespace lists are required. Prometheus/Mimir efficiency is enabled only when `metricsBackend.prometheus.url` is set, and application-state OTLP metrics are enabled only when `metricsBackend.otlp.endpoint` is set.
+
+### Argo CD cache-key lifecycle
+
+Argo CD renders Helm charts offline, so `lookup` cannot retrieve the live key. Before deploying this chart, merge [`argocd/metrics-cache-secret.patch.yaml`](argocd/metrics-cache-secret.patch.yaml) into the Skaha Application, replacing its placeholders with the rendered cache Secret's `metadata.name` and namespace. Long release names are truncated and hashed by the chart, so use the rendered name rather than reconstructing it. Preserve existing rules and options. The rule ignores only `/data/key-secret` on this release's cache Secret; `RespectIgnoreDifferences=true` also preserves that live value during sync. Both settings are required. The immutable Secret rejects accidental changes if the sync option is omitted.
+
+Refreshes, full syncs, image upgrades, and replacement replicas keep the same key. Helm uninstall or **cascading** Argo CD Application deletion removes the Secret, and a fresh install generates a new key. Non-cascading deletion preserves the installed resources and key by design. There are no Secret hooks, keep annotations, bootstrap Jobs, or additional ServiceAccount permissions.
+
+Run the lifecycle regression test with Docker running:
+
+```sh
+uv run --no-project --with pyyaml==6.0.3 python helm/tests/test-metrics-cache-lifecycle.py
+```
+
+The test creates and removes a disposable kind cluster with Argo CD. It installs the production Secret template and two key-consuming replicas, uses a long Helm release name to verify the hashed Secret name matches the ignore rule, then verifies refresh, full sync, restart, non-cascading deletion, cascading uninstall, and reinstall. It does not exercise the rest of the Skaha/Metrics application stack.
+
+## Upgrading to chart 1.9.0
+
+Metrics is now required. Remove `metricsBackend.enabled` and configure `metricsBackend.clusterName`, `metricsBackend.redis.urlSecret`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. The operator-provided `metricsBackend.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.

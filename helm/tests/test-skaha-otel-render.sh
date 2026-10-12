@@ -386,7 +386,10 @@ metrics_cache_secret_render="$(
 )"
 assert_contains "${metrics_cache_secret_render}" "kind: Secret"
 assert_contains "${metrics_cache_secret_render}" "name: metrics-cache-secret-test-skaha-metrics-cache"
+assert_contains "${metrics_cache_secret_render}" "immutable: true"
 assert_contains "${metrics_cache_secret_render}" "key-secret:"
+assert_not_contains "${metrics_cache_secret_render}" "helm.sh/resource-policy: keep"
+assert_not_contains "${metrics_cache_secret_render}" "argocd.argoproj.io/hook"
 assert_not_contains "${metrics_cache_secret_render}" "METRICS_CACHE__KEY_SECRET"
 
 metrics_probe_render="$(

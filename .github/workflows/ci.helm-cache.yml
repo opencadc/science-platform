@@ -1,0 +1,49 @@
+name: "CI: Helm Cache Lifecycle"
+
+on:
+  pull_request:
+    paths:
+      - "helm/argocd/**"
+      - "helm/templates/metricsBackend-cache-secret.yaml"
+      - "helm/templates/_helpers.tpl"
+      - "helm/tests/test-metrics-cache-*.py"
+      - "helm/Chart.yaml"
+      - "helm/values.yaml"
+      - ".github/workflows/ci.helm-cache.yml"
+  push:
+    branches: [main]
+    paths:
+      - "helm/argocd/**"
+      - "helm/templates/metricsBackend-cache-secret.yaml"
+      - "helm/templates/_helpers.tpl"
+      - "helm/tests/test-metrics-cache-*.py"
+      - "helm/Chart.yaml"
+      - "helm/values.yaml"
+      - ".github/workflows/ci.helm-cache.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  argocd-cache-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          egress-policy: audit
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.21.0
+      - name: Setup kind
+        uses: helm/kind-action@v1.15.1
+        with:
+          install_only: true
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+      - name: Test Argo CD reconciliation, deletion, and reinstallation
+        run: uv run --no-project --with pyyaml==6.0.3 python helm/tests/test-metrics-cache-lifecycle.py

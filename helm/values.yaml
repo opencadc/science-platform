@@ -599,6 +599,8 @@ telemetry:
 
 # Required science-platform Metrics API in the same release as Skaha (see README).
 # The Metrics workload is always installed. Setting metricsBackend.enabled=false fails the render.
+# The chart owns an immutable cache integrity Secret. Argo CD must preserve its key
+# using the Application settings in argocd/metrics-cache-secret.patch.yaml.
 metricsBackend:
   # -- Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps.
   platformName: canfar

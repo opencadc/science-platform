@@ -30,9 +30,13 @@ every environment. Deployment and RBAC should stay in one Helm release.
   matching.
 - Metrics uses one operator-provided shared external Redis deployment via
   `metricsBackend.redis.urlSecret`. The chart owns the cache integrity Secret:
-  generated once with `uuidv4` on install, reused via `lookup` on upgrade, and
-  deleted with the release. Metrics does not use a Bitnami or other chart-owned
-  Redis instance. There is no cache backend selector.
+  generated with Helm's `randBytes 32` on install and reused via `lookup` on
+  native Helm upgrades. Argo CD Applications must ignore only `/data/key-secret`
+  on this release's Secret and set `RespectIgnoreDifferences=true` so offline
+  rendering cannot rotate the live key during sync. The Secret is immutable,
+  deleted with the release on cascading uninstall, and recreated with a new key
+  on fresh install. Metrics does not use a Bitnami or other chart-owned Redis
+  instance. There is no cache backend selector.
 - OTLP is metrics-only and external. This release does not own a traces/logs
   pipeline or an OpenTelemetry Collector.
 - Authoritative deploy chart: `deployments/helm/applications/skaha`. The chart
@@ -43,6 +47,11 @@ every environment. Deployment and RBAC should stay in one Helm release.
 - GitOps (e.g. keel-deploy) supplies Metrics runtime config via Helm values
   (`metricsBackend.env` and the operator-provided Redis URL Secret). The cache
   integrity Secret is chart-managed and must not be set in `metricsBackend.env`.
+- Argo CD deployers merge `helm/argocd/metrics-cache-secret.patch.yaml` into
+  their Skaha Application before deploying the chart. Both the narrowly scoped
+  ignore rule and sync option are required. No bootstrap Job or extra Secret
+  API permissions are needed. Non-cascading Application deletion preserves the
+  installed resources and key by design.
 - When `metricsBackend.rbac.enabled` is false, deployers must pre-provision
   the dedicated or operator-provided Metrics ServiceAccount with Kueue
   `ClusterQueue` `get` access for the configured queues and LocalQueue `list`
