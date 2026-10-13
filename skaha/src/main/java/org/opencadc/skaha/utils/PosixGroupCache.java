@@ -1,7 +1,6 @@
 package org.opencadc.skaha.utils;
 
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -142,7 +141,7 @@ public class PosixGroupCache {
     }
 
     private static void fetchAndCacheGroupBatches(
-            final List<GroupURI> groupURIsToQuery, final PosixMapperClient posixMapperClient) throws Exception {
+            final List<GroupURI> groupURIsToQuery, final PosixMapperClient posixMapperClient) {
         final Subject currentSubject = AuthenticationUtil.getCurrentSubject();
         for (int offset = 0;
                 offset < groupURIsToQuery.size();
@@ -154,9 +153,9 @@ public class PosixGroupCache {
             if (uncachedBatch.isEmpty()) {
                 continue;
             }
+
             final List<PosixGroup> fetchedGroups =
-                    Subject.doAs(currentSubject, (PrivilegedExceptionAction<List<PosixGroup>>)
-                            () -> posixMapperClient.getGID(uncachedBatch));
+                    Subject.callAs(currentSubject, () -> posixMapperClient.getGID(uncachedBatch));
             fetchedGroups.forEach(PosixGroupCache::cacheGroup);
         }
     }
