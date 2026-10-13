@@ -4,17 +4,18 @@
 {{- if hasKey $mbRbac "enabled" }}
 {{- $rbacEnabled = $mbRbac.enabled }}
 {{- end }}
+{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
 {{- if $rbacEnabled }}
 {{- $_ := include "skaha.metricsBackend.platformName" . }}
 {{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
 {{- $queues := fromJsonArray $queueConfig }}
-{{- $kueueNamespaceConfig := include "skaha.metricsBackend.rbacKueueNamespaces" . | trim }}
+{{- $kueueNamespaceConfig := include "skaha.metricsBackend.kueueNamespaces" . | trim }}
 {{- $kueueNamespaces := fromJsonArray $kueueNamespaceConfig }}
 {{/*
-  Kueue read ClusterRole / ClusterRoleBinding. Helm renders these before the metrics
-  Deployment and Service (Helm builtin kind install order applies RBAC before typical
-  workload kinds). Apply failures (for example forbidden cluster RBAC) fail the release
-  before those workload resources reconcile.
+  Kueue read ClusterRole / ClusterRoleBinding. Helm renders these before the
+  metrics Deployment and Service (Helm builtin kind install order applies RBAC
+  before typical workload kinds). Apply failures (for example forbidden cluster
+  RBAC) fail the release before those workload resources reconcile.
 */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -43,7 +44,7 @@ roleRef:
   name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "skaha.metricsBackend.serviceAccountName" . }}
+    name: {{ include "skaha.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- range $kueueNamespace := $kueueNamespaces }}
 ---
@@ -81,7 +82,7 @@ roleRef:
   name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "skaha.metricsBackend.serviceAccountName" $ }}
+    name: {{ include "skaha.serviceAccountName" $ }}
     namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- end }}

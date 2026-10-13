@@ -160,6 +160,13 @@ Headless jobs PriorityClass name for SKAHA_HEADLESS_PRIORITY_CLASS from the effe
 {{- $h.name -}}
 {{- end -}}
 
+{{- define "skaha.metricsBackend.assertRequired" -}}
+{{- $mb := .Values.metricsBackend | default dict -}}
+{{- if and (hasKey $mb "enabled") (not $mb.enabled) -}}
+{{- fail "metricsBackend is required and always enabled; remove metricsBackend.enabled" -}}
+{{- end -}}
+{{- end }}
+
 {{- define "skaha.metricsBackend.baseName" -}}
 {{- .Release.Name -}}
 {{- end }}
@@ -189,6 +196,14 @@ Headless jobs PriorityClass name for SKAHA_HEADLESS_PRIORITY_CLASS from the effe
 
 {{- define "skaha.metricsBackend.serviceName" -}}
 {{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-svc") -}}
+{{- end }}
+
+{{- define "skaha.metricsBackend.cacheSecretName" -}}
+{{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-cache") -}}
+{{- end }}
+
+{{- define "skaha.metricsBackend.cacheSecretKey" -}}
+key-secret
 {{- end }}
 
 {{- define "skaha.metricsBackend.internalURL" -}}
@@ -237,37 +252,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- fail "metricsBackend.clusterName must be a real lower-case DNS cluster identity; unknown is not allowed" -}}
 {{- end -}}
 {{- $clusterName -}}
-{{- end }}
-
-{{- define "skaha.metricsBackend.serviceAccountName" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
-{{- $serviceAccount := $mb.serviceAccount | default dict -}}
-{{- $create := true -}}
-{{- if hasKey $serviceAccount "create" -}}
-{{- $create = get $serviceAccount "create" -}}
-{{- end -}}
-{{- $configuredName := get $serviceAccount "name" | default "" | toString | trim -}}
-{{- $name := $configuredName -}}
-{{- if $create -}}
-{{- $name = default (include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-sa")) $configuredName -}}
-{{- else -}}
-{{- $name = required "metricsBackend.serviceAccount.name is required when metricsBackend.serviceAccount.create is false" $configuredName -}}
-{{- end -}}
-{{- if or (gt (len $name) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" $name)) -}}
-{{- fail "metricsBackend.serviceAccount.name must be a lower-case DNS name" -}}
-{{- end -}}
-{{- $mbRbac := $mb.rbac | default dict -}}
-{{- $rbacEnabled := true -}}
-{{- if hasKey $mbRbac "enabled" -}}
-{{- $rbacEnabled = get $mbRbac "enabled" -}}
-{{- end -}}
-{{- if and $rbacEnabled (eq $name "default") -}}
-{{- fail "metricsBackend.serviceAccount.name must not be default when metricsBackend.rbac.enabled is true" -}}
-{{- end -}}
-{{- if eq $name (include "skaha.serviceAccountName" .) -}}
-{{- fail "metricsBackend.serviceAccount.name must be distinct from the Skaha ServiceAccount" -}}
-{{- end -}}
-{{- $name -}}
 {{- end }}
 
 {{- define "skaha.metricsBackend.clusterQueues" -}}
@@ -377,16 +361,11 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.rbacKueueNamespaces" -}}
-{{- include "skaha.metricsBackend.kueueNamespaces" . -}}
-{{- end }}
-
 {{- define "skaha.metricsBackend.env" -}}
 {{- $mb := .Values.metricsBackend | default dict -}}
 {{- $customEnv := $mb.env | default dict -}}
 {{- $redis := $mb.redis | default dict -}}
 {{- $redisURLSecret := $redis.urlSecret | default dict -}}
-{{- $cacheKeySecret := $mb.cacheKeySecret | default dict -}}
 {{- $prometheus := $mb.prometheus | default dict -}}
 {{- $prometheusURL := trim (get $prometheus "url" | default "" | toString) -}}
 {{- $otlp := $mb.otlp | default dict -}}
@@ -403,8 +382,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- $redisSecretName := required "metricsBackend.redis.urlSecret.name is required" (get $redisURLSecret "name" | default "" | toString | trim) -}}
 {{- $redisSecretKey := required "metricsBackend.redis.urlSecret.key is required" (get $redisURLSecret "key" | default "" | toString | trim) -}}
-{{- $cacheSecretName := required "metricsBackend.cacheKeySecret.name is required" (get $cacheKeySecret "name" | default "" | toString | trim) -}}
-{{- $cacheSecretKey := required "metricsBackend.cacheKeySecret.key is required" (get $cacheKeySecret "key" | default "" | toString | trim) -}}
 {{- $_ := unset $env "METRICS_PLATFORM_NAME" -}}
 {{- $_ := unset $env "METRICS_CLUSTER_NAME" -}}
 {{- $_ := unset $env "METRICS_OTEL__POD_UID" -}}
@@ -441,8 +418,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 - name: METRICS_CACHE__KEY_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ $cacheSecretName | quote }}
-      key: {{ $cacheSecretKey | quote }}
+      name: {{ include "skaha.metricsBackend.cacheSecretName" . | quote }}
+      key: {{ include "skaha.metricsBackend.cacheSecretKey" . | quote }}
 {{- if $prometheusURL }}
 - name: METRICS_PROVIDERS__PROMQL__BASE_URL
   value: {{ $prometheusURL | quote }}

@@ -5,7 +5,6 @@ chart_dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 metrics_required_args=(
     --set metricsBackend.clusterName=prod-cluster
-    --set metricsBackend.cacheKeySecret.name=metrics-cache
     --set metricsBackend.redis.urlSecret.name=metrics-redis
     --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
     --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
@@ -28,7 +27,7 @@ render_skaha_deployment() {
 
 render_metrics_rbac() {
     helm template metrics-rbac-test "${chart_dir}" \
-        --show-only templates/metricsBackend-rbac.yaml \
+        --show-only templates/metrics-rbac.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         --set metricsBackend.rbac.enabled=true \
@@ -37,7 +36,7 @@ render_metrics_rbac() {
 
 render_metrics_deployment() {
     helm template metrics-deployment-test "${chart_dir}" \
-        --show-only templates/metricsBackend-deployment.yaml \
+        --show-only templates/metrics-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         "$@"
@@ -45,7 +44,7 @@ render_metrics_deployment() {
 
 render_metrics_networkpolicy() {
     helm template metrics-networkpolicy-test "${chart_dir}" \
-        --show-only templates/metricsBackend-networkpolicy.yaml \
+        --show-only templates/metrics-networkpolicy.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         "$@"
@@ -231,6 +230,10 @@ assert_render_fails \
     --set deployment.skaha.extraEnv[0].name=CATALINA_OPTS \
     --set deployment.skaha.extraEnv[0].value=-Xmx1g
 
+assert_render_fails \
+    "metricsBackend is required and always enabled; remove metricsBackend.enabled" \
+    --set metricsBackend.enabled=false
+
 metrics_rbac_render="$(
     render_metrics_rbac
 )"
@@ -265,15 +268,11 @@ assert_not_contains "${metrics_clusterrole_render}" '"pods"'
 
 metrics_serviceaccount_render="$(
     render_metrics_deployment \
-        --set metricsBackend.serviceAccount.create=false \
-        --set metricsBackend.serviceAccount.name=metrics-existing-sa
+        --set serviceAccount.create=false \
+        --set serviceAccount.name=shared-existing-sa
 )"
-assert_contains "${metrics_serviceaccount_render}" 'serviceAccountName: metrics-existing-sa'
+assert_contains "${metrics_serviceaccount_render}" 'serviceAccountName: shared-existing-sa'
 assert_not_contains "${metrics_serviceaccount_render}" 'serviceAccountName: default'
-
-assert_metrics_render_fails \
-    "metricsBackend.serviceAccount.name must not be default" \
-    --set metricsBackend.serviceAccount.name=default
 
 metrics_networkpolicy_render="$(
     render_metrics_networkpolicy \
@@ -333,17 +332,11 @@ assert_metrics_render_fails \
     "metricsBackend.redis.urlSecret.name is required" \
     --set metricsBackend.redis.urlSecret.name=
 
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.name is required" \
-    --set metricsBackend.cacheKeySecret.name=
 
 assert_metrics_render_fails \
     "metricsBackend.redis.urlSecret.key is required" \
     --set metricsBackend.redis.urlSecret.key=
 
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.key is required" \
-    --set metricsBackend.cacheKeySecret.key=
 
 assert_metrics_render_fails \
     "metricsBackend.clusterName must be a real lower-case DNS cluster identity" \
@@ -354,41 +347,50 @@ assert_metrics_render_fails \
     --set metricsBackend.redis.urlSecret.name= \
     --set metricsBackend.env.METRICS_REDIS_URL=redis://plaintext.example/0
 
-assert_metrics_render_fails \
-    "metricsBackend.cacheKeySecret.name is required" \
-    --set metricsBackend.cacheKeySecret.name= \
-    --set metricsBackend.env.METRICS_CACHE__KEY_SECRET=plaintext-cache-key
-
 metrics_contract_render="$(
     helm template metrics-contract-test "${chart_dir}" \
         --namespace canfar \
         --show-only templates/skaha-tomcat-deployment.yaml \
-        --show-only templates/metricsBackend-deployment.yaml \
-        --show-only templates/metricsBackend-serviceaccount.yaml \
+        --show-only templates/metrics-deployment.yaml \
+        --show-only templates/serviceaccount.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         --set deployment.skaha.serviceAccountName=shared-skaha \
-        --set serviceAccount.create=false
+        --set metricsBackend.serviceAccount.name=ignored-metrics-identity
 )"
-if [[ $(grep -c -F 'serviceAccountName: shared-skaha' <<<"${metrics_contract_render}") -ne 1 ]]; then
-    printf 'Expected only the Skaha Pod to use serviceAccountName shared-skaha\n' >&2
+if [[ $(grep -c -F 'serviceAccountName: shared-skaha' <<<"${metrics_contract_render}") -ne 2 ]]; then
+    printf 'Expected both Skaha and Metrics to use serviceAccountName shared-skaha\n' >&2
     exit 1
 fi
-if [[ $(grep -c -F 'serviceAccountName: metrics-contract-test-skaha-metrics-sa' <<<"${metrics_contract_render}") -ne 1 ]]; then
-    printf 'Expected Metrics Pod to use its dedicated ServiceAccount\n' >&2
+if [[ $(grep -c -F 'kind: ServiceAccount' <<<"${metrics_contract_render}") -ne 1 ]]; then
+    printf 'Expected exactly one chart-owned ServiceAccount for Skaha and Metrics\n' >&2
     exit 1
 fi
-assert_contains "${metrics_contract_render}" 'kind: ServiceAccount'
-assert_contains "${metrics_contract_render}" 'name: metrics-contract-test-skaha-metrics-sa'
+assert_contains "${metrics_contract_render}" 'name: shared-skaha'
+assert_not_contains "${metrics_contract_render}" 'ignored-metrics-identity'
 assert_contains "${metrics_contract_render}" 'name: SKAHA_METRICS_BACKEND_URL'
 assert_contains "${metrics_contract_render}" 'value: "http://metrics-contract-test-skaha-metrics-api-svc.canfar.svc.cluster.local:8000"'
 assert_env_value "${metrics_contract_render}" "METRICS_PLATFORM_NAME" "canfar"
 assert_env_value "${metrics_contract_render}" "SKAHA_METRICS_PLATFORM_NAME" "canfar"
-assert_contains "${metrics_contract_render}" 'image: "images.opencadc.org/platform/metrics:v0.1.5"'
+assert_contains "${metrics_contract_render}" 'image: "images.opencadc.org/platform/metrics:v0.1.7"'
+
+metrics_cache_secret_render="$(
+    helm template metrics-cache-secret-test "${chart_dir}" \
+        --show-only templates/metrics-cache-secret.yaml \
+        "${metrics_required_args[@]}" \
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
+)"
+assert_contains "${metrics_cache_secret_render}" "kind: Secret"
+assert_contains "${metrics_cache_secret_render}" "name: metrics-cache-secret-test-skaha-metrics-cache"
+assert_contains "${metrics_cache_secret_render}" "immutable: true"
+assert_contains "${metrics_cache_secret_render}" "key-secret:"
+assert_not_contains "${metrics_cache_secret_render}" "helm.sh/resource-policy: keep"
+assert_not_contains "${metrics_cache_secret_render}" "argocd.argoproj.io/hook"
+assert_not_contains "${metrics_cache_secret_render}" "METRICS_CACHE__KEY_SECRET"
 
 metrics_probe_render="$(
     helm template metrics-probe-test "${chart_dir}" \
-        --show-only templates/metricsBackend-deployment.yaml \
+        --show-only templates/metrics-deployment.yaml \
         --show-only templates/skaha-tomcat-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
@@ -398,15 +400,13 @@ assert_liveness_probe "${metrics_probe_render}"
 
 metrics_env_render="$(
     helm template metrics-env-test "${chart_dir}" \
-        --show-only templates/metricsBackend-deployment.yaml \
+        --show-only templates/metrics-deployment.yaml \
         --show-only templates/skaha-tomcat-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         --set metricsBackend.platformName=chart-platform \
         --set metricsBackend.redis.urlSecret.name=production-redis \
         --set metricsBackend.redis.urlSecret.key=redis-url \
-        --set metricsBackend.cacheKeySecret.name=production-cache \
-        --set metricsBackend.cacheKeySecret.key=cache-key \
         --set metricsBackend.env.METRICS_PLATFORM_NAME=env-platform \
         --set metricsBackend.env.METRICS_OTEL__POD_UID=unsafe-pod-uid \
         --set metricsBackend.env.METRICS_CACHE__BACKEND=redis \
@@ -431,8 +431,8 @@ assert_single_env_name "${metrics_env_render}" "METRICS_CACHE__KEY_SECRET"
 assert_contains "${metrics_env_render}" 'fieldPath: metadata.uid'
 assert_contains "${metrics_env_render}" 'name: "production-redis"'
 assert_contains "${metrics_env_render}" 'key: "redis-url"'
-assert_contains "${metrics_env_render}" 'name: "production-cache"'
-assert_contains "${metrics_env_render}" 'key: "cache-key"'
+assert_contains "${metrics_env_render}" 'name: "metrics-env-test-skaha-metrics-cache"'
+assert_contains "${metrics_env_render}" 'key: "key-secret"'
 assert_contains "${metrics_env_render}" 'value: "env-platform"'
 assert_env_value "${metrics_env_render}" "METRICS_CLUSTER_NAME" "prod-cluster"
 assert_not_contains "${metrics_env_render}" 'METRICS_CACHE__BACKEND'
@@ -455,8 +455,8 @@ assert_env_value "${metrics_env_render}" "SKAHA_METRICS_PLATFORM_NAME" "env-plat
 long_release="release-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 long_name_render="$(
     helm template "${long_release}" "${chart_dir}" \
-        --show-only templates/metricsBackend-deployment.yaml \
-        --show-only templates/metricsBackend-service.yaml \
+        --show-only templates/metrics-deployment.yaml \
+        --show-only templates/metrics-service.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"
@@ -478,7 +478,7 @@ fi
 long_release_variant="${long_release}y"
 long_variant_render="$(
     helm template "${long_release_variant}" "${chart_dir}" \
-        --show-only templates/metricsBackend-deployment.yaml \
+        --show-only templates/metrics-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
 )"

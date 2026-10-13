@@ -1,9 +1,7 @@
+{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
 {{- $mb := .Values.metricsBackend | default dict }}
 {{- $img := $mb.image | default dict }}
-{{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
-{{- if not $queueConfig }}
-{{- fail "metricsBackend requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" }}
-{{- end }}
+{{- $_ := include "skaha.metricsBackend.clusterQueues" . }}
 {{- $_ := include "skaha.metricsBackend.clusterName" . }}
 apiVersion: apps/v1
 kind: Deployment
@@ -23,7 +21,7 @@ spec:
       labels:
         {{- include "skaha.metricsBackend.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "skaha.metricsBackend.serviceAccountName" . }}
+      serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
@@ -31,7 +29,7 @@ spec:
         fsGroup: 65532
       containers:
         - name: metrics-api
-          image: "{{ $img.repository }}:{{ $img.tag | default "v0.1.5" }}"
+          image: "{{ $img.repository }}:{{ $img.tag | default "v0.1.7" }}"
           imagePullPolicy: {{ $img.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http

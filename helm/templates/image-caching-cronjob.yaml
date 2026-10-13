@@ -9,6 +9,7 @@ spec:
     spec:
       template:
         spec:
+          serviceAccountName: {{ include "skaha.serviceAccountName" . }}
           securityContext:
             runAsUser: 999  # redis user
             runAsGroup: 1000  # redis user group
@@ -52,6 +53,7 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       securityContext:
         runAsUser: 999  # redis user
         runAsGroup: 1000  # redis user group
