@@ -4,7 +4,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Chart | AppVersion | Type |
 |:-----:|:----------:|:----:|
-|1.10.0<!-- x-release-please-version --> | 1.6.0 | application |
+|1.10.1<!-- x-release-please-version --> | 1.6.0 | application |
 
 ## Requirements
 
@@ -93,12 +93,12 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | metrics.image.tag | string | `"v0.1.7"` | Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metrics.env`. |
 | metrics.ingress.enabled | bool | `false` | When true and top-level ingress.enabled is true, add a path on the same host routing to the Metrics Service. |
 | metrics.ingress.path | string | `"/apis/canfar.net/v1alpha1/metrics"` | Ingress path prefix for the Metrics API. It is forwarded unchanged, so it must match the FastAPI route prefix unless the ingress controller is configured with an external rewrite. |
-| metrics.networkPolicy | object | `{"egress":{"dns":[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}],"kubeApiServer":[],"otlp":[],"promql":[],"redis":[]},"enabled":true,"ingress":{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}}` | Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic. |
-| metrics.networkPolicy.egress.dns | list | `[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}]` | DNS egress to CoreDNS. Keep both protocols because resolver behavior is environment-dependent. |
-| metrics.networkPolicy.egress.kubeApiServer | list | `[]` | Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment. |
+| metrics.networkPolicy | object | `{"egress":{"dns":[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}]}],"kubeApiServer":[],"otlp":[],"promql":[],"redis":[]},"enabled":true,"ingress":{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}}` | Isolate the co-deployed Metrics API. Egress to every Pod in the release namespace, including the bundled Redis, is always allowed. Empty operator-supplied destination lists deny that traffic. |
+| metrics.networkPolicy.egress.dns | list | `[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}]}]` | DNS egress on port 53 to any destination, so node-local DNS caches on a host link-local address work as well as CoreDNS Pods. Keep both protocols because resolver behavior is environment-dependent. |
+| metrics.networkPolicy.egress.kubeApiServer | list | `[]` | Kubernetes API destinations, required for readiness. Match what the CNI enforces: Cilium evaluates the API server endpoint after Service translation, so use its port (for example a port-only `6443/TCP` rule) rather than the `kubernetes` Service ClusterIP. |
 | metrics.networkPolicy.egress.otlp | list | `[]` | Optional metrics-only OTLP destinations. Leave empty when application-state telemetry is disabled. |
 | metrics.networkPolicy.egress.promql | list | `[]` | Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled. |
-| metrics.networkPolicy.egress.redis | list | `[]` | Redis destinations for an external `metrics.redis.url`. Egress to the bundled Redis is added automatically when `metrics.redis.url` is empty. |
+| metrics.networkPolicy.egress.redis | list | `[]` | Redis destinations for an external `metrics.redis.url` outside the release namespace. |
 | metrics.networkPolicy.enabled | bool | `true` | Create a default-deny Metrics NetworkPolicy for the co-deployed Metrics API. |
 | metrics.networkPolicy.ingress | object | `{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}` | Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name. |
 | metrics.networkPolicy.ingress.additional | list | `[]` | Additional raw NetworkPolicy ingress rules. These are appended unchanged. |
@@ -263,11 +263,13 @@ If `metrics.rbac.enabled=false`, this chart will not create any Metrics RBAC. Th
 The co-deployed Metrics API is isolated by default. Configure
 `metrics.networkPolicy.ingress.skaha.ports` for the default caller; its
 selector is the Skaha Pod's exact `run: <release>-skaha-tomcat` label on port
-8000. DNS
-egress is explicitly allowed to CoreDNS, and egress to the release's bundled
-Redis on port 6379 is added while `metrics.redis.url` is empty. Kubernetes API,
-external Redis, optional Prometheus/Mimir, and optional metrics-only OTLP
-egress are empty by default and must be supplied as exact rules under
+8000. Egress to every Pod in the release namespace, including the bundled
+Redis, is always allowed. DNS egress is allowed on port 53 to any destination,
+because node-local DNS caches listen on a host link-local address (for example
+`169.254.25.10`) that namespace selectors and, on Cilium, `ipBlock` rules do
+not match. Kubernetes API, Redis outside the release namespace, optional
+Prometheus/Mimir, and optional metrics-only OTLP egress are empty by default
+and must be supplied as exact rules under
 `metrics.networkPolicy.egress`. Empty lists remain denied, and the chart
 never deploys or selects an OTLP dependency. Additional ingress rules
 may be appended under `metrics.networkPolicy.ingress.additional`.

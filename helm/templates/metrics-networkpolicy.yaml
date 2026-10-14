@@ -58,25 +58,11 @@ spec:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   egress:
-    {{- $renderedEgress := false }}
-    {{- if not (trim (get ($mb.redis | default dict) "url" | default "" | toString)) }}
-    {{- $renderedEgress = true }}
     - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/instance: {{ .Release.Name }}
-              app.kubernetes.io/name: redis
-      ports:
-        - port: 6379
-          protocol: TCP
-    {{- end }}
+        - podSelector: {}
     {{- range $rules := ($networkPolicy.egress | default dict) }}
     {{- if $rules }}
-    {{- $renderedEgress = true }}
     {{- toYaml $rules | nindent 4 }}
     {{- end }}
-    {{- end }}
-    {{- if not $renderedEgress }}
-    []
     {{- end }}
 {{- end }}

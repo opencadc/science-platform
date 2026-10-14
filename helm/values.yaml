@@ -662,7 +662,7 @@ metrics:
   redis:
     # -- Optional `redis://` or `rediss://` URL for the Metrics cache. Empty uses this release's bundled Redis (`<release>-redis-master`, database 0), shared with Skaha.
     url: ""
-  # -- Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic.
+  # -- Isolate the co-deployed Metrics API. Egress to every Pod in the release namespace, including the bundled Redis, is always allowed. Empty operator-supplied destination lists deny that traffic.
   networkPolicy:
     # -- Create a default-deny Metrics NetworkPolicy for the co-deployed Metrics API.
     enabled: true
@@ -676,20 +676,16 @@ metrics:
       # -- Additional raw NetworkPolicy ingress rules. These are appended unchanged.
       additional: []
     egress:
-      # -- DNS egress to CoreDNS. Keep both protocols because resolver behavior is environment-dependent.
+      # -- DNS egress on port 53 to any destination, so node-local DNS caches on a host link-local address work as well as CoreDNS Pods. Keep both protocols because resolver behavior is environment-dependent.
       dns:
-        - to:
-            - namespaceSelector:
-                matchLabels:
-                  kubernetes.io/metadata.name: kube-system
-          ports:
+        - ports:
             - port: 53
               protocol: UDP
             - port: 53
               protocol: TCP
-      # -- Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment.
+      # -- Kubernetes API destinations, required for readiness. Match what the CNI enforces: Cilium evaluates the API server endpoint after Service translation, so use its port (for example a port-only `6443/TCP` rule) rather than the `kubernetes` Service ClusterIP.
       kubeApiServer: []
-      # -- Redis destinations for an external `metrics.redis.url`. Egress to the bundled Redis is added automatically when `metrics.redis.url` is empty.
+      # -- Redis destinations for an external `metrics.redis.url` outside the release namespace.
       redis: []
       # -- Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled.
       promql: []
