@@ -1,25 +1,25 @@
-{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
-{{- $mb := .Values.metricsBackend | default dict }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
+{{- $mb := .Values.metrics | default dict }}
 {{- $img := $mb.image | default dict }}
-{{- $_ := include "skaha.metricsBackend.clusterQueues" . }}
-{{- $_ := include "skaha.metricsBackend.clusterName" . }}
+{{- $_ := include "skaha.metrics.clusterQueues" . }}
+{{- $_ := include "skaha.metrics.clusterName" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "skaha.metricsBackend.deploymentName" . }}
+  name: {{ include "skaha.metrics.deploymentName" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 spec:
   replicas: {{ $mb.replicaCount | default 1 }}
   revisionHistoryLimit: {{ $mb.revisionHistoryLimit | default 3 }}
   selector:
     matchLabels:
-      {{- include "skaha.metricsBackend.selectorLabels" . | nindent 6 }}
+      {{- include "skaha.metrics.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "skaha.metricsBackend.selectorLabels" . | nindent 8 }}
+        {{- include "skaha.metrics.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       automountServiceAccountToken: true
@@ -43,7 +43,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           env:
-            {{- include "skaha.metricsBackend.env" . | nindent 12 }}
+            {{- include "skaha.metrics.env" . | nindent 12 }}
           startupProbe:
             httpGet:
               path: /healthz

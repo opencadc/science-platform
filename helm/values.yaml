@@ -621,10 +621,10 @@ telemetry:
     interval: 30
 
 # Required science-platform Metrics API in the same release as Skaha (see README).
-# The Metrics workload is always installed. Setting metricsBackend.enabled=false fails the render.
+# The Metrics workload is always installed. Setting metrics.enabled=false fails the render.
 # The chart owns an immutable cache integrity Secret. Argo CD preserves its key
 # with a Secret-specific ignoreDifferences rule and RespectIgnoreDifferences=true.
-metricsBackend:
+metrics:
   # -- Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps.
   platformName: canfar
   # -- Required stable lower-case DNS identity for this Metrics deployment. It scopes cache identities and must match the Prometheus/Mimir cluster label.
@@ -639,7 +639,7 @@ metricsBackend:
   image:
     # -- Metrics container image repository.
     repository: images.opencadc.org/platform/metrics
-    # -- Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metricsBackend.env`.
+    # -- Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metrics.env`.
     tag: v0.1.7
     # -- imagePullPolicy for the Metrics API container.
     pullPolicy: IfNotPresent
@@ -660,10 +660,8 @@ metricsBackend:
   otlp:
     endpoint: ""
   redis:
-    # -- Existing Secret containing the single external Redis URL used by Metrics. Metrics never uses the chart's Skaha Redis dependency for this cache.
-    urlSecret:
-      name: ""
-      key: redis-url
+    # -- Optional `redis://` or `rediss://` URL for the Metrics cache. Empty uses this release's bundled Redis (`<release>-redis-master`, database 0), shared with Skaha.
+    url: ""
   # -- Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic.
   networkPolicy:
     # -- Create a default-deny Metrics NetworkPolicy for the co-deployed Metrics API.
@@ -691,7 +689,7 @@ metricsBackend:
               protocol: TCP
       # -- Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment.
       kubeApiServer: []
-      # -- External Redis destinations. Set exact CIDR/selector and port rules for the Redis service.
+      # -- Redis destinations for an external `metrics.redis.url`. Egress to the bundled Redis is added automatically when `metrics.redis.url` is empty.
       redis: []
       # -- Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled.
       promql: []

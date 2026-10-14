@@ -51,13 +51,11 @@ def validate_shared_identity():
     command("helm", "dependency", "build", str(ROOT))
     required = [
         "--set",
-        "metricsBackend.clusterName=test-cluster",
-        "--set",
-        "metricsBackend.redis.urlSecret.name=test-redis",
+        "metrics.clusterName=test-cluster",
         "--set-string",
-        'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]',
+        'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]',
         "--set-string",
-        'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["cache-lifecycle"]',
+        'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["cache-lifecycle"]',
         "--set",
         "deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://example.org~cavern",
     ]
@@ -83,7 +81,7 @@ def validate_shared_identity():
         ),
         (
             "obsolete Metrics override",
-            ["--set", "metricsBackend.serviceAccount.name=forbidden-metrics-only"],
+            ["--set", "metrics.serviceAccount.name=forbidden-metrics-only"],
             RELEASE,
             1,
         ),
@@ -157,9 +155,9 @@ def validate_shared_identity():
                 NAMESPACE,
                 *required,
                 "--set",
-                "metricsBackend.test.enabled=false",
+                "metrics.test.enabled=false",
                 "--set",
-                "metricsBackend.networkPolicy.enabled=false",
+                "metrics.networkPolicy.enabled=false",
             )
         )
     )
@@ -291,7 +289,7 @@ spec:
         app: key-consumer
         role: {{ $role }}
         {{- if eq $role "metrics" }}
-        {{- include "skaha.metricsBackend.selectorLabels" $ | nindent 8 }}
+        {{- include "skaha.metrics.selectorLabels" $ | nindent 8 }}
         {{- else }}
         run: {{ $.Release.Name }}-skaha-tomcat
         {{- end }}
@@ -302,7 +300,7 @@ spec:
         runAsUser: 65532
       containers:
         - name: consumer
-          image: "{{ $.Values.metricsBackend.image.repository }}:{{ $.Values.metricsBackend.image.tag }}"
+          image: "{{ $.Values.metrics.image.repository }}:{{ $.Values.metrics.image.tag }}"
           command: ["python", "-c"]
           args:
             - |
@@ -328,8 +326,8 @@ spec:
             - name: KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "skaha.metricsBackend.cacheSecretName" $ }}
-                  key: {{ include "skaha.metricsBackend.cacheSecretKey" $ }}
+                  name: {{ include "skaha.metrics.cacheSecretName" $ }}
+                  key: {{ include "skaha.metrics.cacheSecretKey" $ }}
           readinessProbe:
             exec:
               command: ["python", "-c", "from pathlib import Path; assert Path('/tmp/key-fingerprint').exists()"]
@@ -355,7 +353,7 @@ spec:
         )
     )
     apply(configmap)
-    image = yaml.safe_load((ROOT / "values.yaml").read_text())["metricsBackend"][
+    image = yaml.safe_load((ROOT / "values.yaml").read_text())["metrics"][
         "image"
     ]
     apply(

@@ -1,15 +1,15 @@
-{{- $mb := .Values.metricsBackend | default dict }}
+{{- $mb := .Values.metrics | default dict }}
 {{- $mbRbac := default dict $mb.rbac }}
 {{- $rbacEnabled := true }}
 {{- if hasKey $mbRbac "enabled" }}
 {{- $rbacEnabled = $mbRbac.enabled }}
 {{- end }}
-{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
 {{- if $rbacEnabled }}
-{{- $_ := include "skaha.metricsBackend.platformName" . }}
-{{- $queueConfig := include "skaha.metricsBackend.clusterQueues" . | trim }}
+{{- $_ := include "skaha.metrics.platformName" . }}
+{{- $queueConfig := include "skaha.metrics.clusterQueues" . | trim }}
 {{- $queues := fromJsonArray $queueConfig }}
-{{- $kueueNamespaceConfig := include "skaha.metricsBackend.kueueNamespaces" . | trim }}
+{{- $kueueNamespaceConfig := include "skaha.metrics.kueueNamespaces" . | trim }}
 {{- $kueueNamespaces := fromJsonArray $kueueNamespaceConfig }}
 {{/*
   Kueue read ClusterRole / ClusterRoleBinding. Helm renders these before the
@@ -20,9 +20,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["clusterqueues"]
@@ -35,13 +35,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "skaha.metricsBackend.clusterRoleName" . }}
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "skaha.serviceAccountName" . }}
@@ -51,10 +51,10 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
   namespace: {{ $kueueNamespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" $ | nindent 4 }}
+    {{- include "skaha.metrics.labels" $ | nindent 4 }}
 rules:
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["localqueues"]
@@ -72,14 +72,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
   namespace: {{ $kueueNamespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" $ | nindent 4 }}
+    {{- include "skaha.metrics.labels" $ | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "skaha.serviceAccountName" $ }}

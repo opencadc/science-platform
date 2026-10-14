@@ -4,7 +4,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Chart | AppVersion | Type |
 |:-----:|:----------:|:----:|
-|1.9.0<!-- x-release-please-version --> | 1.6.0 | application |
+|1.10.0<!-- x-release-please-version --> | 1.6.0 | application |
 
 ## Requirements
 
@@ -86,35 +86,35 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | ingress.path | string | `"/skaha"` | Ingress path prefix routed to the Skaha API Service. |
 | kubernetesClusterDomain | string | `"cluster.local"` | Kubernetes DNS domain used when building internal service hostnames. |
 | livenessProbe | object | `{"httpGet":{"path":"/skaha/availability","port":"http"},"periodSeconds":60}` | HTTP liveness probe for the Skaha API container. |
-| metricsBackend.clusterName | string | `""` | Required stable lower-case DNS identity for this Metrics deployment. It scopes cache identities and must match the Prometheus/Mimir cluster label. |
-| metricsBackend.env | object | `{}` | Map of METRICS_* environment variables for the Metrics container. GitOps supplies per-environment values — at minimum METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES and METRICS_PROVIDERS__KUEUE__NAMESPACES (JSON array strings, for example '["cq-a"]' and '["canfar-workloads"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings. See metrics/docs/environment-contracts.md. |
-| metricsBackend.image.pullPolicy | string | `"IfNotPresent"` | imagePullPolicy for the Metrics API container. |
-| metricsBackend.image.repository | string | `"images.opencadc.org/platform/metrics"` | Metrics container image repository. |
-| metricsBackend.image.tag | string | `"v0.1.7"` | Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metricsBackend.env`. |
-| metricsBackend.ingress.enabled | bool | `false` | When true and top-level ingress.enabled is true, add a path on the same host routing to the Metrics Service. |
-| metricsBackend.ingress.path | string | `"/apis/canfar.net/v1alpha1/metrics"` | Ingress path prefix for the Metrics API. It is forwarded unchanged, so it must match the FastAPI route prefix unless the ingress controller is configured with an external rewrite. |
-| metricsBackend.networkPolicy | object | `{"egress":{"dns":[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}],"kubeApiServer":[],"otlp":[],"promql":[],"redis":[]},"enabled":true,"ingress":{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}}` | Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic. |
-| metricsBackend.networkPolicy.egress.dns | list | `[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}]` | DNS egress to CoreDNS. Keep both protocols because resolver behavior is environment-dependent. |
-| metricsBackend.networkPolicy.egress.kubeApiServer | list | `[]` | Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment. |
-| metricsBackend.networkPolicy.egress.otlp | list | `[]` | Optional metrics-only OTLP destinations. Leave empty when application-state telemetry is disabled. |
-| metricsBackend.networkPolicy.egress.promql | list | `[]` | Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled. |
-| metricsBackend.networkPolicy.egress.redis | list | `[]` | External Redis destinations. Set exact CIDR/selector and port rules for the Redis service. |
-| metricsBackend.networkPolicy.enabled | bool | `true` | Create a default-deny Metrics NetworkPolicy for the co-deployed Metrics API. |
-| metricsBackend.networkPolicy.ingress | object | `{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}` | Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name. |
-| metricsBackend.networkPolicy.ingress.additional | list | `[]` | Additional raw NetworkPolicy ingress rules. These are appended unchanged. |
-| metricsBackend.networkPolicy.ingress.skaha.ports | list | `[{"port":8000,"protocol":"TCP"}]` | Port rules for the co-deployed Skaha caller. An explicitly empty list denies this caller. |
-| metricsBackend.otlp | object | `{"endpoint":""}` | Optional external OTLP/HTTP endpoint for Metrics application-state metrics. When set, the chart enables OTLP metrics export. |
-| metricsBackend.platformName | string | `"canfar"` | Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps. |
-| metricsBackend.prometheus | object | `{"url":""}` | Optional Prometheus/Mimir HTTP(S) endpoint for server-owned efficiency queries. When set, the chart enables the fixed PromQL provider. |
-| metricsBackend.rbac.enabled | bool | `true` | When true, create the least-privilege ClusterQueue and configured-namespace LocalQueue RBAC. Set false to provide those permissions out of band. |
-| metricsBackend.rbac.namespaces | list | `[]` | Namespaces in which Metrics lists LocalQueues for User metrics. Required; these must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied. |
-| metricsBackend.redis.urlSecret | object | `{"key":"redis-url","name":""}` | Existing Secret containing the single external Redis URL used by Metrics. Metrics never uses the chart's Skaha Redis dependency for this cache. |
-| metricsBackend.replicaCount | int | `1` | Fixed replica count for the Metrics API (no HPA in this chart version). |
-| metricsBackend.resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Metrics API container. |
-| metricsBackend.revisionHistoryLimit | int | `3` | revisionHistoryLimit for the Metrics API Deployment. |
-| metricsBackend.test.enabled | bool | `true` | Run helm test hook that retries /readyz until success. |
-| metricsBackend.test.image | string | `"busybox:1.37.0"` | Image for the helm test hook Pod. |
-| metricsBackend.test.maxWaitSeconds | int | `180` | Maximum seconds to wait for Metrics /readyz (should exceed startupProbe worst case plus scheduling margin). |
+| metrics.clusterName | string | `""` | Required stable lower-case DNS identity for this Metrics deployment. It scopes cache identities and must match the Prometheus/Mimir cluster label. |
+| metrics.env | object | `{}` | Map of METRICS_* environment variables for the Metrics container. GitOps supplies per-environment values — at minimum METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES and METRICS_PROVIDERS__KUEUE__NAMESPACES (JSON array strings, for example '["cq-a"]' and '["canfar-workloads"]'). Kubernetes endpoint, credentials, and CA are discovered by kr8s from the pod ServiceAccount and are not settings. See metrics/docs/environment-contracts.md. |
+| metrics.image.pullPolicy | string | `"IfNotPresent"` | imagePullPolicy for the Metrics API container. |
+| metrics.image.repository | string | `"images.opencadc.org/platform/metrics"` | Metrics container image repository. |
+| metrics.image.tag | string | `"v0.1.7"` | Metrics container image tag. Note the env contract boundary: images after v0.1.5 discover the Kubernetes endpoint/credentials/CA via kr8s from the pod ServiceAccount and reject the removed transport settings listed under `metrics.env`. |
+| metrics.ingress.enabled | bool | `false` | When true and top-level ingress.enabled is true, add a path on the same host routing to the Metrics Service. |
+| metrics.ingress.path | string | `"/apis/canfar.net/v1alpha1/metrics"` | Ingress path prefix for the Metrics API. It is forwarded unchanged, so it must match the FastAPI route prefix unless the ingress controller is configured with an external rewrite. |
+| metrics.networkPolicy | object | `{"egress":{"dns":[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}],"kubeApiServer":[],"otlp":[],"promql":[],"redis":[]},"enabled":true,"ingress":{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}}` | Isolate the co-deployed Metrics API. Empty operator-supplied destination lists deny that traffic. |
+| metrics.networkPolicy.egress.dns | list | `[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"kube-system"}}}]}]` | DNS egress to CoreDNS. Keep both protocols because resolver behavior is environment-dependent. |
+| metrics.networkPolicy.egress.kubeApiServer | list | `[]` | Kubernetes API destinations. Set the cluster-service CIDR or exact API endpoint CIDR and port for the deployment. |
+| metrics.networkPolicy.egress.otlp | list | `[]` | Optional metrics-only OTLP destinations. Leave empty when application-state telemetry is disabled. |
+| metrics.networkPolicy.egress.promql | list | `[]` | Optional Prometheus/Mimir destinations. Leave empty when efficiency is disabled. |
+| metrics.networkPolicy.egress.redis | list | `[]` | Redis destinations for an external `metrics.redis.url`. Egress to the bundled Redis is added automatically when `metrics.redis.url` is empty. |
+| metrics.networkPolicy.enabled | bool | `true` | Create a default-deny Metrics NetworkPolicy for the co-deployed Metrics API. |
+| metrics.networkPolicy.ingress | object | `{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}` | Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name. |
+| metrics.networkPolicy.ingress.additional | list | `[]` | Additional raw NetworkPolicy ingress rules. These are appended unchanged. |
+| metrics.networkPolicy.ingress.skaha.ports | list | `[{"port":8000,"protocol":"TCP"}]` | Port rules for the co-deployed Skaha caller. An explicitly empty list denies this caller. |
+| metrics.otlp | object | `{"endpoint":""}` | Optional external OTLP/HTTP endpoint for Metrics application-state metrics. When set, the chart enables OTLP metrics export. |
+| metrics.platformName | string | `"canfar"` | Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps. |
+| metrics.prometheus | object | `{"url":""}` | Optional Prometheus/Mimir HTTP(S) endpoint for server-owned efficiency queries. When set, the chart enables the fixed PromQL provider. |
+| metrics.rbac.enabled | bool | `true` | When true, create the least-privilege ClusterQueue and configured-namespace LocalQueue RBAC. Set false to provide those permissions out of band. |
+| metrics.rbac.namespaces | list | `[]` | Namespaces in which Metrics lists LocalQueues for User metrics. Required; these must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied. |
+| metrics.redis.url | string | `""` | Optional `redis://` or `rediss://` URL for the Metrics cache. Empty uses this release's bundled Redis (`<release>-redis-master`, database 0), shared with Skaha. |
+| metrics.replicaCount | int | `1` | Fixed replica count for the Metrics API (no HPA in this chart version). |
+| metrics.resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Metrics API container. |
+| metrics.revisionHistoryLimit | int | `3` | revisionHistoryLimit for the Metrics API Deployment. |
+| metrics.test.enabled | bool | `true` | Run helm test hook that retries /readyz until success. |
+| metrics.test.image | string | `"busybox:1.37.0"` | Image for the helm test hook Pod. |
+| metrics.test.maxWaitSeconds | int | `180` | Maximum seconds to wait for Metrics /readyz (should exceed startupProbe worst case plus scheduling margin). |
 | podSecurityContext | object | `{}` |  |
 | rbac.clusterRole.create | bool | `true` |  |
 | rbac.create | bool | `true` |  |
@@ -252,30 +252,31 @@ Omit `existingSecret.name` (leave default empty) when you do not use this stack�
 
 **Runtime note:** Signed session callbacks also read RSA key material from workload Secret **`pre-auth-token-skaha`** (data keys **`public`** / **`private`**). Confirm with ops which path your environment uses (`/config/RsaSignaturePub.key`, that Secret, classpath, or combinations).
 
-## metricsBackend install ordering
+## metrics install ordering
 
-The Metrics API is required and always installed with Skaha. The chart emits one shared Skaha/Metrics `ServiceAccount`, a Kueue `ClusterRole`/`ClusterRoleBinding`, one namespaced `Role`/`RoleBinding` per configured LocalQueue namespace, the Metrics `Service`, the Metrics `NetworkPolicy`, and the Metrics `Deployment`. Setting `metricsBackend.enabled=false` fails the render. Skaha, Metrics, chart-owned Jobs, and test Pods all use the same ServiceAccount resolved by `serviceAccount` or `deployment.skaha.serviceAccountName`. There is no Metrics-specific ServiceAccount setting. The Metrics bindings add configured ClusterQueue and namespaced Kueue/Job/Pod reads to that shared identity. Bitnami Redis retains its dependency-managed identity. Configure the JSON namespace list with `METRICS_PROVIDERS__KUEUE__NAMESPACES` or `metricsBackend.rbac.namespaces`; when both are supplied they must match. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go), so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken Metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
+The Metrics API is required and always installed with Skaha. The chart emits one shared Skaha/Metrics `ServiceAccount`, a Kueue `ClusterRole`/`ClusterRoleBinding`, one namespaced `Role`/`RoleBinding` per configured LocalQueue namespace, the Metrics `Service`, the Metrics `NetworkPolicy`, and the Metrics `Deployment`. Setting `metrics.enabled=false` fails the render. Skaha, Metrics, chart-owned Jobs, and test Pods all use the same ServiceAccount resolved by `serviceAccount` or `deployment.skaha.serviceAccountName`. There is no Metrics-specific ServiceAccount setting. The Metrics bindings add configured ClusterQueue and namespaced Kueue/Job/Pod reads to that shared identity. Bitnami Redis retains its dependency-managed identity. Configure the JSON namespace list with `METRICS_PROVIDERS__KUEUE__NAMESPACES` or `metrics.rbac.namespaces`; when both are supplied they must match. Helm applies manifest groups in a deterministic [kind order](https://github.com/helm/helm/blob/main/pkg/releaseutil/kind_sorter.go), so RBAC objects are reconciled before typical namespaced workload kinds. If the API server rejects creating or updating those cluster-scoped RBAC rules (for example the caller lacks permission), the release fails instead of only rolling out a broken Metrics `Deployment`. `helm test` (optional) still targets the running Service after install; it does not replace RBAC admission checks.
 
-If `metricsBackend.rbac.enabled=false`, this chart will not create any Metrics RBAC. The chart still validates the configured ClusterQueue and namespace lists. In that mode, the deployer is responsible for ensuring the shared Skaha ServiceAccount already has `get` permission on each configured Kueue `ClusterQueue` and `list` permission on LocalQueues in every configured namespace.
+If `metrics.rbac.enabled=false`, this chart will not create any Metrics RBAC. The chart still validates the configured ClusterQueue and namespace lists. In that mode, the deployer is responsible for ensuring the shared Skaha ServiceAccount already has `get` permission on each configured Kueue `ClusterQueue` and `list` permission on LocalQueues in every configured namespace.
 
-## metricsBackend NetworkPolicy
+## metrics NetworkPolicy
 
 The co-deployed Metrics API is isolated by default. Configure
-`metricsBackend.networkPolicy.ingress.skaha.ports` for the default caller; its
+`metrics.networkPolicy.ingress.skaha.ports` for the default caller; its
 selector is the Skaha Pod's exact `run: <release>-skaha-tomcat` label on port
 8000. DNS
-egress is explicitly allowed to CoreDNS; Kubernetes API, external Redis,
-optional Prometheus/Mimir, and optional metrics-only OTLP egress are empty by
-default and must be supplied as exact rules under
-`metricsBackend.networkPolicy.egress`. Empty lists remain denied, and the chart
-never deploys or selects a Redis or OTLP dependency. Additional ingress rules
-may be appended under `metricsBackend.networkPolicy.ingress.additional`.
+egress is explicitly allowed to CoreDNS, and egress to the release's bundled
+Redis on port 6379 is added while `metrics.redis.url` is empty. Kubernetes API,
+external Redis, optional Prometheus/Mimir, and optional metrics-only OTLP
+egress are empty by default and must be supplied as exact rules under
+`metrics.networkPolicy.egress`. Empty lists remain denied, and the chart
+never deploys or selects an OTLP dependency. Additional ingress rules
+may be appended under `metrics.networkPolicy.ingress.additional`.
 
-## metricsBackend environment handling
+## metrics environment handling
 
-The chart owns `METRICS_PLATFORM_NAME`, the required lower-case DNS `METRICS_CLUSTER_NAME`, and `METRICS_OTEL__POD_UID` from the Pod's downward API. Values for those reserved variables in `metricsBackend.env` cannot create duplicate entries; `unknown` is not a valid cluster identity. The obsolete `METRICS_CACHE__BACKEND` key is never rendered; a transitional custom value is accepted only when it is exactly `redis`, then stripped before it reaches Settings.
+The chart owns `METRICS_PLATFORM_NAME`, the required lower-case DNS `METRICS_CLUSTER_NAME`, and `METRICS_OTEL__POD_UID` from the Pod's downward API. Values for those reserved variables in `metrics.env` cannot create duplicate entries; `unknown` is not a valid cluster identity. The obsolete `METRICS_CACHE__BACKEND` key is never rendered; a transitional custom value is accepted only when it is exactly `redis`, then stripped before it reaches Settings.
 
-Metrics uses one shared external Redis URL via operator-provided `metricsBackend.redis.urlSecret`. The chart owns the immutable cache integrity Secret (`<release>-skaha-metrics-cache`). Helm's `randBytes 32` generates a base64-encoded value from 32 cryptographically random bytes on install, and `lookup` reuses the existing Secret during native Helm upgrades. Plaintext `METRICS_CACHE__KEY_SECRET` in `metricsBackend.env` is stripped and never accepted as configuration. Metrics does not chart-own Redis and exposes no cache backend selector. The configured ClusterQueue and namespace lists are required. Prometheus/Mimir efficiency is enabled only when `metricsBackend.prometheus.url` is set, and application-state OTLP metrics are enabled only when `metricsBackend.otlp.endpoint` is set.
+Metrics shares the release's bundled Redis with Skaha by default (`redis://<release>-redis-master.<namespace>.svc.<clusterDomain>:6379/0`); Metrics keys are prefixed `metrics:`. Set `metrics.redis.url` to a plain `redis://` or `rediss://` URL to use a different Redis. The chart owns the immutable cache integrity Secret (`<release>-skaha-metrics-cache`). Helm's `randBytes 32` generates a base64-encoded value from 32 cryptographically random bytes on install, and `lookup` reuses the existing Secret during native Helm upgrades. Plaintext `METRICS_CACHE__KEY_SECRET` and `METRICS_REDIS_URL` in `metrics.env` are stripped and never accepted as configuration. There is no cache backend selector. The configured ClusterQueue and namespace lists are required. Prometheus/Mimir efficiency is enabled only when `metrics.prometheus.url` is set, and application-state OTLP metrics are enabled only when `metrics.otlp.endpoint` is set.
 
 ### Argo CD cache-key lifecycle
 
@@ -293,7 +294,7 @@ The test first validates the shared ServiceAccount in full-chart renders for def
 
 ## Required deployment configuration
 
-Metrics is now required. Remove `metricsBackend.enabled` and configure `metricsBackend.clusterName`, `metricsBackend.redis.urlSecret`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. The operator-provided `metricsBackend.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.
+Metrics is now required and its values live under `metrics` (the former `metricsBackend` key fails the render). Remove `metrics.enabled` and configure `metrics.clusterName`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. `metrics.redis.urlSecret` is retired; Metrics uses the bundled Redis unless `metrics.redis.url` is set. The operator-provided `metrics.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.
 
 ## Running chart tests
 

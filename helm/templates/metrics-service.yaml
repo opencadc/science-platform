@@ -1,15 +1,15 @@
-{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "skaha.metricsBackend.serviceName" . }}
+  name: {{ include "skaha.metrics.serviceName" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
   selector:
-    {{- include "skaha.metricsBackend.selectorLabels" . | nindent 4 }}
+    {{- include "skaha.metrics.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
       port: 8000
