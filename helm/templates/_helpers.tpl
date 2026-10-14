@@ -160,21 +160,24 @@ Headless jobs PriorityClass name for SKAHA_HEADLESS_PRIORITY_CLASS from the effe
 {{- $h.name -}}
 {{- end -}}
 
-{{- define "skaha.metricsBackend.assertRequired" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.assertRequired" -}}
+{{- if hasKey .Values "metricsBackend" -}}
+{{- fail "metricsBackend was renamed to metrics; move its settings under metrics" -}}
+{{- end -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- if and (hasKey $mb "enabled") (not $mb.enabled) -}}
-{{- fail "metricsBackend is required and always enabled; remove metricsBackend.enabled" -}}
+{{- fail "metrics is required and always enabled; remove metrics.enabled" -}}
 {{- end -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.baseName" -}}
+{{- define "skaha.metrics.baseName" -}}
 {{- .Release.Name -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.nameWithSuffix" -}}
+{{- define "skaha.metrics.nameWithSuffix" -}}
 {{- $suffix := .suffix | trunc 62 | trimSuffix "-" -}}
 {{- $baseLength := int (sub 62 (len $suffix)) -}}
-{{- $base := include "skaha.metricsBackend.baseName" .context -}}
+{{- $base := include "skaha.metrics.baseName" .context -}}
 {{- if gt (len $base) $baseLength -}}
 {{- $hash := sha256sum $base | trunc 10 -}}
 {{- $prefixLength := int (sub $baseLength 11) -}}
@@ -190,36 +193,47 @@ Headless jobs PriorityClass name for SKAHA_HEADLESS_PRIORITY_CLASS from the effe
 {{- end -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.deploymentName" -}}
-{{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api") -}}
+{{- define "skaha.metrics.deploymentName" -}}
+{{- include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api") -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.serviceName" -}}
-{{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-svc") -}}
+{{- define "skaha.metrics.serviceName" -}}
+{{- include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-svc") -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.cacheSecretName" -}}
-{{- include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-cache") -}}
+{{- define "skaha.metrics.cacheSecretName" -}}
+{{- include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-cache") -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.cacheSecretKey" -}}
+{{- define "skaha.metrics.cacheSecretKey" -}}
 key-secret
 {{- end }}
 
-{{- define "skaha.metricsBackend.internalURL" -}}
-{{- printf "http://%s.%s.svc.%s:8000" (include "skaha.metricsBackend.serviceName" .) .Release.Namespace .Values.kubernetesClusterDomain -}}
+{{- define "skaha.metrics.internalURL" -}}
+{{- printf "http://%s.%s.svc.%s:8000" (include "skaha.metrics.serviceName" .) .Release.Namespace .Values.kubernetesClusterDomain -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.selectorLabels" -}}
+{{- define "skaha.metrics.redisURL" -}}
+{{- $redis := (.Values.metrics | default dict).redis | default dict -}}
+{{- $url := get $redis "url" | default "" | toString | trim -}}
+{{- if not $url -}}
+{{- $url = printf "redis://%s-redis-master.%s.svc.%s:6379/0" .Release.Name .Release.Namespace .Values.kubernetesClusterDomain -}}
+{{- else if not (regexMatch "^rediss?://" $url) -}}
+{{- fail "metrics.redis.url must start with redis:// or rediss://" -}}
+{{- end -}}
+{{- $url -}}
+{{- end }}
+
+{{- define "skaha.metrics.selectorLabels" -}}
 app.kubernetes.io/name: skaha-metrics-api
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: metrics-api
 {{- end }}
 
-{{- define "skaha.metricsBackend.labels" -}}
+{{- define "skaha.metrics.labels" -}}
 helm.sh/chart: {{ include "skaha.chart" . }}
-{{ include "skaha.metricsBackend.selectorLabels" . }}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{ include "skaha.metrics.selectorLabels" . }}
+{{- $mb := .Values.metrics | default dict -}}
 {{- with $mb.image }}
 {{- with .tag }}
 app.kubernetes.io/version: {{ . | quote }}
@@ -228,8 +242,8 @@ app.kubernetes.io/version: {{ . | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "skaha.metricsBackend.platformName" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.platformName" -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- $platformName := "canfar" -}}
 {{- if hasKey $mb "platformName" -}}
 {{- $platformName = get $mb "platformName" | default "" | toString -}}
@@ -240,26 +254,26 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- $platformName = trim $platformName -}}
 {{- if or (eq $platformName "") (gt (len $platformName) 63) (not (regexMatch "^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$" $platformName)) -}}
-{{- fail "metricsBackend.platformName must match ^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$ after trimming" -}}
+{{- fail "metrics.platformName must match ^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$ after trimming" -}}
 {{- end -}}
 {{- $platformName -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.clusterName" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.clusterName" -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- $clusterName := get $mb "clusterName" | default "" | toString | trim -}}
 {{- if or (eq $clusterName "") (eq $clusterName "unknown") (gt (len $clusterName) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" $clusterName)) -}}
-{{- fail "metricsBackend.clusterName must be a real lower-case DNS cluster identity; unknown is not allowed" -}}
+{{- fail "metrics.clusterName must be a real lower-case DNS cluster identity; unknown is not allowed" -}}
 {{- end -}}
 {{- $clusterName -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.clusterQueues" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.clusterQueues" -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- $customEnv := $mb.env | default dict -}}
 {{- $raw := get $customEnv "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" | default "" | toString | trim -}}
 {{- if not $raw -}}
-{{- fail "metricsBackend requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" -}}
+{{- fail "metrics requires METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" -}}
 {{- end -}}
 {{- $configured := fromJsonArray $raw -}}
 {{- if not (kindIs "slice" $configured) -}}
@@ -293,7 +307,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- toJson $normalized -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.normalizeKueueNamespaces" -}}
+{{- define "skaha.metrics.normalizeKueueNamespaces" -}}
 {{- $configured := .values -}}
 {{- $field := .field -}}
 {{- if not (kindIs "slice" $configured) -}}
@@ -323,12 +337,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- toJson $normalized -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.kueueNamespaces" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.kueueNamespaces" -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- $mbRbac := $mb.rbac | default dict -}}
 {{- $configured := $mbRbac.namespaces | default list -}}
 {{- if not (kindIs "slice" $configured) -}}
-{{- fail "metricsBackend.rbac.namespaces must be a list" -}}
+{{- fail "metrics.rbac.namespaces must be a list" -}}
 {{- end -}}
 {{- $customEnv := $mb.env | default dict -}}
 {{- $fromEnv := get $customEnv "METRICS_PROVIDERS__KUEUE__NAMESPACES" | default "" | toString | trim -}}
@@ -337,19 +351,19 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $configuredJSON := "[]" -}}
 {{- $configuredNamespaces := list -}}
 {{- if $hasConfigured -}}
-{{- $configuredJSON = include "skaha.metricsBackend.normalizeKueueNamespaces" (dict "values" $configured "field" "metricsBackend.rbac.namespaces") | trim -}}
+{{- $configuredJSON = include "skaha.metrics.normalizeKueueNamespaces" (dict "values" $configured "field" "metrics.rbac.namespaces") | trim -}}
 {{- $configuredNamespaces = fromJsonArray $configuredJSON -}}
 {{- end -}}
 {{- $envJSON := "[]" -}}
 {{- $envNamespaces := list -}}
 {{- if $hasEnv -}}
 {{- $envNamespaces = fromJsonArray $fromEnv -}}
-{{- $envJSON = include "skaha.metricsBackend.normalizeKueueNamespaces" (dict "values" $envNamespaces "field" "METRICS_PROVIDERS__KUEUE__NAMESPACES") | trim -}}
+{{- $envJSON = include "skaha.metrics.normalizeKueueNamespaces" (dict "values" $envNamespaces "field" "METRICS_PROVIDERS__KUEUE__NAMESPACES") | trim -}}
 {{- $envNamespaces = fromJsonArray $envJSON -}}
 {{- end -}}
 {{- if and $hasConfigured $hasEnv -}}
 {{- if ne (toJson $configuredNamespaces) (toJson $envNamespaces) -}}
-{{- fail "metricsBackend.rbac.namespaces must exactly match METRICS_PROVIDERS__KUEUE__NAMESPACES after normalization" -}}
+{{- fail "metrics.rbac.namespaces must exactly match METRICS_PROVIDERS__KUEUE__NAMESPACES after normalization" -}}
 {{- end -}}
 {{- end -}}
 {{- if $hasEnv -}}
@@ -357,15 +371,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- else if $hasConfigured -}}
 {{- $configuredJSON -}}
 {{- else -}}
-{{- fail "metricsBackend requires metricsBackend.rbac.namespaces or METRICS_PROVIDERS__KUEUE__NAMESPACES" -}}
+{{- fail "metrics requires metrics.rbac.namespaces or METRICS_PROVIDERS__KUEUE__NAMESPACES" -}}
 {{- end -}}
 {{- end }}
 
-{{- define "skaha.metricsBackend.env" -}}
-{{- $mb := .Values.metricsBackend | default dict -}}
+{{- define "skaha.metrics.env" -}}
+{{- $mb := .Values.metrics | default dict -}}
 {{- $customEnv := $mb.env | default dict -}}
-{{- $redis := $mb.redis | default dict -}}
-{{- $redisURLSecret := $redis.urlSecret | default dict -}}
 {{- $prometheus := $mb.prometheus | default dict -}}
 {{- $prometheusURL := trim (get $prometheus "url" | default "" | toString) -}}
 {{- $otlp := $mb.otlp | default dict -}}
@@ -374,14 +386,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- range $key, $value := $customEnv -}}
 {{- $_ := set $env $key $value -}}
 {{- end -}}
-{{- $platformName := include "skaha.metricsBackend.platformName" . -}}
-{{- $clusterName := include "skaha.metricsBackend.clusterName" . -}}
-{{- $clusterQueues := include "skaha.metricsBackend.clusterQueues" . | trim -}}
+{{- $platformName := include "skaha.metrics.platformName" . -}}
+{{- $clusterName := include "skaha.metrics.clusterName" . -}}
+{{- $clusterQueues := include "skaha.metrics.clusterQueues" . | trim -}}
 {{- if and (hasKey $customEnv "METRICS_CACHE__BACKEND") (ne (get $customEnv "METRICS_CACHE__BACKEND" | toString) "redis") -}}
-{{- fail "metricsBackend.env.METRICS_CACHE__BACKEND is obsolete and must be exactly redis when supplied for transition" -}}
+{{- fail "metrics.env.METRICS_CACHE__BACKEND is obsolete and must be exactly redis when supplied for transition" -}}
 {{- end -}}
-{{- $redisSecretName := required "metricsBackend.redis.urlSecret.name is required" (get $redisURLSecret "name" | default "" | toString | trim) -}}
-{{- $redisSecretKey := required "metricsBackend.redis.urlSecret.key is required" (get $redisURLSecret "key" | default "" | toString | trim) -}}
 {{- $_ := unset $env "METRICS_PLATFORM_NAME" -}}
 {{- $_ := unset $env "METRICS_CLUSTER_NAME" -}}
 {{- $_ := unset $env "METRICS_OTEL__POD_UID" -}}
@@ -401,7 +411,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $_ := unset $env "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" -}}
 {{- $_ := set $env "METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" $clusterQueues -}}
 {{- $_ := unset $env "METRICS_PROVIDERS__KUEUE__NAMESPACES" -}}
-{{- $_ := set $env "METRICS_PROVIDERS__KUEUE__NAMESPACES" (include "skaha.metricsBackend.kueueNamespaces" . | trim) -}}
+{{- $_ := set $env "METRICS_PROVIDERS__KUEUE__NAMESPACES" (include "skaha.metrics.kueueNamespaces" . | trim) -}}
 - name: METRICS_PLATFORM_NAME
   value: {{ $platformName | quote }}
 - name: METRICS_CLUSTER_NAME
@@ -411,15 +421,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
     fieldRef:
       fieldPath: metadata.uid
 - name: METRICS_REDIS_URL
-  valueFrom:
-    secretKeyRef:
-      name: {{ $redisSecretName | quote }}
-      key: {{ $redisSecretKey | quote }}
+  value: {{ include "skaha.metrics.redisURL" . | quote }}
 - name: METRICS_CACHE__KEY_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ include "skaha.metricsBackend.cacheSecretName" . | quote }}
-      key: {{ include "skaha.metricsBackend.cacheSecretKey" . | quote }}
+      name: {{ include "skaha.metrics.cacheSecretName" . | quote }}
+      key: {{ include "skaha.metrics.cacheSecretKey" . | quote }}
 {{- if $prometheusURL }}
 - name: METRICS_PROVIDERS__PROMQL__BASE_URL
   value: {{ $prometheusURL | quote }}
@@ -436,7 +443,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 {{- end }}
 
-{{- define "skaha.metricsBackend.clusterRoleName" -}}
+{{- define "skaha.metrics.clusterRoleName" -}}
 {{- $raw := printf "skaha-metrics-%s-%s-kueue-read" .Release.Namespace .Release.Name | replace "." "-" -}}
 {{- if gt (len $raw) 63 -}}
 {{- printf "skaha-metrics-%s-kueue-read-%s" ($raw | trunc 26 | trimSuffix "-") (sha256sum $raw | trunc 10) -}}

@@ -26,18 +26,19 @@ every environment. Deployment and RBAC should stay in one Helm release.
 - Skaha always receives an internal base URL (`SKAHA_METRICS_BACKEND_URL`)
   pointing at the in-cluster Metrics Service. Public ingress for Metrics is
   optional and environment-specific.
-- Metrics requires a real lower-case DNS `metricsBackend.clusterName`, which is
+- Metrics requires a real lower-case DNS `metrics.clusterName`, which is
   rendered as `METRICS_CLUSTER_NAME` for cache identity and PromQL cluster-label
   matching.
-- Metrics uses one operator-provided shared external Redis deployment via
-  `metricsBackend.redis.urlSecret`. The chart owns the cache integrity Secret:
+- Metrics shares the release's bundled Redis with Skaha by default
+  (`<release>-redis-master`, database 0, keys prefixed `metrics:`). An
+  optional plain `metrics.redis.url` selects a different Redis; the URL is not
+  treated as a secret. The chart owns the cache integrity Secret:
   generated with Helm's `randBytes 32` on install and reused via `lookup` on
   native Helm upgrades. Argo CD Applications must ignore only `/data/key-secret`
   on this release's Secret and set `RespectIgnoreDifferences=true` so offline
   rendering cannot rotate the live key during sync. The Secret is immutable,
   deleted with the release on cascading uninstall, and recreated with a new key
-  on fresh install. Metrics does not use a Bitnami or other chart-owned Redis
-  instance. There is no cache backend selector.
+  on fresh install. There is no cache backend selector.
 - OTLP is metrics-only and external. This release does not own a traces/logs
   pipeline or an OpenTelemetry Collector.
 - Authoritative deploy chart: `deployments/helm/applications/skaha`. The chart
@@ -46,14 +47,14 @@ every environment. Deployment and RBAC should stay in one Helm release.
 ## Consequences
 
 - GitOps (e.g. keel-deploy) supplies Metrics runtime config via Helm values
-  (`metricsBackend.env` and the operator-provided Redis URL Secret). The cache
-  integrity Secret is chart-managed and must not be set in `metricsBackend.env`.
+  (`metrics.env` and, when not using the bundled Redis, `metrics.redis.url`). The cache
+  integrity Secret is chart-managed and must not be set in `metrics.env`.
 - Argo CD deployers configure the exact cache Secret name, namespace, and
   `/data/key-secret` ignore rule directly in their Skaha Application. Both the narrowly scoped
   ignore rule and sync option are required. No bootstrap Job or extra Secret
   API permissions are needed. Non-cascading Application deletion preserves the
   installed resources and key by design.
-- When `metricsBackend.rbac.enabled` is false, deployers must pre-provision
+- When `metrics.rbac.enabled` is false, deployers must pre-provision
   the shared Skaha ServiceAccount with Kueue
   `ClusterQueue` `get` access for the configured queues and LocalQueue `list`
   access in every configured namespace.

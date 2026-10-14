@@ -4,10 +4,9 @@ set -euo pipefail
 chart_dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 metrics_required_args=(
-    --set metricsBackend.clusterName=prod-cluster
-    --set metricsBackend.redis.urlSecret.name=metrics-redis
-    --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
-    --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
+    --set metrics.clusterName=prod-cluster
+    --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
+    --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
 )
 
 helm dependency build "${chart_dir}" >/dev/null
@@ -30,7 +29,7 @@ render_metrics_rbac() {
         --show-only templates/metrics-rbac.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.rbac.enabled=true \
+        --set metrics.rbac.enabled=true \
         "$@"
 }
 
@@ -231,8 +230,8 @@ assert_render_fails \
     --set deployment.skaha.extraEnv[0].value=-Xmx1g
 
 assert_render_fails \
-    "metricsBackend is required and always enabled; remove metricsBackend.enabled" \
-    --set metricsBackend.enabled=false
+    "metrics is required and always enabled; remove metrics.enabled" \
+    --set metrics.enabled=false
 
 metrics_rbac_render="$(
     render_metrics_rbac
@@ -276,18 +275,18 @@ assert_not_contains "${metrics_serviceaccount_render}" 'serviceAccountName: defa
 
 metrics_networkpolicy_render="$(
     render_metrics_networkpolicy \
-        --set-string 'metricsBackend.networkPolicy.egress.kubeApiServer[0].to[0].ipBlock.cidr=10.96.0.0/12' \
-        --set metricsBackend.networkPolicy.egress.kubeApiServer[0].ports[0].port=443 \
-        --set metricsBackend.networkPolicy.egress.kubeApiServer[0].ports[0].protocol=TCP \
-        --set-string 'metricsBackend.networkPolicy.egress.redis[0].to[0].ipBlock.cidr=10.0.0.0/8' \
-        --set metricsBackend.networkPolicy.egress.redis[0].ports[0].port=6379 \
-        --set metricsBackend.networkPolicy.egress.redis[0].ports[0].protocol=TCP \
-        --set-string 'metricsBackend.networkPolicy.egress.promql[0].to[0].ipBlock.cidr=192.0.2.0/24' \
-        --set metricsBackend.networkPolicy.egress.promql[0].ports[0].port=9090 \
-        --set metricsBackend.networkPolicy.egress.promql[0].ports[0].protocol=TCP \
-        --set-string 'metricsBackend.networkPolicy.egress.otlp[0].to[0].ipBlock.cidr=198.51.100.0/24' \
-        --set metricsBackend.networkPolicy.egress.otlp[0].ports[0].port=4318 \
-        --set metricsBackend.networkPolicy.egress.otlp[0].ports[0].protocol=TCP
+        --set-string 'metrics.networkPolicy.egress.kubeApiServer[0].to[0].ipBlock.cidr=10.96.0.0/12' \
+        --set metrics.networkPolicy.egress.kubeApiServer[0].ports[0].port=443 \
+        --set metrics.networkPolicy.egress.kubeApiServer[0].ports[0].protocol=TCP \
+        --set-string 'metrics.networkPolicy.egress.redis[0].to[0].ipBlock.cidr=10.0.0.0/8' \
+        --set metrics.networkPolicy.egress.redis[0].ports[0].port=6379 \
+        --set metrics.networkPolicy.egress.redis[0].ports[0].protocol=TCP \
+        --set-string 'metrics.networkPolicy.egress.promql[0].to[0].ipBlock.cidr=192.0.2.0/24' \
+        --set metrics.networkPolicy.egress.promql[0].ports[0].port=9090 \
+        --set metrics.networkPolicy.egress.promql[0].ports[0].protocol=TCP \
+        --set-string 'metrics.networkPolicy.egress.otlp[0].to[0].ipBlock.cidr=198.51.100.0/24' \
+        --set metrics.networkPolicy.egress.otlp[0].ports[0].port=4318 \
+        --set metrics.networkPolicy.egress.otlp[0].ports[0].protocol=TCP
 )"
 assert_contains "${metrics_networkpolicy_render}" 'kind: NetworkPolicy'
 assert_contains "${metrics_networkpolicy_render}" 'run: metrics-networkpolicy-test-skaha-tomcat'
@@ -301,12 +300,20 @@ assert_contains "${metrics_networkpolicy_render}" 'cidr: 192.0.2.0/24'
 assert_contains "${metrics_networkpolicy_render}" 'port: 9090'
 assert_contains "${metrics_networkpolicy_render}" 'cidr: 198.51.100.0/24'
 assert_contains "${metrics_networkpolicy_render}" 'port: 4318'
+assert_contains "${metrics_networkpolicy_render}" 'app.kubernetes.io/instance: metrics-networkpolicy-test'
+assert_contains "${metrics_networkpolicy_render}" 'app.kubernetes.io/name: redis'
 assert_not_contains "${metrics_networkpolicy_render}" 'component: redis'
 assert_not_contains "${metrics_networkpolicy_render}" 'component: collector'
 
+external_redis_networkpolicy_render="$(
+    render_metrics_networkpolicy \
+        --set metrics.redis.url=redis://external-redis.example:6379/0
+)"
+assert_not_contains "${external_redis_networkpolicy_render}" 'app.kubernetes.io/name: redis'
+
 metrics_namespace_rbac_render="$(
     render_metrics_rbac \
-        --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
+        --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
 )"
 assert_contains "${metrics_namespace_rbac_render}" 'namespace: metrics-workloads'
 assert_not_contains "${metrics_namespace_rbac_render}" 'namespace: canfar-workloads'
@@ -314,7 +321,7 @@ assert_not_contains "${metrics_namespace_rbac_render}" 'namespace: canfar-worklo
 set +e
 invalid_queue_error="$(
     render_metrics_rbac \
-        --set-string 'metricsBackend.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq/a"]' \
+        --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq/a"]' \
         2>&1 >/dev/null
 )"
 invalid_queue_status=$?
@@ -325,27 +332,28 @@ if [[ ${invalid_queue_status} -eq 0 ]] || ! grep -Fq 'DNS-subdomain' <<<"${inval
 fi
 
 assert_metrics_render_fails \
-    "metricsBackend.env.METRICS_CACHE__BACKEND is obsolete and must be exactly redis" \
-    --set metricsBackend.env.METRICS_CACHE__BACKEND=memory
+    "metrics.env.METRICS_CACHE__BACKEND is obsolete and must be exactly redis" \
+    --set metrics.env.METRICS_CACHE__BACKEND=memory
 
 assert_metrics_render_fails \
-    "metricsBackend.redis.urlSecret.name is required" \
-    --set metricsBackend.redis.urlSecret.name=
-
-
-assert_metrics_render_fails \
-    "metricsBackend.redis.urlSecret.key is required" \
-    --set metricsBackend.redis.urlSecret.key=
-
+    "metrics.redis.url must start with redis:// or rediss://" \
+    --set metrics.redis.url=http://redis.example:6379/0
 
 assert_metrics_render_fails \
-    "metricsBackend.clusterName must be a real lower-case DNS cluster identity" \
-    --set metricsBackend.clusterName=UNKNOWN
+    "metrics.clusterName must be a real lower-case DNS cluster identity" \
+    --set metrics.clusterName=UNKNOWN
 
 assert_metrics_render_fails \
-    "metricsBackend.redis.urlSecret.name is required" \
-    --set metricsBackend.redis.urlSecret.name= \
-    --set metricsBackend.env.METRICS_REDIS_URL=redis://plaintext.example/0
+    "metricsBackend was renamed to metrics" \
+    --set metricsBackend.clusterName=prod-cluster
+
+bundled_redis_render="$(
+    render_metrics_deployment \
+        --namespace canfar \
+        --set metrics.env.METRICS_REDIS_URL=redis://plaintext.example/0
+)"
+assert_env_value "${bundled_redis_render}" "METRICS_REDIS_URL" "redis://metrics-deployment-test-redis-master.canfar.svc.cluster.local:6379/0"
+assert_not_contains "${bundled_redis_render}" 'plaintext.example'
 
 metrics_contract_render="$(
     helm template metrics-contract-test "${chart_dir}" \
@@ -356,7 +364,7 @@ metrics_contract_render="$(
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         --set deployment.skaha.serviceAccountName=shared-skaha \
-        --set metricsBackend.serviceAccount.name=ignored-metrics-identity
+        --set metrics.serviceAccount.name=ignored-metrics-identity
 )"
 if [[ $(grep -c -F 'serviceAccountName: shared-skaha' <<<"${metrics_contract_render}") -ne 2 ]]; then
     printf 'Expected both Skaha and Metrics to use serviceAccountName shared-skaha\n' >&2
@@ -404,24 +412,23 @@ metrics_env_render="$(
         --show-only templates/skaha-tomcat-deployment.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.platformName=chart-platform \
-        --set metricsBackend.redis.urlSecret.name=production-redis \
-        --set metricsBackend.redis.urlSecret.key=redis-url \
-        --set metricsBackend.env.METRICS_PLATFORM_NAME=env-platform \
-        --set metricsBackend.env.METRICS_OTEL__POD_UID=unsafe-pod-uid \
-        --set metricsBackend.env.METRICS_CACHE__BACKEND=redis \
-        --set metricsBackend.env.METRICS_REDIS_URL=unsafe-redis-url \
-        --set metricsBackend.env.METRICS_CACHE__KEY_SECRET=unsafe-cache-secret \
-        --set metricsBackend.env.METRICS_PROVIDERS__PROMQL__ENABLED=false \
-        --set metricsBackend.env.METRICS_PROVIDERS__PROMQL__BASE_URL=http://unsafe-prometheus \
-        --set metricsBackend.env.METRICS_OTEL__METRICS_ENABLED=false \
-        --set metricsBackend.env.METRICS_OTEL__TRACES_ENABLED=true \
-        --set metricsBackend.env.METRICS_OTEL__LOGS_ENABLED=true \
-        --set metricsBackend.env.METRICS_OTEL__EXPORTER_OTLP_ENDPOINT=http://unsafe-otel \
-        --set metricsBackend.prometheus.url=http://prometheus.metrics.svc:9090 \
-        --set metricsBackend.otlp.endpoint=http://otel-collector.observability.svc:4318 \
-        --set metricsBackend.env.METRICS_CUSTOM_Z=last \
-        --set metricsBackend.env.METRICS_CUSTOM_A=first
+        --set metrics.platformName=chart-platform \
+        --set metrics.redis.url=rediss://production-redis.example:6380/1 \
+        --set metrics.env.METRICS_PLATFORM_NAME=env-platform \
+        --set metrics.env.METRICS_OTEL__POD_UID=unsafe-pod-uid \
+        --set metrics.env.METRICS_CACHE__BACKEND=redis \
+        --set metrics.env.METRICS_REDIS_URL=unsafe-redis-url \
+        --set metrics.env.METRICS_CACHE__KEY_SECRET=unsafe-cache-secret \
+        --set metrics.env.METRICS_PROVIDERS__PROMQL__ENABLED=false \
+        --set metrics.env.METRICS_PROVIDERS__PROMQL__BASE_URL=http://unsafe-prometheus \
+        --set metrics.env.METRICS_OTEL__METRICS_ENABLED=false \
+        --set metrics.env.METRICS_OTEL__TRACES_ENABLED=true \
+        --set metrics.env.METRICS_OTEL__LOGS_ENABLED=true \
+        --set metrics.env.METRICS_OTEL__EXPORTER_OTLP_ENDPOINT=http://unsafe-otel \
+        --set metrics.prometheus.url=http://prometheus.metrics.svc:9090 \
+        --set metrics.otlp.endpoint=http://otel-collector.observability.svc:4318 \
+        --set metrics.env.METRICS_CUSTOM_Z=last \
+        --set metrics.env.METRICS_CUSTOM_A=first
 )"
 assert_single_env_name "${metrics_env_render}" "METRICS_PLATFORM_NAME"
 assert_single_env_name "${metrics_env_render}" "METRICS_CLUSTER_NAME"
@@ -429,8 +436,7 @@ assert_single_env_name "${metrics_env_render}" "METRICS_OTEL__POD_UID"
 assert_single_env_name "${metrics_env_render}" "METRICS_REDIS_URL"
 assert_single_env_name "${metrics_env_render}" "METRICS_CACHE__KEY_SECRET"
 assert_contains "${metrics_env_render}" 'fieldPath: metadata.uid'
-assert_contains "${metrics_env_render}" 'name: "production-redis"'
-assert_contains "${metrics_env_render}" 'key: "redis-url"'
+assert_env_value "${metrics_env_render}" "METRICS_REDIS_URL" "rediss://production-redis.example:6380/1"
 assert_contains "${metrics_env_render}" 'name: "metrics-env-test-skaha-metrics-cache"'
 assert_contains "${metrics_env_render}" 'key: "key-secret"'
 assert_contains "${metrics_env_render}" 'value: "env-platform"'
@@ -501,7 +507,7 @@ metrics_ingress_enabled="$(
         --show-only templates/skaha-ingress.yaml \
         "${metrics_required_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
-        --set metricsBackend.ingress.enabled=true
+        --set metrics.ingress.enabled=true
 )"
 assert_contains "${metrics_ingress_enabled}" "skaha-metrics-api-svc"
 assert_contains "${metrics_ingress_enabled}" "path: /apis/canfar.net/v1alpha1/metrics"

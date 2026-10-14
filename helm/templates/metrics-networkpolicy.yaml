@@ -1,4 +1,4 @@
-{{- $mb := .Values.metricsBackend | default dict }}
+{{- $mb := .Values.metrics | default dict }}
 {{- $networkPolicy := $mb.networkPolicy | default dict }}
 {{- $enabled := true }}
 {{- if hasKey $networkPolicy "enabled" }}
@@ -9,19 +9,19 @@
 {{- if hasKey $test "enabled" }}
 {{- $testEnabled = $test.enabled }}
 {{- end }}
-{{- $_ := include "skaha.metricsBackend.assertRequired" . }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
 {{- if $enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-networkpolicy") }}
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-networkpolicy") }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "skaha.metricsBackend.selectorLabels" . | nindent 6 }}
+      {{- include "skaha.metrics.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress
@@ -59,6 +59,17 @@ spec:
     {{- end }}
   egress:
     {{- $renderedEgress := false }}
+    {{- if not (trim (get ($mb.redis | default dict) "url" | default "" | toString)) }}
+    {{- $renderedEgress = true }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: redis
+      ports:
+        - port: 6379
+          protocol: TCP
+    {{- end }}
     {{- range $rules := ($networkPolicy.egress | default dict) }}
     {{- if $rules }}
     {{- $renderedEgress = true }}
