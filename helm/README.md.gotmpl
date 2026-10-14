@@ -132,11 +132,13 @@ If `metrics.rbac.enabled=false`, this chart will not create any Metrics RBAC. Th
 The co-deployed Metrics API is isolated by default. Configure
 `metrics.networkPolicy.ingress.skaha.ports` for the default caller; its
 selector is the Skaha Pod's exact `run: <release>-skaha-tomcat` label on port
-8000. DNS
-egress is explicitly allowed to CoreDNS, and egress to the release's bundled
-Redis on port 6379 is added while `metrics.redis.url` is empty. Kubernetes API,
-external Redis, optional Prometheus/Mimir, and optional metrics-only OTLP
-egress are empty by default and must be supplied as exact rules under
+8000. Egress to every Pod in the release namespace, including the bundled
+Redis, is always allowed. DNS egress is allowed on port 53 to any destination,
+because node-local DNS caches listen on a host link-local address (for example
+`169.254.25.10`) that namespace selectors and, on Cilium, `ipBlock` rules do
+not match. Kubernetes API, Redis outside the release namespace, optional
+Prometheus/Mimir, and optional metrics-only OTLP egress are empty by default
+and must be supplied as exact rules under
 `metrics.networkPolicy.egress`. Empty lists remain denied, and the chart
 never deploys or selects an OTLP dependency. Additional ingress rules
 may be appended under `metrics.networkPolicy.ingress.additional`.

@@ -301,7 +301,8 @@ assert_contains "${metrics_networkpolicy_render}" 'port: 9090'
 assert_contains "${metrics_networkpolicy_render}" 'cidr: 198.51.100.0/24'
 assert_contains "${metrics_networkpolicy_render}" 'port: 4318'
 assert_contains "${metrics_networkpolicy_render}" 'app.kubernetes.io/instance: metrics-networkpolicy-test'
-assert_contains "${metrics_networkpolicy_render}" 'app.kubernetes.io/name: redis'
+assert_contains "${metrics_networkpolicy_render}" 'podSelector: {}'
+assert_not_contains "${metrics_networkpolicy_render}" 'kubernetes.io/metadata.name: kube-system'
 assert_not_contains "${metrics_networkpolicy_render}" 'component: redis'
 assert_not_contains "${metrics_networkpolicy_render}" 'component: collector'
 
@@ -309,7 +310,7 @@ external_redis_networkpolicy_render="$(
     render_metrics_networkpolicy \
         --set metrics.redis.url=redis://external-redis.example:6379/0
 )"
-assert_not_contains "${external_redis_networkpolicy_render}" 'app.kubernetes.io/name: redis'
+assert_contains "${external_redis_networkpolicy_render}" 'podSelector: {}'
 
 metrics_namespace_rbac_render="$(
     render_metrics_rbac \
