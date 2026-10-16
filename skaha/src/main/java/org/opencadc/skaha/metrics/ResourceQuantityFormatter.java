@@ -23,7 +23,7 @@ public final class ResourceQuantityFormatter {
             return cores;
         }
         try {
-            final int coreValueWithoutUnit = Integer.parseInt(cores.substring(0, cores.length() - 1));
+            final long coreValueWithoutUnit = Long.parseLong(cores.substring(0, cores.length() - 1));
             final double coreValue = coreValueWithoutUnit / Math.pow(10, dividend);
             return String.format("%.3f", coreValue);
         } catch (NumberFormatException e) {
