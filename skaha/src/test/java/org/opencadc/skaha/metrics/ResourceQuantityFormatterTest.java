@@ -9,6 +9,7 @@ public class ResourceQuantityFormatterTest {
         Assert.assertEquals("Wrong core unit.", "1.367", ResourceQuantityFormatter.toCoreUnit("1367m"));
         Assert.assertEquals("Wrong core unit.", "0.233", ResourceQuantityFormatter.toCoreUnit("233m"));
         Assert.assertEquals("Wrong core unit.", "0.001", ResourceQuantityFormatter.toCoreUnit("900000n"));
+        Assert.assertEquals("Wrong core unit.", "3.000", ResourceQuantityFormatter.toCoreUnit("3000000001n"));
         Assert.assertEquals("Wrong core unit.", "2.34", ResourceQuantityFormatter.toCoreUnit("2.34"));
     }
 
