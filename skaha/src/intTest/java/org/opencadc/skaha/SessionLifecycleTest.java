@@ -91,7 +91,7 @@ public class SessionLifecycleTest {
     private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
 
     static {
-        Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
+        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
     protected final URL sessionURL;
