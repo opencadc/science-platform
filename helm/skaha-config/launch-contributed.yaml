@@ -29,8 +29,6 @@ spec:
           value: "${skaha.userid}"
         - name: skaha_sessionid
           value: "${skaha.sessionid}"
-        - name: skaha_sessionname
-          value: "${skaha.sessionname}"
         - name: HOME
           value: "${SKAHA_USER_HOME_DIR}"
         - name: PWD
