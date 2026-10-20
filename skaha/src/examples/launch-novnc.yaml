@@ -52,7 +52,7 @@ spec:
           name: novnc-port
         volumeMounts:
         - mountPath: "/cavern"
-          name: cavern-volume
+          name: user-storage-volume
           subPath: "cavern"
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
@@ -69,7 +69,7 @@ spec:
         - mountPath: /var/lib/sss/pipes
           name: sssd-dir
       volumes:
-      - name: cavern-volume
+      - name: user-storage-volume
         persistentVolumeClaim:
           claimName: cavern-ceph-claim
       - name: sssd-config-vol
