@@ -1,5 +1,46 @@
 # Changelog
 
+## [2.0.0](https://github.com/opencadc/science-platform/compare/1.5.0...2.0.0) (2026-10-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **helm:** chart values move from metricsBackend to metrics; a leftover metricsBackend key fails the render. metrics.redis.urlSecret is removed.
+
+### Features
+
+* **helm:** generate Metrics cache Secret once with uuidv4 ([68829eb](https://github.com/opencadc/science-platform/commit/68829ebdae5b833ffe962b367f9b860cf8b343f6))
+* **helm:** rename metricsBackend to metrics and share Skaha Redis ([6f63694](https://github.com/opencadc/science-platform/commit/6f636948f440811ade3e02c75d3e3ea6e571a623))
+* **helm:** require co-deployed metrics with skaha ([1f994f6](https://github.com/opencadc/science-platform/commit/1f994f64f10059bb9720c0b284a89722f02879fa))
+* **helm:** require co-deployed Metrics with Skaha ([8120cf6](https://github.com/opencadc/science-platform/commit/8120cf6cb198a873000a429de1e39ee9bca16ae6))
+* **skaha:** consume usage metrics and align Helm deployment ([ac50bec](https://github.com/opencadc/science-platform/commit/ac50bec09b3fb6e2bfdc9ff5897895feb1b0b363))
+* **skaha:** expose GPU capacity in platform stats ([7a4d83a](https://github.com/opencadc/science-platform/commit/7a4d83aea9bc761f1b79d449b2fba8689db5adcc))
+
+
+### Bug Fixes
+
+* added probes ([dc4a06a](https://github.com/opencadc/science-platform/commit/dc4a06ae040b96e1b305c540cab0c8d3e2ed18df))
+* docker fixes ([cb9dfcc](https://github.com/opencadc/science-platform/commit/cb9dfcc219555cf4a1b3f8240c27fac64a63d6cc))
+* ensure auth security id is passed to cavern for transfer ([50d1d01](https://github.com/opencadc/science-platform/commit/50d1d01a1fd092fbc0fad6248f958f1c15e78b20))
+* fix for shm in launch ([c23c5c8](https://github.com/opencadc/science-platform/commit/c23c5c85abac5b9742b80212ca55d1d3bdc31e40))
+* fix for shm in launch ([0754d2c](https://github.com/opencadc/science-platform/commit/0754d2cb217016db7e343add2c1975e92a36b7d6))
+* fix to remove metrics backend enabled flag ([a7f39b4](https://github.com/opencadc/science-platform/commit/a7f39b42fe3759fe2fd8a4a4e240b3f3abfe1d3c))
+* helm version ([2bfdb61](https://github.com/opencadc/science-platform/commit/2bfdb6121c86859417b3706e652918db29eadf2c))
+* **helm:** allow Metrics egress to its namespace and any DNS resolver ([53094d1](https://github.com/opencadc/science-platform/commit/53094d136f26c01d01cf21b3c4775a94d93e7da5))
+* **helm:** allow Metrics egress to its namespace and any DNS resolver ([a7afb90](https://github.com/opencadc/science-platform/commit/a7afb90d2ba092e741b188e0978275c02df647f0))
+* **helm:** preserve metrics cache key across Argo CD syncs ([89f97d2](https://github.com/opencadc/science-platform/commit/89f97d28088ebfaced700dca4908dc6868b85ce9))
+* remove call to all sessions ([26cb96f](https://github.com/opencadc/science-platform/commit/26cb96fa0ab17e14a96d3bf85a566aeff03ac43d))
+* remove swagger doc ([d9d3d10](https://github.com/opencadc/science-platform/commit/d9d3d10fb1cae1efd468f5908f09faf4003f0c45))
+* update integration tests ([1aafe32](https://github.com/opencadc/science-platform/commit/1aafe3294827428e71c12e8ac2f44470f332aab4))
+* update otel client ([6e2a25d](https://github.com/opencadc/science-platform/commit/6e2a25d47c57fa67ed54be9808c2c1d5903edd56))
+* use long to allow for greater size nanocore ([4fe59e7](https://github.com/opencadc/science-platform/commit/4fe59e7384a57b060116f741d78b184d87899052))
+
+
+### Reverts
+
+* remove Jupyter session title configuration ([af9ef47](https://github.com/opencadc/science-platform/commit/af9ef4762653c93386d7ba5257cadda429e34ce2))
+* remove Jupyter session title configuration ([7dd5c57](https://github.com/opencadc/science-platform/commit/7dd5c57f185e789c57e6ab0e6ce570ee71fe74f0))
+
 ## [1.5.0](https://github.com/opencadc/science-platform/compare/1.4.0...1.5.0) (2026-10-01)
 
 
