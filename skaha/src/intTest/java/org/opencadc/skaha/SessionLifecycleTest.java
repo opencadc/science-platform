@@ -91,7 +91,7 @@ public class SessionLifecycleTest {
     private static final Logger log = Logger.getLogger(SessionLifecycleTest.class);
 
     static {
-        Log4jInit.setLevel("org.opencadc.skaha", Level.INFO);
+        Log4jInit.setLevel("org.opencadc.skaha", Level.DEBUG);
     }
 
     protected final URL sessionURL;
@@ -100,8 +100,7 @@ public class SessionLifecycleTest {
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
         this.authenticatedUser = TestConfiguration.getCurrentUser();
-        this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+        this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
 
         this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
         log.info("sessions URL: " + sessionURL);

@@ -1,0 +1,54 @@
+{{- $mb := .Values.metrics | default dict }}
+{{- $test := $mb.test | default dict }}
+{{- $enabled := true }}
+{{- if hasKey $test "enabled" }}
+{{- $enabled = $test.enabled }}
+{{- end }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
+{{- if $enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "metrics-test") }}
+  labels:
+    {{- include "skaha.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics-test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  serviceAccountName: {{ include "skaha.serviceAccountName" . }}
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: wget
+      image: {{ $test.image | default "busybox:1.37.0" }}
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          url="http://{{ include "skaha.metrics.serviceName" . }}.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:8000/readyz"
+          max={{ $test.maxWaitSeconds | default 180 }}
+          i=0
+          while [ "$i" -lt "$max" ]; do
+            if wget -q -T 3 -O /dev/null "$url" 2>/dev/null; then
+              echo "Metrics readiness check ok"
+              exit 0
+            fi
+            i=$((i+1))
+            sleep 1
+          done
+          echo "Metrics readiness check failed after ${max}s" >&2
+          exit 1
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+  restartPolicy: Never
+{{- end }}

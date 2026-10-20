@@ -139,6 +139,7 @@ public class SessionUtil {
      * @return String session ID, never null.
      */
     static String createSession(final URL sessionURL, final String name, String image, String type) {
+        LOGGER.info("Creating session with name " + name + " and image " + image + " and type " + type);
         final Map<String, Object> params = new HashMap<>();
         params.put("name", name);
         params.put("image", image);

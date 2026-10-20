@@ -1,0 +1,88 @@
+{{- $mb := .Values.metrics | default dict }}
+{{- $mbRbac := default dict $mb.rbac }}
+{{- $rbacEnabled := true }}
+{{- if hasKey $mbRbac "enabled" }}
+{{- $rbacEnabled = $mbRbac.enabled }}
+{{- end }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
+{{- if $rbacEnabled }}
+{{- $_ := include "skaha.metrics.platformName" . }}
+{{- $queueConfig := include "skaha.metrics.clusterQueues" . | trim }}
+{{- $queues := fromJsonArray $queueConfig }}
+{{- $kueueNamespaceConfig := include "skaha.metrics.kueueNamespaces" . | trim }}
+{{- $kueueNamespaces := fromJsonArray $kueueNamespaceConfig }}
+{{/*
+  Kueue read ClusterRole / ClusterRoleBinding. Helm renders these before the
+  metrics Deployment and Service (Helm builtin kind install order applies RBAC
+  before typical workload kinds). Apply failures (for example forbidden cluster
+  RBAC) fail the release before those workload resources reconcile.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
+  labels:
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["clusterqueues"]
+    resourceNames:
+{{- range $queue := $queues }}
+      - {{ $queue | quote }}
+{{- end }}
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
+  labels:
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "skaha.metrics.clusterRoleName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "skaha.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- range $kueueNamespace := $kueueNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  namespace: {{ $kueueNamespace }}
+  labels:
+    {{- include "skaha.metrics.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["localqueues"]
+    verbs: ["list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+  namespace: {{ $kueueNamespace }}
+  labels:
+    {{- include "skaha.metrics.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" $ "suffix" "metrics-kueue-localqueue-read") }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "skaha.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}

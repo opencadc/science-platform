@@ -1,17 +1,27 @@
-{{- $mb := .Values.metricsBackend | default dict }}
+{{- $mb := .Values.metrics | default dict }}
 {{- $networkPolicy := $mb.networkPolicy | default dict }}
-{{- if and (default false $mb.enabled) (default true $networkPolicy.enabled) }}
+{{- $enabled := true }}
+{{- if hasKey $networkPolicy "enabled" }}
+{{- $enabled = $networkPolicy.enabled }}
+{{- end }}
+{{- $test := $mb.test | default dict }}
+{{- $testEnabled := true }}
+{{- if hasKey $test "enabled" }}
+{{- $testEnabled = $test.enabled }}
+{{- end }}
+{{- $_ := include "skaha.metrics.assertRequired" . }}
+{{- if $enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "skaha.metricsBackend.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-networkpolicy") }}
+  name: {{ include "skaha.metrics.nameWithSuffix" (dict "context" . "suffix" "skaha-metrics-api-networkpolicy") }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "skaha.metricsBackend.labels" . | nindent 4 }}
+    {{- include "skaha.metrics.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "skaha.metricsBackend.selectorLabels" . | nindent 6 }}
+      {{- include "skaha.metrics.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress
@@ -31,21 +41,28 @@ spec:
       ports:
         {{- toYaml $skahaPorts | nindent 8 }}
     {{- end }}
-    {{- if and (not $skahaPorts) (not $additionalIngress) }}
+    {{- if $testEnabled }}
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: metrics-test
+      ports:
+        - port: 8000
+          protocol: TCP
+    {{- end }}
+    {{- if and (not $skahaPorts) (not $additionalIngress) (not $testEnabled) }}
     []
     {{- end }}
     {{- with $additionalIngress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
   egress:
-    {{- $renderedEgress := false }}
+    - to:
+        - podSelector: {}
     {{- range $rules := ($networkPolicy.egress | default dict) }}
     {{- if $rules }}
-    {{- $renderedEgress = true }}
     {{- toYaml $rules | nindent 4 }}
     {{- end }}
-    {{- end }}
-    {{- if not $renderedEgress }}
-    []
     {{- end }}
 {{- end }}

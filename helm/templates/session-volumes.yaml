@@ -32,4 +32,8 @@ source (the map under a volume entry: persistentVolumeClaim, cephfs, nfs, csi, e
 {{ include "skaha.session.userStorageVolumeSpec" . }}
       - name: scratch-dir
         emptyDir: {}
+      - name: dshm-volume
+        emptyDir:
+          medium: Memory
+          sizeLimit: "${software.limits.ram}"
 {{- end }}

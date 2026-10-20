@@ -8,9 +8,9 @@ import org.apache.log4j.Logger;
  * Central data access for all Skaha metrics: platform stats from the Metrics backend and session pod usage (Kubernetes
  * metrics API or Metrics backend session API, selected via {@link PodUsageProvider#SKAHA_POD_METRICS_SOURCE}).
  *
- * <p>Platform Metrics is optional: when {@link PlatformMetricsDAO#SKAHA_METRICS_BACKEND_URL} is unset (Helm
- * {@code metricsBackend.enabled=false}), session listing and pod usage still work; {@link #getPlatformMetrics()} fails
- * closed so {@code view=stats} can return 503.
+ * <p>The Skaha Helm chart always co-deploys Metrics and injects {@link PlatformMetricsDAO#SKAHA_METRICS_BACKEND_URL}.
+ * When that variable is unset outside the chart, session listing and pod usage still work;
+ * {@link #getPlatformMetrics()} fails closed so {@code view=stats} can return 503.
  */
 public class MetricsDAO {
 

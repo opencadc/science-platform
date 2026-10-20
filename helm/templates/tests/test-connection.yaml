@@ -7,9 +7,21 @@ metadata:
   annotations:
     "helm.sh/hook": test
 spec:
+  serviceAccountName: {{ include "skaha.serviceAccountName" . }}
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: wget
       image: busybox:1.37.0
       command: ['wget']
-      args: ['{{ include "skaha.fullname" . }}:8080']
+      args: ['-q', '-T', '5', '-O', '/dev/null', 'http://{{ .Release.Name }}-skaha-tomcat-svc.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:{{ .Values.service.port | default 8080 }}']
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
   restartPolicy: Never
