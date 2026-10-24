@@ -74,7 +74,6 @@ import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import io.kubernetes.client.util.Yaml;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -97,6 +96,7 @@ import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
@@ -492,7 +492,6 @@ public class PostAction extends SessionAction {
         }
 
         final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
-        final String jobLaunchString = Yaml.dump(launch.job());
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -501,56 +500,27 @@ public class PostAction extends SessionAction {
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
 
-        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
-        // API is in place, we can swap this out with a proper Java client API.
-        final List<String> dependentResources = new ArrayList<>();
+        final List<String> ownedResourceYamls = new ArrayList<>();
         if (type.supportsService()) {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            dependentResources.add(SessionJobBuilder.labelService(serviceString, launch.labels()));
+            ownedResourceYamls.add(SessionJobBuilder.labelService(serviceString, launch.labels()));
         }
 
+        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
+        // API is in place, we can swap this out with a proper Java client API.
         if (type.supportsIngress()) {
             byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            dependentResources.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
+            ownedResourceYamls.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
         }
 
-        submitSession(jobLaunchString, jobName, dependentResources);
-    }
-
-    /**
-     * Create the session Job, then the resources it owns (Service, ingress). The session ID is only returned when every
-     * resource exists: if any step fails, the session's Job is deleted (owned resources go with it) and the request
-     * fails with 503.
-     *
-     * @param jobYaml The rendered Job.
-     * @param jobName The Job name.
-     * @param dependentYamls Rendered resources owned by the Job; {@code ${skaha.jobuid}} and {@code ${skaha.jobname}}
-     *     are filled from the created Job.
-     * @throws TransientException If the session could not be launched.
-     */
-    void submitSession(final String jobYaml, final String jobName, final List<String> dependentYamls) throws Exception {
-        try {
-            createKubernetesObject(jobYaml);
-            final KubernetesJob kubernetesJob = readJob(jobName);
-            for (final String dependentYaml : dependentYamls) {
-                String yaml = SessionJobBuilder.setConfigValue(
-                        dependentYaml, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-                yaml = SessionJobBuilder.setConfigValue(yaml, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-                createKubernetesObject(yaml);
-            }
-        } catch (Exception exception) {
-            log.error(
-                    "Launch of session " + this.sessionID + " (Job " + jobName + ") failed; deleting its Job.",
-                    exception);
-            deleteSessionJob();
-            throw new TransientException("Unable to launch session.  Please try again.");
-        }
+        new SessionLauncher(SkahaKubernetesClient.get())
+                .launch(ClientJavaJobBridge.toFabric8(launch.job()), ownedResourceYamls);
     }
 
     /**
@@ -571,19 +541,6 @@ public class PostAction extends SessionAction {
         }
     }
 
-    KubernetesJob readJob(final String jobName) throws Exception {
-        return SessionDAO.getJob(jobName);
-    }
-
-    /** Best-effort delete of this session's Job after a failed launch. The Job may not exist. */
-    void deleteSessionJob() {
-        try {
-            SessionDAO.deleteJob(this.sessionID, this.posixPrincipal.username);
-        } catch (Exception exception) {
-            log.error("Unable to delete Job for failed session launch " + this.sessionID, exception);
-        }
-    }
-
     private void injectPOSIXDetails() throws Exception {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
@@ -598,18 +555,16 @@ public class PostAction extends SessionAction {
     }
 
     /**
-     * Create a registry secret and return its name.
+     * Write the user's registry Secret and return its name.
      *
      * @param registryAuth The credentials to use to authenticate to the Image Registry.
      * @return String secret name, never null.
      */
     private String createRegistryImageSecret(final ImageRepositoryAuth registryAuth) throws Exception {
         final String username = this.posixPrincipal.username;
-        final String secretName = "registry-auth-" + username.toLowerCase();
-        log.debug("Creating user secret " + secretName);
-        CommandExecutioner.ensureRegistrySecret(registryAuth, secretName);
-
-        return secretName;
+        log.debug("Writing image pull secret for " + username);
+        RegistryPullSecret.apply(username, registryAuth);
+        return RegistryPullSecret.name(username);
     }
 
     private String getRegistryHost(final String imageID) {

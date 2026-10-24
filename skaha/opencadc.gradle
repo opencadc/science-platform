@@ -33,11 +33,44 @@ tasks.register('intTest', Test) {
     outputs.upToDateWhen { false }
 }
 
+// Launch and ingress session templates hold Helm directives. The session tests use them as the Skaha ConfigMap holds
+// them, rendered from the chart at test time, so they always match the chart. Needs helm.
+def skahaChart = file('../helm')
+def renderedSkahaConfig = layout.buildDirectory.file('session-templates/skaha-config.yaml')
+
+def helmDependencyBuild = tasks.register('helmDependencyBuild', Exec) {
+    // helm template needs the chart's Redis subchart; fetched once into helm/charts/.
+    onlyIf { !new File(skahaChart, 'charts').directory }
+    commandLine 'helm', 'dependency', 'build', skahaChart.path
+}
+
+def renderSessionTemplates = tasks.register('renderSessionTemplates', Exec) {
+    dependsOn helmDependencyBuild
+    inputs.files(fileTree(skahaChart) { exclude 'charts/**', 'tests/**' })
+    outputs.file(renderedSkahaConfig)
+    commandLine 'helm', 'template', 'session-templates', skahaChart.path,
+            '--show-only', 'templates/skaha-config-configmap.yaml',
+            '--set', 'metrics.clusterName=c',
+            '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["w"]',
+            '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq"]',
+            '--set', 'deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern'
+    doFirst {
+        final File output = renderedSkahaConfig.get().asFile
+        output.parentFile.mkdirs()
+        standardOutput = new FileOutputStream(output)
+    }
+    doLast {
+        standardOutput.close()
+    }
+}
+
 test {
     testLogging {
         events "PASSED", "FAILED", "SKIPPED"
         // "STARTED",
     }
+    dependsOn renderSessionTemplates
+    systemProperty 'skaha.sessionTemplates', renderedSkahaConfig.get().asFile.path
 }
 
 intTest {

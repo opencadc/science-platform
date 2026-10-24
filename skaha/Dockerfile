@@ -5,6 +5,8 @@
 FROM eclipse-temurin:21-alpine AS base
 
 FROM base AS builder
+# The session tests render the session templates from the chart.
+RUN apk add --no-cache helm
 COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon

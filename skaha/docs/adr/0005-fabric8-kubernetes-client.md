@@ -34,11 +34,14 @@ policy.
   The client is configured the standard Fabric8 way (`Config.autoConfigure`,
   `KUBERNETES_*` environment), and OkHttp's own connection pool is used. Skaha
   adds no client settings, Helm values or transport factory.
-- **No HTTP retries.** Fabric8's request retry is disabled, so a POST is never
-  resent blindly. Skaha owns retry policy per operation.
-- **Job create.** Bounded and retryable by Skaha: the Job name contains the
-  per-request random session ID, so a 409 means our own earlier attempt landed;
-  read it back and check `canfar.net/id`. The UID comes from the create
+- **No HTTP retries.** Fabric8's request retry is disabled for every request, so
+  a POST is never resent blindly. Skaha retries only where an operation needs
+  it; today that is the Job create.
+- **Job create.** Retried once by Skaha when the outcome is uncertain (no
+  response, 429, 5xx), after reading back whether it landed. The Job name
+  contains the per-request random session ID, so a 409 means our own earlier
+  attempt landed; read it back and check `canfar.net/id`. A definitive rejection
+  (other 4xx) is a server error, not a 503. The UID comes from the create
   response.
 - **Partial failure.** If any step fails after the Job exists, delete the Job
   (owner references cascade to its Service and IngressRoute) and return 503.
@@ -46,6 +49,10 @@ policy.
 - **Caching.** Session reads come from per-replica Job and Pod informers. A read
   that misses right after a create falls back to a direct GET. The max-sessions
   admission check stays a live LIST.
+- **Secrets.** The image pull Secret is written with server-side apply, which
+  needs `patch` on Secrets. The callback signing Secret is created only if
+  absent and read once per replica; after an operator replaces it, restart
+  Skaha.
 - **Preserved.** Operator templates and custom fields (Traefik generic
   resources), Session labels and selectors, the callback signing Secret format,
   and `MetricsDAO` as the single metrics seam with its failure policies.
@@ -57,10 +64,10 @@ One PR per phase, each behind its own sub-task of CADC-15897:
 | Phase | Change |
 | --- | --- |
 | 1 | This ADR; managed Fabric8 client; LocalQueue check on Fabric8 |
-| 2 | Launch reliability fixes on the current `kubectl` path |
+| 2 | Launch reliability fixes on the current `kubectl` path; session events through Fabric8 |
 | 3 | Parent session launch and Secrets through Fabric8 |
 | 4 | Desktop-app attach; session Jobs built from Fabric8 models |
-| 5 | Renew, events and logs through Fabric8; `kubectl` removed from code and image |
+| 5 | Renew, pod lookup and logs through Fabric8; `kubectl` removed from code and image |
 | 6 | client-java removed; informer-cached session reads |
 
 A migrated operation never falls back to `kubectl`. There is no runtime
@@ -72,7 +79,9 @@ client-selection flag.
 - Phase 5 removes `kubectl`, `docker-ce` and `containerd` from the image.
 - Phase 6 supersedes the client-java detail in ADR-0001; the `MetricsDAO`
   contract is unchanged.
-- Informers need `watch` on jobs and pods (Phase 6 RBAC change).
+- Informers need `watch` on jobs and pods (Phase 6 RBAC change); server-side
+  apply of the image pull Secret needs `patch` on Secrets (Phase 3). Sites with
+  externally managed RBAC must add both.
 - Fabric8 does not provide cross-resource transactions; the delete-on-failure
   rule is Skaha's responsibility.
 
