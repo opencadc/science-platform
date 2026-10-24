@@ -169,7 +169,20 @@ Metrics is now required and its values live under `metrics` (the former `metrics
 
 ## Skaha workload permissions
 
-With `rbac.create=true` the chart's Role grants Skaha what it needs in the workload namespace. Sites that manage that Role themselves must grant `patch` on `secrets`: image pull Secrets for private images are written with server-side apply, and without `patch` every private-image launch fails with 503.
+With `rbac.create=true` the chart's Role grants Skaha exactly what it uses in the workload namespace. Sites that manage that Role themselves need:
+
+| Resources | Verbs | Used for |
+| --- | --- | --- |
+| `batch` `jobs` | create, get, list, patch, delete, deletecollection | Launch, read-back, list, renew, delete |
+| `pods` | get, list | Events, logs, desktop-app target IP |
+| `pods/log` | get | Session logs |
+| `events`, `limitranges` | get, list | Session events, session resource ceilings |
+| `services` | create | Session Services |
+| `secrets` | create, get, patch | Image pull Secrets (server-side apply) and the callback signing Secret |
+| `traefik.io` `ingressroutes`, `middlewares` | create | Session ingress |
+| `metrics.k8s.io` `pods` | get, list | Session usage |
+
+Without `patch` on `secrets`, every private-image launch fails with 503. Services and Traefik resources are removed with their Job by owner reference, so Skaha does not delete them itself.
 
 The callback signing Secret `pre-auth-token-skaha` is read once by each Skaha replica. After replacing it, restart Skaha.
 

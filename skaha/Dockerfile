@@ -15,16 +15,5 @@ FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.32
 
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
 
-RUN set -eux \
-    && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core \
-    && dnf -y config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo \
-    && dnf -y install --nodocs --assumeyes --setopt=install_weak_deps=False \
-        containerd.io \
-        docker-ce \
-        docker-ce-cli \
-        kubernetes-client \
-    # Clean up dnf cache and other unneeded files to reduce image size
-    && dnf clean all
-
 COPY --from=otel-javaagent /javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
 COPY --from=builder /src/skaha/build/libs/skaha.war /usr/share/tomcat/webapps/

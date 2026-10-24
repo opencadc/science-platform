@@ -8,30 +8,39 @@ metadata:
   name: {{ $roleName }}
   namespace: {{ include "skaha.workloadNamespace" $ }}
 rules:
+# Skaha's own calls; the Metrics API shares this ServiceAccount and reads Jobs and Pods.
 - apiGroups: [""]
   resources: ["events", "limitranges"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list"]
 
+# Session Jobs: launch (create, read-back, delete on failure), list, renew (patch) and delete.
 - apiGroups: ["batch"]
   resources: ["jobs"]
   verbs: ["create", "deletecollection", "delete", "get", "list", "patch"]
 
+# Session Pods: events, logs and the desktop-app target IP.
 - apiGroups: [""]
-  resources: ["pods", "services"]
-  verbs: ["create", "deletecollection", "delete", "get", "list"]
-
-# patch: image pull Secrets are written with server-side apply.
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["create", "deletecollection", "delete", "get", "list", "patch"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
 
 - apiGroups: [""]
   resources: ["pods/log"]
-  verbs: ["get", "list"]
+  verbs: ["get"]
 
+# Session Services, created with their Job and deleted with it by owner reference.
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["create"]
+
+# Image pull Secrets (server-side apply) and the callback signing Secret (create if absent).
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "patch"]
+
+# Session ingress, created with its Job and deleted with it by owner reference.
 - apiGroups: ["traefik.io"]
   resources: ["ingressroutes", "middlewares"]
-  verbs: ["create", "deletecollection", "delete", "get", "list"]
+  verbs: ["create"]
 
 - apiGroups: ["metrics.k8s.io"]
   resources: ["pods"]
