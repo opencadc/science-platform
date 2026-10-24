@@ -51,7 +51,9 @@ final class SessionFixtures {
                     PostAction.SOFTWARE_CONTAINERPARAM, "terminal",
                     PostAction.SKAHA_JOBUID, "parent-uid"));
         }
-        return SessionJobBuilder.fromPath(template("launch-" + kind + ".yaml")).withParameters(parameters);
+        return SessionJobBuilder.fromPath(template("launch-" + kind + ".yaml"))
+                .withParameters(parameters)
+                .withImage(image(kind));
     }
 
     /** The Service and ingress a session of this kind owns, rendered as PostAction renders them. */
@@ -76,7 +78,7 @@ final class SessionFixtures {
         return owned;
     }
 
-    /** The parameters PostAction supplies when launching a session. */
+    /** The trusted parameters PostAction supplies when launching a session; request values are set separately. */
     static Map<String, String> parameters(final String kind) {
         final Map<String, String> parameters = new HashMap<>();
         parameters.put(PostAction.SKAHA_SESSIONID, SESSION_ID);
@@ -90,15 +92,12 @@ final class SessionFixtures {
         parameters.put(PostAction.SKAHA_SESSIONTYPE, kind);
         parameters.put(PostAction.SKAHA_SUPPLEMENTALGROUPS, "30001,30002");
         parameters.put(PostAction.SKAHA_SESSIONURLPATH, "/session/carta/" + SESSION_ID);
-        parameters.put(PostAction.SOFTWARE_IMAGEID, image(kind));
         parameters.put(PostAction.SOFTWARE_HOSTNAME, "analysis");
         parameters.put(PostAction.SOFTWARE_REQUESTS_CORES, "1.0");
         parameters.put(PostAction.SOFTWARE_LIMITS_CORES, "2.0");
         parameters.put(PostAction.SOFTWARE_REQUESTS_RAM, "4.0Gi");
         parameters.put(PostAction.SOFTWARE_LIMITS_RAM, "8.0Gi");
         parameters.put(PostAction.SOFTWARE_THREAD_COUNT, "1");
-        parameters.put(PostAction.HEADLESS_PRIORITY, "");
-        parameters.put(PostAction.HEADLESS_IMAGE_BUNDLE, "image: \"" + image(kind) + "\"\n        env:");
         parameters.put(PostAction.SKAHA_USER_HOME_DIR, "/cavern/home/alice");
         parameters.put(PostAction.SKAHA_TOP_LEVEL_DIR, "/cavern");
         parameters.put(PostAction.SKAHA_PROJECTS_DIR, "/cavern/projects");

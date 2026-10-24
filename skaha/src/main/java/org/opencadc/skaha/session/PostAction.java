@@ -69,12 +69,10 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.net.ResourceNotFoundException;
-import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import java.io.IOException;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -94,7 +92,6 @@ import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
@@ -430,8 +427,6 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
-        final String headlessPriority = getHeadlessPriority();
-        final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String owner = getUsername();
@@ -453,10 +448,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
-                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
+                .withImage(image)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
-                .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
-                .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
                         userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
@@ -473,7 +466,11 @@ public class PostAction extends SessionAction {
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
-        if (type == SessionType.DESKTOP) {
+        if (type.isHeadless()) {
+            sessionJobBuilder = sessionJobBuilder
+                    .withHeadlessCommand(SessionJobBuilder.HeadlessCommand.fromRequest(cmd, args, envs))
+                    .withPriorityClass(getHeadlessPriorityClass());
+        } else if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         } else if (type == SessionType.CARTA) {
             final String connectURLPrefix = SessionURLBuilder.cartaSession(
@@ -519,26 +516,7 @@ public class PostAction extends SessionAction {
             ownedResourceYamls.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
         }
 
-        new SessionLauncher(SkahaKubernetesClient.get())
-                .launch(ClientJavaJobBridge.toFabric8(launch.job()), ownedResourceYamls);
-    }
-
-    /**
-     * Create the resources in the given YAML in the workload namespace.
-     *
-     * @throws IOException If kubectl reports an error.
-     */
-    void createKubernetesObject(final String yaml) throws IOException, InterruptedException {
-        final String stagedFile = super.stageFile(yaml);
-        try {
-            final KubectlCommandBuilder.KubectlCommand createCommand = KubectlCommandBuilder.command("create")
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .option("-f", stagedFile);
-            final String createResult = CommandExecutioner.execute(createCommand.build(), false);
-            log.debug("Create result: " + createResult);
-        } finally {
-            Files.deleteIfExists(Paths.get(stagedFile));
-        }
+        new SessionLauncher(SkahaKubernetesClient.get()).launch(launch.job(), ownedResourceYamls);
     }
 
     private void injectPOSIXDetails() throws Exception {
@@ -590,38 +568,7 @@ public class PostAction extends SessionAction {
      * @throws Exception For any unexpected errors.
      */
     public void attachDesktopApp(String image, ResourceSpecification resourceSpecification) throws Exception {
-        // Get the IP address based on the session
-        KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
-                .pod()
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .selector(SessionLabels.forSession(posixPrincipal.username, sessionID))
-                .noHeaders()
-                .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,"
-                        + "TYPE:.metadata.labels." + SessionLabels.sessionKindJsonPath()
-                        + ",NAME:.metadata.name");
-
-        String ipResult = CommandExecutioner.execute(getIPCommand.build());
-
-        log.debug("GET IP result: " + ipResult);
-
-        String targetIP = null;
-        String[] ipLines = ipResult.split("\n");
-        for (final String ipLine : ipLines) {
-            log.debug("ipLine: " + ipLine);
-            String[] parts = ipLine.split("\\s+");
-            if (log.isDebugEnabled()) {
-                for (final String part : parts) {
-                    log.debug("part: " + part);
-                }
-            }
-            if (parts.length > 1 && parts[1].trim().equals(NONE) && SESSION_TYPE_DESKTOP.equals(parts[2])) {
-                targetIP = parts[0].trim();
-            }
-        }
-
-        if (targetIP == null) {
-            throw new ResourceNotFoundException("session " + sessionID + " not found");
-        }
+        final String targetIP = SessionPods.desktopIP(posixPrincipal.username, sessionID);
 
         log.debug("attaching desktop app: " + image + " to " + targetIP);
 
@@ -653,8 +600,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
-        final KubernetesJob ownerKubernetesJob = SessionDAO.getJob(ownerJobName);
+        final Job ownerJob = SessionDAO.desktopJob(this.sessionID, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String supplementalGroups = getSupplementalGroupsList();
         final String owner = getUsername();
@@ -662,6 +608,7 @@ public class PostAction extends SessionAction {
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
+                .withImage(image)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -670,7 +617,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
-                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                 .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
@@ -692,29 +638,14 @@ public class PostAction extends SessionAction {
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
-                .withParameter(PostAction.SKAHA_JOBUID, ownerKubernetesJob.getUID())
-                .withParameter(PostAction.SKAHA_JOBNAME, ownerKubernetesJob.getName());
+                .withParameter(PostAction.SKAHA_JOBUID, ownerJob.getMetadata().getUid())
+                .withParameter(PostAction.SKAHA_JOBNAME, ownerJob.getMetadata().getName());
 
-        try {
-            createKubernetesObject(sessionJobBuilder.build());
-        } catch (IOException ioException) {
-            log.error(
-                    "Launch of desktop app " + this.appID + " in session " + this.sessionID + " failed.", ioException);
-            deleteDesktopAppJob();
-            throw new TransientException("Unable to launch desktop app.  Please try again.");
-        }
+        new SessionLauncher(SkahaKubernetesClient.get())
+                .launch(sessionJobBuilder.buildLaunch().job(), List.of());
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);
-    }
-
-    /** Best-effort delete of this desktop app's Job after a failed launch. The Job may not exist. */
-    void deleteDesktopAppJob() {
-        try {
-            SessionDAO.deleteDesktopApplicationJob(this.sessionID, this.posixPrincipal.username, this.appID);
-        } catch (Exception exception) {
-            log.error("Unable to delete Job for failed desktop app launch " + this.appID, exception);
-        }
     }
 
     @Override
@@ -738,58 +669,16 @@ public class PostAction extends SessionAction {
                 .toGIDs(groupCredentials.stream().map(Group::getID).collect(Collectors.toList()));
     }
 
-    /**
-     * Create the image, command, args, and env sections of the job launch yaml. Example:
-     *
-     * <p>image: "${software.imageid}" command: ["/skaha-system/start-desktop-software.sh"] args: [arg1, arg2] env: -
-     * name: HOME value: "/cavern/home/${skaha.userid}" - name: SHELL value: "/bin/bash"
-     */
-    private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("image: \"").append(image).append("\"");
-        if (cmd != null) {
-            sb.append("\n        command: [\"").append(cmd).append("\"]");
-        }
-        if (args != null) {
-            String[] argList = args.split(" ");
-            if (argList.length > 0) {
-                sb.append("\n        args: [");
-                for (String arg : argList) {
-                    sb.append("\"").append(arg).append("\", ");
-                }
-                sb.setLength(sb.length() - 2);
-                sb.append("]");
-            }
-        }
-        sb.append("\n        env:");
-        if (envs != null && !envs.isEmpty()) {
-            for (String env : envs) {
-                String[] keyVal = env.split("=");
-                if (keyVal.length == 2) {
-                    sb.append("\n        - name: ").append(keyVal[0]);
-                    sb.append("\n          value: \"").append(keyVal[1]).append("\"");
-                } else {
-                    log.debug("invalid key/value env var: " + env);
-                }
-            }
-        }
-
-        return sb.toString();
-    }
-
-    private String getHeadlessPriority() {
+    /** The PriorityClass for this user's headless sessions, or null for the default. */
+    private String getHeadlessPriorityClass() {
         if (skahaPriorityHeadlessGroup == null) {
-            return "";
+            return null;
         }
         if (skahaHeadlessPriorityClass == null) {
             log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
-            return "";
+            return null;
         }
-        if (priorityHeadlessUser) {
-            return "priorityClassName: " + skahaHeadlessPriorityClass;
-        } else {
-            return "";
-        }
+        return priorityHeadlessUser ? skahaHeadlessPriorityClass : null;
     }
 
     /** DTO for resource specification parameters. */

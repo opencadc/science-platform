@@ -25,7 +25,7 @@ import org.opencadc.skaha.KubernetesApi;
 
 /**
  * One session's life, per kind, through the real modules against a mock Kubernetes API: launch from the chart's
- * templates, events, desktop-app launch.
+ * templates, events, desktop-app attach.
  */
 @RunWith(Parameterized.class)
 public class SessionLifecycleTest {
@@ -61,13 +61,10 @@ public class SessionLifecycleTest {
         final String kind = this.type.name().toLowerCase();
 
         // Launch: the Job, then the Service and Traefik resources it owns.
-        final SessionJobBuilder builder = SessionFixtures.builder(kind);
-        ClientJavaJobBridgeTest.assertParity(builder);
-        final SessionJobBuilder.LaunchArtifacts launch = builder.buildLaunch();
+        final SessionJobBuilder.LaunchArtifacts launch =
+                SessionFixtures.builder(kind).buildLaunch();
         final Job launched = new SessionLauncher(client)
-                .launch(
-                        ClientJavaJobBridge.toFabric8(launch.job()),
-                        SessionFixtures.ownedResources(this.type, launch.labels()));
+                .launch(launch.job(), SessionFixtures.ownedResources(this.type, launch.labels()));
         final Job job = client.batch()
                 .v1()
                 .jobs()
@@ -106,6 +103,9 @@ public class SessionLifecycleTest {
                         .withLabels(job.getSpec().getTemplate().getMetadata().getLabels())
                         .endMetadata()
                         .withSpec(job.getSpec().getTemplate().getSpec())
+                        .withNewStatus()
+                        .withPodIP("10.0.0.5")
+                        .endStatus()
                         .build())
                 .create();
         expectEvents(launched.getMetadata().getName(), "Normal", "SuccessfulCreate", "Created pod: " + podName);
@@ -120,15 +120,16 @@ public class SessionLifecycleTest {
         assertKubectlColumns();
 
         if (this.type == SessionType.DESKTOP) {
-            // A desktop app is owned by the desktop's Job.
+            // Attach a desktop app to the running desktop; it is owned by the desktop's Job.
+            Assert.assertEquals("10.0.0.5", SessionPods.desktopIP(USER, SESSION_ID));
             final Job app = new SessionLauncher(client)
                     .launch(
-                            ClientJavaJobBridge.toFabric8(SessionFixtures.builder("desktop-app")
+                            SessionFixtures.builder("desktop-app")
                                     .withParameter(
                                             PostAction.SKAHA_JOBUID,
                                             launched.getMetadata().getUid())
                                     .buildLaunch()
-                                    .job()),
+                                    .job(),
                             List.of());
             Assert.assertEquals(
                     launched.getMetadata().getUid(),

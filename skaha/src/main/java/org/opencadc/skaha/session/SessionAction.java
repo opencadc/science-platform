@@ -70,15 +70,10 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
@@ -146,24 +141,12 @@ public abstract class SessionAction extends SkahaAction {
             name = name.replaceAll(":", "-");
             name = name.replaceAll("\\.", "-");
             name = name.replaceAll("_", "-");
-            return name.toLowerCase();
+            // The name becomes part of Kubernetes object names and labels.
+            return name.toLowerCase().replaceAll("[^a-z0-9-]", "-");
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
             return "unknown";
         }
-    }
-
-    protected String stageFile(String data) throws IOException {
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
-        return tmpFileName;
     }
 
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {

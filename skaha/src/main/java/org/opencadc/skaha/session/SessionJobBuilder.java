@@ -1,9 +1,23 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.*;
-import io.kubernetes.client.util.Yaml;
+import io.fabric8.kubernetes.api.model.Affinity;
+import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.EnvVar;
+import io.fabric8.kubernetes.api.model.LocalObjectReference;
+import io.fabric8.kubernetes.api.model.NodeAffinity;
+import io.fabric8.kubernetes.api.model.NodeSelector;
+import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
+import io.fabric8.kubernetes.api.model.NodeSelectorTerm;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.PodSpec;
+import io.fabric8.kubernetes.api.model.PodTemplateSpec;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.ResourceRequirements;
+import io.fabric8.kubernetes.api.model.Service;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
+import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,17 +30,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.stream.Stream;
 import org.apache.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 import org.opencadc.skaha.K8SUtil;
 
-/** Class to interface with Kubernetes. */
+/**
+ * Builds a session Job from an operator template.
+ *
+ * <p>Template placeholders ({@code ${key}}) are filled with trusted values only. Values a user controls (the image, a
+ * headless command, its arguments and environment) are set on the parsed Job as typed fields, so they cannot change the
+ * YAML structure.
+ */
 public class SessionJobBuilder {
     private static final Logger LOGGER = Logger.getLogger(SessionJobBuilder.class);
 
-    record LaunchArtifacts(V1Job job, SessionLabelPlan labels) {}
+    // Stands in for the image while the template is parsed; replaced on every container that uses it.
+    static final String IMAGE_PLACEHOLDER = "skaha-session-image";
 
-    /** Configuration for the queue to use. */
+    record LaunchArtifacts(Job job, SessionLabelPlan labels) {}
+
     private final Map<String, String> parameters = new HashMap<>();
 
     private final Path jobFilePath;
@@ -36,6 +59,37 @@ public class SessionJobBuilder {
     private int gpuCount = 0;
     private QueueConfiguration queueConfiguration;
     private String imageRegistrySecretName;
+    private String image;
+    private String priorityClassName;
+    private HeadlessCommand headlessCommand;
+
+    /**
+     * A headless session's command line, from the request.
+     *
+     * @param command The executable, or null to use the image's entrypoint.
+     * @param args Arguments, possibly empty.
+     * @param env Environment variables in request order, possibly empty.
+     */
+    record HeadlessCommand(String command, List<String> args, List<EnvVar> env) {
+        /**
+         * Parse the request parameters: {@code args} split on single spaces, as before, and each {@code env} entry
+         * split on its first {@code =}. Entries without a name are ignored.
+         */
+        static HeadlessCommand fromRequest(final String command, final String args, final List<String> envs) {
+            final List<String> argList =
+                    args == null ? List.of() : Stream.of(args.split(" ")).toList();
+            final List<EnvVar> envList = new ArrayList<>();
+            for (final String env : Objects.requireNonNullElse(envs, List.<String>of())) {
+                final int separator = env.indexOf('=');
+                if (separator > 0) {
+                    envList.add(new EnvVar(env.substring(0, separator), env.substring(separator + 1), null));
+                } else {
+                    LOGGER.debug("invalid key/value env var: " + env);
+                }
+            }
+            return new HeadlessCommand(command, argList, envList);
+        }
+    }
 
     private SessionJobBuilder(final Path jobFilePath) {
         this.jobFilePath = jobFilePath;
@@ -51,25 +105,14 @@ public class SessionJobBuilder {
         return new SessionJobBuilder(jobFilePath);
     }
 
-    /** Obtain a mutable Job metadata label map attached to the Job. */
-    @NotNull private static Map<String, String> getOrCreateJobLabels(V1Job job) {
-        final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
-        final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(jobMetadata.getLabels(), Map.of()));
-        jobMetadata.setLabels(labels);
-        job.setMetadata(jobMetadata);
-
-        return labels;
-    }
-
-    private static V1NodeSelectorRequirement getV1NodeSelectorRequirement(
-            List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
+    private static NodeSelectorRequirement getNodeSelectorRequirement(
+            final List<NodeSelectorTerm> gpuRequiredNodeSelectorTerms) {
         if (gpuRequiredNodeSelectorTerms.size() != 1) {
             throw new IllegalStateException("GPU Node Selector cannot exceed one selector.");
         }
 
-        final V1NodeSelectorTerm gpuNodeSelectorTerm = gpuRequiredNodeSelectorTerms.get(0);
-        final List<V1NodeSelectorRequirement> gpuNodeSelectorMatchExpressions =
-                gpuNodeSelectorTerm.getMatchExpressions();
+        final List<NodeSelectorRequirement> gpuNodeSelectorMatchExpressions =
+                gpuRequiredNodeSelectorTerms.get(0).getMatchExpressions();
 
         if (gpuNodeSelectorMatchExpressions == null) {
             throw new IllegalStateException("Preset GPU Node Selector match expressions are missing.");
@@ -84,11 +127,12 @@ public class SessionJobBuilder {
     static String setConfigValue(String doc, String key, String value) {
         String regKey = key.replace(".", "\\.");
         String regex = "\\$[{]" + regKey + "[}]";
-        return doc.replaceAll(regex, value);
+        return doc.replaceAll(regex, Matcher.quoteReplacement(value));
     }
 
     /**
-     * Pass parameters to be replaced in the job file.
+     * Pass parameters to be replaced in the job file. Only trusted values belong here; see {@link #withImage(String)}
+     * and {@link #withHeadlessCommand(HeadlessCommand)} for request values.
      *
      * @param parameters Map of parameter String key to String values to replace.
      * @return This SessionJobBuilder, never null.
@@ -155,40 +199,61 @@ public class SessionJobBuilder {
     }
 
     /**
-     * Construct the Job YAML output of this builder.
+     * The session image, set on every container whose template image is {@code ${software.imageid}}.
      *
-     * @return String of Job YAML, never null.
-     * @throws IOException If the provided Path cannot be read.
+     * @param image The image ID from the request.
+     * @return This SessionJobBuilder, never null.
      */
-    String build() throws IOException {
-        return Yaml.dump(buildLaunch().job());
+    SessionJobBuilder withImage(final String image) {
+        this.image = image;
+        return this;
+    }
+
+    /**
+     * The Pod priority class. Replaces the headless template's {@code ${headless.priority}} slot.
+     *
+     * @param priorityClassName The PriorityClass name, or null for none.
+     * @return This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withPriorityClass(final String priorityClassName) {
+        this.priorityClassName = priorityClassName;
+        return this;
+    }
+
+    /**
+     * The headless command line. Replaces the headless template's {@code ${headless.image.bundle}} slot.
+     *
+     * @param headlessCommand The command, arguments and environment from the request.
+     * @return This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withHeadlessCommand(final HeadlessCommand headlessCommand) {
+        this.headlessCommand = headlessCommand;
+        return this;
     }
 
     /** Build launch artifacts from the rendered template. */
     LaunchArtifacts buildLaunch() throws IOException {
-        final byte[] jobFileBytes = Files.readAllBytes(jobFilePath);
-        String jobFileString = new String(jobFileBytes, StandardCharsets.UTF_8);
+        String jobFileString = Files.readString(jobFilePath, StandardCharsets.UTF_8);
+        // Request values are set as typed fields after parsing; the template text only ever gets fixed stand-ins,
+        // substituted first so no parameter can supply them.
+        jobFileString = setConfigValue(jobFileString, PostAction.SOFTWARE_IMAGEID, IMAGE_PLACEHOLDER);
+        jobFileString = setConfigValue(
+                jobFileString, PostAction.HEADLESS_IMAGE_BUNDLE, "image: \"" + IMAGE_PLACEHOLDER + "\"\n        env:");
+        jobFileString = setConfigValue(jobFileString, PostAction.HEADLESS_PRIORITY, "");
         for (final Map.Entry<String, String> entry : this.parameters.entrySet()) {
             jobFileString = SessionJobBuilder.setConfigValue(jobFileString, entry.getKey(), entry.getValue());
         }
 
-        return buildLaunch(jobFileString);
+        return buildLaunch(Serialization.unmarshal(jobFileString, Job.class));
     }
 
-    static String labelService(final String serviceString, final SessionLabelPlan plan) throws IOException {
+    static String labelService(final String serviceString, final SessionLabelPlan plan) {
         final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
-        final V1Service service = (V1Service) Yaml.load(serviceString);
-        final V1ObjectMeta metadata = Objects.requireNonNullElse(service.getMetadata(), new V1ObjectMeta());
-        final Map<String, String> labels = new HashMap<>(Objects.requireNonNullElse(metadata.getLabels(), Map.of()));
-        labels.putAll(labelPlan.serviceMetadataLabels());
-        metadata.setLabels(labels);
-        service.setMetadata(metadata);
+        final Service service = Serialization.unmarshal(serviceString, Service.class);
+        service.getMetadata().getLabels().putAll(labelPlan.serviceMetadataLabels());
+        service.getSpec().setSelector(labelPlan.serviceSelector());
 
-        final V1ServiceSpec spec = Objects.requireNonNullElse(service.getSpec(), new V1ServiceSpec());
-        spec.setSelector(labelPlan.serviceSelector());
-        service.setSpec(spec);
-
-        return Yaml.dump(service);
+        return Serialization.asYaml(service);
     }
 
     static String labelIngress(final String ingressString, final SessionLabelPlan plan) {
@@ -206,20 +271,22 @@ public class SessionJobBuilder {
         return yaml.dumpAll(documents.iterator());
     }
 
-    /** Build and mutate launch artifacts from a rendered YAML template. */
-    private LaunchArtifacts buildLaunch(final String jobFileString) throws IOException {
-        final V1Job launchJob = (V1Job) Yaml.load(jobFileString);
+    /** Build and mutate launch artifacts from a parsed template. */
+    private LaunchArtifacts buildLaunch(final Job launchJob) {
         final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
         applyJobLabels(launchJob, labelPlan);
         mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
+        applyImage(launchJob);
+        applyPriorityClass(launchJob);
+        applyHeadlessCommand(launchJob);
 
         return new LaunchArtifacts(launchJob, labelPlan);
     }
 
     /** Build the canonical label plan for this launch. */
-    private SessionLabelPlan buildLabelPlan(final V1Job launchJob) {
+    private SessionLabelPlan buildLabelPlan(final Job launchJob) {
         final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
         labelValues.put(SessionLabels.Key.ID, requireParam(PostAction.SKAHA_SESSIONID));
         labelValues.put(SessionLabels.Key.USERNAME, requireParam(PostAction.SKAHA_USERID));
@@ -244,20 +311,14 @@ public class SessionJobBuilder {
     }
 
     /** Attach job labels to the Job metadata and pod template metadata. */
-    private void applyJobLabels(final V1Job launchJob, final SessionLabelPlan plan) {
-        final Map<String, String> labels = plan.jobLabels();
-        SessionJobBuilder.getOrCreateJobLabels(launchJob).putAll(labels);
-        final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
-        final V1PodTemplateSpec podTemplate =
-                Objects.requireNonNullElse(jobSpec.getTemplate(), new V1PodTemplateSpec());
-        final V1ObjectMeta podMetadata = Objects.requireNonNullElse(podTemplate.getMetadata(), new V1ObjectMeta());
-        final Map<String, String> podLabels =
-                new HashMap<>(Objects.requireNonNullElse(podMetadata.getLabels(), Map.of()));
-        podLabels.putAll(labels);
-        podMetadata.setLabels(podLabels);
-        podTemplate.setMetadata(podMetadata);
-        jobSpec.setTemplate(podTemplate);
-        launchJob.setSpec(jobSpec);
+    private void applyJobLabels(final Job launchJob, final SessionLabelPlan plan) {
+        launchJob.getMetadata().getLabels().putAll(plan.jobLabels());
+        // Templates usually give the Pod template no metadata.
+        final PodTemplateSpec podTemplate = launchJob.getSpec().getTemplate();
+        if (podTemplate.getMetadata() == null) {
+            podTemplate.setMetadata(new ObjectMeta());
+        }
+        podTemplate.getMetadata().getLabels().putAll(plan.jobLabels());
     }
 
     @SuppressWarnings("unchecked")
@@ -300,18 +361,10 @@ public class SessionJobBuilder {
     }
 
     /** Infer {@code fixed} vs {@code flexible} from memory request/limit equality. */
-    private String getResourceFlavor(final V1Job launchJob) {
-        final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
-        final V1PodSpec podSpec =
-                Objects.requireNonNullElse(jobSpec.getTemplate().getSpec(), new V1PodSpec());
-        final V1ResourceRequirements resourceRequirements = SessionJobBuilder.getResourceRequirements(podSpec);
-        final Map<String, Quantity> resourceLimits =
-                Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
-        final Map<String, Quantity> resourceRequests =
-                Objects.requireNonNullElse(resourceRequirements.getRequests(), new HashMap<>());
-
-        final Quantity memoryLimit = resourceLimits.get("memory");
-        final Quantity memoryRequest = resourceRequests.get("memory");
+    private String getResourceFlavor(final Job launchJob) {
+        final ResourceRequirements resourceRequirements = SessionJobBuilder.getResourceRequirements(podSpec(launchJob));
+        final Quantity memoryLimit = resourceRequirements.getLimits().get("memory");
+        final Quantity memoryRequest = resourceRequirements.getRequests().get("memory");
         if (memoryRequest != null && memoryRequest.equals(memoryLimit)) {
             return "fixed";
         }
@@ -324,123 +377,84 @@ public class SessionJobBuilder {
      *
      * @param launchJob The Job to modify.
      */
-    private void mergeAffinity(final V1Job launchJob) {
-        final V1Affinity gpuAffinity = getGPUSchedulingAffinity();
-        if (gpuAffinity != null) {
-            final V1JobSpec podTemplate = launchJob.getSpec();
-            if (podTemplate != null) {
-                // spec.template.spec
-                final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
-                if (podTemplateSpec != null) {
-                    final V1Affinity affinity = podTemplateSpec.getAffinity();
+    private void mergeAffinity(final Job launchJob) {
+        final Affinity gpuAffinity = getGPUSchedulingAffinity();
+        if (gpuAffinity == null || launchJob.getSpec() == null) {
+            return;
+        }
+        // spec.template.spec
+        final PodSpec podTemplateSpec = launchJob.getSpec().getTemplate().getSpec();
+        if (podTemplateSpec == null) {
+            return;
+        }
 
-                    // If we're this far, there is no need to check if gpuEnabled again, so only
-                    // check if gpuCount is
-                    // greater than 0.
-                    if (this.gpuCount > 0) {
-                        // According to the Kubernetes Documentation:
-                        // https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins
-                        // only the limits should be set.  However, to enable Fair Share in Kueue,
-                        // the requests need
-                        // to be set as well.  As long as they are the same, this should be fine.
-                        // jenkinsd 2026.05.14
-                        //
-                        final V1ResourceRequirements resourceRequirements =
-                                SessionJobBuilder.getResourceRequirements(podTemplateSpec);
-                        final Map<String, Quantity> limits =
-                                Objects.requireNonNullElse(resourceRequirements.getLimits(), new HashMap<>());
-                        limits.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
-                        final Map<String, Quantity> requests =
-                                Objects.requireNonNullElse(resourceRequirements.getRequests(), new HashMap<>());
-                        requests.put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+        // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is greater
+        // than 0.
+        if (this.gpuCount > 0) {
+            // According to the Kubernetes Documentation:
+            // https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins
+            // only the limits should be set.  However, to enable Fair Share in Kueue, the requests need to be set as
+            // well.  As long as they are the same, this should be fine.
+            // jenkinsd 2026.05.14
+            //
+            final ResourceRequirements resourceRequirements =
+                    SessionJobBuilder.getResourceRequirements(podTemplateSpec);
+            resourceRequirements.getLimits().put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+            resourceRequirements.getRequests().put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
+        }
 
-                        resourceRequirements.setLimits(limits);
-                        resourceRequirements.setRequests(requests);
-                    }
+        // spec.template.spec.affinity
+        final Affinity affinity = podTemplateSpec.getAffinity();
+        if (affinity == null) {
+            podTemplateSpec.setAffinity(gpuAffinity);
+            return;
+        }
 
-                    // spec.template.spec.affinity
-                    if (affinity == null) {
-                        podTemplateSpec.setAffinity(gpuAffinity);
-                    } else {
-                        final V1NodeAffinity nodeAffinity = affinity.getNodeAffinity();
+        // spec.template.spec.affinity.nodeAffinity
+        final NodeAffinity nodeAffinity = affinity.getNodeAffinity();
+        final NodeAffinity gpuNodeAffinity = gpuAffinity.getNodeAffinity();
+        if (nodeAffinity == null) {
+            affinity.setNodeAffinity(gpuNodeAffinity);
+            return;
+        }
 
-                        // spec.template.spec.affinity.nodeAffinity
-                        if (nodeAffinity == null) {
-                            affinity.setNodeAffinity(gpuAffinity.getNodeAffinity());
-                        } else {
-                            final List<V1PreferredSchedulingTerm> existingPreferredSchedulingTerms =
-                                    nodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
-                            final V1NodeAffinity gpuNodeAffinity = gpuAffinity.getNodeAffinity();
+        nodeAffinity
+                .getPreferredDuringSchedulingIgnoredDuringExecution()
+                .addAll(gpuNodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution());
 
-                            if (gpuNodeAffinity != null) {
-                                final List<V1PreferredSchedulingTerm> gpuAffinityPreferredSchedulingTerms =
-                                        gpuNodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution();
+        // spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
+        final NodeSelector requiredNodeSelector = nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
+        final NodeSelector gpuRequiredNodeSelector =
+                gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
 
-                                final List<V1PreferredSchedulingTerm> mergedPreferredSchedulingTerms =
-                                        new ArrayList<>();
-                                if (existingPreferredSchedulingTerms != null) {
-                                    mergedPreferredSchedulingTerms.addAll(existingPreferredSchedulingTerms);
-                                }
+        // No preset one from the configuration, so assume the GPU setting is the only one.
+        if (requiredNodeSelector == null) {
+            nodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(gpuRequiredNodeSelector);
+        } else if (gpuRequiredNodeSelector != null) {
+            final List<NodeSelectorTerm> requiredNodeSelectorTerms = requiredNodeSelector.getNodeSelectorTerms();
+            final List<NodeSelectorTerm> gpuRequiredNodeSelectorTerms = gpuRequiredNodeSelector.getNodeSelectorTerms();
 
-                                if (gpuAffinityPreferredSchedulingTerms != null) {
-                                    mergedPreferredSchedulingTerms.addAll(gpuAffinityPreferredSchedulingTerms);
-                                }
-
-                                if (!mergedPreferredSchedulingTerms.isEmpty()) {
-                                    nodeAffinity.setPreferredDuringSchedulingIgnoredDuringExecution(
-                                            mergedPreferredSchedulingTerms);
-                                }
-
-                                // spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
-                                final V1NodeSelector requiredNodeSelector =
-                                        nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
-                                final V1NodeSelector gpuRequiredNodeSelector =
-                                        gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
-
-                                // No preset one from the configuration, so assume the GPU setting
-                                // is the only one.
-                                if (requiredNodeSelector == null) {
-                                    nodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(
-                                            gpuRequiredNodeSelector);
-                                } else if (gpuRequiredNodeSelector != null) {
-                                    final List<V1NodeSelectorTerm> requiredNodeSelectorTerms =
-                                            requiredNodeSelector.getNodeSelectorTerms();
-                                    final List<V1NodeSelectorTerm> gpuRequiredNodeSelectorTerms =
-                                            gpuRequiredNodeSelector.getNodeSelectorTerms();
-
-                                    if (requiredNodeSelectorTerms.isEmpty()) {
-                                        requiredNodeSelector.setNodeSelectorTerms(gpuRequiredNodeSelectorTerms);
-                                    } else {
-                                        final V1NodeSelectorRequirement gpuNodeSelectorMatchExpression =
-                                                SessionJobBuilder.getV1NodeSelectorRequirement(
-                                                        gpuRequiredNodeSelectorTerms);
-                                        requiredNodeSelectorTerms.forEach(requiredNodeSelectorTerm -> {
-                                            final List<V1NodeSelectorRequirement> requiredNodeSelectorMatchExpressions =
-                                                    requiredNodeSelectorTerm.getMatchExpressions();
-                                            if (requiredNodeSelectorMatchExpressions == null) {
-                                                requiredNodeSelectorTerm.setMatchExpressions(
-                                                        Collections.singletonList(gpuNodeSelectorMatchExpression));
-                                            } else {
-                                                requiredNodeSelectorTerm.addMatchExpressionsItem(
-                                                        gpuNodeSelectorMatchExpression);
-                                            }
-                                        });
-                                    }
-                                } else {
-                                    LOGGER.debug("Nothing to alter for Node Affinity.");
-                                }
-                            }
-                        }
-                    }
-                }
+            if (requiredNodeSelectorTerms == null || requiredNodeSelectorTerms.isEmpty()) {
+                requiredNodeSelector.setNodeSelectorTerms(gpuRequiredNodeSelectorTerms);
+            } else {
+                final NodeSelectorRequirement gpuNodeSelectorMatchExpression =
+                        SessionJobBuilder.getNodeSelectorRequirement(gpuRequiredNodeSelectorTerms);
+                requiredNodeSelectorTerms.forEach(
+                        term -> term.getMatchExpressions().add(gpuNodeSelectorMatchExpression));
             }
+        } else {
+            LOGGER.debug("Nothing to alter for Node Affinity.");
         }
     }
 
-    @NotNull private static V1ResourceRequirements getResourceRequirements(V1PodSpec podTemplateSpec) {
-        final V1Container container = podTemplateSpec.getContainers().get(0);
-        final V1ResourceRequirements resourceRequirements =
-                Objects.requireNonNullElse(container.getResources(), new V1ResourceRequirements());
+    private static PodSpec podSpec(final Job launchJob) {
+        return launchJob.getSpec().getTemplate().getSpec();
+    }
+
+    private static ResourceRequirements getResourceRequirements(final PodSpec podTemplateSpec) {
+        final Container container = podTemplateSpec.getContainers().get(0);
+        final ResourceRequirements resourceRequirements =
+                Objects.requireNonNullElse(container.getResources(), new ResourceRequirements());
         container.setResources(resourceRequirements);
 
         return resourceRequirements;
@@ -451,13 +465,13 @@ public class SessionJobBuilder {
      *
      * @param launchJob The Job to modify.
      */
-    void mergeQueue(final V1Job launchJob) {
+    void mergeQueue(final Job launchJob) {
         if (this.queueConfiguration != null) {
             LOGGER.debug("Setting queue name to " + this.queueConfiguration);
 
-            final V1JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new V1JobSpec());
+            final JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new JobSpec());
 
-            final Map<String, String> labels = SessionJobBuilder.getOrCreateJobLabels(launchJob);
+            final Map<String, String> labels = launchJob.getMetadata().getLabels();
             labels.putAll(
                     SessionLabels.kueue(this.queueConfiguration.queueName, this.queueConfiguration.priorityClass));
 
@@ -469,38 +483,61 @@ public class SessionJobBuilder {
         }
     }
 
-    private void mergeImagePullSecret(final V1Job launchJob) {
-        final V1JobSpec podTemplate = launchJob.getSpec();
-        if (podTemplate != null && StringUtil.hasText(this.imageRegistrySecretName)) {
-            final V1PodSpec podTemplateSpec = podTemplate.getTemplate().getSpec();
-            if (podTemplateSpec != null) {
-                final List<V1LocalObjectReference> imagePullSecrets = podTemplateSpec.getImagePullSecrets();
-                if (imagePullSecrets == null) {
-                    podTemplateSpec.setImagePullSecrets(
-                            Collections.singletonList(new V1LocalObjectReference().name(this.imageRegistrySecretName)));
-                } else {
-                    imagePullSecrets.add(new V1LocalObjectReference().name(this.imageRegistrySecretName));
-                }
-            }
+    private void mergeImagePullSecret(final Job launchJob) {
+        if (launchJob.getSpec() == null || !StringUtil.hasText(this.imageRegistrySecretName)) {
+            return;
         }
+        podSpec(launchJob).getImagePullSecrets().add(new LocalObjectReference(this.imageRegistrySecretName));
+    }
+
+    /** Set the session image on every container and init container that the template gave the image placeholder. */
+    private void applyImage(final Job launchJob) {
+        final PodSpec podSpec = podSpec(launchJob);
+        Stream.concat(podSpec.getInitContainers().stream(), podSpec.getContainers().stream())
+                .filter(container -> IMAGE_PLACEHOLDER.equals(container.getImage()))
+                .forEach(container -> container.setImage(requireImage()));
+    }
+
+    private String requireImage() {
+        if (!StringUtil.hasText(this.image)) {
+            throw new IllegalArgumentException("session image is required");
+        }
+        return this.image;
+    }
+
+    private void applyPriorityClass(final Job launchJob) {
+        if (StringUtil.hasText(this.priorityClassName)) {
+            podSpec(launchJob).setPriorityClassName(this.priorityClassName);
+        }
+    }
+
+    /** Prepend the request's environment and set its command and arguments on the main container. */
+    private void applyHeadlessCommand(final Job launchJob) {
+        if (this.headlessCommand == null) {
+            return;
+        }
+        final Container container = podSpec(launchJob).getContainers().get(0);
+        if (this.headlessCommand.command() != null) {
+            container.setCommand(List.of(this.headlessCommand.command()));
+        }
+        if (!this.headlessCommand.args().isEmpty()) {
+            container.setArgs(this.headlessCommand.args());
+        }
+        // Request variables first: for a repeated name the template's value, listed later, wins.
+        container.getEnv().addAll(0, this.headlessCommand.env());
     }
 
     /**
      * Obtain the existing GPU scheduling affinity.
      *
-     * @return V1Affinity instance, or null if not enabled.
+     * @return Affinity instance, or null if not enabled.
      */
-    private V1Affinity getGPUSchedulingAffinity() {
+    private Affinity getGPUSchedulingAffinity() {
         if (!this.gpuEnabled) {
             return null;
         }
 
-        final V1Affinity gpuAffinity = new V1Affinity();
-        final V1NodeAffinity gpuNodeAffinity = new V1NodeAffinity();
-        final V1NodeSelector gpuRequiredNodeSelector = new V1NodeSelector();
-        final List<V1NodeSelectorTerm> nodeSelectorTerms = new ArrayList<>();
-        final V1NodeSelectorTerm nodeSelectorTerm = new V1NodeSelectorTerm();
-        final V1NodeSelectorRequirement nodeSelectorRequirement = new V1NodeSelectorRequirement();
+        final NodeSelectorRequirement nodeSelectorRequirement = new NodeSelectorRequirement();
         nodeSelectorRequirement.setKey("nvidia.com/gpu.count");
 
         if (this.gpuCount <= 0) {
@@ -510,10 +547,13 @@ public class SessionJobBuilder {
             nodeSelectorRequirement.setValues(Collections.singletonList("0"));
         }
 
-        nodeSelectorTerm.addMatchExpressionsItem(nodeSelectorRequirement);
-        nodeSelectorTerms.add(nodeSelectorTerm);
-        gpuRequiredNodeSelector.setNodeSelectorTerms(nodeSelectorTerms);
+        final NodeSelectorTerm nodeSelectorTerm = new NodeSelectorTerm();
+        nodeSelectorTerm.setMatchExpressions(new ArrayList<>(List.of(nodeSelectorRequirement)));
+        final NodeSelector gpuRequiredNodeSelector = new NodeSelector();
+        gpuRequiredNodeSelector.setNodeSelectorTerms(new ArrayList<>(List.of(nodeSelectorTerm)));
+        final NodeAffinity gpuNodeAffinity = new NodeAffinity();
         gpuNodeAffinity.setRequiredDuringSchedulingIgnoredDuringExecution(gpuRequiredNodeSelector);
+        final Affinity gpuAffinity = new Affinity();
         gpuAffinity.setNodeAffinity(gpuNodeAffinity);
 
         return gpuAffinity;

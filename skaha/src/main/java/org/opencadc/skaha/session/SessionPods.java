@@ -1,6 +1,7 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.util.StringUtil;
 import io.fabric8.kubernetes.api.model.Event;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -8,9 +9,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 
-/** What a session's Pods show: events. */
+/** What a session's Pods show: events and the desktop's IP. */
 final class SessionPods {
     private static final String[] EVENT_COLUMNS = {"TYPE", "REASON", "MESSAGE", "FIRST-TIME", "LAST-TIME"};
 
@@ -98,6 +100,21 @@ final class SessionPods {
             table.append(row[EVENT_COLUMNS.length - 1]).append('\n');
         }
         return table.toString().trim();
+    }
+
+    /**
+     * The IP of the session's running desktop Pod.
+     *
+     * @throws ResourceNotFoundException When no desktop Pod has an IP and is not being deleted.
+     */
+    static String desktopIP(final String username, final String sessionID) throws ResourceNotFoundException {
+        return pods(username, sessionID).stream()
+                .filter(pod -> pod.getMetadata().getDeletionTimestamp() == null)
+                .filter(pod -> SkahaAction.SESSION_TYPE_DESKTOP.equals(SessionLabels.get(pod, SessionLabels.Key.KIND)))
+                .map(pod -> pod.getStatus() == null ? null : pod.getStatus().getPodIP())
+                .filter(StringUtil::hasText)
+                .reduce((first, last) -> last)
+                .orElseThrow(() -> new ResourceNotFoundException("session " + sessionID + " not found"));
     }
 
     private static String valueOrNone(final String value) {

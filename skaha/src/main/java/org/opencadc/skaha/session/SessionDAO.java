@@ -1,22 +1,20 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Status;
 import java.net.URISyntaxException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.KubernetesJob;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PodResourceUsage;
 
@@ -99,22 +97,6 @@ public class SessionDAO {
         }
     }
 
-    static KubernetesJob getJob(final String jobName) throws Exception {
-        final ApiClient client = Configuration.getDefaultApiClient();
-        final BatchV1Api api = new BatchV1Api(client);
-
-        final V1Job job =
-                api.readNamespacedJob(jobName, K8SUtil.getWorkloadNamespace()).execute();
-        final V1ObjectMeta jobMetadata = Objects.requireNonNullElse(job.getMetadata(), new V1ObjectMeta());
-        final Map<String, String> labels = Objects.requireNonNullElse(jobMetadata.getLabels(), new HashMap<>());
-
-        return new KubernetesJob(
-                jobName,
-                jobMetadata.getUid(),
-                SessionLabels.require(labels, SessionLabels.Key.ID),
-                SessionType.fromApplicationStringType(SessionLabels.require(labels, SessionLabels.Key.KIND)));
-    }
-
     static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless)
             throws Exception {
         final ApiClient client = Configuration.getDefaultApiClient();
@@ -183,5 +165,23 @@ public class SessionDAO {
         }
 
         return connectURL;
+    }
+
+    /**
+     * The Job of the user's desktop session.
+     *
+     * @throws ResourceNotFoundException When it does not exist.
+     */
+    static Job desktopJob(final String sessionID, final String username) throws ResourceNotFoundException {
+        final Job job = SkahaKubernetesClient.get()
+                .batch()
+                .v1()
+                .jobs()
+                .withName(K8SUtil.getJobName(sessionID, SessionType.DESKTOP, username))
+                .get();
+        if (job == null) {
+            throw new ResourceNotFoundException("session " + sessionID + " not found");
+        }
+        return job;
     }
 }
