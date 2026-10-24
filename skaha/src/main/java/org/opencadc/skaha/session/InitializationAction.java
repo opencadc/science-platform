@@ -69,10 +69,9 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.rest.InitAction;
+import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 import io.kubernetes.client.openapi.ApiClient;
-import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
-import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.util.Arrays;
@@ -81,8 +80,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SkahaKubernetesClient;
 
-/** One-time initialization action for Skaha. This will verify the existence of the local queues, if specified. */
+/**
+ * One-time initialization action for Skaha. Builds the Kubernetes clients and verifies the existence of the local
+ * queues, if specified.
+ */
 public class InitializationAction extends InitAction {
     private static final Logger LOGGER = LogManager.getLogger(InitializationAction.class);
     private static final String FATAL_LOG_MESSAGE =
@@ -97,27 +100,26 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doInit() {
-        LOGGER.info("Verifying QueueConfigurations, if any...");
+        LOGGER.info("Initializing Kubernetes API clients...");
         try {
-            ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+            setupKubernetesAPIConfiguration();
         } catch (IOException ioException) {
             throw new IllegalStateException(ioException.getMessage(), ioException);
         }
-        LOGGER.info("Verifying QueueConfigurations: OK");
+        initializeKubernetesClient();
+        LOGGER.info("Initializing Kubernetes API clients: OK");
 
-        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster...");
-        try {
-            final ApiClient client = Config.fromCluster();
-            Configuration.setDefaultApiClient(client);
-            LOGGER.info("Initialized Kubernetes API client for cluster with base path: {}", client.getBasePath());
-        } catch (IOException e) {
-            LOGGER.error("Failed to configure k8s client from cluster: {}", e.getMessage(), e);
-        }
-        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster: OK");
+        LOGGER.info("Verifying QueueConfigurations, if any...");
+        ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+        LOGGER.info("Verifying QueueConfigurations: OK");
     }
 
-    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) throws IOException {
-        setupKubernetesAPIConfiguration();
+    @Override
+    public void doShutdown() {
+        SkahaKubernetesClient.close();
+    }
+
+    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
         Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
     }
 
@@ -134,39 +136,35 @@ public class InitializationAction extends InitAction {
     }
 
     /**
-     * Query the local queues in the workload namespace. Tests can override this method to return a mock response.
+     * Read the configured LocalQueue in the workload namespace.
      *
-     * @return true if the local queue exists, false otherwise.
+     * @return true if the local queue does not exist, false otherwise. Any other API error (e.g. a missing permission)
+     *     fails startup.
      */
     boolean localQueueMissing(final QueueConfiguration queueConfiguration) {
-        try {
-            final ApiClient apiClient = Configuration.getDefaultApiClient();
-            final CustomObjectsApi customObjectsApi = new CustomObjectsApi(apiClient);
-
-            // Throws an API Exception with a 404 is the queue does not exist.
-            customObjectsApi
-                    .getNamespacedCustomObject(
-                            QueueConfiguration.getKueueApiGroup(),
-                            QueueConfiguration.getKueueApiVersion(),
-                            getWorkloadNamespace(),
-                            QueueConfiguration.KUEUE_API_PLURAL,
-                            queueConfiguration.queueName)
-                    .execute();
-            return false;
-        } catch (ApiException exception) {
-            if (exception.getCode() == 404) {
-                LOGGER.error(
-                        "No local queues exist in namespace {} with name {}",
-                        getWorkloadNamespace(),
-                        queueConfiguration.queueName);
-                return true;
-            } else {
-                // Unexpected error, die here.
-                throw new IllegalStateException(exception.getMessage(), exception);
-            }
-        }
+        return SkahaKubernetesClient.get()
+                        .genericKubernetesResources(InitializationAction.localQueueContext())
+                        .withName(queueConfiguration.queueName)
+                        .get()
+                == null;
     }
 
+    static ResourceDefinitionContext localQueueContext() {
+        return new ResourceDefinitionContext.Builder()
+                .withGroup(QueueConfiguration.getKueueApiGroup())
+                .withVersion(QueueConfiguration.getKueueApiVersion())
+                .withKind("LocalQueue")
+                .withPlural(QueueConfiguration.KUEUE_API_PLURAL)
+                .withNamespaced(true)
+                .build();
+    }
+
+    /** Build the application Fabric8 client. Tests override this to install a mock client. */
+    void initializeKubernetesClient() {
+        SkahaKubernetesClient.initialize(getWorkloadNamespace());
+    }
+
+    /** Configure the client-java default client still used by session readers and metrics. */
     void setupKubernetesAPIConfiguration() throws IOException {
         final ApiClient client = Config.fromCluster();
         Configuration.setDefaultApiClient(client);
