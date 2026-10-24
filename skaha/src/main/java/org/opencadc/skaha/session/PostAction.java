@@ -70,6 +70,7 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.ResourceNotFoundException;
+import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
@@ -491,8 +492,7 @@ public class PostAction extends SessionAction {
         }
 
         final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
-        String jobLaunchString = Yaml.dump(launch.job());
-        String jsonLaunchFile = super.stageFile(jobLaunchString);
+        final String jobLaunchString = Yaml.dump(launch.job());
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -501,63 +501,96 @@ public class PostAction extends SessionAction {
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
 
-        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
-        final KubectlCommandBuilder.KubectlCommand launchCmd =
-                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        final String createJobResult = CommandExecutioner.execute(launchCmd.build());
-
-        log.debug("Create job result: " + createJobResult);
-
-        final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
-
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Java client to create Service objects.
+        final List<String> dependentResources = new ArrayList<>();
         if (type.supportsService()) {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            serviceString = SessionJobBuilder.labelService(serviceString, launch.labels());
-            final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
-
-            log.debug("Create service result: " + createServiceResult);
+            dependentResources.add(SessionJobBuilder.labelService(serviceString, launch.labels()));
         }
 
-        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
-        // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Gateway API to create Ingresses.
-        // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
             byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString = SessionJobBuilder.labelIngress(ingressString, launch.labels());
-            final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
+            dependentResources.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
+        }
 
-            log.debug("Create ingress result: " + createIngressResult);
+        submitSession(jobLaunchString, jobName, dependentResources);
+    }
+
+    /**
+     * Create the session Job, then the resources it owns (Service, ingress). The session ID is only returned when every
+     * resource exists: if any step fails, the session's Job is deleted (owned resources go with it) and the request
+     * fails with 503.
+     *
+     * @param jobYaml The rendered Job.
+     * @param jobName The Job name.
+     * @param dependentYamls Rendered resources owned by the Job; {@code ${skaha.jobuid}} and {@code ${skaha.jobname}}
+     *     are filled from the created Job.
+     * @throws TransientException If the session could not be launched.
+     */
+    void submitSession(final String jobYaml, final String jobName, final List<String> dependentYamls) throws Exception {
+        try {
+            createKubernetesObject(jobYaml);
+            final KubernetesJob kubernetesJob = readJob(jobName);
+            for (final String dependentYaml : dependentYamls) {
+                String yaml = SessionJobBuilder.setConfigValue(
+                        dependentYaml, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
+                yaml = SessionJobBuilder.setConfigValue(yaml, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
+                createKubernetesObject(yaml);
+            }
+        } catch (Exception exception) {
+            log.error(
+                    "Launch of session " + this.sessionID + " (Job " + jobName + ") failed; deleting its Job.",
+                    exception);
+            deleteSessionJob();
+            throw new TransientException("Unable to launch session.  Please try again.");
         }
     }
 
-    private String createKubernetesObjectForJob(String k8sNamespace, KubernetesJob kubernetesJob, String yamlString)
-            throws IOException, InterruptedException {
-        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-        final String jsonLaunchFile = super.stageFile(yamlString);
-        final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand =
-                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        return CommandExecutioner.execute(serviceLaunchCommand.build());
+    /**
+     * Create the resources in the given YAML in the workload namespace.
+     *
+     * @throws IOException If kubectl reports an error.
+     */
+    void createKubernetesObject(final String yaml) throws IOException, InterruptedException {
+        final String stagedFile = super.stageFile(yaml);
+        try {
+            final KubectlCommandBuilder.KubectlCommand createCommand = KubectlCommandBuilder.command("create")
+                    .namespace(K8SUtil.getWorkloadNamespace())
+                    .option("-f", stagedFile);
+            final String createResult = CommandExecutioner.execute(createCommand.build(), false);
+            log.debug("Create result: " + createResult);
+        } finally {
+            Files.deleteIfExists(Paths.get(stagedFile));
+        }
     }
 
-    private void injectPOSIXDetails() {
+    KubernetesJob readJob(final String jobName) throws Exception {
+        return SessionDAO.getJob(jobName);
+    }
+
+    /** Best-effort delete of this session's Job after a failed launch. The Job may not exist. */
+    void deleteSessionJob() {
+        try {
+            SessionDAO.deleteJob(this.sessionID, this.posixPrincipal.username);
+        } catch (Exception exception) {
+            log.error("Unable to delete Job for failed session launch " + this.sessionID, exception);
+        }
+    }
+
+    private void injectPOSIXDetails() throws Exception {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
                 userStorageConfiguration.homeBaseDirectory.toString(),
                 this.posixMapperConfiguration.getPosixMapperClient());
-        posixCache.writePOSIXEntries();
+        posixCache.writePOSIXEntries(this.posixPrincipal, this.skahaCallbackFlow ? Set.of() : getUserPosixGroups());
     }
 
     private String generateToken() throws Exception {
@@ -707,17 +740,26 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBUID, ownerKubernetesJob.getUID())
                 .withParameter(PostAction.SKAHA_JOBNAME, ownerKubernetesJob.getName());
 
-        String launchFile = super.stageFile(sessionJobBuilder.build());
-        KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .option("-f", launchFile);
-
-        String createResult = CommandExecutioner.execute(launchCmd.build());
-
-        log.debug("Create result: " + createResult);
+        try {
+            createKubernetesObject(sessionJobBuilder.build());
+        } catch (IOException ioException) {
+            log.error(
+                    "Launch of desktop app " + this.appID + " in session " + this.sessionID + " failed.", ioException);
+            deleteDesktopAppJob();
+            throw new TransientException("Unable to launch desktop app.  Please try again.");
+        }
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);
+    }
+
+    /** Best-effort delete of this desktop app's Job after a failed launch. The Job may not exist. */
+    void deleteDesktopAppJob() {
+        try {
+            SessionDAO.deleteDesktopApplicationJob(this.sessionID, this.posixPrincipal.username, this.appID);
+        } catch (Exception exception) {
+            log.error("Unable to delete Job for failed desktop app launch " + this.appID, exception);
+        }
     }
 
     @Override
@@ -729,14 +771,14 @@ public class PostAction extends SessionAction {
         if (skahaCallbackFlow) {
             return callbackSupplementalGroups;
         }
-        final List<Group> groupCredentials =
-                CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
-        return buildGroupUriList(groupCredentials).stream()
+        return getUserPosixGroups().stream()
                 .map(posixGroup -> Integer.toString(posixGroup.getGID()))
                 .collect(Collectors.joining(","));
     }
 
-    private Set<PosixGroup> buildGroupUriList(List<Group> groupCredentials) throws Exception {
+    private Set<PosixGroup> getUserPosixGroups() throws Exception {
+        final List<Group> groupCredentials =
+                CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
         return new PosixGroupCache(this.posixMapperConfiguration.getPosixMapperClient())
                 .toGIDs(groupCredentials.stream().map(Group::getID).collect(Collectors.toList()));
     }
