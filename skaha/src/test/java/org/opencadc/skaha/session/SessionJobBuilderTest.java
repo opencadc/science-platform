@@ -505,4 +505,50 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("skaha", labels.get("app.kubernetes.io/managed-by"));
         Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
     }
+
+    @Test
+    public void testHeadlessValuesAreTyped() throws Exception {
+        final String args = "-c print(\"a: b\")\n---\nkind: Secret";
+        final SessionJobBuilder.HeadlessCommand command = SessionJobBuilder.HeadlessCommand.fromRequest(
+                "/bin/sh -c \"echo: hi\"", args, List.of("QUOTE=\"x\": y", "MULTI=line1\nline2", "EQ=a=b", "=noname"));
+
+        final Job job = SessionJobBuilder.fromPath(SessionFixtures.template("launch-headless.yaml"))
+                .withParameters(SessionFixtures.parameters("headless"))
+                .withImage("images.example.org/skaha/headless:1.0")
+                .withHeadlessCommand(command)
+                .buildLaunch()
+                .job();
+
+        final io.fabric8.kubernetes.api.model.Container container =
+                job.getSpec().getTemplate().getSpec().getContainers().get(0);
+        Assert.assertEquals(List.of("/bin/sh -c \"echo: hi\""), container.getCommand());
+        Assert.assertEquals(List.of(args.split(" ")), container.getArgs());
+        final Map<String, String> env = new HashMap<>();
+        container.getEnv().forEach(var -> env.putIfAbsent(var.getName(), var.getValue()));
+        Assert.assertEquals("\"x\": y", env.get("QUOTE"));
+        Assert.assertEquals("line1\nline2", env.get("MULTI"));
+        Assert.assertEquals("a=b", env.get("EQ"));
+        Assert.assertFalse(env.containsKey(""));
+        Assert.assertEquals(
+                "No extra objects or fields",
+                1,
+                job.getSpec().getTemplate().getSpec().getContainers().size());
+    }
+
+    @Test
+    public void testImagePlaceholderOutsideContainerImageIsRejected() throws Exception {
+        final Path template = Files.createTempFile("launch-bad", ".yaml");
+        Files.writeString(
+                template,
+                Files.readString(SessionFixtures.template("launch-notebook.yaml"))
+                        .replace(
+                                "- name: skaha_hostname",
+                                "- name: IMAGE\n          value: \"mirror/${software.imageid}\"\n        - name: skaha_hostname"));
+
+        final SessionJobBuilder builder = SessionJobBuilder.fromPath(template)
+                .withParameters(SessionFixtures.parameters("notebook"))
+                .withImage("images.example.org/skaha/notebook:1.0");
+
+        Assert.assertThrows(IllegalStateException.class, builder::buildLaunch);
+    }
 }

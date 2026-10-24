@@ -281,6 +281,11 @@ public class SessionJobBuilder {
         applyImage(launchJob);
         applyPriorityClass(launchJob);
         applyHeadlessCommand(launchJob);
+        if (Serialization.asYaml(launchJob).contains(IMAGE_PLACEHOLDER)) {
+            // The template used ${software.imageid} somewhere other than a whole container image; the Pod could
+            // never start, so do not launch it.
+            throw new IllegalStateException("Session template uses the image placeholder outside a container image");
+        }
 
         return new LaunchArtifacts(launchJob, labelPlan);
     }
