@@ -11,7 +11,11 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +29,7 @@ import org.opencadc.skaha.KubernetesApi;
 
 /**
  * One session's life, per kind, through the real modules against a mock Kubernetes API: launch from the chart's
- * templates, events, desktop-app attach.
+ * templates, events, logs, renew, desktop-app attach.
  */
 @RunWith(Parameterized.class)
 public class SessionLifecycleTest {
@@ -95,7 +99,7 @@ public class SessionLifecycleTest {
 
         final String podName = launched.getMetadata().getName() + "-x1y2z";
 
-        // A running Pod: events on the Job and the Pod.
+        // A running Pod: events (Job and Pod), then logs.
         client.pods()
                 .resource(new PodBuilder()
                         .withNewMetadata()
@@ -118,6 +122,41 @@ public class SessionLifecycleTest {
         Assert.assertTrue(
                 events[2], events[2].matches("Normal +SuccessfulCreate +Created pod: \\S+ +2026\\S+ +<none>"));
         assertKubectlColumns();
+
+        final String container =
+                job.getSpec().getTemplate().getSpec().getContainers().get(0).getName();
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/api/v1/namespaces/" + NAMESPACE + "/pods/" + podName + "/log?container=" + container)
+                .andReturn(200, "session log\n")
+                .once();
+        final ByteArrayOutputStream logs = new ByteArrayOutputStream();
+        SessionPods.streamLogs(USER, SESSION_ID, logs);
+        Assert.assertEquals("session log\n", logs.toString(StandardCharsets.UTF_8));
+
+        // Renew 2h in, with a 96h expiry: a deadline with less than 96h left moves to 2h + 96h (interactive kinds,
+        // 96h deadline); one with more is left alone (headless, 14 days).
+        final long deadline = job.getSpec().getActiveDeadlineSeconds();
+        final long expectedDeadline = deadline - Duration.ofHours(2).toSeconds()
+                        < Duration.ofHours(96).toSeconds()
+                ? Duration.ofHours(98).toSeconds()
+                : deadline;
+        client.batch().v1().jobs().withName(launched.getMetadata().getName()).edit(current -> new JobBuilder(current)
+                .editOrNewStatus()
+                .withActive(1)
+                .withStartTime(NOW.minus(Duration.ofHours(2)).toString())
+                .endStatus()
+                .build());
+        SessionDAO.renew(USER, SESSION_ID, Duration.ofHours(96), NOW);
+        Assert.assertEquals(expectedDeadline, (long) client.batch()
+                .v1()
+                .jobs()
+                .withName(launched.getMetadata().getName())
+                .get()
+                .getSpec()
+                .getActiveDeadlineSeconds());
 
         if (this.type == SessionType.DESKTOP) {
             // Attach a desktop app to the running desktop; it is owned by the desktop's Job.

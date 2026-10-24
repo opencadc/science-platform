@@ -2,12 +2,19 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobList;
+import io.fabric8.kubernetes.client.dsl.NonNamespaceOperation;
+import io.fabric8.kubernetes.client.dsl.ScalableResource;
+import io.fabric8.kubernetes.client.dsl.base.PatchContext;
+import io.fabric8.kubernetes.client.dsl.base.PatchType;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1Status;
 import java.net.URISyntaxException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -167,21 +174,63 @@ public class SessionDAO {
         return connectURL;
     }
 
-    /**
-     * The Job of the user's desktop session.
-     *
-     * @throws ResourceNotFoundException When it does not exist.
-     */
+    /** The session's desktop Job, parent of its desktop apps. */
     static Job desktopJob(final String sessionID, final String username) throws ResourceNotFoundException {
-        final Job job = SkahaKubernetesClient.get()
-                .batch()
-                .v1()
-                .jobs()
-                .withName(K8SUtil.getJobName(sessionID, SessionType.DESKTOP, username))
+        final Job job = jobs().withName(K8SUtil.getJobName(sessionID, SessionType.DESKTOP, username))
                 .get();
         if (job == null) {
             throw new ResourceNotFoundException("session " + sessionID + " not found");
         }
         return job;
+    }
+
+    static List<Job> liveJobs(final String forUserID, final String sessionID, final boolean omitHeadless) {
+        return jobs().withLabelSelector(SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless))
+                .list()
+                .getItems();
+    }
+
+    /**
+     * Give each active Job of the session the configured expiry from now; a Job with that much time left is left alone.
+     *
+     * @throws IllegalArgumentException When the session has no active Job.
+     */
+    static void renew(
+            final String username, final String sessionID, final Duration configuredExpiry, final Instant now) {
+        final List<Job> activeJobs = liveJobs(username, sessionID, false).stream()
+                .filter(job -> job.getStatus() != null
+                        && Objects.equals(job.getStatus().getActive(), 1)
+                        && job.getStatus().getStartTime() != null)
+                .toList();
+        if (activeJobs.isEmpty()) {
+            throw new IllegalArgumentException("No active job for user " + username + " with session " + sessionID);
+        }
+
+        for (final Job job : activeJobs) {
+            final Long deadline = job.getSpec().getActiveDeadlineSeconds();
+            if (deadline == null) {
+                throw new IllegalStateException("Job " + job.getMetadata().getName() + " has no activeDeadlineSeconds");
+            }
+            final long renewed = renewedDeadlineSeconds(
+                    configuredExpiry, deadline, Instant.parse(job.getStatus().getStartTime()), now);
+            if (renewed > 0) {
+                jobs().withName(job.getMetadata().getName())
+                        .patch(
+                                PatchContext.of(PatchType.JSON_MERGE),
+                                "{\"spec\":{\"activeDeadlineSeconds\":" + renewed + "}}");
+            }
+        }
+    }
+
+    /** The deadline that gives a Job the configured expiry from now, or 0 when it already has at least that long. */
+    static long renewedDeadlineSeconds(
+            final Duration configuredExpiry, final long activeDeadlineSeconds, final Instant start, final Instant now) {
+        final long elapsedSeconds = Duration.between(start, now).toSeconds();
+        final long remainingSeconds = activeDeadlineSeconds - elapsedSeconds;
+        return configuredExpiry.toSeconds() > remainingSeconds ? elapsedSeconds + configuredExpiry.toSeconds() : 0L;
+    }
+
+    static NonNamespaceOperation<Job, JobList, ScalableResource<Job>> jobs() {
+        return SkahaKubernetesClient.get().batch().v1().jobs();
     }
 }

@@ -77,18 +77,15 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
-import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
@@ -97,9 +94,7 @@ import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
-import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 import org.opencadc.skaha.utils.PosixGroupCache;
 
@@ -231,16 +226,7 @@ public class PostAction extends SessionAction {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
                     if (action.equalsIgnoreCase("renew")) {
-                        Map<String, List<String>> jobNameToAttributesMap =
-                                getJobsToRenew(posixPrincipal.username, sessionID);
-                        if (!jobNameToAttributesMap.isEmpty()) {
-                            for (Map.Entry<String, List<String>> entry : jobNameToAttributesMap.entrySet()) {
-                                renew(entry);
-                            }
-                        } else {
-                            throw new IllegalArgumentException(
-                                    "No active job for user " + posixPrincipal + " with session " + sessionID);
-                        }
+                        renew();
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
                     }
@@ -262,91 +248,18 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private void renew(Map.Entry<String, List<String>> entry) throws Exception {
-        final Long newExpiryTime = calculateExpiryTime(entry.getValue());
-        if (newExpiryTime > 0) {
-            final String patchArgument = entry.getKey();
-            log.debug("Renewing " + patchArgument + " to " + newExpiryTime);
-            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .job()
-                    .argument(patchArgument)
-                    .option("-p", "{\"spec\":{\"activeDeadlineSeconds\":" + newExpiryTime + "}}");
-
-            CommandExecutioner.execute(renewExpiryTimeCmd.build(), false);
-        }
-
-        this.userStorageClient.injectProxyCertificate(getUsername());
-    }
-
-    private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
-        String uid = jobAttributes.get(0);
-        String startTimeStr = jobAttributes.get(1);
-
-        String configuredExpiryStr = K8SUtil.getSessionExpiry();
-        if (!StringUtil.hasLength(configuredExpiryStr)) {
+    private void renew() throws Exception {
+        final String configuredExpiry = K8SUtil.getSessionExpiry();
+        if (!StringUtil.hasLength(configuredExpiry)) {
             throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
         }
-        long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
+        SessionDAO.renew(
+                posixPrincipal.username,
+                sessionID,
+                Duration.ofSeconds(Long.parseLong(configuredExpiry)),
+                Instant.now());
 
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, posixPrincipal.username);
-        String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
-        if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
-            long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
-            Instant startTime = Instant.parse(startTimeStr);
-
-            long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
-            long timeRemaining = activeDeadlineSeconds - timeUsed;
-            // default to no need to extend the expiry time
-            long calculatedTime = 0L;
-            if (configuredExpiryTime > timeRemaining) {
-                // add elapsed time (from startTime to now) to the configured expiry time
-                calculatedTime = startTime.until(Instant.now(), ChronoUnit.SECONDS) + configuredExpiryTime;
-            }
-
-            return calculatedTime;
-        } else {
-            throw new IllegalStateException("missing configuration item activeDeadlineSeconds");
-        }
-    }
-
-    private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .job()
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .noHeaders()
-                .outputFormat(
-                        "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
-
-        String renewJobNamesStr = CommandExecutioner.execute(getRenewJobNamesCmd.build());
-
-        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
-
-        return PostAction.getStringListMap(renewJobNamesStr);
-    }
-
-    private static @NonNull Map<String, List<String>> getStringListMap(final String renewJobNamesStr) {
-        final Map<String, List<String>> renewJobMap = new HashMap<>();
-        if (StringUtil.hasLength(renewJobNamesStr)) {
-            String[] lines = renewJobNamesStr.split("\n");
-            for (String line : lines) {
-                final List<String> renewJobAttributes = new ArrayList<>();
-                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                String jobName = parts[0];
-                String uid = parts[1];
-                String isActive = parts[2];
-                String startTime = parts[3];
-                // look for the job ID of an active session
-                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
-                    renewJobAttributes.add(uid);
-                    renewJobAttributes.add(startTime);
-                    renewJobMap.put(jobName, renewJobAttributes);
-                }
-            }
-        }
-        return renewJobMap;
+        this.userStorageClient.injectProxyCertificate(getUsername());
     }
 
     private void validateName(String name) {

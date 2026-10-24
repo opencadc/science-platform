@@ -337,6 +337,6 @@ public class GetAction extends SessionAction {
     }
 
     public void streamContainerLogs(String sessionID, OutputStream out) throws Exception {
-        streamPodLogs(getUsername(), sessionID, out);
+        SessionPods.streamLogs(getUsername(), sessionID, out);
     }
 }

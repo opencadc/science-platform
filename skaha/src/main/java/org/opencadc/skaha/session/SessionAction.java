@@ -70,15 +70,9 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -149,16 +143,6 @@ public abstract class SessionAction extends SkahaAction {
         }
     }
 
-    public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
-
-        KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .option("--tail", "-1");
-
-        CommandExecutioner.execute(getLogsCmd.build(), out);
-    }
-
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
         List<Session> sessions = SessionDAO.getUserSessions(posixPrincipal.username, sessionID, true);
         if (!sessions.isEmpty()) {
@@ -186,33 +170,6 @@ public abstract class SessionAction extends SkahaAction {
 
     List<Session> getAllSessions(final String forUserID) throws Exception {
         return SessionDAO.getUserSessions(forUserID, null, false);
-    }
-
-    protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
-        Map<String, String> jobExpiryTimes = new HashMap<>();
-        String[] jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
-        String jobExpiryTimeMap = CommandExecutioner.execute(jobExpiryTimeCMD);
-        log.debug("Expiry times: " + jobExpiryTimeMap);
-        if (StringUtil.hasLength(jobExpiryTimeMap)) {
-            String[] lines = jobExpiryTimeMap.split("\n");
-            for (String line : lines) {
-                String[] expiryTime = line.trim().replaceAll("\\s+", " ").split(" ");
-                jobExpiryTimes.put(expiryTime[0], expiryTime[1]);
-            }
-        }
-
-        return jobExpiryTimes;
-    }
-
-    private String[] getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        KubectlCommandBuilder.KubectlCommand getSessionJobCmd = KubectlCommandBuilder.command("get")
-                .namespace(k8sNamespace)
-                .job()
-                .label(SessionLabels.forUser(forUserID))
-                .noHeaders()
-                .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
-
-        return getSessionJobCmd.build();
     }
 
     /**
