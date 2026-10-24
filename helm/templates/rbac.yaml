@@ -17,8 +17,13 @@ rules:
   verbs: ["create", "deletecollection", "delete", "get", "list", "patch"]
 
 - apiGroups: [""]
-  resources: ["pods", "services", "secrets"]
+  resources: ["pods", "services"]
   verbs: ["create", "deletecollection", "delete", "get", "list"]
+
+# patch: image pull Secrets are written with server-side apply.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "deletecollection", "delete", "get", "list", "patch"]
 
 - apiGroups: [""]
   resources: ["pods/log"]

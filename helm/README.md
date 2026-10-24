@@ -4,7 +4,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Chart | AppVersion | Type |
 |:-----:|:----------:|:----:|
-|1.10.1<!-- x-release-please-version --> | 1.6.0 | application |
+|1.10.2<!-- x-release-please-version --> | 1.6.0 | application |
 
 ## Requirements
 
@@ -297,6 +297,12 @@ The test first validates the shared ServiceAccount in full-chart renders for def
 ## Required deployment configuration
 
 Metrics is now required and its values live under `metrics` (the former `metricsBackend` key fails the render). Remove `metrics.enabled` and configure `metrics.clusterName`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. `metrics.redis.urlSecret` is retired; Metrics uses the bundled Redis unless `metrics.redis.url` is set. The operator-provided `metrics.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.
+
+## Skaha workload permissions
+
+With `rbac.create=true` the chart's Role grants Skaha what it needs in the workload namespace. Sites that manage that Role themselves must grant `patch` on `secrets`: image pull Secrets for private images are written with server-side apply, and without `patch` every private-image launch fails with 503.
+
+The callback signing Secret `pre-auth-token-skaha` is read once by each Skaha replica. After replacing it, restart Skaha.
 
 ## Running chart tests
 

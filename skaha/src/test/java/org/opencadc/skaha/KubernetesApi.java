@@ -1,5 +1,6 @@
 package org.opencadc.skaha;
 
+import io.fabric8.kubernetes.api.model.APIResourceListBuilder;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -10,7 +11,10 @@ import io.fabric8.mockwebserver.Context;
 import io.fabric8.mockwebserver.MockWebServer;
 import io.fabric8.mockwebserver.ServerRequest;
 import io.fabric8.mockwebserver.ServerResponse;
+import io.fabric8.mockwebserver.http.RecordedRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import org.junit.rules.ExternalResource;
@@ -33,6 +37,27 @@ public class KubernetesApi extends ExternalResource {
         this.server.init();
         this.client = client(10_000);
         SkahaKubernetesClient.install(this.client);
+        // Traefik resources are generic: the client discovers their plural names.
+        this.server
+                .expect()
+                .get()
+                .withPath("/apis/traefik.io/v1alpha1")
+                .andReturn(
+                        200,
+                        new APIResourceListBuilder()
+                                .withGroupVersion("traefik.io/v1alpha1")
+                                .addNewResource()
+                                .withKind("Middleware")
+                                .withName("middlewares")
+                                .withNamespaced(true)
+                                .endResource()
+                                .addNewResource()
+                                .withKind("IngressRoute")
+                                .withName("ingressroutes")
+                                .withNamespaced(true)
+                                .endResource()
+                                .build())
+                .always();
     }
 
     @Override
@@ -59,5 +84,15 @@ public class KubernetesApi extends ExternalResource {
 
     public KubernetesMockServer server() {
         return this.server;
+    }
+
+    /** Every request received so far, as "METHOD path". */
+    public List<String> requests() throws InterruptedException {
+        final List<String> requests = new ArrayList<>();
+        RecordedRequest request;
+        while ((request = this.server.takeRequest(10, java.util.concurrent.TimeUnit.MILLISECONDS)) != null) {
+            requests.add(request.getMethod() + " " + request.getPath());
+        }
+        return requests;
     }
 }
