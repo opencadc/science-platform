@@ -47,6 +47,11 @@ session-type label. Label keys are configured in Metrics; values are set at
 session launch. See
 [system ADR-0004](../docs/adr/0004-interactive-workload-pod-label-contract.md).
 
+**Session Job cache**: Each Skaha replica's watched copy of session Jobs, used
+for a user's session listing. Lookups by session ID and the max-sessions check
+read the API server directly. _Avoid_: "informer" in specs (implementation
+detail).
+
 ## Relationships
 
 - **Platform stats** combines **platform capacity** and **platform allocation**

@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted, 2026-10-23. Implementation in progress under
-[CADC-15897](https://herzberg.atlassian.net/browse/CADC-15897).
+Accepted and implemented, 2026-10-23, under
+[CADC-15897](https://herzberg.atlassian.net/browse/CADC-15897). Skaha has no
+kubectl, client-java or subprocess calls.
 
 ## Context
 
@@ -46,9 +47,21 @@ policy.
 - **Partial failure.** If any step fails after the Job exists, delete the Job
   (owner references cascade to its Service and IngressRoute) and return 503.
   Never return a session ID for a launch that cannot run.
-- **Caching.** Session reads come from per-replica Job and Pod informers. A read
-  that misses right after a create falls back to a direct GET. The max-sessions
-  admission check stays a live LIST.
+- **Caching.** A per-replica informer caches session Jobs (label
+  `canfar.net/id`), indexed by owner. It serves a user's session listing, the
+  path the portal polls. Jobs this replica created in the last 60 seconds are
+  included until the watch delivers them, so a listing right after a launch
+  always shows it. Lookups by session ID (session GET, desktop apps, callbacks),
+  the max-sessions admission check, and any read before the cache syncs are live
+  reads, as is every read while the cache's watch is down. A session this
+  replica deleted leaves the listing when the watch delivers the deletion.
+  Startup waits at most 30 seconds for the first sync and never fails on it.
+  Pods are not cached: their reads (events, logs, attach) are rare.
+- **Exact calls.** Logs are one GET per Pod through the client's authenticated
+  HTTP client: Fabric8's log DSL first reads the Pod and may watch it. Pod
+  metrics are listed as typed `metrics.k8s.io` resources so the session label
+  selector (including `!=`) passes through unchanged. Any Kubernetes API failure
+  not handled closer to the call is a 503.
 - **Secrets.** The image pull Secret is written with server-side apply, which
   needs `patch` on Secrets. The callback signing Secret is created only if
   absent and read once per replica; after an operator replaces it, restart
@@ -68,20 +81,25 @@ One PR per phase, each behind its own sub-task of CADC-15897:
 | 3 | Parent session launch and Secrets through Fabric8 |
 | 4 | Desktop-app attach; session Jobs built from Fabric8 models |
 | 5 | Renew, pod lookup and logs through Fabric8; `kubectl` removed from code and image |
-| 6 | client-java removed; informer-cached session reads |
+| 6 | client-java removed; informer-cached session listings |
 
 A migrated operation never falls back to `kubectl`. There is no runtime
 client-selection flag.
 
 ## Consequences
 
-- Until Phase 6, client-java and Fabric8 coexist; both use OkHttp 5.
-- Phase 5 removes `kubectl`, `docker-ce` and `containerd` from the image.
-- Phase 6 supersedes the client-java detail in ADR-0001; the `MetricsDAO`
+- The image no longer contains `kubectl`, `docker-ce` or `containerd`, and
+  the WAR no longer contains client-java, Netty or the AWS SDK.
+- This supersedes the client-java detail in ADR-0001; the `MetricsDAO`
   contract is unchanged.
-- Informers need `watch` on jobs and pods (Phase 6 RBAC change); server-side
-  apply of the image pull Secret needs `patch` on Secrets (Phase 3). Sites with
-  externally managed RBAC must add both.
+- commons-compress and the HttpClient 4 `URIBuilder` were transitive through
+  client-java; they are now declared at the same versions so session URLs keep
+  their exact encoding.
+- The session cache needs `watch` on Jobs; server-side apply of the image pull
+  Secret needs `patch` on Secrets. Sites with externally managed RBAC must add
+  both (chart README lists every verb).
+- A listing served by one replica may lag another replica's create by the
+  watch delay (normally well under a second); lookups by session ID do not.
 - Fabric8 does not provide cross-resource transactions; the delete-on-failure
   rule is Skaha's responsibility.
 
