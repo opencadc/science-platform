@@ -9,3 +9,4 @@ Skaha and Metrics live in [`../../../docs/adr/`](../../../docs/adr/).
 | [0002](0002-platform-stats-fail-closed.md) | Platform stats fail closed | Accepted |
 | [0003](0003-session-resource-ceiling-sources.md) | Session resource ceiling sources | Accepted |
 | [0004](0004-session-list-pod-usage-soft-fail.md) | Session list pod usage soft-fail | Accepted |
+| [0005](0005-fabric8-kubernetes-client.md) | Fabric8 as Skaha's Kubernetes client | Accepted |
