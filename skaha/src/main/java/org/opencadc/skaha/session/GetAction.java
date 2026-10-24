@@ -329,7 +329,7 @@ public class GetAction extends SessionAction {
     }
 
     public String getEventLogs(String sessionID) throws Exception {
-        String events = getEvents(getUsername(), sessionID);
+        String events = SessionPods.events(getUsername(), sessionID);
         if (!StringUtil.hasLength(events)) {
             events = NONE;
         }

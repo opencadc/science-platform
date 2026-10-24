@@ -166,46 +166,6 @@ public abstract class SessionAction extends SkahaAction {
         return tmpFileName;
     }
 
-    public String getPodID(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getPodCmd = KubectlCommandBuilder.command("get")
-                .pod()
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        final String podID = CommandExecutioner.execute(getPodCmd.build());
-
-        log.debug("podID: " + podID);
-        if (!StringUtil.hasLength(podID)) {
-            throw new ResourceNotFoundException("session " + sessionID + " not found.");
-        }
-        return podID;
-    }
-
-    public String getEvents(String forUserID, String sessionID) throws Exception {
-
-        String podID = getPodID(forUserID, sessionID);
-
-        KubectlCommandBuilder.KubectlCommand getEventsCmd = KubectlCommandBuilder.command("get")
-                .argument("event")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .option("--field-selector", "involvedObject.name=" + podID)
-                .outputFormat(
-                        "custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp");
-
-        String events = CommandExecutioner.execute(getEventsCmd.build());
-
-        log.debug("events: " + events);
-        if (events != null) {
-            String[] lines = events.split("\n");
-            if (lines.length > 1) { // header row returned
-                return events;
-            }
-        }
-        return "";
-    }
-
     public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
 
         KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
