@@ -3,6 +3,7 @@ package org.opencadc.skaha.session;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
@@ -49,6 +50,59 @@ public class SessionBuilderTest {
         testStatus(testSubject, false, false, true, true, Session.STATUS_RUNNING);
         testStatus(testSubject, true, true, false, false, Session.STATUS_COMPLETED);
         testStatus(testSubject, true, false, false, false, Session.STATUS_FAILED);
+    }
+
+    @Test
+    public void testStatusFromJobConditions() {
+        final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");
+
+        // Pods were never created (e.g. rejected at admission), then the deadline passed: no counters, Failed
+        // condition.
+        Assert.assertEquals(
+                Session.STATUS_FAILED,
+                testSubject
+                        .withStatus(statusWithCondition("Failed", "True", "DeadlineExceeded"), false)
+                        .build()
+                        .getStatus());
+
+        // Failure decided while a pod is still terminating.
+        final V1JobStatus failureTarget = statusWithCondition("FailureTarget", "True", "BackoffLimitExceeded");
+        failureTarget.setActive(1);
+        failureTarget.setReady(1);
+        Assert.assertEquals(
+                Session.STATUS_FAILED,
+                testSubject.withStatus(failureTarget, false).build().getStatus());
+
+        Assert.assertEquals(
+                Session.STATUS_COMPLETED,
+                testSubject
+                        .withStatus(statusWithCondition("Complete", "True", null), false)
+                        .build()
+                        .getStatus());
+
+        // A false condition and a Suspended condition do not decide the outcome.
+        Assert.assertEquals(
+                Session.STATUS_PENDING,
+                testSubject
+                        .withStatus(statusWithCondition("Failed", "False", null), false)
+                        .build()
+                        .getStatus());
+        Assert.assertEquals(
+                Session.STATUS_PENDING,
+                testSubject
+                        .withStatus(statusWithCondition("Suspended", "True", "JobSuspended"), true)
+                        .build()
+                        .getStatus());
+    }
+
+    private static V1JobStatus statusWithCondition(final String type, final String status, final String reason) {
+        final V1JobCondition condition = new V1JobCondition();
+        condition.setType(type);
+        condition.setStatus(status);
+        condition.setReason(reason);
+        final V1JobStatus jobStatus = new V1JobStatus();
+        jobStatus.setConditions(List.of(condition));
+        return jobStatus;
     }
 
     private void testStatus(

@@ -3,6 +3,7 @@ package org.opencadc.skaha.session;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
@@ -184,6 +185,32 @@ class SessionBuilder {
         return this;
     }
 
+    /**
+     * Map a terminal Job condition to a session status.
+     *
+     * @return {@link Session#STATUS_FAILED} for a true Failed/FailureTarget condition, {@link Session#STATUS_COMPLETED}
+     *     for a true Complete/SuccessCriteriaMet condition, otherwise null.
+     */
+    static String terminalCondition(final V1JobStatus jobStatus) {
+        final List<V1JobCondition> conditions = Objects.requireNonNullElse(jobStatus.getConditions(), List.of());
+        String terminal = null;
+        for (final V1JobCondition condition : conditions) {
+            if (!"True".equalsIgnoreCase(condition.getStatus())) {
+                continue;
+            }
+            switch (condition.getType()) {
+                case "Failed", "FailureTarget" -> {
+                    return Session.STATUS_FAILED;
+                }
+                case "Complete", "SuccessCriteriaMet" -> terminal = Session.STATUS_COMPLETED;
+                default -> {
+                    // Suspended and other conditions do not decide the outcome.
+                }
+            }
+        }
+        return terminal;
+    }
+
     SessionBuilder withStatus(final V1JobStatus jobStatus, final boolean suspended) {
         if (jobStatus == null) {
             LOGGER.debug("No JobStatus found for " + this.id);
@@ -203,7 +230,12 @@ class SessionBuilder {
             final int ready = Objects.requireNonNullElse(jobStatus.getReady(), 0);
             final int terminating = Objects.requireNonNullElse(jobStatus.getTerminating(), 0);
 
-            if (active > 0) {
+            final String terminalCondition = SessionBuilder.terminalCondition(jobStatus);
+            if (terminalCondition != null) {
+                // The Job controller has decided the outcome, whatever the pod counters say. A Job whose pods were
+                // never created (e.g. rejected at admission) only reports its failure here.
+                this.status = terminalCondition;
+            } else if (active > 0) {
                 if (ready > 0) {
                     this.status = Session.STATUS_RUNNING;
                 } else {
