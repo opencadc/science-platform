@@ -9,9 +9,11 @@ import io.fabric8.kubernetes.api.model.EventListBuilder;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetricsListBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +22,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,7 +34,7 @@ import org.opencadc.skaha.KubernetesApi;
 
 /**
  * One session's life, per kind, through the real modules against a mock Kubernetes API: launch from the chart's
- * templates, events, logs, renew, desktop-app attach.
+ * templates, list (cache, pod metrics, status), events, logs, renew, desktop-app attach, delete.
  */
 @RunWith(Parameterized.class)
 public class SessionLifecycleTest {
@@ -52,11 +57,27 @@ public class SessionLifecycleTest {
     private final SessionType type;
     private final int services;
     private final int traefikResources;
+    private SessionJobCache cache;
 
     public SessionLifecycleTest(final SessionType type, final int services, final int traefikResources) {
         this.type = type;
         this.services = services;
         this.traefikResources = traefikResources;
+    }
+
+    @Before
+    public void startCache() throws Exception {
+        TestUtil.setupUserStorageEnvironment();
+        this.cache = new SessionJobCache(this.api.client());
+        this.cache.start().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        SessionDAO.useCache(this.cache);
+    }
+
+    @After
+    public void stopCache() {
+        SessionDAO.useCache(null);
+        this.cache.close();
+        TestUtil.tearDownUserStorageEnvironment();
     }
 
     @Test
@@ -97,7 +118,36 @@ public class SessionLifecycleTest {
         Assert.assertEquals(this.traefikResources, traefik.size());
         traefik.forEach(resource -> assertOwnedBy(resource, launched));
 
+        // List: the new session shows at once (read-after-write), with Job status and pod usage.
+        SessionDAO.created(launched);
         final String podName = launched.getMetadata().getName() + "-x1y2z";
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/metrics.k8s.io/v1beta1/namespaces/" + NAMESPACE + "/pods?labelSelector="
+                        + "canfar.net%2Fusername%3Dalice")
+                .andReturn(
+                        200,
+                        new PodMetricsListBuilder()
+                                .addNewItem()
+                                .withNewMetadata()
+                                .withName(podName)
+                                .endMetadata()
+                                .addNewContainer()
+                                .withName("main")
+                                .addToUsage("cpu", new Quantity("1367m"))
+                                .addToUsage("memory", new Quantity("1536Mi"))
+                                .endContainer()
+                                .endItem()
+                                .build())
+                .once();
+        final Session listed = onlySession();
+        Assert.assertEquals(SESSION_ID, listed.getId());
+        Assert.assertEquals(kind, listed.getType());
+        Assert.assertEquals(Session.STATUS_PENDING, listed.getStatus());
+        Assert.assertEquals("1.367", listed.getCPUCoresInUse());
+        Assert.assertEquals("1.61", listed.getRAMInUse());
 
         // A running Pod: events (Job and Pod), then logs.
         client.pods()
@@ -175,6 +225,27 @@ public class SessionLifecycleTest {
                     app.getMetadata().getOwnerReferences().get(0).getUid());
             Assert.assertEquals("app1", app.getMetadata().getLabels().get("canfar.net/app-id"));
         }
+
+        // Delete: the mock has no garbage collector, so remove the desktop apps the owner references would; the
+        // listing drops the session once the watch delivers the deletions.
+        SessionDAO.deleteJob(SESSION_ID, USER);
+        client.batch()
+                .v1()
+                .jobs()
+                .withLabel(SessionLabels.Key.ID.label(), SESSION_ID)
+                .delete();
+        KubernetesApi.await("the listing to drop the session", () -> {
+            try {
+                return SessionDAO.getUserSessions(USER, null, false).isEmpty();
+            } catch (Exception exception) {
+                throw new IllegalStateException(exception);
+            }
+        });
+        Assert.assertNull(client.batch()
+                .v1()
+                .jobs()
+                .withName(launched.getMetadata().getName())
+                .get());
     }
 
     /** The table keeps the columns and padding of the former kubectl custom-columns output. */
@@ -192,6 +263,12 @@ public class SessionLifecycleTest {
                                 "2026-10-23T17:00:00Z",
                                 null),
                         event("a.2", "Normal", "Pulled", "ok", "2026-10-23T17:01:00Z", "2026-10-23T17:02:00Z"))));
+    }
+
+    private Session onlySession() {
+        final List<Session> sessions = SessionDAO.getUserSessions(USER, null, false);
+        Assert.assertEquals(1, sessions.size());
+        return sessions.get(0);
     }
 
     private void expectEvents(final String objectName, final String type, final String reason, final String message) {

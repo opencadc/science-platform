@@ -6,8 +6,8 @@ import ca.nrc.cadc.rest.SyncOutput;
 import ca.nrc.cadc.util.PropertiesReader;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import io.fabric8.kubernetes.api.model.LimitRangeItem;
+import io.fabric8.kubernetes.api.model.Quantity;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
@@ -162,7 +162,7 @@ public class GetActionResourceStatsTest {
     public void clusterTotalsComeFromPlatformMetricsNotNodeOrSessionTotals() throws Exception {
         final ClusterResourceFields expectedClusterFields =
                 PlatformMetricsFixtures.fixedPlatformMetrics().toClusterResourceFields();
-        final V1LimitRangeItem limitRange = containerLimitRangeFixture();
+        final LimitRangeItem limitRange = containerLimitRangeFixture();
         final GetAction get =
                 new TestableGetAction(PlatformMetricsFixtures.metricsDAOWithFixedPlatformMetrics(), limitRange, true);
 
@@ -227,29 +227,14 @@ public class GetActionResourceStatsTest {
         Assert.assertEquals(0, gpu.get("maxGPU").getAsInt());
     }
 
-    private static V1LimitRangeItem containerLimitRangeFixture() {
-        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
+    private static LimitRangeItem containerLimitRangeFixture() {
+        final LimitRangeItem containerLimitRange = new LimitRangeItem();
         containerLimitRange.setMax(Map.of(
-                "cpu",
-                Quantity.fromString("8"),
-                "memory",
-                Quantity.fromString("24Gi"),
-                "nvidia.com/gpu",
-                Quantity.fromString("7")));
+                "cpu", Quantity.parse("8"), "memory", Quantity.parse("24Gi"), "nvidia.com/gpu", Quantity.parse("7")));
         containerLimitRange.setDefaultRequest(Map.of(
-                "cpu",
-                Quantity.fromString("1"),
-                "memory",
-                Quantity.fromString("2Gi"),
-                "nvidia.com/gpu",
-                Quantity.fromString("0")));
+                "cpu", Quantity.parse("1"), "memory", Quantity.parse("2Gi"), "nvidia.com/gpu", Quantity.parse("0")));
         containerLimitRange.setDefault(Map.of(
-                "cpu",
-                Quantity.fromString("4"),
-                "memory",
-                Quantity.fromString("16Gi"),
-                "nvidia.com/gpu",
-                Quantity.fromString("0")));
+                "cpu", Quantity.parse("4"), "memory", Quantity.parse("16Gi"), "nvidia.com/gpu", Quantity.parse("0")));
         return containerLimitRange;
     }
 
@@ -302,12 +287,12 @@ public class GetActionResourceStatsTest {
     }
 
     private static final class TestableGetAction extends GetAction {
-        private final V1LimitRangeItem limitRangeItem;
+        private final LimitRangeItem limitRangeItem;
         private final boolean sessionLimitRangeEnabled;
 
         TestableGetAction(
                 final MetricsDAO metricsDAO,
-                final V1LimitRangeItem limitRangeItem,
+                final LimitRangeItem limitRangeItem,
                 final boolean sessionLimitRangeEnabled) {
             super(metricsDAO);
             this.limitRangeItem = limitRangeItem;

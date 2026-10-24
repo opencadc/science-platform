@@ -1,7 +1,7 @@
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import java.util.List;
 import java.util.Map;
 import org.junit.Assert;
@@ -16,8 +16,12 @@ public class SessionDAOTest {
     public void loadPodResourceUsageDelegatesToMetricsDao() {
         final MetricsDAO metricsDAO = Mockito.mock(MetricsDAO.class);
         final PodResourceUsage expected = PodResourceUsage.empty();
-        final List<V1Job> jobs = List.of(new V1Job()
-                .metadata(new V1ObjectMeta().name("job-a-main").labels(Map.of("canfar.net/id", "session-a"))));
+        final List<Job> jobs = List.of(new JobBuilder()
+                .withNewMetadata()
+                .withName("job-a-main")
+                .withLabels(Map.of("canfar.net/id", "session-a"))
+                .endMetadata()
+                .build());
         Mockito.when(metricsDAO.getPodResourceUsage("alice", false, jobs)).thenReturn(expected);
 
         final PodResourceUsage usage = SessionDAO.loadPodResourceUsage(metricsDAO, "alice", false, jobs);

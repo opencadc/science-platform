@@ -77,6 +77,7 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.opencadc.skaha.KubernetesApi;
+import org.opencadc.skaha.SkahaKubernetesClient;
 
 public class InitializationActionTest {
     private static final String LOCAL_QUEUE_PATH =
@@ -141,6 +142,34 @@ public class InitializationActionTest {
     public void testNoQueuesConfigured() {
         testSubject().ensureLocalQueuesValid(new QueueConfiguration[0]);
         Assert.assertEquals(0, this.api.server().getRequestCount());
+    }
+
+    @Test
+    public void testCacheStartFailureDoesNotStopStartup() {
+        // Listing Jobs is forbidden, so the cache never syncs; startup carries on and sessions are read live.
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/batch/v1/namespaces/" + NAMESPACE
+                        + "/jobs?labelSelector=canfar.net%2Fid&resourceVersion=0")
+                .andReturn(403, "")
+                .always();
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/batch/v1/namespaces/" + NAMESPACE + "/jobs?labelSelector=canfar.net%2Fid")
+                .andReturn(403, "")
+                .always();
+        final InitializationAction testSubject = testSubject();
+
+        testSubject.startSessionJobCache();
+
+        Assert.assertFalse(SessionDAO.servedFromCache(testSubject.sessionJobCache(), "alice", null));
+        testSubject.doShutdown();
+        // doShutdown closed the client.
+        Assert.assertThrows(IllegalStateException.class, SkahaKubernetesClient::get);
     }
 
     private static InitializationAction testSubject() {

@@ -173,7 +173,7 @@ With `rbac.create=true` the chart's Role grants Skaha exactly what it uses in th
 
 | Resources | Verbs | Used for |
 | --- | --- | --- |
-| `batch` `jobs` | create, get, list, patch, delete, deletecollection | Launch, read-back, list, renew, delete |
+| `batch` `jobs` | create, get, list, watch, patch, delete, deletecollection | Launch, read-back, session cache, renew, delete |
 | `pods` | get, list | Events, logs, desktop-app target IP |
 | `pods/log` | get | Session logs |
 | `events`, `limitranges` | get, list | Session events, session resource ceilings |

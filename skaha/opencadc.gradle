@@ -71,6 +71,9 @@ test {
     }
     dependsOn renderSessionTemplates
     systemProperty 'skaha.sessionTemplates', renderedSkahaConfig.get().asFile.path
+    // Session end-to-end tests run against the KubernetesApi mock server in this namespace.
+    environment 'skaha.namespace', 'skaha-workload'
+    environment 'SKAHA_SESSIONS_HOSTNAME', 'sessions.example.org'
 }
 
 intTest {

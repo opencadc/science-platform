@@ -12,11 +12,14 @@ import io.fabric8.mockwebserver.MockWebServer;
 import io.fabric8.mockwebserver.ServerRequest;
 import io.fabric8.mockwebserver.ServerResponse;
 import io.fabric8.mockwebserver.http.RecordedRequest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.function.BooleanSupplier;
+import org.junit.Assert;
 import org.junit.rules.ExternalResource;
 
 /**
@@ -94,5 +97,16 @@ public class KubernetesApi extends ExternalResource {
             requests.add(request.getMethod() + " " + request.getPath());
         }
         return requests;
+    }
+
+    /** Wait up to 10 seconds, e.g. for a watch to deliver a change. */
+    public static void await(final String what, final BooleanSupplier condition) throws InterruptedException {
+        final long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) {
+                Assert.fail("Timed out waiting for " + what);
+            }
+            Thread.sleep(20);
+        }
     }
 }

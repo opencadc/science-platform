@@ -1,16 +1,17 @@
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1Container;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobCondition;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1JobStatus;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import io.kubernetes.client.openapi.models.V1PodSecurityContext;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1ResourceRequirements;
+import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.PodSecurityContext;
+import io.fabric8.kubernetes.api.model.PodSpec;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.ResourceRequirements;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobCondition;
+import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
+import io.fabric8.kubernetes.api.model.batch.v1.JobStatus;
 import java.net.URISyntaxException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -66,11 +67,11 @@ class SessionBuilder {
         this.type = type;
     }
 
-    static Session fromJob(final V1Job job, final PodResourceUsage podResourceUsage) {
-        final V1ObjectMeta jobMetadata = job.getMetadata();
+    static Session fromJob(final Job job, final PodResourceUsage podResourceUsage) {
+        final ObjectMeta jobMetadata = job.getMetadata();
         Objects.requireNonNull(jobMetadata, "Invalid Job with null Metadata");
 
-        final V1JobSpec jobSpec = job.getSpec();
+        final JobSpec jobSpec = job.getSpec();
         Objects.requireNonNull(jobSpec, "jobSpec cannot be null");
 
         final Map<String, String> labels = jobMetadata.getLabels();
@@ -92,7 +93,7 @@ class SessionBuilder {
                 .build();
     }
 
-    SessionBuilder withJobSpec(final V1JobSpec jobSpec, final PodResourceUsage podResourceUsage) {
+    SessionBuilder withJobSpec(final JobSpec jobSpec, final PodResourceUsage podResourceUsage) {
         Objects.requireNonNull(jobSpec, "Invalid JobSpec");
 
         final Long secondsUntilExpire = jobSpec.getActiveDeadlineSeconds();
@@ -106,10 +107,10 @@ class SessionBuilder {
             this.activeExpirySeconds = secondsUntilExpire;
         }
 
-        final V1PodSpec podSpec = jobSpec.getTemplate().getSpec();
+        final PodSpec podSpec = jobSpec.getTemplate().getSpec();
 
         if (podSpec != null) {
-            final V1PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
+            final PodSecurityContext podSecurityContext = podSpec.getSecurityContext();
             if (podSecurityContext == null) {
                 SessionDAO.LOGGER.warn("No Pod Security Context found.");
             } else {
@@ -134,27 +135,27 @@ class SessionBuilder {
                     .findFirst()
                     .orElse(null);
 
-            final List<V1Container> podContainers = podSpec.getContainers();
+            final List<Container> podContainers = podSpec.getContainers();
             if (podContainers.isEmpty()) {
                 SessionDAO.LOGGER.warn("No Container found.");
             } else {
-                final V1Container podContainer = podContainers.getFirst();
+                final Container podContainer = podContainers.getFirst();
                 this.image = podContainer.getImage();
 
-                final V1ResourceRequirements resourceRequirements =
-                        Objects.requireNonNullElse(podContainer.getResources(), new V1ResourceRequirements());
+                final ResourceRequirements resourceRequirements =
+                        Objects.requireNonNullElse(podContainer.getResources(), new ResourceRequirements());
 
                 final Map<String, Quantity> resourceRequests =
                         Objects.requireNonNullElse(resourceRequirements.getRequests(), Collections.emptyMap());
                 if (this.isFixedResources) {
                     if (resourceRequests.containsKey("memory")) {
                         this.requestedMemory = ResourceQuantityFormatter.toSessionMemoryGb(
-                                resourceRequests.get("memory").toSuffixedString());
+                                resourceRequests.get("memory").toString());
                     }
 
                     if (resourceRequests.containsKey("cpu")) {
                         this.requestedCPUCores = ResourceQuantityFormatter.toCoreUnit(
-                                resourceRequests.get("cpu").toSuffixedString());
+                                resourceRequests.get("cpu").toString());
                     }
                 }
 
@@ -162,7 +163,7 @@ class SessionBuilder {
                         Objects.requireNonNullElse(resourceRequirements.getLimits(), Collections.emptyMap());
                 if (resourceLimits.containsKey("nvidia.com/gpu")) {
                     this.requestedGPUCores =
-                            resourceLimits.get("nvidia.com/gpu").toSuffixedString();
+                            resourceLimits.get("nvidia.com/gpu").toString();
                 } else {
                     // Set to zero to satisfy UI conditions.
                     this.requestedGPUCores = "0";
@@ -191,10 +192,10 @@ class SessionBuilder {
      * @return {@link Session#STATUS_FAILED} for a true Failed/FailureTarget condition, {@link Session#STATUS_COMPLETED}
      *     for a true Complete/SuccessCriteriaMet condition, otherwise null.
      */
-    static String terminalCondition(final V1JobStatus jobStatus) {
-        final List<V1JobCondition> conditions = Objects.requireNonNullElse(jobStatus.getConditions(), List.of());
+    static String terminalCondition(final JobStatus jobStatus) {
+        final List<JobCondition> conditions = Objects.requireNonNullElse(jobStatus.getConditions(), List.of());
         String terminal = null;
-        for (final V1JobCondition condition : conditions) {
+        for (final JobCondition condition : conditions) {
             if (!"True".equalsIgnoreCase(condition.getStatus())) {
                 continue;
             }
@@ -211,13 +212,14 @@ class SessionBuilder {
         return terminal;
     }
 
-    SessionBuilder withStatus(final V1JobStatus jobStatus, final boolean suspended) {
+    SessionBuilder withStatus(final JobStatus jobStatus, final boolean suspended) {
         if (jobStatus == null) {
             LOGGER.debug("No JobStatus found for " + this.id);
             this.status = Session.STATUS_PENDING;
         } else {
             if (jobStatus.getStartTime() != null) {
-                this.startTime = jobStatus.getStartTime().toString();
+                // Keep the format client-java produced (for example 2026-10-23T12:00Z when seconds are zero).
+                this.startTime = OffsetDateTime.parse(jobStatus.getStartTime()).toString();
             }
 
             if (this.activeExpirySeconds != null && this.startTime != null) {

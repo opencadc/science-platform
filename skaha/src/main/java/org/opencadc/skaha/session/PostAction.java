@@ -298,7 +298,8 @@ public class PostAction extends SessionAction {
     }
 
     private void checkExistingSessions(final SessionType type) throws Exception {
-        checkExistingSessions(type, SessionDAO.getUserSessions(this.posixPrincipal.username, null, true));
+        // Live, not cached: concurrent launches by the same user must see each other.
+        checkExistingSessions(type, SessionDAO.getUserSessionsLive(this.posixPrincipal.username, null, true));
     }
 
     /**
@@ -429,7 +430,7 @@ public class PostAction extends SessionAction {
             ownedResourceYamls.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
         }
 
-        new SessionLauncher(SkahaKubernetesClient.get()).launch(launch.job(), ownedResourceYamls);
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(launch.job(), ownedResourceYamls));
     }
 
     private void injectPOSIXDetails() throws Exception {
@@ -554,8 +555,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBUID, ownerJob.getMetadata().getUid())
                 .withParameter(PostAction.SKAHA_JOBNAME, ownerJob.getMetadata().getName());
 
-        new SessionLauncher(SkahaKubernetesClient.get())
-                .launch(sessionJobBuilder.buildLaunch().job(), List.of());
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
+                .launch(sessionJobBuilder.buildLaunch().job(), List.of()));
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);

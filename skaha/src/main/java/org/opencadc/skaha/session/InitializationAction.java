@@ -70,12 +70,12 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.rest.InitAction;
 import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
-import io.kubernetes.client.openapi.ApiClient;
-import io.kubernetes.client.openapi.Configuration;
-import io.kubernetes.client.util.Config;
-import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -88,6 +88,10 @@ import org.opencadc.skaha.SkahaKubernetesClient;
  */
 public class InitializationAction extends InitAction {
     private static final Logger LOGGER = LogManager.getLogger(InitializationAction.class);
+    static final Duration CACHE_SYNC_WAIT = Duration.ofSeconds(30);
+
+    private SessionJobCache sessionJobCache;
+
     private static final String FATAL_LOG_MESSAGE =
             "Queue %s specified in configuration but no local queues exist in namespace %s";
 
@@ -100,14 +104,11 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doInit() {
-        LOGGER.info("Initializing Kubernetes API clients...");
-        try {
-            setupKubernetesAPIConfiguration();
-        } catch (IOException ioException) {
-            throw new IllegalStateException(ioException.getMessage(), ioException);
-        }
+        LOGGER.info("Initializing Kubernetes API client...");
         initializeKubernetesClient();
-        LOGGER.info("Initializing Kubernetes API clients: OK");
+        LOGGER.info("Initializing Kubernetes API client: OK");
+
+        startSessionJobCache();
 
         LOGGER.info("Verifying QueueConfigurations, if any...");
         ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
@@ -116,7 +117,35 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doShutdown() {
+        final SessionJobCache cache = this.sessionJobCache;
+        if (cache != null) {
+            SessionDAO.useCache(null);
+            cache.close();
+        }
         SkahaKubernetesClient.close();
+    }
+
+    SessionJobCache sessionJobCache() {
+        return this.sessionJobCache;
+    }
+
+    /**
+     * Start the session Job cache and wait a bounded time for its first sync. Until it syncs, session listings are read
+     * live, so a slow sync delays nothing.
+     */
+    void startSessionJobCache() {
+        this.sessionJobCache = new SessionJobCache(SkahaKubernetesClient.get());
+        SessionDAO.useCache(this.sessionJobCache);
+        try {
+            this.sessionJobCache.start().toCompletableFuture().get(CACHE_SYNC_WAIT.toSeconds(), TimeUnit.SECONDS);
+            LOGGER.info("Session Job cache synced");
+        } catch (TimeoutException timeoutException) {
+            LOGGER.warn("Session Job cache not synced after {}; reading sessions live until it is", CACHE_SYNC_WAIT);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException executionException) {
+            LOGGER.error("Session Job cache failed to start; reading sessions live", executionException.getCause());
+        }
     }
 
     void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
@@ -162,14 +191,6 @@ public class InitializationAction extends InitAction {
     /** Build the application Fabric8 client. Tests override this to install a mock client. */
     void initializeKubernetesClient() {
         SkahaKubernetesClient.initialize(getWorkloadNamespace());
-    }
-
-    /** Configure the client-java default client still used by session readers and metrics. */
-    void setupKubernetesAPIConfiguration() throws IOException {
-        final ApiClient client = Config.fromCluster();
-        Configuration.setDefaultApiClient(client);
-
-        LOGGER.info("API Server base path: {}", client.getBasePath());
     }
 
     String getWorkloadNamespace() {

@@ -1,7 +1,7 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -50,7 +50,7 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
     }
 
     @Override
-    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless, final List<V1Job> sessionJobs) {
+    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless, final List<Job> sessionJobs) {
         if (sessionMetricsDAO == null || sessionJobs == null || sessionJobs.isEmpty()) {
             return PodMetrics.empty();
         }
@@ -174,13 +174,13 @@ final class MetricsBackendPodUsageProvider implements PodUsageProvider {
         }
     }
 
-    private static Map<String, List<String>> sessionIdsByJobName(final List<V1Job> jobs) {
+    private static Map<String, List<String>> sessionIdsByJobName(final List<Job> jobs) {
         final Map<String, List<String>> sessionIdToJobNames = new LinkedHashMap<>();
-        for (final V1Job job : jobs) {
+        for (final Job job : jobs) {
             if (job == null || job.getMetadata() == null) {
                 continue;
             }
-            final V1ObjectMeta metadata = job.getMetadata();
+            final ObjectMeta metadata = job.getMetadata();
             final Map<String, String> labels = metadata.getLabels();
             if (labels == null || metadata.getName() == null) {
                 continue;
