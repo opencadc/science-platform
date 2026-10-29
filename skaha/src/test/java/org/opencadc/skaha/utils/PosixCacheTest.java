@@ -5,6 +5,9 @@ import ca.nrc.cadc.net.TransientException;
 import java.net.URI;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -38,15 +41,29 @@ public class PosixCacheTest {
     }
 
     @Test
-    public void testRefreshFailureDoesNotFailLaunch() throws Exception {
-        // pipelined() returns null on the mock, so both full-map refreshes fail; the launch proceeds.
+    public void testRefreshRunsOnceInTheBackground() throws Exception {
+        // The full-map refresh blocks, then fails; launches neither wait for it nor start another.
+        final CountDownLatch release = new CountDownLatch(1);
         final JedisPooled jedis = Mockito.mock(JedisPooled.class);
+        Mockito.when(jedis.pipelined()).thenAnswer(invocation -> {
+            release.await(10, TimeUnit.SECONDS);
+            throw new JedisConnectionException("connection refused");
+        });
         final PosixCache testSubject = new PosixCache(jedis, "/cavern/home", Mockito.mock(PosixMapperClient.class));
 
+        // Another test's refresh may still be finishing.
+        Future<?> refresh;
+        while ((refresh = testSubject.refreshInBackground()) == null) {
+            Thread.sleep(10);
+        }
         testSubject.writePOSIXEntries(alice(), Set.of());
-
+        Assert.assertNull("A refresh is already running", testSubject.refreshInBackground());
         Mockito.verify(jedis).sadd("users:posix", "alice:x:1000:1000::/cavern/home/alice:/sbin/nologin");
-        Mockito.verify(jedis, Mockito.never()).sadd(Mockito.eq("groups:posix"), Mockito.any(String[].class));
+
+        release.countDown();
+        refresh.get(10, TimeUnit.SECONDS);
+        Mockito.verify(jedis, Mockito.times(1)).pipelined();
+        Assert.assertNotNull("The next launch may refresh again", testSubject.refreshInBackground());
     }
 
     private static PosixPrincipal alice() {

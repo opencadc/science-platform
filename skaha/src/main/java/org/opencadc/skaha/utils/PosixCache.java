@@ -7,15 +7,13 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.log4j.Logger;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
@@ -58,6 +56,13 @@ public class PosixCache {
     private static final Map<String, JedisPooled> POOLS = new ConcurrentHashMap<>();
     static final int POOL_MAX_TOTAL = 32;
     static final Duration POOL_MAX_WAIT = Duration.ofSeconds(2);
+
+    private static final ExecutorService REFRESH = Executors.newSingleThreadExecutor(runnable -> {
+        final Thread thread = new Thread(runnable, "posix-cache-refresh");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final AtomicBoolean REFRESHING = new AtomicBoolean();
 
     private final JedisPooled jedisPool;
     private final String rootHomeFolder;
@@ -113,9 +118,9 @@ public class PosixCache {
     }
 
     /**
-     * Write the POSIX entries a new session needs. The requesting user's own passwd and group entries are written first
-     * and are required. The full user and group maps are then refreshed from the POSIX Mapper if they have expired;
-     * that refresh is best-effort and bounded to one minute.
+     * Write the POSIX entries a new session needs. The requesting user's own passwd and group entries are written and
+     * are required. The full user and group maps are refreshed from the POSIX Mapper in the background if they have
+     * expired; the request does not wait for that refresh.
      *
      * @param user The requesting user.
      * @param userGroups The requesting user's groups.
@@ -124,7 +129,7 @@ public class PosixCache {
     public void writePOSIXEntries(final PosixPrincipal user, final Collection<PosixGroup> userGroups)
             throws TransientException {
         writeRequestingUserEntries(user, userGroups);
-        refreshAllEntries();
+        refreshInBackground();
     }
 
     void writeRequestingUserEntries(final PosixPrincipal user, final Collection<PosixGroup> userGroups)
@@ -146,41 +151,26 @@ public class PosixCache {
     }
 
     /**
-     * Refresh the full user and group maps on two threads. Failures and timeouts are logged and do not fail the
-     * request: the requesting user's entries are already written. The request does not wait for a stuck refresh.
+     * Refresh the full user and group maps if they have expired, on this replica's single refresh thread. A launch that
+     * arrives while a refresh runs does not start another, so a burst of launches downloads the maps once and holds one
+     * Redis connection. Failures are logged: the requesting user's entries are already written.
+     *
+     * @return The refresh, or null when one is already running.
      */
-    private void refreshAllEntries() {
-        final ExecutorService executor = Executors.newFixedThreadPool(2);
-        final List<Future<Void>> refreshes = List.of(
-                executor.submit(() -> {
-                    writeUserEntries();
-                    return null;
-                }),
-                executor.submit(() -> {
-                    writeGroupEntries();
-                    return null;
-                }));
-        executor.shutdown();
-
-        try {
-            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
-                LOGGER.error("POSIX Mapper Cache refresh did not complete within a minute");
-                executor.shutdownNow();
-            }
-            for (final Future<Void> refresh : refreshes) {
-                if (refresh.isDone() && !refresh.isCancelled()) {
-                    try {
-                        refresh.get();
-                    } catch (ExecutionException executionException) {
-                        LOGGER.error("POSIX Mapper Cache refresh failed", executionException.getCause());
-                    }
-                }
-            }
-        } catch (InterruptedException interruptedException) {
-            LOGGER.error("POSIX Mapper Cache refresh interrupted", interruptedException);
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
+    Future<?> refreshInBackground() {
+        if (!REFRESHING.compareAndSet(false, true)) {
+            return null;
         }
+        return REFRESH.submit(() -> {
+            try {
+                writeUserEntries();
+                writeGroupEntries();
+            } catch (Exception exception) {
+                LOGGER.error("POSIX Mapper Cache refresh failed", exception);
+            } finally {
+                REFRESHING.set(false);
+            }
+        });
     }
 
     private void writeUserEntries() throws Exception {
