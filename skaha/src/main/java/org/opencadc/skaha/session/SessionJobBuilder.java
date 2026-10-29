@@ -273,6 +273,7 @@ public class SessionJobBuilder {
 
     /** Build and mutate launch artifacts from a parsed template. */
     private LaunchArtifacts buildLaunch(final Job launchJob) {
+        requireImagePlaceholderOnlyAsImage(launchJob);
         final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
         applyJobLabels(launchJob, labelPlan);
         mergeQueue(launchJob);
@@ -281,13 +282,28 @@ public class SessionJobBuilder {
         applyImage(launchJob);
         applyPriorityClass(launchJob);
         applyHeadlessCommand(launchJob);
-        if (Serialization.asYaml(launchJob).contains(IMAGE_PLACEHOLDER)) {
-            // The template used ${software.imageid} somewhere other than a whole container image; the Pod could
-            // never start, so do not launch it.
-            throw new IllegalStateException("Session template uses the image placeholder outside a container image");
-        }
 
         return new LaunchArtifacts(launchJob, labelPlan);
+    }
+
+    /**
+     * A template that uses ${software.imageid} other than as a whole container image would launch a Pod that can never
+     * start. Checked before request values are set, so a request value that contains the placeholder is not mistaken
+     * for template misuse.
+     */
+    private static void requireImagePlaceholderOnlyAsImage(final Job launchJob) {
+        final long asImage = containers(launchJob)
+                .filter(container -> IMAGE_PLACEHOLDER.equals(container.getImage()))
+                .count();
+        final long anywhere = Serialization.asYaml(launchJob).split(IMAGE_PLACEHOLDER, -1).length - 1;
+        if (anywhere != asImage) {
+            throw new IllegalStateException("Session template uses the image placeholder outside a container image");
+        }
+    }
+
+    private static Stream<Container> containers(final Job launchJob) {
+        final PodSpec podSpec = podSpec(launchJob);
+        return Stream.concat(podSpec.getInitContainers().stream(), podSpec.getContainers().stream());
     }
 
     /** Build the canonical label plan for this launch. */
@@ -497,8 +513,7 @@ public class SessionJobBuilder {
 
     /** Set the session image on every container and init container that the template gave the image placeholder. */
     private void applyImage(final Job launchJob) {
-        final PodSpec podSpec = podSpec(launchJob);
-        Stream.concat(podSpec.getInitContainers().stream(), podSpec.getContainers().stream())
+        containers(launchJob)
                 .filter(container -> IMAGE_PLACEHOLDER.equals(container.getImage()))
                 .forEach(container -> container.setImage(requireImage()));
     }
