@@ -92,6 +92,7 @@ import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.metrics.PodResourceUsage;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
@@ -298,8 +299,13 @@ public class PostAction extends SessionAction {
     }
 
     private void checkExistingSessions(final SessionType type) throws Exception {
-        // Live, not cached: concurrent launches by the same user must see each other.
-        checkExistingSessions(type, SessionDAO.getUserSessionsLive(this.posixPrincipal.username, null, true));
+        // Live, not cached: concurrent launches by the same user must see each other. Only status counts, so no
+        // pod usage is loaded.
+        checkExistingSessions(
+                type,
+                SessionDAO.liveJobs(this.posixPrincipal.username, null, true).stream()
+                        .map(job -> SessionBuilder.fromJob(job, PodResourceUsage.empty()))
+                        .collect(Collectors.toList()));
     }
 
     /**
