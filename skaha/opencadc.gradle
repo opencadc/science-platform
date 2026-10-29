@@ -54,13 +54,9 @@ def renderSessionTemplates = tasks.register('renderSessionTemplates', Exec) {
             '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["w"]',
             '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq"]',
             '--set', 'deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern'
-    doFirst {
-        final File output = renderedSkahaConfig.get().asFile
-        output.parentFile.mkdirs()
-        standardOutput = new FileOutputStream(output)
-    }
+    standardOutput = new ByteArrayOutputStream()
     doLast {
-        standardOutput.close()
+        renderedSkahaConfig.get().asFile.bytes = standardOutput.toByteArray()
     }
 }
 
