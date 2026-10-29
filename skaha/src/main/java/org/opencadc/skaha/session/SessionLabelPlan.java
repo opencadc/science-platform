@@ -19,7 +19,7 @@ final class SessionLabelPlan {
         return jobLabels;
     }
 
-    Map<String, String> serviceMetadataLabels() {
+    Map<String, String> ownedLabels() {
         final Map<String, String> metadataLabels = new LinkedHashMap<>();
         for (final SessionLabels.Key key : SessionLabels.Key.values()) {
             final String value = jobLabels.get(key.label());
@@ -35,10 +35,6 @@ final class SessionLabelPlan {
         selector.put(SessionLabels.Key.ID.label(), required(SessionLabels.Key.ID));
         selector.put(SessionLabels.Key.KIND.label(), required(SessionLabels.Key.KIND));
         return Map.copyOf(selector);
-    }
-
-    Map<String, String> ingressMetadataLabels() {
-        return serviceMetadataLabels();
     }
 
     private String required(final SessionLabels.Key key) {

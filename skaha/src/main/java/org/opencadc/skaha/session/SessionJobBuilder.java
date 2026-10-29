@@ -14,9 +14,7 @@ import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodTemplateSpec;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirements;
-import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
-import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -72,8 +69,8 @@ public class SessionJobBuilder {
      */
     record HeadlessCommand(String command, List<String> args, List<EnvVar> env) {
         /**
-         * Parse the request parameters: {@code args} split on single spaces, as before, and each {@code env} entry
-         * split on its first {@code =}. Entries without a name are ignored.
+         * Parse the request parameters: {@code args} split on single spaces, and each {@code env} entry split on its
+         * first {@code =}. Entries without a name are ignored.
          */
         static HeadlessCommand fromRequest(final String command, final String args, final List<String> envs) {
             final List<String> argList =
@@ -231,7 +228,6 @@ public class SessionJobBuilder {
         return this;
     }
 
-    /** Build launch artifacts from the rendered template. */
     LaunchArtifacts buildLaunch() throws IOException {
         String jobFileString = Files.readString(jobFilePath, StandardCharsets.UTF_8);
         // Request values are set as typed fields after parsing; the template text only ever gets fixed stand-ins,
@@ -247,31 +243,6 @@ public class SessionJobBuilder {
         return buildLaunch(Serialization.unmarshal(jobFileString, Job.class));
     }
 
-    static String labelService(final String serviceString, final SessionLabelPlan plan) {
-        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
-        final Service service = Serialization.unmarshal(serviceString, Service.class);
-        service.getMetadata().getLabels().putAll(labelPlan.serviceMetadataLabels());
-        service.getSpec().setSelector(labelPlan.serviceSelector());
-
-        return Serialization.asYaml(service);
-    }
-
-    static String labelIngress(final String ingressString, final SessionLabelPlan plan) {
-        final SessionLabelPlan labelPlan = Objects.requireNonNull(plan, "plan cannot be null");
-        final org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
-        final List<Object> documents = new ArrayList<>();
-
-        for (final Object document : yaml.loadAll(ingressString)) {
-            if (document instanceof Map<?, ?> yamlDocument) {
-                applyMetadataLabels(yamlDocument, labelPlan.ingressMetadataLabels());
-            }
-            documents.add(document);
-        }
-
-        return yaml.dumpAll(documents.iterator());
-    }
-
-    /** Build and mutate launch artifacts from a parsed template. */
     private LaunchArtifacts buildLaunch(final Job launchJob) {
         requireImagePlaceholderOnlyAsImage(launchJob);
         final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
@@ -309,10 +280,10 @@ public class SessionJobBuilder {
     /** Build the canonical label plan for this launch. */
     private SessionLabelPlan buildLabelPlan(final Job launchJob) {
         final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
-        labelValues.put(SessionLabels.Key.ID, requireParam(PostAction.SKAHA_SESSIONID));
-        labelValues.put(SessionLabels.Key.USERNAME, requireParam(PostAction.SKAHA_USERID));
-        labelValues.put(SessionLabels.Key.NAME, requireParam(PostAction.SKAHA_SESSIONNAME));
-        labelValues.put(SessionLabels.Key.KIND, requireParam(PostAction.SKAHA_SESSIONTYPE));
+        labelValues.put(SessionLabels.Key.ID, requireFirstNonBlank(PostAction.SKAHA_SESSIONID));
+        labelValues.put(SessionLabels.Key.USERNAME, requireFirstNonBlank(PostAction.SKAHA_USERID));
+        labelValues.put(SessionLabels.Key.NAME, requireFirstNonBlank(PostAction.SKAHA_SESSIONNAME));
+        labelValues.put(SessionLabels.Key.KIND, requireFirstNonBlank(PostAction.SKAHA_SESSIONTYPE));
         final String appId = firstNonBlank(PostAction.SOFTWARE_APPID);
         if (appId != null) {
             labelValues.put(SessionLabels.Key.APP_ID, appId);
@@ -342,20 +313,6 @@ public class SessionJobBuilder {
         podTemplate.getMetadata().getLabels().putAll(plan.jobLabels());
     }
 
-    @SuppressWarnings("unchecked")
-    private static void applyMetadataLabels(final Map<?, ?> yamlDocument, final Map<String, String> metadataLabels) {
-        final Map<String, Object> document = (Map<String, Object>) yamlDocument;
-        final Map<String, Object> metadata =
-                (Map<String, Object>) document.computeIfAbsent("metadata", key -> new LinkedHashMap<>());
-        final Map<String, Object> labels = new LinkedHashMap<>();
-        final Object currentLabels = metadata.get("labels");
-        if (currentLabels instanceof Map<?, ?> currentLabelMap) {
-            currentLabelMap.forEach((key, value) -> labels.put(key.toString(), value));
-        }
-        labels.putAll(metadataLabels);
-        metadata.put("labels", labels);
-    }
-
     /** Return the first non-blank parameter value for the provided keys. */
     private String firstNonBlank(final String... keys) {
         for (final String key : keys) {
@@ -365,11 +322,6 @@ public class SessionJobBuilder {
             }
         }
         return null;
-    }
-
-    /** Return one required parameter value. */
-    private String requireParam(final String key) {
-        return requireFirstNonBlank(key);
     }
 
     /** Return the first non-blank value or throw when none are present. */
@@ -400,14 +352,10 @@ public class SessionJobBuilder {
      */
     private void mergeAffinity(final Job launchJob) {
         final Affinity gpuAffinity = getGPUSchedulingAffinity();
-        if (gpuAffinity == null || launchJob.getSpec() == null) {
+        if (gpuAffinity == null) {
             return;
         }
-        // spec.template.spec
-        final PodSpec podTemplateSpec = launchJob.getSpec().getTemplate().getSpec();
-        if (podTemplateSpec == null) {
-            return;
-        }
+        final PodSpec podTemplateSpec = podSpec(launchJob);
 
         // If we're this far, there is no need to check if gpuEnabled again, so only check if gpuCount is greater
         // than 0.
@@ -424,14 +372,12 @@ public class SessionJobBuilder {
             resourceRequirements.getRequests().put("nvidia.com/gpu", new Quantity(Integer.toString(this.gpuCount)));
         }
 
-        // spec.template.spec.affinity
         final Affinity affinity = podTemplateSpec.getAffinity();
         if (affinity == null) {
             podTemplateSpec.setAffinity(gpuAffinity);
             return;
         }
 
-        // spec.template.spec.affinity.nodeAffinity
         final NodeAffinity nodeAffinity = affinity.getNodeAffinity();
         final NodeAffinity gpuNodeAffinity = gpuAffinity.getNodeAffinity();
         if (nodeAffinity == null) {
@@ -443,7 +389,6 @@ public class SessionJobBuilder {
                 .getPreferredDuringSchedulingIgnoredDuringExecution()
                 .addAll(gpuNodeAffinity.getPreferredDuringSchedulingIgnoredDuringExecution());
 
-        // spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
         final NodeSelector requiredNodeSelector = nodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
         final NodeSelector gpuRequiredNodeSelector =
                 gpuNodeAffinity.getRequiredDuringSchedulingIgnoredDuringExecution();
@@ -486,29 +431,21 @@ public class SessionJobBuilder {
      *
      * @param launchJob The Job to modify.
      */
-    void mergeQueue(final Job launchJob) {
+    private void mergeQueue(final Job launchJob) {
         if (this.queueConfiguration != null) {
-            LOGGER.debug("Setting queue name to " + this.queueConfiguration);
-
-            final JobSpec jobSpec = Objects.requireNonNullElse(launchJob.getSpec(), new JobSpec());
-
-            final Map<String, String> labels = launchJob.getMetadata().getLabels();
-            labels.putAll(
-                    SessionLabels.kueue(this.queueConfiguration.queueName, this.queueConfiguration.priorityClass));
-
-            jobSpec.setSuspend(true);
-
-            launchJob.setSpec(jobSpec);
-        } else {
-            LOGGER.debug("No queue name provided.");
+            launchJob
+                    .getMetadata()
+                    .getLabels()
+                    .putAll(SessionLabels.kueue(
+                            this.queueConfiguration.queueName, this.queueConfiguration.priorityClass));
+            launchJob.getSpec().setSuspend(true);
         }
     }
 
     private void mergeImagePullSecret(final Job launchJob) {
-        if (launchJob.getSpec() == null || !StringUtil.hasText(this.imageRegistrySecretName)) {
-            return;
+        if (StringUtil.hasText(this.imageRegistrySecretName)) {
+            podSpec(launchJob).getImagePullSecrets().add(new LocalObjectReference(this.imageRegistrySecretName));
         }
-        podSpec(launchJob).getImagePullSecrets().add(new LocalObjectReference(this.imageRegistrySecretName));
     }
 
     /** Set the session image on every container and init container that the template gave the image placeholder. */

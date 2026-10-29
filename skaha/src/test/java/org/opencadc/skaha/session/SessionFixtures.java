@@ -5,15 +5,12 @@ import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * Session templates and launch parameters as PostAction supplies them. Launch and ingress templates come from the Skaha
- * ConfigMap that Gradle's {@code renderSessionTemplates} renders from the chart before the tests run. Service templates
- * have no Helm directives and are read from the chart directly.
+ * Session templates and launch parameters as PostAction supplies them. The templates come from the Skaha ConfigMap that
+ * Gradle's {@code renderSessionTemplates} renders from the chart before the tests run.
  */
 final class SessionFixtures {
     static final String USER = "alice";
@@ -21,30 +18,25 @@ final class SessionFixtures {
 
     private SessionFixtures() {}
 
+    /** The session templates in the Skaha ConfigMap that Gradle renders from the chart, by file name. */
+    private static Map<String, String> templates() throws IOException {
+        final Path configMap = Path.of(System.getProperty("skaha.sessionTemplates"));
+        return Serialization.unmarshal(Files.readString(configMap), ConfigMap.class)
+                .getData();
+    }
+
     static Path template(final String name) throws IOException {
-        if (name.startsWith("service-")) {
-            return Path.of("../helm/skaha-config", name);
-        }
-        final Path configMap =
-                Path.of(System.getProperty("skaha.sessionTemplates", "build/session-templates/skaha-config.yaml"));
-        final String template = Serialization.unmarshal(Files.readString(configMap), ConfigMap.class)
-                .getData()
-                .get(name);
+        final String template = templates().get(name);
         if (template == null) {
-            throw new IOException("No session template " + name + " in " + configMap);
+            throw new IOException("No session template " + name);
         }
-        return Files.writeString(configMap.resolveSibling(name), template);
+        return Files.writeString(Files.createTempFile(name, ".yaml"), template);
     }
 
     /** A working directory whose config/ holds every session template, as the Skaha container has them. */
     static Path workingDirectory(final Path root) throws IOException {
         final Path config = Files.createDirectories(root.resolve("config"));
-        final Path configMap =
-                Path.of(System.getProperty("skaha.sessionTemplates", "build/session-templates/skaha-config.yaml"));
-        for (final Map.Entry<String, String> entry : Serialization.unmarshal(
-                        Files.readString(configMap), ConfigMap.class)
-                .getData()
-                .entrySet()) {
+        for (final Map.Entry<String, String> entry : templates().entrySet()) {
             Files.writeString(config.resolve(entry.getKey()), entry.getValue());
         }
         return root;
@@ -68,28 +60,6 @@ final class SessionFixtures {
         return SessionJobBuilder.fromPath(template("launch-" + kind + ".yaml"))
                 .withParameters(parameters)
                 .withImage(image(kind));
-    }
-
-    /** The Service and ingress a session of this kind owns, rendered as PostAction renders them. */
-    static List<String> ownedResources(final SessionType type, final SessionLabelPlan labels) throws IOException {
-        final String kind = type.name().toLowerCase();
-        final List<String> owned = new ArrayList<>();
-        if (type.supportsService()) {
-            owned.add(SessionJobBuilder.labelService(
-                    SessionJobBuilder.setConfigValue(
-                            Files.readString(template("service-" + kind + ".yaml")),
-                            PostAction.SKAHA_SESSIONID,
-                            SESSION_ID),
-                    labels));
-        }
-        if (type.supportsIngress()) {
-            String ingress = Files.readString(template("ingress-" + kind + ".yaml"));
-            ingress = SessionJobBuilder.setConfigValue(ingress, PostAction.SKAHA_SESSIONID, SESSION_ID);
-            ingress = SessionJobBuilder.setConfigValue(
-                    ingress, PostAction.SKAHA_SESSIONS_HOSTNAME, "sessions.example.org");
-            owned.add(SessionJobBuilder.labelIngress(ingress, labels));
-        }
-        return owned;
     }
 
     /** The trusted parameters PostAction supplies when launching a session; request values are set separately. */

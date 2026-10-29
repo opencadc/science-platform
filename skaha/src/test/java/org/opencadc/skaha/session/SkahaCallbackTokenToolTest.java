@@ -78,7 +78,7 @@ public class SkahaCallbackTokenToolTest {
     @Test
     public void fromSecret_kubectlEraSecret_reusedAndCached() throws Exception {
         final KeyPair keyPair = SkahaCallbackTokenToolTest.fixedTestKeyPair();
-        // A token issued before the migration must still validate with the keys read back.
+        // A token signed with the persisted keys validates with the keys read back.
         final String oldToken = new SkahaCallbackTokenTool(
                         keyPair.getPublic().getEncoded(), keyPair.getPrivate().getEncoded())
                 .generateToken(WriteGrant.class, "session-1");

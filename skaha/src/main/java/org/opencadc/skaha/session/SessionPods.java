@@ -45,8 +45,8 @@ final class SessionPods {
     }
 
     /**
-     * Events on the session's Jobs and Pods, in the columns of the former {@code kubectl get event -o custom-columns}.
-     * Job events matter when no Pod exists, e.g. a Pod rejected at admission ({@code FailedCreate}).
+     * Events on the session's Jobs and Pods, as a table: type, reason, message, first and last time. Job events matter
+     * when no Pod exists, e.g. a Pod rejected at admission ({@code FailedCreate}).
      *
      * @return The table, or an empty string when there are no events.
      * @throws ResourceNotFoundException When the session has neither a Job nor a Pod.
@@ -108,10 +108,7 @@ final class SessionPods {
         return table.toString().trim();
     }
 
-    /**
-     * Write each session Pod's log from its default container, as {@code kubectl logs -l} did. Pods whose container has
-     * not started are skipped.
-     */
+    /** Write each session Pod's log from its default container. Pods whose container has not started are skipped. */
     static void streamLogs(final String username, final String sessionID, final OutputStream out) throws IOException {
         for (final Pod pod : pods(username, sessionID)) {
             final HttpResponse<InputStream> response = getLog(pod.getMetadata().getName(), defaultContainer(pod));

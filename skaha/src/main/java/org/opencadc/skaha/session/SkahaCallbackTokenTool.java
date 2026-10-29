@@ -85,7 +85,7 @@ public final class SkahaCallbackTokenTool {
             if (exception.getCode() != 409) {
                 throw exception;
             }
-            return Objects.requireNonNull(client.secrets().withName(name).get(), "Secret " + name + " vanished");
+            return client.secrets().withName(name).get();
         }
     }
 
@@ -97,7 +97,7 @@ public final class SkahaCallbackTokenTool {
 
     /**
      * The tool for a persisted key pair. Each Secret value is the Base64 of the encoded key, so the API's data holds it
-     * Base64-encoded twice, as kubectl wrote it.
+     * Base64-encoded twice.
      *
      * @throws IllegalStateException If a key is missing or malformed; an unpersisted key is never substituted.
      */
@@ -107,11 +107,16 @@ public final class SkahaCallbackTokenTool {
     }
 
     private static byte[] decodeKey(final Map<String, String> data, final String key) {
+        final String message = "Callback signing Secret has no valid '" + key + "' key";
+        final String value = data.get(key);
+        if (value == null) {
+            throw new IllegalStateException(message);
+        }
         try {
             final java.util.Base64.Decoder decoder = java.util.Base64.getDecoder();
-            return decoder.decode(decoder.decode(Objects.requireNonNull(data.get(key))));
-        } catch (NullPointerException | IllegalArgumentException exception) {
-            throw new IllegalStateException("Callback signing Secret has no valid '" + key + "' key", exception);
+            return decoder.decode(decoder.decode(value));
+        } catch (IllegalArgumentException malformed) {
+            throw new IllegalStateException(message, malformed);
         }
     }
 

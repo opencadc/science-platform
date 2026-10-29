@@ -95,11 +95,6 @@ public final class SessionLabels {
         return selector(labelEquals(Key.ID, sessionID), labelEquals(Key.USERNAME, username));
     }
 
-    /** Selector for all sessions owned by a user, or {@code ""} when username is blank. */
-    public static String forUser(final String username) {
-        return StringUtil.hasText(username) ? selector(labelEquals(Key.USERNAME, username)) : "";
-    }
-
     /** Selector for session listings and pod metrics. */
     public static String forUserSessions(final String username, final String sessionID, final boolean omitHeadless) {
         final List<String> requirements = new ArrayList<>();

@@ -218,7 +218,7 @@ class SessionBuilder {
             this.status = Session.STATUS_PENDING;
         } else {
             if (jobStatus.getStartTime() != null) {
-                // Keep the format client-java produced (for example 2026-10-23T12:00Z when seconds are zero).
+                // ISO-8601, seconds omitted when zero (e.g. 2026-10-23T12:00Z).
                 this.startTime = OffsetDateTime.parse(jobStatus.getStartTime()).toString();
             }
 

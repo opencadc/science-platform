@@ -149,6 +149,7 @@ public class SessionLifecycleTest {
         Assert.assertEquals(this.services, createdServices.size());
         for (final Service service : createdServices) {
             assertOwnedBy(service, job);
+            assertSessionLabels(service, sessionID, kind);
             Assert.assertEquals(
                     Map.of("canfar.net/id", sessionID, "canfar.net/kind", kind),
                     service.getSpec().getSelector());
@@ -160,7 +161,10 @@ public class SessionLifecycleTest {
                     .getItems());
         }
         Assert.assertEquals(this.traefikResources, traefik.size());
-        traefik.forEach(resource -> assertOwnedBy(resource, job));
+        traefik.forEach(resource -> {
+            assertOwnedBy(resource, job);
+            assertSessionLabels(resource, sessionID, kind);
+        });
 
         // List: the new session shows at once (read-after-write), with Job status and pod usage.
         final String podName = job.getMetadata().getName() + "-x1y2z";
@@ -346,6 +350,16 @@ public class SessionLifecycleTest {
                                         .build())
                                 .build())
                 .once();
+    }
+
+    /** Owned resources carry the launch's session labels and none of Kueue's. */
+    private static void assertSessionLabels(final HasMetadata resource, final String sessionID, final String kind) {
+        final Map<String, String> labels = resource.getMetadata().getLabels();
+        Assert.assertEquals(sessionID, labels.get("canfar.net/id"));
+        Assert.assertEquals(kind, labels.get("canfar.net/kind"));
+        Assert.assertEquals(USER, labels.get("canfar.net/username"));
+        Assert.assertEquals("analysis", labels.get("canfar.net/name"));
+        Assert.assertTrue(labels.keySet().stream().noneMatch(key -> key.startsWith("kueue.x-k8s.io/")));
     }
 
     private static void assertOwnedBy(final HasMetadata resource, final Job job) {

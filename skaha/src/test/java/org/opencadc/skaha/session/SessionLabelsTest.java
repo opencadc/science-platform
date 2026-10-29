@@ -41,7 +41,6 @@ public class SessionLabelsTest {
         Assert.assertEquals(
                 "canfar.net/id=session-123,canfar.net/username=alice",
                 SessionLabels.forSession("alice", "session-123"));
-        Assert.assertEquals("canfar.net/username=alice", SessionLabels.forUser("alice"));
         Assert.assertEquals(
                 "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/kind!=headless",
                 SessionLabels.forUserSessions("alice", "session-123", true));

@@ -24,11 +24,10 @@ public class SessionLabelPlanTest {
 
         Assert.assertEquals("session-123", plan.jobLabels().get("canfar.net/id"));
         Assert.assertEquals("1.2.3", plan.jobLabels().get("app.kubernetes.io/version"));
-        Assert.assertEquals("session-123", plan.serviceMetadataLabels().get("canfar.net/id"));
-        Assert.assertEquals("1.2.3", plan.serviceMetadataLabels().get("app.kubernetes.io/version"));
+        Assert.assertEquals("session-123", plan.ownedLabels().get("canfar.net/id"));
+        Assert.assertEquals("1.2.3", plan.ownedLabels().get("app.kubernetes.io/version"));
         Assert.assertEquals(2, plan.serviceSelector().size());
         Assert.assertEquals("session-123", plan.serviceSelector().get("canfar.net/id"));
         Assert.assertEquals("notebook", plan.serviceSelector().get("canfar.net/kind"));
-        Assert.assertEquals(plan.serviceMetadataLabels(), plan.ingressMetadataLabels());
     }
 }

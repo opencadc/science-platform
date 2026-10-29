@@ -6,12 +6,10 @@ import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
 import io.fabric8.kubernetes.api.model.NodeSelectorRequirementBuilder;
 import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.Quantity;
-import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +17,6 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 import org.junit.Assert;
 import org.junit.Test;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * The Job, Service and ingress a launch builds from a template: parameters, canonical labels, queue, GPU affinity and
@@ -82,46 +79,6 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("pod", podLabels.get("template-owned"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/queue-name"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/priority-class"));
-    }
-
-    /**
-     * Owned resources take their labels from the launch's label plan, never from the Job, and no Kueue labels; every
-     * document of an ingress bundle is labelled.
-     */
-    @Test
-    @SuppressWarnings("unchecked")
-    public void testOwnedResourceLabels() throws Exception {
-        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(
-                        resource("test-base-values-queue.yaml"))
-                .withParameters(parameters("carta"))
-                .withQueue(new QueueConfiguration("carta", "high", "my-queue"))
-                .buildLaunch();
-        launch.job().getMetadata().getLabels().put("canfar.net/name", "tampered-name");
-        final Map<String, String> expected = new HashMap<>(SESSION_LABELS);
-        expected.put("canfar.net/kind", "carta");
-        expected.put("canfar.net/job", "notebook-alice-session-123");
-
-        final Service service = Serialization.unmarshal(
-                SessionJobBuilder.labelService(Files.readString(resource("test-carta-service.yaml")), launch.labels()),
-                Service.class);
-        assertContains(service.getMetadata().getLabels(), expected);
-        Assert.assertEquals(
-                Map.of("canfar.net/id", "session-123", "canfar.net/kind", "carta"),
-                service.getSpec().getSelector());
-
-        final String ingress = "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: carta-ingress\n"
-                + "  labels:\n    existing: label\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: carta-config\n";
-        final List<Map<String, String>> documentLabels = new ArrayList<>();
-        new Yaml()
-                .loadAll(SessionJobBuilder.labelIngress(ingress, launch.labels()))
-                .forEach(document -> documentLabels.add((Map<String, String>)
-                        ((Map<String, Object>) ((Map<String, Object>) document).get("metadata")).get("labels")));
-        Assert.assertEquals(2, documentLabels.size());
-        Assert.assertEquals("label", documentLabels.get(0).get("existing"));
-        for (final Map<String, String> labels : documentLabels) {
-            assertContains(labels, expected);
-            Assert.assertFalse(labels.containsKey("kueue.x-k8s.io/queue-name"));
-        }
     }
 
     @Test

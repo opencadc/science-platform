@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.Assert;
 import org.junit.rules.ExternalResource;
@@ -93,7 +94,7 @@ public class KubernetesApi extends ExternalResource {
     public List<String> requests() throws InterruptedException {
         final List<String> requests = new ArrayList<>();
         RecordedRequest request;
-        while ((request = this.server.takeRequest(10, java.util.concurrent.TimeUnit.MILLISECONDS)) != null) {
+        while ((request = this.server.takeRequest(10, TimeUnit.MILLISECONDS)) != null) {
             requests.add(request.getMethod() + " " + request.getPath());
         }
         return requests;

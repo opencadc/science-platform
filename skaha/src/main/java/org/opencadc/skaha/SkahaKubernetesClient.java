@@ -15,7 +15,6 @@ public final class SkahaKubernetesClient {
 
     private SkahaKubernetesClient() {}
 
-    /** Build the client for the workload namespace. */
     public static synchronized void initialize(final String workloadNamespace) {
         install(new KubernetesClientBuilder()
                 .withConfig(new ConfigBuilder(Config.autoConfigure(null))

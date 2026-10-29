@@ -3,12 +3,15 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.TransientException;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 
@@ -35,13 +38,15 @@ class SessionLauncher {
     /**
      * Create the Job, then each owned resource.
      *
+     * @param labels The launch's labels, applied to each owned resource; a Service also selects by them.
      * @param ownedResourceYamls Rendered Service and ingress documents; {@code ${skaha.jobuid}} and
      *     {@code ${skaha.jobname}} are filled from the created Job.
      * @return The created Job.
      * @throws TransientException If the outcome was uncertain or an owned resource failed; nothing is left behind.
      * @throws IllegalStateException If the cluster rejected the Job; retrying will not help.
      */
-    Job launch(final Job job, final List<String> ownedResourceYamls) throws TransientException {
+    Job launch(final Job job, final SessionLabelPlan labels, final List<String> ownedResourceYamls)
+            throws TransientException {
         final Job created = createJob(job);
         try {
             for (final String ownedResourceYaml : ownedResourceYamls) {
@@ -54,6 +59,13 @@ class SessionLauncher {
                 for (final HasMetadata resource : this.client
                         .load(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)))
                         .items()) {
+                    final Map<String, String> resourceLabels = new HashMap<>(
+                            Objects.requireNonNullElse(resource.getMetadata().getLabels(), Map.of()));
+                    resourceLabels.putAll(labels.ownedLabels());
+                    resource.getMetadata().setLabels(resourceLabels);
+                    if (resource instanceof Service service) {
+                        service.getSpec().setSelector(labels.serviceSelector());
+                    }
                     this.client.resource(resource).create();
                 }
             }
@@ -75,8 +87,7 @@ class SessionLauncher {
             try {
                 return this.client.batch().v1().jobs().resource(job).create();
             } catch (KubernetesClientException exception) {
-                final boolean conflict = exception.getCode() == 409;
-                if (!conflict && !isUncertain(exception)) {
+                if (exception.getCode() != 409 && !isUncertain(exception)) {
                     LOGGER.error("Job " + jobName + " create rejected.", exception);
                     throw new IllegalStateException("Session launch was rejected by the cluster.");
                 }
@@ -84,7 +95,8 @@ class SessionLauncher {
                 final Job existing = readOwnJob(job);
                 if (existing != null) {
                     return existing;
-                } else if (attempt >= MAX_CREATE_ATTEMPTS) {
+                }
+                if (attempt >= MAX_CREATE_ATTEMPTS) {
                     deleteJob(jobName);
                     throw new TransientException(LAUNCH_FAILED);
                 }
@@ -103,15 +115,14 @@ class SessionLauncher {
             deleteJob(jobName);
             throw new TransientException(LAUNCH_FAILED);
         }
-        if (existing != null
-                && !(Objects.equals(
-                                SessionLabels.get(job, SessionLabels.Key.ID),
-                                SessionLabels.get(existing, SessionLabels.Key.ID))
-                        && Objects.equals(
-                                SessionLabels.get(job, SessionLabels.Key.APP_ID),
-                                SessionLabels.get(existing, SessionLabels.Key.APP_ID)))) {
-            LOGGER.error("Job " + jobName + " belongs to another session or desktop app.");
-            throw new TransientException(LAUNCH_FAILED);
+        if (existing == null) {
+            return null;
+        }
+        for (final SessionLabels.Key key : List.of(SessionLabels.Key.ID, SessionLabels.Key.APP_ID)) {
+            if (!Objects.equals(SessionLabels.get(job, key), SessionLabels.get(existing, key))) {
+                LOGGER.error("Job " + jobName + " belongs to another session or desktop app.");
+                throw new TransientException(LAUNCH_FAILED);
+            }
         }
         return existing;
     }

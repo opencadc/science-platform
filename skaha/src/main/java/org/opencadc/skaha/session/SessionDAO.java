@@ -26,7 +26,6 @@ import org.opencadc.skaha.metrics.PodResourceUsage;
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
 
-    // Serves user session listings once synced; see getUserSessions.
     private static volatile SessionJobCache cache;
 
     /** Serve user session listings from the given cache. Pass null to read live again. */
@@ -146,7 +145,8 @@ public class SessionDAO {
 
     private static List<Session> toSessions(
             final String forUserID, final boolean omitHeadless, final List<Job> userJobs) {
-        final PodResourceUsage podResourceUsage = loadPodResourceUsage(forUserID, omitHeadless, userJobs);
+        final PodResourceUsage podResourceUsage =
+                MetricsDAO.getDefault().getPodResourceUsage(forUserID, omitHeadless, userJobs);
         return userJobs.stream()
                 .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
@@ -154,16 +154,6 @@ public class SessionDAO {
 
     static NonNamespaceOperation<Job, JobList, ScalableResource<Job>> jobs() {
         return SkahaKubernetesClient.get().batch().v1().jobs();
-    }
-
-    static PodResourceUsage loadPodResourceUsage(
-            final String forUserID, final boolean omitHeadless, final List<Job> userJobs) {
-        return loadPodResourceUsage(MetricsDAO.getDefault(), forUserID, omitHeadless, userJobs);
-    }
-
-    static PodResourceUsage loadPodResourceUsage(
-            final MetricsDAO metricsDAO, final String forUserID, final boolean omitHeadless, final List<Job> userJobs) {
-        return metricsDAO.getPodResourceUsage(forUserID, omitHeadless, userJobs);
     }
 
     static String getConnectURL(

@@ -212,14 +212,15 @@ public class SessionLaunchFailureTest {
         try (KubernetesClient client = this.api.client(this.scenario.requestTimeoutMillis())) {
             final SessionLauncher launcher = new SessionLauncher(client);
             if (this.scenario.error() == null) {
-                final Job launched = launcher.launch(job, this.scenario.owned());
+                final Job launched = launcher.launch(job, labels(job), this.scenario.owned());
                 Assert.assertEquals(JOB_NAME, launched.getMetadata().getName());
                 if (this.scenario.uid() != null) {
                     Assert.assertEquals(
                             this.scenario.uid(), launched.getMetadata().getUid());
                 }
             } else {
-                Assert.assertThrows(this.scenario.error(), () -> launcher.launch(job, this.scenario.owned()));
+                Assert.assertThrows(
+                        this.scenario.error(), () -> launcher.launch(job, labels(job), this.scenario.owned()));
             }
         }
 
@@ -257,12 +258,17 @@ public class SessionLaunchFailureTest {
         return job;
     }
 
+    private static SessionLabelPlan labels(final Job job) {
+        return SessionLabelPlan.of(job.getMetadata().getLabels());
+    }
+
     private static Job job(final String appID, final String uid) {
         final JobBuilder builder = new JobBuilder()
                 .withNewMetadata()
                 .withName(JOB_NAME)
                 .withUid(uid)
                 .addToLabels(SessionLabels.Key.ID.label(), SessionFixtures.SESSION_ID)
+                .addToLabels(SessionLabels.Key.KIND.label(), "notebook")
                 .endMetadata()
                 .withNewSpec()
                 .withNewTemplate()

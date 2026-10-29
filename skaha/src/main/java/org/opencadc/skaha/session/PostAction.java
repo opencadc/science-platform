@@ -89,7 +89,6 @@ import org.apache.log4j.Logger;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
 import org.opencadc.skaha.metrics.PodResourceUsage;
@@ -299,8 +298,7 @@ public class PostAction extends SessionAction {
     }
 
     private void checkExistingSessions(final SessionType type) throws Exception {
-        // Live, not cached: concurrent launches by the same user must see each other. Only status counts, so no
-        // pod usage is loaded.
+        // Live, not cached: concurrent launches by the same user must see each other.
         checkExistingSessions(
                 type,
                 SessionDAO.liveJobs(this.posixPrincipal.username, null, true).stream()
@@ -405,7 +403,8 @@ public class PostAction extends SessionAction {
         // caught a non-existent Image already.
         if (getPublicImage(image) == null) {
             final ImageRepositoryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
-            sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
+            sessionJobBuilder = sessionJobBuilder.withImageSecret(
+                    RegistryPullSecret.apply(this.posixPrincipal.username, userRegistryAuth));
         }
 
         final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
@@ -422,7 +421,7 @@ public class PostAction extends SessionAction {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            ownedResourceYamls.add(SessionJobBuilder.labelService(serviceString, launch.labels()));
+            ownedResourceYamls.add(serviceString);
         }
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
@@ -433,10 +432,11 @@ public class PostAction extends SessionAction {
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ownedResourceYamls.add(SessionJobBuilder.labelIngress(ingressString, launch.labels()));
+            ownedResourceYamls.add(ingressString);
         }
 
-        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(launch.job(), ownedResourceYamls));
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
+                .launch(launch.job(), launch.labels(), ownedResourceYamls));
     }
 
     protected void injectPOSIXDetails() throws Exception {
@@ -449,20 +449,7 @@ public class PostAction extends SessionAction {
     }
 
     private String generateToken() throws Exception {
-        return SkahaAction.getSkahaCallbackTokenTool().generateToken(WriteGrant.class, this.sessionID);
-    }
-
-    /**
-     * Write the user's registry Secret and return its name.
-     *
-     * @param registryAuth The credentials to use to authenticate to the Image Registry.
-     * @return String secret name, never null.
-     */
-    private String createRegistryImageSecret(final ImageRepositoryAuth registryAuth) throws Exception {
-        final String username = this.posixPrincipal.username;
-        log.debug("Writing image pull secret for " + username);
-        RegistryPullSecret.apply(username, registryAuth);
-        return RegistryPullSecret.name(username);
+        return SkahaCallbackTokenTool.fromSecret().generateToken(WriteGrant.class, this.sessionID);
     }
 
     private String getRegistryHost(final String imageID) {
@@ -561,8 +548,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBUID, ownerJob.getMetadata().getUid())
                 .withParameter(PostAction.SKAHA_JOBNAME, ownerJob.getMetadata().getName());
 
-        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
-                .launch(sessionJobBuilder.buildLaunch().job(), List.of()));
+        final SessionJobBuilder.LaunchArtifacts app = sessionJobBuilder.buildLaunch();
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(app.job(), app.labels(), List.of()));
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);

@@ -134,11 +134,6 @@ public abstract class SessionAction extends SkahaAction {
             // return the last segment of the path
             int lastSlash = image.lastIndexOf("/");
             String name = image.substring(lastSlash + 1);
-            log.debug("cleaning up name: " + name);
-            // replace colons and dots and underscores with dash
-            name = name.replaceAll(":", "-");
-            name = name.replaceAll("\\.", "-");
-            name = name.replaceAll("_", "-");
             // The name becomes part of Kubernetes object names and labels.
             return name.toLowerCase().replaceAll("[^a-z0-9-]", "-");
         } catch (Exception e) {

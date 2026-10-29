@@ -105,7 +105,7 @@ public class InitializationAction extends InitAction {
     @Override
     public void doInit() {
         LOGGER.info("Initializing Kubernetes API client...");
-        initializeKubernetesClient();
+        SkahaKubernetesClient.initialize(getWorkloadNamespace());
         LOGGER.info("Initializing Kubernetes API client: OK");
 
         startSessionJobCache(CACHE_SYNC_WAIT);
@@ -117,10 +117,9 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doShutdown() {
-        final SessionJobCache cache = this.sessionJobCache;
-        if (cache != null) {
+        if (this.sessionJobCache != null) {
             SessionDAO.useCache(null);
-            cache.close();
+            this.sessionJobCache.close();
         }
         SkahaKubernetesClient.close();
     }
@@ -172,25 +171,16 @@ public class InitializationAction extends InitAction {
      */
     boolean localQueueMissing(final QueueConfiguration queueConfiguration) {
         return SkahaKubernetesClient.get()
-                        .genericKubernetesResources(InitializationAction.localQueueContext())
+                        .genericKubernetesResources(new ResourceDefinitionContext.Builder()
+                                .withGroup(QueueConfiguration.getKueueApiGroup())
+                                .withVersion(QueueConfiguration.getKueueApiVersion())
+                                .withKind("LocalQueue")
+                                .withPlural(QueueConfiguration.KUEUE_API_PLURAL)
+                                .withNamespaced(true)
+                                .build())
                         .withName(queueConfiguration.queueName)
                         .get()
                 == null;
-    }
-
-    static ResourceDefinitionContext localQueueContext() {
-        return new ResourceDefinitionContext.Builder()
-                .withGroup(QueueConfiguration.getKueueApiGroup())
-                .withVersion(QueueConfiguration.getKueueApiVersion())
-                .withKind("LocalQueue")
-                .withPlural(QueueConfiguration.KUEUE_API_PLURAL)
-                .withNamespaced(true)
-                .build();
-    }
-
-    /** Build the application Fabric8 client. Tests override this to install a mock client. */
-    void initializeKubernetesClient() {
-        SkahaKubernetesClient.initialize(getWorkloadNamespace());
     }
 
     String getWorkloadNamespace() {

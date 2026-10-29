@@ -108,7 +108,7 @@ public class SessionErrorsTest {
                 "", this.requests.get(new Request("s1").param("view", "logs")).text());
     }
 
-    /** The events table keeps the columns and padding of the former kubectl custom-columns output. */
+    /** The events table keeps kubectl's column layout and padding, which clients may parse. */
     @Test
     public void eventsTable() throws Exception {
         this.api

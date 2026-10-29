@@ -200,10 +200,6 @@ public abstract class SkahaAction extends RestAction {
         return null;
     }
 
-    protected static SkahaCallbackTokenTool getSkahaCallbackTokenTool() {
-        return SkahaCallbackTokenTool.fromSecret();
-    }
-
     /**
      * Return this action's request method.
      *
@@ -272,8 +268,8 @@ public abstract class SkahaAction extends RestAction {
         final String xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         try {
-            final String callbackSessionId = SkahaAction.getSkahaCallbackTokenTool()
-                    .validateSessionCallbackToken(xAuthTokenSkaha, WriteGrant.class);
+            final String callbackSessionId =
+                    SkahaCallbackTokenTool.fromSecret().validateSessionCallbackToken(xAuthTokenSkaha, WriteGrant.class);
 
             final Session session = SessionDAO.getSession(null, callbackSessionId);
             this.posixPrincipal = session.getPosixPrincipal();
