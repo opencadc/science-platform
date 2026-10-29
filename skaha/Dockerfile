@@ -5,6 +5,8 @@
 FROM eclipse-temurin:21-alpine AS base
 
 FROM base AS builder
+# The session tests render the session templates from the chart.
+RUN apk add --no-cache helm
 COPY . /src
 WORKDIR /src/skaha
 RUN ./gradlew clean spotlessCheck build --no-daemon
@@ -12,17 +14,6 @@ RUN ./gradlew clean spotlessCheck build --no-daemon
 FROM ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.32.0-1@sha256:9dad1c6e3e2ecee48fc164a19bcfde703510bee972c8cb421689fde89b5f89e9 AS otel-javaagent
 
 FROM images.opencadc.org/library/cadc-tomcat:1 AS production
-
-RUN set -eux \
-    && dnf install --nodocs --assumeyes --setopt=install_weak_deps=False dnf-plugins-core \
-    && dnf -y config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo \
-    && dnf -y install --nodocs --assumeyes --setopt=install_weak_deps=False \
-        containerd.io \
-        docker-ce \
-        docker-ce-cli \
-        kubernetes-client \
-    # Clean up dnf cache and other unneeded files to reduce image size
-    && dnf clean all
 
 COPY --from=otel-javaagent /javaagent.jar /opt/opentelemetry-javaagent/opentelemetry-javaagent.jar
 COPY --from=builder /src/skaha/build/libs/skaha.war /usr/share/tomcat/webapps/

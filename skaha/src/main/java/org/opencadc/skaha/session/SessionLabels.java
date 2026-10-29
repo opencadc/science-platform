@@ -1,6 +1,7 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.StringUtil;
+import io.fabric8.kubernetes.api.model.HasMetadata;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -131,13 +132,12 @@ public final class SessionLabels {
                 labelNotEquals(Key.KIND, DESKTOP_APP));
     }
 
-    /** Escape the session kind label for kubectl JSONPath and custom-column usage. */
-    static String sessionKindJsonPath() {
-        return jsonPath(Key.KIND);
-    }
-
     static String require(final Map<String, String> labels, final Key key) {
         return Objects.requireNonNull(get(labels, key), key.label + " label is required");
+    }
+
+    static String get(final HasMetadata resource, final Key key) {
+        return get(Objects.requireNonNullElse(resource.getMetadata().getLabels(), Map.of()), key);
     }
 
     static String get(final Map<String, String> labels, final Key key) {
@@ -164,10 +164,6 @@ public final class SessionLabels {
 
     private static String selector(final String... requirements) {
         return String.join(",", requirements);
-    }
-
-    private static String jsonPath(final Key key) {
-        return Objects.requireNonNull(key, "key cannot be null").label.replace(".", "\\.");
     }
 
     private static String defaultWhenBlank(final String label, final String value) {

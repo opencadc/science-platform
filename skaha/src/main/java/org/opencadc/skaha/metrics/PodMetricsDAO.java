@@ -1,34 +1,18 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.Metrics;
-import io.kubernetes.client.custom.PodMetricsList;
-import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.Configuration;
-import org.opencadc.skaha.K8SUtil;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetricsList;
+import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.session.SessionLabels;
 
 /**
- * Fetches per-pod resource usage from the Kubernetes metrics API ({@code metrics.k8s.io}).
- *
- * <p>Uses {@link Configuration#getDefaultApiClient()} (in-cluster service account). Does not call
- * {@link io.kubernetes.client.util.Config#fromCluster()} here.
+ * Fetches per-pod resource usage from the Kubernetes metrics API ({@code metrics.k8s.io}) with Skaha's Fabric8 client.
  */
 class PodMetricsDAO {
-
-    private final Metrics metricsClient;
-
-    public PodMetricsDAO() {
-        this(new Metrics(Configuration.getDefaultApiClient()));
-    }
-
-    PodMetricsDAO(final Metrics metricsClient) {
-        this.metricsClient = metricsClient;
-    }
-
-    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) throws ApiException {
-        final String labelSelector = buildLabelSelector(userID, omitHeadless);
-        final PodMetricsList podMetricsList =
-                metricsClient.getPodMetrics(K8SUtil.getWorkloadNamespace(), labelSelector);
+    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless) {
+        final PodMetricsList podMetricsList = SkahaKubernetesClient.get()
+                .resources(io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetrics.class, PodMetricsList.class)
+                .withLabelSelector(buildLabelSelector(userID, omitHeadless))
+                .list();
         return PodMetrics.fromKubernetes(podMetricsList);
     }
 

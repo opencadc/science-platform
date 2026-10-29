@@ -1,6 +1,6 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.custom.Quantity;
+import io.fabric8.kubernetes.api.model.Quantity;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -103,7 +103,7 @@ public record PlatformMetrics(Metadata metadata, Data data) {
         }
         final BigDecimal number;
         try {
-            number = Quantity.fromString(raw).getNumber();
+            number = new Quantity(raw).getNumericalAmount();
         } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Metrics resource quantity is invalid", ex);
         }
@@ -143,7 +143,7 @@ public record PlatformMetrics(Metadata metadata, Data data) {
             return 0;
         }
         try {
-            final BigDecimal number = Quantity.fromString(raw.trim()).getNumber();
+            final BigDecimal number = new Quantity(raw.trim()).getNumericalAmount();
             if (number == null
                     || number.signum() < 0
                     || number.stripTrailingZeros().scale() > 0) {

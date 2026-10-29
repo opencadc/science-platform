@@ -68,86 +68,116 @@
 
 package org.opencadc.skaha.session;
 
-import java.io.IOException;
+import static org.opencadc.skaha.KubernetesApi.NAMESPACE;
+
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.opencadc.skaha.KubernetesApi;
+import org.opencadc.skaha.SkahaKubernetesClient;
 
 public class InitializationActionTest {
+    private static final String LOCAL_QUEUE_PATH =
+            "/apis/kueue.x-k8s.io/v1beta2/namespaces/" + NAMESPACE + "/localqueues/test-queue";
+    private static final QueueConfiguration[] QUEUES =
+            new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")};
+
+    @Rule
+    public final KubernetesApi api = new KubernetesApi();
+
     @Test
-    public void testInitializationActionErrorWrongQueueName() throws Exception {
-        final boolean[] setupCalled = new boolean[] {false};
-        final InitializationAction testSubject = new InitializationAction() {
-            @Override
-            String getWorkloadNamespace() {
-                return "test-workload";
-            }
+    public void testLocalQueuePresent() throws Exception {
+        final GenericKubernetesResource localQueue = new GenericKubernetesResourceBuilder()
+                .withApiVersion("kueue.x-k8s.io/v1beta2")
+                .withKind("LocalQueue")
+                .withNewMetadata()
+                .withName("test-queue")
+                .withNamespace(NAMESPACE)
+                .endMetadata()
+                .build();
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath(LOCAL_QUEUE_PATH)
+                .andReturn(200, localQueue)
+                .once();
 
-            @Override
-            boolean localQueueMissing(QueueConfiguration queueConfiguration) {
-                return true;
-            }
-
-            @Override
-            void setupKubernetesAPIConfiguration() {
-                setupCalled[0] = true;
-            }
-        };
-
-        try {
-            testSubject.ensureLocalQueuesValid(
-                    new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.assertTrue("Setup was not called", setupCalled[0]);
-            Assert.fail("Expected IllegalStateException");
-        } catch (IllegalStateException illegalStateException) {
-            // Expected
-        }
+        testSubject().ensureLocalQueuesValid(QUEUES);
+        Assert.assertEquals(LOCAL_QUEUE_PATH, this.api.server().getLastRequest().getPath());
     }
 
     @Test
-    public void testUnusableConfig() {
-        final InitializationAction testSubject = new InitializationAction() {
-            @Override
-            String getWorkloadNamespace() {
-                return "test-workload";
-            }
+    public void testLocalQueueMissing() {
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath(LOCAL_QUEUE_PATH)
+                .andReturn(404, "")
+                .once();
 
-            @Override
-            void setupKubernetesAPIConfiguration() throws IOException {
-                throw new IOException("Test exception");
-            }
-        };
-
-        try {
-            testSubject.ensureLocalQueuesValid(
-                    new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-            Assert.fail("Expected IOException");
-        } catch (IOException ioException) {
-            // Expected
-        }
+        final IllegalStateException exception = Assert.assertThrows(
+                IllegalStateException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
+        Assert.assertTrue(exception.getMessage(), exception.getMessage().contains("test-queue"));
     }
 
     @Test
-    public void testInitializationAction() throws Exception {
-        final boolean[] setupCalled = new boolean[] {false};
-        final InitializationAction testSubject = new InitializationAction() {
+    public void testLocalQueueForbidden() {
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath(LOCAL_QUEUE_PATH)
+                .andReturn(403, "")
+                .once();
+
+        Assert.assertThrows(KubernetesClientException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
+    }
+
+    @Test
+    public void testNoQueuesConfigured() {
+        testSubject().ensureLocalQueuesValid(new QueueConfiguration[0]);
+        Assert.assertEquals(0, this.api.server().getRequestCount());
+    }
+
+    @Test
+    public void testCacheStartFailureDoesNotStopStartup() {
+        // Listing Jobs is forbidden, so the cache never syncs; startup carries on and sessions are read live.
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/batch/v1/namespaces/" + NAMESPACE
+                        + "/jobs?labelSelector=canfar.net%2Fid&resourceVersion=0")
+                .andReturn(403, "")
+                .always();
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/batch/v1/namespaces/" + NAMESPACE + "/jobs?labelSelector=canfar.net%2Fid")
+                .andReturn(403, "")
+                .always();
+        final InitializationAction testSubject = testSubject();
+
+        testSubject.startSessionJobCache();
+
+        Assert.assertFalse(SessionDAO.servedFromCache(testSubject.sessionJobCache(), "alice", null));
+        testSubject.doShutdown();
+        // doShutdown closed the client.
+        Assert.assertThrows(IllegalStateException.class, SkahaKubernetesClient::get);
+    }
+
+    private static InitializationAction testSubject() {
+        return new InitializationAction() {
             @Override
             String getWorkloadNamespace() {
-                return "test-workload";
-            }
-
-            @Override
-            boolean localQueueMissing(QueueConfiguration queueConfiguration) {
-                return false;
-            }
-
-            @Override
-            void setupKubernetesAPIConfiguration() {
-                setupCalled[0] = true;
+                return NAMESPACE;
             }
         };
-
-        testSubject.ensureLocalQueuesValid(
-                new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")});
-        Assert.assertTrue("Setup was not called", setupCalled[0]);
     }
 }

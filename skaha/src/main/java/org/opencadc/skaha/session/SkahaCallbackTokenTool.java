@@ -3,13 +3,22 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.util.Base64;
 import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.RsaSignatureVerifier;
+import io.fabric8.kubernetes.api.model.Secret;
+import io.fabric8.kubernetes.api.model.SecretBuilder;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.log4j.Logger;
 import org.opencadc.permissions.Grant;
+import org.opencadc.skaha.K8SUtil;
+import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.session.authorization.SessionAccessDeniedException;
+import org.opencadc.skaha.utils.CommonUtils;
 
 /**
  * RSA-signed session callback tokens using the same {@code meta~sig} transport as
@@ -28,8 +37,81 @@ public final class SkahaCallbackTokenTool {
 
     private static final String TOKEN_DELIM = "~";
 
+    static final String PUBLIC_KEY = "public";
+    static final String PRIVATE_KEY = "private";
+
     private final RsaSignatureGenerator sg;
     private final RsaSignatureVerifier sv;
+
+    private static SkahaCallbackTokenTool shared;
+
+    /**
+     * The tool for the signing keys persisted in the workload Secret shared by all replicas, read once per process. The
+     * Secret is created when absent; if another replica creates it first, its keys are used. Skaha never rotates the
+     * keys, so after an operator replaces the Secret, Skaha must be restarted.
+     */
+    public static synchronized SkahaCallbackTokenTool fromSecret() {
+        if (SkahaCallbackTokenTool.shared == null) {
+            SkahaCallbackTokenTool.shared = fromSecret(readOrCreateSecret(K8SUtil.getPreAuthorizedTokenSecretName()));
+        }
+        return SkahaCallbackTokenTool.shared;
+    }
+
+    /** Forget the shared tool. Tests only. */
+    static synchronized void forget() {
+        SkahaCallbackTokenTool.shared = null;
+    }
+
+    private static Secret readOrCreateSecret(final String name) {
+        final KubernetesClient client = SkahaKubernetesClient.get();
+        final Secret existing = client.secrets().withName(name).get();
+        if (existing != null) {
+            return existing;
+        }
+        final KeyPair keyPair = RsaSignatureGenerator.getKeyPair(2048);
+        try {
+            return client.secrets()
+                    .resource(new SecretBuilder()
+                            .withNewMetadata()
+                            .withName(name)
+                            .endMetadata()
+                            .withType("Opaque")
+                            .withStringData(Map.of(
+                                    PUBLIC_KEY,
+                                            CommonUtils.encodeBase64(
+                                                    keyPair.getPublic().getEncoded()),
+                                    PRIVATE_KEY,
+                                            CommonUtils.encodeBase64(
+                                                    keyPair.getPrivate().getEncoded())))
+                            .build())
+                    .create();
+        } catch (KubernetesClientException exception) {
+            if (exception.getCode() != 409) {
+                throw exception;
+            }
+            return Objects.requireNonNull(client.secrets().withName(name).get(), "Secret " + name + " vanished");
+        }
+    }
+
+    /**
+     * The tool for a persisted key pair. Each Secret value is the Base64 of the encoded key, so the API's data holds it
+     * Base64-encoded twice, as kubectl wrote it.
+     *
+     * @throws IllegalStateException If a key is missing or malformed; an unpersisted key is never substituted.
+     */
+    static SkahaCallbackTokenTool fromSecret(final Secret secret) {
+        final Map<String, String> data = Objects.requireNonNullElse(secret.getData(), Map.of());
+        return new SkahaCallbackTokenTool(decodeKey(data, PUBLIC_KEY), decodeKey(data, PRIVATE_KEY));
+    }
+
+    private static byte[] decodeKey(final Map<String, String> data, final String key) {
+        try {
+            final java.util.Base64.Decoder decoder = java.util.Base64.getDecoder();
+            return decoder.decode(decoder.decode(Objects.requireNonNull(data.get(key))));
+        } catch (NullPointerException | IllegalArgumentException exception) {
+            throw new IllegalStateException("Callback signing Secret has no valid '" + key + "' key", exception);
+        }
+    }
 
     public SkahaCallbackTokenTool(final byte[] publicKey, final byte[] privateKey) {
         Objects.requireNonNull(publicKey, "publicKey");

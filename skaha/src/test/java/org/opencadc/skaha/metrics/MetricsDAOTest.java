@@ -1,8 +1,8 @@
 package org.opencadc.skaha.metrics;
 
 import ca.nrc.cadc.util.StringUtil;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import java.util.List;
 import java.util.Map;
 import org.junit.Assert;
@@ -96,8 +96,12 @@ public class MetricsDAOTest {
                 .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
 
         final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(sessionMetricsDAO));
-        final List<V1Job> jobs = List.of(new V1Job()
-                .metadata(new V1ObjectMeta().name("job-a-main").labels(Map.of("canfar.net/id", "session-a"))));
+        final List<Job> jobs = List.of(new JobBuilder()
+                .withNewMetadata()
+                .withName("job-a-main")
+                .withLabels(Map.of("canfar.net/id", "session-a"))
+                .endMetadata()
+                .build());
 
         final PodResourceUsage usage = dao.getPodResourceUsage("alice", false, jobs);
 

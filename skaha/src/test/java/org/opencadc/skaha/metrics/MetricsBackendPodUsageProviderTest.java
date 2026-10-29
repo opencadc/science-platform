@@ -1,7 +1,7 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +24,7 @@ public class MetricsBackendPodUsageProviderTest {
                 .thenReturn(new SessionMetrics("session-b", Map.of("cpu", "250m", "memory", "256Mi")));
 
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(sessionMetricsDAO);
-        final List<V1Job> jobs =
+        final List<Job> jobs =
                 List.of(job("job-a-main", "session-a"), job("job-a-app", "session-a"), job("job-b-main", "session-b"));
         final PodMetrics podMetrics = provider.getPodMetrics("alice", false, jobs);
 
@@ -87,7 +87,7 @@ public class MetricsBackendPodUsageProviderTest {
         try {
             final MetricsBackendPodUsageProvider provider =
                     new MetricsBackendPodUsageProvider(sessionMetricsDAO, 8, 30, executor);
-            final List<V1Job> jobs = new ArrayList<>();
+            final List<Job> jobs = new ArrayList<>();
             for (int index = 0; index < 20; index++) {
                 jobs.add(job("job-" + index, "session-" + index));
             }
@@ -142,10 +142,12 @@ public class MetricsBackendPodUsageProviderTest {
         }
     }
 
-    private static V1Job job(final String jobName, final String sessionId) {
-        return new V1Job()
-                .metadata(new V1ObjectMeta()
-                        .name(jobName)
-                        .labels(Map.of("canfar.net/id", sessionId, "canfar.net/username", "alice")));
+    private static Job job(final String jobName, final String sessionId) {
+        return new JobBuilder()
+                .withNewMetadata()
+                .withName(jobName)
+                .withLabels(Map.of("canfar.net/id", sessionId, "canfar.net/username", "alice"))
+                .endMetadata()
+                .build();
     }
 }

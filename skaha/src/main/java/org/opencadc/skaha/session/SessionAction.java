@@ -70,20 +70,9 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import org.apache.log4j.Logger;
-import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
-import org.opencadc.skaha.utils.CommandExecutioner;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -146,74 +135,12 @@ public abstract class SessionAction extends SkahaAction {
             name = name.replaceAll(":", "-");
             name = name.replaceAll("\\.", "-");
             name = name.replaceAll("_", "-");
-            return name.toLowerCase();
+            // The name becomes part of Kubernetes object names and labels.
+            return name.toLowerCase().replaceAll("[^a-z0-9-]", "-");
         } catch (Exception e) {
             log.warn("failed to determine name for image: " + image);
             return "unknown";
         }
-    }
-
-    protected String stageFile(String data) throws IOException {
-        String tmpFileName = "/tmp/" + UUID.randomUUID();
-        File file = new File(tmpFileName);
-        if (!file.setExecutable(true, true)) {
-            log.debug("Failed to set execution permission on file " + tmpFileName);
-        }
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(data + "\n");
-        writer.flush();
-        writer.close();
-        return tmpFileName;
-    }
-
-    public String getPodID(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getPodCmd = KubectlCommandBuilder.command("get")
-                .pod()
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .noHeaders()
-                .outputFormat("custom-columns=NAME:.metadata.name");
-
-        final String podID = CommandExecutioner.execute(getPodCmd.build());
-
-        log.debug("podID: " + podID);
-        if (!StringUtil.hasLength(podID)) {
-            throw new ResourceNotFoundException("session " + sessionID + " not found.");
-        }
-        return podID;
-    }
-
-    public String getEvents(String forUserID, String sessionID) throws Exception {
-
-        String podID = getPodID(forUserID, sessionID);
-
-        KubectlCommandBuilder.KubectlCommand getEventsCmd = KubectlCommandBuilder.command("get")
-                .argument("event")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .option("--field-selector", "involvedObject.name=" + podID)
-                .outputFormat(
-                        "custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,FIRST-TIME:.firstTimestamp,LAST-TIME:.lastTimestamp");
-
-        String events = CommandExecutioner.execute(getEventsCmd.build());
-
-        log.debug("events: " + events);
-        if (events != null) {
-            String[] lines = events.split("\n");
-            if (lines.length > 1) { // header row returned
-                return events;
-            }
-        }
-        return "";
-    }
-
-    public void streamPodLogs(String forUserID, String sessionID, OutputStream out) throws Exception {
-
-        KubectlCommandBuilder.KubectlCommand getLogsCmd = KubectlCommandBuilder.command("logs")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .option("--tail", "-1");
-
-        CommandExecutioner.execute(getLogsCmd.build(), out);
     }
 
     public Session getDesktopApp(String sessionID, String appID) throws Exception {
@@ -243,33 +170,6 @@ public abstract class SessionAction extends SkahaAction {
 
     List<Session> getAllSessions(final String forUserID) throws Exception {
         return SessionDAO.getUserSessions(forUserID, null, false);
-    }
-
-    protected Map<String, String> getJobExpiryTimes(String k8sNamespace, String forUserID) throws Exception {
-        Map<String, String> jobExpiryTimes = new HashMap<>();
-        String[] jobExpiryTimeCMD = getJobExpiryTimeCMD(k8sNamespace, forUserID);
-        String jobExpiryTimeMap = CommandExecutioner.execute(jobExpiryTimeCMD);
-        log.debug("Expiry times: " + jobExpiryTimeMap);
-        if (StringUtil.hasLength(jobExpiryTimeMap)) {
-            String[] lines = jobExpiryTimeMap.split("\n");
-            for (String line : lines) {
-                String[] expiryTime = line.trim().replaceAll("\\s+", " ").split(" ");
-                jobExpiryTimes.put(expiryTime[0], expiryTime[1]);
-            }
-        }
-
-        return jobExpiryTimes;
-    }
-
-    private String[] getJobExpiryTimeCMD(String k8sNamespace, String forUserID) {
-        KubectlCommandBuilder.KubectlCommand getSessionJobCmd = KubectlCommandBuilder.command("get")
-                .namespace(k8sNamespace)
-                .job()
-                .label(SessionLabels.forUser(forUserID))
-                .noHeaders()
-                .outputFormat("custom-columns=UID:.metadata.uid,EXPIRY:.spec.activeDeadlineSeconds");
-
-        return getSessionJobCmd.build();
     }
 
     /**

@@ -4,7 +4,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 
 | Chart | AppVersion | Type |
 |:-----:|:----------:|:----:|
-|1.10.1<!-- x-release-please-version --> | 1.6.0 | application |
+|1.10.2<!-- x-release-please-version --> | 1.6.0 | application |
 
 ## Requirements
 
@@ -297,6 +297,25 @@ The test first validates the shared ServiceAccount in full-chart renders for def
 ## Required deployment configuration
 
 Metrics is now required and its values live under `metrics` (the former `metricsBackend` key fails the render). Remove `metrics.enabled` and configure `metrics.clusterName`, the ClusterQueue JSON list, and the LocalQueue namespace list before upgrading. `metrics.redis.urlSecret` is retired; Metrics uses the bundled Redis unless `metrics.redis.url` is set. The operator-provided `metrics.cacheKeySecret` setting is retired; the chart generates the integrity key. Configure the Argo CD cache-key rules above before syncing, and use cascading deletion when uninstalling the application.
+
+## Skaha workload permissions
+
+With `rbac.create=true` the chart's Role grants Skaha exactly what it uses in the workload namespace. Sites that manage that Role themselves need:
+
+| Resources | Verbs | Used for |
+| --- | --- | --- |
+| `batch` `jobs` | create, get, list, watch, patch, delete, deletecollection | Launch, read-back, session cache, renew, delete |
+| `pods` | get, list | Events, logs, desktop-app target IP |
+| `pods/log` | get | Session logs |
+| `events`, `limitranges` | get, list | Session events, session resource ceilings |
+| `services` | create | Session Services |
+| `secrets` | create, get, patch | Image pull Secrets (server-side apply) and the callback signing Secret |
+| `traefik.io` `ingressroutes`, `middlewares` | create | Session ingress |
+| `metrics.k8s.io` `pods` | get, list | Session usage |
+
+Without `patch` on `secrets`, every private-image launch fails with 503. Services and Traefik resources are removed with their Job by owner reference, so Skaha does not delete them itself.
+
+The callback signing Secret `pre-auth-token-skaha` is read once by each Skaha replica. After replacing it, restart Skaha.
 
 ## Running chart tests
 

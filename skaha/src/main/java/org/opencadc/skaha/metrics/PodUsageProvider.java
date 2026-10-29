@@ -1,6 +1,6 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.openapi.models.V1Job;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.util.List;
 
 /**
@@ -24,7 +24,7 @@ interface PodUsageProvider {
      * @param omitHeadless when true, exclude headless session pods; ignored by the backend provider
      * @param sessionJobs listed session Jobs; required for the backend provider to map session usage to job names
      */
-    PodMetrics getPodMetrics(String userID, boolean omitHeadless, List<V1Job> sessionJobs) throws Exception;
+    PodMetrics getPodMetrics(String userID, boolean omitHeadless, List<Job> sessionJobs) throws Exception;
 
     static PodUsageProvider fromEnvironment() {
         final String source = System.getenv(SKAHA_POD_METRICS_SOURCE);

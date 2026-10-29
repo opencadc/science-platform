@@ -1,14 +1,14 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.FileUtil;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1NodeAffinity;
-import io.kubernetes.client.openapi.models.V1NodeSelectorRequirement;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1Service;
-import io.kubernetes.client.util.Yaml;
+import io.fabric8.kubernetes.api.model.NodeAffinity;
+import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.PodSpec;
+import io.fabric8.kubernetes.api.model.Service;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
+import io.fabric8.kubernetes.client.utils.Serialization;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -36,7 +36,7 @@ public class SessionJobBuilderTest {
         final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
                 .buildLaunch();
-        final V1Job job = launch.job();
+        final Job job = launch.job();
         final Map<String, String> tamperedJobLabels =
                 Objects.requireNonNull(job.getMetadata().getLabels());
         tamperedJobLabels.put("canfar.net/name", "tampered-name");
@@ -44,7 +44,7 @@ public class SessionJobBuilderTest {
 
         final String renderedService =
                 SessionJobBuilder.labelService(Files.readString(serviceTemplatePath), launch.labels());
-        final V1Service service = (V1Service) Yaml.load(renderedService);
+        final Service service = Serialization.unmarshal(renderedService, Service.class);
         final Map<String, String> serviceLabels =
                 Objects.requireNonNull(service.getMetadata().getLabels());
         final Map<String, String> serviceSelector =
@@ -132,7 +132,7 @@ public class SessionJobBuilderTest {
                 .withQueue(new QueueConfiguration("carta", "high", "my-queue"))
                 .buildLaunch();
 
-        final V1Job job = launch.job();
+        final Job job = launch.job();
         final Map<String, String> jobLabels =
                 Objects.requireNonNull(job.getMetadata().getLabels());
         Assert.assertEquals("my-queue", jobLabels.get("kueue.x-k8s.io/queue-name"));
@@ -174,9 +174,11 @@ public class SessionJobBuilderTest {
         parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
         parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "desktop-app-alice-session-123");
 
-        final V1Job job = (V1Job) Yaml.load(SessionJobBuilder.fromPath(testBaseValuesPath)
+        final Job job = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
-                .build());
+                .withImage("images.example.org/skaha/notebook:1.0")
+                .buildLaunch()
+                .job();
 
         final String labelName =
                 Objects.requireNonNull(job.getMetadata().getLabels()).get("canfar.net/name");
@@ -202,7 +204,7 @@ public class SessionJobBuilderTest {
                 .withGPUCount(2)
                 .withQueue(new QueueConfiguration("notebook", "high", "my-queue"));
 
-        final V1Job job = (V1Job) Yaml.load(testSubject.build());
+        final Job job = testSubject.buildLaunch().job();
         final Map<String, String> jobLabels =
                 Objects.requireNonNull(job.getMetadata().getLabels());
         final Map<String, String> podLabels =
@@ -238,17 +240,21 @@ public class SessionJobBuilderTest {
         parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
         parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
 
-        SessionJobBuilder testSubject =
-                SessionJobBuilder.fromPath(testBaseValuesPath).withParameters(parametersToReplaceValues);
-        final String output = testSubject.build();
+        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
+                .withParameters(parametersToReplaceValues)
+                .withImage("images.example.org/skaha/notebook:1.0");
+        final Job job = testSubject.buildLaunch().job();
+        final String output = Serialization.asYaml(job);
+        Assert.assertEquals(
+                "images.example.org/skaha/notebook:1.0",
+                job.getSpec().getTemplate().getSpec().getContainers().get(0).getImage());
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
 
-        V1Job job = (V1Job) Yaml.load(output);
-        V1PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
+        PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
         Assert.assertTrue(
                 "PodSpec should not have image pull secrets",
@@ -301,14 +307,14 @@ public class SessionJobBuilderTest {
             testSubject = testSubject.withGPUEnabled(true).withGPUCount(gpuCount);
         }
 
-        final String output = testSubject.build();
+        final Job job = testSubject.buildLaunch().job();
+        final String output = Serialization.asYaml(job);
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
 
-        final V1Job job = (V1Job) Yaml.load(output);
         if (gpuCount > 0) {
             Assert.assertEquals(
                     "Wrong GPU limit.",
@@ -321,7 +327,7 @@ public class SessionJobBuilderTest {
                             .getResources()
                             .getLimits()
                             .get("nvidia.com/gpu")
-                            .getNumber()
+                            .getNumericalAmount()
                             .intValue());
 
             // When GPUs are requested, the GPU requests should match the limits.
@@ -336,7 +342,7 @@ public class SessionJobBuilderTest {
                             .getResources()
                             .getRequests()
                             .get("nvidia.com/gpu")
-                            .getNumber()
+                            .getNumericalAmount()
                             .intValue());
         } else {
             Assert.assertNull(
@@ -376,22 +382,22 @@ public class SessionJobBuilderTest {
                 "fixed",
                 Objects.requireNonNull(job.getMetadata().getLabels()).get(SessionLabels.Key.FLAVOR.label()));
 
-        final V1PodSpec podSpec =
+        final PodSpec podSpec =
                 Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
         Assert.assertNotNull("PodSpec should not be null", podSpec);
-        final List<V1NodeSelectorRequirement> testMatchExpressions = getV1NodeSelectorRequirements(podSpec);
+        final List<NodeSelectorRequirement> testMatchExpressions = getNodeSelectorRequirements(podSpec);
 
         Assert.assertEquals(
                 "Wrong pull secret.",
                 "my-secret",
                 Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
 
-        final V1NodeSelectorRequirement gpuRequirement = new V1NodeSelectorRequirement();
+        final NodeSelectorRequirement gpuRequirement = new NodeSelectorRequirement();
         gpuRequirement.setKey("nvidia.com/gpu.count");
         gpuRequirement.setOperator("Gt");
         gpuRequirement.setValues(Collections.singletonList("0"));
 
-        final V1NodeSelectorRequirement providedRequirement = new V1NodeSelectorRequirement();
+        final NodeSelectorRequirement providedRequirement = new NodeSelectorRequirement();
         providedRequirement.setKey("my-node-please");
         providedRequirement.setOperator("Exists");
 
@@ -426,18 +432,18 @@ public class SessionJobBuilderTest {
         final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
                 .withParameters(parametersToReplaceValues)
                 .withQueue(new QueueConfiguration("notebook", "high", "my-queue"));
-        final String output = testSubject.build();
+        final Job job = testSubject.buildLaunch().job();
+        final String output = Serialization.asYaml(job);
 
         for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
             Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
             Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
         }
 
-        final V1Job job = (V1Job) Yaml.load(output);
-        final V1JobSpec jobSpec = Objects.requireNonNull(job.getSpec());
+        final JobSpec jobSpec = Objects.requireNonNull(job.getSpec());
         Assert.assertEquals("Job should be suspended.", Boolean.TRUE, jobSpec.getSuspend());
 
-        final V1ObjectMeta metadata = Objects.requireNonNull(job.getMetadata());
+        final ObjectMeta metadata = Objects.requireNonNull(job.getMetadata());
         Assert.assertEquals(
                 "Wrong queue name.",
                 "my-queue",
@@ -452,14 +458,14 @@ public class SessionJobBuilderTest {
                 Objects.requireNonNull(metadata.getLabels()).get(SessionLabels.Key.FLAVOR.label()));
     }
 
-    @NotNull private static List<V1NodeSelectorRequirement> getV1NodeSelectorRequirements(V1PodSpec podSpec) {
+    @NotNull private static List<NodeSelectorRequirement> getNodeSelectorRequirements(PodSpec podSpec) {
         assert podSpec != null;
-        final V1NodeAffinity nodeAffinity =
+        final NodeAffinity nodeAffinity =
                 Objects.requireNonNull(podSpec.getAffinity()).getNodeAffinity();
 
-        final List<V1NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
+        final List<NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
         assert nodeAffinity != null;
-        final List<V1NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
+        final List<NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
                         Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
                 .getNodeSelectorTerms()
                 .get(0)
@@ -498,5 +504,51 @@ public class SessionJobBuilderTest {
         Assert.assertEquals("default", labels.get("canfar.net/project"));
         Assert.assertEquals("skaha", labels.get("app.kubernetes.io/managed-by"));
         Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
+    }
+
+    @Test
+    public void testHeadlessValuesAreTyped() throws Exception {
+        final String args = "-c print(\"a: b\")\n---\nkind: Secret";
+        final SessionJobBuilder.HeadlessCommand command = SessionJobBuilder.HeadlessCommand.fromRequest(
+                "/bin/sh -c \"echo: hi\"", args, List.of("QUOTE=\"x\": y", "MULTI=line1\nline2", "EQ=a=b", "=noname"));
+
+        final Job job = SessionJobBuilder.fromPath(SessionFixtures.template("launch-headless.yaml"))
+                .withParameters(SessionFixtures.parameters("headless"))
+                .withImage("images.example.org/skaha/headless:1.0")
+                .withHeadlessCommand(command)
+                .buildLaunch()
+                .job();
+
+        final io.fabric8.kubernetes.api.model.Container container =
+                job.getSpec().getTemplate().getSpec().getContainers().get(0);
+        Assert.assertEquals(List.of("/bin/sh -c \"echo: hi\""), container.getCommand());
+        Assert.assertEquals(List.of(args.split(" ")), container.getArgs());
+        final Map<String, String> env = new HashMap<>();
+        container.getEnv().forEach(var -> env.putIfAbsent(var.getName(), var.getValue()));
+        Assert.assertEquals("\"x\": y", env.get("QUOTE"));
+        Assert.assertEquals("line1\nline2", env.get("MULTI"));
+        Assert.assertEquals("a=b", env.get("EQ"));
+        Assert.assertFalse(env.containsKey(""));
+        Assert.assertEquals(
+                "No extra objects or fields",
+                1,
+                job.getSpec().getTemplate().getSpec().getContainers().size());
+    }
+
+    @Test
+    public void testImagePlaceholderOutsideContainerImageIsRejected() throws Exception {
+        final Path template = Files.createTempFile("launch-bad", ".yaml");
+        Files.writeString(
+                template,
+                Files.readString(SessionFixtures.template("launch-notebook.yaml"))
+                        .replace(
+                                "- name: skaha_hostname",
+                                "- name: IMAGE\n          value: \"mirror/${software.imageid}\"\n        - name: skaha_hostname"));
+
+        final SessionJobBuilder builder = SessionJobBuilder.fromPath(template)
+                .withParameters(SessionFixtures.parameters("notebook"))
+                .withImage("images.example.org/skaha/notebook:1.0");
+
+        Assert.assertThrows(IllegalStateException.class, builder::buildLaunch);
     }
 }
