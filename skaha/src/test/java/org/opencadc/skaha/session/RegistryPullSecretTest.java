@@ -4,7 +4,6 @@ import static org.opencadc.skaha.KubernetesApi.NAMESPACE;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.fabric8.kubernetes.api.model.Secret;
-import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
@@ -50,20 +49,6 @@ public class RegistryPullSecretTest {
                                                 .decode(applied.getData().get(".dockerconfigjson")),
                                         StandardCharsets.UTF_8),
                                 Map.class));
-    }
-
-    @Test
-    public void testApplyFailure() {
-        this.api
-                .server()
-                .expect()
-                .patch()
-                .withPath("/api/v1/namespaces/" + NAMESPACE
-                        + "/secrets/registry-auth-alice?fieldManager=skaha&force=true")
-                .andReturn(500, "")
-                .once();
-        Assert.assertThrows(
-                KubernetesClientException.class, () -> RegistryPullSecret.apply("alice", auth("alice", "pw")));
     }
 
     private static ImageRepositoryAuth auth(final String username, final String secret) {

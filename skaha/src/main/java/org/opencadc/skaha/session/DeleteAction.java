@@ -85,7 +85,7 @@ public class DeleteAction extends SessionAction {
 
     @Override
     public void doAction() throws Exception {
-        super.initRequest();
+        initRequest();
         if (requestType.equals(REQUEST_TYPE_SESSION)) {
             if (sessionID == null) {
                 throw new UnsupportedOperationException("Cannot kill all sessions.");

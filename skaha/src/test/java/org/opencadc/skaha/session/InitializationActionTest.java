@@ -73,6 +73,7 @@ import static org.opencadc.skaha.KubernetesApi.NAMESPACE;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
+import java.time.Duration;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -88,8 +89,9 @@ public class InitializationActionTest {
     @Rule
     public final KubernetesApi api = new KubernetesApi();
 
+    /** Startup checks each configured LocalQueue: present passes, missing or any other API error fails startup. */
     @Test
-    public void testLocalQueuePresent() throws Exception {
+    public void testLocalQueueCheck() {
         final GenericKubernetesResource localQueue = new GenericKubernetesResourceBuilder()
                 .withApiVersion("kueue.x-k8s.io/v1beta2")
                 .withKind("LocalQueue")
@@ -98,50 +100,33 @@ public class InitializationActionTest {
                 .withNamespace(NAMESPACE)
                 .endMetadata()
                 .build();
-        this.api
-                .server()
-                .expect()
-                .get()
-                .withPath(LOCAL_QUEUE_PATH)
-                .andReturn(200, localQueue)
-                .once();
-
+        expectLocalQueue(200, localQueue);
         testSubject().ensureLocalQueuesValid(QUEUES);
-        Assert.assertEquals(LOCAL_QUEUE_PATH, this.api.server().getLastRequest().getPath());
-    }
 
-    @Test
-    public void testLocalQueueMissing() {
-        this.api
-                .server()
-                .expect()
-                .get()
-                .withPath(LOCAL_QUEUE_PATH)
-                .andReturn(404, "")
-                .once();
-
-        final IllegalStateException exception = Assert.assertThrows(
+        expectLocalQueue(404, "");
+        final IllegalStateException missing = Assert.assertThrows(
                 IllegalStateException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
-        Assert.assertTrue(exception.getMessage(), exception.getMessage().contains("test-queue"));
+        Assert.assertTrue(missing.getMessage(), missing.getMessage().contains("test-queue"));
+
+        expectLocalQueue(403, "");
+        Assert.assertThrows(KubernetesClientException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
+
+        final int requests = this.api.server().getRequestCount();
+        testSubject().ensureLocalQueuesValid(new QueueConfiguration[0]);
+        Assert.assertEquals(
+                "No queues configured: nothing to check",
+                requests,
+                this.api.server().getRequestCount());
     }
 
-    @Test
-    public void testLocalQueueForbidden() {
+    private void expectLocalQueue(final int code, final Object body) {
         this.api
                 .server()
                 .expect()
                 .get()
                 .withPath(LOCAL_QUEUE_PATH)
-                .andReturn(403, "")
+                .andReturn(code, body)
                 .once();
-
-        Assert.assertThrows(KubernetesClientException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
-    }
-
-    @Test
-    public void testNoQueuesConfigured() {
-        testSubject().ensureLocalQueuesValid(new QueueConfiguration[0]);
-        Assert.assertEquals(0, this.api.server().getRequestCount());
     }
 
     @Test
@@ -164,7 +149,7 @@ public class InitializationActionTest {
                 .always();
         final InitializationAction testSubject = testSubject();
 
-        testSubject.startSessionJobCache();
+        testSubject.startSessionJobCache(Duration.ofMillis(200));
 
         Assert.assertFalse(SessionDAO.servedFromCache(testSubject.sessionJobCache(), "alice", null));
         testSubject.doShutdown();

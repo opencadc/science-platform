@@ -97,7 +97,11 @@ public abstract class SessionAction extends SkahaAction {
 
     protected void initRequest() throws Exception {
         super.initRequest();
+        parseRequestPath();
+    }
 
+    /** Set the request type, session ID and app ID from the request path. */
+    void parseRequestPath() {
         String path = syncInput.getPath();
         log.debug("request path: " + path);
         requestType = REQUEST_TYPE_SESSION;

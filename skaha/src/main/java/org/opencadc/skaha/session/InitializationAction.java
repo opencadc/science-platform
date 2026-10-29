@@ -108,7 +108,7 @@ public class InitializationAction extends InitAction {
         initializeKubernetesClient();
         LOGGER.info("Initializing Kubernetes API client: OK");
 
-        startSessionJobCache();
+        startSessionJobCache(CACHE_SYNC_WAIT);
 
         LOGGER.info("Verifying QueueConfigurations, if any...");
         ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
@@ -133,14 +133,14 @@ public class InitializationAction extends InitAction {
      * Start the session Job cache and wait a bounded time for its first sync. Until it syncs, session listings are read
      * live, so a slow sync delays nothing.
      */
-    void startSessionJobCache() {
+    void startSessionJobCache(final Duration syncWait) {
         this.sessionJobCache = new SessionJobCache(SkahaKubernetesClient.get());
         SessionDAO.useCache(this.sessionJobCache);
         try {
-            this.sessionJobCache.start().toCompletableFuture().get(CACHE_SYNC_WAIT.toSeconds(), TimeUnit.SECONDS);
+            this.sessionJobCache.start().toCompletableFuture().get(syncWait.toMillis(), TimeUnit.MILLISECONDS);
             LOGGER.info("Session Job cache synced");
         } catch (TimeoutException timeoutException) {
-            LOGGER.warn("Session Job cache not synced after {}; reading sessions live until it is", CACHE_SYNC_WAIT);
+            LOGGER.warn("Session Job cache not synced after {}; reading sessions live until it is", syncWait);
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException executionException) {

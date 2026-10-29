@@ -168,7 +168,7 @@ public class PostAction extends SessionAction {
     @Override
     public void doAction() throws Exception {
 
-        super.initRequest();
+        initRequest();
 
         String image = syncInput.getParameter("image");
         if (image == null) {
@@ -439,7 +439,7 @@ public class PostAction extends SessionAction {
         SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(launch.job(), ownedResourceYamls));
     }
 
-    private void injectPOSIXDetails() throws Exception {
+    protected void injectPOSIXDetails() throws Exception {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
@@ -582,7 +582,7 @@ public class PostAction extends SessionAction {
                 .collect(Collectors.joining(","));
     }
 
-    private Set<PosixGroup> getUserPosixGroups() throws Exception {
+    protected Set<PosixGroup> getUserPosixGroups() throws Exception {
         final List<Group> groupCredentials =
                 CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
         return new PosixGroupCache(this.posixMapperConfiguration.getPosixMapperClient())

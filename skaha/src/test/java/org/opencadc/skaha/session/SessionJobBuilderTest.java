@@ -1,538 +1,178 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.FileUtil;
-import io.fabric8.kubernetes.api.model.NodeAffinity;
+import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
-import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.NodeSelectorRequirementBuilder;
 import io.fabric8.kubernetes.api.model.PodSpec;
+import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
-import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.jetbrains.annotations.NotNull;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
 import org.junit.Assert;
 import org.junit.Test;
+import org.yaml.snakeyaml.Yaml;
 
+/**
+ * The Job, Service and ingress a launch builds from a template: parameters, canonical labels, queue, GPU affinity and
+ * image pull Secret. The session flows ({@link SessionLifecycleTest}) cover the chart's templates end to end; these
+ * cover the template variants the chart does not ship.
+ */
 public class SessionJobBuilderTest {
+    private static final Map<String, String> SESSION_LABELS = Map.of(
+            "canfar.net/id", "session-123",
+            "canfar.net/name", "analysis",
+            "canfar.net/username", "alice",
+            "canfar.net/job", "notebook-alice-session-123");
+
     @Test
-    public void labelServiceUsesPlanMetadataInsteadOfScrapedJobLabels() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Path serviceTemplatePath = FileUtil.getFileFromResource(
-                        "test-carta-service.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
+    public void testParametersSubstituted() throws Exception {
+        final Map<String, String> parameters = parameters("notebook");
+        parameters.put(PostAction.SKAHA_HOSTNAME, "skaha-host");
+        parameters.put(PostAction.SKAHA_POSIXID, "20001");
+        final Job job = build("test-base-values.yaml", parameters, builder -> builder.withImage("img:1"));
 
-        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .buildLaunch();
-        final Job job = launch.job();
-        final Map<String, String> tamperedJobLabels =
-                Objects.requireNonNull(job.getMetadata().getLabels());
-        tamperedJobLabels.put("canfar.net/name", "tampered-name");
-        tamperedJobLabels.put("canfar.net/kind", "tampered-kind");
-
-        final String renderedService =
-                SessionJobBuilder.labelService(Files.readString(serviceTemplatePath), launch.labels());
-        final Service service = Serialization.unmarshal(renderedService, Service.class);
-        final Map<String, String> serviceLabels =
-                Objects.requireNonNull(service.getMetadata().getLabels());
-        final Map<String, String> serviceSelector =
-                Objects.requireNonNull(service.getSpec().getSelector());
-
-        Assert.assertEquals("analysis", serviceLabels.get("canfar.net/name"));
-        Assert.assertEquals("notebook", serviceLabels.get("canfar.net/kind"));
-        Assert.assertEquals("session-123", serviceSelector.get("canfar.net/id"));
-        Assert.assertEquals("notebook", serviceSelector.get("canfar.net/kind"));
-        Assert.assertEquals(2, serviceSelector.size());
+        final String output = Serialization.asYaml(job);
+        parameters.forEach((name, value) -> {
+            Assert.assertFalse("Not replaced: " + name, output.contains(name));
+            Assert.assertTrue("Not injected: " + value, output.contains(value));
+        });
+        Assert.assertEquals("img:1", container(job).getImage());
+        Assert.assertTrue(podSpec(job).getImagePullSecrets().isEmpty());
+        Assert.assertNull("No GPU limit", gpu(container(job).getResources().getLimits()));
+        Assert.assertNull("No GPU request", gpu(container(job).getResources().getRequests()));
     }
 
+    /** Canonical labels on the Job and Pod; Kueue's only on the Job; the template's own labels kept. */
     @Test
-    @SuppressWarnings("unchecked")
-    public void labelIngressAppliesCanonicalMetadataLabelsAcrossYamlDocuments() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "carta");
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "carta-alice-session-123");
+    public void testJobAndPodLabels() throws Exception {
+        final Job job =
+                build("test-base-values-queue.yaml", parameters("notebook"), builder -> builder.withGPUEnabled(true)
+                        .withGPUCount(2)
+                        .withQueue(new QueueConfiguration("notebook", "high", "my-queue")));
 
-        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .buildLaunch();
-
-        final String ingressYaml =
-                """
-                apiVersion: networking.k8s.io/v1
-                kind: Ingress
-                metadata:
-                  name: carta-ingress
-                  labels:
-                    existing: label
-                ---
-                apiVersion: v1
-                kind: ConfigMap
-                metadata:
-                  name: carta-config
-                """;
-
-        final String renderedIngress = SessionJobBuilder.labelIngress(ingressYaml, launch.labels());
-        final List<Map<String, Object>> documents = new ArrayList<>();
-        final org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
-        yaml.loadAll(renderedIngress).forEach(document -> documents.add((Map<String, Object>) document));
-
-        Assert.assertEquals(2, documents.size());
-        final Map<String, Object> ingressMetadata =
-                (Map<String, Object>) documents.get(0).get("metadata");
-        final Map<String, Object> ingressLabels = (Map<String, Object>) ingressMetadata.get("labels");
-        Assert.assertEquals("label", ingressLabels.get("existing"));
-        Assert.assertEquals("session-123", ingressLabels.get("canfar.net/id"));
-        Assert.assertEquals("analysis", ingressLabels.get("canfar.net/name"));
-        Assert.assertEquals("carta", ingressLabels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", ingressLabels.get("canfar.net/username"));
-        Assert.assertEquals("carta-alice-session-123", ingressLabels.get("canfar.net/job"));
-
-        final Map<String, Object> configMapMetadata =
-                (Map<String, Object>) documents.get(1).get("metadata");
-        final Map<String, Object> configMapLabels = (Map<String, Object>) configMapMetadata.get("labels");
-        Assert.assertEquals("session-123", configMapLabels.get("canfar.net/id"));
-        Assert.assertEquals("analysis", configMapLabels.get("canfar.net/name"));
-        Assert.assertEquals("carta", configMapLabels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", configMapLabels.get("canfar.net/username"));
-        Assert.assertEquals("carta-alice-session-123", configMapLabels.get("canfar.net/job"));
-    }
-
-    @Test
-    public void launchManifestAppliesCanonicalLabelsAcrossLaunchResourcesWithoutKueueLeakage() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "carta");
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "carta-alice-session-123");
-
-        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withQueue(new QueueConfiguration("carta", "high", "my-queue"))
-                .buildLaunch();
-
-        final Job job = launch.job();
-        final Map<String, String> jobLabels =
-                Objects.requireNonNull(job.getMetadata().getLabels());
-        Assert.assertEquals("my-queue", jobLabels.get("kueue.x-k8s.io/queue-name"));
-        Assert.assertEquals("session-123", jobLabels.get("canfar.net/id"));
-
-        final Map<String, String> serviceLabels = launch.labels().serviceMetadataLabels();
-        final Map<String, String> serviceSelector = launch.labels().serviceSelector();
-
-        Assert.assertEquals("session-123", serviceLabels.get("canfar.net/id"));
-        Assert.assertEquals("analysis", serviceLabels.get("canfar.net/name"));
-        Assert.assertEquals("carta", serviceLabels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", serviceLabels.get("canfar.net/username"));
-        Assert.assertEquals("carta-alice-session-123", serviceLabels.get("canfar.net/job"));
-        Assert.assertFalse(serviceLabels.containsKey("kueue.x-k8s.io/queue-name"));
-        Assert.assertFalse(serviceLabels.containsKey("kueue.x-k8s.io/priority-class"));
-        Assert.assertEquals(2, serviceSelector.size());
-        Assert.assertEquals("session-123", serviceSelector.get("canfar.net/id"));
-        Assert.assertEquals("carta", serviceSelector.get("canfar.net/kind"));
-        final Map<String, String> ingressLabels = launch.labels().ingressMetadataLabels();
-        Assert.assertEquals("session-123", ingressLabels.get("canfar.net/id"));
-        Assert.assertEquals("analysis", ingressLabels.get("canfar.net/name"));
-        Assert.assertEquals("carta", ingressLabels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", ingressLabels.get("canfar.net/username"));
-        Assert.assertEquals("carta-alice-session-123", ingressLabels.get("canfar.net/job"));
-        Assert.assertFalse(ingressLabels.containsKey("kueue.x-k8s.io/queue-name"));
-        Assert.assertFalse(ingressLabels.containsKey("kueue.x-k8s.io/priority-class"));
-    }
-
-    @Test
-    public void buildTruncatesLongSessionNamesForLabels() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final String longName = "desktop-" + "a".repeat(80);
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, longName);
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "desktop-app");
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "desktop-app-alice-session-123");
-
-        final Job job = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withImage("images.example.org/skaha/notebook:1.0")
-                .buildLaunch()
-                .job();
-
-        final String labelName =
-                Objects.requireNonNull(job.getMetadata().getLabels()).get("canfar.net/name");
-        Assert.assertEquals(63, labelName.length());
-        Assert.assertTrue(longName.startsWith(labelName));
-    }
-
-    @Test
-    public void buildAppliesCanonicalLabelsToJobAndPodTemplateMetadata() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONID, "session-123");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
-
-        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withGPUEnabled(true)
-                .withGPUCount(2)
-                .withQueue(new QueueConfiguration("notebook", "high", "my-queue"));
-
-        final Job job = testSubject.buildLaunch().job();
-        final Map<String, String> jobLabels =
-                Objects.requireNonNull(job.getMetadata().getLabels());
+        final Map<String, String> jobLabels = job.getMetadata().getLabels();
         final Map<String, String> podLabels =
-                Objects.requireNonNull(job.getSpec().getTemplate().getMetadata().getLabels());
-
-        assertCanonicalSessionLabels(jobLabels);
-        assertCanonicalSessionLabels(podLabels);
+                job.getSpec().getTemplate().getMetadata().getLabels();
+        for (final Map<String, String> labels : List.of(jobLabels, podLabels)) {
+            assertContains(labels, SESSION_LABELS);
+            assertContains(
+                    labels,
+                    Map.of(
+                            "canfar.net/kind", "notebook",
+                            "canfar.net/flavor", "flexible",
+                            "canfar.net/accelerator", "gpu",
+                            "canfar.net/community", "default",
+                            "canfar.net/project", "default",
+                            "app.kubernetes.io/managed-by", "skaha",
+                            "app.kubernetes.io/part-of", "canfar"));
+        }
         Assert.assertEquals("my-queue", jobLabels.get("kueue.x-k8s.io/queue-name"));
         Assert.assertEquals("high", jobLabels.get("kueue.x-k8s.io/priority-class"));
+        Assert.assertEquals(Boolean.TRUE, job.getSpec().getSuspend());
         Assert.assertEquals("job", jobLabels.get("template-owned"));
         Assert.assertEquals("pod", podLabels.get("template-owned"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/queue-name"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/priority-class"));
     }
 
+    /**
+     * Owned resources take their labels from the launch's label plan, never from the Job, and no Kueue labels; every
+     * document of an ingress bundle is labelled.
+     */
     @Test
-    public void testParsing() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final String fileContent = Files.readString(testBaseValuesPath);
+    @SuppressWarnings("unchecked")
+    public void testOwnedResourceLabels() throws Exception {
+        final SessionJobBuilder.LaunchArtifacts launch = SessionJobBuilder.fromPath(
+                        resource("test-base-values-queue.yaml"))
+                .withParameters(parameters("carta"))
+                .withQueue(new QueueConfiguration("carta", "high", "my-queue"))
+                .buildLaunch();
+        launch.job().getMetadata().getLabels().put("canfar.net/name", "tampered-name");
+        final Map<String, String> expected = new HashMap<>(SESSION_LABELS);
+        expected.put("canfar.net/kind", "carta");
+        expected.put("canfar.net/job", "notebook-alice-session-123");
 
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        final String[] parametersToReplace =
-                new String[] {PostAction.SKAHA_SESSIONID, PostAction.SKAHA_HOSTNAME, PostAction.SKAHA_POSIXID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
-        }
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
-
-        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withImage("images.example.org/skaha/notebook:1.0");
-        final Job job = testSubject.buildLaunch().job();
-        final String output = Serialization.asYaml(job);
+        final Service service = Serialization.unmarshal(
+                SessionJobBuilder.labelService(Files.readString(resource("test-carta-service.yaml")), launch.labels()),
+                Service.class);
+        assertContains(service.getMetadata().getLabels(), expected);
         Assert.assertEquals(
-                "images.example.org/skaha/notebook:1.0",
-                job.getSpec().getTemplate().getSpec().getContainers().get(0).getImage());
+                Map.of("canfar.net/id", "session-123", "canfar.net/kind", "carta"),
+                service.getSpec().getSelector());
 
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        PodSpec podSpec = Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        Assert.assertNotNull("PodSpec should not be null", podSpec);
-        Assert.assertTrue(
-                "PodSpec should not have image pull secrets",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).isEmpty());
-        Assert.assertFalse(
-                "Wrong GPU limit.",
-                job.getSpec()
-                        .getTemplate()
-                        .getSpec()
-                        .getContainers()
-                        .get(0)
-                        .getResources()
-                        .getLimits()
-                        .containsKey("nvidia.com/gpu"));
-
-        // GPU requests should also not be set when GPUs are not enabled.
-        if (Objects.requireNonNull(job.getSpec())
-                        .getTemplate()
-                        .getSpec()
-                        .getContainers()
-                        .get(0)
-                        .getResources()
-                        .getRequests()
-                != null) {
-            Assert.assertFalse(
-                    "Wrong GPU request.",
-                    job.getSpec()
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .getResources()
-                            .getRequests()
-                            .containsKey("nvidia.com/gpu"));
+        final String ingress = "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: carta-ingress\n"
+                + "  labels:\n    existing: label\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: carta-config\n";
+        final List<Map<String, String>> documentLabels = new ArrayList<>();
+        new Yaml()
+                .loadAll(SessionJobBuilder.labelIngress(ingress, launch.labels()))
+                .forEach(document -> documentLabels.add((Map<String, String>)
+                        ((Map<String, Object>) ((Map<String, Object>) document).get("metadata")).get("labels")));
+        Assert.assertEquals(2, documentLabels.size());
+        Assert.assertEquals("label", documentLabels.get(0).get("existing"));
+        for (final Map<String, String> labels : documentLabels) {
+            assertContains(labels, expected);
+            Assert.assertFalse(labels.containsKey("kueue.x-k8s.io/queue-name"));
         }
     }
 
-    private void testBaseValuesAffinityJob(final int gpuCount) throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-affinity.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        commonValues(testBaseValuesPath, parametersToReplaceValues);
+    @Test
+    public void testLongSessionNameTruncatedForLabels() throws Exception {
+        final String longName = "desktop-" + "a".repeat(80);
+        final Map<String, String> parameters = parameters("desktop-app");
+        parameters.put(PostAction.SKAHA_SESSIONNAME, longName);
 
-        SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withImageSecret("my-secret");
+        final String label = build("test-base-values.yaml", parameters, builder -> builder.withImage("img:1"))
+                .getMetadata()
+                .getLabels()
+                .get("canfar.net/name");
+        Assert.assertEquals(63, label.length());
+        Assert.assertTrue(longName.startsWith(label));
+    }
 
-        if (gpuCount > 0) {
-            testSubject = testSubject.withGPUEnabled(true).withGPUCount(gpuCount);
-        }
+    /** The template's node affinity is kept; a GPU request adds a GPU node requirement and matching limits. */
+    @Test
+    public void testGPUAffinityAndPullSecret() throws Exception {
+        final NodeSelectorRequirement gpuNode = new NodeSelectorRequirementBuilder()
+                .withKey("nvidia.com/gpu.count")
+                .withOperator("Gt")
+                .withValues("0")
+                .build();
+        final NodeSelectorRequirement templateNode = new NodeSelectorRequirementBuilder()
+                .withKey("my-node-please")
+                .withOperator("Exists")
+                .build();
+        for (final int gpus : new int[] {0, 2}) {
+            final Job job =
+                    build("test-base-values-affinity.yaml", parameters("notebook"), builder -> builder.withImageSecret(
+                                    "my-secret")
+                            .withGPUEnabled(gpus > 0)
+                            .withGPUCount(gpus));
 
-        final Job job = testSubject.buildLaunch().job();
-        final String output = Serialization.asYaml(job);
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        if (gpuCount > 0) {
+            final Quantity expected = gpus > 0 ? new Quantity(Integer.toString(gpus)) : null;
+            Assert.assertEquals(expected, gpu(container(job).getResources().getLimits()));
+            Assert.assertEquals(expected, gpu(container(job).getResources().getRequests()));
+            final List<NodeSelectorRequirement> required = podSpec(job)
+                    .getAffinity()
+                    .getNodeAffinity()
+                    .getRequiredDuringSchedulingIgnoredDuringExecution()
+                    .getNodeSelectorTerms()
+                    .get(0)
+                    .getMatchExpressions();
+            Assert.assertEquals("GPU node requirement", gpus > 0, required.contains(gpuNode));
+            Assert.assertTrue(required.contains(templateNode));
             Assert.assertEquals(
-                    "Wrong GPU limit.",
-                    gpuCount,
-                    job.getSpec()
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .getResources()
-                            .getLimits()
-                            .get("nvidia.com/gpu")
-                            .getNumericalAmount()
-                            .intValue());
-
-            // When GPUs are requested, the GPU requests should match the limits.
-            Assert.assertEquals(
-                    "Wrong GPU request.",
-                    gpuCount,
-                    Objects.requireNonNull(job.getSpec())
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .getResources()
-                            .getRequests()
-                            .get("nvidia.com/gpu")
-                            .getNumericalAmount()
-                            .intValue());
-        } else {
-            Assert.assertNull(
-                    "GPU limit should be null.",
-                    job.getSpec()
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .getResources()
-                            .getLimits()
-                            .get("nvidia.com/gpu"));
-
-            if (Objects.requireNonNull(job.getSpec())
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .getResources()
-                            .getRequests()
-                    != null) {
-                Assert.assertFalse(
-                        "GPU request should be absent.",
-                        job.getSpec()
-                                .getTemplate()
-                                .getSpec()
-                                .getContainers()
-                                .get(0)
-                                .getResources()
-                                .getRequests()
-                                .containsKey("nvidia.com/gpu"));
-            }
+                    "my-secret", podSpec(job).getImagePullSecrets().get(0).getName());
+            Assert.assertEquals("fixed", job.getMetadata().getLabels().get(SessionLabels.Key.FLAVOR.label()));
         }
-
-        Assert.assertEquals(
-                "Wrong fixed label",
-                "fixed",
-                Objects.requireNonNull(job.getMetadata().getLabels()).get(SessionLabels.Key.FLAVOR.label()));
-
-        final PodSpec podSpec =
-                Objects.requireNonNull(job.getSpec()).getTemplate().getSpec();
-        Assert.assertNotNull("PodSpec should not be null", podSpec);
-        final List<NodeSelectorRequirement> testMatchExpressions = getNodeSelectorRequirements(podSpec);
-
-        Assert.assertEquals(
-                "Wrong pull secret.",
-                "my-secret",
-                Objects.requireNonNull(podSpec.getImagePullSecrets()).get(0).getName());
-
-        final NodeSelectorRequirement gpuRequirement = new NodeSelectorRequirement();
-        gpuRequirement.setKey("nvidia.com/gpu.count");
-        gpuRequirement.setOperator("Gt");
-        gpuRequirement.setValues(Collections.singletonList("0"));
-
-        final NodeSelectorRequirement providedRequirement = new NodeSelectorRequirement();
-        providedRequirement.setKey("my-node-please");
-        providedRequirement.setOperator("Exists");
-
-        if (gpuCount > 0) {
-            Assert.assertTrue("Missing GPU required match expression.", testMatchExpressions.contains(gpuRequirement));
-        } else {
-            Assert.assertFalse("GPU should be missing.", testMatchExpressions.contains(gpuRequirement));
-        }
-        Assert.assertTrue(
-                "Missing provided (custom) required match expression.",
-                testMatchExpressions.contains(providedRequirement));
-    }
-
-    @Test
-    public void testWithAffinityMergingNoGPUs() throws Exception {
-        testBaseValuesAffinityJob(0);
-    }
-
-    @Test
-    public void testWithAffinityMerging() throws Exception {
-        testBaseValuesAffinityJob(2);
-    }
-
-    @Test
-    public void testWithQueueMerging() throws Exception {
-        final Path testBaseValuesPath = FileUtil.getFileFromResource(
-                        "test-base-values-queue.yaml", SessionJobBuilderTest.class)
-                .toPath();
-        final Map<String, String> parametersToReplaceValues = new HashMap<>();
-        commonValues(testBaseValuesPath, parametersToReplaceValues);
-
-        final SessionJobBuilder testSubject = SessionJobBuilder.fromPath(testBaseValuesPath)
-                .withParameters(parametersToReplaceValues)
-                .withQueue(new QueueConfiguration("notebook", "high", "my-queue"));
-        final Job job = testSubject.buildLaunch().job();
-        final String output = Serialization.asYaml(job);
-
-        for (final Map.Entry<String, String> entry : parametersToReplaceValues.entrySet()) {
-            Assert.assertFalse("Entry not replaced.", output.contains(entry.getKey()));
-            Assert.assertTrue("Value not injected into file.", output.contains(entry.getValue()));
-        }
-
-        final JobSpec jobSpec = Objects.requireNonNull(job.getSpec());
-        Assert.assertEquals("Job should be suspended.", Boolean.TRUE, jobSpec.getSuspend());
-
-        final ObjectMeta metadata = Objects.requireNonNull(job.getMetadata());
-        Assert.assertEquals(
-                "Wrong queue name.",
-                "my-queue",
-                Objects.requireNonNull(metadata.getLabels()).get("kueue.x-k8s.io/queue-name"));
-        Assert.assertEquals(
-                "Wrong priority class.",
-                "high",
-                Objects.requireNonNull(metadata.getLabels()).get("kueue.x-k8s.io/priority-class"));
-        Assert.assertEquals(
-                "Wrong flex label",
-                "flexible",
-                Objects.requireNonNull(metadata.getLabels()).get(SessionLabels.Key.FLAVOR.label()));
-    }
-
-    @NotNull private static List<NodeSelectorRequirement> getNodeSelectorRequirements(PodSpec podSpec) {
-        assert podSpec != null;
-        final NodeAffinity nodeAffinity =
-                Objects.requireNonNull(podSpec.getAffinity()).getNodeAffinity();
-
-        final List<NodeSelectorRequirement> testMatchExpressions = new ArrayList<>();
-        assert nodeAffinity != null;
-        final List<NodeSelectorRequirement> matchExpressions = Objects.requireNonNull(
-                        Objects.requireNonNull(nodeAffinity).getRequiredDuringSchedulingIgnoredDuringExecution())
-                .getNodeSelectorTerms()
-                .get(0)
-                .getMatchExpressions();
-
-        if (matchExpressions != null) {
-            testMatchExpressions.addAll(matchExpressions);
-        }
-        return testMatchExpressions;
-    }
-
-    private void commonValues(final Path testBaseValuesPath, final Map<String, String> parametersToReplaceValues)
-            throws Exception {
-        final String fileContent = Files.readString(testBaseValuesPath);
-        final String[] parametersToReplace = new String[] {PostAction.SKAHA_SESSIONID};
-
-        for (final String param : parametersToReplace) {
-            Assert.assertTrue("Test file is missing required field.", fileContent.contains(param));
-            parametersToReplaceValues.put(param, RandomStringUtils.secure().nextAlphanumeric(12));
-        }
-        parametersToReplaceValues.put(PostAction.SKAHA_USERID, "alice");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONNAME, "analysis");
-        parametersToReplaceValues.put(PostAction.SKAHA_SESSIONTYPE, "notebook");
-        parametersToReplaceValues.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
-    }
-
-    private static void assertCanonicalSessionLabels(final Map<String, String> labels) {
-        Assert.assertEquals("session-123", labels.get("canfar.net/id"));
-        Assert.assertEquals("analysis", labels.get("canfar.net/name"));
-        Assert.assertEquals("notebook", labels.get("canfar.net/kind"));
-        Assert.assertEquals("alice", labels.get("canfar.net/username"));
-        Assert.assertEquals("notebook-alice-session-123", labels.get("canfar.net/job"));
-        Assert.assertEquals("flexible", labels.get("canfar.net/flavor"));
-        Assert.assertEquals("gpu", labels.get("canfar.net/accelerator"));
-        Assert.assertEquals("default", labels.get("canfar.net/community"));
-        Assert.assertEquals("default", labels.get("canfar.net/project"));
-        Assert.assertEquals("skaha", labels.get("app.kubernetes.io/managed-by"));
-        Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
-    }
-
-    @Test
-    public void testHeadlessValuesAreTyped() throws Exception {
-        final String args = "-c print(\"a: b\")\n---\nkind: Secret";
-        final SessionJobBuilder.HeadlessCommand command = SessionJobBuilder.HeadlessCommand.fromRequest(
-                "/bin/sh -c \"echo: hi\"", args, List.of("QUOTE=\"x\": y", "MULTI=line1\nline2", "EQ=a=b", "=noname"));
-
-        final Job job = SessionJobBuilder.fromPath(SessionFixtures.template("launch-headless.yaml"))
-                .withParameters(SessionFixtures.parameters("headless"))
-                .withImage("images.example.org/skaha/headless:1.0")
-                .withHeadlessCommand(command)
-                .buildLaunch()
-                .job();
-
-        final io.fabric8.kubernetes.api.model.Container container =
-                job.getSpec().getTemplate().getSpec().getContainers().get(0);
-        Assert.assertEquals(List.of("/bin/sh -c \"echo: hi\""), container.getCommand());
-        Assert.assertEquals(List.of(args.split(" ")), container.getArgs());
-        final Map<String, String> env = new HashMap<>();
-        container.getEnv().forEach(var -> env.putIfAbsent(var.getName(), var.getValue()));
-        Assert.assertEquals("\"x\": y", env.get("QUOTE"));
-        Assert.assertEquals("line1\nline2", env.get("MULTI"));
-        Assert.assertEquals("a=b", env.get("EQ"));
-        Assert.assertFalse(env.containsKey(""));
-        Assert.assertEquals(
-                "No extra objects or fields",
-                1,
-                job.getSpec().getTemplate().getSpec().getContainers().size());
     }
 
     @Test
@@ -550,5 +190,47 @@ public class SessionJobBuilderTest {
                 .withImage("images.example.org/skaha/notebook:1.0");
 
         Assert.assertThrows(IllegalStateException.class, builder::buildLaunch);
+    }
+
+    private static Map<String, String> parameters(final String kind) {
+        final Map<String, String> parameters = new HashMap<>();
+        parameters.put(PostAction.SKAHA_SESSIONID, "session-123");
+        parameters.put(PostAction.SKAHA_SESSIONNAME, "analysis");
+        parameters.put(PostAction.SKAHA_SESSIONTYPE, kind);
+        parameters.put(PostAction.SKAHA_USERID, "alice");
+        parameters.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
+        return parameters;
+    }
+
+    private static Job build(
+            final String template,
+            final Map<String, String> parameters,
+            final UnaryOperator<SessionJobBuilder> configure)
+            throws Exception {
+        return configure
+                .apply(SessionJobBuilder.fromPath(resource(template)).withParameters(parameters))
+                .buildLaunch()
+                .job();
+    }
+
+    private static Path resource(final String name) {
+        return FileUtil.getFileFromResource(name, SessionJobBuilderTest.class).toPath();
+    }
+
+    private static PodSpec podSpec(final Job job) {
+        return job.getSpec().getTemplate().getSpec();
+    }
+
+    private static Container container(final Job job) {
+        return podSpec(job).getContainers().get(0);
+    }
+
+    private static Quantity gpu(final Map<String, Quantity> resources) {
+        return resources == null ? null : resources.get("nvidia.com/gpu");
+    }
+
+    private static void assertContains(final Map<String, String> actual, final Map<String, String> expected) {
+        expected.forEach((key, value) ->
+                Assert.assertEquals(key, value, Objects.requireNonNull(actual).get(key)));
     }
 }

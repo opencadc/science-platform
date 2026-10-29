@@ -36,6 +36,20 @@ final class SessionFixtures {
         return Files.writeString(configMap.resolveSibling(name), template);
     }
 
+    /** A working directory whose config/ holds every session template, as the Skaha container has them. */
+    static Path workingDirectory(final Path root) throws IOException {
+        final Path config = Files.createDirectories(root.resolve("config"));
+        final Path configMap =
+                Path.of(System.getProperty("skaha.sessionTemplates", "build/session-templates/skaha-config.yaml"));
+        for (final Map.Entry<String, String> entry : Serialization.unmarshal(
+                        Files.readString(configMap), ConfigMap.class)
+                .getData()
+                .entrySet()) {
+            Files.writeString(config.resolve(entry.getKey()), entry.getValue());
+        }
+        return root;
+    }
+
     static String image(final String kind) {
         return "images.example.org/skaha/" + kind + ":1.0";
     }

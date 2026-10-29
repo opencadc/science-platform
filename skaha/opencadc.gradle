@@ -74,6 +74,8 @@ test {
     // Session end-to-end tests run against the KubernetesApi mock server in this namespace.
     environment 'skaha.namespace', 'skaha-workload'
     environment 'SKAHA_SESSIONS_HOSTNAME', 'sessions.example.org'
+    environment 'SKAHA_HOSTNAME', 'skaha.example.org'
+    environment 'skaha.sessionexpiry', '345600'
 }
 
 intTest {
