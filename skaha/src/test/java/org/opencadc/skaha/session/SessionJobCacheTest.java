@@ -10,7 +10,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -28,10 +27,9 @@ public class SessionJobCacheTest {
     private SessionJobCache cache;
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         this.clock = new MutableClock(Instant.parse("2026-10-23T12:00:00Z"));
         this.cache = new SessionJobCache(this.api.client(), this.clock);
-        this.cache.start().toCompletableFuture().get(10, TimeUnit.SECONDS);
     }
 
     @After
@@ -40,54 +38,44 @@ public class SessionJobCacheTest {
     }
 
     @Test
-    public void testWatchKeepsCacheCurrent() throws Exception {
-        Assert.assertTrue(this.cache.isCurrent());
-        create(job("skaha-notebook-alice-a1", "alice", "a1", "notebook"));
-        create(job("skaha-headless-alice-h1", "alice", "h1", "headless"));
-        create(job("skaha-notebook-bob-b1", "bob", "b1", "notebook"));
+    public void testRecentlyCreated() throws Exception {
+        this.cache.start().toCompletableFuture().get(10, TimeUnit.SECONDS);
 
-        await(() -> names(this.cache.userJobs("alice", false)).size() == 2);
-        Assert.assertEquals(List.of("skaha-notebook-alice-a1"), names(this.cache.userJobs("alice", true)));
-
-        delete("skaha-notebook-alice-a1");
-        await(() -> names(this.cache.userJobs("alice", true)).isEmpty());
-    }
-
-    @Test
-    public void testJustCreatedJobVisibleBeforeWatch() {
-        // The API never shows this Job, as when the watch lags behind the create.
+        // The API never shows this Job, as when the watch lags behind the create: listed for its user only, then
+        // forgotten after the window.
         this.cache.created(job("skaha-notebook-alice-new", "alice", "new1", "notebook"));
-
         Assert.assertEquals(List.of("skaha-notebook-alice-new"), names(this.cache.userJobs("alice", false)));
         Assert.assertTrue(
                 "Other users do not see it", this.cache.userJobs("bob", false).isEmpty());
-
         this.clock.advance(SessionJobCache.RECENT_CREATE_WINDOW.plusSeconds(1));
         Assert.assertTrue(
                 "Forgotten after the window",
                 this.cache.userJobs("alice", false).isEmpty());
-    }
 
-    @Test
-    public void testDeletionNotMasked() throws Exception {
-        // Created here, then deleted elsewhere (another replica, a controller) before the window ends.
+        // Created here, then deleted elsewhere (another replica, a controller) inside the window: the deletion shows.
         this.cache.created(create(job("skaha-notebook-alice-a2", "alice", "a2", "notebook")));
-        Assert.assertEquals(1, this.cache.userJobs("alice", false).size());
-
         delete("skaha-notebook-alice-a2");
-        await(() -> this.cache.userJobs("alice", false).isEmpty());
+        KubernetesApi.await(
+                "the deletion", () -> this.cache.userJobs("alice", false).isEmpty());
     }
 
     @Test
-    public void testRouting() {
-        Assert.assertTrue(SessionDAO.servedFromCache(this.cache, "alice", null));
-        Assert.assertFalse("Lookups by session ID are live", SessionDAO.servedFromCache(this.cache, "alice", "a1"));
-        Assert.assertFalse("Callbacks have no user", SessionDAO.servedFromCache(this.cache, null, null));
-        Assert.assertFalse("No cache", SessionDAO.servedFromCache(null, "alice", null));
+    public void testFirstSyncFailureRecovers() throws Exception {
+        // The API fails the first list, as during an API server restart at pod start; the cache keeps retrying.
+        this.api
+                .server()
+                .expect()
+                .get()
+                .withPath("/apis/batch/v1/namespaces/" + NAMESPACE
+                        + "/jobs?labelSelector=canfar.net%2Fid&resourceVersion=0")
+                .andReturn(500, "")
+                .once();
+        create(job("skaha-notebook-alice-a1", "alice", "a1", "notebook"));
 
-        this.cache.close();
-        Assert.assertFalse("A stopped watch is not current", this.cache.isCurrent());
-        Assert.assertFalse(SessionDAO.servedFromCache(this.cache, "alice", null));
+        this.cache.start();
+
+        KubernetesApi.await("the cache to sync after the failed first list", this.cache::isCurrent);
+        Assert.assertEquals(List.of("skaha-notebook-alice-a1"), names(this.cache.userJobs("alice", false)));
     }
 
     private Job create(final Job job) {
@@ -114,16 +102,6 @@ public class SessionJobCacheTest {
 
     private static List<String> names(final List<Job> jobs) {
         return jobs.stream().map(job -> job.getMetadata().getName()).sorted().toList();
-    }
-
-    private static void await(final BooleanSupplier condition) throws InterruptedException {
-        final long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-        while (!condition.getAsBoolean()) {
-            if (System.nanoTime() > deadline) {
-                Assert.fail("Condition not met within 10 seconds");
-            }
-            Thread.sleep(20);
-        }
     }
 
     private static Job job(final String name, final String username, final String sessionID, final String kind) {

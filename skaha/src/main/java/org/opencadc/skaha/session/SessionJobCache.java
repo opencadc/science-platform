@@ -39,6 +39,8 @@ final class SessionJobCache implements AutoCloseable {
                 .jobs()
                 .withLabel(SessionLabels.Key.ID.label())
                 .runnableInformer(0);
+        // Fabric8 retries only after the first sync by default; a failed first list would stop the watch for good.
+        this.informer.exceptionHandler((started, exception) -> true);
         this.informer.addIndexers(Map.of(BY_USERNAME, job -> {
             final String username = SessionLabels.get(job, SessionLabels.Key.USERNAME);
             return username == null ? List.of() : List.of(username);

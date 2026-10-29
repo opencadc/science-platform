@@ -85,20 +85,7 @@ public class SessionDAO {
     }
 
     static boolean servedFromCache(final SessionJobCache cache, final String forUserID, final String sessionID) {
-        if (!StringUtil.hasText(forUserID) || StringUtil.hasText(sessionID) || cache == null) {
-            return false;
-        }
-        if (!cache.isCurrent()) {
-            LOGGER.warn("Session Job cache is not current (not synced or watch down); reading sessions live.");
-            return false;
-        }
-        return true;
-    }
-
-    /** Sessions matching the filters, always read live, e.g. for the session limit. */
-    static List<Session> getUserSessionsLive(
-            final String forUserID, final String sessionID, final boolean omitHeadless) {
-        return toSessions(forUserID, omitHeadless, liveJobs(forUserID, sessionID, omitHeadless));
+        return StringUtil.hasText(forUserID) && !StringUtil.hasText(sessionID) && cache != null && cache.isCurrent();
     }
 
     static List<Job> liveJobs(final String forUserID, final String sessionID, final boolean omitHeadless) {
