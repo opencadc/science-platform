@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.request
 
 import yaml
 
@@ -37,13 +38,15 @@ def command(*args, input=None):
     return result.stdout
 
 
-def wait_for(description, predicate, timeout=240):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+def wait_for(description, predicate, timeout=240, diagnose=None):
+    start = time.monotonic()
+    while time.monotonic() < start + timeout:
         if predicate():
-            print(f"PASS: {description}", flush=True)
+            print(f"PASS: {description} ({time.monotonic() - start:.0f}s)", flush=True)
             return
         time.sleep(2)
+    if diagnose:
+        diagnose()
     raise AssertionError(f"Timed out: {description}")
 
 
@@ -209,6 +212,19 @@ def run(kubeconfig, directory):
             )
 
     apply({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "argocd"}})
+    with urllib.request.urlopen(
+        f"https://raw.githubusercontent.com/argoproj/argo-cd/{ARGO_VERSION}/manifests/core-install.yaml"
+    ) as response:
+        manifests = [manifest for manifest in yaml.safe_load_all(response) if manifest]
+    for manifest in manifests:
+        if (
+            manifest["kind"] == "ConfigMap"
+            and manifest["metadata"]["name"] == "argocd-cm"
+        ):
+            # Argo CD retries a failed comparison only on its next reconcile, 2-3
+            # minutes by default. Make it 10 seconds, so a transient error while the
+            # cluster settles does not outlast the waits.
+            manifest.setdefault("data", {})["timeout.reconciliation"] = "10s"
     kubectl(
         "apply",
         "--server-side",
@@ -216,24 +232,15 @@ def run(kubeconfig, directory):
         "-n",
         "argocd",
         "-f",
-        f"https://raw.githubusercontent.com/argoproj/argo-cd/{ARGO_VERSION}/manifests/core-install.yaml",
+        "-",
+        input=yaml.safe_dump_all(manifests),
     )
-    kubectl(
-        "rollout",
-        "status",
-        "-n",
-        "argocd",
+    for workload in (
+        "deployment/argocd-redis",
         "deployment/argocd-repo-server",
-        "--timeout=240s",
-    )
-    kubectl(
-        "rollout",
-        "status",
-        "-n",
-        "argocd",
         "statefulset/argocd-application-controller",
-        "--timeout=240s",
-    )
+    ):
+        kubectl("rollout", "status", "-n", "argocd", workload, "--timeout=240s")
     apply(
         {
             "apiVersion": "argoproj.io/v1alpha1",
@@ -500,6 +507,41 @@ spec:
             and current["status"].get("health", {}).get("status") == "Healthy"
         )
 
+    def diagnose():
+        current = status().get("status", {})
+        print("Application status:", flush=True)
+        print(
+            yaml.safe_dump(
+                {key: current.get(key) for key in ("conditions", "health", "sync")}
+                | {
+                    "operationState": {
+                        key: current.get("operationState", {}).get(key)
+                        for key in ("phase", "message", "startedAt", "finishedAt")
+                    },
+                    "resources": [
+                        {
+                            "kind": resource["kind"],
+                            "name": resource["name"],
+                            "status": resource.get("status"),
+                            "health": resource.get("health"),
+                        }
+                        for resource in current.get("resources", [])
+                    ],
+                }
+            ),
+            flush=True,
+        )
+        for namespace in ("argocd", NAMESPACE):
+            print(kubectl("get", "pods", "-n", namespace, "-o", "wide"), flush=True)
+            print(
+                kubectl("get", "events", "-n", namespace, "--sort-by=.lastTimestamp"),
+                flush=True,
+            )
+
+    def refreshed():
+        annotations = status()["metadata"].get("annotations", {})
+        return "argocd.argoproj.io/refresh" not in annotations and healthy()
+
     def secret():
         return json.loads(
             kubectl(
@@ -534,7 +576,9 @@ spec:
         ]
 
     apply(application)
-    wait_for("Argo CD initial full sync is Healthy and Synced", healthy)
+    wait_for(
+        "Argo CD initial full sync is Healthy and Synced", healthy, diagnose=diagnose
+    )
     first = secret()
     expected = hashlib.sha256(base64.b64decode(first["data"]["key-secret"])).hexdigest()
     assert first["immutable"] is True
@@ -594,7 +638,6 @@ spec:
         flush=True,
     )
     for iteration in range(3):
-        previous = status()["status"]["reconciledAt"]
         kubectl(
             "annotate",
             "application",
@@ -604,9 +647,11 @@ spec:
             "--overwrite",
             "argocd.argoproj.io/refresh=hard",
         )
+        # Argo CD removes the annotation once the refresh is done.
         wait_for(
             f"hard refresh {iteration + 1} stays Healthy and Synced",
-            lambda: status()["status"]["reconciledAt"] != previous and healthy(),
+            refreshed,
+            diagnose=diagnose,
         )
         assert secret()["metadata"]["uid"] == first["metadata"]["uid"]
         assert secret()["data"] == first["data"]
@@ -618,6 +663,7 @@ spec:
                 status()["status"]["operationState"]["startedAt"] != previous
                 and healthy()
             ),
+            diagnose=diagnose,
         )
         assert secret()["metadata"]["uid"] == first["metadata"]["uid"]
         assert secret()["data"] == first["data"]
@@ -654,7 +700,11 @@ spec:
     assert secret()["data"] == first["data"]
     apply(application)
     sync()
-    wait_for("reattaching a non-cascaded installation preserves the key", healthy)
+    wait_for(
+        "reattaching a non-cascaded installation preserves the key",
+        healthy,
+        diagnose=diagnose,
+    )
     assert secret()["metadata"]["uid"] == first["metadata"]["uid"]
     assert secret()["data"] == first["data"]
 
@@ -677,7 +727,9 @@ spec:
         ),
     )
     apply(application)
-    wait_for("fresh Argo CD installation is Healthy and Synced", healthy)
+    wait_for(
+        "fresh Argo CD installation is Healthy and Synced", healthy, diagnose=diagnose
+    )
     second = secret()
     assert second["metadata"]["uid"] != first["metadata"]["uid"]
     assert second["data"] != first["data"]
