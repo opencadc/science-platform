@@ -186,6 +186,21 @@ def run(kubeconfig, directory):
     def apply(resource, namespace="argocd"):
         kubectl("apply", "-n", namespace, "-f", "-", input=yaml.safe_dump(resource))
 
+    def describe(namespace):
+        print(kubectl("get", "pods", "-n", namespace, "-o", "wide"), flush=True)
+        print(
+            kubectl("get", "events", "-n", namespace, "--sort-by=.lastTimestamp"),
+            flush=True,
+        )
+
+    def rollout(namespace, workload):
+        try:
+            kubectl("rollout", "status", "-n", namespace, workload, "--timeout=240s")
+        except RuntimeError:
+            print(f"Timed out: rollout of {workload}", flush=True)
+            describe(namespace)
+            raise
+
     context = kubectl("config", "current-context").strip()
     local_contexts = {
         f"kind-{cluster}" for cluster in command("kind", "get", "clusters").splitlines()
@@ -217,6 +232,13 @@ def run(kubeconfig, directory):
     ) as response:
         manifests = [manifest for manifest in yaml.safe_load_all(response) if manifest]
     for manifest in manifests:
+        if manifest["kind"] == "Deployment":
+            # public.ecr.aws answers CI runners with 429 Too Many Requests, so Redis
+            # never starts. Pull the same official image from Docker Hub instead.
+            for container in manifest["spec"]["template"]["spec"]["containers"]:
+                container["image"] = container["image"].replace(
+                    "public.ecr.aws/docker/library/", "docker.io/library/"
+                )
         if (
             manifest["kind"] == "ConfigMap"
             and manifest["metadata"]["name"] == "argocd-cm"
@@ -240,7 +262,7 @@ def run(kubeconfig, directory):
         "deployment/argocd-repo-server",
         "statefulset/argocd-application-controller",
     ):
-        kubectl("rollout", "status", "-n", "argocd", workload, "--timeout=240s")
+        rollout("argocd", workload)
     apply(
         {
             "apiVersion": "argoproj.io/v1alpha1",
@@ -408,14 +430,7 @@ spec:
             "spec": {"selector": {"app": repository_name}, "ports": [{"port": 8080}]},
         }
     )
-    kubectl(
-        "rollout",
-        "status",
-        "-n",
-        "argocd",
-        f"deployment/{repository_name}",
-        "--timeout=240s",
-    )
+    rollout("argocd", f"deployment/{repository_name}")
 
     application = {
         "apiVersion": "argoproj.io/v1alpha1",
@@ -532,11 +547,7 @@ spec:
             flush=True,
         )
         for namespace in ("argocd", NAMESPACE):
-            print(kubectl("get", "pods", "-n", namespace, "-o", "wide"), flush=True)
-            print(
-                kubectl("get", "events", "-n", namespace, "--sort-by=.lastTimestamp"),
-                flush=True,
-            )
+            describe(namespace)
 
     def refreshed():
         annotations = status()["metadata"].get("annotations", {})
