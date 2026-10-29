@@ -76,13 +76,9 @@ public final class SkahaCallbackTokenTool {
                             .withName(name)
                             .endMetadata()
                             .withType("Opaque")
-                            .withStringData(Map.of(
-                                    PUBLIC_KEY,
-                                            CommonUtils.encodeBase64(
-                                                    keyPair.getPublic().getEncoded()),
-                                    PRIVATE_KEY,
-                                            CommonUtils.encodeBase64(
-                                                    keyPair.getPrivate().getEncoded())))
+                            .withData(Map.of(
+                                    PUBLIC_KEY, persisted(keyPair.getPublic().getEncoded()),
+                                    PRIVATE_KEY, persisted(keyPair.getPrivate().getEncoded())))
                             .build())
                     .create();
         } catch (KubernetesClientException exception) {
@@ -91,6 +87,12 @@ public final class SkahaCallbackTokenTool {
             }
             return Objects.requireNonNull(client.secrets().withName(name).get(), "Secret " + name + " vanished");
         }
+    }
+
+    /** A key as the Secret's data holds it, so the create response decodes like any later read. */
+    private static String persisted(final byte[] key) {
+        return CommonUtils.encodeBase64(
+                CommonUtils.encodeBase64(key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /**

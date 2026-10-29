@@ -6,12 +6,10 @@ import ca.nrc.cadc.util.RsaSignatureGenerator;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
-import io.fabric8.kubernetes.client.utils.Serialization;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Map;
 import org.junit.After;
 import org.junit.Assert;
@@ -100,36 +98,15 @@ public class SkahaCallbackTokenToolTest {
 
     @Test
     public void fromSecret_absent_created() throws Exception {
-        this.api
-                .server()
-                .expect()
-                .get()
-                .withPath(SECRET_PATH)
-                .andReturn(404, "")
-                .once();
-        // The API server turns stringData into data.
-        this.api
-                .server()
-                .expect()
-                .post()
-                .withPath(SECRETS_PATH)
-                .andReply(201, request -> {
-                    final Secret sent =
-                            Serialization.unmarshal(request.getBody().readUtf8(), Secret.class);
-                    final Map<String, String> data = new HashMap<>();
-                    sent.getStringData().forEach((key, value) -> data.put(key, apiBase64(value)));
-                    return new SecretBuilder(sent)
-                            .withStringData(null)
-                            .withData(data)
-                            .build();
-                })
-                .once();
-
         final SkahaCallbackTokenTool tool = SkahaCallbackTokenTool.fromSecret();
 
+        // The stored keys are the ones in use: a token signed now verifies with a tool read back from the Secret.
+        final SkahaCallbackTokenTool stored = SkahaCallbackTokenTool.fromSecret(
+                this.api.client().secrets().withName("pre-auth-token-skaha").get());
         Assert.assertEquals(
                 "session-2",
-                tool.validateSessionCallbackToken(tool.generateToken(WriteGrant.class, "session-2"), WriteGrant.class));
+                stored.validateSessionCallbackToken(
+                        tool.generateToken(WriteGrant.class, "session-2"), WriteGrant.class));
     }
 
     @Test
