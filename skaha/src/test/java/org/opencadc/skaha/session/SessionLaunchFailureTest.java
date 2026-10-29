@@ -184,6 +184,48 @@ public class SessionLaunchFailureTest {
                         false,
                         true)),
                 row(new Case(
+                        "503, then the read-back fails: Job deleted",
+                        api -> {
+                            api.expect()
+                                    .post()
+                                    .withPath(JOBS)
+                                    .andReturn(503, "")
+                                    .once();
+                            api.expect()
+                                    .get()
+                                    .withPath(JOBS + "/" + JOB_NAME)
+                                    .andReturn(500, "")
+                                    .once();
+                        },
+                        null,
+                        List.of(),
+                        10_000,
+                        TransientException.class,
+                        null,
+                        false,
+                        true)),
+                row(new Case(
+                        "owned Service fails and so does the cleanup: launch still fails",
+                        api -> {
+                            api.expect()
+                                    .post()
+                                    .withPath("/api/v1/namespaces/" + NAMESPACE + "/services")
+                                    .andReturn(500, "")
+                                    .once();
+                            api.expect()
+                                    .delete()
+                                    .withPath(JOBS + "/" + JOB_NAME)
+                                    .andReturn(500, "")
+                                    .once();
+                        },
+                        null,
+                        List.of(SERVICE),
+                        10_000,
+                        TransientException.class,
+                        null,
+                        true,
+                        true)),
+                row(new Case(
                         "owned template does not parse: Job deleted",
                         api -> {},
                         null,
