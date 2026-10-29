@@ -6,6 +6,7 @@
 .vscode
 
 /**/charts/
+__pycache__/
 
 # Coding agents / local AI tooling
 .cursor/
