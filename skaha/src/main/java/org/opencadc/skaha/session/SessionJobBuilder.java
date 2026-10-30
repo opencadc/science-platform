@@ -63,13 +63,6 @@ public class SessionJobBuilder {
     private FlexibleSpread flexibleSpread;
 
     /**
-     * A headless session's command line, from the request.
-     *
-     * @param command The executable, or null to use the image's entrypoint.
-     * @param args Arguments, possibly empty.
-     * @param env Environment variables in request order, possibly empty.
-     */
-    /**
      * Spread flexible session Pods ({@code canfar.net/flavor=flexible}) across topology domains with a topology spread
      * constraint. Their memory request is below their limit, so packing them onto one node invites memory pressure
      * there. The spread is a preference ({@code ScheduleAnyway}): it never blocks a session.
@@ -81,12 +74,26 @@ public class SessionJobBuilder {
         /** The configured spread, or null when the chart disables it. */
         static FlexibleSpread fromEnv() {
             final String maxSkew = System.getenv("SKAHA_FLEXIBLE_SPREAD_MAX_SKEW");
-            return StringUtil.hasText(maxSkew)
-                    ? new FlexibleSpread(Integer.parseInt(maxSkew), System.getenv("SKAHA_FLEXIBLE_SPREAD_TOPOLOGY_KEY"))
-                    : null;
+            if (!StringUtil.hasText(maxSkew)) {
+                return null;
+            }
+            try {
+                return new FlexibleSpread(
+                        Integer.parseInt(maxSkew.trim()), System.getenv("SKAHA_FLEXIBLE_SPREAD_TOPOLOGY_KEY"));
+            } catch (NumberFormatException notANumber) {
+                throw new IllegalStateException(
+                        "SKAHA_FLEXIBLE_SPREAD_MAX_SKEW must be an integer, not '" + maxSkew + "'", notANumber);
+            }
         }
     }
 
+    /**
+     * A headless session's command line, from the request.
+     *
+     * @param command The executable, or null to use the image's entrypoint.
+     * @param args Arguments, possibly empty.
+     * @param env Environment variables in request order, possibly empty.
+     */
     record HeadlessCommand(String command, List<String> args, List<EnvVar> env) {
         /**
          * Parse the request parameters: {@code args} split on single spaces, and each {@code env} entry split on its
