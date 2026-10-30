@@ -14,6 +14,7 @@ import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.PodTemplateSpec;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.ResourceRequirements;
+import io.fabric8.kubernetes.api.model.TopologySpreadConstraintBuilder;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import java.io.IOException;
@@ -59,6 +60,7 @@ public class SessionJobBuilder {
     private String image;
     private String priorityClassName;
     private HeadlessCommand headlessCommand;
+    private FlexibleSpread flexibleSpread;
 
     /**
      * A headless session's command line, from the request.
@@ -67,6 +69,24 @@ public class SessionJobBuilder {
      * @param args Arguments, possibly empty.
      * @param env Environment variables in request order, possibly empty.
      */
+    /**
+     * Spread flexible session Pods ({@code canfar.net/flavor=flexible}) across topology domains with a topology spread
+     * constraint. Their memory request is below their limit, so packing them onto one node invites memory pressure
+     * there. The spread is a preference ({@code ScheduleAnyway}): it never blocks a session.
+     *
+     * @param maxSkew The largest allowed difference in flexible Pods between two domains.
+     * @param topologyKey The node label that defines a domain, e.g. {@code kubernetes.io/hostname}.
+     */
+    record FlexibleSpread(int maxSkew, String topologyKey) {
+        /** The configured spread, or null when the chart disables it. */
+        static FlexibleSpread fromEnv() {
+            final String maxSkew = System.getenv("SKAHA_FLEXIBLE_SPREAD_MAX_SKEW");
+            return StringUtil.hasText(maxSkew)
+                    ? new FlexibleSpread(Integer.parseInt(maxSkew), System.getenv("SKAHA_FLEXIBLE_SPREAD_TOPOLOGY_KEY"))
+                    : null;
+        }
+    }
+
     record HeadlessCommand(String command, List<String> args, List<EnvVar> env) {
         /**
          * Parse the request parameters: {@code args} split on single spaces, and each {@code env} entry split on its
@@ -218,6 +238,17 @@ public class SessionJobBuilder {
     }
 
     /**
+     * Spread the Pod across nodes when it is flexible.
+     *
+     * @param flexibleSpread The spread, or null for none.
+     * @return This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withFlexibleSpread(final FlexibleSpread flexibleSpread) {
+        this.flexibleSpread = flexibleSpread;
+        return this;
+    }
+
+    /**
      * The headless command line. Replaces the headless template's {@code ${headless.image.bundle}} slot.
      *
      * @param headlessCommand The command, arguments and environment from the request.
@@ -247,6 +278,7 @@ public class SessionJobBuilder {
         requireImagePlaceholderOnlyAsImage(launchJob);
         final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
         applyJobLabels(launchJob, labelPlan);
+        applyFlexibleSpread(launchJob, labelPlan);
         mergeQueue(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
@@ -339,10 +371,30 @@ public class SessionJobBuilder {
         final Quantity memoryLimit = resourceRequirements.getLimits().get("memory");
         final Quantity memoryRequest = resourceRequirements.getRequests().get("memory");
         if (memoryRequest != null && memoryRequest.equals(memoryLimit)) {
-            return "fixed";
+            return SessionLabels.FLAVOR_FIXED;
         }
 
-        return "flexible";
+        return SessionLabels.FLAVOR_FLEXIBLE;
+    }
+
+    private void applyFlexibleSpread(final Job launchJob, final SessionLabelPlan labelPlan) {
+        final String flavorLabel = SessionLabels.Key.FLAVOR.label();
+        if (this.flexibleSpread == null
+                || !SessionLabels.FLAVOR_FLEXIBLE.equals(labelPlan.jobLabels().get(flavorLabel))) {
+            return;
+        }
+        podSpec(launchJob)
+                .getTopologySpreadConstraints()
+                .add(new TopologySpreadConstraintBuilder()
+                        .withMaxSkew(this.flexibleSpread.maxSkew())
+                        .withTopologyKey(this.flexibleSpread.topologyKey())
+                        .withWhenUnsatisfiable("ScheduleAnyway")
+                        // Tainted nodes (e.g. GPU only) take no flexible sessions, so they do not count.
+                        .withNodeTaintsPolicy("Honor")
+                        .withNewLabelSelector()
+                        .addToMatchLabels(flavorLabel, SessionLabels.FLAVOR_FLEXIBLE)
+                        .endLabelSelector()
+                        .build());
     }
 
     /**

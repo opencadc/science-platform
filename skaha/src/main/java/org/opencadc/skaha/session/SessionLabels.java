@@ -19,8 +19,8 @@ public final class SessionLabels {
     private static final String DEFAULT_SCOPE = "default";
     private static final String ACCELERATOR_GPU = "gpu";
     private static final String ACCELERATOR_NONE = "none";
-    private static final String FLAVOR_FIXED = "fixed";
-    private static final String FLAVOR_FLEXIBLE = "flexible";
+    static final String FLAVOR_FIXED = "fixed";
+    static final String FLAVOR_FLEXIBLE = "flexible";
     private static final String HEADLESS = "headless";
     private static final String DESKTOP_APP = "desktop-app";
     private static final String KUEUE_QUEUE_NAME = "kueue.x-k8s.io/queue-name";

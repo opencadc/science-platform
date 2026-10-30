@@ -167,6 +167,14 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
+        {{- with .Values.deployment.skaha.sessions.flexibleSpread }}
+        {{- if .enabled }}
+        - name: SKAHA_FLEXIBLE_SPREAD_MAX_SKEW
+          value: {{ .maxSkew | int | quote }}
+        - name: SKAHA_FLEXIBLE_SPREAD_TOPOLOGY_KEY
+          value: {{ required "deployment.skaha.sessions.flexibleSpread.topologyKey is required" .topologyKey | quote }}
+        {{- end }}
+        {{- end }}
         - name: skaha.posixmapper.resourceid
           value: "{{ .Values.deployment.skaha.posixMapperResourceID }}"
         - name: REDIS_HOST

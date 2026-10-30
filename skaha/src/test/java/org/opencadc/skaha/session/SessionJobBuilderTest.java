@@ -6,6 +6,7 @@ import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
 import io.fabric8.kubernetes.api.model.NodeSelectorRequirementBuilder;
 import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.TopologySpreadConstraint;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import java.nio.file.Files;
@@ -130,6 +131,37 @@ public class SessionJobBuilderTest {
                     "my-secret", podSpec(job).getImagePullSecrets().get(0).getName());
             Assert.assertEquals("fixed", job.getMetadata().getLabels().get(SessionLabels.Key.FLAVOR.label()));
         }
+    }
+
+    /** Flexible Pods spread across nodes; a fixed Pod, or a disabled spread, adds no constraint. */
+    @Test
+    public void testFlexibleSpread() throws Exception {
+        final SessionJobBuilder.FlexibleSpread spread =
+                new SessionJobBuilder.FlexibleSpread(2, "topology.kubernetes.io/zone");
+
+        final Job flexible = build(
+                "test-base-values-queue.yaml", parameters("notebook"), builder -> builder.withFlexibleSpread(spread));
+        Assert.assertEquals("flexible", flexible.getMetadata().getLabels().get("canfar.net/flavor"));
+        final List<TopologySpreadConstraint> constraints = podSpec(flexible).getTopologySpreadConstraints();
+        Assert.assertEquals(1, constraints.size());
+        final TopologySpreadConstraint constraint = constraints.get(0);
+        Assert.assertEquals(Integer.valueOf(2), constraint.getMaxSkew());
+        Assert.assertEquals("topology.kubernetes.io/zone", constraint.getTopologyKey());
+        Assert.assertEquals("ScheduleAnyway", constraint.getWhenUnsatisfiable());
+        Assert.assertEquals("Honor", constraint.getNodeTaintsPolicy());
+        Assert.assertEquals(
+                Map.of("canfar.net/flavor", "flexible"),
+                constraint.getLabelSelector().getMatchLabels());
+
+        final Job fixed = build(
+                "test-base-values-affinity.yaml",
+                parameters("notebook"),
+                builder -> builder.withFlexibleSpread(spread));
+        Assert.assertEquals("fixed", fixed.getMetadata().getLabels().get("canfar.net/flavor"));
+        Assert.assertTrue(podSpec(fixed).getTopologySpreadConstraints().isEmpty());
+
+        final Job disabled = build("test-base-values-queue.yaml", parameters("notebook"), builder -> builder);
+        Assert.assertTrue(podSpec(disabled).getTopologySpreadConstraints().isEmpty());
     }
 
     @Test
