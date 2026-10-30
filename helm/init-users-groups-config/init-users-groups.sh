@@ -7,12 +7,14 @@
 # env:
 #   - name: REDIS_URL
 #     value: http://example.org:6359
+#   - name: SKAHA_USERNAME   (optional) session owner; the container fails if they are missing from passwd.
+#     value: username
 #
 
-SAVEIFS=$IFS
-IFS='\n'
+# Fail the init container on any error, so a session never starts with incomplete passwd/group files.
+set -eu
 
-if [ -z "${REDIS_URL}" ]; then
+if [ -z "${REDIS_URL:-}" ]; then
     echo "Required argument REDIS_URL is missing."
     exit 1
 else
@@ -30,5 +32,7 @@ cat /etc-group/group-orig > "${TARGET_GROUP_FILE}"
 redis-cli -u "${REDIS_URL}" --raw smembers "users:posix" >> "${TARGET_PASSWD_FILE}"
 redis-cli -u "${REDIS_URL}" --raw smembers "groups:posix" >> "${TARGET_GROUP_FILE}"
 
-# restore $IFS
-IFS=$SAVEIFS
+if [ -n "${SKAHA_USERNAME:-}" ] && ! grep -q "^${SKAHA_USERNAME}:" "${TARGET_PASSWD_FILE}"; then
+    echo "User ${SKAHA_USERNAME} has no passwd entry in ${REDIS_URL}."
+    exit 1
+fi

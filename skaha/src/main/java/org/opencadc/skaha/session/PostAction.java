@@ -69,39 +69,32 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
-import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
-import io.kubernetes.client.util.Yaml;
-import java.io.IOException;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
-import org.jspecify.annotations.NonNull;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.permissions.WriteGrant;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.KubernetesJob;
-import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.context.ResourceContexts;
+import org.opencadc.skaha.metrics.PodResourceUsage;
 import org.opencadc.skaha.repository.ImageRepositoryAuth;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
-import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.PosixCache;
 import org.opencadc.skaha.utils.PosixGroupCache;
 
@@ -174,7 +167,7 @@ public class PostAction extends SessionAction {
     @Override
     public void doAction() throws Exception {
 
-        super.initRequest();
+        initRequest();
 
         String image = syncInput.getParameter("image");
         if (image == null) {
@@ -233,16 +226,7 @@ public class PostAction extends SessionAction {
                 String action = syncInput.getParameter("action");
                 if (StringUtil.hasLength(action)) {
                     if (action.equalsIgnoreCase("renew")) {
-                        Map<String, List<String>> jobNameToAttributesMap =
-                                getJobsToRenew(posixPrincipal.username, sessionID);
-                        if (!jobNameToAttributesMap.isEmpty()) {
-                            for (Map.Entry<String, List<String>> entry : jobNameToAttributesMap.entrySet()) {
-                                renew(entry);
-                            }
-                        } else {
-                            throw new IllegalArgumentException(
-                                    "No active job for user " + posixPrincipal + " with session " + sessionID);
-                        }
+                        renew();
                     } else {
                         throw new UnsupportedOperationException("unrecognized action");
                     }
@@ -264,91 +248,18 @@ public class PostAction extends SessionAction {
         }
     }
 
-    private void renew(Map.Entry<String, List<String>> entry) throws Exception {
-        final Long newExpiryTime = calculateExpiryTime(entry.getValue());
-        if (newExpiryTime > 0) {
-            final String patchArgument = entry.getKey();
-            log.debug("Renewing " + patchArgument + " to " + newExpiryTime);
-            KubectlCommandBuilder.KubectlCommand renewExpiryTimeCmd = KubectlCommandBuilder.command("patch")
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .job()
-                    .argument(patchArgument)
-                    .option("-p", "{\"spec\":{\"activeDeadlineSeconds\":" + newExpiryTime + "}}");
-
-            CommandExecutioner.execute(renewExpiryTimeCmd.build(), false);
-        }
-
-        this.userStorageClient.injectProxyCertificate(getUsername());
-    }
-
-    private Long calculateExpiryTime(List<String> jobAttributes) throws Exception {
-        String uid = jobAttributes.get(0);
-        String startTimeStr = jobAttributes.get(1);
-
-        String configuredExpiryStr = K8SUtil.getSessionExpiry();
-        if (!StringUtil.hasLength(configuredExpiryStr)) {
+    private void renew() throws Exception {
+        final String configuredExpiry = K8SUtil.getSessionExpiry();
+        if (!StringUtil.hasLength(configuredExpiry)) {
             throw new IllegalStateException("missing configuration item " + SKAHA_SESSIONEXPIRY);
         }
-        long configuredExpiryTime = Long.parseLong(configuredExpiryStr);
+        SessionDAO.renew(
+                posixPrincipal.username,
+                sessionID,
+                Duration.ofSeconds(Long.parseLong(configuredExpiry)),
+                Instant.now());
 
-        String k8sNamespace = K8SUtil.getWorkloadNamespace();
-        Map<String, String> jobExpiryTimeMap = getJobExpiryTimes(k8sNamespace, posixPrincipal.username);
-        String activeDeadlineSecondsStr = jobExpiryTimeMap.get(uid);
-        if (StringUtil.hasLength(activeDeadlineSecondsStr)) {
-            long activeDeadlineSeconds = Long.parseLong(activeDeadlineSecondsStr);
-            Instant startTime = Instant.parse(startTimeStr);
-
-            long timeUsed = startTime.until(Instant.now(), ChronoUnit.SECONDS);
-            long timeRemaining = activeDeadlineSeconds - timeUsed;
-            // default to no need to extend the expiry time
-            long calculatedTime = 0L;
-            if (configuredExpiryTime > timeRemaining) {
-                // add elapsed time (from startTime to now) to the configured expiry time
-                calculatedTime = startTime.until(Instant.now(), ChronoUnit.SECONDS) + configuredExpiryTime;
-            }
-
-            return calculatedTime;
-        } else {
-            throw new IllegalStateException("missing configuration item activeDeadlineSeconds");
-        }
-    }
-
-    private Map<String, List<String>> getJobsToRenew(String forUserID, String sessionID) throws Exception {
-        KubectlCommandBuilder.KubectlCommand getRenewJobNamesCmd = KubectlCommandBuilder.command("get")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .job()
-                .label(SessionLabels.forSession(forUserID, sessionID))
-                .noHeaders()
-                .outputFormat(
-                        "custom-columns=NAME:.metadata.name,UID:.metadata.uid,STATUS:.status.active,START:.status.startTime");
-
-        String renewJobNamesStr = CommandExecutioner.execute(getRenewJobNamesCmd.build());
-
-        log.debug("jobs for user " + forUserID + " with session ID=" + sessionID + ":\n" + renewJobNamesStr);
-
-        return PostAction.getStringListMap(renewJobNamesStr);
-    }
-
-    private static @NonNull Map<String, List<String>> getStringListMap(final String renewJobNamesStr) {
-        final Map<String, List<String>> renewJobMap = new HashMap<>();
-        if (StringUtil.hasLength(renewJobNamesStr)) {
-            String[] lines = renewJobNamesStr.split("\n");
-            for (String line : lines) {
-                final List<String> renewJobAttributes = new ArrayList<>();
-                String[] parts = line.replaceAll("\\s+", " ").trim().split(" ");
-                String jobName = parts[0];
-                String uid = parts[1];
-                String isActive = parts[2];
-                String startTime = parts[3];
-                // look for the job ID of an active session
-                if (!NONE.equalsIgnoreCase(isActive) && (Integer.parseInt(isActive) == 1)) {
-                    renewJobAttributes.add(uid);
-                    renewJobAttributes.add(startTime);
-                    renewJobMap.put(jobName, renewJobAttributes);
-                }
-            }
-        }
-        return renewJobMap;
+        this.userStorageClient.injectProxyCertificate(getUsername());
     }
 
     private void validateName(String name) {
@@ -387,7 +298,12 @@ public class PostAction extends SessionAction {
     }
 
     private void checkExistingSessions(final SessionType type) throws Exception {
-        checkExistingSessions(type, SessionDAO.getUserSessions(this.posixPrincipal.username, null, true));
+        // Live, not cached: concurrent launches by the same user must see each other.
+        checkExistingSessions(
+                type,
+                SessionDAO.liveJobs(this.posixPrincipal.username, null, true).stream()
+                        .map(job -> SessionBuilder.fromJob(job, PodResourceUsage.empty()))
+                        .collect(Collectors.toList()));
     }
 
     /**
@@ -429,8 +345,6 @@ public class PostAction extends SessionAction {
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
-        final String headlessPriority = getHeadlessPriority();
-        final String headlessImageBundle = getHeadlessImageBundle(image, cmd, args, envs);
         final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String owner = getUsername();
@@ -443,6 +357,7 @@ public class PostAction extends SessionAction {
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
                 .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
+                .withFlexibleSpread(SessionJobBuilder.FlexibleSpread.fromEnv())
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -452,10 +367,8 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
-                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
+                .withImage(image)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
-                .withParameter(PostAction.HEADLESS_IMAGE_BUNDLE, headlessImageBundle)
-                .withParameter(PostAction.HEADLESS_PRIORITY, headlessPriority)
                 .withParameter(
                         PostAction.SKAHA_USER_HOME_DIR,
                         userStorageConfiguration.homeBaseDirectory.toString() + "/" + owner)
@@ -472,7 +385,11 @@ public class PostAction extends SessionAction {
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
-        if (type == SessionType.DESKTOP) {
+        if (type.isHeadless()) {
+            sessionJobBuilder = sessionJobBuilder
+                    .withHeadlessCommand(SessionJobBuilder.HeadlessCommand.fromRequest(cmd, args, envs))
+                    .withPriorityClass(getHeadlessPriorityClass());
+        } else if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         } else if (type == SessionType.CARTA) {
             final String connectURLPrefix = SessionURLBuilder.cartaSession(
@@ -487,12 +404,11 @@ public class PostAction extends SessionAction {
         // caught a non-existent Image already.
         if (getPublicImage(image) == null) {
             final ImageRepositoryAuth userRegistryAuth = getRegistryAuth(getRegistryHost(image));
-            sessionJobBuilder = sessionJobBuilder.withImageSecret(createRegistryImageSecret(userRegistryAuth));
+            sessionJobBuilder = sessionJobBuilder.withImageSecret(
+                    RegistryPullSecret.apply(this.posixPrincipal.username, userRegistryAuth));
         }
 
         final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
-        String jobLaunchString = Yaml.dump(launch.job());
-        String jsonLaunchFile = super.stageFile(jobLaunchString);
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -501,82 +417,40 @@ public class PostAction extends SessionAction {
         // inject the entries from the POSIX Mapper
         injectPOSIXDetails();
 
-        final String k8sNamespace = K8SUtil.getWorkloadNamespace();
-
-        final KubectlCommandBuilder.KubectlCommand launchCmd =
-                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        final String createJobResult = CommandExecutioner.execute(launchCmd.build());
-
-        log.debug("Create job result: " + createJobResult);
-
-        final KubernetesJob kubernetesJob = SessionDAO.getJob(jobName);
-
-        // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
-        // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Java client to create Service objects.
+        final List<String> ownedResourceYamls = new ArrayList<>();
         if (type.supportsService()) {
             byte[] serviceBytes = Files.readAllBytes(type.getServiceConfigPath());
             String serviceString = new String(serviceBytes, StandardCharsets.UTF_8);
             serviceString = SessionJobBuilder.setConfigValue(serviceString, PostAction.SKAHA_SESSIONID, this.sessionID);
-            serviceString = SessionJobBuilder.labelService(serviceString, launch.labels());
-            final String createServiceResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, serviceString);
-
-            log.debug("Create service result: " + createServiceResult);
+            ownedResourceYamls.add(serviceString);
         }
 
         // Ingress construction is still done using plain String interpolation for now.  When the Kubernetes Gateway
         // API is in place, we can swap this out with a proper Java client API.
-        // TODO: Use the Kubernetes Gateway API to create Ingresses.
-        // TODO: Use the Kubernetes Java client to create Gateway API objects.
         if (type.supportsIngress()) {
             byte[] ingressBytes = Files.readAllBytes(type.getIngressConfigPath());
             String ingressString = new String(ingressBytes, StandardCharsets.UTF_8);
             ingressString = SessionJobBuilder.setConfigValue(ingressString, PostAction.SKAHA_SESSIONID, this.sessionID);
             ingressString = SessionJobBuilder.setConfigValue(
                     ingressString, PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName());
-            ingressString = SessionJobBuilder.labelIngress(ingressString, launch.labels());
-            final String createIngressResult = createKubernetesObjectForJob(k8sNamespace, kubernetesJob, ingressString);
-
-            log.debug("Create ingress result: " + createIngressResult);
+            ownedResourceYamls.add(ingressString);
         }
+
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
+                .launch(launch.job(), launch.labels(), ownedResourceYamls));
     }
 
-    private String createKubernetesObjectForJob(String k8sNamespace, KubernetesJob kubernetesJob, String yamlString)
-            throws IOException, InterruptedException {
-        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBUID, kubernetesJob.getUID());
-        yamlString = SessionJobBuilder.setConfigValue(yamlString, PostAction.SKAHA_JOBNAME, kubernetesJob.getName());
-        final String jsonLaunchFile = super.stageFile(yamlString);
-        final KubectlCommandBuilder.KubectlCommand serviceLaunchCommand =
-                KubectlCommandBuilder.command("create").namespace(k8sNamespace).option("-f", jsonLaunchFile);
-        return CommandExecutioner.execute(serviceLaunchCommand.build());
-    }
-
-    private void injectPOSIXDetails() {
+    protected void injectPOSIXDetails() throws Exception {
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final PosixCache posixCache = new PosixCache(
                 this.skahaPosixCacheURL,
                 userStorageConfiguration.homeBaseDirectory.toString(),
                 this.posixMapperConfiguration.getPosixMapperClient());
-        posixCache.writePOSIXEntries();
+        posixCache.writePOSIXEntries(this.posixPrincipal, this.skahaCallbackFlow ? Set.of() : getUserPosixGroups());
     }
 
     private String generateToken() throws Exception {
-        return SkahaAction.getSkahaCallbackTokenTool().generateToken(WriteGrant.class, this.sessionID);
-    }
-
-    /**
-     * Create a registry secret and return its name.
-     *
-     * @param registryAuth The credentials to use to authenticate to the Image Registry.
-     * @return String secret name, never null.
-     */
-    private String createRegistryImageSecret(final ImageRepositoryAuth registryAuth) throws Exception {
-        final String username = this.posixPrincipal.username;
-        final String secretName = "registry-auth-" + username.toLowerCase();
-        log.debug("Creating user secret " + secretName);
-        CommandExecutioner.ensureRegistrySecret(registryAuth, secretName);
-
-        return secretName;
+        return SkahaCallbackTokenTool.fromSecret().generateToken(WriteGrant.class, this.sessionID);
     }
 
     private String getRegistryHost(final String imageID) {
@@ -602,38 +476,7 @@ public class PostAction extends SessionAction {
      * @throws Exception For any unexpected errors.
      */
     public void attachDesktopApp(String image, ResourceSpecification resourceSpecification) throws Exception {
-        // Get the IP address based on the session
-        KubectlCommandBuilder.KubectlCommand getIPCommand = KubectlCommandBuilder.command("get")
-                .pod()
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .selector(SessionLabels.forSession(posixPrincipal.username, sessionID))
-                .noHeaders()
-                .outputFormat("custom-columns=IPADDR:.status.podIP,DT:.metadata.deletionTimestamp,"
-                        + "TYPE:.metadata.labels." + SessionLabels.sessionKindJsonPath()
-                        + ",NAME:.metadata.name");
-
-        String ipResult = CommandExecutioner.execute(getIPCommand.build());
-
-        log.debug("GET IP result: " + ipResult);
-
-        String targetIP = null;
-        String[] ipLines = ipResult.split("\n");
-        for (final String ipLine : ipLines) {
-            log.debug("ipLine: " + ipLine);
-            String[] parts = ipLine.split("\\s+");
-            if (log.isDebugEnabled()) {
-                for (final String part : parts) {
-                    log.debug("part: " + part);
-                }
-            }
-            if (parts.length > 1 && parts[1].trim().equals(NONE) && SESSION_TYPE_DESKTOP.equals(parts[2])) {
-                targetIP = parts[0].trim();
-            }
-        }
-
-        if (targetIP == null) {
-            throw new ResourceNotFoundException("session " + sessionID + " not found");
-        }
+        final String targetIP = SessionPods.desktopIP(posixPrincipal.username, sessionID);
 
         log.debug("attaching desktop app: " + image + " to " + targetIP);
 
@@ -665,8 +508,7 @@ public class PostAction extends SessionAction {
             }
         }
 
-        final String ownerJobName = K8SUtil.getJobName(this.sessionID, SessionType.DESKTOP, posixPrincipal.username);
-        final KubernetesJob ownerKubernetesJob = SessionDAO.getJob(ownerJobName);
+        final Job ownerJob = SessionDAO.desktopJob(this.sessionID, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String supplementalGroups = getSupplementalGroupsList();
         final String owner = getUsername();
@@ -674,6 +516,8 @@ public class PostAction extends SessionAction {
         SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
                 .withGPUEnabled(this.gpuEnabled)
                 .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
+                .withFlexibleSpread(SessionJobBuilder.FlexibleSpread.fromEnv())
+                .withImage(image)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
                 .withParameter(PostAction.SKAHA_SESSIONEXPIRY, K8SUtil.getSessionExpiry())
@@ -682,7 +526,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
                 .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
-                .withParameter(PostAction.SOFTWARE_IMAGEID, image)
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                 .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
                 .withParameter(PostAction.SOFTWARE_HOSTNAME, name.toLowerCase())
@@ -704,17 +547,11 @@ public class PostAction extends SessionAction {
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
-                .withParameter(PostAction.SKAHA_JOBUID, ownerKubernetesJob.getUID())
-                .withParameter(PostAction.SKAHA_JOBNAME, ownerKubernetesJob.getName());
+                .withParameter(PostAction.SKAHA_JOBUID, ownerJob.getMetadata().getUid())
+                .withParameter(PostAction.SKAHA_JOBNAME, ownerJob.getMetadata().getName());
 
-        String launchFile = super.stageFile(sessionJobBuilder.build());
-        KubectlCommandBuilder.KubectlCommand launchCmd = KubectlCommandBuilder.command("create")
-                .namespace(K8SUtil.getWorkloadNamespace())
-                .option("-f", launchFile);
-
-        String createResult = CommandExecutioner.execute(launchCmd.build());
-
-        log.debug("Create result: " + createResult);
+        final SessionJobBuilder.LaunchArtifacts app = sessionJobBuilder.buildLaunch();
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(app.job(), app.labels(), List.of()));
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);
@@ -729,70 +566,28 @@ public class PostAction extends SessionAction {
         if (skahaCallbackFlow) {
             return callbackSupplementalGroups;
         }
-        final List<Group> groupCredentials =
-                CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
-        return buildGroupUriList(groupCredentials).stream()
+        return getUserPosixGroups().stream()
                 .map(posixGroup -> Integer.toString(posixGroup.getGID()))
                 .collect(Collectors.joining(","));
     }
 
-    private Set<PosixGroup> buildGroupUriList(List<Group> groupCredentials) throws Exception {
+    protected Set<PosixGroup> getUserPosixGroups() throws Exception {
+        final List<Group> groupCredentials =
+                CommonUtils.getCachedGroupsFromSubject(AuthenticationUtil.getCurrentSubject());
         return new PosixGroupCache(this.posixMapperConfiguration.getPosixMapperClient())
                 .toGIDs(groupCredentials.stream().map(Group::getID).collect(Collectors.toList()));
     }
 
-    /**
-     * Create the image, command, args, and env sections of the job launch yaml. Example:
-     *
-     * <p>image: "${software.imageid}" command: ["/skaha-system/start-desktop-software.sh"] args: [arg1, arg2] env: -
-     * name: HOME value: "/cavern/home/${skaha.userid}" - name: SHELL value: "/bin/bash"
-     */
-    private String getHeadlessImageBundle(String image, String cmd, String args, List<String> envs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("image: \"").append(image).append("\"");
-        if (cmd != null) {
-            sb.append("\n        command: [\"").append(cmd).append("\"]");
-        }
-        if (args != null) {
-            String[] argList = args.split(" ");
-            if (argList.length > 0) {
-                sb.append("\n        args: [");
-                for (String arg : argList) {
-                    sb.append("\"").append(arg).append("\", ");
-                }
-                sb.setLength(sb.length() - 2);
-                sb.append("]");
-            }
-        }
-        sb.append("\n        env:");
-        if (envs != null && !envs.isEmpty()) {
-            for (String env : envs) {
-                String[] keyVal = env.split("=");
-                if (keyVal.length == 2) {
-                    sb.append("\n        - name: ").append(keyVal[0]);
-                    sb.append("\n          value: \"").append(keyVal[1]).append("\"");
-                } else {
-                    log.debug("invalid key/value env var: " + env);
-                }
-            }
-        }
-
-        return sb.toString();
-    }
-
-    private String getHeadlessPriority() {
+    /** The PriorityClass for this user's headless sessions, or null for the default. */
+    private String getHeadlessPriorityClass() {
         if (skahaPriorityHeadlessGroup == null) {
-            return "";
+            return null;
         }
         if (skahaHeadlessPriorityClass == null) {
             log.warn("headlessPriorityGroup set but headlessPriorityClass not set");
-            return "";
+            return null;
         }
-        if (priorityHeadlessUser) {
-            return "priorityClassName: " + skahaHeadlessPriorityClass;
-        } else {
-            return "";
-        }
+        return priorityHeadlessUser ? skahaHeadlessPriorityClass : null;
     }
 
     /** DTO for resource specification parameters. */

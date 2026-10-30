@@ -75,17 +75,15 @@ import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.rest.InlineContentHandler;
 import ca.nrc.cadc.rest.RestAction;
 import ca.nrc.cadc.util.InvalidConfigException;
-import ca.nrc.cadc.util.RsaSignatureGenerator;
 import ca.nrc.cadc.util.StringUtil;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
-import java.security.KeyPair;
 import java.util.*;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.log4j.Logger;
-import org.json.JSONObject;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.gms.GroupURI;
 import org.opencadc.gms.IvoaGroupClient;
@@ -97,9 +95,7 @@ import org.opencadc.skaha.session.SessionDAO;
 import org.opencadc.skaha.session.SkahaCallbackTokenTool;
 import org.opencadc.skaha.session.authorization.SessionAccessDeniedException;
 import org.opencadc.skaha.session.authorization.SessionAuthorizers;
-import org.opencadc.skaha.utils.CommandExecutioner;
 import org.opencadc.skaha.utils.CommonUtils;
-import org.opencadc.skaha.utils.KubectlCommandBuilder;
 import org.opencadc.skaha.utils.RedisCache;
 
 public abstract class SkahaAction extends RestAction {
@@ -194,51 +190,14 @@ public abstract class SkahaAction extends RestAction {
             logInfo.setSuccess(true);
             logInfo.setMessage(sessionAccessDeniedException.getMessage());
             handleException(sessionAccessDeniedException, 403, sessionAccessDeniedException.getMessage(), false, false);
+        } catch (KubernetesClientException kubernetesClientException) {
+            // Any Kubernetes API failure not handled closer to the call: the cluster is unavailable, not the request.
+            log.error("Kubernetes API request failed", kubernetesClientException);
+            handleException(
+                    kubernetesClientException, 503, "Kubernetes API unavailable.  Please try again.", false, false);
         }
 
         return null;
-    }
-
-    protected static SkahaCallbackTokenTool getSkahaCallbackTokenTool() throws Exception {
-        final EncodedKeyPair encodedKeyPair = getPreAuthorizedTokenSecret();
-        return new SkahaCallbackTokenTool(encodedKeyPair.encodedPublicKey, encodedKeyPair.encodedPrivateKey);
-    }
-
-    private static EncodedKeyPair getPreAuthorizedTokenSecret() throws Exception {
-        // Check the current secret
-        final JSONObject secretData = CommandExecutioner.getSecretData(
-                K8SUtil.getPreAuthorizedTokenSecretName(), K8SUtil.getWorkloadNamespace());
-        final String publicKeyPropertyName = "public";
-        final String privateKeyPropertyName = "private";
-
-        if (secretData.isEmpty()) {
-            final KeyPair keyPair = RsaSignatureGenerator.getKeyPair(2048);
-            final byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
-            final byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
-
-            String[] createCmd = KubectlCommandBuilder.command("create")
-                    .argument("secret")
-                    .argument("generic")
-                    .argument(K8SUtil.getPreAuthorizedTokenSecretName())
-                    .namespace(K8SUtil.getWorkloadNamespace())
-                    .argument(String.format(
-                            "--from-literal=%s=%s", publicKeyPropertyName, CommonUtils.encodeBase64(encodedPublicKey)))
-                    .argument(String.format(
-                            "--from-literal=%s=%s",
-                            privateKeyPropertyName, CommonUtils.encodeBase64(encodedPrivateKey)))
-                    .build();
-
-            final String createResult = CommandExecutioner.execute(createCmd);
-            log.debug("create secret result: " + createResult);
-
-            return new EncodedKeyPair(encodedPublicKey, encodedPrivateKey);
-        } else {
-            final Base64.Decoder base64Decoder = Base64.getDecoder();
-            // Decode twice since Kubernetes does a separate Base64 encoding.
-            return new EncodedKeyPair(
-                    base64Decoder.decode(base64Decoder.decode(secretData.getString(publicKeyPropertyName))),
-                    base64Decoder.decode(base64Decoder.decode(secretData.getString(privateKeyPropertyName))));
-        }
     }
 
     /**
@@ -309,8 +268,8 @@ public abstract class SkahaAction extends RestAction {
         final String xAuthTokenSkaha = syncInput.getHeader(X_AUTH_TOKEN_SKAHA);
         log.debug("x-auth-token-skaha header is " + xAuthTokenSkaha);
         try {
-            final String callbackSessionId = SkahaAction.getSkahaCallbackTokenTool()
-                    .validateSessionCallbackToken(xAuthTokenSkaha, WriteGrant.class);
+            final String callbackSessionId =
+                    SkahaCallbackTokenTool.fromSecret().validateSessionCallbackToken(xAuthTokenSkaha, WriteGrant.class);
 
             final Session session = SessionDAO.getSession(null, callbackSessionId);
             this.posixPrincipal = session.getPosixPrincipal();
@@ -408,16 +367,6 @@ public abstract class SkahaAction extends RestAction {
             } else {
                 return new PosixMapperClient(resourceID);
             }
-        }
-    }
-
-    protected static class EncodedKeyPair {
-        final byte[] encodedPublicKey;
-        final byte[] encodedPrivateKey;
-
-        public EncodedKeyPair(byte[] encodedPublicKey, byte[] encodedPrivateKey) {
-            this.encodedPublicKey = encodedPublicKey;
-            this.encodedPrivateKey = encodedPrivateKey;
         }
     }
 }

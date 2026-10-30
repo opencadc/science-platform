@@ -69,22 +69,29 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.rest.InitAction;
-import io.kubernetes.client.openapi.ApiClient;
-import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.Configuration;
-import io.kubernetes.client.openapi.apis.CustomObjectsApi;
-import io.kubernetes.client.util.Config;
-import java.io.IOException;
+import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.SkahaKubernetesClient;
 
-/** One-time initialization action for Skaha. This will verify the existence of the local queues, if specified. */
+/**
+ * One-time initialization action for Skaha. Builds the Kubernetes clients and verifies the existence of the local
+ * queues, if specified.
+ */
 public class InitializationAction extends InitAction {
     private static final Logger LOGGER = LogManager.getLogger(InitializationAction.class);
+    static final Duration CACHE_SYNC_WAIT = Duration.ofSeconds(30);
+
+    private SessionJobCache sessionJobCache;
+
     private static final String FATAL_LOG_MESSAGE =
             "Queue %s specified in configuration but no local queues exist in namespace %s";
 
@@ -97,27 +104,50 @@ public class InitializationAction extends InitAction {
 
     @Override
     public void doInit() {
-        LOGGER.info("Verifying QueueConfigurations, if any...");
-        try {
-            ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
-        } catch (IOException ioException) {
-            throw new IllegalStateException(ioException.getMessage(), ioException);
-        }
-        LOGGER.info("Verifying QueueConfigurations: OK");
+        LOGGER.info("Initializing Kubernetes API client...");
+        SkahaKubernetesClient.initialize(getWorkloadNamespace());
+        LOGGER.info("Initializing Kubernetes API client: OK");
 
-        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster...");
-        try {
-            final ApiClient client = Config.fromCluster();
-            Configuration.setDefaultApiClient(client);
-            LOGGER.info("Initialized Kubernetes API client for cluster with base path: {}", client.getBasePath());
-        } catch (IOException e) {
-            LOGGER.error("Failed to configure k8s client from cluster: {}", e.getMessage(), e);
-        }
-        LOGGER.info("Initializing Kubernetes API client from cluster configuration from cluster: OK");
+        startSessionJobCache(CACHE_SYNC_WAIT);
+
+        LOGGER.info("Verifying QueueConfigurations, if any...");
+        ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
+        LOGGER.info("Verifying QueueConfigurations: OK");
     }
 
-    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) throws IOException {
-        setupKubernetesAPIConfiguration();
+    @Override
+    public void doShutdown() {
+        if (this.sessionJobCache != null) {
+            SessionDAO.useCache(null);
+            this.sessionJobCache.close();
+        }
+        SkahaKubernetesClient.close();
+    }
+
+    SessionJobCache sessionJobCache() {
+        return this.sessionJobCache;
+    }
+
+    /**
+     * Start the session Job cache and wait a bounded time for its first sync. Until it syncs, session listings are read
+     * live, so a slow sync delays nothing.
+     */
+    void startSessionJobCache(final Duration syncWait) {
+        this.sessionJobCache = new SessionJobCache(SkahaKubernetesClient.get());
+        SessionDAO.useCache(this.sessionJobCache);
+        try {
+            this.sessionJobCache.start().toCompletableFuture().get(syncWait.toMillis(), TimeUnit.MILLISECONDS);
+            LOGGER.info("Session Job cache synced");
+        } catch (TimeoutException timeoutException) {
+            LOGGER.warn("Session Job cache not synced after {}; reading sessions live until it is", syncWait);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException executionException) {
+            LOGGER.error("Session Job cache failed to start; reading sessions live", executionException.getCause());
+        }
+    }
+
+    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
         Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
     }
 
@@ -134,44 +164,23 @@ public class InitializationAction extends InitAction {
     }
 
     /**
-     * Query the local queues in the workload namespace. Tests can override this method to return a mock response.
+     * Read the configured LocalQueue in the workload namespace.
      *
-     * @return true if the local queue exists, false otherwise.
+     * @return true if the local queue does not exist, false otherwise. Any other API error (e.g. a missing permission)
+     *     fails startup.
      */
     boolean localQueueMissing(final QueueConfiguration queueConfiguration) {
-        try {
-            final ApiClient apiClient = Configuration.getDefaultApiClient();
-            final CustomObjectsApi customObjectsApi = new CustomObjectsApi(apiClient);
-
-            // Throws an API Exception with a 404 is the queue does not exist.
-            customObjectsApi
-                    .getNamespacedCustomObject(
-                            QueueConfiguration.getKueueApiGroup(),
-                            QueueConfiguration.getKueueApiVersion(),
-                            getWorkloadNamespace(),
-                            QueueConfiguration.KUEUE_API_PLURAL,
-                            queueConfiguration.queueName)
-                    .execute();
-            return false;
-        } catch (ApiException exception) {
-            if (exception.getCode() == 404) {
-                LOGGER.error(
-                        "No local queues exist in namespace {} with name {}",
-                        getWorkloadNamespace(),
-                        queueConfiguration.queueName);
-                return true;
-            } else {
-                // Unexpected error, die here.
-                throw new IllegalStateException(exception.getMessage(), exception);
-            }
-        }
-    }
-
-    void setupKubernetesAPIConfiguration() throws IOException {
-        final ApiClient client = Config.fromCluster();
-        Configuration.setDefaultApiClient(client);
-
-        LOGGER.info("API Server base path: {}", client.getBasePath());
+        return SkahaKubernetesClient.get()
+                        .genericKubernetesResources(new ResourceDefinitionContext.Builder()
+                                .withGroup(QueueConfiguration.getKueueApiGroup())
+                                .withVersion(QueueConfiguration.getKueueApiVersion())
+                                .withKind("LocalQueue")
+                                .withPlural(QueueConfiguration.KUEUE_API_PLURAL)
+                                .withNamespaced(true)
+                                .build())
+                        .withName(queueConfiguration.queueName)
+                        .get()
+                == null;
     }
 
     String getWorkloadNamespace() {

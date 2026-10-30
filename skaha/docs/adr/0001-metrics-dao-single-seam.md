@@ -17,9 +17,10 @@ sources evolve.
   reads.
 - Session-layer code calls **`MetricsDAO` only**; do not reference
   `PlatformMetricsDAO`, `PodMetricsDAO`, or legacy `SkahaMetricsDAO` in specs.
-- Pod usage uses Kubernetes Java client **v26+** via `Metrics.getPodMetrics` and
-  `Configuration.getDefaultApiClient()` (same in-cluster SA as `SessionDAO`).
-  Do **not** call `Config.fromCluster()` inside fetch code.
+- Pod usage reads the Kubernetes metrics API through Skaha's Fabric8 client
+  (`SkahaKubernetesClient`, the same in-cluster SA as `SessionDAO`); see
+  [ADR-0005](0005-fabric8-kubernetes-client.md). Fetch code never builds its own
+  client.
 - Format legacy session quantity strings via **`ResourceQuantityFormatter`**;
   keep **`PodResourceUsage`** as the session-list DTO for `cpuCoresInUse` /
   `memoryInUse`.

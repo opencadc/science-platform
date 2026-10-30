@@ -1,8 +1,8 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.custom.ContainerMetrics;
-import io.kubernetes.client.custom.PodMetricsList;
-import io.kubernetes.client.custom.Quantity;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.ContainerMetrics;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetricsList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +31,7 @@ public record PodMetrics(Map<String, String> cpuByPodName, Map<String, String> m
         if (podMetricsList == null || podMetricsList.getItems() == null) {
             return new PodMetrics(cpuByPodName, memoryByPodName);
         }
-        for (final io.kubernetes.client.custom.PodMetrics podMetrics : podMetricsList.getItems()) {
+        for (final io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetrics podMetrics : podMetricsList.getItems()) {
             if (podMetrics.getMetadata() == null || podMetrics.getMetadata().getName() == null) {
                 continue;
             }
@@ -39,10 +39,10 @@ public record PodMetrics(Map<String, String> cpuByPodName, Map<String, String> m
             final Quantity cpu = primaryContainerQuantity(podMetrics.getContainers(), "cpu");
             final Quantity memory = primaryContainerQuantity(podMetrics.getContainers(), "memory");
             if (cpu != null) {
-                cpuByPodName.put(podName, cpu.toSuffixedString());
+                cpuByPodName.put(podName, cpu.toString());
             }
             if (memory != null) {
-                memoryByPodName.put(podName, memory.toSuffixedString());
+                memoryByPodName.put(podName, memory.toString());
             }
         }
         return new PodMetrics(cpuByPodName, memoryByPodName);
