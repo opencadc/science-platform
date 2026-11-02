@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2](https://github.com/opencadc/science-platform/compare/1.6.1...1.6.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* update image to fix cert cve ([216bf3e](https://github.com/opencadc/science-platform/commit/216bf3e2cf592a21c1513998858ac33fe889074e))
+
 ## [1.6.1](https://github.com/opencadc/science-platform/compare/1.6.0...1.6.1) (2026-11-02)
 
 
