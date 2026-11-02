@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/opencadc/science-platform/compare/1.6.0...1.6.1) (2026-11-02)
+
+
+### Miscellaneous Chores
+
+* refresh base image ([892ba23](https://github.com/opencadc/science-platform/commit/892ba230f8f0b89d746ed7b6fbc3ddc0e8622d6f))
+
 ## [1.6.0](https://github.com/opencadc/science-platform/compare/1.6.0...1.6.0) (2026-10-20)
 
 
