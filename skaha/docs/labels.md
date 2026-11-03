@@ -1,8 +1,8 @@
 # Skaha session labels
 
-Labels Skaha attaches at session launch. Owned by `SessionLabels` / `SessionLabelPlan`.
-The Metrics requirement for using these labels as workload attribution is stated
-separately in the integration boundary below; it is conditional on PromQL.
+Labels Skaha attaches at session launch. `SessionLabels` and `SessionLabelPlan`
+own this set. Metrics may use the same labels for PromQL attribution. That
+contract is under [Metrics integration boundary](#metrics-integration-boundary).
 
 ## All labels
 
@@ -14,7 +14,7 @@ separately in the integration boundary below; it is conditional on PromQL.
 | `canfar.net/kind` | session type (`notebook`, `carta`, `desktop`, `headless`, `desktop-app`, `firefly`, …) | Always | Required |
 | `canfar.net/job` | Job name | Always | Required |
 | `canfar.net/flavor` | `fixed` \| `flexible` | Always | `fixed` when memory request equals memory limit; otherwise `flexible` |
-| `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` (also defaulted if somehow omitted) |
+| `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` |
 | `canfar.net/community` | scope string | Always | The launch assignment's Community; currently always `default` |
 | `canfar.net/project` | scope string | Always | Defaults to `default` when blank/omitted |
 | `canfar.net/app-id` | desktop app id | Only when non-blank (desktop-app launches) | Omitted entirely when blank |
@@ -64,7 +64,7 @@ kueue.x-k8s.io/queue-name=<user>-default-lq   # Job only
 | GPU count > 0 | `canfar.net/accelerator=gpu` |
 | Memory request == limit | `canfar.net/flavor=fixed` |
 | Memory request ≠ limit (or unpaired) | `canfar.net/flavor=flexible` |
-| User or Community not a DNS-1123 label, or `<user>-<community>-lq` over 63 characters | LocalQueue named `skaha-<digest>-lq` |
+| User or Community not a DNS-1123 label, or `<user>-<community>-lq` over 63 characters | Launch rejected |
 | Project omitted | `canfar.net/project=default` |
 
 ## Metrics integration boundary
@@ -79,15 +79,15 @@ labels are:
 | Submitting Job/workload metadata | `kueue.x-k8s.io/queue-name` | `canfar.net/username`, `canfar.net/community` |
 | Job Pod template and resulting Pod | None | `canfar.net/username`, `canfar.net/community` |
 
-The Job/workload and Pod attribution labels are required only when the fixed
-PromQL provider is enabled. They are not required for a core Kueue-only report;
-the queue-name label selects the User-specific LocalQueue and does not establish
-Community authority.
+PromQL attribution labels on the Job and Pod are required only when the PromQL
+provider is enabled. Core Kueue reports do not need them. The Job's
+`kueue.x-k8s.io/queue-name` selects the user's LocalQueue. It does not decide
+Community membership. The ClusterQueue's `canfar.net/community` label does.
 
-Skaha owns the LocalQueue. Before creating a session Job it reads the Community's
-ClusterQueue (from `deployment.skaha.sessions.communities.default.clusterQueue`),
-which must carry `canfar.net/community=default`, then creates or reuses the
-owner's LocalQueue with these labels:
+Before Skaha creates a session Job, it reads the Community ClusterQueue named by
+`deployment.skaha.sessions.communities.default.clusterQueue`. That object must
+carry `canfar.net/community=default`. Skaha then creates or reuses the owner's
+LocalQueue with these labels:
 
 | Label | Value |
 |-------|-------|
@@ -95,10 +95,11 @@ owner's LocalQueue with these labels:
 | `canfar.net/community` | `default` |
 | `app.kubernetes.io/managed-by` | `skaha` (set on create only) |
 
-An existing LocalQueue is reused when both identity labels match and it targets
-the same ClusterQueue. Skaha adds a missing identity label only to its own
-LocalQueue (`managed-by=skaha`) whose name proves the identity, and otherwise
-refuses the launch with 503. It never retargets, deletes, or adopts a LocalQueue.
+Skaha reuses an existing LocalQueue when both identity labels match and
+`spec.clusterQueue` matches the assignment. It patches one missing identity
+label only when `managed-by=skaha` and the other identity label already matches.
+If both identity labels are missing, or the queue is otherwise unsafe, the
+launch returns 503. Skaha never retargets, deletes, or adopts a LocalQueue.
 
 ## Legacy keys (historical)
 

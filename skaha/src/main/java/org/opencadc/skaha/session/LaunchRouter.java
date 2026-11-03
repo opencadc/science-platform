@@ -82,7 +82,8 @@ final class LaunchRouter {
     /**
      * Route one launch. No I/O.
      *
-     * @throws IllegalArgumentException When the user is not a valid Kubernetes label value.
+     * @throws IllegalArgumentException When the user is not a valid Kubernetes label value, or
+     *     {@code <user>-<community>-lq} is not a DNS-1123 label of at most 63 characters.
      */
     LaunchAssignment assign(final String user, final SessionType type) {
         return new LaunchAssignment(

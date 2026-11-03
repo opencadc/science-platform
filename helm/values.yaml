@@ -326,10 +326,9 @@ deployment:
       # -- Node label selector used when discovering schedulable worker nodes.
       nodeLabelSelector:
 
-      # Every session Job is submitted suspended to a private LocalQueue for its owner and Community, which Skaha
-      # creates in the workload namespace on first launch and never deletes. Kueue, its Job integration, and the
-      # Community's ClusterQueue are prerequisites; this chart creates neither.
-      # This release routes every session to the Default Community, which must be the only entry and be named default.
+      # Every session Job is suspended onto a private LocalQueue for its owner. Skaha creates that LocalQueue on
+      # first launch and never deletes it. Install Kueue and the Community ClusterQueue yourself; this chart does not.
+      # This release uses only Community `default`.
       # @see https://kueue.sigs.k8s.io/docs/
       # Example:
       #   communities:
@@ -341,7 +340,7 @@ deployment:
         default:
           # -- Marks the Default Community. Must be true.
           default: true
-          # -- (string) Required. Existing ClusterQueue labelled canfar.net/community=default. Must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
+          # -- Required. Existing ClusterQueue labelled canfar.net/community=default. Must appear in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
           clusterQueue: ""
 
       # Kueue WorkloadPriorityClass per session type (e.g. notebook, desktop, headless, desktop-app), with default as

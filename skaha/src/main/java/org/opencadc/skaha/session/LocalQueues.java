@@ -20,11 +20,9 @@ import java.util.Objects;
 import org.apache.log4j.Logger;
 
 /**
- * Makes an assignment's LocalQueue safe to submit to, or refuses. The only Skaha code that reads ClusterQueues or
- * writes LocalQueues.
- *
- * <p>Each call reads current state and applies only the difference, so a retry after a crash at any point converges. It
- * never updates, deletes, retargets, or adopts a LocalQueue, and never writes a ClusterQueue.
+ * Creates, reuses, or repairs an assignment's LocalQueue, or refuses. This is the only Skaha type that reads
+ * ClusterQueues or writes LocalQueues. It never deletes, retargets, or adopts a LocalQueue, and never writes a
+ * ClusterQueue.
  */
 final class LocalQueues {
     private static final Logger LOGGER = Logger.getLogger(LocalQueues.class);
@@ -166,8 +164,8 @@ final class LocalQueues {
         if (!SessionLabels.MANAGED_BY_SKAHA.equals(labels.get(SessionLabels.Key.MANAGED_BY.label()))) {
             throw unavailable(assignment, "not managed by Skaha and missing " + missing.keySet(), null);
         }
-        if (missing.size() == 2 && assignment.readableLocalQueueName()) {
-            throw unavailable(assignment, "readable name without identity labels is ambiguous", null);
+        if (missing.size() == 2) {
+            throw unavailable(assignment, "name without identity labels is ambiguous", null);
         }
         return missing;
     }

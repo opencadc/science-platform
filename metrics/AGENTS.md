@@ -30,7 +30,8 @@ local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
 ## Runtime vocabulary
 
 - User requests come from LocalQueues in the configured namespaces, selected by
-  `canfar.net/username` and restricted to the configured ClusterQueues.
+  `canfar.net/username`. The user path does not read ClusterQueues; each
+  LocalQueue must name a configured ClusterQueue.
 - Community requests come from the one configured ClusterQueue selected by
   `canfar.net/community`. A repeated label on the configured set fails the read.
 - Platform totals include every configured ClusterQueue. Cohorts are not a

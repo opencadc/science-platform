@@ -51,18 +51,6 @@ public class LocalQueuesTest {
     }
 
     @Test
-    public void digestNamedQueueForIdentitiesThatAreNotDnsLabels() throws Exception {
-        this.api.clusterQueue("cadc", "default");
-        final LaunchAssignment bob = assignment("Bob_Smith");
-        new LocalQueues(this.api.client()).ensure(bob);
-
-        Assert.assertTrue(bob.localQueue(), bob.localQueue().matches("skaha-[a-z2-7]{52}-lq"));
-        Assert.assertEquals(
-                "Bob_Smith",
-                localQueue(bob.localQueue()).getMetadata().getLabels().get(USERNAME));
-    }
-
-    @Test
     public void missingClusterQueueIsNotFoundWhenKueueIsServed() {
         this.api
                 .server()
@@ -202,7 +190,7 @@ public class LocalQueuesTest {
     }
 
     @Test
-    public void skahaQueueMissingLabelsIsRepairedWhenItsNameProvesTheIdentity() throws Exception {
+    public void skahaQueueMissingOneIdentityLabelIsRepaired() throws Exception {
         this.api.clusterQueue("cadc", "default");
         final GenericKubernetesResource oneLabel = localQueueObject(
                 "alice-default-lq", "cadc", Map.of(USERNAME, "alice", MANAGED_BY, "skaha", "keep", "me"));
@@ -211,13 +199,6 @@ public class LocalQueuesTest {
         Assert.assertEquals(
                 Map.of(USERNAME, "alice", COMMUNITY, "default", MANAGED_BY, "skaha", "keep", "me"),
                 localQueue("alice-default-lq").getMetadata().getLabels());
-
-        final LaunchAssignment digest = assignment("Alice");
-        create(localQueueObject(digest.localQueue(), "cadc", Map.of(MANAGED_BY, "skaha")));
-        new LocalQueues(this.api.client()).ensure(digest);
-        Assert.assertEquals(
-                Map.of(USERNAME, "Alice", COMMUNITY, "default", MANAGED_BY, "skaha"),
-                localQueue(digest.localQueue()).getMetadata().getLabels());
     }
 
     @Test

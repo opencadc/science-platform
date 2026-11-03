@@ -1,57 +1,33 @@
 package org.opencadc.skaha.session;
 
-import ca.nrc.cadc.util.FileUtil;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import java.nio.file.Files;
 import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** LocalQueue names against vectors from the independent generator in skaha/tools/localqueue_name_vectors.py. */
+/** LocalQueue names are {@code <user>-<community>-lq}, or the assignment is rejected. */
 public class LaunchAssignmentTest {
-    private record Vector(String user, String community, String localQueue) {}
 
     @Test
-    public void localQueueNamesMatchGeneratedVectors() throws Exception {
-        final List<Vector> vectors = new Gson()
-                .fromJson(
-                        Files.readString(
-                                FileUtil.getFileFromResource("localqueue-name-vectors.json", LaunchAssignmentTest.class)
-                                        .toPath()),
-                        new TypeToken<List<Vector>>() {}.getType());
-        Assert.assertFalse(vectors.isEmpty());
-        for (final Vector vector : vectors) {
-            final String name = assignment(vector.user(), vector.community()).localQueue();
-            Assert.assertEquals(vector.user() + "/" + vector.community(), vector.localQueue(), name);
-            Assert.assertTrue(name, name.length() <= 63);
-        }
-    }
-
-    @Test
-    public void readableNameOnlyForLowercaseDnsLabelsWithinSixtyThreeCharacters() {
+    public void localQueueIsUserCommunitySuffix() {
         Assert.assertEquals("bob-default-lq", assignment("bob", "default").localQueue());
+        Assert.assertEquals("bob-cadc-lq", assignment("bob", "cadc").localQueue());
+        Assert.assertEquals("0-default-lq", assignment("0", "default").localQueue());
+
         final String boundary = "u".repeat(52) + "-default-lq";
         Assert.assertEquals(63, boundary.length());
         Assert.assertEquals(boundary, assignment("u".repeat(52), "default").localQueue());
-
-        final String pastBoundary = "u".repeat(53) + "-default-lq";
-        Assert.assertEquals(64, pastBoundary.length());
-        for (final LaunchAssignment digest : List.of(
-                assignment("Bob", "default"),
-                assignment("bob_smith", "default"),
-                assignment("bob.smith", "default"),
-                assignment("u".repeat(53), "default"))) {
-            Assert.assertNotEquals(digest.user() + "-" + digest.community() + "-lq", digest.localQueue());
-            Assert.assertTrue(digest.localQueue(), digest.localQueue().matches("skaha-[a-z2-7]{52}-lq"));
-        }
-        Assert.assertNotEquals(
-                assignment("Bob", "default").localQueue(),
-                assignment("bob", "default").localQueue());
     }
 
     @Test
-    public void hyphenatedPairsShareOneReadableName() {
+    public void rejectsNamesThatAreNotDnsLabelsOrExceedSixtyThreeCharacters() {
+        for (final String user : List.of("Bob", "bob_smith", "bob.smith", "u".repeat(53))) {
+            Assert.assertThrows(IllegalArgumentException.class, () -> assignment(user, "default"));
+        }
+        Assert.assertThrows(IllegalArgumentException.class, () -> assignment("a".repeat(63), "default"));
+    }
+
+    @Test
+    public void hyphenatedPairsShareOneLocalQueueName() {
         Assert.assertEquals(
                 assignment("bob-x", "y").localQueue(), assignment("bob", "x-y").localQueue());
     }

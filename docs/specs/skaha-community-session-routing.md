@@ -226,13 +226,14 @@ reference, and non-terminating state. The LocalQueue Community label must equal 
 referenced ClusterQueue label, which must equal the selected Community. A compliant
 queue managed by another producer may be reused without modification or adoption.
 
-Only `managed-by=skaha` permits repair of missing required identity labels. Repair
-must establish the requested identity unambiguously from the deterministic name
-and surviving identity metadata; otherwise fail closed. Patch only missing keys,
-with UID/resourceVersion or equivalent optimistic preconditions, preserving all
-other metadata and spec fields. A present conflicting or invalid identity value,
-wrong ClusterQueue reference, or ownership conflict is 503, even on a Skaha-owned
-queue. Never overwrite, force field ownership, retarget, or delete/recreate it.
+Only `managed-by=skaha` permits repair of a missing identity label, and only when
+exactly one identity label is missing and the other already matches the request.
+If both identity labels are missing, fail closed. The LocalQueue name alone does
+not prove identity when components contain hyphens. Patch only the missing keys,
+with resourceVersion or equivalent optimistic preconditions, and preserve all
+other metadata and spec fields. A conflicting identity value, wrong ClusterQueue
+reference, or ownership conflict is 503, even on a Skaha-owned queue. Never
+overwrite, force field ownership, retarget, or delete and recreate the queue.
 
 A create conflict triggers a bounded reread and complete validation of the winner.
 A patch conflict triggers bounded reread/revalidation, not unconditional retry of a
@@ -241,25 +242,16 @@ failed request creates no Job and does not erase the retained queue.
 
 ### 5. Deterministic LocalQueue naming
 
-Use the exact readable composition `<username>-<community>-lq` when it is a valid
-lowercase DNS-compatible resource name and also a label value of at most 63
-characters; `bob` and `cadc` produce `bob-cadc-lq`. A label-valid identity containing
-uppercase, underscores, or other non-DNS characters must not be sanitized into
-someone else's readable queue.
+The LocalQueue name is `<username>-<community>-lq`. For `bob` and `cadc` that is
+`bob-cadc-lq`. The name must be a lowercase DNS-1123 label of at most 63
+characters. If it is longer, or if it contains uppercase letters, underscores,
+periods, or other non-DNS characters, reject the launch. Do not sanitize the
+identity into another user's queue name. Do not substitute a digest name.
 
-Otherwise use `skaha-<digest>-lq`, where digest is the complete lowercase, unpadded
-base32 SHA-256 digest of the exact ordered pair. The digest input is the ASCII
-domain separator `skaha-localqueue-v1`, one zero byte, then User followed by
-Community, each encoded as an unsigned 32-bit big-endian byte length followed by
-its UTF-8 bytes. Check in cross-language test vectors before release. Do not hash an
-ambiguous delimiter-joined pair, truncate the digest, or change this encoding after
-queues have been created. The digest has 52 characters and the resulting name 61.
-
-Readable concatenation itself can collide when components contain hyphens. Names
-therefore never prove identity against conflicting labels: such a collision returns
-503 without adopting the existing queue or allocating a second ledger. In particular,
-do not repair an ambiguously attributable readable queue with both identity labels
-missing. Naming tests must cover these cases as well as digest stability.
+Hyphens inside the user or community can make two pairs share one name. In that
+case, refuse with 503. Do not adopt the existing queue. Do not create a second
+queue for the same name. Do not repair a queue that is missing both identity
+labels.
 
 ### 6. Workload metadata and priority
 
@@ -435,7 +427,7 @@ Session-child fixtures. Do not run lifecycle acceptance against a live shared cl
 | Consistency/POSIX | One membership observation across general auth, headless priority, Project intersection, and all supplemental GIDs; catalog edits do not renew membership; unrelated groups preserved; unmapped group 503; no derived cache extending grants |
 | ClusterQueue | Correct exact named queue; missing object versus missing API; wrong/missing label; terminating/inaccessible object; no mutation; target-local failure isolation; no quota-based reroute |
 | LocalQueue | Create, reuse, concurrent 409 winner; safe owned missing-label repair; unowned compliant reuse without adoption; unowned missing labels denied; present conflicts, wrong reference, terminating state, ambiguous name, stale patch and UID replacement denied; no delete/update/retarget; retained queue after later failure |
-| Naming | Readable example; uppercase/lowercase distinction; underscores and periods; 63/64 boundary; valid label but invalid resource name; pair-order and length-prefix vectors; hyphen-composition collision; full digest and stable 61-character fallback |
+| Naming | Readable example; reject uppercase, underscores, periods; 63/64 boundary; hyphen-composition collision; refuse repair when both identity labels are missing |
 | Emitted objects | Every session kind and app Job initially suspended with exact queue label; matching Job/Pod User and Community; JSON Project annotation on Job/Pod only; no scalar project or group label; existing session metadata/selectors and priority policy preserved |
 | Callback | Valid active parent inheritance after membership expiry and Redis outage; no GMS; invalid grant/route mismatch rejected; terminating/terminal/missing/legacy parent rejected; conflicting Community rejected; catalog/default edits cannot switch assignment; missing/mismatched inherited live queues fail closed |
 | Reads/lifecycle | Additive stored attribution; later membership changes do not rewrite it; unknown legacy fields omitted; LocalQueue not exposed; Permissions API GET/DELETE remain membership-independent; existing renew/delete/list behavior remains |

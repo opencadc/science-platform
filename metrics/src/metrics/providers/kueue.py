@@ -19,7 +19,6 @@ from metrics.providers.kube import (
     KubeApi,
     MAX_RESULT_OBJECTS,
     KubeReader,
-    concurrently,
     fan_out,
     label_selector,
     label_value,
@@ -283,20 +282,19 @@ class KueueProvider:
         )
 
     async def read_user(self, username: str) -> UserObservation:
-        """Aggregate a user's LocalQueues across configured namespaces.
+        """Sum reservation from the user's LocalQueues only.
 
-        Every matching LocalQueue must name a configured ClusterQueue whose
-        community label equals its own; any other matching queue fails the read.
+        Does not read ClusterQueues. Each matching LocalQueue must name a
+        configured ClusterQueue and carry username and community labels; any
+        other matching queue fails the read.
         """
-        cluster_queues, local_queues = await concurrently(
-            self._cluster_queues(), self._local_queues(username)
-        )
+        local_queues = await self._local_queues(username)
         if not local_queues:
             # A cached list can trail a just-created LocalQueue; confirm before a 404.
             local_queues = await self._local_queues(username, consistent=True)
         if not local_queues:
             raise SubjectNotFoundError("User has no matching LocalQueue")
-        community_by_queue = {queue.name: queue.community for queue in cluster_queues.values()}
+        configured = set(self._config.cluster_queues)
 
         requests: list[dict[str, Decimal]] = []
         reserving = 0
@@ -312,19 +310,14 @@ class KueueProvider:
                 raise ProviderExecutionError(
                     "Kueue LocalQueue username label did not match selector"
                 )
-            local_community = _required_label(labels, _COMMUNITY_LABEL, "LocalQueue")
+            _required_label(labels, _COMMUNITY_LABEL, "LocalQueue")
             spec = mapping(doc.get("spec"), "Kueue LocalQueue spec was invalid")
             cluster_queue = spec.get("clusterQueue")
             if not isinstance(cluster_queue, str) or not cluster_queue:
                 raise ProviderExecutionError("Kueue LocalQueue clusterQueue was missing")
-            expected_community = community_by_queue.get(cluster_queue)
-            if expected_community is None:
+            if cluster_queue not in configured:
                 raise ProviderExecutionError(
                     "Kueue LocalQueue referenced an out-of-scope ClusterQueue"
-                )
-            if local_community != expected_community:
-                raise ProviderExecutionError(
-                    "Kueue LocalQueue community did not match its ClusterQueue"
                 )
             identities = {("name", f"{namespace}/{name_of(doc, 'Kueue LocalQueue')}")}
             uid = metadata.get("uid")

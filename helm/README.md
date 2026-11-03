@@ -47,7 +47,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | deployment.skaha.sessions.authorization.permissionsAPI.name | string | `"skaha"` | Service name passed to the permissions API (SKAHA_PERMISSIONS_API_NAME). |
 | deployment.skaha.sessions.authorization.permissionsAPI.version | string | `""` | Policy version passed to the permissions API (SKAHA_PERMISSIONS_API_VERSION). Omitted from the Deployment when empty; Skaha defaults to "1". |
 | deployment.skaha.sessions.communities | object | `{"default":{"clusterQueue":"","default":true}}` | Session routing Communities, keyed by exact Community name. |
-| deployment.skaha.sessions.communities.default.clusterQueue | string | `""` | Required. Existing ClusterQueue labelled canfar.net/community=default. Must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES. |
+| deployment.skaha.sessions.communities.default.clusterQueue | string | `""` | Required. Existing ClusterQueue labelled canfar.net/community=default. Must appear in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES. |
 | deployment.skaha.sessions.communities.default.default | bool | `true` | Marks the Default Community. Must be true. |
 | deployment.skaha.sessions.expirySeconds | string | `"345600"` | Session lifetime in seconds before expiry and shutdown. |
 | deployment.skaha.sessions.flexResourceRequests.headless.cpuCores | string | `"1"` | Default CPU request (cores) for flex headless sessions. |

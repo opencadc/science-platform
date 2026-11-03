@@ -334,19 +334,21 @@ becomes a partial sum.
 ### User
 
 Metrics lists LocalQueues labelled exactly `canfar.net/username=<user>` in
-every configured namespace, reading ClusterQueues at the same time. A repeated
-community label on those ClusterQueues fails the User read. Every matching
-LocalQueue must:
+every configured namespace. The User path does not read ClusterQueues.
+Duplicate community labels on ClusterQueues fail Platform, Community, and
+startup instead.
 
-- be returned from the namespace that was queried;
-- reference a configured ClusterQueue;
-- carry a `canfar.net/community` equal to that ClusterQueue's label; and
-- have a distinct `(namespace, name)` and, when present, UID.
+Every matching LocalQueue must:
 
-Any matching LocalQueue that fails a check fails the User read (a 503 when no
-snapshot exists); it is never silently dropped. The report sums
-`status.flavorsReservation[].resources[].total` into `requests` and
-`reservingWorkloads` into the count. No match is a 404.
+- come from the namespace that was queried
+- name a configured ClusterQueue in `spec.clusterQueue`
+- carry a nonempty `canfar.net/community` label
+- have a distinct `(namespace, name)` and, when present, a distinct UID
+
+If any matching LocalQueue fails a check, the User read fails. When no cache
+snapshot exists, that failure is a 503. Metrics never drops a matching queue
+from the total. The report sums `status.flavorsReservation[].resources[].total`
+into `requests` and `reservingWorkloads` into the count. No match is a 404.
 
 ### Community
 

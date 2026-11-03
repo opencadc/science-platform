@@ -1,57 +1,75 @@
-# Design: per-user LocalQueue routing (community `default`)
+# About per-user LocalQueue routing
 
-## Nomenclature
+## Names
 
-- **Community** = one ClusterQueue (operator-owned). Jobs always admit through a Community’s ClusterQueue.
-- **LocalQueue** = private, user-named (§5). One LocalQueue per user in this slice; it points at the Community’s ClusterQueue.
-- **Now:** a single Community `default` → Helm `clusterQueue`.
-- **Later:** more than one ClusterQueue means more than one Community; selection/GMS stay out of this slice.
+A Community is one operator-owned ClusterQueue. Every session Job admits through
+that ClusterQueue. A LocalQueue is private to one user. It points at the
+Community's ClusterQueue. This change uses a single Community named `default`.
+More Communities later means more ClusterQueues. Community selection and GMS are
+out of scope here.
 
-## Problem
+## What this change does
 
-Every new Skaha user Job must land on a private LocalQueue named by spec §5, labelled with the user’s identity and community `default`, pointing at the Helm-configured ClusterQueue for that community. Metrics must fail closed when two configured ClusterQueues share a community label (§9). Community POST, GMS, and multi-community selection stay out of this slice.
+On first launch for a user, Skaha creates a LocalQueue named
+`<user>-default-lq` in the workload namespace when that name is a DNS-1123 label
+of at most 63 characters. If the name is longer or not a DNS-1123 label, Skaha
+rejects the launch. It does not hash the name.
 
-## Usage (caller's view)
+The LocalQueue carries `canfar.net/username`, `canfar.net/community=default`, and
+`app.kubernetes.io/managed-by=skaha`. Its `spec.clusterQueue` is the Helm value
+`deployment.skaha.sessions.communities.default.clusterQueue`. That ClusterQueue
+must already exist and must be labelled `canfar.net/community=default`.
+
+Skaha never deletes LocalQueues. Metrics treats a repeated community label on
+two configured ClusterQueues as an error.
+
+## Helm
 
 ```yaml
+deployment.skaha.sessions.communities:
+  default:
+    clusterQueue: cadc
 deployment.skaha.sessions.kueue:
-  community: default
-  clusterQueue: cadc   # operator ClusterQueue; must be in Metrics CLUSTER_QUEUES
   default: {priorityClass: high}
   headless: {priorityClass: low}
 ```
 
-Leftover `queueName` fails render. `PostAction` builds an assignment once, then the builder and launcher consume it.
+A leftover `queueName` fails the chart render. List the ClusterQueue in
+`METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES`. The workload Role needs LocalQueue
+`create`, `get`, and `patch`. Skaha also needs ClusterQueue `get`.
+
+## Call path
 
 ```java
 LaunchAssignment assignment = LaunchRouter.fromEnv().assign(owner, type);
 SessionJobBuilder.fromPath(path, assignment) /* ... */ .buildLaunch();
-new SessionLauncher(client).launch(launch, ownedYamls); // ensure LocalQueue then create Job
+new SessionLauncher(client).launch(launch, ownedYamls);
 ```
 
-## Shape
+`LaunchRouter` replaces `QueueConfiguration`. It rejects `SKAHA_QUEUE_*_NAME`.
+`LocalQueues.ensure` is the only Skaha code that reads ClusterQueues or writes
+LocalQueues. Before that write, the Job must already carry the assignment's
+`kueue.x-k8s.io/queue-name` and `suspend=true`.
 
-- `LaunchAssignment` (immutable): namespace, user, community, clusterQueue, workloadPriorityClass. `localQueue()` derives the §5 name (never stored).
-- `LaunchRouter`: replaces `QueueConfiguration`. Reads `community` + `clusterQueue` + per-type priorities from env. Rejects `SKAHA_QUEUE_*_NAME`. `assign` is pure.
-- `LocalQueues.ensure(assignment)`: sole ClusterQueue reader / LocalQueue writer. Create, reuse, repair missing labels only when `managed-by=skaha`. Non-empty `ownerReferences` → 503. Hyphen-collision: both identity labels missing on a readable name → 503 unless the name is unambiguous for the requested pair via digest rules; one surviving matching label may repair. Never write `managed-by` during repair. Before any write, Job must already carry matching queue-name and `suspend=true` from the assignment.
-- `SessionJobBuilder.fromPath(path, assignment)`: always suspend + queue-name; user/community on Job and Pod. `withQueue` deleted.
-- Metrics: index configured ClusterQueues by community label; duplicate → `ProviderExecutionError` on platform, community, user, and startup.
+## LocalQueue ensure
 
-## Synthesis decision
+| Existing object | Result |
+|-----------------|--------|
+| None | Create the private LocalQueue |
+| Both identity labels match, same ClusterQueue | Reuse |
+| Skaha-managed, one identity label missing, the other matches | Patch the missing label |
+| Both identity labels missing, owner references, wrong ClusterQueue, conflicting labels, or not Skaha-managed with gaps | 503 |
 
-Base: candidate-opus ([LaunchAssignment sketch](75f6264c-be2c-45b5-b63b-c871439181a3)), picked by [cross-judge](3b8e1155-deac-4853-8d7c-4d90136f59bd) 27–25 over [extend builders](700cc7cc-2f47-40cd-9aba-9e2b898ec2fc).
+## Metrics
 
-Grafts from Grok: (1) reject non-empty `ownerReferences`; (2) hyphen-collision vectors + digest both-labels-missing repair, with unambiguous readable repair kept; (3) Job stamp check before LocalQueue mutate, comparing to the assignment only.
+User reports list LocalQueues by `canfar.net/username` only. They do not read
+ClusterQueues. Community reports read the one configured ClusterQueue with that
+`canfar.net/community` label. Platform and startup fail if two configured
+ClusterQueues share a community label.
 
-Operator lock: community stays the configured `default` string mapped to Helm `clusterQueue`. Helm uses flat `kueue.community` / `kueue.clusterQueue` for this slice (thinner than a full `communities` map).
+## Trade-offs
 
-## Tradeoffs accepted
-
-- Desktop-app Jobs use current Default route, not parent inheritance.
-- Live ClusterQueue GET + LocalQueue GET each launch, no cache.
-- Prod needs ClusterQueue `get` (CADC-15958) or every launch is 503.
-- Periods in usernames take the digest path (DNS-1123 label rule).
-
-## Next implementation step
-
-Naming vectors + `LaunchAssignment.localQueue()`, then router, ensure, builder, Helm, Metrics.
+Desktop-app Jobs still use the Default Community route. Each launch does a live
+ClusterQueue GET and LocalQueue GET with no cache. Production needs ClusterQueue
+`get` for the Skaha ServiceAccount (CADC-15958) or every launch returns 503.
+Usernames that cannot form a DNS-1123 LocalQueue name cannot launch.
