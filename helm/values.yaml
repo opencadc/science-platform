@@ -326,57 +326,40 @@ deployment:
       # -- Node label selector used when discovering schedulable worker nodes.
       nodeLabelSelector:
 
-      # Optionally configure the Kueue system to handle large workloads. Configurable per session type (e.g. desktop, notebook, etc.).
-      # Leaving this empty will default to submitting Jobs to the base Kubernetes system.
-      # Provide a default configuration for all session types, or omit and only configure specific session types.
-      # Provided PriorityClass names are "high", "medium", and "low".
-      # Configure Kueue queues and priority classes for session scheduling.
-      # Queue provisioning and per-user LocalQueue selection are external to this chart.
-      # The Metrics/Skaha charts do not deploy an admission or provisioning component.
+      # Every session Job is submitted suspended to a private LocalQueue for its owner and Community, which Skaha
+      # creates in the workload namespace on first launch and never deletes. Kueue, its Job integration, and the
+      # Community's ClusterQueue are prerequisites; this chart creates neither.
+      # This release routes every session to the Default Community, which must be the only entry and be named default.
       # @see https://kueue.sigs.k8s.io/docs/
-      # @see https://github.com/opencadc/deployments/tree/main/configs/kueue
-      # Example 1:
-      #   # Configure notebook, desktop, and default session types.
-      #   kueue:
-      #     notebook:
-      #       queueName: "notebook-queue"
-      #       priorityClass: "medium"
-      #     desktop:
-      #       queueName: "desktop-queue"
-      #       priorityClass: "low"
+      # Example:
+      #   communities:
       #     default:
-      #       queueName: "default-queue"
-      #       priorityClass: "medium"
-      #
-      # Example 2:
-      #    # Configure contributed session types. All else will use the bare Kubernetes system.
-      #    kueue:
-      #      contributed:
-      #        queueName: "contributed-queue"
-      #        priorityClass: "high"
-      #
-      # Example 3:
-      #    # Configure Kueue for all user session types.
-      #    kueue:
-      #      default:
-      #        queueName: "all-user-sessions-local-queue"
-      #        priorityClass: "medium"
-      #
-      # Optional RBAC: grant the Skaha service account permission to read LocalQueues in this chart's
-      # release namespace and in skahaWorkload.namespace (see top-level skahaWorkload).
-      #    kueue:
-      #      rbac:
-      #        create: true
-      # -- Per-session-type Kueue configuration.
+      #       default: true
+      #       clusterQueue: cadc
+      # -- Session routing Communities, keyed by exact Community name.
+      communities:
+        default:
+          # -- Marks the Default Community. Must be true.
+          default: true
+          # -- (string) Required. Existing ClusterQueue labelled canfar.net/community=default. Must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
+          clusterQueue: ""
+
+      # Kueue WorkloadPriorityClass per session type (e.g. notebook, desktop, headless, desktop-app), with default as
+      # the fallback for unlisted types. Omit every type to use Kueue's default priority.
+      # Example:
+      #   kueue:
+      #     default:
+      #       priorityClass: "high"
+      #     headless:
+      #       priorityClass: "low"
+      # -- Per-session-type Kueue WorkloadPriorityClass and the Kueue API Skaha uses.
       kueue:
-        # -- Kueue CustomObjects API (LocalQueues): sets SKAHA_KUEUE_API_VERSION and SKAHA_KUEUE_API_GROUP on the Skaha Deployment.
+        # -- Kueue CustomObjects API: sets SKAHA_KUEUE_API_VERSION and SKAHA_KUEUE_API_GROUP on the Skaha Deployment.
         api:
-          # -- Kueue API version segment for LocalQueue lookups (override e.g. to v1beta1 for older Kueue installs).
+          # -- Kueue API version segment for LocalQueue and ClusterQueue requests.
           version: v1beta2
           # -- Kueue API group CRDs belong to.
           group: kueue.x-k8s.io
-        rbac:
-          create: false
 
       # PriorityClass for the Skaha API pod. When create is true, a cluster PriorityClass is installed.
       # If create is false, name must reference an existing PriorityClass. Omit name to skip setting priorityClassName on the pod.

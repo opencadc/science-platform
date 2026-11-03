@@ -476,6 +476,44 @@ Structural validation only; Skaha rejects conflicting modes at runtime.
 {{- end }}
 
 {{/*
+The Default Community's ClusterQueue. Fails on any catalog shape this release cannot route, on the removed static
+queue settings, and when Metrics does not cover the routed ClusterQueue.
+*/}}
+{{- define "skaha.defaultClusterQueue" -}}
+{{- $sessions := .Values.deployment.skaha.sessions -}}
+{{- $kueue := $sessions.kueue | default dict -}}
+{{- if hasKey $kueue "rbac" -}}
+{{- fail "deployment.skaha.sessions.kueue.rbac was removed: LocalQueue access is granted by rbac.create" -}}
+{{- end -}}
+{{- range $type, $config := $kueue -}}
+{{- if and (ne $type "api") (kindIs "map" $config) (hasKey $config "queueName") -}}
+{{- fail (printf "deployment.skaha.sessions.kueue.%s.queueName was removed: Skaha routes every session to a per-user LocalQueue; set deployment.skaha.sessions.communities.default.clusterQueue instead" $type) -}}
+{{- end -}}
+{{- end -}}
+{{- $communities := $sessions.communities | default dict -}}
+{{- if or (ne (len $communities) 1) (not (hasKey $communities "default")) -}}
+{{- fail "deployment.skaha.sessions.communities must contain exactly one Community, named default" -}}
+{{- end -}}
+{{- $community := get $communities "default" | default dict -}}
+{{- range $field, $_ := $community -}}
+{{- if not (has $field (list "default" "clusterQueue")) -}}
+{{- fail (printf "deployment.skaha.sessions.communities.default.%s is not supported" $field) -}}
+{{- end -}}
+{{- end -}}
+{{- if ne $community.default true -}}
+{{- fail "deployment.skaha.sessions.communities.default.default must be true" -}}
+{{- end -}}
+{{- $clusterQueue := trim (default "" $community.clusterQueue | toString) -}}
+{{- if not $clusterQueue -}}
+{{- fail "deployment.skaha.sessions.communities.default.clusterQueue is required" -}}
+{{- end -}}
+{{- if not (has $clusterQueue (include "skaha.metrics.clusterQueues" . | fromJsonArray)) -}}
+{{- fail (printf "ClusterQueue %q routed by deployment.skaha.sessions.communities is missing from METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" $clusterQueue) -}}
+{{- end -}}
+{{- $clusterQueue -}}
+{{- end }}
+
+{{/*
 OpenTelemetry validation for the Skaha Java agent.
 */}}
 {{- define "skaha.validateTelemetry" }}

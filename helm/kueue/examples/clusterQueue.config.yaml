@@ -12,11 +12,14 @@ kind: ResourceFlavor
 metadata:
   name: canfar-science-platform-default
 ---
-# ClusterQueue
+# ClusterQueue for the Default Community. Set deployment.skaha.sessions.communities.default.clusterQueue to its name;
+# Skaha creates each user's LocalQueue against it.
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
 metadata:
   name: canfar-science-platform-cluster-queue
+  labels:
+    canfar.net/community: default
 spec:
   namespaceSelector:
     matchExpressions:

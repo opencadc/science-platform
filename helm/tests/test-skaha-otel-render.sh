@@ -7,6 +7,7 @@ metrics_required_args=(
     --set metrics.clusterName=prod-cluster
     --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
     --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
+    --set deployment.skaha.sessions.communities.default.clusterQueue=cq-test
 )
 
 helm dependency build "${chart_dir}" >/dev/null
@@ -181,12 +182,46 @@ assert_not_contains "${disabled_render}" "-javaagent:/opt/opentelemetry-javaagen
 
 queue_render="$(
     render_skaha_deployment \
-        --set deployment.skaha.sessions.kueue.default.queueName=cadc-default \
-        --set deployment.skaha.sessions.kueue.default.priorityClass=high
+        --set deployment.skaha.sessions.kueue.default.priorityClass=high \
+        --set deployment.skaha.sessions.kueue.desktop-app.priorityClass=medium
 )"
-assert_env_value "${queue_render}" "SKAHA_QUEUE_DEFAULT_NAME" "cadc-default"
+assert_env_value "${queue_render}" "SKAHA_DEFAULT_COMMUNITY" "default"
+assert_env_value "${queue_render}" "SKAHA_DEFAULT_CLUSTER_QUEUE" "cq-test"
 assert_env_value "${queue_render}" "SKAHA_QUEUE_DEFAULT_PRIORITY_CLASS" "high"
-assert_not_contains "${queue_render}" "SKAHA_QUEUE_DEFAULT_COMMUNITY"
+assert_env_value "${queue_render}" "SKAHA_QUEUE_DESKTOP-APP_PRIORITY_CLASS" "medium"
+assert_not_contains "${queue_render}" "SKAHA_QUEUE_DEFAULT_NAME"
+
+assert_render_fails \
+    "deployment.skaha.sessions.kueue.default.queueName was removed" \
+    --set deployment.skaha.sessions.kueue.default.queueName=cadc-default \
+    --set deployment.skaha.sessions.kueue.default.priorityClass=high
+assert_render_fails \
+    "deployment.skaha.sessions.kueue.rbac was removed" \
+    --set deployment.skaha.sessions.kueue.rbac.create=true
+assert_render_fails \
+    "deployment.skaha.sessions.communities.default.clusterQueue is required" \
+    --set deployment.skaha.sessions.communities.default.clusterQueue=
+assert_render_fails \
+    'ClusterQueue "cadc" routed by deployment.skaha.sessions.communities is missing from METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES' \
+    --set deployment.skaha.sessions.communities.default.clusterQueue=cadc
+assert_render_fails \
+    "deployment.skaha.sessions.communities must contain exactly one Community, named default" \
+    --set deployment.skaha.sessions.communities.cadc.clusterQueue=cq-test
+assert_render_fails \
+    "deployment.skaha.sessions.communities.default.default must be true" \
+    --set deployment.skaha.sessions.communities.default.default=false
+assert_render_fails \
+    "deployment.skaha.sessions.communities.default.projects is not supported" \
+    --set 'deployment.skaha.sessions.communities.default.projects[0]=astronomy'
+
+workload_rbac="$(
+    helm template rbac-test "${chart_dir}" \
+        --show-only templates/rbac.yaml \
+        "${metrics_required_args[@]}" \
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern
+)"
+assert_contains "${workload_rbac}" '  resources: ["localqueues"]
+  verbs: ["create", "get", "patch"]'
 
 endpoint_only_render="$(render_skaha_deployment --set telemetry.otlp.destination=http://otel-collector:4318)"
 assert_not_contains "${endpoint_only_render}" "OTEL_"

@@ -53,6 +53,7 @@ def renderSessionTemplates = tasks.register('renderSessionTemplates', Exec) {
             '--set', 'metrics.clusterName=c',
             '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["w"]',
             '--set-string', 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq"]',
+            '--set', 'deployment.skaha.sessions.communities.default.clusterQueue=cq',
             '--set', 'deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern'
     standardOutput = new ByteArrayOutputStream()
     doLast {
