@@ -464,9 +464,7 @@ async def test_user_read_does_not_fetch_clusterqueues() -> None:
             super().__init__(
                 {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
                 {
-                    "work-a": [
-                        _local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")
-                    ],
+                    "work-a": [_local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")],
                     "work-b": [],
                 },
             )
