@@ -3,7 +3,8 @@
 ## Status
 
 Accepted. Amended: Session requests and counts come from active Jobs only, and
-each Job's request is its effective pod request.
+each Job's request is its effective pod request. Amended: each Community is
+one configured ClusterQueue, and a repeated community label is invalid.
 
 ## Decision
 
@@ -11,9 +12,10 @@ Metrics is one asynchronous FastAPI service with one shared external Redis
 cache and one public `canfar.net/v1alpha1` `Metrics` kind. Four subject routes
 select User, Community, Platform, or Session. User, Community, and Platform
 primary sources are Kueue only: LocalQueues by exact `canfar.net/username` in
-configured namespaces (restricted to configured ClusterQueues), ClusterQueues
-by exact `canfar.net/community`, and all configured ClusterQueues for
-Platform. Session primary source is `batch/v1` Jobs by exact `canfar.net/id`,
+configured namespaces (restricted to configured ClusterQueues), the one
+ClusterQueue with an exact `canfar.net/community` label, and all configured
+ClusterQueues for Platform. No two configured ClusterQueues share a community
+label. Session primary source is `batch/v1` Jobs by exact `canfar.net/id`,
 including desktop-app children that share the id.
 
 Public aggregation uses `flavorsReservation` / `reservingWorkloads` for User

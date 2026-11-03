@@ -325,15 +325,18 @@ the complete Platform boundary:
 METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
 ```
 
-Each configured ClusterQueue carries one `canfar.net/community` label. A
-missing, forbidden, or malformed configured ClusterQueue fails the read;
-Platform never becomes a partial sum.
+Each configured ClusterQueue carries one `canfar.net/community` label, and
+no two configured ClusterQueues share it. A missing, forbidden, or malformed
+configured ClusterQueue fails the read. Two configured ClusterQueues that
+share a community label fail Platform reads and startup. Platform never
+becomes a partial sum.
 
 ### User
 
 Metrics lists LocalQueues labelled exactly `canfar.net/username=<user>` in
-every configured namespace, reading ClusterQueues at the same time. Every
-matching LocalQueue must:
+every configured namespace, reading ClusterQueues at the same time. A repeated
+community label on those ClusterQueues fails the User read. Every matching
+LocalQueue must:
 
 - be returned from the namespace that was queried;
 - reference a configured ClusterQueue;
@@ -347,10 +350,11 @@ snapshot exists); it is never silently dropped. The report sums
 
 ### Community
 
-Metrics filters the configured ClusterQueues by
-`canfar.net/community=<community>` and sums their
-`flavorsReservation` totals and `reservingWorkloads`. No match is a 404.
-Community membership is not derived from LocalQueues or Cohorts.
+Metrics reads the one configured ClusterQueue labelled
+`canfar.net/community=<community>` and reports its `flavorsReservation`
+totals and `reservingWorkloads`. No match is a 404. A repeated community
+label in the configured set fails the read. Community membership is not
+derived from LocalQueues or Cohorts.
 
 ### Session
 

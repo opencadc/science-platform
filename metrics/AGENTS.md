@@ -31,8 +31,8 @@ local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
 
 - User requests come from LocalQueues in the configured namespaces, selected by
   `canfar.net/username` and restricted to the configured ClusterQueues.
-- Community requests come from configured ClusterQueues selected by
-  `canfar.net/community`.
+- Community requests come from the one configured ClusterQueue selected by
+  `canfar.net/community`. A repeated label on the configured set fails the read.
 - Platform totals include every configured ClusterQueue. Cohorts are not a
   Metrics source.
 - Session reports aggregate Jobs labelled `canfar.net/id` in the configured

@@ -166,7 +166,7 @@ async def test_clusterqueue_reads_use_bounded_concurrency_in_configured_order() 
     class BlockingApi(FakeKueueApi):
         def __init__(self) -> None:
             super().__init__(
-                {name: _cluster_queue(name, "astronomy", cpu="1") for name in names},
+                {name: _cluster_queue(name, name, cpu="1") for name in names},
                 {"work-a": []},
             )
             self.active = 0
@@ -221,7 +221,7 @@ async def test_clusterqueue_failure_cancels_siblings_and_propagates() -> None:
     class FailingApi(FakeKueueApi):
         def __init__(self) -> None:
             super().__init__(
-                {name: _cluster_queue(name, "astronomy") for name in names},
+                {name: _cluster_queue(name, name) for name in names},
                 {"work-a": []},
             )
             self.started: list[str] = []
@@ -291,7 +291,7 @@ async def test_user_accepts_empty_optional_status_fields() -> None:
 
 
 async def test_community_filters_configured_clusterqueues_by_exact_label() -> None:
-    """Community requests sum reservation values from matching ClusterQueues."""
+    """One community label selects its single configured ClusterQueue."""
     api = FakeKueueApi(
         {
             "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
@@ -306,6 +306,41 @@ async def test_community_filters_configured_clusterqueues_by_exact_label() -> No
     assert result.reserving_workloads == 2
     with pytest.raises(SubjectNotFoundError):
         await _provider(api).read_community("biology")
+
+
+def _duplicate_community_api() -> FakeKueueApi:
+    """Return two configured ClusterQueues that share one community label."""
+    return FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
+            "cq-physics": _cluster_queue("cq-physics", "astronomy", cpu="8"),
+        },
+        {
+            "work-a": [_local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")],
+            "work-b": [],
+        },
+    )
+
+
+async def test_duplicate_community_label_fails_closed() -> None:
+    """Two configured ClusterQueues with one community label are not summed."""
+    provider = _provider(_duplicate_community_api())
+
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_platform()
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_community("astronomy")
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_community("biology")
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_user("bob")
+
+    startup_api = _duplicate_community_api()
+    with pytest.raises(RuntimeStartupError, match="Kueue dependency validation failed") as raised:
+        await _provider(startup_api).startup()
+    assert isinstance(raised.value.__cause__, ProviderExecutionError)
+    assert "community label was duplicated" in str(raised.value.__cause__)
+    assert startup_api.local_params == []
 
 
 async def test_user_aggregates_valid_localqueues_across_namespaces() -> None:

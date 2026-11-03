@@ -167,6 +167,16 @@ def _cluster_queue(name: str, doc: dict[str, Any]) -> _ClusterQueue:
     )
 
 
+def _index_communities(queues: list[_ClusterQueue]) -> dict[str, _ClusterQueue]:
+    """Index configured ClusterQueues by community label."""
+    indexed: dict[str, _ClusterQueue] = {}
+    for queue in queues:
+        if queue.community in indexed:
+            raise ProviderExecutionError("Kueue ClusterQueue community label was duplicated")
+        indexed[queue.community] = queue
+    return indexed
+
+
 def _resource_maps(values: dict[str, Decimal]) -> dict[str, str]:
     """Format an aggregate resource map deterministically."""
     return {name: format_resource_amount(name, value) for name, value in sorted(values.items())}
@@ -192,8 +202,8 @@ class KueueProvider:
         self._config = settings.providers.kueue
         self._kube = KubeReader(api=api)
 
-    async def _cluster_queues(self) -> list[_ClusterQueue]:
-        """Read and parse every configured ClusterQueue with named GETs."""
+    async def _cluster_queues(self) -> dict[str, _ClusterQueue]:
+        """Read configured ClusterQueues, indexed by community label."""
         names = self._config.cluster_queues
         if len(names) > MAX_RESULT_OBJECTS:
             raise ProviderExecutionError("Kueue ClusterQueue result exceeded the result limit")
@@ -206,7 +216,7 @@ class KueueProvider:
             )
             return _cluster_queue(name, doc)
 
-        return await fan_out(names, fetch)
+        return _index_communities(await fan_out(names, fetch))
 
     async def _local_queues(
         self, username: str, *, consistent: bool = False
@@ -247,28 +257,28 @@ class KueueProvider:
     async def read_platform(self) -> PlatformObservation:
         """Sum capacity, allocation, and reserving workloads across ClusterQueues."""
         queues = await self._cluster_queues()
-        capacity = _sum([queue.capacity for queue in queues])
+        capacity = _sum([queue.capacity for queue in queues.values()])
         if not capacity:
             raise ProviderExecutionError("Kueue platform had no configured capacity")
-        allocated = _sum([queue.allocated for queue in queues])
+        allocated = _sum([queue.allocated for queue in queues.values()])
         return PlatformObservation(
             cluster=self._settings.cluster_name,
             capacity=_resource_maps(capacity),
             allocated=_resource_maps({name: allocated.get(name, Decimal(0)) for name in capacity}),
-            reserving_workloads=sum(queue.reserving_workloads for queue in queues),
+            reserving_workloads=sum(queue.reserving_workloads for queue in queues.values()),
             observed_at=observation_time(),
         )
 
     async def read_community(self, community: str) -> CommunityObservation:
-        """Sum reservation and reserving counts for matching ClusterQueues."""
+        """Read reservation for the one ClusterQueue with this community label."""
         label_value(community)
-        matching = [queue for queue in await self._cluster_queues() if queue.community == community]
-        if not matching:
+        queue = (await self._cluster_queues()).get(community)
+        if queue is None:
             raise SubjectNotFoundError("Community has no configured ClusterQueue")
         return CommunityObservation(
             community=community,
-            requests=_resource_maps(_sum([queue.requests for queue in matching])),
-            reserving_workloads=sum(queue.reserving_workloads for queue in matching),
+            requests=_resource_maps(queue.requests),
+            reserving_workloads=queue.reserving_workloads,
             observed_at=observation_time(),
         )
 
@@ -286,7 +296,7 @@ class KueueProvider:
             local_queues = await self._local_queues(username, consistent=True)
         if not local_queues:
             raise SubjectNotFoundError("User has no matching LocalQueue")
-        community_by_queue = {queue.name: queue.community for queue in cluster_queues}
+        community_by_queue = {queue.name: queue.community for queue in cluster_queues.values()}
 
         requests: list[dict[str, Decimal]] = []
         reserving = 0
