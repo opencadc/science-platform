@@ -76,14 +76,6 @@ public final class SessionLabels {
         return Map.copyOf(labels);
     }
 
-    static Map<String, String> kueue(final String queueName, final String priorityClass) {
-        return Map.of(
-                KUEUE_QUEUE_NAME,
-                validateLabelValue(KUEUE_QUEUE_NAME, queueName),
-                KUEUE_PRIORITY_CLASS,
-                validateLabelValue(KUEUE_PRIORITY_CLASS, priorityClass));
-    }
-
     /** Kueue labels for a submitting Job; the priority class is omitted when the assignment has none. */
     static Map<String, String> kueue(final LaunchAssignment assignment) {
         final Map<String, String> labels = new LinkedHashMap<>();

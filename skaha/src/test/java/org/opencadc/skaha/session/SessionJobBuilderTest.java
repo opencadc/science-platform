@@ -52,10 +52,14 @@ public class SessionJobBuilderTest {
     /** Canonical labels on the Job and Pod; Kueue's only on the Job; the template's own labels kept. */
     @Test
     public void testJobAndPodLabels() throws Exception {
-        final Job job =
-                build("test-base-values-queue.yaml", parameters("notebook"), builder -> builder.withGPUEnabled(true)
-                        .withGPUCount(2)
-                        .withQueue(new QueueConfiguration("notebook", "high", "my-queue")));
+        final Job job = SessionJobBuilder.fromPath(
+                        resource("test-base-values-queue.yaml"),
+                        new LaunchAssignment("skaha-workload", "alice", "default", "cq", "high"))
+                .withParameters(parameters("notebook"))
+                .withGPUEnabled(true)
+                .withGPUCount(2)
+                .buildLaunch()
+                .job();
 
         final Map<String, String> jobLabels = job.getMetadata().getLabels();
         final Map<String, String> podLabels =
@@ -73,13 +77,26 @@ public class SessionJobBuilderTest {
                             "app.kubernetes.io/managed-by", "skaha",
                             "app.kubernetes.io/part-of", "canfar"));
         }
-        Assert.assertEquals("my-queue", jobLabels.get("kueue.x-k8s.io/queue-name"));
+        Assert.assertEquals("alice-default-lq", jobLabels.get("kueue.x-k8s.io/queue-name"));
+        Assert.assertEquals("skaha-workload", job.getMetadata().getNamespace());
         Assert.assertEquals("high", jobLabels.get("kueue.x-k8s.io/priority-class"));
         Assert.assertEquals(Boolean.TRUE, job.getSpec().getSuspend());
         Assert.assertEquals("job", jobLabels.get("template-owned"));
         Assert.assertEquals("pod", podLabels.get("template-owned"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/queue-name"));
         Assert.assertFalse(podLabels.containsKey("kueue.x-k8s.io/priority-class"));
+    }
+
+    /** The owner, its labels, and its LocalQueue come only from the assignment. */
+    @Test
+    public void testUserIdParameterIsRejected() {
+        final SessionJobBuilder builder =
+                SessionJobBuilder.fromPath(resource("test-base-values.yaml"), SessionFixtures.ASSIGNMENT);
+        Assert.assertThrows(
+                IllegalArgumentException.class, () -> builder.withParameter(PostAction.SKAHA_USERID, "mallory"));
+        Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> builder.withParameters(Map.of(PostAction.SKAHA_USERID, "mallory")));
     }
 
     @Test
@@ -174,7 +191,7 @@ public class SessionJobBuilderTest {
                                 "- name: skaha_hostname",
                                 "- name: IMAGE\n          value: \"mirror/${software.imageid}\"\n        - name: skaha_hostname"));
 
-        final SessionJobBuilder builder = SessionJobBuilder.fromPath(template)
+        final SessionJobBuilder builder = SessionJobBuilder.fromPath(template, SessionFixtures.ASSIGNMENT)
                 .withParameters(SessionFixtures.parameters("notebook"))
                 .withImage("images.example.org/skaha/notebook:1.0");
 
@@ -186,7 +203,6 @@ public class SessionJobBuilderTest {
         parameters.put(PostAction.SKAHA_SESSIONID, "session-123");
         parameters.put(PostAction.SKAHA_SESSIONNAME, "analysis");
         parameters.put(PostAction.SKAHA_SESSIONTYPE, kind);
-        parameters.put(PostAction.SKAHA_USERID, "alice");
         parameters.put(PostAction.SKAHA_JOBNAME, "notebook-alice-session-123");
         return parameters;
     }
@@ -197,7 +213,8 @@ public class SessionJobBuilderTest {
             final UnaryOperator<SessionJobBuilder> configure)
             throws Exception {
         return configure
-                .apply(SessionJobBuilder.fromPath(resource(template)).withParameters(parameters))
+                .apply(SessionJobBuilder.fromPath(resource(template), SessionFixtures.ASSIGNMENT)
+                        .withParameters(parameters))
                 .buildLaunch()
                 .job();
     }

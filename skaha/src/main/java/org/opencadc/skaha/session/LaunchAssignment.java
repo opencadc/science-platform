@@ -51,6 +51,11 @@ record LaunchAssignment(
         return "skaha-" + base32(sha256(digestInput())) + "-lq";
     }
 
+    /** True for the readable name, which another hyphenated pair can share; a digest name proves its pair. */
+    boolean readableLocalQueueName() {
+        return readableLocalQueue().equals(localQueue());
+    }
+
     private String readableLocalQueue() {
         return this.user + "-" + this.community + "-lq";
     }

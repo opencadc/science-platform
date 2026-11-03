@@ -73,6 +73,8 @@ test {
     environment 'SKAHA_SESSIONS_HOSTNAME', 'sessions.example.org'
     environment 'SKAHA_HOSTNAME', 'skaha.example.org'
     environment 'skaha.sessionexpiry', '345600'
+    environment 'SKAHA_DEFAULT_COMMUNITY', 'default'
+    environment 'SKAHA_DEFAULT_CLUSTER_QUEUE', 'cq'
 }
 
 intTest {
