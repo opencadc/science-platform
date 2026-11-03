@@ -68,7 +68,6 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.net.HttpPost;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -107,11 +106,8 @@ public class ExpiryTimeRenewalTest {
 
     public ExpiryTimeRenewalTest() throws Exception {
         final RegistryClient regClient = new RegistryClient();
-        this.authenticatedUser = TestConfiguration.getCurrentUser();
-        this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
-
-        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+        this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
+        this.authenticatedUser = TestConfiguration.getCurrentUser(this.sessionURL);
         log.debug("userSubject: " + authenticatedUser.subject);
     }
 

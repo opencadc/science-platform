@@ -44,14 +44,14 @@ public class PlatformStatsIntTest {
 
     public PlatformStatsIntTest() throws Exception {
         final RegistryClient regClient = new RegistryClient();
-        this.authenticatedUser = TestConfiguration.getCurrentUser();
-        this.sessionURL = regClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1, this.authenticatedUser.authMethod);
+        this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
+        this.authenticatedUser = TestConfiguration.getCurrentUser(this.sessionURL);
         log.info("sessions URL: " + sessionURL);
     }
 
     @Test
     public void platformStatsMatchesSchema() throws Exception {
+        log.info("platformStatsMatchesSchema -> authenticatedUser: " + authenticatedUser.subject);
         Subject.doAs(authenticatedUser.subject, (PrivilegedExceptionAction<Void>) () -> {
             final JSONObject stats = SessionUtil.getStats(sessionURL);
             validateStatsSchema(stats);

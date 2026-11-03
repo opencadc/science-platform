@@ -68,7 +68,6 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -105,13 +104,8 @@ public class ImagesTest {
     public ImagesTest() {
         try {
             final RegistryClient regClient = new RegistryClient();
-            this.authenticatedUser = TestConfiguration.getCurrentUser();
-            this.imageURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(),
-                    Standards.PLATFORM_IMAGE_1,
-                    this.authenticatedUser.authMethod);
-
-            this.authenticatedUser.setDomain(NetUtil.getDomainName(this.imageURL));
+            this.imageURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1);
+            this.authenticatedUser = TestConfiguration.getCurrentUser(this.imageURL);
             log.info("sessions URL: " + imageURL);
         } catch (Exception e) {
             log.error("init exception", e);

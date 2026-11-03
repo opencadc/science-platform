@@ -68,7 +68,7 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.auth.AuthMethod;
+import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.net.HttpDelete;
 import ca.nrc.cadc.net.HttpGet;
 import ca.nrc.cadc.net.HttpPost;
@@ -269,6 +269,7 @@ public class SessionUtil {
     }
 
     static JSONObject getStats(final URL sessionURL) throws Exception {
+        LOGGER.info("getStats -> Running as: " + AuthenticationUtil.getCurrentSubject());
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         HttpGet get =
                 new HttpGet(URI.create(sessionURL.toString() + "?view=stats").toURL(), out);
@@ -425,8 +426,8 @@ public class SessionUtil {
 
     protected static List<Image> getImagesOfType(final String type) {
         final RegistryClient registryClient = new RegistryClient();
-        final URL imageServiceURL = registryClient.getServiceURL(
-                TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1, AuthMethod.TOKEN);
+        final URL imageServiceURL =
+                registryClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_IMAGE_1);
 
         final List<Image> allImagesList = ImagesTest.getImages(imageServiceURL);
         return allImagesList.stream()

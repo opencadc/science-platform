@@ -1,7 +1,6 @@
 package org.opencadc.skaha;
 
 import ca.nrc.cadc.net.HttpGet;
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -30,19 +29,16 @@ public class RepositoryHostsTest {
 
     public RepositoryHostsTest() throws Exception {
         final String configuredServiceEndpoint = System.getProperty("SKAHA_SERVICE_ENDPOINT");
-        this.authenticatedUser = TestConfiguration.getCurrentUser();
 
         if (StringUtil.hasText(configuredServiceEndpoint)) {
             this.repositoryURL = URI.create(configuredServiceEndpoint).toURL();
         } else {
             final RegistryClient regClient = new RegistryClient();
-            this.repositoryURL = regClient.getServiceURL(
-                    TestConfiguration.getSkahaServiceID(),
-                    Standards.PLATFORM_REPO_1,
-                    this.authenticatedUser.authMethod);
+            this.repositoryURL =
+                    regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_REPO_1);
         }
 
-        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.repositoryURL));
+        this.authenticatedUser = TestConfiguration.getCurrentUser(this.repositoryURL);
         log.info("sessions URL: " + repositoryURL);
     }
 

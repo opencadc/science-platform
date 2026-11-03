@@ -67,7 +67,6 @@
 
 package org.opencadc.skaha;
 
-import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.Log4jInit;
@@ -99,12 +98,9 @@ public class SessionLifecycleTest {
 
     public SessionLifecycleTest() throws Exception {
         RegistryClient regClient = new RegistryClient();
-        this.authenticatedUser = TestConfiguration.getCurrentUser();
         this.sessionURL = regClient.getServiceURL(TestConfiguration.getSkahaServiceID(), Standards.PLATFORM_SESSION_1);
-
-        this.authenticatedUser.setDomain(NetUtil.getDomainName(this.sessionURL));
+        this.authenticatedUser = TestConfiguration.getCurrentUser(this.sessionURL);
         log.info("sessions URL: " + sessionURL);
-
         log.debug("userSubject: " + authenticatedUser);
     }
 

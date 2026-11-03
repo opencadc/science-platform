@@ -8,6 +8,7 @@ import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.auth.SSOCookieCredential;
 import ca.nrc.cadc.auth.X509CertificateChain;
 import ca.nrc.cadc.net.HttpPost;
+import ca.nrc.cadc.net.NetUtil;
 import ca.nrc.cadc.net.NetrcFile;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
@@ -21,8 +22,8 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.MissingResourceException;
 import javax.security.auth.Subject;
@@ -82,10 +83,10 @@ public class TestConfiguration {
         return desktopImageID;
     }
 
-    private static AuthorizationToken getBearerToken() throws Exception {
+    private static AuthorizationToken getBearerToken(final List<String> domains) throws Exception {
         final File bearerTokenFile = FileUtil.getFileFromResource("skaha-test.token", SessionUtil.class);
         final String bearerToken = new String(Files.readAllBytes(bearerTokenFile.toPath()));
-        return new AuthorizationToken("Bearer", bearerToken.replace("\n", ""), new ArrayList<>());
+        return new AuthorizationToken("Bearer", bearerToken.replace("\n", ""), domains);
     }
 
     private static X509CertificateChain getProxyCertificate() throws Exception {
@@ -125,7 +126,7 @@ public class TestConfiguration {
      *
      * @return Subject instance, never null.
      */
-    static AuthenticatedUser getCurrentUser() throws Exception {
+    static AuthenticatedUser getCurrentUser(final URL serviceURL) throws Exception {
         try {
             final X509CertificateChain proxyCertificate = TestConfiguration.getProxyCertificate();
             LOGGER.info("PEM Certificate found in path.");
@@ -135,11 +136,12 @@ public class TestConfiguration {
         }
 
         try {
-            final AuthorizationToken bearerToken = TestConfiguration.getBearerToken();
+            final AuthorizationToken bearerToken =
+                    TestConfiguration.getBearerToken(List.of(NetUtil.getDomainName(serviceURL)));
             final Subject subject = new Subject();
             subject.getPublicCredentials().add(bearerToken);
             subject.getPublicCredentials().add(AuthMethod.TOKEN);
-            LOGGER.info("Bearer Token found in path.");
+            LOGGER.info("Bearer Token found in path: " + bearerToken.getCredentials());
             return new AuthenticatedUser(subject, AuthMethod.TOKEN);
         } catch (MissingResourceException noTokenFile) {
             LOGGER.warn("No bearer token (skaha-test.token) found in path.");
@@ -149,11 +151,10 @@ public class TestConfiguration {
             final RegistryClient registryClient = new RegistryClient();
             final URI loginServiceID = TestConfiguration.getGMSServiceID();
             final URL loginURL;
-            final URL newLoginURL =
-                    registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10, AuthMethod.ANON);
+            final URL newLoginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_10);
             if (newLoginURL == null) {
                 LOGGER.info("No login service URL found.  Trying older login Resource ID...");
-                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01, AuthMethod.ANON);
+                loginURL = registryClient.getServiceURL(loginServiceID, Standards.UMS_LOGIN_01);
             } else {
                 loginURL = newLoginURL;
             }
