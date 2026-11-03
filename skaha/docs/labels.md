@@ -15,26 +15,26 @@ separately in the integration boundary below; it is conditional on PromQL.
 | `canfar.net/job` | Job name | Always | Required |
 | `canfar.net/flavor` | `fixed` \| `flexible` | Always | `fixed` when memory request equals memory limit; otherwise `flexible` |
 | `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` (also defaulted if somehow omitted) |
-| `canfar.net/community` | scope string | Always | Defaults to `default` when blank/omitted; a static Skaha queue configuration does not make this the authoritative ClusterQueue Community |
+| `canfar.net/community` | scope string | Always | The launch assignment's Community; currently always `default` |
 | `canfar.net/project` | scope string | Always | Defaults to `default` when blank/omitted |
 | `canfar.net/app-id` | desktop app id | Only when non-blank (desktop-app launches) | Omitted entirely when blank |
 | `app.kubernetes.io/managed-by` | `skaha` | Always | Constant |
 | `app.kubernetes.io/part-of` | `canfar` | Always | Constant |
 | `app.kubernetes.io/version` | Skaha version string | Only when `SKAHA_VERSION` is set | Validated as a Kubernetes label value |
-| `kueue.x-k8s.io/queue-name` | local queue name | Only when a queue is configured for the launch | Job only; not copied to Service/Ingress |
-| `kueue.x-k8s.io/priority-class` | priority class name | Only when a queue is configured for the launch | Job only; not copied to Service/Ingress |
+| `kueue.x-k8s.io/queue-name` | the owner's LocalQueue name | Always | Job only; not copied to Service/Ingress |
+| `kueue.x-k8s.io/priority-class` | WorkloadPriorityClass name | When `SKAHA_QUEUE_<TYPE>_PRIORITY_CLASS` or `SKAHA_QUEUE_DEFAULT_PRIORITY_CLASS` is set | Job only; not copied to Service/Ingress |
 
 ## Applied to
 
 | Object | Labels |
 |--------|--------|
-| Job metadata | All session labels above that are present for the launch, plus Kueue labels when queued |
-| Job pod template | Same session labels as Job metadata (not Kueue-specific beyond what was merged onto the Job) |
+| Job metadata | All session labels above that are present for the launch, plus Kueue labels; the Job is created suspended |
+| Job pod template | Same session labels as Job metadata, without Kueue labels |
 | Service metadata | Present `canfar.net/*` and `app.kubernetes.io/*` session keys from the plan (not Kueue) |
 | Service selector | Only `canfar.net/id` and `canfar.net/kind` |
 | Ingress metadata | Same as Service metadata |
 
-## Typical full set (common session, no desktop app, version set, no queue)
+## Typical full set (common session, no desktop app, version set)
 
 ```text
 canfar.net/community=default
@@ -49,6 +49,7 @@ canfar.net/accelerator=none|gpu
 app.kubernetes.io/managed-by=skaha
 app.kubernetes.io/part-of=canfar
 app.kubernetes.io/version=<SKAHA_VERSION>
+kueue.x-k8s.io/queue-name=<user>-default-lq   # Job only
 ```
 
 ## Edge cases
@@ -58,13 +59,12 @@ app.kubernetes.io/version=<SKAHA_VERSION>
 | Desktop app with `SOFTWARE_APPID` | Adds `canfar.net/app-id` |
 | Desktop app / launch without app id | No `canfar.net/app-id` key |
 | `SKAHA_VERSION` unset or blank | No `app.kubernetes.io/version` key |
-| Queue enabled | Adds both Kueue labels on the Job only |
-| Queue disabled | No Kueue labels; the Job uses the base Kubernetes scheduler |
+| No priority class configured | No `kueue.x-k8s.io/priority-class` key |
 | GPU count = 0 | `canfar.net/accelerator=none` |
 | GPU count > 0 | `canfar.net/accelerator=gpu` |
 | Memory request == limit | `canfar.net/flavor=fixed` |
 | Memory request ≠ limit (or unpaired) | `canfar.net/flavor=flexible` |
-| Static queue configuration | Selects only a configured queue name and priority class for the session type; it does not route a user to a per-user LocalQueue or establish Metrics Community authority |
+| User or Community not a DNS-1123 label, or `<user>-<community>-lq` over 63 characters | LocalQueue named `skaha-<digest>-lq` |
 | Project omitted | `canfar.net/project=default` |
 
 ## Metrics integration boundary
@@ -76,18 +76,29 @@ labels are:
 |--------|-------------------|--------------------------------|
 | ClusterQueue | `canfar.net/community` only | None |
 | LocalQueue | `canfar.net/username`, `canfar.net/community` | None |
-| Submitting Job/workload metadata | `kueue.x-k8s.io/queue-name` when queued | `canfar.net/username`, `canfar.net/community` |
+| Submitting Job/workload metadata | `kueue.x-k8s.io/queue-name` | `canfar.net/username`, `canfar.net/community` |
 | Job Pod template and resulting Pod | None | `canfar.net/username`, `canfar.net/community` |
 
 The Job/workload and Pod attribution labels are required only when the fixed
 PromQL provider is enabled. They are not required for a core Kueue-only report;
 the queue-name label selects the User-specific LocalQueue and does not establish
-Community authority. Static session-type queue configuration cannot provide
-that per-user routing contract. A separate trusted provisioning or admission
-component must choose the Community, create the user-specific LocalQueue, hand
-its exact name to the submitter, validate the LocalQueue-to-ClusterQueue
-relationship, and stamp protected labels. Neither the Skaha chart nor the Metrics
-chart deploys that component.
+Community authority.
+
+Skaha owns the LocalQueue. Before creating a session Job it reads the Community's
+ClusterQueue (from `deployment.skaha.sessions.communities.default.clusterQueue`),
+which must carry `canfar.net/community=default`, then creates or reuses the
+owner's LocalQueue with these labels:
+
+| Label | Value |
+|-------|-------|
+| `canfar.net/username` | session owner |
+| `canfar.net/community` | `default` |
+| `app.kubernetes.io/managed-by` | `skaha` (set on create only) |
+
+An existing LocalQueue is reused when both identity labels match and it targets
+the same ClusterQueue. Skaha adds a missing identity label only to its own
+LocalQueue (`managed-by=skaha`) whose name proves the identity, and otherwise
+refuses the launch with 503. It never retargets, deletes, or adopts a LocalQueue.
 
 ## Legacy keys (historical)
 
