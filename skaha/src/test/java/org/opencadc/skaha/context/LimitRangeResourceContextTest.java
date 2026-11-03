@@ -1,8 +1,8 @@
 package org.opencadc.skaha.context;
 
 import ca.nrc.cadc.util.Log4jInit;
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import io.fabric8.kubernetes.api.model.LimitRangeItem;
+import io.fabric8.kubernetes.api.model.Quantity;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -27,7 +27,7 @@ public class LimitRangeResourceContextTest {
     @Test
     public void testJSONOutput() throws Exception {
         try (final OutputStream outputStream = new ByteArrayOutputStream()) {
-            final V1LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
+            final LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
 
             final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
 
@@ -53,7 +53,7 @@ public class LimitRangeResourceContextTest {
 
     @Test
     public void testCounts() {
-        final V1LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
+        final LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRange();
 
         final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
         Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 8), resourceContext.getTotalCoreCounts());
@@ -68,8 +68,7 @@ public class LimitRangeResourceContextTest {
 
     @Test
     public void testCountEnsureUnitless() {
-        final V1LimitRangeItem containerLimitRange =
-                LimitRangeResourceContextTest.getContainerLimitRangeDefaultMinimum();
+        final LimitRangeItem containerLimitRange = LimitRangeResourceContextTest.getContainerLimitRangeDefaultMinimum();
 
         final LimitRangeResourceContext resourceContext = new LimitRangeResourceContext(containerLimitRange);
         Assert.assertEquals("Wrong CPU count", new IntegerRange(1, 3), resourceContext.getTotalCoreCounts());
@@ -92,14 +91,14 @@ public class LimitRangeResourceContextTest {
         }
 
         try {
-            new LimitRangeResourceContext(new V1LimitRangeItem());
+            new LimitRangeResourceContext(new LimitRangeItem());
             Assert.fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException iae) {
             // no-op
         }
 
-        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
+        final LimitRangeItem containerLimitRange = new LimitRangeItem();
+        containerLimitRange.setMax(Map.of("cpu", Quantity.parse("8"), "memory", Quantity.parse("24Gi")));
         try {
             new LimitRangeResourceContext(containerLimitRange);
             Assert.fail("Expected IllegalArgumentException");
@@ -107,8 +106,7 @@ public class LimitRangeResourceContextTest {
             // no-op
         }
 
-        containerLimitRange.setDefaultRequest(
-                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
+        containerLimitRange.setDefaultRequest(Map.of("cpu", Quantity.parse("1"), "memory", Quantity.parse("2Gi")));
         try {
             new LimitRangeResourceContext(containerLimitRange);
             Assert.fail("Expected IllegalArgumentException");
@@ -116,26 +114,24 @@ public class LimitRangeResourceContextTest {
             // no-op
         }
 
-        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+        containerLimitRange.setDefault(Map.of("cpu", Quantity.parse("4"), "memory", Quantity.parse("16Gi")));
         new LimitRangeResourceContext(containerLimitRange);
     }
 
-    private static V1LimitRangeItem getContainerLimitRange() {
-        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("8"), "memory", Quantity.fromString("24Gi")));
-        containerLimitRange.setDefaultRequest(
-                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
-        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+    private static LimitRangeItem getContainerLimitRange() {
+        final LimitRangeItem containerLimitRange = new LimitRangeItem();
+        containerLimitRange.setMax(Map.of("cpu", Quantity.parse("8"), "memory", Quantity.parse("24Gi")));
+        containerLimitRange.setDefaultRequest(Map.of("cpu", Quantity.parse("1"), "memory", Quantity.parse("2Gi")));
+        containerLimitRange.setDefault(Map.of("cpu", Quantity.parse("4"), "memory", Quantity.parse("16Gi")));
 
         return containerLimitRange;
     }
 
-    private static V1LimitRangeItem getContainerLimitRangeDefaultMinimum() {
-        final V1LimitRangeItem containerLimitRange = new V1LimitRangeItem();
-        containerLimitRange.setMax(Map.of("cpu", Quantity.fromString("3"), "memory", Quantity.fromString("24Gi")));
-        containerLimitRange.setDefaultRequest(
-                Map.of("cpu", Quantity.fromString("1"), "memory", Quantity.fromString("2Gi")));
-        containerLimitRange.setDefault(Map.of("cpu", Quantity.fromString("4"), "memory", Quantity.fromString("16Gi")));
+    private static LimitRangeItem getContainerLimitRangeDefaultMinimum() {
+        final LimitRangeItem containerLimitRange = new LimitRangeItem();
+        containerLimitRange.setMax(Map.of("cpu", Quantity.parse("3"), "memory", Quantity.parse("24Gi")));
+        containerLimitRange.setDefaultRequest(Map.of("cpu", Quantity.parse("1"), "memory", Quantity.parse("2Gi")));
+        containerLimitRange.setDefault(Map.of("cpu", Quantity.parse("4"), "memory", Quantity.parse("16Gi")));
 
         return containerLimitRange;
     }

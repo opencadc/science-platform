@@ -38,8 +38,9 @@ tasks.withType(Copy).configureEach {
 dependencies {
     providedCompile 'javax.servlet:javax.servlet-api:[3.1.0,)'
 
-    // Used to assemble URIs programmatically
-    implementation 'org.apache.httpcomponents.client5:httpclient5:[5.4.1,5.5)'
+    // Session URLs (URIBuilder) and desktop home preparation (tar).
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'org.apache.commons:commons-compress:1.28.0'
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.21.2'
     implementation 'com.google.code.gson:gson:2.8.9'
@@ -49,7 +50,11 @@ dependencies {
     // Used to merge YAML sections to fully configure Job files.
     // Ensure the Snake YAML version is 2.5 to prevent unnecessary logging of WARNING messages.
     implementation 'org.yaml:snakeyaml:2.5'
-    implementation "io.kubernetes:client-java:${kubernetesClientJavaVersion}"
+    implementation("io.fabric8:kubernetes-client:${fabric8KubernetesClientVersion}") {
+        // OkHttp transport: keeps Vert.x and Netty out of Tomcat. Fabric8 pools connections in it.
+        exclude group: 'io.fabric8', module: 'kubernetes-httpclient-vertx'
+    }
+    implementation "io.fabric8:kubernetes-httpclient-okhttp:${fabric8KubernetesClientVersion}"
     // Used to read configuration from the environment and property files.
     implementation 'org.apache.commons:commons-configuration2:[2.11.0,3.0.0)'
     implementation 'org.opencadc:cadc-access-control:[1.1.31,1.2.0)'
@@ -72,6 +77,7 @@ dependencies {
     testImplementation 'junit:junit:[4.13,)'
     testImplementation 'org.json:json:20251224'
     testImplementation 'org.mockito:mockito-core:5.21.0'
+    testImplementation "io.fabric8:kubernetes-server-mock:${fabric8KubernetesClientVersion}"
 }
 
 spotless {

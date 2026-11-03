@@ -1,7 +1,7 @@
 package org.opencadc.skaha.context;
 
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import io.fabric8.kubernetes.api.model.LimitRangeItem;
+import io.fabric8.kubernetes.api.model.Quantity;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -45,11 +45,11 @@ public class LimitRangeResourceContext {
     }
 
     /**
-     * Constructor to accept a V1LimitRangeItem. Mainly for testing.
+     * Constructor to accept a LimitRangeItem. Mainly for testing.
      *
      * @param containerLimitRange A configured LimitRangeItem from Kubernetes.
      */
-    public LimitRangeResourceContext(@NotNull final V1LimitRangeItem containerLimitRange) {
+    public LimitRangeResourceContext(@NotNull final LimitRangeItem containerLimitRange) {
         LOGGER.debug("Initializing LimitRangeResourceContext with " + containerLimitRange);
         final Map<String, Quantity> configuredMax =
                 Objects.requireNonNullElse(containerLimitRange.getMax(), new HashMap<>());
@@ -196,7 +196,7 @@ public class LimitRangeResourceContext {
 
     private static int quantityAsInt(final Map<String, Quantity> map, final String limitRangeKey) {
         if (map.containsKey(limitRangeKey)) {
-            final BigDecimal limitRangeValue = map.get(limitRangeKey).getNumber();
+            final BigDecimal limitRangeValue = map.get(limitRangeKey).getNumericalAmount();
             if (limitRangeKey.equals(LimitRangeResourceContext.LIMIT_RANGE_MEMORY_KEY)) {
                 return (int) MemoryUnitConverter.format(limitRangeValue.longValue(), MemoryUnitConverter.MemoryUnit.Gi);
             } else {

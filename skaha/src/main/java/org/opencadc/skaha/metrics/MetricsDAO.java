@@ -1,6 +1,6 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.openapi.models.V1Job;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.util.List;
 import org.apache.log4j.Logger;
 
@@ -84,7 +84,7 @@ public class MetricsDAO {
      * @param userJobs listed session Jobs; required for the Metrics backend pod-usage source
      */
     public PodResourceUsage getPodResourceUsage(
-            final String userID, final boolean omitHeadless, final List<V1Job> userJobs) {
+            final String userID, final boolean omitHeadless, final List<Job> userJobs) {
         try {
             return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless, userJobs));
         } catch (Exception e) {

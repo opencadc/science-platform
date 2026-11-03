@@ -1,9 +1,9 @@
 package org.opencadc.skaha.metrics;
 
-import io.kubernetes.client.custom.ContainerMetrics;
-import io.kubernetes.client.custom.PodMetricsList;
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.fabric8.kubernetes.api.model.ObjectMetaBuilder;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.ContainerMetrics;
+import io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetricsList;
 import java.util.List;
 import java.util.Map;
 import org.junit.Assert;
@@ -13,8 +13,10 @@ public class PodMetricsTest {
 
     @Test
     public void fromKubernetesMapsPodUsageToRawQuantities() {
-        final io.kubernetes.client.custom.PodMetrics k8sPod = new io.kubernetes.client.custom.PodMetrics();
-        k8sPod.setMetadata(new V1ObjectMeta().name("skaha-notebook-alice-abc"));
+        final io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetrics k8sPod =
+                new io.fabric8.kubernetes.api.model.metrics.v1beta1.PodMetrics();
+        k8sPod.setMetadata(
+                new ObjectMetaBuilder().withName("skaha-notebook-alice-abc").build());
         final ContainerMetrics container = new ContainerMetrics();
         container.setUsage(Map.of(
                 "cpu", new Quantity("1367m"),

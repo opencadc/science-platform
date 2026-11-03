@@ -34,14 +34,15 @@ jobs:
         run: rm -rf ~/.gradle/caches
       - name: Show JAVA_HOME
         run: echo "${JAVA_HOME}"
-      - name: Run Tests
-        run: |
-            cd skaha
-            ./gradlew clean check --no-daemon
+      # The session tests render the session templates from the chart.
       - name: Setup Helm
         uses: azure/setup-helm@v5
         with:
           version: v3.21.0
+      - name: Run Tests
+        run: |
+            cd skaha
+            ./gradlew clean check --no-daemon
       - name: Run Helm Render Tests
         run: helm/tests/test-skaha-otel-render.sh
       - name: Upload coverage artifacts

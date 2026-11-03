@@ -2,18 +2,27 @@ package org.opencadc.skaha.utils;
 
 import ca.nrc.cadc.auth.PosixPrincipal;
 import ca.nrc.cadc.io.ResourceIterator;
+import ca.nrc.cadc.net.TransientException;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.opencadc.auth.PosixGroup;
 import org.opencadc.auth.PosixMapperClient;
 import org.opencadc.skaha.K8SUtil;
+import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
+import redis.clients.jedis.exceptions.JedisException;
 
 /**
  * A simple Redis Cache for POSIX information. This will update the underlying Redis Set in a transaction to ensure
@@ -41,6 +50,16 @@ public class PosixCache {
     private static final String UID_MAP_KEY = "users:posix";
     private static final String GID_MAP_FIELD = "groups:posix";
 
+    // One connection pool per Redis URL for the life of the application.
+    private static final Map<String, JedisPooled> POOLS = new ConcurrentHashMap<>();
+
+    private static final ExecutorService REFRESH = Executors.newSingleThreadExecutor(runnable -> {
+        final Thread thread = new Thread(runnable, "posix-cache-refresh");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final AtomicBoolean REFRESHING = new AtomicBoolean();
+
     private final JedisPooled jedisPool;
     private final String rootHomeFolder;
     private final PosixMapperClient posixMapperClient;
@@ -54,7 +73,22 @@ public class PosixCache {
      * @param posixMapperClient The Client to the POSIX Mapper API.
      */
     public PosixCache(final String cacheURL, final String rootHomeFolder, final PosixMapperClient posixMapperClient) {
-        this.jedisPool = new JedisPooled(cacheURL);
+        this(
+                POOLS.computeIfAbsent(cacheURL, url -> new JedisPooled(poolConfig(), url)),
+                rootHomeFolder,
+                posixMapperClient);
+    }
+
+    /** Larger than Jedis's default of 8; a launch waits at most 2 seconds for a connection instead of forever. */
+    private static ConnectionPoolConfig poolConfig() {
+        final ConnectionPoolConfig poolConfig = new ConnectionPoolConfig();
+        poolConfig.setMaxTotal(32);
+        poolConfig.setMaxWait(Duration.ofSeconds(2));
+        return poolConfig;
+    }
+
+    PosixCache(final JedisPooled jedisPool, final String rootHomeFolder, final PosixMapperClient posixMapperClient) {
+        this.jedisPool = jedisPool;
         this.rootHomeFolder = rootHomeFolder;
         this.posixMapperClient = posixMapperClient;
     }
@@ -81,121 +115,98 @@ public class PosixCache {
     }
 
     /**
-     * Write out the POSIX entries to the cache. This will use two threads to write user and group entries concurrently.
-     * This method does not use the try-with-resources construct for the ExecutorService to allow a better timeout.
+     * Write the POSIX entries a new session needs. The requesting user's own passwd and group entries are written and
+     * are required. The full user and group maps are refreshed from the POSIX Mapper in the background if they have
+     * expired; the request does not wait for that refresh.
+     *
+     * @param user The requesting user.
+     * @param userGroups The requesting user's groups.
+     * @throws TransientException If the requesting user's entries cannot be written.
      */
-    public void writePOSIXEntries() {
-        /*
-        The try-with-resources construct will still call the close() method in the end, but it's used as a variable
-        here to allow better control of the timeout, and catch a (unlikely) InterruptedException.
-         */
-        final ExecutorService executor = Executors.newFixedThreadPool(2);
-        try (executor) {
-            executor.submit(() -> {
-                try {
-                    writeUserEntries();
-                } catch (Exception e) {
-                    LOGGER.error("Error writing user entries to POSIX cache", e);
-                    throw new RuntimeException(e.getMessage(), e);
-                }
-            });
-
-            executor.submit(() -> {
-                try {
-                    writeGroupEntries();
-                } catch (Exception e) {
-                    LOGGER.error("Error writing group entries to POSIX cache", e);
-                    throw new RuntimeException(e.getMessage(), e);
-                }
-            });
-
-            executor.shutdown();
-
-            if (!executor.awaitTermination(1, java.util.concurrent.TimeUnit.MINUTES)) {
-                LOGGER.warn("POSIX Mapper Cache update did not complete under a minute");
-                executor.shutdownNow();
-            } else {
-                LOGGER.debug("POSIX Mapper Cache update completed");
+    public void writePOSIXEntries(final PosixPrincipal user, final Collection<PosixGroup> userGroups)
+            throws TransientException {
+        try {
+            this.jedisPool.sadd(
+                    PosixCache.UID_MAP_KEY,
+                    PosixCache.uidMapping(new PosixPrincipalEntry(
+                            user, Path.of(this.rootHomeFolder, user.username).toString())));
+            if (!userGroups.isEmpty()) {
+                this.jedisPool.sadd(
+                        PosixCache.GID_MAP_FIELD,
+                        userGroups.stream().map(PosixCache::gidMapping).toArray(String[]::new));
             }
-        } catch (InterruptedException interruptedException) {
-            LOGGER.error("POSIX Mapper Cache update interrupted", interruptedException);
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
+        } catch (JedisException jedisException) {
+            LOGGER.error("Unable to write POSIX entries for " + user.username, jedisException);
+            throw new TransientException("Unable to prepare POSIX entries for the session.  Please try again.");
         }
+        refreshInBackground();
     }
 
-    private void writeUserEntries() throws Exception {
-        LOGGER.debug("writeUserEntries()");
-        final long currentTTLSeconds;
-        try (final Pipeline pipeline = this.jedisPool.pipelined()) {
-            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.UID_MAP_CACHE_KEY);
-            pipeline.sync();
-            currentTTLSeconds = existingTTLSeconds.get();
+    /**
+     * Refresh the full user and group maps if they have expired, on this replica's single refresh thread. A launch that
+     * arrives while a refresh runs does not start another, so a burst of launches downloads the maps once and holds one
+     * Redis connection. Failures are logged: the requesting user's entries are already written.
+     *
+     * @return The refresh, or null when one is already running.
+     */
+    Future<?> refreshInBackground() {
+        if (!REFRESHING.compareAndSet(false, true)) {
+            return null;
         }
-
-        // Redis will return -1 if the key exists but has no associated expire, and -2 if the key does not exist.
-        // Either way, refresh the cache with an expiry.
-        if (currentTTLSeconds < 0) {
-            final long currTimeMillis = System.currentTimeMillis();
-            final long expirationSeconds = K8SUtil.getPosixMapperCacheTTLSeconds();
-            try (final Pipeline pipeline = this.jedisPool.pipelined();
-                    final ResourceIterator<PosixPrincipal> posixPrincipalIterator =
-                            this.posixMapperClient.getUserMap()) {
-                final Set<Response<Long>> responses = new HashSet<>();
-                while (posixPrincipalIterator.hasNext()) {
-                    final PosixPrincipal posixPrincipal = posixPrincipalIterator.next();
-                    responses.add(pipeline.sadd(
-                            PosixCache.UID_MAP_KEY,
-                            PosixCache.uidMapping(new PosixPrincipalEntry(
-                                    posixPrincipal,
-                                    Path.of(this.rootHomeFolder, posixPrincipal.username)
-                                            .toString()))));
-                }
-
-                pipeline.set(PosixCache.UID_MAP_CACHE_KEY, "UID_CACHE_EXPIRATION");
-                pipeline.expire(PosixCache.UID_MAP_CACHE_KEY, expirationSeconds);
-                pipeline.sync();
-                LOGGER.debug("writeUserEntries(): OK " + responses.size() + " user entries (TTL = "
-                        + expirationSeconds + "s) in "
-                        + (System.currentTimeMillis() - currTimeMillis) + " ms");
+        return REFRESH.submit(() -> {
+            try {
+                refresh(
+                        UID_MAP_CACHE_KEY,
+                        UID_MAP_KEY,
+                        this.posixMapperClient::getUserMap,
+                        user -> uidMapping(new PosixPrincipalEntry(
+                                user,
+                                Path.of(this.rootHomeFolder, user.username).toString())));
+                refresh(GID_MAP_CACHE_KEY, GID_MAP_FIELD, this.posixMapperClient::getGroupMap, PosixCache::gidMapping);
+            } catch (Exception exception) {
+                LOGGER.error("POSIX Mapper Cache refresh failed", exception);
+            } finally {
+                REFRESHING.set(false);
             }
-        } else {
-            LOGGER.debug("writeUserEntries(): OK using existing user entries (TTL=" + currentTTLSeconds + "s)");
-        }
+        });
     }
 
-    private void writeGroupEntries() throws Exception {
-        LOGGER.debug("writeGroupEntries()");
-        final long currentTTLSeconds;
+    /**
+     * Refresh one map from the POSIX Mapper when its expiry key has no TTL: Redis answers -1 when the key has no expiry
+     * and -2 when it does not exist.
+     */
+    private <T> void refresh(
+            final String expiryKey,
+            final String setKey,
+            final Callable<ResourceIterator<T>> source,
+            final Function<T, String> entry)
+            throws Exception {
+        final long ttlSeconds;
         try (final Pipeline pipeline = this.jedisPool.pipelined()) {
-            final Response<Long> existingTTLSeconds = pipeline.ttl(PosixCache.GID_MAP_CACHE_KEY);
+            final Response<Long> ttl = pipeline.ttl(expiryKey);
             pipeline.sync();
-            currentTTLSeconds = existingTTLSeconds.get();
+            ttlSeconds = ttl.get();
+        }
+        if (ttlSeconds >= 0) {
+            LOGGER.debug("Using existing " + setKey + " (TTL=" + ttlSeconds + "s)");
+            return;
         }
 
-        // Redis will return -1 if the key exists but has no associated expire, and -2 if the key does not exist.
-        // Either way, refresh the cache with an expiry.
-        if (currentTTLSeconds < 0) {
-            final long currTimeMillis = System.currentTimeMillis();
-            final long expirationSeconds = K8SUtil.getPosixMapperCacheTTLSeconds();
-            try (final Pipeline pipeline = this.jedisPool.pipelined();
-                    final ResourceIterator<PosixGroup> posixGroupIterator = this.posixMapperClient.getGroupMap()) {
-                final Set<Response<Long>> responses = new HashSet<>();
-                while (posixGroupIterator.hasNext()) {
-                    final PosixGroup posixGroup = posixGroupIterator.next();
-                    responses.add(pipeline.sadd(PosixCache.GID_MAP_FIELD, PosixCache.gidMapping(posixGroup)));
-                }
-
-                pipeline.set(PosixCache.GID_MAP_CACHE_KEY, "GID_CACHE_EXPIRATION");
-                pipeline.expire(PosixCache.GID_MAP_CACHE_KEY, expirationSeconds);
-                pipeline.sync();
-                LOGGER.debug("writeGroupEntries(): OK " + responses.size() + " group entries (TTL = "
-                        + expirationSeconds + "s) in "
-                        + (System.currentTimeMillis() - currTimeMillis) + " ms");
+        final long start = System.currentTimeMillis();
+        final long expirationSeconds = K8SUtil.getPosixMapperCacheTTLSeconds();
+        int count = 0;
+        try (final Pipeline pipeline = this.jedisPool.pipelined();
+                final ResourceIterator<T> entries = source.call()) {
+            while (entries.hasNext()) {
+                pipeline.sadd(setKey, entry.apply(entries.next()));
+                count++;
             }
-        } else {
-            LOGGER.debug("writeGroupEntries(): OK using existing group entries (TTL=" + currentTTLSeconds + "s)");
+            pipeline.set(expiryKey, "CACHE_EXPIRATION");
+            pipeline.expire(expiryKey, expirationSeconds);
+            pipeline.sync();
         }
+        LOGGER.debug("Refreshed " + count + " " + setKey + " entries (TTL=" + expirationSeconds + "s) in "
+                + (System.currentTimeMillis() - start) + " ms");
     }
 
     private record PosixPrincipalEntry(PosixPrincipal posixPrincipal, String homeFolder) {}

@@ -42,6 +42,11 @@ jobs:
         run: rm -rf ~/.gradle/caches
       - name: Show JAVA_HOME
         run: echo "${JAVA_HOME}"
+      # The Skaha Gradle Build hook renders the session templates from the chart.
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.21.0
       - name: Run Pre-Commit
         uses: pre-commit/action@v3.0.1
   spotless:

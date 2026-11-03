@@ -1,14 +1,15 @@
 package org.opencadc.skaha.session;
 
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.openapi.models.V1Container;
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1JobSpec;
-import io.kubernetes.client.openapi.models.V1JobStatus;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import io.kubernetes.client.openapi.models.V1PodSpec;
-import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
-import io.kubernetes.client.openapi.models.V1ResourceRequirements;
+import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.PodSpec;
+import io.fabric8.kubernetes.api.model.PodTemplateSpec;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.kubernetes.api.model.ResourceRequirements;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import io.fabric8.kubernetes.api.model.batch.v1.JobCondition;
+import io.fabric8.kubernetes.api.model.batch.v1.JobSpec;
+import io.fabric8.kubernetes.api.model.batch.v1.JobStatus;
 import java.util.List;
 import java.util.Map;
 import org.junit.After;
@@ -51,6 +52,59 @@ public class SessionBuilderTest {
         testStatus(testSubject, true, false, false, false, Session.STATUS_FAILED);
     }
 
+    @Test
+    public void testStatusFromJobConditions() {
+        final SessionBuilder testSubject = new SessionBuilder("sessionID", "userID", "notebook");
+
+        // Pods were never created (e.g. rejected at admission), then the deadline passed: no counters, Failed
+        // condition.
+        Assert.assertEquals(
+                Session.STATUS_FAILED,
+                testSubject
+                        .withStatus(statusWithCondition("Failed", "True", "DeadlineExceeded"), false)
+                        .build()
+                        .getStatus());
+
+        // Failure decided while a pod is still terminating.
+        final JobStatus failureTarget = statusWithCondition("FailureTarget", "True", "BackoffLimitExceeded");
+        failureTarget.setActive(1);
+        failureTarget.setReady(1);
+        Assert.assertEquals(
+                Session.STATUS_FAILED,
+                testSubject.withStatus(failureTarget, false).build().getStatus());
+
+        Assert.assertEquals(
+                Session.STATUS_COMPLETED,
+                testSubject
+                        .withStatus(statusWithCondition("Complete", "True", null), false)
+                        .build()
+                        .getStatus());
+
+        // A false condition and a Suspended condition do not decide the outcome.
+        Assert.assertEquals(
+                Session.STATUS_PENDING,
+                testSubject
+                        .withStatus(statusWithCondition("Failed", "False", null), false)
+                        .build()
+                        .getStatus());
+        Assert.assertEquals(
+                Session.STATUS_PENDING,
+                testSubject
+                        .withStatus(statusWithCondition("Suspended", "True", "JobSuspended"), true)
+                        .build()
+                        .getStatus());
+    }
+
+    private static JobStatus statusWithCondition(final String type, final String status, final String reason) {
+        final JobCondition condition = new JobCondition();
+        condition.setType(type);
+        condition.setStatus(status);
+        condition.setReason(reason);
+        final JobStatus jobStatus = new JobStatus();
+        jobStatus.setConditions(List.of(condition));
+        return jobStatus;
+    }
+
     private void testStatus(
             final SessionBuilder testSubject,
             final boolean failed,
@@ -58,7 +112,7 @@ public class SessionBuilderTest {
             final boolean ready,
             final boolean active,
             final String expectedStatus) {
-        final V1JobStatus status = new V1JobStatus();
+        final JobStatus status = new JobStatus();
         if (failed) {
             status.setFailed(1);
         }
@@ -78,7 +132,7 @@ public class SessionBuilderTest {
 
     @Test
     public void fromJobReadsCanonicalLabelsAndFlavor() {
-        final V1Job job = jobWithLabels(SessionLabels.canonical(Map.of(
+        final Job job = jobWithLabels(SessionLabels.canonical(Map.of(
                 SessionLabels.Key.COMMUNITY, "astronomy",
                 SessionLabels.Key.ID, "session-123",
                 SessionLabels.Key.USERNAME, "alice",
@@ -100,29 +154,29 @@ public class SessionBuilderTest {
         Assert.assertNotNull(session.getRequestedRAM());
     }
 
-    private static V1Job jobWithLabels(final Map<String, String> labels) {
-        final V1ObjectMeta metadata = new V1ObjectMeta();
+    private static Job jobWithLabels(final Map<String, String> labels) {
+        final ObjectMeta metadata = new ObjectMeta();
         metadata.setName("headless-alice-session-123");
         metadata.setLabels(labels);
 
-        final V1ResourceRequirements resources = new V1ResourceRequirements();
+        final ResourceRequirements resources = new ResourceRequirements();
         resources.setRequests(Map.of("memory", new Quantity("2Gi"), "cpu", new Quantity("2")));
         resources.setLimits(Map.of("memory", new Quantity("2Gi"), "cpu", new Quantity("2")));
 
-        final V1Container container = new V1Container();
+        final Container container = new Container();
         container.setImage("images.example.org/headless:latest");
         container.setResources(resources);
 
-        final V1PodSpec podSpec = new V1PodSpec();
+        final PodSpec podSpec = new PodSpec();
         podSpec.setContainers(List.of(container));
 
-        final V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
+        final PodTemplateSpec podTemplate = new PodTemplateSpec();
         podTemplate.setSpec(podSpec);
 
-        final V1JobSpec jobSpec = new V1JobSpec();
+        final JobSpec jobSpec = new JobSpec();
         jobSpec.setTemplate(podTemplate);
 
-        final V1Job job = new V1Job();
+        final Job job = new Job();
         job.setMetadata(metadata);
         job.setSpec(jobSpec);
         return job;

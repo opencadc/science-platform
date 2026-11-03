@@ -234,6 +234,16 @@ deployment:
           # -- Default CPU request (cores) for flex headless sessions.
           cpuCores: "1"
 
+      # Spread flexible sessions (label canfar.net/flavor=flexible, memory request below the limit) evenly across nodes
+      # with a Pod topology spread constraint, so they do not pile onto one node and compete for memory there.
+      flexibleSpread:
+        # -- Add a topology spread constraint to flexible session Pods. The scheduler prefers an even spread (`ScheduleAnyway`), so it never blocks a session.
+        enabled: true
+        # -- Largest allowed difference in flexible session Pods between any two topology domains.
+        maxSkew: 2
+        # -- Node label that defines a topology domain, e.g. `kubernetes.io/hostname` for nodes or `topology.kubernetes.io/zone` for zones.
+        topologyKey: kubernetes.io/hostname
+
       # Storage setings to be passed into the User Session Kubernetes Job spec.
       userStorage:
         # Required.  ABSOLUTE path mount point to where the top level directory is mounted in the User Sessions.  For most, this can be set to "/cavern", and

@@ -592,6 +592,8 @@ The init containers for the launch scripts.
           value: "{{ template "skaha.job.userStorage.homeBaseDirectory" . }}/${skaha.userid}"
         - name: REDIS_URL
           value: "redis://{{ .Release.Name }}-redis-master.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}:6379"
+        - name: SKAHA_USERNAME
+          value: "${skaha.userid}"
         volumeMounts:
         - mountPath: "/etc-passwd"
           name: etc-passwd
