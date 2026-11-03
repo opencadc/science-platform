@@ -9,31 +9,39 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Where one launch runs and under whose queue ledger. {@link LaunchRouter} produces it before any Job is built; the
- * builder and launcher read it, and nothing else chooses a queue.
+ * Where one launch runs, and which user and community own its queue.
  *
- * @param namespace The workload namespace for the Job and its LocalQueue.
- * @param user The exact, case-sensitive owner, a Kubernetes label value.
- * @param community The exact, case-sensitive Community, a Kubernetes label value.
- * @param clusterQueue The Community's operator-provisioned ClusterQueue.
- * @param workloadPriorityClass The Kueue WorkloadPriorityClass, or null for Kueue's default.
+ * <p>The LocalQueue name is derived from the user and community. It is not stored, so the name cannot drift from the
+ * pair.
+ *
+ * @param namespace workload namespace of the Job and its LocalQueue
+ * @param user exact case-sensitive owner, a Kubernetes label value
+ * @param community exact case-sensitive community, a Kubernetes label value
+ * @param clusterQueue operator ClusterQueue for that community
+ * @param workloadPriorityClass Kueue workload priority class, or null for Kueue's default
  */
 record LaunchAssignment(
         String namespace, String user, String community, String clusterQueue, String workloadPriorityClass) {
     private static final Pattern DNS_1123_LABEL = Pattern.compile("[a-z0-9]([-a-z0-9]*[a-z0-9])?");
+    private static final String PRIORITY_CLASS_LABEL = "kueue.x-k8s.io/priority-class";
+    /** Domain separator is the trailing 0x00, before the length-prefixed pair. */
     private static final byte[] DIGEST_DOMAIN = "skaha-localqueue-v1\0".getBytes(StandardCharsets.US_ASCII);
+
     private static final char[] BASE32 = "abcdefghijklmnopqrstuvwxyz234567".toCharArray();
 
     LaunchAssignment {
-        Objects.requireNonNull(namespace, "namespace cannot be null");
-        Objects.requireNonNull(clusterQueue, "clusterQueue cannot be null");
-        SessionLabels.labelValue(SessionLabels.Key.USERNAME, user);
-        SessionLabels.labelValue(SessionLabels.Key.COMMUNITY, community);
+        namespace = requireText(namespace, "namespace");
+        user = SessionLabels.labelValue(SessionLabels.Key.USERNAME, user);
+        community = SessionLabels.labelValue(SessionLabels.Key.COMMUNITY, community);
+        clusterQueue = requireText(clusterQueue, "clusterQueue");
+        if (workloadPriorityClass != null) {
+            workloadPriorityClass = SessionLabels.labelValue(PRIORITY_CLASS_LABEL, workloadPriorityClass);
+        }
     }
 
     /**
-     * The LocalQueue name for this User and Community: {@code <user>-<community>-lq} when that is a DNS label of at
-     * most 63 characters, otherwise {@code skaha-<base32(sha256)>-lq}. Frozen once queues exist.
+     * LocalQueue name for this user and community. Readable {@code user-community-lq} when that is a DNS-1123 label of
+     * at most 63 characters. Otherwise the 61-character digest name.
      */
     String localQueue() {
         final String readable = readableLocalQueue();
@@ -43,18 +51,22 @@ record LaunchAssignment(
         return "skaha-" + base32(sha256(digestInput())) + "-lq";
     }
 
-    /** True when {@link #localQueue()} is the readable form, whose hyphens can be split more than one way. */
-    boolean readableLocalQueueName() {
-        return readableLocalQueue().equals(localQueue());
-    }
-
     private String readableLocalQueue() {
         return this.user + "-" + this.community + "-lq";
+    }
+
+    private static String requireText(final String value, final String field) {
+        Objects.requireNonNull(value, field + " cannot be null");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
+        }
+        return value;
     }
 
     private byte[] digestInput() {
         final ByteArrayOutputStream input = new ByteArrayOutputStream();
         input.writeBytes(DIGEST_DOMAIN);
+        // Length prefixes stop "ab" + "c" and "a" + "bc" from sharing a digest.
         for (final String part : new String[] {this.user, this.community}) {
             final byte[] bytes = part.getBytes(StandardCharsets.UTF_8);
             input.writeBytes(

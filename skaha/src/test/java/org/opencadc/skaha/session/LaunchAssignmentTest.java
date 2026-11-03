@@ -31,17 +31,19 @@ public class LaunchAssignmentTest {
     @Test
     public void readableNameOnlyForLowercaseDnsLabelsWithinSixtyThreeCharacters() {
         Assert.assertEquals("bob-default-lq", assignment("bob", "default").localQueue());
-        Assert.assertTrue(assignment("bob", "default").readableLocalQueueName());
-        Assert.assertEquals(
-                63, assignment("u".repeat(52), "default").localQueue().length());
+        final String boundary = "u".repeat(52) + "-default-lq";
+        Assert.assertEquals(63, boundary.length());
+        Assert.assertEquals(boundary, assignment("u".repeat(52), "default").localQueue());
 
+        final String pastBoundary = "u".repeat(53) + "-default-lq";
+        Assert.assertEquals(64, pastBoundary.length());
         for (final LaunchAssignment digest : List.of(
                 assignment("Bob", "default"),
                 assignment("bob_smith", "default"),
                 assignment("bob.smith", "default"),
                 assignment("u".repeat(53), "default"))) {
-            Assert.assertFalse(digest.user(), digest.readableLocalQueueName());
-            Assert.assertTrue(digest.localQueue().matches("skaha-[a-z2-7]{52}-lq"));
+            Assert.assertNotEquals(digest.user() + "-" + digest.community() + "-lq", digest.localQueue());
+            Assert.assertTrue(digest.localQueue(), digest.localQueue().matches("skaha-[a-z2-7]{52}-lq"));
         }
         Assert.assertNotEquals(
                 assignment("Bob", "default").localQueue(),
@@ -60,6 +62,13 @@ public class LaunchAssignmentTest {
         Assert.assertThrows(IllegalArgumentException.class, () -> assignment(" bob", "default"));
         Assert.assertThrows(IllegalArgumentException.class, () -> assignment("bob", ""));
         Assert.assertThrows(IllegalArgumentException.class, () -> assignment("u".repeat(64), "default"));
+        Assert.assertThrows(
+                IllegalArgumentException.class, () -> new LaunchAssignment(" ", "bob", "default", "cq", null));
+        Assert.assertThrows(
+                IllegalArgumentException.class, () -> new LaunchAssignment("ns", "bob", "default", " ", null));
+        Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> new LaunchAssignment("ns", "bob", "default", "cq", "not/a-label"));
     }
 
     static LaunchAssignment assignment(final String user, final String community) {

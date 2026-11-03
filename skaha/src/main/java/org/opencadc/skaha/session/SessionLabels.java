@@ -109,8 +109,12 @@ public final class SessionLabels {
                 .get(KUEUE_QUEUE_NAME);
     }
 
+    static String labelValue(final String label, final String value) {
+        return validateLabelValue(label, value);
+    }
+
     static String labelValue(final Key key, final String value) {
-        return validateLabelValue(key.label, value);
+        return labelValue(key.label, value);
     }
 
     /** Selector for one user's session. */
