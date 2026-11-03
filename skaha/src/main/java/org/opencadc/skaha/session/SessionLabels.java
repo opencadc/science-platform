@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
  */
 public final class SessionLabels {
     private static final String DEFAULT_SCOPE = "default";
+    static final String MANAGED_BY_SKAHA = "skaha";
     private static final String ACCELERATOR_GPU = "gpu";
     private static final String ACCELERATOR_NONE = "none";
     static final String FLAVOR_FIXED = "fixed";
@@ -45,7 +46,7 @@ public final class SessionLabels {
         final Map<String, String> labels = new LinkedHashMap<>();
         labels.put(Key.COMMUNITY.label, defaultWhenBlank(Key.COMMUNITY.label, values.get(Key.COMMUNITY)));
         labels.put(Key.PROJECT.label, defaultWhenBlank(Key.PROJECT.label, values.get(Key.PROJECT)));
-        labels.put(Key.MANAGED_BY.label, "skaha");
+        labels.put(Key.MANAGED_BY.label, MANAGED_BY_SKAHA);
         labels.put(Key.PART_OF.label, "canfar");
 
         for (final Map.Entry<Key, String> entry : values.entrySet()) {
@@ -75,19 +76,41 @@ public final class SessionLabels {
         return Map.copyOf(labels);
     }
 
-    /**
-     * Build validated Kueue labels for a Job.
-     *
-     * @param queueName local queue name
-     * @param priorityClass priority class name
-     * @return immutable Kueue label map
-     */
     static Map<String, String> kueue(final String queueName, final String priorityClass) {
         return Map.of(
                 KUEUE_QUEUE_NAME,
                 validateLabelValue(KUEUE_QUEUE_NAME, queueName),
                 KUEUE_PRIORITY_CLASS,
                 validateLabelValue(KUEUE_PRIORITY_CLASS, priorityClass));
+    }
+
+    /** Kueue labels for a submitting Job; the priority class is omitted when the assignment has none. */
+    static Map<String, String> kueue(final LaunchAssignment assignment) {
+        final Map<String, String> labels = new LinkedHashMap<>();
+        labels.put(KUEUE_QUEUE_NAME, validateLabelValue(KUEUE_QUEUE_NAME, assignment.localQueue()));
+        if (assignment.workloadPriorityClass() != null) {
+            labels.put(
+                    KUEUE_PRIORITY_CLASS, validateLabelValue(KUEUE_PRIORITY_CLASS, assignment.workloadPriorityClass()));
+        }
+        return Map.copyOf(labels);
+    }
+
+    /** Identity labels for a LocalQueue that Skaha creates. */
+    static Map<String, String> localQueue(final LaunchAssignment assignment) {
+        return Map.of(
+                Key.USERNAME.label, assignment.user(),
+                Key.COMMUNITY.label, assignment.community(),
+                Key.MANAGED_BY.label, MANAGED_BY_SKAHA);
+    }
+
+    /** The LocalQueue a Job was submitted to, or null. */
+    static String queueName(final HasMetadata resource) {
+        return Objects.requireNonNullElse(resource.getMetadata().getLabels(), Map.<String, String>of())
+                .get(KUEUE_QUEUE_NAME);
+    }
+
+    static String labelValue(final Key key, final String value) {
+        return validateLabelValue(key.label, value);
     }
 
     /** Selector for one user's session. */
