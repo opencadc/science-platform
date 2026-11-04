@@ -42,7 +42,7 @@ dependencies {
     implementation 'org.apache.httpcomponents:httpclient:4.5.14'
     implementation 'org.apache.commons:commons-compress:1.28.0'
 
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.21.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
     implementation 'com.google.code.gson:gson:2.8.9'
 
     implementation 'commons-io:commons-io:[2.14.0,3.0.0)'
