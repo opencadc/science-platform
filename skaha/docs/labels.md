@@ -11,7 +11,7 @@ separately in the integration boundary below; it is conditional on PromQL.
 | `canfar.net/id` | session id | Always | Required |
 | `canfar.net/username` | user id | Always | Required |
 | `canfar.net/name` | session name | Always | Required; truncated to ≤63 chars if needed for Kubernetes label syntax |
-| `canfar.net/kind` | session type (`notebook`, `carta`, `desktop`, `headless`, `desktop-app`, `firefly`, …) | Always | Required |
+| `canfar.net/kind` | session type (`notebook`, `carta`, `desktop`, `headless`, `ssh`, `desktop-app`, `firefly`, …) | Always | Required |
 | `canfar.net/job` | Job name | Always | Required |
 | `canfar.net/flavor` | `fixed` \| `flexible` | Always | `fixed` when memory request equals memory limit; otherwise `flexible` |
 | `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` (also defaulted if somehow omitted) |

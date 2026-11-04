@@ -80,6 +80,8 @@ import org.opencadc.skaha.session.SessionType;
 
 public class K8SUtil {
     private static final String SKAHA_HEADLESS_PRIORITY_CLASS_NAME = "SKAHA_HEADLESS_PRIORITY_CLASS";
+    private static final String SKAHA_SSH_SESSION_IMAGE_ENV = "SKAHA_SSH_SESSION_IMAGE";
+    private static final String SKAHA_SSH_HOSTNAME_ENV = "SKAHA_SSH_HOSTNAME";
     private static final String SKAHA_VERSION_ENV = "SKAHA_VERSION";
 
     static final String SKAHA_WORKER_NODE_LABEL_SELECTOR_ENV = "SKAHA_WORKER_NODE_LABEL_SELECTOR";
@@ -107,6 +109,16 @@ public class K8SUtil {
 
     public static String getSkahaVersion() {
         return System.getenv(SKAHA_VERSION_ENV);
+    }
+
+    /** Curated sshd image for {@code type=ssh} sessions. */
+    public static String getSshSessionImage() {
+        return System.getenv(K8SUtil.SKAHA_SSH_SESSION_IMAGE_ENV);
+    }
+
+    /** Public SSH entry host (sshpiper), e.g. {@code ssh.example.com}. */
+    public static String getSshHostname() {
+        return System.getenv(K8SUtil.SKAHA_SSH_HOSTNAME_ENV);
     }
 
     public static String getWorkloadNamespace() {

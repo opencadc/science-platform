@@ -233,6 +233,17 @@ deployment:
           memoryInGB: "4"
           # -- Default CPU request (cores) for flex headless sessions.
           cpuCores: "1"
+        ssh:
+          memory: "2"
+          cpu: "1"
+
+      # Dedicated SSH sessions (sshpiper Lane A). Image must include OpenSSH server.
+      ssh:
+        # -- Curated sshd image for type=ssh (SKAHA_SSH_SESSION_IMAGE). Must provide OpenSSH server
+        # (/usr/sbin/sshd, Debian-style SFTP at /usr/lib/openssh/sftp-server per launch-ssh + ssh-sshd-configmap).
+        sessionImage: "images.canfar.net/skaha/ssh:1.0.0"
+        # -- Public SSH hostname for sshpiper (SKAHA_SSH_HOSTNAME), e.g. ssh.example.com.
+        hostname: ""
 
       # Spread flexible sessions (label canfar.net/flavor=flexible, memory request below the limit) evenly across nodes
       # with a Pod topology spread constraint, so they do not pile onto one node and compete for memory there.
@@ -824,3 +835,19 @@ redis:
       capabilities:
         # -- Linux capabilities dropped from the Redis master container.
         drop: ["ALL"]
+
+# sshpiper SSH gateway (Lane A). Skaha creates Pipe CRs in the workload namespace.
+sshpiper:
+  # -- Deploy sshpiper and the Pipe CRD. Requires deployment.skaha.sessions.ssh.hostname and hostKey when enabled.
+  enabled: false
+  image: farmer1992/sshpiperd:v1.3.6
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  # -- OpenSSH host private key (Ed25519 PEM) for sshpiper's listening socket.
+  hostKey: ""
+  service:
+    type: LoadBalancer
+    port: 22
+    annotations: {}
+  networkPolicy:
+    enabled: true

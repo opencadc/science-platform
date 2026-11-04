@@ -26,6 +26,14 @@ public class SessionTypeTest {
     }
 
     @Test
+    public void testSshTypeHasServiceNotIngress() {
+        final SessionType ssh = SessionType.fromApplicationStringType("ssh");
+        Assert.assertFalse(ssh.supportsIngress());
+        Assert.assertTrue(ssh.supportsService());
+        Assert.assertTrue(ssh.isExemptFromInteractiveSessionLimit());
+    }
+
+    @Test
     public void testNonCARTAType() {
         final String currentWorkingDirectory = System.getProperty("user.home");
         final SessionType testSubject = SessionType.fromApplicationStringType("notebook");

@@ -32,10 +32,15 @@ rules:
   resources: ["services"]
   verbs: ["create"]
 
-# Image pull Secrets (server-side apply) and the callback signing Secret (create if absent).
+# Image pull Secrets (server-side apply), callback signing Secret, and SSH pipe/session Secrets.
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create", "get", "patch"]
+  verbs: ["create", "get", "patch", "delete"]
+
+# sshpiper Pipes for SSH sessions (Skaha creates with ownerReference to the session Job).
+- apiGroups: ["sshpiper.com"]
+  resources: ["pipes"]
+  verbs: ["create", "get", "delete"]
 
 # Session ingress, created with its Job and deleted with it by owner reference.
 - apiGroups: ["traefik.io"]

@@ -62,6 +62,21 @@ public class KubernetesApi extends ExternalResource {
                                 .endResource()
                                 .build())
                 .always();
+        this.server
+                .expect()
+                .get()
+                .withPath("/apis/sshpiper.com/v1beta1")
+                .andReturn(
+                        200,
+                        new APIResourceListBuilder()
+                                .withGroupVersion("sshpiper.com/v1beta1")
+                                .addNewResource()
+                                .withKind("Pipe")
+                                .withName("pipes")
+                                .withNamespaced(true)
+                                .endResource()
+                                .build())
+                .always();
     }
 
     @Override

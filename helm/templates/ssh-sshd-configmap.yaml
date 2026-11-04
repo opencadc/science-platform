@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ssh-sshd-config
+  namespace: {{ include "skaha.workloadNamespace" . }}
+data:
+  sshd.conf: |
+    PasswordAuthentication no
+    PubkeyAuthentication yes
+    AuthorizedKeysFile /etc/ssh/skaha/authorized_keys
+    Subsystem sftp /usr/lib/openssh/sftp-server
+    AllowTcpForwarding yes
+    X11Forwarding no
+    PermitRootLogin no

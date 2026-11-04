@@ -69,6 +69,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.ac.Group;
 import ca.nrc.cadc.auth.AuthenticationUtil;
+import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
 import ca.nrc.cadc.uws.server.RandomStringGenerator;
@@ -139,6 +140,8 @@ public class PostAction extends SessionAction {
     public static final String SOFTWARE_LIMITS_RAM = "software.limits.ram";
     public static final String HEADLESS_PRIORITY = "headless.priority";
     public static final String HEADLESS_IMAGE_BUNDLE = "headless.image.bundle";
+    public static final String SKAHA_SSH_HOST_AUTH_SECRET = "skaha.ssh.hostauth.secret";
+    public static final String SSH_PUBLIC_KEY_PARAM = "sshPublicKey";
     public static final String SOFTWARE_THREAD_COUNT = "software.thread.count";
 
     // k8s rejects label size > 63. Since k8s appends a maximum of six characters
@@ -170,6 +173,12 @@ public class PostAction extends SessionAction {
         initRequest();
 
         String image = syncInput.getParameter("image");
+        if (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null) {
+            final String type = SessionAction.getRequestedSessionType(this.syncInput);
+            if (SessionType.fromApplicationStringType(type).isSsh()) {
+                image = K8SUtil.getSshSessionImage();
+            }
+        }
         if (image == null) {
             if (requestType.equals(REQUEST_TYPE_APP)
                     || (requestType.equals(REQUEST_TYPE_SESSION) && sessionID == null)) {
@@ -316,7 +325,7 @@ public class PostAction extends SessionAction {
         Objects.requireNonNull(type, "type must not be null");
         Objects.requireNonNull(sessions, "sessions must not be null");
 
-        if (!type.isHeadless()) {
+        if (!type.isExemptFromInteractiveSessionLimit()) {
             final long count = sessions.stream()
                     .filter(session -> !TYPE_DESKTOP_APP.equals(session.getType()))
                     .filter(session -> session.getStatus().equalsIgnoreCase(Session.STATUS_RUNNING)
@@ -329,6 +338,32 @@ public class PostAction extends SessionAction {
                         + maxUserSessions + " active sessions.");
             }
         }
+        if (type.isSsh()) {
+            assertNoActiveSshSession(this.posixPrincipal.username);
+        }
+    }
+
+    private void assertNoActiveSshSession(final String username) {
+        final boolean activeSsh = SessionDAO.liveJobs(username, null, false).stream()
+                .filter(job -> SessionType.SSH.applicationName.equals(SessionLabels.get(job, SessionLabels.Key.KIND)))
+                .anyMatch(PostAction::jobStillActive);
+        if (activeSsh) {
+            throw new IllegalArgumentException(
+                    "User " + username + " already has an active SSH session. Delete it before starting another.");
+        }
+    }
+
+    private static boolean jobStillActive(final Job job) {
+        if (job.getStatus() == null) {
+            return true;
+        }
+        if (job.getStatus().getSucceeded() != null && job.getStatus().getSucceeded() > 0) {
+            return false;
+        }
+        if (job.getStatus().getFailed() != null && job.getStatus().getFailed() > 0) {
+            return false;
+        }
+        return true;
     }
 
     public void createSession(
@@ -385,7 +420,16 @@ public class PostAction extends SessionAction {
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
                         StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
 
-        if (type.isHeadless()) {
+        SshSessionCredentials sshCredentials = null;
+        String sshPublicKey = null;
+        String hostAuthSecretName = null;
+        if (type.isSsh()) {
+            sshPublicKey = requireSshPublicKey();
+            sshCredentials = SshSessionCredentials.generate();
+            hostAuthSecretName = SshSessionSecrets.createHostAuthSecret(
+                    this.sessionID, owner, sshCredentials.publicKeyOpenSshLine());
+            sessionJobBuilder = sessionJobBuilder.withParameter(SKAHA_SSH_HOST_AUTH_SECRET, hostAuthSecretName);
+        } else if (type.isHeadless()) {
             sessionJobBuilder = sessionJobBuilder
                     .withHeadlessCommand(SessionJobBuilder.HeadlessCommand.fromRequest(cmd, args, envs))
                     .withPriorityClass(getHeadlessPriorityClass());
@@ -408,7 +452,15 @@ public class PostAction extends SessionAction {
                     RegistryPullSecret.apply(this.posixPrincipal.username, userRegistryAuth));
         }
 
-        final SessionJobBuilder.LaunchArtifacts launch = sessionJobBuilder.buildLaunch();
+        final SessionJobBuilder.LaunchArtifacts launch;
+        try {
+            launch = sessionJobBuilder.buildLaunch();
+        } catch (Exception buildFailed) {
+            if (type.isSsh()) {
+                SshSessionSecrets.deleteForSession(this.sessionID);
+            }
+            throw buildFailed;
+        }
 
         // insert the user's proxy cert in the home dir.  Do this first, so they're available to initContainer
         // configurations.
@@ -436,8 +488,42 @@ public class PostAction extends SessionAction {
             ownedResourceYamls.add(ingressString);
         }
 
-        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
-                .launch(launch.job(), launch.labels(), ownedResourceYamls));
+        final Job createdJob;
+        try {
+            createdJob = new SessionLauncher(SkahaKubernetesClient.get())
+                    .launch(launch.job(), launch.labels(), ownedResourceYamls);
+        } catch (RuntimeException launchFailed) {
+            if (type.isSsh()) {
+                SshSessionSecrets.deleteForSession(this.sessionID);
+            }
+            throw launchFailed;
+        }
+
+        if (type.isSsh()) {
+            final String upstreamSecretName = SshSessionSecrets.createUpstreamPrivateKeySecret(
+                    this.sessionID, owner, sshCredentials.privateKeyPem());
+            SshSessionSecrets.attachJobOwner(createdJob, hostAuthSecretName, upstreamSecretName);
+            try {
+                SshPipeManager.createForSession(createdJob, owner, this.sessionID, sshPublicKey, upstreamSecretName);
+            } catch (RuntimeException pipeFailed) {
+                log.error("SSH Pipe create failed for session " + this.sessionID, pipeFailed);
+                SshPipeManager.deleteForUser(owner);
+                SshSessionSecrets.deleteForSession(this.sessionID);
+                SessionDAO.deleteJob(this.sessionID, owner);
+                throw new TransientException("Unable to launch SSH session. Please try again.");
+            }
+        }
+
+        SessionDAO.created(createdJob);
+    }
+
+    private String requireSshPublicKey() {
+        final String key = syncInput.getParameter(SSH_PUBLIC_KEY_PARAM);
+        if (!StringUtil.hasText(key) || !key.trim().startsWith("ssh-")) {
+            throw new IllegalArgumentException("Missing or invalid parameter '" + SSH_PUBLIC_KEY_PARAM
+                    + "' (expected one OpenSSH public key line).");
+        }
+        return key.trim();
     }
 
     protected void injectPOSIXDetails() throws Exception {

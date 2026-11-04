@@ -179,6 +179,9 @@ public class SessionDAO {
                     SessionURLBuilder.contributedSession(sessionHostName, id).build();
         } else if (SessionType.FIREFLY == type) {
             connectURL = SessionURLBuilder.fireflySession(sessionHostName, id).build();
+        } else if (SessionType.SSH == type) {
+            final String sshHost = K8SUtil.getSshHostname();
+            connectURL = StringUtil.hasText(sshHost) ? "ssh://" + userid + "@" + sshHost : "";
         } else {
             connectURL = "";
         }

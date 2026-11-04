@@ -1,0 +1,110 @@
+{{- if .Values.sshpiper.enabled }}
+{{- $workloadNs := include "skaha.workloadNamespace" . }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $.Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $workloadNs }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+- apiGroups: ["sshpiper.com"]
+  resources: ["pipes"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $workloadNs }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-sshpiper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $.Release.Namespace }}
+  {{- with .Values.sshpiper.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sshpiper.service.type }}
+  selector:
+    app: {{ .Release.Name }}-sshpiper
+  ports:
+  - name: ssh
+    port: {{ .Values.sshpiper.service.port }}
+    targetPort: ssh
+    protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-sshpiper
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: {{ .Values.sshpiper.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sshpiper
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-sshpiper
+    spec:
+      serviceAccountName: {{ .Release.Name }}-sshpiper
+      containers:
+      - name: sshpiper
+        image: {{ .Values.sshpiper.image }}
+        imagePullPolicy: {{ .Values.sshpiper.imagePullPolicy }}
+        ports:
+        - name: ssh
+          containerPort: 2222
+        env:
+        - name: PLUGIN
+          value: kubernetes
+        - name: SSHPIPERD_KUBERNETES_ALL_NAMESPACES
+          value: "false"
+        - name: SSHPIPERD_KUBERNETES_NAMESPACE
+          value: {{ $workloadNs | quote }}
+        - name: SSHPIPERD_SERVER_KEY
+          value: /serverkey/ssh_host_ed25519_key
+        volumeMounts:
+        - name: server-key
+          mountPath: /serverkey
+          readOnly: true
+      volumes:
+      - name: server-key
+        secret:
+          secretName: {{ .Release.Name }}-sshpiper-host-keys
+          optional: true
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-sshpiper-host-keys
+  namespace: {{ $.Release.Namespace }}
+type: Opaque
+stringData:
+  ssh_host_ed25519_key: |
+    {{ required "sshpiper.hostKey must be set when sshpiper.enabled (OpenSSH host private key PEM)" .Values.sshpiper.hostKey | nindent 4 }}
+{{- end }}

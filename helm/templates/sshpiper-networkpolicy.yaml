@@ -1,0 +1,48 @@
+{{- if and .Values.sshpiper.enabled .Values.sshpiper.networkPolicy.enabled }}
+{{- $workloadNs := include "skaha.workloadNamespace" . }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-sshpiper-egress
+  namespace: {{ $.Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-sshpiper
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ $workloadNs }}
+    ports:
+    - protocol: TCP
+      port: 22
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ssh-sessions-ingress
+  namespace: {{ $workloadNs }}
+spec:
+  podSelector:
+    matchLabels:
+      canfar.net/kind: ssh
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ $.Release.Namespace }}
+    ports:
+    - protocol: TCP
+      port: 22
+{{- end }}

@@ -105,6 +105,7 @@ public abstract class SkahaAction extends RestAction {
     public static final String SESSION_TYPE_DESKTOP = "desktop";
     public static final String SESSION_TYPE_CONTRIB = "contributed";
     public static final String SESSION_TYPE_HEADLESS = "headless";
+    public static final String SESSION_TYPE_SSH = "ssh";
     public static final String SESSION_TYPE_FIREFLY = "firefly";
     public static final String TYPE_DESKTOP_APP = "desktop-app";
     public static final String X_AUTH_TOKEN_SKAHA = "x-auth-token-skaha";
@@ -116,6 +117,7 @@ public abstract class SkahaAction extends RestAction {
             SESSION_TYPE_DESKTOP,
             SESSION_TYPE_CONTRIB,
             SESSION_TYPE_HEADLESS,
+            SESSION_TYPE_SSH,
             SESSION_TYPE_FIREFLY,
             TYPE_DESKTOP_APP);
     protected final PosixMapperConfiguration posixMapperConfiguration;

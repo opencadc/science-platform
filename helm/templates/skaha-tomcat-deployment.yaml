@@ -76,6 +76,14 @@ spec:
       {{- end }}
         - name: SKAHA_SESSIONS_HOSTNAME
           value: "{{ .Values.deployment.skaha.sessions.hostname | default .Values.deployment.hostname }}"
+        {{- with .Values.deployment.skaha.sessions.ssh.sessionImage }}
+        - name: SKAHA_SSH_SESSION_IMAGE
+          value: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.deployment.skaha.sessions.ssh.hostname }}
+        - name: SKAHA_SSH_HOSTNAME
+          value: {{ . | quote }}
+        {{- end }}
         - name: SKAHA_HOSTNAME
           value: "{{ .Values.deployment.hostname }}"
         - name: SKAHA_VERSION

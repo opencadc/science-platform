@@ -9,6 +9,7 @@ public enum SessionType {
     DESKTOP(true, true, "desktop"),
     NOTEBOOK(true, true, "notebook"),
     HEADLESS(false, false, "headless"),
+    SSH(false, true, "ssh"),
     DESKTOP_APP(false, false, "desktop-app"),
     FIREFLY(true, true, "firefly");
 
@@ -66,6 +67,15 @@ public enum SessionType {
 
     public boolean isHeadless() {
         return this == HEADLESS;
+    }
+
+    public boolean isSsh() {
+        return this == SSH;
+    }
+
+    /** Session types that do not count toward {@code maxUserSessions}. */
+    public boolean isExemptFromInteractiveSessionLimit() {
+        return this == HEADLESS || this == SSH;
     }
 
     public boolean isDesktop() {

@@ -1,0 +1,23 @@
+# Service YAML for an SSH session. Loaded by Skaha and tied to the session Job via ownerReferences.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skaha-ssh-svc-${skaha.sessionid}
+  labels:
+    run: skaha-ssh-svc-${skaha.sessionid}
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: "${skaha.jobname}"
+    uid: "${skaha.jobuid}"
+spec:
+  ports:
+  - port: 22
+    protocol: TCP
+    name: ssh
+    targetPort: 22
+  selector:
+    canfar.net/id: "${skaha.sessionid}"
