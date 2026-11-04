@@ -751,6 +751,22 @@ def test_fixture_metadata_rejects_local_queue_community_mismatch(tmp_path: Path)
         fixtures.validate_fixture_metadata(topology_path, stack.WORKLOAD_FIXTURES)
 
 
+def test_fixture_metadata_rejects_duplicate_cluster_queue_community(tmp_path: Path) -> None:
+    topology = _load_documents(stack.FIXTURES)
+    fair = next(
+        document
+        for document in topology
+        if document.get("kind") == "ClusterQueue"
+        and document.get("metadata", {}).get("name") == "cq-fair"
+    )
+    fair["metadata"]["labels"]["canfar.net/community"] = "astronomy"
+    topology_path = tmp_path / "topology.yaml"
+    _write_documents(topology_path, topology)
+
+    with pytest.raises(stack.DevStackError, match="one ClusterQueue per community"):
+        fixtures.validate_fixture_metadata(topology_path, stack.WORKLOAD_FIXTURES)
+
+
 def test_fixture_metadata_rejects_pod_label_mismatch(tmp_path: Path) -> None:
     workloads = _load_documents(stack.WORKLOAD_FIXTURES)
     job = next(document for document in workloads if document.get("kind") == "Job")
