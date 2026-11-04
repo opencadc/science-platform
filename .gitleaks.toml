@@ -1,0 +1,10 @@
+title = "science-platform gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Runtime-generated SSH session key PEM wrapper (no embedded secret)"
+paths = [
+  '''skaha/src/main/java/org/opencadc/skaha/session/SshSessionCredentials\.java''',
+]
