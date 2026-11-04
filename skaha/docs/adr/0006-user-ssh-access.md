@@ -17,9 +17,9 @@ Shell **inside** a running Notebook/Desktop (any image) is out of scope for Skah
 - New session type **`ssh`**: `SessionType.SSH` — Service on port 22, no IngressRoute.
 - **At most one** active SSH session Job per user (live Job check).
 - SSH sessions **do not** count toward `maxUserSessions` (same quota class as headless).
-- Image from **`SKAHA_SSH_SESSION_IMAGE`** (chart-configured); POST **`sshPublicKey`** required (downstream auth to sshpiper).
+- Image from **`SKAHA_SSH_SESSION_IMAGE`** (chart-configured); POST **`sshPublicKey`** on launch merges into a per-user Secret (`authorized_keys`); additional Register SSH flows patch that Secret.
 - **`sshpiper.com/v1beta1` `Pipe`**, created and deleted by **Skaha** (Fabric8 generic client):
-  - `spec.from.username` = POSIX username (downstream match key).
+  - `spec.from.username` = POSIX username; `spec.from.authorized_keys_secret` references the user registered-keys Secret.
   - `spec.to.host` = session Service DNS name on port 22.
   - `metadata.ownerReferences` → SSH session Job (`controller: true`, `blockOwnerDeletion: true`).
   - Pipe and pipe Secrets live in the **workload namespace** (same namespace as the Job).

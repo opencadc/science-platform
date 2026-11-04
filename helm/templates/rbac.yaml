@@ -32,7 +32,7 @@ rules:
   resources: ["services"]
   verbs: ["create"]
 
-# Image pull Secrets (server-side apply), callback signing Secret, and SSH pipe/session Secrets.
+# Image pull Secrets (server-side apply), callback signing Secret, SSH user registered-keys Secrets, and SSH pipe/session Secrets.
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create", "get", "patch", "delete"]

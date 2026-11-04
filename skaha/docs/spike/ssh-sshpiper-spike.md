@@ -11,7 +11,7 @@ Manual validation checklist before/after MVP merge. Run on kind/minikube with ch
 ## Steps
 
 1. POST Skaha session `type=ssh` with `sshPublicKey` (OpenSSH one-line public key).
-2. Confirm Job, Service (port 22), Pipe (`metadata.ownerReferences` → Job), and Secrets exist in the workload namespace.
+2. Confirm Job, Service (port 22), Pipe (`metadata.ownerReferences` → Job), per-user registered-keys Secret (`skaha-ssh-user-keys-<user>`), and per-session upstream/host-auth Secrets exist in the workload namespace.
 3. `ssh -i <private> <username>@<ssh.host>` through sshpiper LoadBalancer/DNS.
 4. `sftp <username>@<ssh.host>` — SFTP subsystem must respond.
 5. `sshfs <username>@<ssh.host>:/cavern/home/<user> ~/mnt` — same path as session `HOME` parent layout (match [launch-ssh.yaml](../../../helm/skaha-config/launch-ssh.yaml) mounts).

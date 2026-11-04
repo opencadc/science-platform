@@ -500,11 +500,15 @@ public class PostAction extends SessionAction {
         }
 
         if (type.isSsh()) {
+            final SshSessionCredentials credentials = Objects.requireNonNull(sshCredentials);
+            final String publicKey = Objects.requireNonNull(sshPublicKey);
+            final String hostAuthSecret = Objects.requireNonNull(hostAuthSecretName);
             final String upstreamSecretName = SshSessionSecrets.createUpstreamPrivateKeySecret(
-                    this.sessionID, owner, sshCredentials.privateKeyPem());
-            SshSessionSecrets.attachJobOwner(createdJob, hostAuthSecretName, upstreamSecretName);
+                    this.sessionID, owner, credentials.privateKeyPem());
+            SshSessionSecrets.attachJobOwner(createdJob, hostAuthSecret, upstreamSecretName);
+            SshUserRegisteredKeys.registerPublicKey(owner, publicKey);
             try {
-                SshPipeManager.createForSession(createdJob, owner, this.sessionID, sshPublicKey, upstreamSecretName);
+                SshPipeManager.createForSession(createdJob, owner, this.sessionID, upstreamSecretName);
             } catch (RuntimeException pipeFailed) {
                 log.error("SSH Pipe create failed for session " + this.sessionID, pipeFailed);
                 SshPipeManager.deleteForUser(owner);

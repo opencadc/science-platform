@@ -31,12 +31,7 @@ public class SshPipeManagerTest {
                 .endMetadata()
                 .build();
 
-        SshPipeManager.createForSession(
-                job,
-                "alice",
-                "abc123",
-                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample user-key",
-                "skaha-ssh-pipe-upstream-abc123");
+        SshPipeManager.createForSession(job, "alice", "abc123", "skaha-ssh-pipe-upstream-abc123");
 
         final List<String> requests = this.api.requests();
         Assert.assertTrue(requests.stream().anyMatch(line -> line.startsWith("POST") && line.contains("/pipes")));
