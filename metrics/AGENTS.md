@@ -24,6 +24,10 @@ uv run ty check
 uv run pytest --cov=src --cov-report=term-missing -m "not integration"
 ```
 
+Before any git commit in this repository, from the science-platform root run
+`pre-commit run --all-files` and require exit 0 (Spotless via the Skaha Gradle
+hook, Metrics hooks, shared file checks). Do not use `--no-verify`.
+
 Cluster-backed checks use the pinned kind/Kueue environment and the supported
 local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
 

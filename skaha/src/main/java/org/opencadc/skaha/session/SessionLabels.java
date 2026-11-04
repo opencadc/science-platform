@@ -90,10 +90,14 @@ public final class SessionLabels {
     /** Identity labels for a LocalQueue that Skaha creates. */
     static Map<String, String> localQueue(final LaunchAssignment assignment) {
         return Map.of(
-                Key.USERNAME.label, assignment.user(),
-                Key.COMMUNITY.label, assignment.community(),
-                Key.MANAGED_BY.label, MANAGED_BY_SKAHA,
-                Key.PART_OF.label, PART_OF_CANFAR);
+                Key.USERNAME.label,
+                assignment.user(),
+                Key.COMMUNITY.label,
+                assignment.community(),
+                Key.MANAGED_BY.label,
+                MANAGED_BY_SKAHA,
+                Key.PART_OF.label,
+                PART_OF_CANFAR);
     }
 
     /** The LocalQueue a Job was submitted to, or null. */
