@@ -4,21 +4,21 @@
 
 A Community is one operator-owned ClusterQueue. Every session Job admits through
 that ClusterQueue. A LocalQueue is private to one user. It points at the
-Community's ClusterQueue. This change uses a single Community named `default`.
-More Communities later means more ClusterQueues. Community selection and GMS are
-out of scope here.
+Community's ClusterQueue. The Community name is the Helm map key of the one
+entry with `default: true`. On CANFAR that key is `cadc`. More Communities later
+means more ClusterQueues. Community selection and GMS are out of scope here.
 
 ## What this change does
 
 On first launch for a user, Skaha creates a LocalQueue named
-`<user>-default-lq` in the workload namespace when that name is a DNS-1123 label
+`<user>-<community>-lq` in the workload namespace when that name is a DNS-1123 label
 of at most 63 characters. If the name is longer or not a DNS-1123 label, Skaha
 rejects the launch. It does not hash the name.
 
-The LocalQueue carries `canfar.net/username`, `canfar.net/community=default`, and
-`app.kubernetes.io/managed-by=skaha`. Its `spec.clusterQueue` is the Helm value
-`deployment.skaha.sessions.communities.default.clusterQueue`. That ClusterQueue
-must already exist and must be labelled `canfar.net/community=default`.
+The LocalQueue carries `canfar.net/username`, `canfar.net/community` set to that
+map key, and `app.kubernetes.io/managed-by=skaha`. Its `spec.clusterQueue` is
+that entry's `clusterQueue`. That ClusterQueue must already exist and must be
+labelled `canfar.net/community` with the same map key.
 
 Skaha never deletes LocalQueues. Metrics treats a repeated community label on
 two configured ClusterQueues as an error.
@@ -27,7 +27,8 @@ two configured ClusterQueues as an error.
 
 ```yaml
 deployment.skaha.sessions.communities:
-  default:
+  cadc:
+    default: true
     clusterQueue: cadc
 deployment.skaha.sessions.kueue:
   default: {priorityClass: high}

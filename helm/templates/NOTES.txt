@@ -59,7 +59,7 @@ User Sessions Ingress Configurations:
 
 Kueue:
   - Kueue and its Job integration are required. Every session Job is submitted suspended.
-  - Community default routes to ClusterQueue {{ include "skaha.defaultClusterQueue" . }}, which must be labelled canfar.net/community=default.
+  - Community {{ include "skaha.defaultCommunity" . }} routes to ClusterQueue {{ include "skaha.defaultClusterQueue" . }}, which must be labelled canfar.net/community={{ include "skaha.defaultCommunity" . }}.
   - Skaha creates one LocalQueue per user in {{ include "skaha.workloadNamespace" . }} on first launch and never deletes it.
 
 Quick checks:

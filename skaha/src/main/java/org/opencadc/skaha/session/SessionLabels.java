@@ -79,10 +79,9 @@ public final class SessionLabels {
     /** Kueue labels for a submitting Job; the priority class is omitted when the assignment has none. */
     static Map<String, String> kueue(final LaunchAssignment assignment) {
         final Map<String, String> labels = new LinkedHashMap<>();
-        labels.put(KUEUE_QUEUE_NAME, validateLabelValue(KUEUE_QUEUE_NAME, assignment.localQueue()));
+        labels.put(KUEUE_QUEUE_NAME, assignment.localQueue());
         if (assignment.workloadPriorityClass() != null) {
-            labels.put(
-                    KUEUE_PRIORITY_CLASS, validateLabelValue(KUEUE_PRIORITY_CLASS, assignment.workloadPriorityClass()));
+            labels.put(KUEUE_PRIORITY_CLASS, assignment.workloadPriorityClass());
         }
         return Map.copyOf(labels);
     }

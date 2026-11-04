@@ -476,10 +476,11 @@ Structural validation only; Skaha rejects conflicting modes at runtime.
 {{- end }}
 
 {{/*
-The Default Community's ClusterQueue. Fails on any catalog shape this release cannot route, on the removed static
-queue settings, and when Metrics does not cover the routed ClusterQueue.
+Resolve the one Community Skaha routes to. The map key is canfar.net/community. The entry's clusterQueue is the
+ClusterQueue. Fails unless exactly one entry sets default: true, on unknown fields, on an empty clusterQueue, on the
+removed static queue settings, and when Metrics does not list that ClusterQueue.
 */}}
-{{- define "skaha.defaultClusterQueue" -}}
+{{- define "skaha.communityRoute" -}}
 {{- $sessions := .Values.deployment.skaha.sessions -}}
 {{- $kueue := $sessions.kueue | default dict -}}
 {{- if hasKey $kueue "rbac" -}}
@@ -487,31 +488,52 @@ queue settings, and when Metrics does not cover the routed ClusterQueue.
 {{- end -}}
 {{- range $type, $config := $kueue -}}
 {{- if and (ne $type "api") (kindIs "map" $config) (hasKey $config "queueName") -}}
-{{- fail (printf "deployment.skaha.sessions.kueue.%s.queueName was removed: Skaha routes every session to a per-user LocalQueue; set deployment.skaha.sessions.communities.default.clusterQueue instead" $type) -}}
+{{- fail (printf "deployment.skaha.sessions.kueue.%s.queueName was removed: Skaha routes every session to a per-user LocalQueue; set clusterQueue on the communities entry with default: true" $type) -}}
 {{- end -}}
 {{- end -}}
 {{- $communities := $sessions.communities | default dict -}}
-{{- if or (ne (len $communities) 1) (not (hasKey $communities "default")) -}}
-{{- fail "deployment.skaha.sessions.communities must contain exactly one Community, named default" -}}
+{{- $selected := list -}}
+{{- range $name, $entry := $communities -}}
+{{- if not (kindIs "map" $entry) -}}
+{{- fail (printf "deployment.skaha.sessions.communities.%s must set default and clusterQueue" $name) -}}
 {{- end -}}
-{{- $community := get $communities "default" | default dict -}}
-{{- range $field, $_ := $community -}}
+{{- range $field, $_ := $entry -}}
 {{- if not (has $field (list "default" "clusterQueue")) -}}
-{{- fail (printf "deployment.skaha.sessions.communities.default.%s is not supported" $field) -}}
+{{- fail (printf "deployment.skaha.sessions.communities.%s.%s is not supported" $name $field) -}}
 {{- end -}}
 {{- end -}}
-{{- if ne $community.default true -}}
-{{- fail "deployment.skaha.sessions.communities.default.default must be true" -}}
+{{- if eq (default false $entry.default) true -}}
+{{- $selected = append $selected $name -}}
 {{- end -}}
-{{- $clusterQueue := trim (default "" $community.clusterQueue | toString) -}}
+{{- end -}}
+{{- if ne (len $selected) 1 -}}
+{{- fail "deployment.skaha.sessions.communities requires exactly one entry with default: true" -}}
+{{- end -}}
+{{- $name := index $selected 0 -}}
+{{- $entry := get $communities $name -}}
+{{- $clusterQueue := trim (default "" $entry.clusterQueue | toString) -}}
 {{- if not $clusterQueue -}}
-{{- fail "deployment.skaha.sessions.communities.default.clusterQueue is required" -}}
+{{- fail (printf "deployment.skaha.sessions.communities.%s.clusterQueue is required" $name) -}}
 {{- end -}}
 {{- if not (has $clusterQueue (include "skaha.metrics.clusterQueues" . | fromJsonArray)) -}}
 {{- fail (printf "ClusterQueue %q routed by deployment.skaha.sessions.communities is missing from METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" $clusterQueue) -}}
 {{- end -}}
-{{- $clusterQueue -}}
-{{- end }}
+{{- dict "community" $name "clusterQueue" $clusterQueue | toJson -}}
+{{- end -}}
+
+{{/*
+Community name stamped as canfar.net/community. Map key of the one entry with default: true.
+*/}}
+{{- define "skaha.defaultCommunity" -}}
+{{- (include "skaha.communityRoute" . | fromJson).community -}}
+{{- end -}}
+
+{{/*
+ClusterQueue for skaha.defaultCommunity.
+*/}}
+{{- define "skaha.defaultClusterQueue" -}}
+{{- (include "skaha.communityRoute" . | fromJson).clusterQueue -}}
+{{- end -}}
 
 {{/*
 OpenTelemetry validation for the Skaha Java agent.

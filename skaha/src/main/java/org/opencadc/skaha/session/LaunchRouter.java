@@ -52,7 +52,8 @@ final class LaunchRouter {
                 .toList();
         if (!legacy.isEmpty()) {
             throw new IllegalStateException(legacy + " no longer supported: Skaha routes every session to a per-user "
-                    + "LocalQueue; set deployment.skaha.sessions.communities.default.clusterQueue instead.");
+                    + "LocalQueue; set deployment.skaha.sessions.communities.<name>.clusterQueue "
+                    + "on the entry with default: true.");
         }
         final String namespace = require(env, NAMESPACE_ENV);
         final String community = require(env, DEFAULT_COMMUNITY_ENV);

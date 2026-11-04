@@ -128,7 +128,7 @@ spec:
           value: "{{ . }}"
         {{- end }}
         - name: SKAHA_DEFAULT_COMMUNITY
-          value: "default"
+          value: {{ include "skaha.defaultCommunity" . | quote }}
         - name: SKAHA_DEFAULT_CLUSTER_QUEUE
           value: {{ include "skaha.defaultClusterQueue" . | quote }}
         {{- with .Values.deployment.skaha.sessions.kueue }}

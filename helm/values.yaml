@@ -328,19 +328,19 @@ deployment:
 
       # Every session Job is suspended onto a private LocalQueue for its owner. Skaha creates that LocalQueue on
       # first launch and never deletes it. Install Kueue and the Community ClusterQueue yourself; this chart does not.
-      # This release uses only Community `default`.
+      # The map key is the Community name stamped as canfar.net/community. Exactly one entry sets default: true.
       # @see https://kueue.sigs.k8s.io/docs/
       # Example:
       #   communities:
-      #     default:
+      #     cadc:
       #       default: true
       #       clusterQueue: cadc
-      # -- Session routing Communities, keyed by exact Community name.
+      # -- Communities keyed by Community name. Exactly one entry sets default true.
       communities:
-        default:
-          # -- Marks the Default Community. Must be true.
+        cadc:
+          # -- True on the Community Skaha routes to. Exactly one entry in the map must be true.
           default: true
-          # -- Required. Existing ClusterQueue labelled canfar.net/community=default. Must appear in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
+          # -- ClusterQueue for this Community. Its canfar.net/community label must equal the map key, and the name must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
           clusterQueue: ""
 
       # Kueue WorkloadPriorityClass per session type (e.g. notebook, desktop, headless, desktop-app), with default as

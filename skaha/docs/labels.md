@@ -15,7 +15,7 @@ contract is under [Metrics integration boundary](#metrics-integration-boundary).
 | `canfar.net/job` | Job name | Always | Required |
 | `canfar.net/flavor` | `fixed` \| `flexible` | Always | `fixed` when memory request equals memory limit; otherwise `flexible` |
 | `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` |
-| `canfar.net/community` | scope string | Always | The launch assignment's Community; currently always `default` |
+| `canfar.net/community` | Community name | Always | Helm communities map key of the entry with `default: true` |
 | `canfar.net/project` | scope string | Always | Defaults to `default` when blank/omitted |
 | `canfar.net/app-id` | desktop app id | Only when non-blank (desktop-app launches) | Omitted entirely when blank |
 | `app.kubernetes.io/managed-by` | `skaha` | Always | Constant |
@@ -37,7 +37,7 @@ contract is under [Metrics integration boundary](#metrics-integration-boundary).
 ## Typical full set (common session, no desktop app, version set)
 
 ```text
-canfar.net/community=default
+canfar.net/community=cadc
 canfar.net/project=default
 canfar.net/id=<session-id>
 canfar.net/username=<user>
@@ -49,7 +49,7 @@ canfar.net/accelerator=none|gpu
 app.kubernetes.io/managed-by=skaha
 app.kubernetes.io/part-of=canfar
 app.kubernetes.io/version=<SKAHA_VERSION>
-kueue.x-k8s.io/queue-name=<user>-default-lq   # Job only
+kueue.x-k8s.io/queue-name=<user>-cadc-lq   # Job only
 ```
 
 ## Edge cases
@@ -84,15 +84,15 @@ provider is enabled. Core Kueue reports do not need them. The Job's
 `kueue.x-k8s.io/queue-name` selects the user's LocalQueue. It does not decide
 Community membership. The ClusterQueue's `canfar.net/community` label does.
 
-Before Skaha creates a session Job, it reads the Community ClusterQueue named by
-`deployment.skaha.sessions.communities.default.clusterQueue`. That object must
-carry `canfar.net/community=default`. Skaha then creates or reuses the owner's
-LocalQueue with these labels:
+Before Skaha creates a session Job, it reads the ClusterQueue named by
+`clusterQueue` on the communities entry with `default: true`. That object must
+carry `canfar.net/community` equal to the entry's map key. Skaha then creates or
+reuses the owner's LocalQueue with these labels:
 
 | Label | Value |
 |-------|-------|
 | `canfar.net/username` | session owner |
-| `canfar.net/community` | `default` |
+| `canfar.net/community` | that map key |
 | `app.kubernetes.io/managed-by` | `skaha` (set on create only) |
 
 Skaha reuses an existing LocalQueue when both identity labels match and
