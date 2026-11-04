@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 public final class SessionLabels {
     private static final String DEFAULT_SCOPE = "default";
     static final String MANAGED_BY_SKAHA = "skaha";
+    static final String PART_OF_CANFAR = "canfar";
     private static final String ACCELERATOR_GPU = "gpu";
     private static final String ACCELERATOR_NONE = "none";
     static final String FLAVOR_FIXED = "fixed";
@@ -47,7 +48,7 @@ public final class SessionLabels {
         labels.put(Key.COMMUNITY.label, defaultWhenBlank(Key.COMMUNITY.label, values.get(Key.COMMUNITY)));
         labels.put(Key.PROJECT.label, defaultWhenBlank(Key.PROJECT.label, values.get(Key.PROJECT)));
         labels.put(Key.MANAGED_BY.label, MANAGED_BY_SKAHA);
-        labels.put(Key.PART_OF.label, "canfar");
+        labels.put(Key.PART_OF.label, PART_OF_CANFAR);
 
         for (final Map.Entry<Key, String> entry : values.entrySet()) {
             final Key key = Objects.requireNonNull(entry.getKey(), "label key cannot be null");
@@ -91,7 +92,8 @@ public final class SessionLabels {
         return Map.of(
                 Key.USERNAME.label, assignment.user(),
                 Key.COMMUNITY.label, assignment.community(),
-                Key.MANAGED_BY.label, MANAGED_BY_SKAHA);
+                Key.MANAGED_BY.label, MANAGED_BY_SKAHA,
+                Key.PART_OF.label, PART_OF_CANFAR);
     }
 
     /** The LocalQueue a Job was submitted to, or null. */

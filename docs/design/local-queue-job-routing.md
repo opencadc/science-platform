@@ -16,7 +16,8 @@ of at most 63 characters. If the name is longer or not a DNS-1123 label, Skaha
 rejects the launch. It does not hash the name.
 
 The LocalQueue carries `canfar.net/username`, `canfar.net/community` set to that
-map key, and `app.kubernetes.io/managed-by=skaha`. Its `spec.clusterQueue` is
+map key, `app.kubernetes.io/managed-by=skaha`, and `app.kubernetes.io/part-of=canfar`.
+Its `spec.clusterQueue` is
 that entry's `clusterQueue`. That ClusterQueue must already exist and must be
 labelled `canfar.net/community` with the same map key.
 

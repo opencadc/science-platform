@@ -75,7 +75,7 @@ labels are:
 | Object | Core Kueue labels | PromQL-only attribution labels |
 |--------|-------------------|--------------------------------|
 | ClusterQueue | `canfar.net/community` only | None |
-| LocalQueue | `canfar.net/username`, `canfar.net/community` | None |
+| LocalQueue | `canfar.net/username`, `canfar.net/community`; also `app.kubernetes.io/managed-by=skaha` and `app.kubernetes.io/part-of=canfar` on Skaha-created queues | None |
 | Submitting Job/workload metadata | `kueue.x-k8s.io/queue-name` | `canfar.net/username`, `canfar.net/community` |
 | Job Pod template and resulting Pod | None | `canfar.net/username`, `canfar.net/community` |
 
@@ -94,6 +94,7 @@ reuses the owner's LocalQueue with these labels:
 | `canfar.net/username` | session owner |
 | `canfar.net/community` | that map key |
 | `app.kubernetes.io/managed-by` | `skaha` (set on create only) |
+| `app.kubernetes.io/part-of` | `canfar` (set on create only) |
 
 Skaha reuses an existing LocalQueue when both identity labels match and
 `spec.clusterQueue` matches the assignment. It patches one missing identity

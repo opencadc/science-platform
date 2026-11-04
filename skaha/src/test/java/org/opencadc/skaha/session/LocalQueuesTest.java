@@ -28,6 +28,7 @@ public class LocalQueuesTest {
     private static final String USERNAME = "canfar.net/username";
     private static final String COMMUNITY = "canfar.net/community";
     private static final String MANAGED_BY = "app.kubernetes.io/managed-by";
+    private static final String PART_OF = "app.kubernetes.io/part-of";
     private static final ResourceDefinitionContext LOCAL_QUEUE = context("LocalQueue", "localqueues", true);
     private static final ResourceDefinitionContext CLUSTER_QUEUE = context("ClusterQueue", "clusterqueues", false);
 
@@ -42,7 +43,7 @@ public class LocalQueuesTest {
 
         final GenericKubernetesResource queue = localQueue("alice-default-lq");
         Assert.assertEquals(
-                Map.of(USERNAME, "alice", COMMUNITY, "default", MANAGED_BY, "skaha"),
+                Map.of(USERNAME, "alice", COMMUNITY, "default", MANAGED_BY, "skaha", PART_OF, "canfar"),
                 queue.getMetadata().getLabels());
         Assert.assertEquals(
                 Map.of("clusterQueue", "cadc"), queue.getAdditionalProperties().get("spec"));
@@ -185,7 +186,7 @@ public class LocalQueuesTest {
         Assert.assertThrows(TransientException.class, () -> new LocalQueues(this.api.client())
                 .ensure(new LaunchAssignment(NAMESPACE, "bob-x", "y", "cq-y", null)));
         Assert.assertEquals(
-                Map.of(USERNAME, "bob", COMMUNITY, "x-y", MANAGED_BY, "skaha"),
+                Map.of(USERNAME, "bob", COMMUNITY, "x-y", MANAGED_BY, "skaha", PART_OF, "canfar"),
                 localQueue("bob-x-y-lq").getMetadata().getLabels());
     }
 
