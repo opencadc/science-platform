@@ -58,27 +58,16 @@ User Sessions Ingress Configurations:
 {{- end }}
 
 Kueue:
-{{- if .Values.deployment.skaha.sessions.kueue }}
-  - It's expected that the Kueue CRDs and controllers to be present if you set session queues.
-{{- $queues := omit (default dict .Values.deployment.skaha.sessions.kueue) "rbac" }}
-{{- if gt (len $queues) 0 }}
-{{- range $type, $cfg := $queues }}
-  - {{ $cfg.queueName | default (printf "%s-%s" $.Release.Name $type) }} (type: {{ $type }})
-{{- end }}
-{{- else }}
-  - none configured; Jobs will NOT run with Kueue unless annotated by Skaha.
-{{- end }}
-{{- else }}
-  - Not configured
-{{- end }}
+  - Kueue and its Job integration are required. Every session Job is submitted suspended.
+  - Community {{ include "skaha.defaultCommunity" . }} routes to ClusterQueue {{ include "skaha.defaultClusterQueue" . }}, which must be labelled canfar.net/community={{ include "skaha.defaultCommunity" . }}.
+  - Skaha creates one LocalQueue per user in {{ include "skaha.workloadNamespace" . }} on first launch and never deletes it.
 
 Quick checks:
   - kubectl get deployment {{ .Release.Name }}-skaha-tomcat -n {{ .Release.Namespace }}
-  - kubectl get clusterqueues 2>/dev/null || true
-  - kubectl get localqueues -n {{ include "skaha.workloadNamespace" . }} 2>/dev/null || true
+  - kubectl get clusterqueue {{ include "skaha.defaultClusterQueue" . }} --show-labels 2>/dev/null || true
+  - kubectl get localqueues -n {{ include "skaha.workloadNamespace" . }} -l app.kubernetes.io/managed-by=skaha 2>/dev/null || true
 
 If user Jobs remain Pending:
-- Ensure LocalQueue exists in {{ include "skaha.workloadNamespace" . }} and references your configured ClusterQueue.
 - Verify ClusterQueue quotas are sufficient.
 - Confirm priority classes referenced by sessions exist or are created.
 

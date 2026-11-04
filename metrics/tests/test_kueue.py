@@ -166,7 +166,7 @@ async def test_clusterqueue_reads_use_bounded_concurrency_in_configured_order() 
     class BlockingApi(FakeKueueApi):
         def __init__(self) -> None:
             super().__init__(
-                {name: _cluster_queue(name, "astronomy", cpu="1") for name in names},
+                {name: _cluster_queue(name, name, cpu="1") for name in names},
                 {"work-a": []},
             )
             self.active = 0
@@ -221,7 +221,7 @@ async def test_clusterqueue_failure_cancels_siblings_and_propagates() -> None:
     class FailingApi(FakeKueueApi):
         def __init__(self) -> None:
             super().__init__(
-                {name: _cluster_queue(name, "astronomy") for name in names},
+                {name: _cluster_queue(name, name) for name in names},
                 {"work-a": []},
             )
             self.started: list[str] = []
@@ -291,7 +291,7 @@ async def test_user_accepts_empty_optional_status_fields() -> None:
 
 
 async def test_community_filters_configured_clusterqueues_by_exact_label() -> None:
-    """Community requests sum reservation values from matching ClusterQueues."""
+    """One community label selects its single configured ClusterQueue."""
     api = FakeKueueApi(
         {
             "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
@@ -306,6 +306,43 @@ async def test_community_filters_configured_clusterqueues_by_exact_label() -> No
     assert result.reserving_workloads == 2
     with pytest.raises(SubjectNotFoundError):
         await _provider(api).read_community("biology")
+
+
+def _duplicate_community_api() -> FakeKueueApi:
+    """Return two configured ClusterQueues that share one community label."""
+    return FakeKueueApi(
+        {
+            "cq-astronomy": _cluster_queue("cq-astronomy", "astronomy", cpu="4"),
+            "cq-physics": _cluster_queue("cq-physics", "astronomy", cpu="8"),
+        },
+        {
+            "work-a": [_local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")],
+            "work-b": [],
+        },
+    )
+
+
+async def test_duplicate_community_label_fails_closed() -> None:
+    """Two configured ClusterQueues with one community label are not summed."""
+    provider = _provider(_duplicate_community_api())
+
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_platform()
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_community("astronomy")
+    with pytest.raises(ProviderExecutionError, match="community label was duplicated"):
+        await provider.read_community("biology")
+    # User metrics read LocalQueues only, so duplicate ClusterQueue labels do not
+    # appear on that path; startup and community/platform reads still fail closed.
+    user = await provider.read_user("bob")
+    assert user.requests == {"cpu": "1"}
+
+    startup_api = _duplicate_community_api()
+    with pytest.raises(RuntimeStartupError, match="Kueue dependency validation failed") as raised:
+        await _provider(startup_api).startup()
+    assert isinstance(raised.value.__cause__, ProviderExecutionError)
+    assert "community label was duplicated" in str(raised.value.__cause__)
+    assert startup_api.local_params == []
 
 
 async def test_user_aggregates_valid_localqueues_across_namespaces() -> None:
@@ -402,7 +439,7 @@ async def test_user_with_no_matching_localqueue_is_not_zero() -> None:
     "mutate",
     [
         lambda item: item["metadata"]["labels"].pop("canfar.net/username"),
-        lambda item: item["metadata"]["labels"].update({"canfar.net/community": "physics"}),
+        lambda item: item["metadata"]["labels"].pop("canfar.net/community"),
         lambda item: item["spec"].update({"clusterQueue": "cq-outside"}),
     ],
 )
@@ -417,6 +454,34 @@ async def test_invalid_matching_localqueue_is_dependency_corruption(mutate) -> N
 
     with pytest.raises(ProviderExecutionError):
         await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+
+
+async def test_user_read_does_not_fetch_clusterqueues() -> None:
+    """User metrics come from LocalQueues only; ClusterQueues stay unread."""
+
+    class TrackingApi(FakeKueueApi):
+        def __init__(self) -> None:
+            super().__init__(
+                {"cq-astronomy": _cluster_queue("cq-astronomy", "astronomy")},
+                {
+                    "work-a": [_local_queue("bob-a", "work-a", "bob", "astronomy", "cq-astronomy")],
+                    "work-b": [],
+                },
+            )
+            self.cluster_gets = 0
+
+        @contextlib.asynccontextmanager
+        async def call_api(self, **kwargs):
+            url = kwargs.get("url", "")
+            if isinstance(url, str) and "clusterqueues/" in url:
+                self.cluster_gets += 1
+            async with super().call_api(**kwargs) as response:
+                yield response
+
+    api = TrackingApi()
+    result = await _provider(api, queues=["cq-astronomy"]).read_user("bob")
+    assert result.requests == {"cpu": "1"}
+    assert api.cluster_gets == 0
 
 
 async def test_user_aggregates_distinct_localqueues_with_same_labels() -> None:

@@ -46,16 +46,16 @@ public class SessionJobBuilder {
     // Stands in for the image while the template is parsed; replaced on every container that uses it.
     static final String IMAGE_PLACEHOLDER = "skaha-session-image";
 
-    record LaunchArtifacts(Job job, SessionLabelPlan labels) {}
+    record LaunchArtifacts(Job job, SessionLabelPlan labels, LaunchAssignment assignment) {}
 
     private final Map<String, String> parameters = new HashMap<>();
 
     private final Path jobFilePath;
+    private final LaunchAssignment assignment;
 
     // Options
     private boolean gpuEnabled;
     private int gpuCount = 0;
-    private QueueConfiguration queueConfiguration;
     private String imageRegistrySecretName;
     private String image;
     private String priorityClassName;
@@ -115,18 +115,21 @@ public class SessionJobBuilder {
         }
     }
 
-    private SessionJobBuilder(final Path jobFilePath) {
+    private SessionJobBuilder(final Path jobFilePath, final LaunchAssignment assignment) {
         this.jobFilePath = jobFilePath;
+        this.assignment = Objects.requireNonNull(assignment, "assignment");
+        this.parameters.put(PostAction.SKAHA_USERID, assignment.user());
     }
 
     /**
      * Create a new builder from the provided path.
      *
      * @param jobFilePath The Path of the template file.
+     * @param assignment Where the Job runs and which LocalQueue admits it; its user is the session owner.
      * @return SessionJobBuilder instance. Never null.
      */
-    static SessionJobBuilder fromPath(final Path jobFilePath) {
-        return new SessionJobBuilder(jobFilePath);
+    static SessionJobBuilder fromPath(final Path jobFilePath, final LaunchAssignment assignment) {
+        return new SessionJobBuilder(jobFilePath, assignment);
     }
 
     private static NodeSelectorRequirement getNodeSelectorRequirement(
@@ -162,7 +165,7 @@ public class SessionJobBuilder {
      * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withParameters(final Map<String, String> parameters) {
-        this.parameters.putAll(parameters);
+        parameters.forEach(this::withParameter);
         return this;
     }
 
@@ -189,17 +192,6 @@ public class SessionJobBuilder {
     }
 
     /**
-     * Set the queue name for the job to use with Kueue.
-     *
-     * @param queueConfiguration The QueueConfiguration.
-     * @return This SessionJobBuilder, never null.
-     */
-    SessionJobBuilder withQueue(final QueueConfiguration queueConfiguration) {
-        this.queueConfiguration = queueConfiguration;
-        return this;
-    }
-
-    /**
      * Build a single parameter into this builder's parameter map.
      *
      * @param key The key to find.
@@ -207,6 +199,9 @@ public class SessionJobBuilder {
      * @return This SessionJobBuilder, never null.
      */
     SessionJobBuilder withParameter(final String key, final String value) {
+        if (PostAction.SKAHA_USERID.equals(key)) {
+            throw new IllegalArgumentException(key + " comes from the launch assignment");
+        }
         this.parameters.put(key, value);
         return this;
     }
@@ -286,14 +281,14 @@ public class SessionJobBuilder {
         final SessionLabelPlan labelPlan = buildLabelPlan(launchJob);
         applyJobLabels(launchJob, labelPlan);
         applyFlexibleSpread(launchJob, labelPlan);
-        mergeQueue(launchJob);
+        applyAssignment(launchJob);
         mergeAffinity(launchJob);
         mergeImagePullSecret(launchJob);
         applyImage(launchJob);
         applyPriorityClass(launchJob);
         applyHeadlessCommand(launchJob);
 
-        return new LaunchArtifacts(launchJob, labelPlan);
+        return new LaunchArtifacts(launchJob, labelPlan, this.assignment);
     }
 
     /**
@@ -320,7 +315,8 @@ public class SessionJobBuilder {
     private SessionLabelPlan buildLabelPlan(final Job launchJob) {
         final Map<SessionLabels.Key, String> labelValues = new EnumMap<>(SessionLabels.Key.class);
         labelValues.put(SessionLabels.Key.ID, requireFirstNonBlank(PostAction.SKAHA_SESSIONID));
-        labelValues.put(SessionLabels.Key.USERNAME, requireFirstNonBlank(PostAction.SKAHA_USERID));
+        labelValues.put(SessionLabels.Key.USERNAME, this.assignment.user());
+        labelValues.put(SessionLabels.Key.COMMUNITY, this.assignment.community());
         labelValues.put(SessionLabels.Key.NAME, requireFirstNonBlank(PostAction.SKAHA_SESSIONNAME));
         labelValues.put(SessionLabels.Key.KIND, requireFirstNonBlank(PostAction.SKAHA_SESSIONTYPE));
         final String appId = firstNonBlank(PostAction.SOFTWARE_APPID);
@@ -485,20 +481,11 @@ public class SessionJobBuilder {
         return resourceRequirements;
     }
 
-    /**
-     * For the given Job, determine if it's queue-able, and set the appropriate label and suspend information.
-     *
-     * @param launchJob The Job to modify.
-     */
-    private void mergeQueue(final Job launchJob) {
-        if (this.queueConfiguration != null) {
-            launchJob
-                    .getMetadata()
-                    .getLabels()
-                    .putAll(SessionLabels.kueue(
-                            this.queueConfiguration.queueName, this.queueConfiguration.priorityClass));
-            launchJob.getSpec().setSuspend(true);
-        }
+    /** Place the Job in the assignment's namespace, suspended until its LocalQueue admits it. */
+    private void applyAssignment(final Job launchJob) {
+        launchJob.getMetadata().setNamespace(this.assignment.namespace());
+        launchJob.getMetadata().getLabels().putAll(SessionLabels.kueue(this.assignment));
+        launchJob.getSpec().setSuspend(true);
     }
 
     private void mergeImagePullSecret(final Job launchJob) {

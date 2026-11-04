@@ -353,10 +353,10 @@ public class PostAction extends SessionAction {
             this.userStorageClient.ensureDesktopUserHomePreparation(owner);
         }
 
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(type.getJobConfigPath())
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(
+                        type.getJobConfigPath(), LaunchRouter.fromEnv().assign(owner, type))
                 .withGPUEnabled(this.gpuEnabled)
                 .withGPUCount(gpus)
-                .withQueue(QueueConfiguration.fromType(type.name())) // Can be null.
                 .withFlexibleSpread(SessionJobBuilder.FlexibleSpread.fromEnv())
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
                 .withParameter(PostAction.SKAHA_SESSIONNAME, name.toLowerCase())
@@ -364,7 +364,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBNAME, jobName)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, type.name().toLowerCase())
                 .withImage(image)
@@ -436,8 +435,7 @@ public class PostAction extends SessionAction {
             ownedResourceYamls.add(ingressString);
         }
 
-        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get())
-                .launch(launch.job(), launch.labels(), ownedResourceYamls));
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(launch, ownedResourceYamls));
     }
 
     protected void injectPOSIXDetails() throws Exception {
@@ -513,9 +511,9 @@ public class PostAction extends SessionAction {
         final String supplementalGroups = getSupplementalGroupsList();
         final String owner = getUsername();
         final String launchSoftwarePath = K8SUtil.getWorkingDirectory() + "/config/launch-desktop-app.yaml";
-        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(Paths.get(launchSoftwarePath))
+        SessionJobBuilder sessionJobBuilder = SessionJobBuilder.fromPath(
+                        Paths.get(launchSoftwarePath), LaunchRouter.fromEnv().assign(owner, SessionType.DESKTOP_APP))
                 .withGPUEnabled(this.gpuEnabled)
-                .withQueue(QueueConfiguration.fromType(SessionAction.TYPE_DESKTOP_APP)) // Can be null.
                 .withFlexibleSpread(SessionJobBuilder.FlexibleSpread.fromEnv())
                 .withImage(image)
                 .withParameter(PostAction.SKAHA_SESSIONID, this.sessionID)
@@ -524,7 +522,6 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_SESSIONTYPE, SessionAction.TYPE_DESKTOP_APP)
                 .withParameter(PostAction.SKAHA_HOSTNAME, K8SUtil.getSkahaHostName())
                 .withParameter(PostAction.SKAHA_SESSIONS_HOSTNAME, K8SUtil.getSessionsHostName())
-                .withParameter(PostAction.SKAHA_USERID, owner)
                 .withParameter(PostAction.SKAHA_POSIXID, Integer.toString(this.posixPrincipal.getUidNumber()))
                 .withParameter(PostAction.SOFTWARE_APPID, this.appID)
                 .withParameter(PostAction.SOFTWARE_JOBNAME, jobName)
@@ -551,7 +548,7 @@ public class PostAction extends SessionAction {
                 .withParameter(PostAction.SKAHA_JOBNAME, ownerJob.getMetadata().getName());
 
         final SessionJobBuilder.LaunchArtifacts app = sessionJobBuilder.buildLaunch();
-        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(app.job(), app.labels(), List.of()));
+        SessionDAO.created(new SessionLauncher(SkahaKubernetesClient.get()).launch(app, List.of()));
 
         // refresh the user's proxy cert
         this.userStorageClient.injectProxyCertificate(owner);

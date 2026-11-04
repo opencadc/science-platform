@@ -24,15 +24,20 @@ uv run ty check
 uv run pytest --cov=src --cov-report=term-missing -m "not integration"
 ```
 
+Before any git commit in this repository, from the science-platform root run
+`pre-commit run --all-files` and require exit 0 (Spotless via the Skaha Gradle
+hook, Metrics hooks, shared file checks). Do not use `--no-verify`.
+
 Cluster-backed checks use the pinned kind/Kueue environment and the supported
 local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
 
 ## Runtime vocabulary
 
 - User requests come from LocalQueues in the configured namespaces, selected by
-  `canfar.net/username` and restricted to the configured ClusterQueues.
-- Community requests come from configured ClusterQueues selected by
-  `canfar.net/community`.
+  `canfar.net/username`. The user path does not read ClusterQueues; each
+  LocalQueue must name a configured ClusterQueue.
+- Community requests come from the one configured ClusterQueue selected by
+  `canfar.net/community`. A repeated label on the configured set fails the read.
 - Platform totals include every configured ClusterQueue. Cohorts are not a
   Metrics source.
 - Session reports aggregate Jobs labelled `canfar.net/id` in the configured

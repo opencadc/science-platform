@@ -36,9 +36,11 @@ Mimir series queried by the optional efficiency provider.
 `/metrics/platform/{platform}` path value; a mismatch returns 404.
 
 `CLUSTER_QUEUES` is the complete Platform set. Each named ClusterQueue must be
-readable and maps to one Community. `NAMESPACES` is the complete namespace set
-searched for User LocalQueues, Session Jobs and Pods, and PodMetrics. The service lists LocalQueues
-in every configured namespace and selects exact `canfar.net/username` labels.
+readable and maps to one Community. No two of those queues share a community
+label. User reports list LocalQueues only and do not GET ClusterQueues.
+`NAMESPACES` is the complete namespace set searched for User LocalQueues,
+Session Jobs and Pods, and PodMetrics. The service lists LocalQueues in every
+configured namespace and selects exact `canfar.net/username` labels.
 
 Kubernetes endpoint, credentials, and CA trust come from the in-cluster
 ServiceAccount or kubeconfig. The Kueue API contract is

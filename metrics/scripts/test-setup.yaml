@@ -68,7 +68,8 @@ metadata:
   name: cq-fair
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
-    canfar.net/community: astronomy
+    # Distinct from astronomy: Metrics indexes one ClusterQueue per community.
+    canfar.net/community: fairshare
     metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   admissionScope:
@@ -121,7 +122,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
     canfar.net/username: alice
-    canfar.net/community: astronomy
+    canfar.net/community: fairshare
     metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   clusterQueue: cq-fair
@@ -136,7 +137,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: metrics-kueue-smoke
     canfar.net/username: carol
-    canfar.net/community: astronomy
+    canfar.net/community: fairshare
     metrics.canfar.net/fixture-owner: metrics-dev
 spec:
   clusterQueue: cq-fair

@@ -18,8 +18,8 @@ matching LocalQueues in the configured namespaces.
 _Avoid_: Pod owner, account, billing identity
 
 **Community**:
-A canonical `canfar.net/community` label value. A Community report aggregates
-configured ClusterQueues carrying that label.
+A canonical `canfar.net/community` label value. A Community report reads the
+one configured ClusterQueue with that label.
 _Avoid_: Cohort, namespace, user list
 
 **Session**:
@@ -47,7 +47,8 @@ _Avoid_: workload inventory, Pod queue, user account
 
 **ClusterQueue**:
 A cluster-scoped Kueue queue that supplies the community and platform
-aggregation boundary. Each configured ClusterQueue maps to one Community.
+aggregation boundary. Each configured ClusterQueue maps to one Community, and
+no two configured ClusterQueues share that label.
 _Avoid_: Cohort, node pool, Prometheus series
 
 **Configured namespace**:
