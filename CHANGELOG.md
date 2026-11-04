@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.3](https://github.com/opencadc/science-platform/compare/1.6.2...1.6.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* cve fixes from jackson library ([5bb36e6](https://github.com/opencadc/science-platform/commit/5bb36e6ed6b08c3cbaffc55b12ee17961d91b340))
+
 ## [1.6.2](https://github.com/opencadc/science-platform/compare/1.6.1...1.6.2) (2026-11-03)
 
 
