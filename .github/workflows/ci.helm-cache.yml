@@ -36,7 +36,7 @@ jobs:
         with:
           version: v3.21.0
       - name: Setup kind
-        uses: helm/kind-action@v1.15.1
+        uses: helm/kind-action@v1.15.2
         with:
           install_only: true
       - name: Setup uv
