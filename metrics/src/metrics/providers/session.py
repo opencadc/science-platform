@@ -32,6 +32,7 @@ from metrics.services.models import SessionObservation
 from metrics.services.resources import (
     format_resource_amount,
     merge_resource_totals,
+    multiply_resource_amount,
     parse_resource_amount,
 )
 
@@ -39,6 +40,7 @@ from metrics.services.resources import (
 _JOB_API_VERSION = "batch/v1"
 _POD_API_VERSION = "v1"
 _SESSION_LABEL = "canfar.net/id"
+_KIND_LABEL = "canfar.net/kind"
 _TERMINAL_CONDITIONS = frozenset({"Complete", "Failed"})
 
 
@@ -62,6 +64,26 @@ def _add(left: dict[str, Decimal], right: dict[str, Decimal]) -> dict[str, Decim
     for name, value in right.items():
         merge_resource_totals(totals, name, value)
     return totals
+
+
+def _times(requests: dict[str, Decimal], pods: int) -> dict[str, Decimal]:
+    """Return one pod's request multiplied by a pod count."""
+    return {name: multiply_resource_amount(name, value, pods) for name, value in requests.items()}
+
+
+def _formatted(values: dict[str, Decimal]) -> dict[str, str]:
+    """Return a resource map as public quantity strings, sorted by name."""
+    return {name: format_resource_amount(name, value) for name, value in sorted(values.items())}
+
+
+def _count(fields: dict[str, Any], key: str, default: int) -> int:
+    """Return one non-negative integer Job field, or ``default`` when it is absent."""
+    value = fields.get(key)
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ProviderExecutionError(f"Job {key} was invalid")
+    return value
 
 
 def _peak(left: dict[str, Decimal], right: dict[str, Decimal]) -> dict[str, Decimal]:
@@ -108,23 +130,40 @@ def _pod_requests(doc: dict[str, Any]) -> dict[str, Decimal]:
 
 @dataclass(frozen=True, slots=True)
 class _Job:
-    """Hold the parts of one session Job that Metrics reports."""
+    """Hold the parts of one session Job that Metrics reports.
 
-    requests: dict[str, Decimal]
+    ``pod_request`` is one pod's effective request. ``completions`` and
+    ``parallelism`` default to 1 when the Job spec omits them, as Kubernetes
+    does for a non-parallel Job.
+    """
+
+    pod_request: dict[str, Decimal]
     reserving: bool
+    batch: bool
+    completions: int
+    parallelism: int
+    succeeded: int
     start_time: datetime | None
     end_time: datetime | None
 
+    @property
+    def held_pods(self) -> int:
+        """Return how many pods the Job can still run at once while it reserves quota."""
+        if not self.reserving:
+            return 0
+        return max(0, min(self.parallelism, self.completions - self.succeeded))
+
 
 def _job(doc: dict[str, Any], session_id: str) -> _Job:
-    """Validate one matching Job and derive its reservation and timing.
+    """Validate one matching Job and derive its reservation, size, and timing.
 
     A Job reserves quota while it is neither finished (a true ``Complete`` or
     ``Failed`` condition) nor suspended (Kueue has not admitted it). A finished
     Job ends at ``completionTime``, or else at its terminal condition's
     transition time.
     """
-    if labels_of(doc, "Job").get(_SESSION_LABEL) != session_id:
+    labels = labels_of(doc, "Job")
+    if labels.get(_SESSION_LABEL) != session_id:
         raise ProviderExecutionError("Job session label did not match selector")
     spec = mapping(doc.get("spec"), "Job spec was invalid")
     status = doc.get("status")
@@ -147,8 +186,12 @@ def _job(doc: dict[str, Any], session_id: str) -> _Job:
     raw_start = status.get("startTime")
     start = None if raw_start is None else parse_timestamp(raw_start, "Job startTime was invalid")
     return _Job(
-        requests=_pod_requests(doc),
+        pod_request=_pod_requests(doc),
         reserving=not finished and spec.get("suspend") is not True,
+        batch=labels.get(_KIND_LABEL) == "batch",
+        completions=_count(spec, "completions", 1),
+        parallelism=_count(spec, "parallelism", 1),
+        succeeded=_count(status, "succeeded", 0),
         start_time=start,
         end_time=terminal if finished else None,
     )
@@ -229,7 +272,11 @@ class SessionProvider:
         return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
     async def read_session(self, session_id: str) -> SessionObservation:
-        """Aggregate one session's active Jobs and derive its timing window."""
+        """Aggregate one session's held requests, batch totals, and timing window.
+
+        A batch Job reports its held request even while it holds nothing, so
+        its resources stay listed beside its total.
+        """
         job_docs, pods = await concurrently(
             self._list(_JOB_API_VERSION, "jobs", "Job list", session_id),
             self._pods(session_id),
@@ -251,9 +298,12 @@ class SessionProvider:
             jobs.append(_job(doc, session_id))
 
         requests: dict[str, Decimal] = {}
+        totals: dict[str, Decimal] = {}
         for job in jobs:
-            if job.reserving:
-                requests = _add(requests, job.requests)
+            if job.reserving or job.batch:
+                requests = _add(requests, _times(job.pod_request, job.held_pods))
+            if job.batch:
+                totals = _add(totals, _times(job.pod_request, job.completions))
         now = observation_time()
         starts = [job.start_time for job in jobs if job.start_time is not None]
         start_time = min(starts) if starts else None
@@ -264,10 +314,8 @@ class SessionProvider:
         running = _running_pods_by_namespace(pods) if pods is not None else {}
         return SessionObservation(
             session=session_id,
-            requests={
-                name: format_resource_amount(name, value)
-                for name, value in sorted(requests.items())
-            },
+            requests=_formatted(requests),
+            totals=_formatted(totals),
             reserving_workloads=sum(job.reserving for job in jobs),
             observed_at=now,
             start_time=start_time,

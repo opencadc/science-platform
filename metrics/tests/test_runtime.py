@@ -74,7 +74,7 @@ def test_an_endpoint_enables_the_promql_provider() -> None:
 
 def test_runtime_cache_schema_revision_separates_two_stage_payloads() -> None:
     """Two-stage payloads and lease markers live in a keyspace older pods never read."""
-    assert runtime_module._SCHEMA_REVISION == "9"  # noqa: SLF001
+    assert runtime_module._SCHEMA_REVISION == "10"  # noqa: SLF001
 
 
 def _without_prose(node: object) -> object:
@@ -98,7 +98,7 @@ def test_stored_payload_shape_is_pinned_to_the_schema_revision() -> None:
     """
     schema = _without_prose(TypeAdapter(CachedSnapshot).json_schema())
     digest = hashlib.sha256(json.dumps(schema, sort_keys=True).encode()).hexdigest()[:16]
-    assert (runtime_module._SCHEMA_REVISION, digest) == ("9", "7d400942ff584de9")  # noqa: SLF001
+    assert (runtime_module._SCHEMA_REVISION, digest) == ("10", "bc1c34579d7d9260")  # noqa: SLF001
 
 
 def test_runtime_lease_expires_before_cold_waiters_give_up() -> None:

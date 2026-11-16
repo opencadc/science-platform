@@ -65,12 +65,27 @@ quantity, not measured consumption.
 _Avoid_: usage, capacity, usage-hours
 
 **Effective pod request**:
-The Session request of one active Job, computed as Kubernetes and Kueue do:
+The request of one pod of a Session Job, computed as Kubernetes and Kueue do:
 per resource, the larger of the init-container peak (each regular init
 container plus the native sidecars started before it) and the app containers
 plus all native sidecars, plus pod overhead. It matches the quota Kueue
-reserves for the Job.
+reserves for each pod of the Job.
 _Avoid_: sum of every container, limits, usage
+
+**Held request**:
+What one active Job holds now: its effective pod request times the pods it
+can still run at once, `min(parallelism, completions - succeeded)`. A failed
+index stays held, because Kueue reclaims quota only for succeeded indexes.
+A Job with `parallelism` and `completions` of 1 holds one pod until it
+finishes. A Session's `requests` is the sum over its active Jobs.
+_Avoid_: total, replicas times pod, admitted parallelism
+
+**Batch total**:
+The demand of a whole batch run: the effective pod request of a Job labelled
+`canfar.net/kind=batch` times its `completions`. It does not change during
+the run, and the report keeps it while the Job is suspended or finished. A
+Session's `total` is the sum over its batch Jobs.
+_Avoid_: held request, consumed resources, usage-hours
 
 **Pending workload**:
 A Kueue workload counted by `pendingWorkloads`: it is waiting for admission.
