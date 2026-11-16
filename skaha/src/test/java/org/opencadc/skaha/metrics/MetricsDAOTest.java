@@ -5,6 +5,7 @@ import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
@@ -85,15 +86,41 @@ public class MetricsDAOTest {
 
     @Test
     public void fromEnvironmentSelectsKubernetesProviderByDefault() throws Exception {
-        final PodUsageProvider provider = PodUsageProvider.fromEnvironment();
+        final PodUsageProvider provider = PodUsageProvider.fromEnvironment(null);
         Assert.assertTrue(provider instanceof KubernetesPodUsageProvider);
+    }
+
+    @Test
+    public void sessionMetricsAreAbsentWithoutTheBackend() {
+        final MetricsDAO dao = new MetricsDAO(null, Mockito.mock(PodUsageProvider.class));
+
+        Assert.assertEquals(Map.of(), dao.getSessionMetrics(Set.of("session-a")));
+    }
+
+    @Test
+    public void sessionMetricsComeFromTheBackendWhateverThePodUsageSource() throws Exception {
+        final SessionMetrics report =
+                new SessionMetrics("session-a", List.of(new SessionMetrics.Resource("cpu", "50", "10", "6.3", "0.68")));
+        final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
+        Mockito.when(sessionMetricsDAO.getSessionMetrics(Set.of("session-a"))).thenReturn(Map.of("session-a", report));
+
+        final MetricsDAO dao = new MetricsDAO(
+                null, new KubernetesPodUsageProvider(Mockito.mock(PodMetricsDAO.class)), sessionMetricsDAO);
+
+        Assert.assertEquals(Map.of("session-a", report), dao.getSessionMetrics(Set.of("session-a")));
     }
 
     @Test
     public void getPodResourceUsageUsesBackendSessionApiForListedJobs() throws Exception {
         final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
-                .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
+        Mockito.when(sessionMetricsDAO.getSessionMetrics(Set.of("session-a")))
+                .thenReturn(Map.of(
+                        "session-a",
+                        new SessionMetrics(
+                                "session-a",
+                                List.of(
+                                        new SessionMetrics.Resource("cpu", null, "1", "500m", null),
+                                        new SessionMetrics.Resource("memory", null, "1Gi", "512Mi", null)))));
 
         final MetricsDAO dao = new MetricsDAO(null, new MetricsBackendPodUsageProvider(sessionMetricsDAO));
         final List<Job> jobs = List.of(new JobBuilder()

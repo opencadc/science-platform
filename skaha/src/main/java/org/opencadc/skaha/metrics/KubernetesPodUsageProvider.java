@@ -13,8 +13,8 @@ final class KubernetesPodUsageProvider implements PodUsageProvider {
     }
 
     @Override
-    public PodMetrics getPodMetrics(final String userID, final boolean omitHeadless, final List<Job> sessionJobs)
+    public PodMetrics getPodMetrics(final String userID, final boolean interactiveOnly, final List<Job> sessionJobs)
             throws Exception {
-        return podMetricsDAO.getPodMetrics(userID, omitHeadless);
+        return podMetricsDAO.getPodMetrics(userID, interactiveOnly);
     }
 }
